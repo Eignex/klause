@@ -18,6 +18,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class Xcsp3Test {
@@ -1207,5 +1208,29 @@ class Xcsp3Test {
         """.trimIndent()
         // m = [[1,2],[3,4]], i=1, j=0 -> v = m[1][0] = 3.
         assertEquals(3, sat(xml)[Xcsp3.parse(xml).intVarNames.getValue("v")])
+    }
+
+    @Test
+    fun `a group shares one extension tuple array across its rows`() {
+        // Every row of the group is the same `<supports>` template, so the parsed tuple array is
+        // cached by text identity and shared — re-allocating it per row exhausts the heap on a large,
+        // high-arity group.
+        val xml = """
+            <instance type="CSP">
+              <variables><array id="x" size="[3][2]"> 0..1 </array></variables>
+              <constraints>
+                <group>
+                  <extension><list> %0 %1 </list><supports> (0,1)(1,0) </supports></extension>
+                  <args> x[0][0] x[0][1] </args>
+                  <args> x[1][0] x[1][1] </args>
+                  <args> x[2][0] x[2][1] </args>
+                </group>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val tables = Xcsp3.parse(xml).problem.factors.filterIsInstance<Table>()
+        assertEquals(3, tables.size, "one table per args row")
+        assertSame(tables[0].tuples, tables[1].tuples, "rows share the cached tuple array")
+        assertSame(tables[1].tuples, tables[2].tuples, "rows share the cached tuple array")
     }
 }

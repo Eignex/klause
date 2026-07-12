@@ -17,14 +17,16 @@ import com.eignex.klause.util.LongArrayList
 
 internal fun Xcsp3.Builder.extension(e: XmlElement) {
     val vars = listVars(e)
-    val supports = e.child("supports")?.textContent?.trim()
-    val conflicts = e.child("conflicts")?.textContent?.trim()
+    // The raw (untrimmed) text is one shared String object across a group's rows, so the support
+    // template cache keys on it by identity; the tuple scan already skips surrounding whitespace.
+    val supports = e.child("supports")?.textContent
+    val conflicts = e.child("conflicts")?.textContent
     when {
         // No allowed tuple ⇒ the constraint (hence the instance) is unsatisfiable.
-        supports != null && supports.isEmpty() -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
+        supports != null && supports.isBlank() -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
 
         // No forbidden tuple ⇒ trivially satisfied; post nothing.
-        conflicts != null && conflicts.isEmpty() -> Unit
+        conflicts != null && conflicts.isBlank() -> Unit
 
         supports != null -> postSupportTable(vars, supports)
 
@@ -94,11 +96,35 @@ internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRow
     factors.add(Table(xs = vars, tuples = allowed.toLongArray()))
 }
 
+/** The parsed short-support tuple arrays of a `<supports>` table, shared across a group's rows: the
+ *  row-major cell lower bounds [tuples] and, for a short table, the per-cell upper bounds [hi] (null
+ *  for a fully-ground table). [triviallySat] flags a table with a fully unbounded row, which matches
+ *  every assignment — the constraint posts nothing. */
+internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray, val hi: LongArray?)
+
+/** Return the support template for [text], reusing the last one when [text] is the same object — the
+ *  case for a `<group>`'s rows, which share one `<supports>` String object. */
+@Suppress("AvoidReferentialEquality")
+private inline fun Xcsp3.Builder.supportTemplateFor(text: String, compute: () -> SupportTemplate): SupportTemplate {
+    cachedSupportTemplate?.let { if (text === cachedSupportsText) return it }
+    val built = compute()
+    cachedSupportsText = text
+    cachedSupportTemplate = built
+    return built
+}
+
 /** Post a positive `<supports>` table as a [Table] factor. `*`/range columns become short-support
  *  cells (an interval `[lo, hi]`; a `*` is `[MIN, MAX]`), so each written tuple is exactly one row.
- *  A fully unbounded row matches every assignment, so the whole constraint is trivially satisfied. */
+ *  A fully unbounded row matches every assignment, so the whole constraint is trivially satisfied. The
+ *  parsed tuple arrays are cached by text identity and shared across a group's rows. */
 internal fun Xcsp3.Builder.postSupportTable(vars: IntArray, text: String) {
     val arity = vars.size
+    val tpl = supportTemplateFor(text) { buildSupportTemplate(arity, text) }
+    if (tpl.triviallySat) return
+    factors.add(Table(xs = vars, tuples = tpl.tuples, hi = tpl.hi))
+}
+
+private fun Xcsp3.Builder.buildSupportTemplate(arity: Int, text: String): SupportTemplate {
     val rows = parseShortRows(text, arity)
     val n = rows.lo.size / arity
     for (r in 0 until n) {
@@ -109,11 +135,11 @@ internal fun Xcsp3.Builder.postSupportTable(vars: IntArray, text: String) {
                 break
             }
         }
-        if (allFree) return
+        if (allFree) return SupportTemplate(triviallySat = true, tuples = LongArray(0), hi = null)
     }
     // Ground (all points) ⇒ no upper-bound array, keeping the fast path byte-identical.
     val short = rows.lo.indices.any { rows.lo[it] != rows.hi[it] }
-    factors.add(Table(xs = vars, tuples = rows.lo, hi = if (short) rows.hi else null))
+    return SupportTemplate(triviallySat = false, tuples = rows.lo, hi = if (short) rows.hi else null)
 }
 
 /** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — the disjunction of
