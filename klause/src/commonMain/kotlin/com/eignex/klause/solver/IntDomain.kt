@@ -107,11 +107,59 @@ interface IntDomain {
      *  runs / survivors crossed, not every integer in the range. */
     fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer)
 
-    /** Nearest in-domain value to [value] (clamps to the bounds). */
+    /** Nearest in-domain value to [value]: clamps to the bounds, then snaps an interior hole to the
+     *  closest present value (ties toward the smaller). Identity on the contiguous fast path. */
     fun clamp(value: Long): Long = when {
-        value < min -> min
-        value > max -> max
-        else -> value
+        value <= min -> min
+        value >= max -> max
+        value in this -> value
+        else -> {
+            val lo = lower(value)
+            val hi = higher(value)
+            if (value - lo <= hi - value) lo else hi
+        }
+    }
+
+    /** Largest in-domain value strictly less than [value]; requires `value > `[min] so one exists.
+     *  Skips interior holes — the contiguous fast path returns `value - 1`. */
+    fun lower(value: Long): Long {
+        val cand = value - 1
+        if (cand in this) return cand
+        var lo = 0
+        var hi = size - 1
+        var ans = min
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val v = valueAt(mid)
+            if (v < value) {
+                ans = v
+                lo = mid + 1
+            } else {
+                hi = mid - 1
+            }
+        }
+        return ans
+    }
+
+    /** Smallest in-domain value strictly greater than [value]; requires `value < `[max] so one exists.
+     *  Skips interior holes — the contiguous fast path returns `value + 1`. */
+    fun higher(value: Long): Long {
+        val cand = value + 1
+        if (cand in this) return cand
+        var lo = 0
+        var hi = size - 1
+        var ans = max
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val v = valueAt(mid)
+            if (v > value) {
+                ans = v
+                hi = mid - 1
+            } else {
+                lo = mid + 1
+            }
+        }
+        return ans
     }
 
     /** Factory for [IntDomain]; the bitset/wide-rep cutoff is

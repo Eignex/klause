@@ -147,4 +147,36 @@ class IntDomainTest {
         assertTrue(198 in d)
         assertEquals(195, d.size)
     }
+
+    @Test
+    fun `clamp snaps an interior hole to the nearest present value`() {
+        val d = IntDomain(-1, 1).excludeValue(0)
+        // 0 is an interior hole; nearest present values are -1 and 1 (tie → smaller).
+        assertEquals(-1, d.clamp(0))
+        assertEquals(-1, d.clamp(-1))
+        assertEquals(1, d.clamp(1))
+        // Out of bounds still clamps to the endpoints.
+        assertEquals(-1, d.clamp(-5))
+        assertEquals(1, d.clamp(5))
+    }
+
+    @Test
+    fun `clamp is identity inside a contiguous domain`() {
+        val d = IntDomain(0, 10)
+        for (v in 0..10) assertEquals(v.toLong(), d.clamp(v.toLong()))
+        assertEquals(0, d.clamp(-3))
+        assertEquals(10, d.clamp(42))
+    }
+
+    @Test
+    fun `lower and higher skip interior holes`() {
+        val d = IntDomain(0, 10).excludeValue(3).excludeValue(4).excludeValue(5)
+        assertEquals(2, d.lower(3))
+        assertEquals(6, d.higher(5))
+        assertEquals(6, d.higher(3))
+        assertEquals(2, d.lower(6))
+        // Contiguous neighbours are the immediate predecessor/successor.
+        assertEquals(1, d.lower(2))
+        assertEquals(7, d.higher(6))
+    }
 }
