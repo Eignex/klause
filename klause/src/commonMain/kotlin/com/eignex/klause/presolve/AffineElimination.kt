@@ -83,6 +83,7 @@ internal object AffineSingletons {
                     objectiveIntVars,
                     capWide,
                     problem.intDomains,
+                    cancellation,
                 )
             } else {
                 findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide, cancellation) != null ||
@@ -417,13 +418,19 @@ internal object AffineSingletons {
         objectiveIntVars: Set<Int>,
         capWide: Boolean,
         domains: Array<IntDomain>,
+        cancellation: Cancellation = Cancellation.Never,
     ): Boolean {
         val checked = IntHashSet()
+        var polled = 0
         for (x in touchedVars) {
             val degree = seed.degreeOf(x)
             for (k in 0 until degree) {
                 val di = seed.occurrenceAt(x, k)
                 if (!checked.add(di)) continue
+                // Poll the deadline: this re-scan is O(touched · occurrences) and each candidate test walks
+                // a row, so on a wide-row model it must be interruptible. Bailing reports "no candidate", so
+                // affine skips this firing — sound (a partial pass only forgoes reduction).
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return false
                 if (candidateInFactor(seed, di, eliminated, objectiveIntVars, capWide) != null) return true
                 if (residueCandidateInFactor(seed, di, eliminated, objectiveIntVars, domains) != null) return true
             }
