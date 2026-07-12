@@ -3,6 +3,7 @@ package com.eignex.klause.bench.catalog
 import com.eignex.klause.bench.OpbFormat
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,6 +43,15 @@ class CatalogTest {
         val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "setcover-tiny").source))
         val obj = assertNotNull(opb.objective)
         assertTrue(obj.toString().isNotEmpty())
+    }
+
+    @Test
+    fun `opb-core resolves the non-linear instance to product indicators`() {
+        val problem = InProcessRunner.resolve(ref("opb-core", "sporttournament06")).problem
+        // 15 declared variables plus one indicator per distinct product.
+        assertEquals(39, problem.numBoolVars)
+        assertTrue(problem.factors.any { it is Clause }, "products lower to Tseitin clauses")
+        assertNotNull(OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "sporttournament06").source)).objective)
     }
 
     @Test

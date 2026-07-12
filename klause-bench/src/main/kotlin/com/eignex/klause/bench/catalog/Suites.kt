@@ -408,6 +408,12 @@ internal object Suites {
         license = "internal"
         vendored("setcover-tiny", Category.PACKING, Expected.Sat)
         vendored("pb-cardinality", Category.SAT, Expected.Sat)
+        vendored(
+            "sporttournament06",
+            Category.OPTIMIZATION,
+            Expected.Opt(-6L),
+            license = "PB Competition (academic benchmarks)",
+        )
     }
 
     private val schemaCore = suite("schema-core", "klause JSON schema instances") {
