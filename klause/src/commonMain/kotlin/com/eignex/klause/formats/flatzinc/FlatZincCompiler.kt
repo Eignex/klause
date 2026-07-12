@@ -294,6 +294,17 @@ internal class FlatZincCompiler(
         boolVars[name] = id
         return id
     }
+
+    /** Post a trivially unsatisfiable constraint. A [Clause] cannot be empty (an empty clause would
+     *  encode `false`, but the factor rejects zero literals), so an exact contradiction is a fresh
+     *  Boolean pinned both ways. Use only for exact infeasibility (e.g. two constants that violate
+     *  their relation), never to paper over a value an approximate encoding cannot represent — that
+     *  must reject via [failHere] so the instance is not silently reported unsatisfiable. */
+    internal fun postFalseFactor() {
+        val f = allocBool("__false_$numBoolVars")
+        factors.add(Clause(intArrayOf(Lit.make(f, true))))
+        factors.add(Clause(intArrayOf(Lit.make(f, false))))
+    }
     internal fun allocInt(name: String, lo: Long, hi: Long): Int {
         val id = intDomains.size
         intDomains.add(IntDomain(lo, hi))
