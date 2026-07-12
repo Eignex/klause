@@ -55,6 +55,12 @@ object Xcsp3 {
         internal var objective: LinearObjective? = null
         internal var objectiveMaximize = false
 
+        // A `<group>` instantiates its regular/mdd template once per `<args>` row over the same shared
+        // `<transitions>` text object; the built automaton depends only on that text, so cache the last
+        // one by reference identity and reuse it, rebuilding only each row's own sequence variables.
+        internal var cachedAutomatonText: String? = null
+        internal var cachedAutomaton: RegularAutomaton? = null
+
         fun declareVar(e: XmlElement) {
             when (e.tag) {
                 "var" -> addVar(e.attr("id"), domainFor(e))

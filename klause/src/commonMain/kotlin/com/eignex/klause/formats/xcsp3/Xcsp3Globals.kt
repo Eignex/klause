@@ -345,77 +345,111 @@ private fun internTransitions(text: String, firstState: String? = null): Interne
     )
 }
 
-internal fun Xcsp3.Builder.regular(e: XmlElement) {
-    // The start state is interned first (id 1), then the transitions, then any final absent from them —
-    // the original insertion order, so the built automaton (hence the search) is byte-identical.
-    val start = requireNotNull(e.child("start")).textContent.trim()
-    val trs = internTransitions(requireNotNull(e.child("transitions")).textContent, start)
-    if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
-    val finals = requireNotNull(e.child("final")).textContent.trim()
-        .split(Regex("\\s+")).filter { it.isNotBlank() }
-    val extra = HashMap<String, Int>()
-    fun resolve(name: String): Int {
-        val id = trs.idOf(name)
-        if (id != -1) return id
-        return extra.getOrPut(name) { trs.numStates + extra.size + 1 }
-    }
-    val q0 = resolve(start)
-    val accepting = IntArray(finals.size) { resolve(finals[it]) }
-    buildRegular(listVars(e), trs, trs.numStates + extra.size, q0, accepting)
+/** A regular/mdd automaton built from a `<transitions>` list, independent of the sequence it constrains:
+ *  the symbol [offset] (`1 - minSym`) shifting symbols to the 1-based [transitions] table, plus [q0] and
+ *  [accepting]. Cached and shared across the rows of a `<group>` that instantiate the same template. */
+internal class RegularAutomaton(
+    val numStates: Int,
+    val alphabetSize: Int,
+    val offset: Int,
+    val transitions: LongArray,
+    val q0: Int,
+    val accepting: IntArray,
+)
+
+/** Return the automaton for [text], reusing the last one when [text] is the same object — the case for
+ *  every row of a group over one template. [compute] runs only on a miss; a throw is not cached. */
+// Referential equality is the intent: group rows share one `<transitions>` String object, and distinct
+// constraints hold distinct objects, so `===` reuses within a group and never conflates unrelated text.
+@Suppress("AvoidReferentialEquality")
+private inline fun Xcsp3.Builder.automatonFor(text: String, compute: () -> RegularAutomaton): RegularAutomaton {
+    cachedAutomaton?.let { if (text === cachedAutomatonText) return it }
+    val built = compute()
+    cachedAutomatonText = text
+    cachedAutomaton = built
+    return built
 }
 
-/** A multi-valued decision diagram is a layered automaton: the root is the node that is never a
- *  transition destination; the accepting nodes are the sinks (never a source). */
-internal fun Xcsp3.Builder.mdd(e: XmlElement) {
-    val trs = internTransitions(requireNotNull(e.child("transitions")).textContent)
-    if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
-    val q = trs.numStates
-    val isSrc = BooleanArray(q + 1)
-    val isDst = BooleanArray(q + 1)
-    for (k in trs.srcIds.indices) {
-        isSrc[trs.srcIds[k]] = true
-        isDst[trs.dstIds[k]] = true
-    }
-    val rootId = trs.idOf("root")
-    val q0 = if (rootId != -1 && isSrc[rootId]) {
-        rootId
-    } else {
-        var r = -1
-        for (id in 1..q) if (isSrc[id] && !isDst[id]) {
-            r = id;
-            break
-        }
-        if (r == -1) throw UnsupportedXcsp3Exception("mdd: no root node") else r
-    }
-    val accepting = IntArrayList()
-    for (id in 1..q) if (isDst[id] && !isSrc[id]) accepting.add(id)
-    buildRegular(listVars(e), trs, q, q0, accepting.toIntArray())
-}
-
-private fun Xcsp3.Builder.buildRegular(
-    seqVars: IntArray,
-    trs: InternedTransitions,
-    numStates: Int,
-    q0: Int,
-    accepting: IntArray,
-) {
-    if (seqVars.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: empty sequence list")
-    val n = trs.symbols.size
-
+/** Assemble the transition table from interned transitions (symbols shifted to 1-based columns). */
+private fun buildAutomaton(trs: InternedTransitions, numStates: Int, q0: Int, accepting: IntArray): RegularAutomaton {
     var minSym = trs.symbols[0]
     var maxSym = trs.symbols[0]
-    for (k in 1 until n) {
+    for (k in 1 until trs.symbols.size) {
         val v = trs.symbols[k]
         if (v < minSym) minSym = v
         if (v > maxSym) maxSym = v
     }
     val offset = 1 - minSym
     val s = maxSym - minSym + 1
-    val table = IntArray(numStates * s) // 0 = dead state
-    for (k in 0 until n) {
-        table[(trs.srcIds[k] - 1) * s + (trs.symbols[k] + offset - 1)] = trs.dstIds[k]
+    val table = LongArray(numStates * s) // 0 = dead state
+    for (k in trs.symbols.indices) {
+        table[(trs.srcIds[k] - 1) * s + (trs.symbols[k] + offset - 1)] = trs.dstIds[k].toLong()
     }
+    return RegularAutomaton(numStates, s, offset, table, q0, accepting)
+}
 
+internal fun Xcsp3.Builder.regular(e: XmlElement) {
+    val text = requireNotNull(e.child("transitions")).textContent
+    val automaton = automatonFor(text) {
+        // The start state is interned first (id 1), then the transitions, then any final absent from
+        // them — the original insertion order, so the built automaton (hence the search) matches.
+        val start = requireNotNull(e.child("start")).textContent.trim()
+        val trs = internTransitions(text, start)
+        if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
+        val finals = requireNotNull(e.child("final")).textContent.trim()
+            .split(Regex("\\s+")).filter { it.isNotBlank() }
+        val extra = HashMap<String, Int>()
+        fun resolve(name: String): Int {
+            val id = trs.idOf(name)
+            if (id != -1) return id
+            return extra.getOrPut(name) { trs.numStates + extra.size + 1 }
+        }
+        val q0 = resolve(start)
+        val accepting = IntArray(finals.size) { resolve(finals[it]) }
+        buildAutomaton(trs, trs.numStates + extra.size, q0, accepting)
+    }
+    emitRegular(listVars(e), automaton)
+}
+
+/** A multi-valued decision diagram is a layered automaton: the root is the node that is never a
+ *  transition destination; the accepting nodes are the sinks (never a source). */
+internal fun Xcsp3.Builder.mdd(e: XmlElement) {
+    val text = requireNotNull(e.child("transitions")).textContent
+    val automaton = automatonFor(text) {
+        val trs = internTransitions(text)
+        if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
+        val q = trs.numStates
+        val isSrc = BooleanArray(q + 1)
+        val isDst = BooleanArray(q + 1)
+        for (k in trs.srcIds.indices) {
+            isSrc[trs.srcIds[k]] = true
+            isDst[trs.dstIds[k]] = true
+        }
+        val rootId = trs.idOf("root")
+        val q0 = if (rootId != -1 && isSrc[rootId]) {
+            rootId
+        } else {
+            var r = -1
+            for (id in 1..q) {
+                if (isSrc[id] && !isDst[id]) {
+                    r = id
+                    break
+                }
+            }
+            if (r == -1) throw UnsupportedXcsp3Exception("mdd: no root node") else r
+        }
+        val accepting = IntArrayList()
+        for (id in 1..q) if (isDst[id] && !isSrc[id]) accepting.add(id)
+        buildAutomaton(trs, q, q0, accepting.toIntArray())
+    }
+    emitRegular(listVars(e), automaton)
+}
+
+/** Post a [Regular] factor over [seqVars] for the shared [automaton], allocating per-constraint only the
+ *  offset-shifted sequence (and its channels) when the automaton's symbols are not already 1-based. */
+private fun Xcsp3.Builder.emitRegular(seqVars: IntArray, automaton: RegularAutomaton) {
+    if (seqVars.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: empty sequence list")
+    val offset = automaton.offset
     val seq = if (offset == 0) {
         seqVars
     } else {
@@ -430,11 +464,11 @@ private fun Xcsp3.Builder.buildRegular(
     factors.add(
         Regular(
             seq = seq,
-            numStates = numStates,
-            alphabetSize = s,
-            transitions = table.widenToLong(),
-            q0 = q0,
-            accepting = accepting,
+            numStates = automaton.numStates,
+            alphabetSize = automaton.alphabetSize,
+            transitions = automaton.transitions,
+            q0 = automaton.q0,
+            accepting = automaton.accepting,
         ),
     )
 }
