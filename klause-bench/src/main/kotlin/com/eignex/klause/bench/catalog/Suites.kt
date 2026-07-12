@@ -87,11 +87,20 @@ internal object Suites {
                 )
             },
             DynamicSuite("pb-comp", "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)") {
-                // The archive ships `.opb.xz` (linear + non-linear PB) and `.wbo.xz`; the `opb` layout
-                // takes only the `.opb` instances (WBO is a different, soft-constraint format).
+                // The archive ships both `.opb.xz` (linear + non-linear PB) and `.wbo.xz` (soft
+                // constraints); this layout takes the `.opb` instances, `pb-comp-wbo` the `.wbo`.
                 CorpusSelection.select(
                     ExternalCollections.pbComp2024,
                     CorpusSelection.Layout.Flat("PB24", "opb", familyOf = { it.substringBeforeLast('/', it) }),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.OPTIMIZATION,
+                    format = Format.OPB,
+                )
+            },
+            DynamicSuite("pb-comp-wbo", "Pseudo-Boolean Competition 2024 WBO soft-constraint set (fetched; 1/family)") {
+                CorpusSelection.select(
+                    ExternalCollections.pbComp2024,
+                    CorpusSelection.Layout.Flat("PB24", "wbo", familyOf = { it.substringBeforeLast('/', it) }),
                     CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
                     Category.OPTIMIZATION,
                     format = Format.OPB,
@@ -423,6 +432,13 @@ internal object Suites {
             "sporttournament06",
             Category.OPTIMIZATION,
             Expected.Opt(-6L),
+            license = "PB Competition (academic benchmarks)",
+        )
+        vendored(
+            "queens4-soft",
+            Category.OPTIMIZATION,
+            Expected.Opt(0L),
+            relPath = "opb/queens4-soft.wbo",
             license = "PB Competition (academic benchmarks)",
         )
     }

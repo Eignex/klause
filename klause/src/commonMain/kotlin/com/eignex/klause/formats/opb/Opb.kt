@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.opb
 
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.tseitinAnd
@@ -21,11 +22,19 @@ data class OpbProblem(
     val objective: LinearObjective?,
 )
 
-/** Parser for OPB pseudo-Boolean instances, linear and non-linear (product terms). */
+/**
+ * Parser for OPB/WBO pseudo-Boolean instances: linear and non-linear (product terms), with
+ * hard constraints and WBO soft constraints. A soft constraint `[c] Σ… ⟨op⟩ k` is reified to an
+ * indicator `sat ⇔ (constraint holds)` and its violation charged `c·(1 − sat)` into the objective;
+ * a `soft: top` header bounds the total violated cost below `top`.
+ */
 object Opb {
 
     /** A parsed term: [coef] times the conjunction of [lits] (a single literal when linear). */
     private class Term(val coef: Long, val lits: IntArrayList)
+
+    /** A parsed relation `Σ weights(i)·literals(i) op bound` shared by hard and soft constraints. */
+    private class Relation(val weights: LongArray, val literals: IntArray, val op: PbOp, val bound: Long)
 
     /**
      * Accumulates the compiled problem. A product term `c l1 l2 ...` is a coefficient times an
@@ -66,6 +75,10 @@ object Opb {
         val objWeights = MutableIntDoubleMap()
         var objConstant = 0.0
         var hasObjective = false
+        // WBO soft constraints: a cost bound `soft: top` and the (cost, violation-literal) pairs.
+        var softTop: Long? = null
+        val softCosts = LongArrayList()
+        val softViolations = IntArrayList()
 
         var i = 0
         while (i < tokens.size) {
@@ -79,47 +92,49 @@ object Opb {
             if (stmt[0] == "min:") {
                 hasObjective = true
                 for (term in parseTerms(stmt.subList(1, stmt.size))) {
-                    val w = term.coef.toDouble()
-                    val lit = builder.literalFor(term.lits)
-                    val v = Lit.variable(lit)
-                    if (Lit.isPositive(lit)) {
-                        objWeights.addTo(v, w)
-                    } else {
-                        // c*(~x) in OPB objective is c*(1-x).
-                        objWeights.addTo(v, -w)
-                        objConstant += w
-                    }
+                    addObjectiveTerm(
+                        objWeights,
+                        term.coef.toDouble(),
+                        builder.literalFor(term.lits),
+                    ) { objConstant += it }
                 }
                 continue
             }
 
-            val opIdx = stmt.indexOfFirst { it == ">=" || it == "<=" || it == "=" }
-            if (opIdx < 0) error("OPB constraint missing relational operator: ${stmt.joinToString(" ")}")
-            require(opIdx + 1 < stmt.size) {
-                "OPB constraint missing right-hand side: ${stmt.joinToString(" ")}"
+            if (stmt[0] == "soft:") {
+                // `soft: top` bounds total violated cost strictly below top; the top is optional.
+                softTop = stmt.getOrNull(1)?.let {
+                    it.toLongOrNull() ?: error("WBO soft top not an integer: '$it'")
+                }
+                continue
             }
-            val rhs = stmt[opIdx + 1].toLongOrNull()
-                ?: error("OPB constraint rhs not an integer: '${stmt[opIdx + 1]}'")
-            val pbOp = when (stmt[opIdx]) {
-                ">=" -> PbOp.GE
-                "<=" -> PbOp.LE
-                "=" -> PbOp.EQ
-                else -> error("unknown OPB operator '${stmt[opIdx]}'")
+
+            val softCost = parseSoftCost(stmt[0])
+            val body = if (softCost != null) stmt.subList(1, stmt.size) else stmt
+            val relation = parseRelation(builder, body)
+            if (softCost == null) {
+                builder.factors.add(PseudoBoolean(relation.weights, relation.literals, relation.op, relation.bound))
+            } else {
+                // Reify the soft relation to `sat`; a violation (¬sat) costs `softCost`.
+                val sat = builder.newBool()
+                builder.factors.add(
+                    ReifiedPseudoBoolean(sat, relation.weights, relation.literals, relation.op, relation.bound),
+                )
+                hasObjective = true
+                objWeights.addTo(sat, -softCost.toDouble())
+                objConstant += softCost.toDouble()
+                softCosts.add(softCost)
+                softViolations.add(Lit.make(sat, positive = false))
             }
-            val weights = LongArrayList()
-            val literals = IntArrayList()
-            for (term in parseTerms(stmt.subList(0, opIdx))) {
-                weights.add(term.coef)
-                literals.add(builder.literalFor(term.lits))
+        }
+
+        // A `soft: top` header rejects any assignment whose total violated cost reaches top.
+        softTop?.let { top ->
+            if (softViolations.size > 0) {
+                builder.factors.add(
+                    PseudoBoolean(softCosts.toLongArray(), softViolations.toIntArray(), PbOp.LE, top - 1),
+                )
             }
-            builder.factors.add(
-                PseudoBoolean(
-                    weights = weights.toLongArray(),
-                    literals = literals.toIntArray(),
-                    op = pbOp,
-                    bound = rhs,
-                ),
-            )
         }
 
         val objective: LinearObjective? = if (!hasObjective) {
@@ -136,6 +151,53 @@ object Opb {
             factors = builder.factors.toTypedArray(),
         )
         return OpbProblem(problem, objective)
+    }
+
+    /** Fold `weight·lit` into the objective, rewriting a negated literal `c·(~x)` as `c·(1 − x)`. */
+    private inline fun addObjectiveTerm(
+        objWeights: MutableIntDoubleMap,
+        weight: Double,
+        lit: Int,
+        addConstant: (Double) -> Unit,
+    ) {
+        val v = Lit.variable(lit)
+        if (Lit.isPositive(lit)) {
+            objWeights.addTo(v, weight)
+        } else {
+            objWeights.addTo(v, -weight)
+            addConstant(weight)
+        }
+    }
+
+    /** Parse a `Σ terms ⟨op⟩ rhs` relation, reifying any product term to an indicator literal. */
+    private fun parseRelation(builder: Builder, tokens: List<String>): Relation {
+        val opIdx = tokens.indexOfFirst { it == ">=" || it == "<=" || it == "=" }
+        if (opIdx < 0) error("OPB constraint missing relational operator: ${tokens.joinToString(" ")}")
+        require(opIdx + 1 < tokens.size) {
+            "OPB constraint missing right-hand side: ${tokens.joinToString(" ")}"
+        }
+        val rhs = tokens[opIdx + 1].toLongOrNull()
+            ?: error("OPB constraint rhs not an integer: '${tokens[opIdx + 1]}'")
+        val op = when (tokens[opIdx]) {
+            ">=" -> PbOp.GE
+            "<=" -> PbOp.LE
+            "=" -> PbOp.EQ
+            else -> error("unknown OPB operator '${tokens[opIdx]}'")
+        }
+        val weights = LongArrayList()
+        val literals = IntArrayList()
+        for (term in parseTerms(tokens.subList(0, opIdx))) {
+            weights.add(term.coef)
+            literals.add(builder.literalFor(term.lits))
+        }
+        return Relation(weights.toLongArray(), literals.toIntArray(), op, rhs)
+    }
+
+    /** The cost of a WBO soft constraint whose statement opens with a `[cost]` token, else null (hard). */
+    private fun parseSoftCost(token: String): Long? {
+        if (!(token.startsWith("[") && token.endsWith("]"))) return null
+        val inner = token.substring(1, token.length - 1)
+        return inner.toLongOrNull() ?: error("WBO soft cost not an integer: '$token'")
     }
 
     /** Parse a term sequence: each term is a coefficient followed by one or more literals. */

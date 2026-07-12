@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.opb
 
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
@@ -100,6 +101,47 @@ class OpbTest {
         val obj = assertNotNull(out.objective)
         assertEquals(3, out.problem.numBoolVars)
         assertEquals(3L, obj.boolWeights[2])
+    }
+
+    @Test
+    fun `reifies a wbo soft constraint into an objective penalty`() {
+        val text = """
+            soft: 5 ;
+            [3] +1 x1 >= 1 ;
+            +1 x2 >= 1 ;
+        """.trimIndent()
+        val out = Opb.parse(text)
+        // x1, x2, plus the soft constraint's reifying indicator.
+        assertEquals(3, out.problem.numBoolVars)
+        val reif = out.problem.factors.filterIsInstance<ReifiedPseudoBoolean>().single()
+        assertEquals(2, reif.auxBoolVar)
+        val obj = assertNotNull(out.objective)
+        // Violation costs 3, charged as 3*(1 - sat).
+        assertEquals(-3L, obj.boolWeights[2])
+        assertEquals(3L, obj.constant)
+    }
+
+    @Test
+    fun `bounds violated cost with the soft top`() {
+        val text = """
+            soft: 5 ;
+            [3] +1 x1 >= 1 ;
+        """.trimIndent()
+        val out = Opb.parse(text)
+        val bound = out.problem.factors.filterIsInstance<PseudoBoolean>().single { it.op == PbOp.LE }
+        // Total violated cost must stay strictly below the top of 5. The soft indicator is the
+        // sole aux var (id 1); its violation is the negated indicator literal.
+        assertEquals(4L, bound.bound)
+        assertEquals(listOf(3L), bound.weights.toList())
+        assertEquals(listOf(Lit.make(1, false)), bound.literals.toList())
+    }
+
+    @Test
+    fun `omits the cost bound when no soft top is given`() {
+        val text = "[3] +1 x1 >= 1 ;"
+        val out = Opb.parse(text)
+        assertTrue(out.problem.factors.none { it is PseudoBoolean })
+        assertNotNull(out.objective)
     }
 
     @Test

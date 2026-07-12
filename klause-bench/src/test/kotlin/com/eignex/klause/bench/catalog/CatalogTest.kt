@@ -3,6 +3,7 @@ package com.eignex.klause.bench.catalog
 import com.eignex.klause.bench.OpbFormat
 import com.eignex.klause.bench.runner.InProcessRunner
 import com.eignex.klause.bench.source.CorpusFetcher
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import kotlin.test.Test
@@ -52,6 +53,15 @@ class CatalogTest {
         assertEquals(39, problem.numBoolVars)
         assertTrue(problem.factors.any { it is Clause }, "products lower to Tseitin clauses")
         assertNotNull(OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "sporttournament06").source)).objective)
+    }
+
+    @Test
+    fun `opb-core resolves the wbo instance with soft-constraint reification`() {
+        val opb = OpbFormat.ingest(CorpusFetcher.resolve(ref("opb-core", "queens4-soft").source))
+        // Soft constraints reify to indicators, so the objective is present and vars exceed the 16 declared.
+        assertNotNull(opb.objective)
+        assertTrue(opb.problem.numBoolVars > 16)
+        assertTrue(opb.problem.factors.any { it is ReifiedPseudoBoolean }, "soft constraints reify to indicators")
     }
 
     @Test
