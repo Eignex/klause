@@ -27,13 +27,27 @@ internal interface RestartSchedule {
     fun onRestart() {}
 
     companion object {
-        /** The schedule selected by [params], in precedence order: EMA-adaptive when
-         *  [BacktrackParams.emaRestart], else Glucose-adaptive when [BacktrackParams.adaptiveRestart],
-         *  else Luby when [BacktrackParams.lubyRestartBase] is set, else a single unbounded run. */
+        /** Conflicts in the first mode segment of the default [ModeSwitchingRestartSchedule]; later
+         *  segments scale it by the Luby sequence. */
+        const val DEFAULT_MODE_BASE: Long = 500L
+
+        /** The schedule selected by [params], in precedence order: mode-switching when
+         *  [BacktrackParams.modeSwitchingRestart], else EMA-adaptive when [BacktrackParams.emaRestart],
+         *  else Glucose-adaptive when [BacktrackParams.adaptiveRestart], else Luby when
+         *  [BacktrackParams.lubyRestartBase] is set, else a single unbounded run. */
         fun from(params: BacktrackParams): RestartSchedule = when {
+            params.modeSwitchingRestart -> ModeSwitchingRestartSchedule(
+                focused = EmaRestartSchedule(),
+                stable = NoRestartSchedule,
+                modeBase = DEFAULT_MODE_BASE,
+            )
+
             params.emaRestart -> EmaRestartSchedule()
+
             params.adaptiveRestart -> AdaptiveRestartSchedule()
+
             params.lubyRestartBase != null -> LubyRestartSchedule(params.lubyRestartBase)
+
             else -> NoRestartSchedule
         }
     }
@@ -104,4 +118,51 @@ internal class EmaRestartSchedule : RestartSchedule {
     override fun onRestart() {
         restartRequested = false
     }
+}
+
+/**
+ * Stable/focused mode-switching schedule (the CaDiCaL/Kissat regime), mixing two schedules within one
+ * run to be robust on optimization without hand-tuning. The search alternates between a [focused] mode
+ * — restart-heavy proving, e.g. an adaptive detector — and a [stable] dive mode that rarely (or never)
+ * restarts so the solver can drive deep and hold onto a good assignment via phase saving. Each mode
+ * segment lasts `lubyN(seg) · modeBase` conflicts, so dive phases lengthen as the search proceeds.
+ * Starts focused.
+ *
+ * Delegation is total: [shouldRestart] / [onRestart] / [beginRun] all route to the active sub-schedule,
+ * and [recordConflict] both feeds the active schedule and drives the mode clock. On a mode switch the
+ * newly active schedule's [beginRun] is called so its budget is sized for the fresh segment.
+ */
+internal class ModeSwitchingRestartSchedule(
+    private val focused: RestartSchedule,
+    private val stable: RestartSchedule,
+    private val modeBase: Long,
+) : RestartSchedule {
+    private var inStableMode = false
+    private var segment = 1L
+    private var conflictsThisSegment = 0L
+    private var segmentBudget = segmentBudget()
+
+    private fun active(): RestartSchedule = if (inStableMode) stable else focused
+
+    private fun segmentBudget(): Long {
+        val limit = lubyN(segment)
+        return if (limit > Long.MAX_VALUE / modeBase) Long.MAX_VALUE else limit * modeBase
+    }
+
+    override fun beginRun() = active().beginRun()
+
+    override fun recordConflict(lbd: Int, trailSize: Int) {
+        active().recordConflict(lbd, trailSize)
+        if (++conflictsThisSegment >= segmentBudget) {
+            inStableMode = !inStableMode
+            segment++
+            conflictsThisSegment = 0
+            segmentBudget = segmentBudget()
+            active().beginRun()
+        }
+    }
+
+    override fun shouldRestart(decisionsThisRun: Long): Boolean = active().shouldRestart(decisionsThisRun)
+
+    override fun onRestart() = active().onRestart()
 }

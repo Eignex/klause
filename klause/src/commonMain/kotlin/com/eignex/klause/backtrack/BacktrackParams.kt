@@ -87,6 +87,15 @@ data class BacktrackParams(
      */
     val emaRestart: Boolean = false,
     /**
+     * Stable/focused mode-switching restarts (the CaDiCaL/Kissat regime) — the mixing default. Within a
+     * single run the search alternates a focused proving mode (frequent adaptive restarts) with a stable
+     * dive mode (no restarts, driving deep and holding a good assignment via phase saving), so it is
+     * robust on optimization without hand-tuning a Luby base. See [ModeSwitchingRestartSchedule]. Takes
+     * precedence over [emaRestart], [adaptiveRestart], and [lubyRestartBase] when set. Disabled by
+     * default.
+     */
+    val modeSwitchingRestart: Boolean = false,
+    /**
      * Phase-saving: cache the last value the search committed to for each variable.
      * On a fresh descent (after a backtrack or restart) the cached value is tried
      * first, so the search doesn't lose the work spent narrowing down the right
