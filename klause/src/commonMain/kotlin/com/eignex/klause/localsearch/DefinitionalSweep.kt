@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Factor
@@ -42,6 +43,56 @@ class DefinitionalSweep internal constructor(
     /** Defining nodes in topological order — every node's inputs are free vars or earlier nodes. */
     private val nodes: List<SweepNode>,
 ) {
+    /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
+    companion object {
+        /** Infer a sweep from the factor IR alone (front-end-agnostic — the XCSP3/SMT front-ends carry
+         *  no `defines_var` annotations): each `Product(a, b, out)` functionally defines `out = a·b`, so
+         *  local search can derive `out` from the decision vars rather than searching it. A var defined by
+         *  more than one product, or transitively by itself, is left searched (excluded). Nodes come out in
+         *  topological order; returns null when nothing is definable. */
+        fun infer(factors: Array<Factor>, numIntVars: Int): DefinitionalSweep? {
+            // Only `Product` results are inferred as definitional: a Product genuinely determines its
+            // output (out = a·b), so deriving it and excluding it from search is always sound. Orienting a
+            // `Linear` equality would need to know which var is the output — the `defines_var` info XCSP3
+            // lacks — and a wrong guess "defines" a decision var, producing an infeasible assignment.
+            val def = arrayOfNulls<Product>(numIntVars)
+            val overDefined = BooleanArray(numIntVars)
+            for (f in factors) {
+                if (f !is Product) continue
+                val o = f.result
+                if (o !in 0 until numIntVars) continue
+                if (def[o] != null || overDefined[o]) {
+                    def[o] = null
+                    overDefined[o] = true
+                } else {
+                    def[o] = f
+                }
+            }
+            val nodes = ArrayList<SweepNode>()
+            val state = ByteArray(numIntVars) // 0 unseen, 1 on-stack, 2 done
+            val cyclic = BooleanArray(numIntVars)
+            fun visit(v: Int) {
+                if (v < 0 || v >= numIntVars || state[v].toInt() == 2) return
+                if (state[v].toInt() == 1) {
+                    cyclic[v] = true
+                    return
+                }
+                val p = def[v] ?: return
+                state[v] = 1
+                visit(p.a)
+                visit(p.b)
+                if (!cyclic[v]) {
+                    val a = FunctionalObjective.Operand.v(p.a)
+                    val b = FunctionalObjective.Operand.v(p.b)
+                    nodes.add(SweepNode.IntDef(FunctionalObjective.Times(v, a, b), intArrayOf(p.a, p.b)))
+                }
+                state[v] = 2
+            }
+            for (v in 0 until numIntVars) visit(v)
+            return if (nodes.isEmpty()) null else DefinitionalSweep(nodes)
+        }
+    }
+
     /** One evaluable definition `out = f(inputs)` with its read-set exposed for cone indexing. */
     sealed interface SweepNode {
         /** The defined output var id ([outIsBool] selects the value space). */

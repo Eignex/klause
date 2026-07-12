@@ -338,7 +338,10 @@ object Xcsp3 {
                 // `eq(v, mul(a,b))` with v, a, b plain variables is one Product (v = a·b), skipping the aux
                 // var and equality the generic term path emits — the bulk of an O(n²) product model.
                 (directProduct(node.args[0], node.args[1]) ?: directProduct(node.args[1], node.args[0]))
-                    ?.let { factors.add(it); return }
+                    ?.let {
+                        factors.add(it)
+                        return
+                    }
             }
             if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
                 val r = relationParts(node)
