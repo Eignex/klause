@@ -83,6 +83,10 @@ object Dimacs {
         var hasOldHeader = false
         val hardClauses = mutableListOf<Clause>()
         val softClauses = mutableListOf<Pair<Long, IntArray>>()
+        // An empty hard clause is unsatisfiable; an empty soft clause is always falsified, so its
+        // weight is a fixed cost every solution pays.
+        var triviallyUnsat = false
+        var fixedCost = 0L
 
         for (rawLine in text.lineSequence()) {
             val line = rawLine.trim()
@@ -132,16 +136,27 @@ object Dimacs {
             }
             require(terminated) { "wcnf clause not terminated by 0: '$rawLine'" }
             require(i == tokens.size) { "wcnf clause has trailing tokens after 0: '$rawLine'" }
-            if (isHard) {
-                hardClauses.add(Clause(lits.toIntArray()))
-            } else {
-                softClauses.add(weight to lits.toIntArray())
+            val clauseLits = lits.toIntArray()
+            when {
+                isHard && clauseLits.isEmpty() -> triviallyUnsat = true
+
+                isHard -> hardClauses.add(Clause(clauseLits))
+
+                // A zero-weight soft clause contributes no cost and imposes no constraint.
+                weight == 0L -> Unit
+
+                clauseLits.isEmpty() -> fixedCost += weight
+
+                else -> softClauses.add(weight to clauseLits)
             }
         }
-        require(numVars >= 0) { "wcnf file has no clauses and no header to fix numVars" }
+        // New-format instances carry no header, so an instance with no variable-bearing clause
+        // (only empty/degenerate clauses) leaves numVars unset — it simply has zero variables.
+        if (numVars < 0) numVars = 0
 
         val numOriginal = numVars
-        val totalVars = numOriginal + softClauses.size
+        // Relaxation variables follow the originals; an unsat marker (if any) follows the relaxations.
+        val totalVars = numOriginal + softClauses.size + if (triviallyUnsat) 1 else 0
         val factors = mutableListOf<Factor>()
         factors.addAll(hardClauses)
         val weights = LongArray(totalVars)
@@ -154,12 +169,18 @@ object Dimacs {
             factors.add(Clause(extended))
             weights[relax] = w
         }
+        if (triviallyUnsat) {
+            // Force a contradiction on a fresh variable to reject the whole instance.
+            val marker = numOriginal + softClauses.size
+            factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
+            factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
+        }
         val problem = Problem(
             numBoolVars = totalVars,
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = factors.toTypedArray(),
         )
-        return WcnfProblem(problem, LinearObjective(boolWeights = weights), numOriginal)
+        return WcnfProblem(problem, LinearObjective(boolWeights = weights, constant = fixedCost), numOriginal)
     }
 }

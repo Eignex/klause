@@ -30,7 +30,7 @@ internal object Suites {
 
     val all: List<Suite> by lazy {
         listOf(
-            handwrittenCore, slackAllDifferent, dimacsCore, opbCore, schemaCore, flatzincCore,
+            handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore, flatzincCore,
             smtlibCore, xcsp3Core, mznSmoke, satlibUf20, satLadder, satCrafted,
         )
     }
@@ -122,6 +122,24 @@ internal object Suites {
                     CorpusSelection.Selection.fromProps(),
                     Category.CSP,
                     format = Format.XCSP3,
+                )
+            },
+            DynamicSuite("maxsat-unweighted", "MaxSAT Evaluation 2024 exact unweighted track (fetched; 1/family)") {
+                CorpusSelection.select(
+                    ExternalCollections.maxsatExactUnweighted,
+                    CorpusSelection.Layout.Flat("", "wcnf", familyOf = ::maxsatFamily),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
+                )
+            },
+            DynamicSuite("maxsat-weighted", "MaxSAT Evaluation 2024 exact weighted track (fetched; 1/family)") {
+                CorpusSelection.select(
+                    ExternalCollections.maxsatExactWeighted,
+                    CorpusSelection.Layout.Flat("", "wcnf", familyOf = ::maxsatFamily),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.OPTIMIZATION,
+                    format = Format.WCNF,
                 )
             },
         )
@@ -423,6 +441,12 @@ internal object Suites {
         vendored("random3sat-50-200", Category.SAT, Expected.Sat)
     }
 
+    private val wcnfCore = suite("wcnf-core", "Curated DIMACS WCNF (MaxSAT)") {
+        format = Format.WCNF
+        license = "internal"
+        vendored("maxsat-tiny", Category.OPTIMIZATION, Expected.Opt(1L))
+    }
+
     private val opbCore = suite("opb-core", "Curated pseudo-Boolean OPB") {
         format = Format.OPB
         license = "internal"
@@ -475,6 +499,11 @@ internal object Suites {
      *  groups the ~76 COP / CSP series for `per-family` sampling instead of treating every
      *  parameterization as its own singleton family. */
     private fun xcspSeries(name: String): String = name.substringBefore('-')
+
+    /** MaxSAT family key: the descriptive prefix before the first `-` of a flat MSE filename
+     *  (`causal-discovery-causal_n6_…` → `causal`), grouping parameterizations for `per-family`
+     *  sampling instead of treating every instance as its own family. */
+    private fun maxsatFamily(name: String): String = name.substringBefore('-')
 
     private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
         format = Format.XCSP3
@@ -681,6 +710,20 @@ internal object ExternalCollections {
         license = "Pseudo-Boolean Competition (academic benchmarks)",
         reason = "255MB PB'24 selected-benchmark set; fetched rather than vendored",
         fetch = FetchMethod.Tar,
+    )
+    val maxsatExactUnweighted = ExternalCollection(
+        id = "mse24-exact-unweighted",
+        url = "https://www.cs.helsinki.fi/group/coreo/MSE2024-instances/mse24-exact-unweighted.zip",
+        license = "MaxSAT Evaluation (academic benchmarks)",
+        reason = "1.9GB MSE'24 exact unweighted track (flat `*.wcnf.xz`); fetched rather than vendored",
+        fetch = FetchMethod.Zip,
+    )
+    val maxsatExactWeighted = ExternalCollection(
+        id = "mse24-exact-weighted",
+        url = "https://www.cs.helsinki.fi/group/coreo/MSE2024-instances/mse24-exact-weighted.zip",
+        license = "MaxSAT Evaluation (academic benchmarks)",
+        reason = "4.4GB MSE'24 exact weighted track (flat `*.wcnf.xz`); fetched rather than vendored",
+        fetch = FetchMethod.Zip,
     )
 
     /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */

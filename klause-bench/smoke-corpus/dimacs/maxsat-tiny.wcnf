@@ -1,0 +1,4 @@
+c tiny weighted partial MaxSAT (new format); optimum cost 1 at x1=0, x2=1
+h 1 2 0
+3 -1 0
+1 -2 0

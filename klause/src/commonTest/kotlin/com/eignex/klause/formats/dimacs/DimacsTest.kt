@@ -138,4 +138,31 @@ class DimacsTest {
         assertEquals(5L, w.objective.boolWeights[2])
         assertEquals(3L, w.objective.boolWeights[3])
     }
+
+    @Test
+    fun `an empty soft clause becomes a fixed objective cost`() {
+        // `4 0` is an always-falsified soft clause; only `2 -1 0` needs a relaxation variable.
+        val w = Dimacs.parseWcnf("h 1 0\n4 0\n2 -1 0\n")
+        assertEquals(1, w.numOriginalBoolVars)
+        assertEquals(2, w.problem.numBoolVars)
+        assertEquals(4L, w.objective.constant)
+        assertEquals(2L, w.objective.boolWeights[1])
+    }
+
+    @Test
+    fun `a zero-weight soft clause is dropped`() {
+        val w = Dimacs.parseWcnf("h 1 0\n0 -1 0\n")
+        // No relaxation variable and no cost for the zero-weight clause.
+        assertEquals(1, w.numOriginalBoolVars)
+        assertEquals(1, w.problem.numBoolVars)
+        assertEquals(0L, w.objective.constant)
+    }
+
+    @Test
+    fun `an empty hard clause makes the instance unsatisfiable`() {
+        // The empty hard clause forces a contradiction on a fresh marker variable.
+        val w = Dimacs.parseWcnf("h 0\n2 -1 0\n")
+        assertTrue(w.problem.factors.any { it is Clause })
+        assertEquals(2, w.problem.factors.count { it is Clause && it.literals.size == 1 })
+    }
 }

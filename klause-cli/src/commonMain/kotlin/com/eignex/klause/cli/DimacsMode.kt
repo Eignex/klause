@@ -8,8 +8,8 @@ import com.eignex.klause.solver.result.SolveStats
  * DIMACS **CNF** front-end (`.cnf`) for Boolean satisfiability. Emits the SAT-competition
  * convention: an `s SATISFIABLE` / `s UNSATISFIABLE` / `s UNKNOWN` status line, and on sat a
  * `v`-prefixed model listing each variable as `i` (true) or `-i` (false), 1-based, terminated
- * by `0`. `-s` statistics are emitted as `c` comment lines. Weighted CNF (MaxSAT) is a
- * distinct format with an objective and is out of scope here.
+ * by `0`. `-s` statistics are emitted as `c` comment lines. Weighted CNF (MaxSAT) is a distinct
+ * format with an objective, handled by [WcnfMode].
  */
 internal object DimacsMode : CliMode {
     override val names = listOf("dimacs", "cnf", "sat")

@@ -153,6 +153,7 @@ internal fun suite(id: String, description: String, block: SuiteBuilder.() -> Un
 val Format.dir: String
     get() = when (this) {
         Format.DIMACS -> "dimacs"
+        Format.WCNF -> "dimacs"
         Format.OPB -> "opb"
         Format.JSON_SCHEMA -> "schema"
         Format.FLATZINC -> "flatzinc"
@@ -166,6 +167,7 @@ val Format.dir: String
 val Format.ext: String
     get() = when (this) {
         Format.DIMACS -> "cnf"
+        Format.WCNF -> "wcnf"
         Format.OPB -> "opb"
         Format.JSON_SCHEMA -> "json"
         Format.FLATZINC -> "fzn"
