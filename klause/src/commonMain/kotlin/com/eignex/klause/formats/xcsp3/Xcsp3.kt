@@ -96,6 +96,13 @@ object Xcsp3 {
         internal var cachedMddText: String? = null
         internal var cachedMddResult: MddResult? = null
 
+        // Same reuse for a `<group>`'s positive `<extension>` template: the parsed short-support tuple
+        // arrays depend only on the shared `<supports>` text, so cache them by reference identity and
+        // share them across every row's [Table] (which treats its tuples as read-only) instead of
+        // re-parsing an identical high-arity table per row — that accumulation exhausted the heap.
+        internal var cachedSupportsText: String? = null
+        internal var cachedSupportTemplate: SupportTemplate? = null
+
         fun declareVar(e: XmlElement) {
             when (e.tag) {
                 "var" -> addVar(e.attr("id"), domainFor(e))
