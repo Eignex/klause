@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.*
 
@@ -84,7 +83,8 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
                     ),
                 )
             } else if (!holds) {
-                factors.add(Clause(EmptyIntArray))
+                // Two exact float constants that violate their relation: an exact contradiction.
+                postFalseFactor()
             }
             return
         }
@@ -205,8 +205,9 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         }
     }
     if (rows.isEmpty()) {
-        factors.add(Clause(EmptyIntArray))
-        return
+        // No bucket triple realises the product within tolerance. This is a resolution limit of the
+        // bucketing, not proven infeasibility, so reject rather than report a spurious UNSAT.
+        failHere("float_times: product not representable under the current float bucketing")
     }
     factors.add(
         Table(
@@ -214,6 +215,97 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
             rows.toLongArray(),
         ),
     )
+}
+
+/** Lower `float_abs(x, y)` (`y = |x|`) to a bucket-index table, mirroring [emitFloatTimes]. */
+internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
+    require(c.args.size == 2)
+    val xRef = resolveFloatVarOrConst(c.args[0])
+    val yRef = resolveFloatVarOrConst(c.args[1])
+    if (xRef is FloatRef.Const) {
+        // |constant| is itself a constant: constrain the result to equal it, via the linear path.
+        emitFloatLinear(
+            FznConstraint(
+                "float_lin_eq",
+                listOf(
+                    FznExpr.ArrayLit(listOf(FznExpr.FloatLit(1.0))),
+                    FznExpr.ArrayLit(listOf(c.args[1])),
+                    FznExpr.FloatLit(abs(xRef.value)),
+                ),
+                emptyList(),
+            ),
+            reified = false,
+        )
+        return
+    }
+    if (yRef !is FloatRef.Var) failHere("float_abs: result must be a float var")
+    val x = (xRef as FloatRef.Var).bk
+    val y = yRef.bk
+    val stepX = if (x.buckets > 1) (x.hi - x.lo) / (x.buckets - 1) else 0.0
+    val stepY = if (y.buckets > 1) (y.hi - y.lo) / (y.buckets - 1) else 0.0
+    val rows = LongArrayList(x.buckets * 2)
+    val tolerance = 0.5
+    for (ix in 0 until x.buckets) {
+        val vy = abs(x.lo + ix * stepX)
+        if (vy < y.lo - stepY * tolerance || vy > y.hi + stepY * tolerance) continue
+        val iy = if (stepY == 0.0) {
+            0
+        } else {
+            ((vy - y.lo) / stepY).let {
+                val rounded = round(it).toInt()
+                if (abs(it - rounded) > tolerance) return@let -1
+                rounded
+            }
+        }
+        if (iy < 0 || iy >= y.buckets) continue
+        rows.add(ix.toLong())
+        rows.add(iy.toLong())
+    }
+    if (rows.isEmpty()) failHere("float_abs: not representable under the current float bucketing")
+    factors.add(Table(intArrayOf(x.varId, y.varId), rows.toLongArray()))
+}
+
+/** Lower `array_float_element(idx, arr, x)` (`x = arr[idx]`, 1-based, `arr` a float-constant array)
+ *  to a table pairing each valid index value with the bucket of its constant. An index value whose
+ *  constant is unrepresentable in the result's bucketing rejects, so a dropped row never silently
+ *  forbids a feasible index. */
+internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) {
+    require(c.args.size == 3)
+    val idx = resolveIntVar(c.args[0])
+    val arr = evalFloatConstArray(c.args[1])
+    val xRef = resolveFloatVarOrConst(c.args[2])
+    if (xRef !is FloatRef.Var) failHere("array_float_element: result must be a float var")
+    val x = xRef.bk
+    val stepX = if (x.buckets > 1) (x.hi - x.lo) / (x.buckets - 1) else 0.0
+    val dom = intDomains[idx]
+    val tolerance = 0.5
+    val rows = LongArrayList()
+    for (vi in dom.min.toInt()..dom.max.toInt()) {
+        val ai = vi - 1 // FlatZinc arrays are 1-based.
+        if (ai < 0 || ai >= arr.size) continue // Out-of-range index value: the table forbids it.
+        val cv = arr[ai]
+        if (cv < x.lo - stepX * tolerance || cv > x.hi + stepX * tolerance) {
+            failHere("array_float_element: value $cv not representable under the current float bucketing")
+        }
+        val ix = if (stepX == 0.0) {
+            0
+        } else {
+            ((cv - x.lo) / stepX).let {
+                val rounded = round(it).toInt()
+                if (abs(it - rounded) > tolerance) {
+                    failHere("array_float_element: value $cv not representable under the current float bucketing")
+                }
+                rounded
+            }
+        }
+        if (ix < 0 || ix >= x.buckets) {
+            failHere("array_float_element: value $cv not representable under the current float bucketing")
+        }
+        rows.add(vi.toLong())
+        rows.add(ix.toLong())
+    }
+    if (rows.isEmpty()) failHere("array_float_element: no valid index value in the domain")
+    factors.add(Table(intArrayOf(idx, x.varId), rows.toLongArray()))
 }
 
 internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing> = when (e) {
