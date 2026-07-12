@@ -14,6 +14,8 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.LayeredMddData
+import com.eignex.klause.formats.packLayeredMdd
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Lit
@@ -409,38 +411,129 @@ internal fun Xcsp3.Builder.regular(e: XmlElement) {
     emitRegular(listVars(e), automaton)
 }
 
-/** A multi-valued decision diagram is a layered automaton: the root is the node that is never a
- *  transition destination; the accepting nodes are the sinks (never a source). */
+/** Either the layered form of an `<mdd>` (when the diagram is cleanly layered) or null, signalling the
+ *  [Regular] fallback. Cached by transitions-text identity like [RegularAutomaton]. */
+internal class MddResult(val layered: LayeredMddData?)
+
+/** Return the mdd lowering for [text], reusing the last one when [text] is the same object (a group). */
+@Suppress("AvoidReferentialEquality")
+private inline fun Xcsp3.Builder.mddResultFor(text: String, compute: () -> MddResult): MddResult {
+    cachedMddResult?.let { if (text === cachedMddText) return it }
+    val built = compute()
+    cachedMddText = text
+    cachedMddResult = built
+    return built
+}
+
+/** A multi-valued decision diagram is a layered automaton. It is lowered onto the native layered `Mdd`
+ *  factor when the diagram is cleanly layered — every state at one depth from the root, all sinks at the
+ *  final depth — and falls back to a flattened [Regular] automaton otherwise. */
 internal fun Xcsp3.Builder.mdd(e: XmlElement) {
     val text = requireNotNull(e.child("transitions")).textContent
-    val automaton = automatonFor(text) {
+    val seq = listVars(e)
+    val layered = mddResultFor(text) {
         val trs = internTransitions(text)
         if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
-        val q = trs.numStates
-        val isSrc = BooleanArray(q + 1)
-        val isDst = BooleanArray(q + 1)
-        for (k in trs.srcIds.indices) {
-            isSrc[trs.srcIds[k]] = true
-            isDst[trs.dstIds[k]] = true
-        }
-        val rootId = trs.idOf("root")
-        val q0 = if (rootId != -1 && isSrc[rootId]) {
-            rootId
-        } else {
-            var r = -1
-            for (id in 1..q) {
-                if (isSrc[id] && !isDst[id]) {
-                    r = id
-                    break
-                }
-            }
-            if (r == -1) throw UnsupportedXcsp3Exception("mdd: no root node") else r
-        }
-        val accepting = IntArrayList()
-        for (id in 1..q) if (isDst[id] && !isSrc[id]) accepting.add(id)
-        buildAutomaton(trs, q, q0, accepting.toIntArray())
+        MddResult(layerMdd(trs))
+    }.layered
+    if (layered != null && layered.nLayers == seq.size) {
+        factors.add(layered.toMdd(seq))
+        return
     }
-    emitRegular(listVars(e), automaton)
+    val automaton = automatonFor(text) { buildMddAutomaton(internTransitions(text)) }
+    emitRegular(seq, automaton)
+}
+
+/** The mdd root: the state named "root" if it is a source, else the unique source that is never a
+ *  destination; -1 when there is none. */
+private fun mddRoot(trs: InternedTransitions, isSrc: BooleanArray, isDst: BooleanArray): Int {
+    val rootId = trs.idOf("root")
+    if (rootId != -1 && isSrc[rootId]) return rootId
+    for (id in 1..trs.numStates) if (isSrc[id] && !isDst[id]) return id
+    return -1
+}
+
+/** Flattened-DFA fallback: a [Regular] automaton over the mdd's states (the sinks are the accepting set). */
+private fun buildMddAutomaton(trs: InternedTransitions): RegularAutomaton {
+    val q = trs.numStates
+    val isSrc = BooleanArray(q + 1)
+    val isDst = BooleanArray(q + 1)
+    for (k in trs.srcIds.indices) {
+        isSrc[trs.srcIds[k]] = true
+        isDst[trs.dstIds[k]] = true
+    }
+    val q0 = mddRoot(trs, isSrc, isDst)
+    if (q0 == -1) throw UnsupportedXcsp3Exception("mdd: no root node")
+    val accepting = IntArrayList()
+    for (id in 1..q) if (isDst[id] && !isSrc[id]) accepting.add(id)
+    return buildAutomaton(trs, q, q0, accepting.toIntArray())
+}
+
+/** Try to lower the interned transitions onto a layered `Mdd` (states dense per layer). Returns null when
+ *  the diagram is not cleanly layered — no root, a state reachable at two depths, an unreachable state, or
+ *  a sink before the final layer — so the caller uses the [Regular] fallback. */
+private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
+    val q = trs.numStates
+    val nEdges = trs.srcIds.size
+    val isSrc = BooleanArray(q + 1)
+    val isDst = BooleanArray(q + 1)
+    for (k in 0 until nEdges) {
+        isSrc[trs.srcIds[k]] = true
+        isDst[trs.dstIds[k]] = true
+    }
+    val root = mddRoot(trs, isSrc, isDst)
+    if (root == -1) return null
+
+    // CSR adjacency (dst per src) for the layering BFS.
+    val outStart = IntArray(q + 2)
+    for (k in 0 until nEdges) outStart[trs.srcIds[k] + 1]++
+    for (s in 1..q + 1) outStart[s] += outStart[s - 1]
+    val cursor = outStart.copyOf()
+    val adjDst = IntArray(nEdges)
+    for (k in 0 until nEdges) adjDst[cursor[trs.srcIds[k]]++] = trs.dstIds[k]
+
+    val layer = IntArray(q + 1) { -1 }
+    layer[root] = 0
+    var maxLayer = 0
+    val queue = ArrayDeque<Int>()
+    queue.add(root)
+    while (queue.isNotEmpty()) {
+        val s = queue.removeFirst()
+        val nl = layer[s] + 1
+        for (i in outStart[s] until outStart[s + 1]) {
+            val d = adjDst[i]
+            if (layer[d] == -1) {
+                layer[d] = nl
+                if (nl > maxLayer) maxLayer = nl
+                queue.add(d)
+            } else if (layer[d] != nl) {
+                return null // reachable at two depths — not layered
+            }
+        }
+    }
+    val nLayers = maxLayer
+    for (id in 1..q) {
+        if (layer[id] == -1) return null // unreachable from the root
+        // A sink (no outgoing edge) must sit at the final layer, else it is a short accepting path.
+        if (outStart[id] == outStart[id + 1] && layer[id] != nLayers) return null
+    }
+
+    val countPerLayer = IntArray(nLayers + 1)
+    val localIdx = IntArray(q)
+    for (id in 1..q) {
+        localIdx[id - 1] = countPerLayer[layer[id]]
+        countPerLayer[layer[id]]++
+    }
+    val nodeLayer = IntArray(q) { layer[it + 1] }
+    val edgeSrc = IntArray(nEdges) { trs.srcIds[it] - 1 }
+    val edgeDst = IntArray(nEdges) { trs.dstIds[it] - 1 }
+    val edgeSym = LongArray(nEdges) { trs.symbols[it].toLong() }
+    val accepting = IntArrayList()
+    for (id in 1..q) if (layer[id] == nLayers) accepting.add(id - 1)
+    return packLayeredMdd(
+        nLayers, countPerLayer, localIdx, nodeLayer,
+        edgeSrc, edgeSym, edgeDst, root - 1, accepting.toIntArray(),
+    )
 }
 
 /** Post a [Regular] factor over [seqVars] for the shared [automaton], allocating per-constraint only the
