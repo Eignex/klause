@@ -31,14 +31,16 @@ internal class BtValOption(val label: String, val make: () -> ValueSelector)
 /**
  * A named restart-schedule axis option — the sweep counterpart of a [RestartSchedule] choice, applied
  * through [BacktrackParams]. A [lubyBase] selects the Luby schedule at that base; [adaptive] selects the
- * Glucose adaptive schedule; [ema] selects the EMA-based adaptive schedule; all left unset is the
- * single-unbounded-run (no-restart) schedule.
+ * Glucose adaptive schedule; [ema] selects the EMA-based adaptive schedule; [modeSwitching] selects the
+ * stable/focused mode-switching schedule; all left unset is the single-unbounded-run (no-restart)
+ * schedule.
  */
 internal class BtRestartOption(
     val label: String,
     val lubyBase: Long? = null,
     val adaptive: Boolean = false,
     val ema: Boolean = false,
+    val modeSwitching: Boolean = false,
 )
 
 /** A named LP-emphasis axis option; [emphasis] `OFF` leaves the recipe with no LP relaxation. */
@@ -96,6 +98,7 @@ internal class BacktrackRecipeSpace(
                 lubyRestartBase = r.lubyBase,
                 adaptiveRestart = r.adaptive,
                 emaRestart = r.ema,
+                modeSwitchingRestart = r.modeSwitching,
                 lpConfig = if (l.emphasis == LpEmphasis.OFF) null else LpConfig(l.emphasis),
             )
         }
@@ -120,6 +123,7 @@ internal class BacktrackRecipeSpace(
             BtRestartOption("luby-256", lubyBase = 256L),
             BtRestartOption("adaptive", adaptive = true),
             BtRestartOption("ema", ema = true),
+            BtRestartOption("mode-switch", modeSwitching = true),
             BtRestartOption("no-restart"),
         )
 
