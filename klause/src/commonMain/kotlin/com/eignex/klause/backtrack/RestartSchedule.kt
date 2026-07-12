@@ -3,6 +3,14 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.util.lubyN
 
 /**
+ * The phase regime a [RestartSchedule] asks the engine's [PhaseSaving] to run under. [STABLE] dives on
+ * the best conflict-free phase (holding progress across restarts); [FOCUSED] uses plain phase saving
+ * without the target bias; [UNMANAGED] leaves phasing to its own rephase rotation (the default, so a
+ * schedule that doesn't opt in never perturbs phasing).
+ */
+internal enum class PhaseMode { UNMANAGED, STABLE, FOCUSED }
+
+/**
  * Pluggable restart *schedule* for one backtrack run: the per-run decision budget and the decision of
  * when to cut a run short and pop back to root. Decouples *when* to restart from the restart *action* —
  * popping the trail, replaying nogoods, forgetting, vivifying — which stays with the caller
@@ -26,28 +34,38 @@ internal interface RestartSchedule {
     /** Consume a restart once the caller has popped to root — advance the schedule state. */
     fun onRestart() {}
 
+    /** The phase regime the schedule wants the engine's [PhaseSaving] to run right now. [UNMANAGED]
+     *  (the default) leaves phasing to its own rephase rotation; a schedule that alternates a proving
+     *  and a diving regime returns [STABLE] / [FOCUSED] to couple the polarity source to the mode. */
+    fun phaseMode(): PhaseMode = PhaseMode.UNMANAGED
+
     companion object {
-        /** Conflicts in the first mode segment of the default [ModeSwitchingRestartSchedule]; later
+        /** Conflicts in the first cycle segment of the default [ModeSwitchingRestartSchedule]; later
          *  segments scale it by the Luby sequence. */
         const val DEFAULT_MODE_BASE: Long = 500L
+
+        /** Luby decision base for the stable stage of the default cycle. */
+        const val STABLE_LUBY_BASE: Long = 100L
+
+        /** The CP-SAT-style default cycle: a Luby stable stage that dives on the target phase, and an
+         *  EMA-adaptive focused stage that restarts on learned-clause quality. */
+        private fun defaultModeSwitching(): ModeSwitchingRestartSchedule = ModeSwitchingRestartSchedule(
+            stages = listOf(
+                RestartStage(LubyRestartSchedule(STABLE_LUBY_BASE), PhaseMode.STABLE),
+                RestartStage(EmaRestartSchedule(), PhaseMode.FOCUSED),
+            ),
+            switchBase = DEFAULT_MODE_BASE,
+        )
 
         /** The schedule selected by [params], in precedence order: mode-switching when
          *  [BacktrackParams.modeSwitchingRestart], else EMA-adaptive when [BacktrackParams.emaRestart],
          *  else Glucose-adaptive when [BacktrackParams.adaptiveRestart], else Luby when
          *  [BacktrackParams.lubyRestartBase] is set, else a single unbounded run. */
         fun from(params: BacktrackParams): RestartSchedule = when {
-            params.modeSwitchingRestart -> ModeSwitchingRestartSchedule(
-                focused = EmaRestartSchedule(),
-                stable = NoRestartSchedule,
-                modeBase = DEFAULT_MODE_BASE,
-            )
-
+            params.modeSwitchingRestart -> defaultModeSwitching()
             params.emaRestart -> EmaRestartSchedule()
-
             params.adaptiveRestart -> AdaptiveRestartSchedule()
-
             params.lubyRestartBase != null -> LubyRestartSchedule(params.lubyRestartBase)
-
             else -> NoRestartSchedule
         }
     }
@@ -120,33 +138,39 @@ internal class EmaRestartSchedule : RestartSchedule {
     }
 }
 
+/** One member of a [ModeSwitchingRestartSchedule] cycle: a sub-schedule that governs restarts while it
+ *  is active, paired with the phase regime the engine should run under during it. */
+internal class RestartStage(val schedule: RestartSchedule, val phaseMode: PhaseMode)
+
 /**
- * Stable/focused mode-switching schedule (the CaDiCaL/Kissat regime), mixing two schedules within one
- * run to be robust on optimization without hand-tuning. The search alternates between a [focused] mode
- * — restart-heavy proving, e.g. an adaptive detector — and a [stable] dive mode that rarely (or never)
- * restarts so the solver can drive deep and hold onto a good assignment via phase saving. Each mode
- * segment lasts `lubyN(seg) · modeBase` conflicts, so dive phases lengthen as the search proceeds.
- * Starts focused.
+ * Cycling multi-strategy restart portfolio (the CaDiCaL/Kissat/CP-SAT regime), mixing several schedules
+ * within one run to be robust on optimization without hand-tuning. The search cycles the [stages] list:
+ * each segment lasts `lubyN(seg) · switchBase` conflicts, then the next stage takes over, so segments
+ * lengthen as the search proceeds. A stage's [RestartStage.phaseMode] couples the polarity heuristic to
+ * the mode — the typical cycle pairs a [PhaseMode.STABLE] Luby stage (dive on the target phase, holding
+ * progress) with one or more [PhaseMode.FOCUSED] adaptive stages (restart-heavy proving). Starts on the
+ * first stage.
  *
  * Delegation is total: [shouldRestart] / [onRestart] / [beginRun] all route to the active sub-schedule,
- * and [recordConflict] both feeds the active schedule and drives the mode clock. On a mode switch the
+ * and [recordConflict] both feeds the active schedule and drives the cycle clock. On a stage switch the
  * newly active schedule's [beginRun] is called so its budget is sized for the fresh segment.
  */
-internal class ModeSwitchingRestartSchedule(
-    private val focused: RestartSchedule,
-    private val stable: RestartSchedule,
-    private val modeBase: Long,
-) : RestartSchedule {
-    private var inStableMode = false
+internal class ModeSwitchingRestartSchedule(private val stages: List<RestartStage>, private val switchBase: Long) :
+    RestartSchedule {
+    init {
+        require(stages.isNotEmpty()) { "a mode-switching schedule needs at least one stage" }
+    }
+
+    private var stageIndex = 0
     private var segment = 1L
     private var conflictsThisSegment = 0L
     private var segmentBudget = segmentBudget()
 
-    private fun active(): RestartSchedule = if (inStableMode) stable else focused
+    private fun active(): RestartSchedule = stages[stageIndex].schedule
 
     private fun segmentBudget(): Long {
         val limit = lubyN(segment)
-        return if (limit > Long.MAX_VALUE / modeBase) Long.MAX_VALUE else limit * modeBase
+        return if (limit > Long.MAX_VALUE / switchBase) Long.MAX_VALUE else limit * switchBase
     }
 
     override fun beginRun() = active().beginRun()
@@ -154,7 +178,7 @@ internal class ModeSwitchingRestartSchedule(
     override fun recordConflict(lbd: Int, trailSize: Int) {
         active().recordConflict(lbd, trailSize)
         if (++conflictsThisSegment >= segmentBudget) {
-            inStableMode = !inStableMode
+            stageIndex = (stageIndex + 1) % stages.size
             segment++
             conflictsThisSegment = 0
             segmentBudget = segmentBudget()
@@ -165,4 +189,7 @@ internal class ModeSwitchingRestartSchedule(
     override fun shouldRestart(decisionsThisRun: Long): Boolean = active().shouldRestart(decisionsThisRun)
 
     override fun onRestart() = active().onRestart()
+
+    /** The phase regime of the active stage, so a stable Luby stage dives on the target phase. */
+    override fun phaseMode(): PhaseMode = stages[stageIndex].phaseMode
 }

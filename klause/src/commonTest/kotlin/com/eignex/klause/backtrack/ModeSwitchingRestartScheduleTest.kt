@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -17,11 +18,13 @@ class ModeSwitchingRestartScheduleTest {
         override fun shouldRestart(decisionsThisRun: Long): Boolean = true
     }
 
-    // modeBase 3, so segment budgets follow lubyN(seg)*3: 3 (focused), 3 (stable), 6 (focused), ...
+    // switchBase 3, so segment budgets follow lubyN(seg)*3: 3 (focused), 3 (stable), 6 (focused), ...
     private fun schedule() = ModeSwitchingRestartSchedule(
-        focused = AlwaysRestart,
-        stable = NoRestartSchedule,
-        modeBase = 3,
+        stages = listOf(
+            RestartStage(AlwaysRestart, PhaseMode.FOCUSED),
+            RestartStage(NoRestartSchedule, PhaseMode.STABLE),
+        ),
+        switchBase = 3,
     )
 
     private fun RestartSchedule.recordConflicts(n: Int) = repeat(n) { recordConflict(lbd = 2, trailSize = 10) }
@@ -47,5 +50,35 @@ class ModeSwitchingRestartScheduleTest {
         val s = schedule()
         s.recordConflicts(6)
         assertTrue(s.shouldRestart(0), "restarts resume once the stable segment is spent")
+    }
+
+    @Test
+    fun `cycles through more than two stages and wraps to the first`() {
+        // Distinguish stages by their restart behaviour: only stage 1 asks to restart.
+        val s = ModeSwitchingRestartSchedule(
+            stages = listOf(
+                RestartStage(NoRestartSchedule, PhaseMode.STABLE),
+                RestartStage(AlwaysRestart, PhaseMode.FOCUSED),
+                RestartStage(NoRestartSchedule, PhaseMode.STABLE),
+            ),
+            switchBase = 2,
+        )
+        // Segment budgets follow lubyN(seg)*2: 2, 2, 4, ...
+        s.recordConflicts(2)
+        assertTrue(s.shouldRestart(0), "advanced to the restart-heavy second stage")
+        s.recordConflicts(2)
+        assertFalse(s.shouldRestart(0), "advanced to the third, no-restart stage")
+        s.recordConflicts(4)
+        assertFalse(s.shouldRestart(0), "wrapped back to the first, no-restart stage")
+    }
+
+    @Test
+    fun `phase mode tracks the active segment`() {
+        val s = schedule()
+        assertEquals(PhaseMode.FOCUSED, s.phaseMode(), "the focused segment runs the focused phase")
+        s.recordConflicts(3)
+        assertEquals(PhaseMode.STABLE, s.phaseMode(), "the stable dive segment runs the stable phase")
+        s.recordConflicts(3)
+        assertEquals(PhaseMode.FOCUSED, s.phaseMode(), "focused again after the stable segment")
     }
 }
