@@ -87,8 +87,7 @@ internal fun Xcsp3.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
     // Matrix element uses per-axis start indices (defaulting to 0), not a single startIndex.
     val rowOffset = e.attr("startRowIndex").ifBlank { "0" }.toInt()
     val colOffset = e.attr("startColIndex").ifBlank { "0" }.toInt()
-    val idxTokens = requireNotNull(e.child("index")).textContent.trim()
-        .split(Regex("\\s+")).filter { it.isNotBlank() }
+    val idxTokens = requireNotNull(e.child("index")).textContent.splitWs()
     if (idxTokens.size != 2) throw UnsupportedXcsp3Exception("element: matrix needs a 2-D <index>")
     val i = singleTermVar(idxTokens[0])
     val j = singleTermVar(idxTokens[1])
@@ -396,8 +395,7 @@ internal fun Xcsp3.Builder.regular(e: XmlElement) {
         val start = requireNotNull(e.child("start")).textContent.trim()
         val trs = internTransitions(text, start)
         if (trs.symbols.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: no transitions")
-        val finals = requireNotNull(e.child("final")).textContent.trim()
-            .split(Regex("\\s+")).filter { it.isNotBlank() }
+        val finals = requireNotNull(e.child("final")).textContent.splitWs()
         val extra = HashMap<String, Int>()
         fun resolve(name: String): Int {
             val id = trs.idOf(name)
@@ -606,7 +604,7 @@ internal fun Xcsp3.Builder.matrixRows(text: String): List<IntArray> {
         return rows
     }
     val idxRe = Regex("""\[(\d+)]""")
-    val cells = t.split(Regex("\\s+")).filter { it.isNotBlank() }.flatMap { expandNames(it) }
+    val cells = t.splitWs().flatMap { expandNames(it) }
     val byRow = HashMap<Int, MutableList<Pair<Int, Int>>>()
     for (name in cells) {
         val idx = idxRe.findAll(name).map { it.groupValues[1].toInt() }.toList()
@@ -670,8 +668,7 @@ internal fun Xcsp3.Builder.allEqual(e: XmlElement) {
 /** `minimum`/`maximum` of a list constrained by a condition, via [ArrayMinMax] + the condition. */
 internal fun Xcsp3.Builder.minMax(e: XmlElement, max: Boolean) {
     // Entries may be plain variables or expressions (e.g. `sub(y,37)`), each resolved to an int var.
-    val vars = requireNotNull(e.child("list")).textContent.trim()
-        .split(Regex("\\s+")).filter { it.isNotBlank() }
+    val vars = requireNotNull(e.child("list")).textContent.splitWs()
         .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
     val m = newAuxVar(domainMin(vars), domainMin(vars) + domainSpan(vars) - 1)
     factors.add(ArrayMinMax(result = m, xs = vars, max = max))
@@ -690,7 +687,7 @@ internal fun Xcsp3.Builder.cardinality(e: XmlElement) {
     // closed="true" additionally forbids any variable taking a value outside <values>.
     val closed = valuesEl.attr("closed").equals("true", ignoreCase = true)
     val occursText = requireNotNull(e.child("occurs")).textContent.trim()
-    val occTokens = occursText.split(Regex("\\s+")).filter { it.isNotBlank() }
+    val occTokens = occursText.splitWs()
     val exact = parseInts(occursText)
     when {
         // Interval occurrences `lo..hi`.
@@ -749,7 +746,7 @@ internal fun Xcsp3.Builder.binPacking(e: XmlElement) {
         // `<loads>`: each bin's total size equals its load variable — `Σ size[i]·[list[i]=b] = loads[b]`.
         loadsEl != null -> {
             // Load entries may be plain variables or expressions (e.g. `sub(y,37)`).
-            val loadVars = loadsEl.textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val loadVars = loadsEl.textContent.splitWs()
                 .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             if (loadVars.size.toLong() * items.size > negTableCap) {
                 throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")

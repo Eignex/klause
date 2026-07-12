@@ -36,6 +36,23 @@ data class Xcsp3Problem(
     val maximize: Boolean = false,
 )
 
+/** Split on runs of whitespace into non-blank tokens. A manual scan replacing an inline
+ *  `split(Regex("\\s+")).filter { it.isNotBlank() }`, whose per-call `Regex` compilation dominated
+ *  group instantiation over hundreds of thousands of `<args>` rows. */
+internal fun String.splitWs(): List<String> {
+    val out = ArrayList<String>()
+    val n = length
+    var i = 0
+    while (i < n) {
+        while (i < n && this[i].isWhitespace()) i++
+        if (i >= n) break
+        val start = i
+        while (i < n && !this[i].isWhitespace()) i++
+        out.add(substring(start, i))
+    }
+    return out
+}
+
 /** Parser/compiler for the supported XCSP3 integer subset. */
 object Xcsp3 {
     /** Parse XCSP3 [text] into an [Xcsp3Problem]. */
@@ -111,7 +128,7 @@ object Xcsp3 {
 
         internal fun parseDomain(text: String): IntDomain {
             val values = HashSet<Long>()
-            for (tok in text.split(Regex("\\s+")).filter { it.isNotBlank() }) {
+            for (tok in text.splitWs()) {
                 val r = tok.split("..")
                 if (r.size == 2) for (v in r[0].toLong()..r[1].toLong()) values.add(v) else values.add(tok.toLong())
             }
@@ -158,8 +175,7 @@ object Xcsp3 {
         internal fun sum(e: XmlElement) {
             // Terms may be plain variables or expressions (e.g. `ne(x,0)` counting occurrences);
             // each expression is reified/linearized into an int var carrying its value.
-            val tokens = requireNotNull(e.child("list")).textContent.trim()
-                .split(Regex("\\s+")).filter { it.isNotBlank() }
+            val tokens = requireNotNull(e.child("list")).textContent.splitWs()
             val termVars = tokens.flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             if (termVars.isEmpty()) throw UnsupportedXcsp3Exception("sum: empty <list>")
             val condText = requireNotNull(e.child("condition")).textContent.trim()
@@ -172,7 +188,7 @@ object Xcsp3 {
             }
             // Variable coefficients (constCoeffs is null only when <coeffs> is present but not constant):
             // Σ coeff_i·term_i where each product is materialized via [Product].
-            val coeffVars = requireNotNull(coeffsText).trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val coeffVars = requireNotNull(coeffsText).splitWs()
                 .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             require(coeffVars.size == termVars.size) { "sum: <coeffs> length != term count" }
             val products = IntArray(termVars.size) { i ->
@@ -382,7 +398,7 @@ object Xcsp3 {
             val type = e.attr("type").ifBlank { "sum" }
             // Terms may be plain variables or expressions (e.g. `gt(x,0)`), each resolved to an int var.
             val listText = e.child("list")?.textContent ?: e.textContent
-            val termVars = listText.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            val termVars = listText.splitWs()
                 .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
             if (termVars.isEmpty()) throw UnsupportedXcsp3Exception("objective: empty <list>")
             when (type) {
@@ -631,7 +647,7 @@ object Xcsp3 {
          *  is not an integer (e.g. a variable reference) — callers treat null as "not constant".
          *  Supports XCSP3 run-length shorthand `vxn` (value `v` repeated `n` times). */
         internal fun parseInts(text: String?): IntArray? {
-            val toks = text?.trim()?.split(Regex("\\s+"))?.filter { it.isNotBlank() } ?: return null
+            val toks = text?.splitWs() ?: return null
             val out = ArrayList<Int>(toks.size)
             for (tok in toks) {
                 val rle = RLE.matchEntire(tok)
@@ -652,8 +668,7 @@ object Xcsp3 {
             else -> parseInts(text) ?: throw UnsupportedXcsp3Exception("non-constant <coeffs>")
         }
 
-        internal fun refList(text: String): List<Int> =
-            text.trim().split(Regex("\\s+")).filter { it.isNotBlank() }.flatMap { expandRef(it) }
+        internal fun refList(text: String): List<Int> = text.splitWs().flatMap { expandRef(it) }
 
         // A `<list>` entry may be a declared variable (possibly a wildcard/range over cells), a
         // constant, a reified relation, or an arithmetic expression; [termVar] resolves each to an
@@ -692,8 +707,7 @@ object Xcsp3 {
             val listElem = lists[0]
             val template = e.children.firstOrNull { it.tag != "list" }
                 ?: throw UnsupportedXcsp3Exception("slide: missing template constraint")
-            val names = listElem.textContent.trim().split(Regex("\\s+"))
-                .filter { it.isNotBlank() }.flatMap { expandNames(it) }
+            val names = listElem.textContent.splitWs().flatMap { expandNames(it) }
             val used = template.explicitParamIndices()
             val collect = listElem.attr("collect").toIntOrNull() ?: ((used.maxOrNull() ?: 0) + 1)
             require(collect >= 1) { "slide: collect must be >= 1" }
@@ -708,7 +722,7 @@ object Xcsp3 {
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
             val used = template.explicitParamIndices()
             for (args in e.children.filter { it.tag == "args" }) {
-                val tokens = args.textContent.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+                val tokens = args.textContent.splitWs()
                     .flatMap { expandNames(it) }
                 constraint(template.substituteParams(tokens, used))
             }
