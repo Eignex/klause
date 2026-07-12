@@ -13,10 +13,14 @@ catalog suites, including the discovered MiniZinc corpora.
 
 Vendored directories and their provenance:
 
-- `dimacs/` (DIMACS CNF): SATLIB-style random 3-SAT, plus self-authored
+- `dimacs/` (DIMACS CNF + WCNF): SATLIB-style random 3-SAT, plus self-authored
   pigeonhole (PHP(4,3)/PHP(3,2), UNSAT), an implication chain, and a bipartite
-  2-colouring — small SAT/UNSAT shapes from public benchmarks / internal.
-- `opb/` (Pseudo-Boolean): self-authored, internal (set-cover, cardinality).
+  2-colouring — small SAT/UNSAT shapes from public benchmarks / internal. Also
+  `maxsat-tiny.wcnf`: a self-authored MaxSAT (weighted partial WCNF) toy, internal.
+- `opb/` (Pseudo-Boolean OPB + WBO): self-authored, internal (set-cover,
+  cardinality), plus two small samples of the MaxSAT/PB Competition (academic
+  benchmarks): `sporttournament06.opb` (a non-linear OPB with product terms) and
+  `queens4-soft.wbo` (a WBO soft-constraint instance).
 - `schema/` (klause JSON): self-authored, internal (campaign, roster);
   regenerate the campaign sample via `:klause-bench:dumpSchema`.
 - `flatzinc/` (FlatZinc): self-authored, internal — cardinality, permutation,
