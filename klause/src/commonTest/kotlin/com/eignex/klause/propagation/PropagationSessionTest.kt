@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -116,5 +117,20 @@ class PropagationSessionTest {
         val secondImpl = assertIs<PropagationResult.Implied>(second)
         assertTrue(secondImpl.bools.isEmpty())
         assertTrue(secondImpl.ints.isEmpty())
+    }
+
+    @Test
+    fun `a per-node fixpoint cut short by the deadline flags fixpointCancelled`() {
+        // (¬x0 ∨ x1): pinning x0 wakes the clause, so the targeted fixpoint fires at least once.
+        // cancelFloor 0 makes the poll engage from the first fire (a real run only polls once a single
+        // fixpoint runs away past the fire floor), so the armed deadline cuts this tiny propagation.
+        val p = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))))
+        var armed = false
+        val s = PropagationSession(p, Cancellation { armed }, propagationCancelFloor = 0)
+        s.seed(Assumptions.None) // bake + seed run before the deadline fires
+        assertTrue(!s.fixpointCancelled)
+        armed = true // the deadline now fires inside the next targeted propagation
+        s.pinBool(0, true)
+        assertTrue(s.fixpointCancelled, "a targeted fixpoint stopped by the deadline must flag cancellation")
     }
 }

@@ -10,6 +10,7 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -551,5 +552,24 @@ class BacktrackSolverTest {
             assertEquals(raw.size, raw.toHashSet().size, "seed $seed: a solution was yielded more than once")
             assertEquals(brute, raw.toHashSet(), "seed $seed: enumeration must equal the brute-force feasible set")
         }
+    }
+
+    @Test
+    fun `a deadline firing inside propagation yields Unknown rather than a solution`() {
+        // Satisfiable (x0 ∨ x1). With cancelFloor 0 a fired deadline cuts the very first fixpoint
+        // short, leaving an under-propagated state the search must not report as SAT — the honest
+        // verdict is Unknown, never a solution built on a cut-short fixpoint.
+        val p = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+        )
+        val fired = BacktrackSolver(p).solve(
+            BacktrackParams(randomSeed = 0L, cancellation = Cancellation { true }, propagationCancelFloor = 0),
+        )
+        assertIs<SolveResult.Unknown>(fired)
+        // With no deadline the same problem is solved.
+        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
     }
 }
