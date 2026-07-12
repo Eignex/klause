@@ -20,6 +20,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.MutableLongIntMap
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
 class UnsupportedXcsp3Exception(msg: String) : RuntimeException("klause XCSP3: $msg")
@@ -71,6 +72,17 @@ object Xcsp3 {
         internal var nextBool = 0
         internal var objective: LinearObjective? = null
         internal var objectiveMaximize = false
+
+        // A fixed var for an integer constant is shared across its occurrences. An Element/sum `<list>`
+        // can repeat a constant tens of thousands of times (WordSquare), and a fresh `{c}` var each time
+        // bloated the problem to millions of vars. A constant var is single-valued (never branched), so
+        // sharing it is solve-neutral.
+        private val constVars = MutableLongIntMap()
+        internal fun constVar(value: Long): Int {
+            val existing = constVars.getOrDefault(value, -1)
+            if (existing != -1) return existing
+            return newAuxVar(value, value).also { constVars.put(value, it) }
+        }
 
         // A `<group>` instantiates its regular/mdd template once per `<args>` row over the same shared
         // `<transitions>` text object; the built automaton depends only on that text, so cache the last
@@ -213,7 +225,7 @@ object Xcsp3 {
             return when {
                 node is FExpr.Ref -> ref(node.name)
 
-                node is FExpr.Num -> newAuxVar(node.value.toLong(), node.value.toLong())
+                node is FExpr.Num -> constVar(node.value.toLong())
 
                 node is FExpr.Call && node.fn in REL -> {
                     val r = relationParts(node)
@@ -634,7 +646,7 @@ object Xcsp3 {
             varIds[t]?.let { return it }
             return when (val node = FExpr.parse(t)) {
                 is FExpr.Ref -> ref(node.name)
-                is FExpr.Num -> newAuxVar(node.value.toLong(), node.value.toLong())
+                is FExpr.Num -> constVar(node.value.toLong())
                 else -> throw UnsupportedXcsp3Exception("expected a single variable/constant, got '$text'")
             }
         }
