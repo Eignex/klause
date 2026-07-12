@@ -108,6 +108,21 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `a small-domain conflict table complements to a positive table for GAC`() {
+        val xml = "<instance type=\"CSP\"><variables><var id=\"a\"> 0..2 </var><var id=\"b\"> 0..2 </var></variables>" +
+            "<constraints><extension><list> a b </list><conflicts> (1,1) </conflicts></extension></constraints></instance>"
+        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Table }, "small conflict should complement to a Table")
+    }
+
+    @Test
+    fun `a conflict table whose complement exceeds the cap stays clauses`() {
+        val xml = "<instance type=\"CSP\"><variables><var id=\"a\"> 0..2 </var><var id=\"b\"> 0..2 </var></variables>" +
+            "<constraints><extension><list> a b </list><conflicts> (1,1) </conflicts></extension></constraints></instance>"
+        // The 3x3 domain product exceeds a cap of 4, so it lowers to nogood clauses instead of a Table.
+        assertTrue(Xcsp3.parse(xml, negTableCap = 4).problem.factors.none { it is Table }, "over-cap ⇒ clauses")
+    }
+
+    @Test
     fun `conflict tables enumerate exactly the complement of the forbidden set`() {
         // Soundness gate for the nogood-clause lowering of <conflicts>: klause must accept exactly the
         // assignments NOT listed as forbidden. Compared against a brute-force complement.

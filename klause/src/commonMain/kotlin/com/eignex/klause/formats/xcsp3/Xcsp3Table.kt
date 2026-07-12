@@ -28,10 +28,70 @@ internal fun Xcsp3.Builder.extension(e: XmlElement) {
 
         supports != null -> postSupportTable(vars, supports)
 
-        conflicts != null -> postConflictClauses(vars, conflicts)
+        conflicts != null -> postConflicts(vars, conflicts)
 
         else -> throw UnsupportedXcsp3Exception("extension without supports or conflicts")
     }
+}
+
+/** Post a negative `<conflicts>` table. When the variables' domain Cartesian product is small enough,
+ *  complement it to a positive [Table] — STR2 propagates that at GAC strength, which matters for dense
+ *  binary negatives (e.g. FRB) where forward checking is far too weak. Otherwise lower to nogood clauses
+ *  (forward-checking strength) to avoid materializing a large complement. */
+internal fun Xcsp3.Builder.postConflicts(vars: IntArray, text: String) {
+    val rows = parseShortRows(text, vars.size)
+    var product = 1L
+    for (v in vars) {
+        product *= domainValues(v).size
+        if (product > negTableCap) return postConflictClauses(vars, rows)
+    }
+    postConflictComplement(vars, rows)
+}
+
+/** The allowed complement of a forbidden-tuple table as a positive [Table]: every domain combination
+ *  that matches no forbidden row. An empty complement ⇒ every assignment forbidden ⇒ unsatisfiable. */
+internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRows) {
+    val arity = vars.size
+    val doms = vars.map { domainValues(it) }
+    val nRows = rows.lo.size / arity
+    // Ground forbidden rows go in a set for O(1) lookup; rows with a `*`/range cell are scanned.
+    val forbiddenPoints = HashSet<List<Int>>()
+    val intervalRows = ArrayList<Int>()
+    for (r in 0 until nRows) {
+        val point = (0 until arity).all { rows.lo[r * arity + it] == rows.hi[r * arity + it] }
+        if (point) forbiddenPoints.add(List(arity) { rows.lo[r * arity + it].toInt() }) else intervalRows.add(r)
+    }
+    fun forbidden(combo: List<Int>): Boolean {
+        if (combo in forbiddenPoints) return true
+        for (r in intervalRows) {
+            if ((0 until arity).all { combo[it].toLong() in rows.lo[r * arity + it]..rows.hi[r * arity + it] }) {
+                return true
+            }
+        }
+        return false
+    }
+    val allowed = LongArrayList()
+    var count = 0
+    val combo = IntArray(arity)
+    fun rec(p: Int) {
+        if (p == arity) {
+            if (!forbidden(combo.toList())) {
+                for (c in 0 until arity) allowed.add(combo[c].toLong())
+                count++
+            }
+            return
+        }
+        for (value in doms[p]) {
+            combo[p] = value
+            rec(p + 1)
+        }
+    }
+    rec(0)
+    if (count == 0) {
+        factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
+        return
+    }
+    factors.add(Table(xs = vars, tuples = allowed.toLongArray()))
 }
 
 /** Post a positive `<supports>` table as a [Table] factor. `*`/range columns become short-support
@@ -59,9 +119,8 @@ internal fun Xcsp3.Builder.postSupportTable(vars: IntArray, text: String) {
 /** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — the disjunction of
  *  each column "differing" from its cell: `x ≠ v` for a point, `x < lo ∨ x > hi` for a range, and
  *  nothing for a `*` (it forbids regardless of that variable). Never materializes the complement. */
-internal fun Xcsp3.Builder.postConflictClauses(vars: IntArray, text: String) {
+internal fun Xcsp3.Builder.postConflictClauses(vars: IntArray, rows: ShortRows) {
     val arity = vars.size
-    val rows = parseShortRows(text, arity)
     val n = rows.lo.size / arity
     for (r in 0 until n) {
         val lits = IntArrayList()
