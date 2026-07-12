@@ -658,10 +658,25 @@ object Xcsp3 {
          *  group is a fixed index `[i]`, a range `[lo..hi]`, or a wildcard `[]` (any index), in
          *  any position and dimensionality — e.g. `x[]`, `x[][]`, `x[2][]`, `x[0..1][0]`. A plain
          *  reference with no wildcard or range is returned as-is (resolved later by [ref]). */
+        // Declared cell names grouped by array base (the prefix before the first `[`), built lazily on
+        // the first wildcard/range reference — by which point every variable is declared. A wildcard
+        // pattern `^base\[…]$` can only match cells of that base, so expansion filters this bucket
+        // instead of every declared variable, turning an O(references × variables) scan (pathological
+        // with a large array) into O(cells of the base).
+        private val cellsByBase: HashMap<String, ArrayList<String>> by lazy(LazyThreadSafetyMode.NONE) {
+            val index = HashMap<String, ArrayList<String>>()
+            for (name in varIds.keys) {
+                val br = name.indexOf('[')
+                if (br > 0) index.getOrPut(name.substring(0, br)) { ArrayList() }.add(name)
+            }
+            index
+        }
+
         internal fun expandNames(tok: String): List<String> {
             if ("[]" !in tok && ".." !in tok) return listOf(tok)
             val m = ARRAY_REF.find(tok) ?: return listOf(tok)
-            val pattern = StringBuilder("^").append(Regex.escape(m.groupValues[1]))
+            val base = m.groupValues[1]
+            val pattern = StringBuilder("^").append(Regex.escape(base))
             for (spec in BRACKET.findAll(m.groupValues[2]).map { it.groupValues[1] }) {
                 val range = spec.split("..")
                 val frag = when {
@@ -672,7 +687,8 @@ object Xcsp3 {
                 pattern.append("""\[""").append(frag).append(']')
             }
             val rx = Regex(pattern.append('$').toString())
-            return varIds.keys.filter { rx.matches(it) }
+            val cells = cellsByBase[base] ?: return emptyList()
+            return cells.filter { rx.matches(it) }
         }
         internal fun ref(name: String): Int = varIds[name] ?: throw UnsupportedXcsp3Exception(
             "unknown variable '$name'",
