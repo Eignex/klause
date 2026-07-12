@@ -79,14 +79,21 @@ object SmtLibQfLia {
          *  as a new scope. */
         internal fun pushLetScope(bindingList: SExpr) {
             require(bindingList is SExpr.SList) { "malformed let bindings" }
-            val bound = bindingList.items.map { pair ->
-                val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
-                val name = (p.items[0] as SExpr.Atom).text
-                val expr = p.items[1]
-                val b = Binding(isBool = isBoolExpr(expr))
-                if (b.isBool) b.lit = compileBool(expr) else b.lin = linearTerm(expr)
-                name to b
-            }
+            pushScopeBindings(
+                bindingList.items.map { pair ->
+                    val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
+                    val name = (p.items[0] as SExpr.Atom).text
+                    val expr = p.items[1]
+                    val b = Binding(isBool = isBoolExpr(expr))
+                    if (b.isBool) b.lit = compileBool(expr) else b.lin = linearTerm(expr)
+                    name to b
+                },
+            )
+        }
+
+        /** Push already-compiled [bound] bindings as one new innermost scope. Used by the iterative
+         *  term evaluator, which folds a `let`'s binding values in-stack before building the scope. */
+        internal fun pushScopeBindings(bound: List<Pair<String, Binding>>) {
             val names = ArrayList<String>(bound.size)
             for ((name, b) in bound) {
                 bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(b)
@@ -100,23 +107,6 @@ object SmtLibQfLia {
                 val stack = bindingStacks.getValue(name)
                 stack.removeLast()
                 if (stack.isEmpty()) bindingStacks.remove(name)
-            }
-        }
-
-        /** Push scopes for a leading chain of `let`s in [t] iteratively (not recursively), run [body] on
-         *  the innermost non-`let` node, then pop them — keeping let-chain depth off the call stack. */
-        internal inline fun <T> unwindingLets(t: SExpr, body: (SExpr) -> T): T {
-            var pushed = 0
-            var node = t
-            try {
-                while (node is SExpr.SList && (node.items.firstOrNull() as? SExpr.Atom)?.text == "let") {
-                    pushLetScope(node.items[1])
-                    pushed++
-                    node = node.items[2]
-                }
-                return body(node)
-            } finally {
-                repeat(pushed) { popLetScope() }
             }
         }
 

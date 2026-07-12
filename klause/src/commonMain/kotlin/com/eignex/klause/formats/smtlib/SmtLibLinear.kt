@@ -2,7 +2,6 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
@@ -44,7 +43,12 @@ internal fun SmtLibQfLia.Builder.relationToLinear(t: SExpr.SList): Rel {
             "$op with ${t.items.size - 1} operands not supported as a single linear relation",
         )
     }
-    val (vars, coeffs, baseBound) = diff(linearTerm(t.items[1]), linearTerm(t.items[2]))
+    return relFromOperands(op, linearTerm(t.items[1]), linearTerm(t.items[2]))
+}
+
+/** Build a linear relation `a op b` (as `Σ coeffs·vars ⟨op⟩ bound`) from two folded operands. */
+internal fun SmtLibQfLia.Builder.relFromOperands(op: String, a: LinComb, b: LinComb): Rel {
+    val (vars, coeffs, baseBound) = diff(a, b)
     val (linOp, delta) = when (op) {
         "<=" -> LinearOp.LE to 0
         ">=" -> LinearOp.GE to 0
@@ -57,76 +61,8 @@ internal fun SmtLibQfLia.Builder.relationToLinear(t: SExpr.SList): Rel {
     return Rel(vars, coeffs, linOp, baseBound + delta)
 }
 
-internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = unwindingLets(t) { node ->
-    when (node) {
-        is SExpr.Atom -> {
-            val n = node.text.toLongOrNull()
-            when {
-                n != null -> LinComb(emptyMap(), n)
-
-                // An integer literal beyond 64 bits (SMT integers are arbitrary precision) is not a real;
-                // report it honestly as out of the lowering's range rather than as a real literal.
-                isIntegerLiteral(node.text) -> throw UnsupportedSmtException(
-                    "integer literal '${node.text}' exceeds the 64-bit range of the QF_LIA lowering",
-                )
-
-                isRealLiteral(
-                    node.text,
-                ) -> throw UnsupportedSmtException("real literal '${node.text}' (QF_LIA is integer-only)")
-
-                else -> lookup(node.text)?.let { intBinding(node.text, it) }
-                    ?: LinComb(
-                        mapOf(
-                            (
-                                intNames[node.text]
-                                    ?: throw UnsupportedSmtException("unknown int var '${node.text}'")
-                                ) to 1,
-                        ),
-                        0,
-                    )
-            }
-        }
-
-        is SExpr.SList -> {
-            val h = (node.items[0] as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("bad int term")
-            val args = node.items.drop(1)
-            when (h) {
-                "+" -> args.map { linearTerm(it) }.reduce(::add)
-
-                "-" -> if (args.size == 1) {
-                    scale(linearTerm(args[0]), -1L)
-                } else {
-                    args.drop(1).fold(linearTerm(args[0])) { acc, e -> add(acc, scale(linearTerm(e), -1L)) }
-                }
-
-                "*" -> {
-                    val parts = args.map { linearTerm(it) }
-                    val nonConst = parts.filter { it.coeffs.isNotEmpty() }
-                    if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
-                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> a * c.constant }
-                    if (nonConst.isEmpty()) LinComb(emptyMap(), k) else scale(nonConst[0], k)
-                }
-
-                "to_real", "to_int" -> linearTerm(args[0])
-
-                "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$h'")
-
-                "ite" -> {
-                    // v = if cond then a else b: a fresh int pinned to each branch by the condition.
-                    val cond = compileBool(args[0])
-                    val a = linearTerm(args[1])
-                    val b = linearTerm(args[2])
-                    val self = LinComb(mapOf(newInt() to 1), 0)
-                    factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
-                    factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
-                    self
-                }
-
-                else -> throw UnsupportedSmtException("unsupported int op '$h'")
-            }
-        }
-    }
-}
+/** Fold [t] to an integer linear combination (iteratively, via [evalTerm]). */
+internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = (evalTerm(t, Sort.INT) as Res.I).lin
 
 internal fun SmtLibQfLia.Builder.intBinding(name: String, b: SmtLibQfLia.Builder.Binding): LinComb {
     if (b.isBool) throw UnsupportedSmtException("'$name' used as Int but bound to a Bool term")
