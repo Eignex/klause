@@ -79,6 +79,14 @@ data class BacktrackParams(
      */
     val adaptiveRestart: Boolean = false,
     /**
+     * EMA-based adaptive restarts (Biere-Fröhlich) — the modern CDCL variant of [adaptiveRestart].
+     * Instead of [GlucoseRestart]'s bounded LBD/trail windows, restarts are driven by exponential
+     * moving averages of learned-clause LBD (a fast recent average against a slow long-run one) with
+     * the same trail-size blocking. See [EmaRestart]. Takes precedence over [adaptiveRestart] and
+     * [lubyRestartBase] when set. Disabled by default.
+     */
+    val emaRestart: Boolean = false,
+    /**
      * Phase-saving: cache the last value the search committed to for each variable.
      * On a fresh descent (after a backtrack or restart) the cached value is tried
      * first, so the search doesn't lose the work spent narrowing down the right

@@ -64,8 +64,14 @@ class BacktrackRecipeSpaceTest {
         assertTrue(adaptive.adaptiveRestart, "the adaptive option enables the Glucose schedule")
         assertNull(adaptive.lubyRestartBase, "the adaptive option leaves no Luby base")
 
+        val ema = recipes.first { it.label.contains("/ema/") }.build(1L)
+        assertTrue(ema.emaRestart, "the ema option enables the EMA schedule")
+        assertFalse(ema.adaptiveRestart, "the ema option leaves Glucose adaptive off")
+        assertNull(ema.lubyRestartBase, "the ema option leaves no Luby base")
+
         val noRestart = recipes.first { it.label.contains("/no-restart/") }.build(1L)
         assertFalse(noRestart.adaptiveRestart, "the no-restart option leaves adaptive off")
+        assertFalse(noRestart.emaRestart, "the no-restart option leaves ema off")
         assertNull(noRestart.lubyRestartBase, "the no-restart option leaves no Luby base")
 
         val luby = recipes.first { it.label.contains("/luby-256/") }.build(1L)

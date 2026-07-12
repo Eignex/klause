@@ -44,6 +44,7 @@ class RestartScheduleTest {
 
     @Test
     fun `from selects the schedule configured on the params`() {
+        assertIs<EmaRestartSchedule>(RestartSchedule.from(BacktrackParams(emaRestart = true)))
         assertIs<AdaptiveRestartSchedule>(RestartSchedule.from(BacktrackParams(adaptiveRestart = true)))
         assertIs<LubyRestartSchedule>(RestartSchedule.from(BacktrackParams(lubyRestartBase = 256L)))
         assertIs<NoRestartSchedule>(RestartSchedule.from(BacktrackParams()))
@@ -53,6 +54,13 @@ class RestartScheduleTest {
     fun `adaptive wins when both adaptive and a luby base are set`() {
         assertIs<AdaptiveRestartSchedule>(
             RestartSchedule.from(BacktrackParams(adaptiveRestart = true, lubyRestartBase = 256L)),
+        )
+    }
+
+    @Test
+    fun `ema wins over adaptive and a luby base`() {
+        assertIs<EmaRestartSchedule>(
+            RestartSchedule.from(BacktrackParams(emaRestart = true, adaptiveRestart = true, lubyRestartBase = 256L)),
         )
     }
 }
