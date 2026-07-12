@@ -547,7 +547,8 @@ internal fun linearSolvable(
         return Solvable(
             problem = problem, optimize = false, maximize = false,
             lsObjective = null, linearObjective = null, objVarId = null,
-            definitionalSweep = null, render = render, objectiveValue = null,
+            definitionalSweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars),
+            render = render, objectiveValue = null,
         )
     }
     return Solvable(
@@ -558,7 +559,7 @@ internal fun linearSolvable(
         lsObjective = null,
         linearObjective = objective,
         objVarId = objective.singleIntObjective()?.varId,
-        definitionalSweep = null,
+        definitionalSweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars),
         render = render,
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
     )
