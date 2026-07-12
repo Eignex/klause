@@ -10,7 +10,11 @@ import com.eignex.klause.util.IntArrayList
  * seed set, the per-int-var owner map, and the binary-implication graph. All built lazily on first
  * access and paid once per solve rather than per move.
  */
-class ImplicitSeeding(private val problem: Problem) {
+class ImplicitSeeding(
+    private val problem: Problem,
+    /** Free-Boolean probe cap for [implicationGraph]. */
+    private val maxImplicationCandidates: Int = IMPLICATION_SEED_MAX_CANDIDATES,
+) {
 
     /** Factor ids elected for implicit-solving structured neighbourhoods — structural globals whose
      *  [Invariant.proposeStructuredMoves] preserves their own feasibility (see
@@ -39,10 +43,12 @@ class ImplicitSeeding(private val problem: Problem) {
      *  value)]` lists every literal that pinning `v = value` forces (sound, from probing-style
      *  propagation). Built once on first access — the implication-aware move sources
      *  ([com.eignex.klause.localsearch.movesource.FlipAndPropagate]) bundle a flip's forced
-     *  literals into one atomic move. The candidate cap mirrors probing's free-Boolean bound, so the
-     *  build cost is paid once per solve rather than per move. */
+     *  literals into one atomic move. Probing is bounded to [maxImplicationCandidates] free Booleans
+     *  (in id order), mirroring the presolve implication-graph pass: an uncapped `numBoolVars` harvest
+     *  materialises an O(numBoolVars²) adjacency that exhausts the heap on Boolean-heavy models. Seeds
+     *  past the cap simply find no forced literals, so the move source degrades to lone flips. */
     val implicationGraph: Array<IntArray> by lazy {
-        Presolve.implicationGraph(problem, problem.numBoolVars, Cancellation.Never)
+        Presolve.implicationGraph(problem, maxImplicationCandidates, Cancellation.Never)
     }
 
     private fun electImplicitFactors(): IntArray {
@@ -98,3 +104,10 @@ class ImplicitSeeding(private val problem: Problem) {
         state.moveSink.setOwners(owners)
     }
 }
+
+/** Free-Boolean probe cap for [ImplicitSeeding.implicationGraph], mirroring the presolve
+ *  implication-graph pass: each candidate costs up to two `propagate` calls to harvest its outgoing
+ *  implications, and the uncapped full-`numBoolVars` build materialised an O(numBoolVars²) adjacency
+ *  that OOM'd on Boolean-heavy CSP instances (only [com.eignex.klause.localsearch.movesource.FlipAndPropagate]
+ *  forces the build). */
+private const val IMPLICATION_SEED_MAX_CANDIDATES = 2_048
