@@ -1,7 +1,10 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -69,15 +72,30 @@ internal fun SmtLibQfLia.Builder.evalTerm(root: SExpr, sort: Sort): Res {
 
             is Frame.Eval -> {
                 when (val node = fr.node) {
-                    is SExpr.Atom -> vals.addLast(evalAtom(node, fr.sort))
+                    is SExpr.Atom -> {
+                        // A bare reference to a 0-parameter `define-fun` inlines its body.
+                        val m = macros[node.text]
+                        if (m != null && m.params.isEmpty()) {
+                            work.addLast(Frame.Eval(m.body, fr.sort))
+                        } else {
+                            vals.addLast(evalAtom(node, fr.sort))
+                        }
+                    }
 
                     is SExpr.SList -> {
-                        if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "let") {
-                            scheduleLet(node, fr.sort, work)
-                        } else {
-                            val kids = childTasks(node, fr.sort)
-                            work.addLast(Frame.Combine(node, fr.sort, kids.size))
-                            for (i in kids.indices.reversed()) work.addLast(Frame.Eval(kids[i].first, kids[i].second))
+                        val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+                        when {
+                            head == "let" -> scheduleLet(node, fr.sort, work)
+
+                            head != null && macros.containsKey(head) -> scheduleMacro(node, head, fr.sort, work)
+
+                            else -> {
+                                val kids = childTasks(node, fr.sort)
+                                work.addLast(Frame.Combine(node, fr.sort, kids.size))
+                                for (i in kids.indices.reversed()) {
+                                    work.addLast(Frame.Eval(kids[i].first, kids[i].second))
+                                }
+                            }
                         }
                     }
                 }
@@ -104,6 +122,18 @@ private fun SmtLibQfLia.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work:
     }
 }
 
+/** Inline a `define-fun` call `(f a…)` by binding its parameters to the arguments like a `let` and
+ *  evaluating the body — non-recursive, so this expands to a bounded nest handled on the work-stack. */
+private fun SmtLibQfLia.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: Sort, work: ArrayDeque<Frame>) {
+    val m = macros.getValue(head)
+    val callArgs = node.items.drop(1)
+    if (callArgs.size != m.params.size) {
+        throw UnsupportedSmtException("'$head' applied to ${callArgs.size} args, expected ${m.params.size}")
+    }
+    val bindings = SExpr.SList(m.params.indices.map { SExpr.SList(listOf(SExpr.Atom(m.params[it]), callArgs[it])) })
+    scheduleLet(SExpr.SList(listOf(SExpr.Atom("let"), bindings, m.body)), sort, work)
+}
+
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
 private fun SmtLibQfLia.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
     val head = (node.items[0] as? SExpr.Atom)?.text
@@ -120,9 +150,10 @@ private fun SmtLibQfLia.Builder.childTasks(node: SExpr.SList, sort: Sort): List<
     } else {
         when (head) {
             "+", "-", "*" -> args.map { it to Sort.INT }
-            "to_real", "to_int" -> args.map { it to Sort.INT }
+            "to_real", "to_int", "abs" -> args.map { it to Sort.INT }
+            "div", "mod" -> args.map { it to Sort.INT }
             "ite" -> listOf(args[0] to Sort.BOOL, args[1] to Sort.INT, args[2] to Sort.INT)
-            "/", "div", "mod", "abs" -> throw UnsupportedSmtException("nonlinear/real operator '$head'")
+            "/" -> throw UnsupportedSmtException("real division '/' (QF_LIA is integer-only)")
             else -> null
         }
     }
@@ -189,6 +220,12 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
 
     "to_real", "to_int" -> Res.I(args[0].asLin())
 
+    "abs" -> Res.I(absTerm(args[0].asLin()))
+
+    "div" -> Res.I(divModTerm(args[0].asLin(), args[1].asLin(), quotient = true))
+
+    "mod" -> Res.I(divModTerm(args[0].asLin(), args[1].asLin(), quotient = false))
+
     "ite" -> {
         // v = if cond then a else b: a fresh int pinned to each branch by the condition.
         val cond = args[0].asLit()
@@ -201,6 +238,40 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
     }
 
     else -> throw UnsupportedSmtException("unsupported int op '$head'")
+}
+
+/** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
+ *  (posting the false literal when it cannot hold) rather than an empty [Linear] row. */
+private fun SmtLibQfLia.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
+    val (vars, coeffs, bound) = diff(a, b)
+    if (vars.isEmpty()) {
+        if (!constRelationHolds(op, bound)) forceTrue(Lit.negate(trueLit()))
+    } else {
+        factors.add(Linear(coeffs, vars, op, bound))
+    }
+}
+
+/** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. */
+private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
+    val y = LinComb(mapOf(newInt(0L, unboundedIntHi.toLong()) to 1), 0)
+    val negX = x.scaled(-1L)
+    postLinearRel(y, x, LinearOp.GE)
+    postLinearRel(y, negX, LinearOp.GE)
+    factors.add(Clause(intArrayOf(reifyEq(y, x), reifyEq(y, negX))))
+    return y
+}
+
+/** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and
+ *  `0 ≤ m < |d|`. A non-constant divisor is genuinely non-linear, so it is rejected. */
+private fun SmtLibQfLia.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
+    if (b.coeffs.isNotEmpty()) throw UnsupportedSmtException("non-constant divisor in div/mod")
+    val d = b.constant
+    if (d == 0L) throw UnsupportedSmtException("division by zero in div/mod")
+    val absd = if (d < 0) -d else d
+    val m = LinComb(mapOf(newInt(0L, absd - 1) to 1), 0)
+    val q = LinComb(mapOf(newInt() to 1), 0)
+    postLinearRel(a, q.scaled(d).plus(m), LinearOp.EQ) // a = d·q + m
+    return if (quotient) q else m
 }
 
 /** Reify a two-operand arithmetic relation from its folded operands. */

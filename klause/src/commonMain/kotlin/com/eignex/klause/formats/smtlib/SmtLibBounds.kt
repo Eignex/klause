@@ -58,19 +58,32 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
         }
     }
 
+    val loCap = unboundedIntLo.toLong()
+    val hiCap = unboundedIntHi.toLong()
     for ((name, v) in intNames) {
-        var vlo = lo[v]
-        var vhi = hi[v]
+        val provLo = lo[v]
+        val provHi = hi[v]
+        var vlo = provLo
+        var vhi = provHi
         if (vlo <= NEG_INF) {
             if (strictBounds) throw UnsupportedSmtException("no provable lower bound for '$name'")
-            vlo = unboundedIntLo.toLong()
+            vlo = loCap
         }
         if (vhi >= POS_INF) {
             if (strictBounds) throw UnsupportedSmtException("no provable upper bound for '$name'")
-            vhi = unboundedIntHi.toLong()
+            vhi = hiCap
         }
-        val clo = vlo.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong())
-        val chi = vhi.coerceIn(unboundedIntLo.toLong(), unboundedIntHi.toLong())
+        val clo = vlo.coerceIn(loCap, hiCap)
+        val chi = vhi.coerceIn(loCap, hiCap)
+        // The finite domain drops part of the variable's true range when a bound was unprovable
+        // (infinite) or a provable bound lay outside the representable range and was clamped. Any such
+        // narrowing makes an `unsat` result unsound for the original problem — it is only `unsat`
+        // within this finite box — so flag it to downgrade the verdict to `unknown`. A `clo > chi`
+        // (empty domain) is *not* clamping: `coerceIn` is monotonic, so it only arises when the
+        // provable bounds already contradict — a genuine `unsat` that must stay `unsat`.
+        if (provLo <= NEG_INF || provHi >= POS_INF || provLo < loCap || provHi > hiCap) {
+            domainsClamped = true
+        }
         intDomains[v] = if (clo <= chi) IntDomain(clo, chi) else IntDomain(clo, clo)
     }
 }
@@ -141,7 +154,7 @@ internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(top: SExpr, out: Ar
         when ((t.items[0] as? SExpr.Atom)?.text) {
             "and" -> for (i in 1 until t.items.size) work.addLast(t.items[i])
 
-            "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t) && !containsIte(t)) {
+            "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t) && !hasSideEffectingTerm(t)) {
                 try {
                     out.add(relationToLinear(t))
                 } catch (_: UnsupportedSmtException) { }
@@ -150,16 +163,23 @@ internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(top: SExpr, out: Ar
     }
 }
 
-/** Whether [t] contains an `(ite …)` subterm — lowering it has side effects (fresh vars and
- *  clauses), so the read-only bound-inference pass must not descend into it. The scan is iterative
- *  (explicit stack) so a deep term can't overflow the call stack. */
-internal fun SmtLibQfLia.Builder.containsIte(t: SExpr): Boolean {
+/** Whether [t] contains a subterm whose lowering has side effects (fresh vars and clauses): `ite`,
+ *  `abs`, `div`, `mod`, or a `define-fun` call (whose body may contain any of these). The read-only
+ *  bound-inference pass must not descend into such a relation, since evaluating it would allocate
+ *  variables the fixpoint's bound arrays aren't sized for. The scan is iterative (explicit stack) so
+ *  a deep term can't overflow the call stack. */
+internal fun SmtLibQfLia.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(t)
     while (work.isNotEmpty()) {
         val n = work.removeLast()
         if (n is SExpr.SList) {
-            if ((n.items.firstOrNull() as? SExpr.Atom)?.text == "ite") return true
+            val head = (n.items.firstOrNull() as? SExpr.Atom)?.text
+            if (head == "ite" || head == "abs" || head == "div" || head == "mod" ||
+                (head != null && macros.containsKey(head))
+            ) {
+                return true
+            }
             for (c in n.items) work.addLast(c)
         }
     }
