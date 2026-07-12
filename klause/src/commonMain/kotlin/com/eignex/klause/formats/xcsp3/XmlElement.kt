@@ -10,13 +10,12 @@ class XmlElement(
     val children: List<XmlElement>,
     private val directText: String,
 ) {
-    /** Concatenated text under this element and its descendants. */
-    val textContent: String
-        get() = if (children.isEmpty()) {
-            directText
-        } else {
-            directText + children.joinToString("") { it.textContent }
-        }
+    /** Concatenated text under this element and its descendants. Cached: the tree is immutable after
+     *  parsing, and recomputing rebuilt every descendant's text on each access — quadratic on a deep
+     *  element read repeatedly. */
+    val textContent: String by lazy(LazyThreadSafetyMode.NONE) {
+        if (children.isEmpty()) directText else directText + children.joinToString("") { it.textContent }
+    }
 
     /** Attribute [name], or empty string if absent. */
     fun attr(name: String): String = attributes[name].orEmpty()
