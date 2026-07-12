@@ -27,9 +27,11 @@ internal interface RestartSchedule {
     fun onRestart() {}
 
     companion object {
-        /** The schedule selected by [params]: adaptive Glucose when [BacktrackParams.adaptiveRestart],
+        /** The schedule selected by [params], in precedence order: EMA-adaptive when
+         *  [BacktrackParams.emaRestart], else Glucose-adaptive when [BacktrackParams.adaptiveRestart],
          *  else Luby when [BacktrackParams.lubyRestartBase] is set, else a single unbounded run. */
         fun from(params: BacktrackParams): RestartSchedule = when {
+            params.emaRestart -> EmaRestartSchedule()
             params.adaptiveRestart -> AdaptiveRestartSchedule()
             params.lubyRestartBase != null -> LubyRestartSchedule(params.lubyRestartBase)
             else -> NoRestartSchedule
@@ -75,6 +77,26 @@ internal class AdaptiveRestartSchedule : RestartSchedule {
 
     override fun recordConflict(lbd: Int, trailSize: Int) {
         if (glucose.recordConflict(lbd, trailSize)) restartRequested = true
+    }
+
+    override fun shouldRestart(decisionsThisRun: Long): Boolean = restartRequested
+
+    override fun onRestart() {
+        restartRequested = false
+    }
+}
+
+/**
+ * EMA-based adaptive schedule: an [EmaRestart] detector drives restarts off exponential moving averages
+ * of learned-clause LBD (the CaDiCaL/Kissat scheme) rather than [GlucoseRestart]'s bounded windows. The
+ * per-run budget is disabled (unbounded), as for [AdaptiveRestartSchedule].
+ */
+internal class EmaRestartSchedule : RestartSchedule {
+    private val ema = EmaRestart()
+    private var restartRequested = false
+
+    override fun recordConflict(lbd: Int, trailSize: Int) {
+        if (ema.recordConflict(lbd, trailSize)) restartRequested = true
     }
 
     override fun shouldRestart(decisionsThisRun: Long): Boolean = restartRequested
