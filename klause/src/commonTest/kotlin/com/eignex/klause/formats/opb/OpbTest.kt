@@ -155,4 +155,23 @@ class OpbTest {
         val text = "+1 x1 1 ;"
         assertTrue(runCatching { Opb.parse(text) }.isFailure)
     }
+
+    @Test
+    fun `rejects a coefficient beyond the 64-bit range with a range error`() {
+        // 2^63 overflows a signed Long by one.
+        assertTrue("64-bit range" in parseError("+9223372036854775808 x1 >= 1 ;"))
+    }
+
+    @Test
+    fun `rejects an out-of-range right-hand side and soft cost`() {
+        assertTrue("64-bit range" in parseError("+1 x1 >= 99999999999999999999 ;"))
+        assertTrue("64-bit range" in parseError("[99999999999999999999] +1 x1 >= 1 ;"))
+    }
+
+    @Test
+    fun `still reports a non-numeric coefficient as not an integer`() {
+        assertTrue("not an integer" in parseError("abc x1 >= 1 ;"))
+    }
+
+    private fun parseError(text: String): String = runCatching { Opb.parse(text) }.exceptionOrNull()?.message.orEmpty()
 }
