@@ -37,6 +37,7 @@ bench list [<suite>]                 list suites, or the problems in one suite
 | `category=SAT,UNSAT,CSP,OPTIMIZATION,…` | keep only these categories |
 | `tag=…` / `name=<glob>[,…]` | tag membership / comma-separated OR of substring-or-`*`-glob patterns on the instance name (e.g. `name=cvrp,nfc,mario`) |
 | `per-family=N` `max=N` `seed=N` | cap and deterministically sample (discovered corpora) |
+| `balance=format` | split `max` evenly across the formats present, water-filling short formats' surplus into larger ones — so a broad multi-format sweep touches every format instead of filling with the format that has the most families |
 | `backend=<minizinc solver id>` | the single solver `solve` runs as a subprocess: a registered MiniZinc solver (`choco`/`gecode`/`yuck`/…) via `minizinc --solver`; unset (or `klause`) runs klause via `klause-cli`. Alias `reference=`. |
 | `timeout=<ms>` | per-instance solve budget |
 | `label=<name>` | free-form run tag folded into the `<config>` dir name (e.g. a klause version / fix name), so re-running the same config coexists as a distinct dir instead of overwriting — then `compare.sh` the two. References are version-stable, so this is mainly for klause across updates |

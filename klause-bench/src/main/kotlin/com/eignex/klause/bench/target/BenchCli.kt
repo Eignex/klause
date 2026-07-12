@@ -575,7 +575,16 @@ object BenchCli {
             maxInstances = f["max"]?.toIntOrNull(),
             sampleSeed = f["seed"]?.toLongOrNull(),
         )
-        val selected = CorpusSelection.applySelectionBy(refs, sel) { it.name.substringBefore('/') }
+        val family = { r: ProblemRef -> r.name.substringBefore('/') }
+        // `balance=format` splits `max` evenly across the formats present (water-filling short
+        // formats' surplus into larger ones) instead of across families globally — so a broad
+        // multi-format sweep touches every format rather than filling with the format that has the
+        // most families. Unset keeps the family-global cap.
+        val selected = when (f["balance"]?.lowercase()) {
+            null -> CorpusSelection.applySelectionBy(refs, sel, family)
+            "format" -> CorpusSelection.applyBalancedBy(refs, sel, family) { it.format }
+            else -> error("balance must be 'format', got '${f["balance"]}'")
+        }
         // Sharding for parallel sweeps: -Dklause.bench.shard=i/n keeps every n-th selected
         // problem starting at i (0-based). Applied before resolution so each worker only
         // compiles its own rows — disjoint shards never race on the shared mzn-fzn cache.
@@ -640,6 +649,7 @@ object BenchCli {
             |
             |Filters: suite=a,b (suite=core = in-process core) kind=cop|csp category=SAT,OPTIMIZATION
             |         tag=… name=<glob>[,…] (comma=OR) per-family=N max=N seed=N backend=<minizinc solver id> timeout=<ms>
+            |         balance=format (split max evenly across the formats present, for broad sweeps)
             |         engine=fixed|cp|mixed|ls processors=N (klause search for solve)
             |         lp=off|conservative|default|aggressive[±id] (klause-cli --lp LP emphasis)
             |         presolve=off|conservative|default|aggressive[,±pass] (klause-cli --presolve)
