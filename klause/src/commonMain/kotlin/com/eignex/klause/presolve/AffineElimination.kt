@@ -320,6 +320,7 @@ internal object AffineSingletons {
                 eliminated,
                 objectiveIntVars,
                 capWide,
+                cancellation,
             )?.let { return it }
         }
         return null
@@ -345,10 +346,14 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: Set<Int>,
         capWide: Boolean,
+        cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         val f = ws.factorAt(di) ?: return null
         if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) return null
         for (xi in f.vars.indices) {
+            // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
+            // overflow check, so poll the deadline between them (and inside the check below).
+            if ((xi and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             val x = f.vars[xi]
             val cx = f.coeffs[xi]
             if (eliminated[x] || x in objectiveIntVars) continue
@@ -390,7 +395,7 @@ internal object AffineSingletons {
                 if (capWide && (ws.degreeOf(x) - 1).toLong() * termVars.size > WIDE_FILL_IN) continue
                 // Leave x un-eliminated if folding it would overflow 64-bit arithmetic in some row it
                 // rewrites — sound (x stays, solved directly) and avoids a wrong wrapped coefficient.
-                if (ws.foldOverflowsLong(di, x, termVars, termCoeffs, constTerm)) continue
+                if (ws.foldOverflowsLong(di, x, termVars, termCoeffs, constTerm, cancellation)) continue
             }
             // A single-partner affine `x = a·y + b` can also be projected out of non-linear globals
             // that absorb the affine view (via Factor.substituteAffine); a multi-partner relation
@@ -431,7 +436,17 @@ internal object AffineSingletons {
                 // a row, so on a wide-row model it must be interruptible. Bailing reports "no candidate", so
                 // affine skips this firing — sound (a partial pass only forgoes reduction).
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return false
-                if (candidateInFactor(seed, di, eliminated, objectiveIntVars, capWide) != null) return true
+                if (candidateInFactor(
+                        seed,
+                        di,
+                        eliminated,
+                        objectiveIntVars,
+                        capWide,
+                        cancellation,
+                    ) != null
+                ) {
+                    return true
+                }
                 if (residueCandidateInFactor(seed, di, eliminated, objectiveIntVars, domains) != null) return true
             }
         }
@@ -471,7 +486,14 @@ internal object AffineSingletons {
         /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
          *  mentions [x] (other than [defIdx]) would overflow 64-bit arithmetic. When it would, the
          *  candidate is skipped and `x` is left un-eliminated (sound) rather than wrapping a coefficient. */
-        fun foldOverflowsLong(defIdx: Int, x: Int, termVars: IntArray, termCoeffs: LongArray, constTerm: Long): Boolean
+        fun foldOverflowsLong(
+            defIdx: Int,
+            x: Int,
+            termVars: IntArray,
+            termCoeffs: LongArray,
+            constTerm: Long,
+            cancellation: Cancellation = Cancellation.Never,
+        ): Boolean
     }
 
     /**
@@ -508,8 +530,13 @@ internal object AffineSingletons {
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
+            cancellation: Cancellation,
         ): Boolean {
+            var polled = 0
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+                // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
+                // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ.flat[k]
                 val f = factors[id]
                 if (id != defIdx && f is Linear && foldRowOverflowsLong(
@@ -640,9 +667,14 @@ internal object AffineSingletons {
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
+            cancellation: Cancellation,
         ): Boolean {
             val occ = intOcc[x]
+            var polled = 0
             for (k in 0 until occ.size) {
+                // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
+                // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ[k]
                 val f = slots[id]
                 if (id != defIdx && f is Linear && foldRowOverflowsLong(
