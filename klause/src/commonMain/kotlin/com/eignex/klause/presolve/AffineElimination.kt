@@ -201,8 +201,9 @@ internal object AffineSingletons {
         domains: Array<IntDomain>,
         cancellation: Cancellation = Cancellation.Never,
     ): ResidueCandidate? {
+        var polled = 0
         for (di in 0 until ws.size) {
-            if ((di and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+            if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             residueCandidateInFactor(
                 ws,
                 di,
@@ -305,11 +306,13 @@ internal object AffineSingletons {
         // structure here (e.g. DiamondFree's ~490k decomposed constraints, none a foldable equality — the
         // pass folds nothing), scanning to the end is pure fruitless cost. Sound: an unfound pivot stays.
         val limit = minOf(ws.size.toLong(), start.toLong() + AFFINE_SCAN_ABORT).toInt()
+        var polled = 0
         for (di in start until limit) {
             // Poll the presolve deadline inside the scan, not only between folds: a single scan over a large
             // wide-row factor set (Coprime) can run for seconds, so without this the budget cannot bound it.
-            // Giving up returns the folds made so far — sound (an unfound pivot simply stays).
-            if ((di and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+            // Count iterations (a dense counter) rather than keying on [di], which a candidate index makes
+            // sparse. Giving up returns the folds made so far — sound (an unfound pivot simply stays).
+            if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             candidateInFactor(
                 ws,
                 di,
