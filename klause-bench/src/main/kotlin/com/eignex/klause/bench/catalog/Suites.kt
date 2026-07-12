@@ -86,6 +86,17 @@ internal object Suites {
                     format = Format.DIMACS,
                 )
             },
+            DynamicSuite("pb-comp", "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)") {
+                // The archive ships `.opb.xz` (linear + non-linear PB) and `.wbo.xz`; the `opb` layout
+                // takes only the `.opb` instances (WBO is a different, soft-constraint format).
+                CorpusSelection.select(
+                    ExternalCollections.pbComp2024,
+                    CorpusSelection.Layout.Flat("PB24", "opb", familyOf = { it.substringBeforeLast('/', it) }),
+                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    Category.OPTIMIZATION,
+                    format = Format.OPB,
+                )
+            },
             DynamicSuite("xcsp3-cop", "XCSP3 competition COP aggregate 2022-25 (fetched, 1000; cap with max=)") {
                 CorpusSelection.select(
                     ExternalCollections.xcsp3Cop,
@@ -641,6 +652,13 @@ internal object ExternalCollections {
         license = "SAT Competition (academic benchmarks)",
         reason = "4.3GB application-CNF archive (400 instances); fetched rather than vendored",
         fetch = FetchMethod.Zip,
+    )
+    val pbComp2024 = ExternalCollection(
+        id = "pb-comp-2024",
+        url = "https://www.cril.univ-artois.fr/PB24/benchs/selected-PB24.tar",
+        license = "Pseudo-Boolean Competition (academic benchmarks)",
+        reason = "255MB PB'24 selected-benchmark set; fetched rather than vendored",
+        fetch = FetchMethod.Tar,
     )
 
     /** Ordered rungs (low→high vars) of the SAT and UNSAT ladders, keyed by family name. */

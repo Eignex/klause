@@ -17,6 +17,9 @@ import java.net.URI
  */
 internal object CorpusFetcher {
 
+    /** Compression suffix → the system decompressor that strips it in place (see [decompressInPlace]). */
+    private val DECOMPRESS_TOOLS = mapOf("xz" to "unxz", "bz2" to "bunzip2", "gz" to "gunzip", "lzma" to "unlzma")
+
     /** Resolve the workspace root. Honors `-Dklause.workspace.root`; otherwise walks up from
      *  the working directory looking for the `klause-mzn-lib/` marker. */
     fun workspaceRoot(): File {
@@ -74,6 +77,7 @@ internal object CorpusFetcher {
         when (val m = collection.fetch) {
             is FetchMethod.GitClone -> gitClone(collection, m, dir)
             FetchMethod.Tarball -> tarball(collection, dir)
+            FetchMethod.Tar -> tar(collection, dir)
             FetchMethod.TarballZst -> tarballZst(collection, dir)
             FetchMethod.Zip -> zip(collection, dir)
         }
@@ -107,6 +111,16 @@ internal object CorpusFetcher {
         tar.delete()
     }
 
+    private fun tar(c: ExternalCollection, dir: File) {
+        dir.mkdirs()
+        val tar = File(cacheRoot, "${c.id}.tar")
+        URI(c.url).toURL().openStream().use { input -> tar.outputStream().use { input.copyTo(it) } }
+        run("tar", "xf", tar.absolutePath, "-C", dir.absolutePath)
+        tar.delete()
+        // PB competition instances ship individually `*.opb.xz`/`*.wbo.xz`; decompress in place.
+        decompressInPlace(dir)
+    }
+
     private fun tarballZst(c: ExternalCollection, dir: File) {
         dir.mkdirs()
         val tar = File(cacheRoot, "${c.id}.tar.zst")
@@ -121,19 +135,23 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
         run("unzip", "-q", "-o", zip.absolutePath, "-d", dir.absolutePath)
         zip.delete()
-        // XCSP3 competition archives ship each instance individually `*.xml.lzma`-compressed; unzip
-        // leaves them packed, so decompress in place to the plain file the front-end reads. A no-op
-        // for archives with no `.lzma` members.
-        decompressLzma(dir)
+        // Competition archives ship instances individually compressed (XCSP3 `*.xml.lzma`, satcomp
+        // `*.cnf.xz`); unzip leaves them packed, so decompress in place to the plain file the
+        // front-end reads. A no-op for archives with no compressed members.
+        decompressInPlace(dir)
     }
 
-    /** Decompress every `*.lzma` under [dir] in place (`unlzma` strips the `.lzma` suffix, so
-     *  `foo.xml.lzma` becomes `foo.xml`). Chunked to stay under the argument-length limit. */
-    private fun decompressLzma(dir: File) {
-        val packed = dir.walkTopDown().filter { it.isFile && it.extension == "lzma" }.map { it.absolutePath }.toList()
-        if (packed.isEmpty()) return
-        log("decompressing ${packed.size} .lzma instance(s) in '${dir.name}'")
-        for (chunk in packed.chunked(500)) runCmd(null, listOf("unlzma", "-q", "-f") + chunk)
+    /** Decompress every individually-compressed instance under [dir] in place, stripping the
+     *  compression suffix so the front-end reads the plain file (`foo.cnf.xz` → `foo.cnf`). Covers the
+     *  suffixes competition corpora use; a no-op for anything already plain. Chunked to stay under the
+     *  argument-length limit. */
+    private fun decompressInPlace(dir: File) {
+        for ((ext, tool) in DECOMPRESS_TOOLS) {
+            val packed = dir.walkTopDown().filter { it.isFile && it.extension == ext }.map { it.absolutePath }.toList()
+            if (packed.isEmpty()) continue
+            log("decompressing ${packed.size} .$ext instance(s) in '${dir.name}'")
+            for (chunk in packed.chunked(500)) runCmd(null, listOf(tool, "-q", "-f") + chunk)
+        }
     }
 
     private fun run(vararg cmd: String) = runCmd(null, cmd.asList())
