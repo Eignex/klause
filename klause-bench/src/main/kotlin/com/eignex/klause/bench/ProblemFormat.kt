@@ -2,7 +2,6 @@ package com.eignex.klause.bench
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.formats.dimacs.Dimacs
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
@@ -58,15 +57,6 @@ internal object JsonSchemaFormat : ProblemFormat {
     override fun ingest(file: File) = Ingested(JsonSchema.parseProblem(file.readText()))
 }
 
-internal object FlatZincFormat : ProblemFormat {
-    override val format = Format.FLATZINC
-    override val inProcess = true
-
-    // Objective extraction from the solve directive is deferred to the MiniZinc optimization
-    // path; satisfaction FZN is handled here.
-    override fun ingest(file: File) = Ingested(parseFlatZinc(file.readText()).problem)
-}
-
 /** Compiled by the `minizinc` CLI, then parsed in-process — see `runner.MiniZincRunner`. */
 internal object MiniZincFormat : ProblemFormat {
     override val format = Format.MINIZINC
@@ -104,7 +94,6 @@ internal object Formats {
         WcnfFormat,
         OpbFormat,
         JsonSchemaFormat,
-        FlatZincFormat,
         MiniZincFormat,
         Xcsp3Format,
         SmtLibFormat,

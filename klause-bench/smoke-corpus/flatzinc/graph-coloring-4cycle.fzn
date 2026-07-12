@@ -1,8 +1,0 @@
-% 2-colouring of the 4-cycle a-b-c-d-a (bipartite): adjacent nodes differ.
-var 1..2: a; var 1..2: b; var 1..2: c; var 1..2: d;
-constraint int_ne(a, b);
-constraint int_ne(b, c);
-constraint int_ne(c, d);
-constraint int_ne(d, a);
-solve satisfy;
-output ["colors = ", show(a), show(b), show(c), show(d), "\n"];

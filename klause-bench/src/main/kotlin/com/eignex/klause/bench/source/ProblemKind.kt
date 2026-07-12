@@ -25,7 +25,7 @@ internal object ProblemKind {
             val text = runCatching { CorpusFetcher.resolve(ref.source).readText() }.getOrNull()
             when {
                 text == null -> false
-                ref.format == Format.MINIZINC || ref.format == Format.FLATZINC -> hasSolveObjective(text)
+                ref.format == Format.MINIZINC -> hasSolveObjective(text)
                 ref.format == Format.OPB -> OPB_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.SMTLIB_QF_LIA -> SMT_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.XCSP3 -> XCSP_OBJECTIVE.containsMatchIn(text)

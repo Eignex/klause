@@ -1,8 +1,0 @@
-% array_int_element channeling: y = arr[idx] over arr = [10,20,30], with y >= 20
-% (encoded as -y <= -20 since FlatZinc only has int_lin_le), forcing idx in {2,3}.
-var 1..3: idx;
-var 0..100: y;
-constraint array_int_element(idx, [10, 20, 30], y);
-constraint int_lin_le([-1], [y], -20);
-solve satisfy;
-output ["idx=", show(idx), " y=", show(y), "\n"];
