@@ -138,7 +138,8 @@ internal class DfsEngine<L>(
         n > RELEARN_FALLBACK_THRESHOLD
     }
 
-    private val restart = RestartController(params)
+    private val restart = RestartSchedule.from(params)
+    private var restartCount = 0L
     private val vivifyEnabled = params.vivification && params.assumptions.isEmpty
     private var vivifyCursor = 0
     private val poller = DeadlinePoller()
@@ -351,7 +352,8 @@ internal class DfsEngine<L>(
         params.valueSelector.onRestart()
         solver.forgetIfOverCap(session, params)
         if (vivifyEnabled) vivifyCursor = solver.vivify(session, params, vivifyCursor)
-        val restartIndex = restart.onRestart()
+        restart.onRestart()
+        val restartIndex = ++restartCount
         sink?.search?.observeRestart()
         params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
         return null
