@@ -116,15 +116,17 @@ internal fun Xcsp3.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
 /** The rows of a constant integer `<matrix>` (`(1,2)(3,4)`), or null when it is not an all-constant
  *  parenthesised matrix (an array reference, or one with variable entries — handled elsewhere). */
 internal fun Xcsp3.Builder.constMatrixRows(text: String): List<IntArray>? {
-    val t = text.trim()
-    if ('(' !in t) return null
+    if ('(' !in text) return null
     val rows = ArrayList<IntArray>()
-    for (m in Regex("""\(([^)]*)\)""").findAll(t)) {
-        val cells = m.groupValues[1].split(",")
-        val ints = IntArray(cells.size)
-        for (k in cells.indices) ints[k] = cells[k].trim().toIntOrNull() ?: return null
-        rows.add(ints)
-    }
+    val cur = IntArrayList()
+    forEachTuple(
+        text,
+        cell = { cur.add(it.toIntOrNull() ?: return null) },
+        endRow = {
+            rows.add(cur.toIntArray())
+            cur.clear()
+        },
+    )
     return rows
 }
 
@@ -557,9 +559,17 @@ internal fun Xcsp3.Builder.postLexChain(vectors: List<IntArray>, strict: Boolean
 internal fun Xcsp3.Builder.matrixRows(text: String): List<IntArray> {
     val t = text.trim()
     if ('(' in t) {
-        return Regex("""\(([^)]*)\)""").findAll(t)
-            .map { m -> m.groupValues[1].split(",").map { singleTermVar(it.trim()) }.toIntArray() }
-            .toList()
+        val rows = ArrayList<IntArray>()
+        val cur = IntArrayList()
+        forEachTuple(
+            t,
+            cell = { cur.add(singleTermVar(it)) },
+            endRow = {
+                rows.add(cur.toIntArray())
+                cur.clear()
+            },
+        )
+        return rows
     }
     val idxRe = Regex("""\[(\d+)]""")
     val cells = t.split(Regex("\\s+")).filter { it.isNotBlank() }.flatMap { expandNames(it) }
@@ -895,10 +905,19 @@ internal fun Xcsp3.Builder.reifyLe3(a: Int, b: Int, c: Int): Int =
     reifyLinear(intArrayOf(1, 1, -1), intArrayOf(a, b, c), LinearOp.LE, 0)
 
 /** Parse `(t,t,…)(t,t,…)…` tuple rows, resolving each entry with [resolve]. */
-internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): List<IntArray> =
-    Regex("""\(([^)]*)\)""").findAll(text.trim())
-        .map { m -> m.groupValues[1].split(",").map { resolve(it.trim()) }.toIntArray() }
-        .toList()
+internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): List<IntArray> {
+    val rows = ArrayList<IntArray>()
+    val cur = IntArrayList()
+    forEachTuple(
+        text,
+        cell = { cur.add(resolve(it)) },
+        endRow = {
+            rows.add(cur.toIntArray())
+            cur.clear()
+        },
+    )
+    return rows
+}
 
 internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
     val vars = refList(listText(e)).toIntArray()

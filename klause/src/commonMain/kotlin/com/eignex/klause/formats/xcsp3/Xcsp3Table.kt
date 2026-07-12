@@ -158,26 +158,30 @@ internal class ShortRows(val lo: LongArray, val hi: LongArray)
  *  column is `[MIN, MAX]`, a `lo..hi` column is that interval, everything else is a point `[v, v]`.
  *  Unary tables use the bare-value form (`0 1 2`, no parentheses). */
 internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
-    val t = text.trim()
     val lo = LongArrayList()
     val hi = LongArrayList()
-    fun addCell(tok: String) {
-        when {
-            tok == "*" -> {
-                lo.add(Long.MIN_VALUE)
-                hi.add(Long.MAX_VALUE)
-            }
 
-            ".." in tok -> tok.split("..").let {
-                lo.add(it[0].toLong())
-                hi.add(it[1].toLong())
-            }
-
-            else -> {
-                val v = tok.toLong()
-                lo.add(v)
-                hi.add(v)
-            }
+    // A cell is read from the source in place (no substring per field): a `*` wildcard, a `lo..hi`
+    // interval, or a point value — the parse of a multi-MB table dominated the ingestion, so it must
+    // not allocate a MatchResult per tuple nor a String per field.
+    fun addCell(from: Int, to: Int) {
+        var a = from
+        var b = to
+        while (a < b && text[a].isWhitespace()) a++
+        while (b > a && text[b - 1].isWhitespace()) b--
+        if (b - a == 1 && text[a] == '*') {
+            lo.add(Long.MIN_VALUE)
+            hi.add(Long.MAX_VALUE)
+            return
+        }
+        val dots = indexOfDotDot(text, a, b)
+        if (dots >= 0) {
+            lo.add(parseLongIn(text, a, dots))
+            hi.add(parseLongIn(text, dots + 2, b))
+        } else {
+            val v = parseLongIn(text, a, b)
+            lo.add(v)
+            hi.add(v)
         }
     }
 
@@ -187,18 +191,90 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     fun capRows() {
         if (lo.size / arity > negTableCap) throw UnsupportedXcsp3Exception("table exceeds cap ($negTableCap rows)")
     }
-    if (arity == 1 && '(' !in t) {
-        for (tok in t.split(Regex("\\s+")).filter { it.isNotBlank() }) {
-            addCell(tok)
+
+    val n = text.length
+    if (arity == 1 && '(' !in text) {
+        var i = 0
+        while (i < n) {
+            while (i < n && text[i].isWhitespace()) i++
+            if (i >= n) break
+            val start = i
+            while (i < n && !text[i].isWhitespace()) i++
+            addCell(start, i)
             capRows()
         }
     } else {
-        for (m in Regex("""\(([^)]*)\)""").findAll(t)) {
-            val row = m.groupValues[1].split(",").map { it.trim() }
-            if (row.size != arity) throw UnsupportedXcsp3Exception("tuple arity ${row.size} != $arity")
-            for (tok in row) addCell(tok)
+        var i = 0
+        while (true) {
+            while (i < n && text[i] != '(') i++
+            if (i >= n) break
+            i++
+            var cellStart = i
+            var cells = 0
+            while (i < n && text[i] != ')') {
+                if (text[i] == ',') {
+                    addCell(cellStart, i)
+                    cells++
+                    cellStart = i + 1
+                }
+                i++
+            }
+            addCell(cellStart, i)
+            cells++
+            if (cells != arity) throw UnsupportedXcsp3Exception("tuple arity $cells != $arity")
+            if (i < n) i++ // past ')'
             capRows()
         }
     }
     return ShortRows(lo.toLongArray(), hi.toLongArray())
+}
+
+/** First index `k` in `[from, to)` where `text[k]` and `text[k+1]` are both `.` (a `lo..hi` separator),
+ *  or -1. */
+private fun indexOfDotDot(text: String, from: Int, to: Int): Int {
+    var k = from
+    while (k < to - 1) {
+        if (text[k] == '.' && text[k + 1] == '.') return k
+        k++
+    }
+    return -1
+}
+
+/** Parse a base-10 [Long] from `text[from, to)` (an optional sign then digits), without a substring. */
+private fun parseLongIn(text: String, from: Int, to: Int): Long {
+    var a = from
+    val neg = a < to && text[a] == '-'
+    if (neg || (a < to && text[a] == '+')) a++
+    require(a < to) { "empty integer in table tuple" }
+    var v = 0L
+    while (a < to) {
+        val c = text[a]
+        require(c in '0'..'9') { "non-digit '$c' in table tuple" }
+        v = v * 10 + (c - '0')
+        a++
+    }
+    return if (neg) -v else v
+}
+
+/** Invoke [cell] with each trimmed comma-separated field of every `(...)` group in [text], then [endRow]
+ *  after the group — one linear scan, no per-tuple Regex match. */
+internal inline fun forEachTuple(text: String, cell: (String) -> Unit, endRow: () -> Unit) {
+    val n = text.length
+    var i = 0
+    while (true) {
+        while (i < n && text[i] != '(') i++
+        if (i >= n) break
+        i++
+        var start = i
+        while (i < n && text[i] != ')') {
+            if (text[i] == ',') {
+                cell(text.substring(start, i).trim())
+                start = i + 1
+            }
+            i++
+        }
+        cell(text.substring(start, i).trim())
+        if (i < n) i++ // past ')'
+        endRow()
+    }
 }
