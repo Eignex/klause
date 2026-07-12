@@ -88,16 +88,19 @@ internal fun SmtLibQfLia.Builder.isBoolExpr(t: SExpr): Boolean {
     var node = t
     while (true) {
         when (node) {
-            is SExpr.Atom ->
+            is SExpr.Atom -> {
+                val m = macros[node.text]
+                if (m != null && m.params.isEmpty()) return m.isBool
                 return node.text == "true" || node.text == "false" ||
                     node.text in boolNames || (lookup(node.text)?.isBool == true)
+            }
 
-            is SExpr.SList -> when ((node.items[0] as? SExpr.Atom)?.text) {
+            is SExpr.SList -> when (val head = (node.items[0] as? SExpr.Atom)?.text) {
                 "and", "or", "not", "=>", "xor", "=", "distinct", "<", "<=", ">", ">=" -> return true
-                "+", "-", "*", "to_real", "to_int" -> return false
+                "+", "-", "*", "to_real", "to_int", "abs", "div", "mod" -> return false
                 "ite" -> node = node.items[2]
                 "let" -> node = node.items[2]
-                else -> return false
+                else -> return macros[head]?.isBool ?: false
             }
         }
     }

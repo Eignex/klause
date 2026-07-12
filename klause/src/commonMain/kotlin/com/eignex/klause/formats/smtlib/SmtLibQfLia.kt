@@ -28,6 +28,10 @@ data class SmtLibProblem(
     val boolVarNames: Map<String, Int> = emptyMap(),
     /** True when the parsed objective was a maximize directive. */
     val maximize: Boolean = false,
+    /** True when some integer variable's true (infinite or wider) domain was narrowed to the finite
+     *  solver range because no tight bound was provable. An `unsat` over such a clamped model is only
+     *  `unsat` within the finite range — the honest verdict for the original problem is `unknown`. */
+    val domainsClamped: Boolean = false,
 )
 
 /** Parser/compiler for the supported SMT-LIB QF_LIA subset. The [Builder]'s per-concern compilation
@@ -61,6 +65,14 @@ object SmtLibQfLia {
         internal val asserts = ArrayList<SExpr>()
         private var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
         override var trueLitCache: Int = -1
+
+        /** Set once bound inference has to clamp an integer variable to the finite solver range; makes
+         *  an eventual `unsat` verdict `unknown` (see [SmtLibProblem.domainsClamped]). */
+        internal var domainsClamped = false
+
+        /** Non-recursive `define-fun` macros: name to (parameter names, body term, Bool-return flag).
+         *  A call `(f a…)` is inlined by binding the parameters to the arguments like a `let`. */
+        internal val macros = HashMap<String, Macro>()
 
         internal class Binding(val isBool: Boolean) {
             var lin: LinComb? = null
@@ -126,11 +138,26 @@ object SmtLibQfLia {
             when (head) {
                 "declare-const" -> declare((e.items[1] as SExpr.Atom).text, (e.items[2] as SExpr.Atom).text)
                 "declare-fun" -> declare((e.items[1] as SExpr.Atom).text, (e.items[3] as SExpr.Atom).text)
+                "define-fun" -> defineFun(e)
                 "assert" -> asserts.add(e.items[1])
                 "minimize" -> objectiveSpec = e.items[1] to false
                 "maximize" -> objectiveSpec = e.items[1] to true
                 else -> Unit // set-logic / set-info / check-sat / get-* / exit — ignored
             }
+        }
+
+        /** Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro. */
+        private fun defineFun(e: SExpr.SList) {
+            val name = (e.items[1] as SExpr.Atom).text
+            val paramList = e.items[2] as? SExpr.SList ?: throw UnsupportedSmtException(
+                "define-fun '$name': bad params",
+            )
+            val params = paramList.items.map { p ->
+                ((p as? SExpr.SList)?.items?.getOrNull(0) as? SExpr.Atom)?.text
+                    ?: throw UnsupportedSmtException("define-fun '$name': bad parameter")
+            }
+            val retSort = (e.items[3] as SExpr.Atom).text
+            macros[name] = Macro(params, e.items[4], isBool = retSort == "Bool")
         }
 
         private fun declare(name: String, sort: String) {
@@ -157,7 +184,11 @@ object SmtLibQfLia {
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),
                 maximize = objectiveSpec?.second ?: false,
+                domainsClamped = domainsClamped,
             )
         }
     }
+
+    /** A non-recursive `define-fun` macro: its [params], [body] term, and whether it returns `Bool`. */
+    internal class Macro(val params: List<String>, val body: SExpr, val isBool: Boolean)
 }

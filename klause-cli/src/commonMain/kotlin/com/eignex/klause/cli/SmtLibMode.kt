@@ -15,15 +15,20 @@ internal object SmtLibMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
+        // Set by load(): true when parsing clamped an unbounded integer to the finite range, so an
+        // `unsat` verdict must be reported as `unknown` (see output()).
+        private var domainsClamped = false
+
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
             // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
             val config = KlauseConfig.current
             val parsed = SmtLibQfLia.parse(readTextFile(path), config.unboundedIntLo, config.unboundedIntHi)
+            domainsClamped = parsed.domainsClamped
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
-                    "factors=${parsed.problem.numFactors}"
+                    "factors=${parsed.problem.numFactors} clamped=$domainsClamped"
             }
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
@@ -31,7 +36,7 @@ internal object SmtLibMode : CliMode {
             return linearSolvable(parsed.problem, parsed.objective, parsed.maximize, render)
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput()
+        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput(domainsClamped)
     }
 }
 
@@ -44,13 +49,15 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, s: Sam
     append(")")
 }
 
-/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
-internal class SmtLibOutput : BufferedBestOutput() {
+/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. When
+ *  [domainsClamped] is set, an `unsat` is only `unsat` within the finite solver range — the sound
+ *  verdict for the original (unbounded) problem is `unknown`, so it is reported as such. */
+internal class SmtLibOutput(private val domainsClamped: Boolean = false) : BufferedBestOutput() {
     override val commentPrefix: String = ";"
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "sat"
-        Verdict.UNSATISFIABLE -> "unsat"
+        Verdict.UNSATISFIABLE -> if (domainsClamped) "unknown" else "unsat"
         Verdict.UNKNOWN -> "unknown"
     }
 

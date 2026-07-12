@@ -8,6 +8,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SmtLibQfLiaTest {
@@ -240,5 +241,64 @@ class SmtLibQfLiaTest {
         """.trimIndent()
         val problem = SmtLibQfLia.parse(text).problem
         assertTrue(problem.numIntVars >= 1)
+    }
+
+    private fun solveFor(text: String, name: String): Long {
+        val parsed = SmtLibQfLia.parse(text)
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        return r.assignment.ints[parsed.intVarNames.getValue(name)]
+    }
+
+    @Test
+    fun `a define-fun call is inlined`() {
+        // `mymax(x, 5) = 8` forces x = 8 (the larger operand), exercising macro inlining over `ite`.
+        val text = """
+            (set-logic QF_LIA)
+            (define-fun mymax ((a Int) (b Int)) Int (ite (>= a b) a b))
+            (declare-fun x () Int)
+            (assert (>= x 0)) (assert (<= x 10))
+            (assert (= (mymax x 5) 8))
+            (check-sat)
+        """.trimIndent()
+        assertEquals(8L, solveFor(text, "x"))
+    }
+
+    @Test
+    fun `abs constrains the absolute value`() {
+        val text = """
+            (set-logic QF_LIA)
+            (declare-fun x () Int)
+            (assert (>= x -10)) (assert (<= x 10))
+            (assert (= (abs x) 4)) (assert (< x 0))
+            (check-sat)
+        """.trimIndent()
+        assertEquals(-4L, solveFor(text, "x"))
+    }
+
+    @Test
+    fun `div and mod use euclidean semantics with a constant divisor`() {
+        val text = """
+            (set-logic QF_LIA)
+            (declare-fun x () Int)
+            (assert (>= x 0)) (assert (<= x 30))
+            (assert (= (mod x 7) 3)) (assert (= (div x 7) 2))
+            (check-sat)
+        """.trimIndent()
+        assertEquals(17L, solveFor(text, "x")) // 7*2 + 3
+    }
+
+    @Test
+    fun `an unbounded variable marks the model as clamped`() {
+        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
+        assertTrue(parsed.domainsClamped, "x has no provable upper bound, so it was clamped")
+    }
+
+    @Test
+    fun `a fully bounded model is not clamped`() {
+        val parsed = SmtLibQfLia.parse(
+            "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
+        )
+        assertFalse(parsed.domainsClamped, "both bounds are provable, so an unsat here is sound")
     }
 }
