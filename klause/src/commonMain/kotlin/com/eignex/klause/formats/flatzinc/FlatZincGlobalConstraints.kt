@@ -18,12 +18,13 @@ import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.scheduling.Disjunctive
-import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.packLayeredMdd
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
@@ -150,49 +151,49 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
 
         else -> failHere("mdd: unsupported label arg ${la::class.simpleName}")
     }
-    val numLayers = n + 1
-    val localIdx = IntArray(level.size) { -1 }
-    val countPerLayer = IntArray(numLayers)
+    // Dense node ids `0..N-1` for MDD nodes `1..N`, plus a synthetic terminal node `N` (edge target `0`);
+    // nodes explicitly at the terminal level collapse onto local index 0, the terminal.
+    val bigN = level.size
+    val nodeLayer = IntArray(bigN + 1)
+    for (node in 1..bigN) nodeLayer[node - 1] = level[node - 1] - 1
+    nodeLayer[bigN] = n
+    val localIdx = IntArray(bigN + 1)
+    val countPerLayer = IntArray(n + 1)
     countPerLayer[n] = 1 // terminal
-    for (node in 1..level.size) {
-        val lyr = level[node - 1] - 1 // 0-based layer
+    for (node in 1..bigN) {
+        val lyr = nodeLayer[node - 1]
         if (lyr in 0 until n) {
             localIdx[node - 1] = countPerLayer[lyr]
             countPerLayer[lyr]++
-        } else if (lyr == n) {
-            localIdx[node - 1] = 0 // a node explicitly at terminal level
         }
+        // lyr == n keeps local index 0 (collapsed onto the terminal); other layers are unreachable.
     }
-    val perLayer = Array(numLayers) { LongArrayList() }
+    val edgeSrc = IntArrayList()
+    val edgeSym = LongArrayList()
+    val edgeDst = IntArrayList()
     for (e in from.indices) {
-        val lyr = level[from[e] - 1] - 1
-        if (lyr !in 0 until n) continue
-        val src = localIdx[from[e] - 1]
-        val dst = if (to[e] == 0) 0 else localIdx[to[e] - 1]
+        if (nodeLayer[from[e] - 1] !in 0 until n) continue
+        val src = from[e] - 1
+        val dst = if (to[e] == 0) bigN else to[e] - 1
         for (v in labels[e]) {
-            perLayer[lyr].add(src.toLong())
-            perLayer[lyr].add(v)
-            perLayer[lyr].add(dst.toLong())
+            edgeSrc.add(src)
+            edgeSym.add(v)
+            edgeDst.add(dst)
         }
     }
-    val transitions = LongArrayList()
-    val layerStarts = IntArray(numLayers) // = n + 1
-    for (lyr in 0 until n) {
-        layerStarts[lyr] = transitions.size
-        perLayer[lyr].forEach { transitions.add(it) }
+    var initialNode = bigN
+    for (node in 0..bigN) {
+        if (nodeLayer[node] == 0) {
+            initialNode = node
+            break
+        }
     }
-    layerStarts[n] = transitions.size
-    factors.add(
-        Mdd(
-            seq = seq,
-            numStatesPerLayer = countPerLayer,
-            layerStarts = layerStarts,
-            transitions = transitions.toLongArray(),
-            initial = 0,
-            accepting = intArrayOf(0),
-            recordStride = 3,
-        ),
+    val data = packLayeredMdd(
+        n, countPerLayer, localIdx, nodeLayer,
+        edgeSrc.toIntArray(), edgeSym.toLongArray(), edgeDst.toIntArray(),
+        initialNode, intArrayOf(bigN),
     )
+    factors.add(data.toMdd(seq))
 }
 
 internal fun FlatZincCompiler.emitTable(c: FznConstraint) {

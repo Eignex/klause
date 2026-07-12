@@ -78,6 +78,11 @@ object Xcsp3 {
         internal var cachedAutomatonText: String? = null
         internal var cachedAutomaton: RegularAutomaton? = null
 
+        // Same reuse for the layered-Mdd lowering of an <mdd> (result.layered == null means the diagram
+        // was not cleanly layered and the Regular fallback — cached above — is used instead).
+        internal var cachedMddText: String? = null
+        internal var cachedMddResult: MddResult? = null
+
         fun declareVar(e: XmlElement) {
             when (e.tag) {
                 "var" -> addVar(e.attr("id"), domainFor(e))
