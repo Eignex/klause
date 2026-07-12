@@ -544,11 +544,12 @@ internal fun linearSolvable(
     render: (Sample) -> String,
     definedVars: IntArray = IntArray(0),
 ): Solvable {
+    val sweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars)
     if (objective == null) {
         return Solvable(
             problem = problem, optimize = false, maximize = false,
             lsObjective = null, linearObjective = null, objVarId = null,
-            definitionalSweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars),
+            definitionalSweep = sweep,
             render = render, objectiveValue = null,
         )
     }
@@ -556,14 +557,29 @@ internal fun linearSolvable(
         problem = problem,
         optimize = true,
         maximize = maximize,
-        // No gradient view for these modes: LS descends the linear objective directly.
-        lsObjective = null,
+        // Gradient view over the definitional cone (when the objective's terms are functionally
+        // defined), so LS descends the true objective on the decision vars; else null and LS
+        // descends the linear objective directly.
+        lsObjective = functionalObjectiveFor(objective, sweep),
         linearObjective = objective,
         objVarId = objective.singleIntObjective()?.varId,
-        definitionalSweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars),
+        definitionalSweep = sweep,
         render = render,
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
     )
+}
+
+/** Build a functional-objective gradient view of [objective] over [sweep]'s cone, or null when the
+ *  objective has bool weights or none of its int terms are functionally defined (a plain
+ *  [LinearObjective] suffices). [objective]'s int coefficients already encode the maximize sign
+ *  ("lower is better"), so the functional objective minimizes them directly. */
+private fun functionalObjectiveFor(objective: LinearObjective, sweep: DefinitionalSweep?): IncrementalObjective? {
+    if (sweep == null || objective.boolWeights.any { it != 0L }) return null
+    val ic = objective.intCoefficients
+    val terms = ic.indices.filter { ic[it] != 0L }.toIntArray()
+    if (terms.isEmpty()) return null
+    val coeffs = LongArray(terms.size) { ic[terms[it]] }
+    return sweep.functionalObjective(terms, coeffs, objective.constant, minimize = true)
 }
 
 /** A front-end. Stateless; all per-run state lives in the [ModeSession] it creates. */
