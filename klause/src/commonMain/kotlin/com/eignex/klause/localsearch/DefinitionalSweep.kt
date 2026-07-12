@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -46,6 +47,17 @@ class DefinitionalSweep internal constructor(
     /** Defining nodes in topological order — every node's inputs are free vars or earlier nodes. */
     private val nodes: List<SweepNode>,
 ) {
+    /** A front-end-supplied bool definition `out ↔ ⋀ lits` (or `⋁` when `!isAnd`) — the shape a
+     *  Tseitin AND indicator (OPB product term) recovers. */
+    class BoolFoldSpec(
+        /** The defined indicator's bool var id. */
+        val out: Int,
+        /** [Lit]-encoded member literals (a negated member is legal). */
+        val lits: IntArray,
+        /** `true` for a conjunction (`⋀`), `false` for a disjunction (`⋁`). */
+        val isAnd: Boolean,
+    )
+
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
     companion object {
         /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
@@ -57,7 +69,12 @@ class DefinitionalSweep internal constructor(
          *    never done unhinted.
          *  A var claimed by more than one definition, or transitively by itself, is left searched. Nodes
          *  come out in topological order; returns null when nothing is definable. */
-        fun infer(factors: Array<Factor>, numIntVars: Int, definedHints: IntArray = IntArray(0)): DefinitionalSweep? {
+        fun infer(
+            factors: Array<Factor>,
+            numIntVars: Int,
+            definedHints: IntArray = IntArray(0),
+            boolFolds: List<BoolFoldSpec> = emptyList(),
+        ): DefinitionalSweep? {
             val def = arrayOfNulls<Factor>(numIntVars)
             val defOut = IntArray(numIntVars) { -1 } // for a Linear definer, the output var's index
             val overDefined = BooleanArray(numIntVars)
@@ -147,25 +164,37 @@ class DefinitionalSweep internal constructor(
                 state[v] = 2
             }
             for (v in 0 until numIntVars) visit(v)
+            // Bool AND/OR definitions supplied by the front-end (e.g. OPB Tseitin product indicators),
+            // which the factor IR alone can't recover from the reified clauses. Appended after the int
+            // cone; callers list them so an input fold precedes any fold that reads it.
+            for (bf in boolFolds) nodes.add(SweepNode.BoolFold(bf.out, bf.lits, bf.isAnd))
             return if (nodes.isEmpty()) null else DefinitionalSweep(nodes)
         }
     }
 
     /**
-     * Build a [FunctionalObjective] `Σ termCoeffs·terms + constant` (already "lower is better") over
-     * this sweep's int cone, so local search descends the objective on the decision (leaf) vars
-     * rather than the functionally-defined ones. Returns null when no term is defined here (a bare
-     * linear objective — a [com.eignex.klause.solver.objective.LinearObjective] already suffices).
+     * Build a [FunctionalObjective] `Σ termCoeffs·terms + Σ boolTermCoeffs·[boolTerm holds] + constant`
+     * (already "lower is better") over this sweep's int and bool cones, so local search descends the
+     * objective on the decision (leaf) vars rather than the functionally-defined ones. Returns null
+     * when no term is defined here (a bare linear objective — a
+     * [com.eignex.klause.solver.objective.LinearObjective] already suffices).
      */
     fun functionalObjective(
         terms: IntArray,
         termCoeffs: LongArray,
         constant: Long,
         minimize: Boolean,
+        boolTerms: IntArray = EmptyIntArray,
+        boolTermCoeffs: LongArray = EmptyLongArray,
     ): IncrementalObjective? {
         val defByOut = MutableIntObjectMap<SweepNode.IntDef>()
         for (n in nodes) if (n is SweepNode.IntDef) defByOut.put(n.out, n)
-        if (terms.none { defByOut.containsKey(it) }) return null
+        val boolDefByOut = MutableIntObjectMap<SweepNode.BoolFold>()
+        for (n in nodes) if (n is SweepNode.BoolFold) boolDefByOut.put(n.out, n)
+        val anyIntDef = terms.any { defByOut.containsKey(it) }
+        val anyBoolDef = boolTerms.any { boolDefByOut.containsKey(it) }
+        if (!anyIntDef && !anyBoolDef) return null
+
         val reachable = IntHashSet()
         fun mark(id: Int) {
             val d = defByOut[id] ?: return
@@ -182,7 +211,30 @@ class DefinitionalSweep internal constructor(
             coneNodes.add(n.node)
             for (inId in n.intInputs) if (inId !in reachable) leaves.add(inId)
         }
-        return FunctionalObjective(terms, termCoeffs, constant, minimize, coneNodes, leaves.toIntArray())
+
+        val boolReachable = IntHashSet()
+        fun markBool(id: Int) {
+            val d = boolDefByOut[id] ?: return
+            if (id in boolReachable) return
+            boolReachable.add(id)
+            for (lit in d.ins) markBool(Lit.variable(lit))
+        }
+        for (t in boolTerms) markBool(t)
+        val boolConeNodes = ArrayList<FunctionalObjective.BoolFold>(boolReachable.size)
+        val boolLeaves = LinkedHashSet<Int>()
+        for (n in nodes) {
+            if (n !is SweepNode.BoolFold || n.out !in boolReachable) continue
+            boolConeNodes.add(FunctionalObjective.BoolFold(n.out, n.ins, n.isAnd))
+            for (lit in n.ins) {
+                val v = Lit.variable(lit)
+                if (v !in boolReachable) boolLeaves.add(v)
+            }
+        }
+
+        return FunctionalObjective(
+            terms, termCoeffs, constant, minimize, coneNodes, leaves.toIntArray(),
+            boolTerms, boolTermCoeffs, boolConeNodes, boolLeaves.toIntArray(),
+        )
     }
 
     /** One evaluable definition `out = f(inputs)` with its read-set exposed for cone indexing. */
@@ -301,8 +353,8 @@ class DefinitionalSweep internal constructor(
         class BoolFold(
             /** The defined output var id. */
             override val out: Int,
-            private val ins: IntArray,
-            private val isAnd: Boolean,
+            internal val ins: IntArray,
+            internal val isAnd: Boolean,
         ) : SweepNode {
             override val outIsBool: Boolean get() = true
             override val intInputs: IntArray get() = EmptyIntArray

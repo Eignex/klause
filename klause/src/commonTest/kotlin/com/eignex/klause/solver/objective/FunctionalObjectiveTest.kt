@@ -74,6 +74,46 @@ class FunctionalObjectiveTest {
         }
     }
 
+    @Test
+    fun `bool-count objective descends the literals through array_bool_and`() {
+        // maximize bool2int(x1 /\ x2) + bool2int(x3 /\ x4), the indicators functionally defined.
+        val src = """
+            var bool: x1; var bool: x2; var bool: x3; var bool: x4;
+            var bool: a1; var bool: a2;
+            var 0..1: t1; var 0..1: t2;
+            var 0..2: obj;
+            constraint array_bool_and([x1,x2], a1):: defines_var(a1);
+            constraint array_bool_and([x3,x4], a2):: defines_var(a2);
+            constraint bool2int(a1, t1):: defines_var(t1);
+            constraint bool2int(a2, t2):: defines_var(t2);
+            constraint int_lin_eq([1,1,-1],[t1,t2,obj],0):: defines_var(obj);
+            solve maximize obj;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val obj = program.lsObjective
+        assertNotNull(obj, "expected a bool-count functional objective")
+        assertTrue(obj is FunctionalObjective)
+        val x = intArrayOf(1, 2, 3, 4).map { program.boolVarsByName.getValue("x$it") }
+        assertEquals(x.toSet(), obj.boolLeafVars.toSet())
+
+        val rng = Random(11)
+        val state = LocalSearchState(program.problem, rng)
+        repeat(200) {
+            for (b in 0 until program.problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
+            val v = x.random(rng)
+            val move = Move.BoolFlip(v)
+            val before = obj.evaluate(snapshot(state, program))
+            val predicted = obj.deltaIfApplied(state.assignment, move)
+            state.assignment.flipBool(v)
+            val after = obj.evaluate(snapshot(state, program))
+            assertEquals(after - before, predicted, 1e-9, "delta mismatch: before=$before after=$after")
+            // maximize ⇒ "lower is better" objective is −(count of satisfied ANDs).
+            val a1 = state.assignment.boolValue(x[0]) && state.assignment.boolValue(x[1])
+            val a2 = state.assignment.boolValue(x[2]) && state.assignment.boolValue(x[3])
+            assertEquals(-((if (a1) 1 else 0) + (if (a2) 1 else 0)).toDouble(), after, 1e-9)
+        }
+    }
+
     private fun snapshot(state: LocalSearchState, program: FlatZincProgram): Sample {
         val bools = BooleanArray(program.problem.numBoolVars) { state.assignment.boolValue(it) }
         val ints = LongArray(program.problem.numIntVars) { state.assignment.intValue(it) }

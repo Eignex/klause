@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
@@ -20,6 +21,8 @@ data class OpbProblem(
     val problem: Problem,
     /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
+    /** AND-indicator definitions for product terms — the local-search bool functional cone. */
+    val boolFolds: List<DefinitionalSweep.BoolFoldSpec> = emptyList(),
 )
 
 /**
@@ -54,11 +57,19 @@ object Opb {
 
         private val productCache = HashMap<List<Int>, Int>()
 
+        /** AND-indicator definitions `b ↔ ⋀ lits` recovered as they are minted, so local search can
+         *  derive the indicators from the literals and descend the objective through them. */
+        val boolFolds = ArrayList<DefinitionalSweep.BoolFoldSpec>()
+
         /** The literal standing for a term's value: the literal itself when linear, else an AND indicator. */
         fun literalFor(lits: IntArrayList): Int {
             if (lits.size == 1) return lits[0]
             val key = lits.toIntArray().sorted()
-            return productCache.getOrPut(key) { tseitinAnd(key) }
+            return productCache.getOrPut(key) {
+                val indicator = tseitinAnd(key)
+                boolFolds.add(DefinitionalSweep.BoolFoldSpec(Lit.variable(indicator), key.toIntArray(), isAnd = true))
+                indicator
+            }
         }
     }
 
@@ -151,7 +162,7 @@ object Opb {
             intDomains = emptyArray(),
             factors = builder.factors.toTypedArray(),
         )
-        return OpbProblem(problem, objective)
+        return OpbProblem(problem, objective, builder.boolFolds)
     }
 
     /** Fold `weight·lit` into the objective, rewriting a negated literal `c·(~x)` as `c·(1 − x)`. */
