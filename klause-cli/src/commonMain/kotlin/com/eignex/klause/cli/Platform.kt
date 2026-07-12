@@ -36,4 +36,23 @@ internal fun nowMillis(): Long = timeOrigin.elapsedNow().inWholeMilliseconds
 
 internal fun fileName(path: String): String = path.substringAfterLast('/').substringAfterLast('\\')
 
-internal fun fileExtension(path: String): String = fileName(path).substringAfterLast('.', "")
+/** Compression suffix → the external decompress-to-stdout command. Shelling out to the system tools
+ *  (the mature reference implementations, ubiquitous on any bench/competition box) keeps the CLI free
+ *  of a compression dependency; [readTextFile] pipes the file through the matching command. */
+internal val DECOMPRESSORS = mapOf(
+    "xz" to listOf("xz", "-dc"),
+    "gz" to listOf("gzip", "-dc"),
+    "bz2" to listOf("bzip2", "-dc"),
+)
+
+/** The trailing compression suffix (lowercased) when [path] names a compressed file, else null. */
+internal fun compressionExtension(path: String): String? =
+    fileName(path).substringAfterLast('.', "").lowercase().takeIf { it in DECOMPRESSORS }
+
+/** The format-determining extension: the suffix after any compression suffix (`foo.cnf.xz` → `cnf`),
+ *  so a compressed instance routes to the same front-end as its uncompressed form. */
+internal fun fileExtension(path: String): String {
+    val name = fileName(path)
+    val last = name.substringAfterLast('.', "")
+    return if (last.lowercase() in DECOMPRESSORS) name.substringBeforeLast('.').substringAfterLast('.', "") else last
+}

@@ -381,9 +381,11 @@ internal fun Xcsp3.Builder.mdd(e: XmlElement) {
         rootId
     } else {
         var r = -1
-        for (id in 1..q) if (isSrc[id] && !isDst[id]) {
-            r = id;
+        for (id in 1..q) {
+            if (isSrc[id] && !isDst[id]) {
+            r = id
             break
+        }
         }
         if (r == -1) throw UnsupportedXcsp3Exception("mdd: no root node") else r
     }

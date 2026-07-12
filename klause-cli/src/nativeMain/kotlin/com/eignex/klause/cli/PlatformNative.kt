@@ -15,6 +15,8 @@ import platform.posix.fread
 import platform.posix.fseek
 import platform.posix.ftell
 import platform.posix.getenv
+import platform.posix.pclose
+import platform.posix.popen
 import platform.posix.rewind
 import platform.posix.stderr
 import kotlin.system.exitProcess
@@ -31,6 +33,12 @@ internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
 @OptIn(ExperimentalForeignApi::class)
 internal actual fun readTextFile(path: String): String {
+    compressionExtension(path)?.let { ext ->
+        // `<decompressor> -dc '<path>'` piped through the shell; single-quote the path (escaping any
+        // embedded quote) so a path with spaces is one argument.
+        val quoted = "'" + path.replace("'", "'\\''") + "'"
+        return readCommandOutput(DECOMPRESSORS.getValue(ext).joinToString(" ") + " " + quoted)
+    }
     val f = fopen(path, "rb") ?: error("cannot open $path")
     try {
         fseek(f, 0L, SEEK_END)
@@ -43,6 +51,33 @@ internal actual fun readTextFile(path: String): String {
     } finally {
         fclose(f)
     }
+}
+
+/** Read the full stdout of a shell [command] (used to pipe compressed instances through the system
+ *  decompressor). Bytes are accumulated and decoded once so a multi-byte character is never split. */
+@OptIn(ExperimentalForeignApi::class)
+private fun readCommandOutput(command: String): String {
+    val pipe = popen(command, "r") ?: error("cannot run '$command'")
+    val chunks = ArrayList<ByteArray>()
+    var total = 0
+    try {
+        while (true) {
+            val buf = ByteArray(65536)
+            val n = buf.usePinned { fread(it.addressOf(0), 1u, buf.size.toULong(), pipe) }.toInt()
+            if (n <= 0) break
+            chunks.add(buf.copyOf(n))
+            total += n
+        }
+    } finally {
+        require(pclose(pipe) == 0) { "decompression command '$command' failed" }
+    }
+    val all = ByteArray(total)
+    var off = 0
+    for (c in chunks) {
+        c.copyInto(all, off)
+        off += c.size
+    }
+    return all.decodeToString()
 }
 
 internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)
