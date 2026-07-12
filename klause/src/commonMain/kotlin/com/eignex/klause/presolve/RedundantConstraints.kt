@@ -43,7 +43,7 @@ internal object RedundantConstraints {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         if (incremental == null) return computeFull(problem, cancellation)
-        val out = incremental.memo.reconcile(problem, incremental)
+        val out = incremental.memo.reconcile(problem, incremental, cancellation)
         val delta = finishAfterPhase2(problem, out, cancellation)
         // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
         // every dropped factor's index entry before the next firing.
@@ -230,6 +230,16 @@ internal object RedundantConstraints {
         // be excluded from the self-drops retracted next firing.
         private var lastDups: Set<Factor> = emptySet()
 
+        // Set when a rebuild bailed on the presolve deadline, leaving the indices cleared — the next
+        // reconcile must rebuild rather than apply a delta against the empty index.
+        private var bailedRebuild = false
+
+        private fun clearIndices() {
+            shallowSingle.clear()
+            shallowMulti.clear()
+            buckets.clear()
+        }
+
         /** A coefficient-vector bucket: the multiset of `≤` offer bounds (and which are equalities, for
          *  the equality-dominates rule) and the single surviving representative row, if any. */
         private class Bucket {
@@ -264,15 +274,34 @@ internal object RedundantConstraints {
         /** Reconcile the memo with the current live set and return the phase-1/2 survivor list in
          *  [Problem.factors] order. On [SubsumeIncremental.rebuild] the memo is rebuilt from scratch;
          *  otherwise only the delta is applied. */
-        fun reconcile(problem: Problem, inc: SubsumeIncremental): List<Factor> {
+        fun reconcile(
+            problem: Problem,
+            inc: SubsumeIncremental,
+            cancellation: Cancellation = Cancellation.Never,
+        ): List<Factor> {
             val drops = HashSet<Factor>()
             val dups = HashSet<Factor>()
-            if (inc.rebuild) {
-                shallowSingle.clear()
-                shallowMulti.clear()
-                buckets.clear()
+            // A prior firing that bailed mid-rebuild left the memo cleared, so it must rebuild (not apply a
+            // delta against an empty index).
+            if (inc.rebuild || bailedRebuild) {
+                clearIndices()
                 pendingSelfDrops = emptyList()
-                for (f in problem.factors) process(f, drops, dups)
+                bailedRebuild = false
+                val factors = problem.factors
+                for (i in factors.indices) {
+                    // The from-scratch rebuild is O(factors) — on a multi-million-row model (Coprime-30) it
+                    // must honor the presolve deadline. Bailing leaves a cleared (consistent) memo and forces
+                    // a clean rebuild next firing; this firing subsumes nothing (returns the live set), which
+                    // is sound (a partial pass only forgoes reduction).
+                    if ((i and REBUILD_CANCEL_POLL_MASK) == 0 && cancellation()) {
+                        clearIndices()
+                        pendingSelfDrops = emptyList()
+                        lastDups = emptySet()
+                        bailedRebuild = true
+                        return factors.asList()
+                    }
+                    process(factors[i], drops, dups)
+                }
             } else {
                 for (f in pendingSelfDrops) retract(f)
                 for (f in inc.droppedFactors) retract(f)
@@ -426,6 +455,9 @@ internal object RedundantConstraints {
 
     /** Poll the cancellation once per this many drop-candidates in the pairwise domination scan. */
     private const val SUBSET_CANCEL_POLL_MASK = 0xFF
+
+    /** Poll the cancellation once per this many factors while rebuilding the subsume memo from scratch. */
+    private const val REBUILD_CANCEL_POLL_MASK = 0x3FF
 
     /** Magnitude past which a Phase-3 activity sum is treated as non-dominating, so the `Long`
      *  comparison can't wrap (real bounds are far below this). */
