@@ -8,6 +8,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -36,10 +37,14 @@ internal object RedundantConstraints {
      * fruitless re-run (the ma-path-finding #937 cost) becomes O(delta). Phases 3–5 run over the phase-2
      * survivor list either way.
      */
-    fun removeRedundantConstraints(problem: Problem, incremental: SubsumeIncremental? = null): PassDelta {
-        if (incremental == null) return computeFull(problem)
+    fun removeRedundantConstraints(
+        problem: Problem,
+        incremental: SubsumeIncremental? = null,
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta {
+        if (incremental == null) return computeFull(problem, cancellation)
         val out = incremental.memo.reconcile(problem, incremental)
-        val delta = finishAfterPhase2(problem, out)
+        val delta = finishAfterPhase2(problem, out, cancellation)
         // Phases 3–5 drop factors [reconcile] never saw; feed the full drop set back so the memo retracts
         // every dropped factor's index entry before the next firing.
         incremental.memo.setPendingSelfDrops(delta.droppedIndices.map { problem.factors[it] })
@@ -81,7 +86,7 @@ internal object RedundantConstraints {
      * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
      * purely cross-constraint.
      */
-    private fun computeFull(problem: Problem): PassDelta {
+    private fun computeFull(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val factors = problem.factors
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
         // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
@@ -159,15 +164,19 @@ internal object RedundantConstraints {
             }
             if (keep) out.add(f)
         }
-        return finishAfterPhase2(problem, out)
+        return finishAfterPhase2(problem, out, cancellation)
     }
 
     /** Phases 3–5 over the phase-1/2 survivor list [out] (in [Problem.factors] order), recovering the
      *  dropped input indices. Shared by the fresh recompute and the incremental path. */
-    private fun finishAfterPhase2(problem: Problem, out: List<Factor>): PassDelta {
+    private fun finishAfterPhase2(
+        problem: Problem,
+        out: List<Factor>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta {
         val factors = problem.factors
         // Phase 3: variable-subset / proportional domination across different supports (#466).
-        val out3 = dropSubsetDominated(problem, out)
+        val out3 = dropSubsetDominated(problem, out, cancellation)
         // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques (#527).
         val out4 = dropCliqueImpliedKnapsacks(out3)
         // Phase 5: drop globals the current domains make vacuously satisfied (#553); removing one frees
@@ -415,6 +424,9 @@ internal object RedundantConstraints {
      *  on a huge linear system; above it the scan is skipped (sound — it only means fewer drops). */
     private const val SUBSET_DOMINATION_ROW_CAP = 1500
 
+    /** Poll the cancellation once per this many drop-candidates in the pairwise domination scan. */
+    private const val SUBSET_CANCEL_POLL_MASK = 0xFF
+
     /** Magnitude past which a Phase-3 activity sum is treated as non-dominating, so the `Long`
      *  comparison can't wrap (real bounds are far below this). */
     private const val OVERFLOW_GUARD = 1_000_000_000_000_000L
@@ -455,7 +467,11 @@ internal object RedundantConstraints {
      * `≤`/`≥` [Linear] rows take part; equalities and globals are untouched. Bounded by
      * [SUBSET_DOMINATION_ROW_CAP] so the pairwise scan can't blow up.
      */
-    private fun dropSubsetDominated(problem: Problem, factors: List<Factor>): List<Factor> {
+    private fun dropSubsetDominated(
+        problem: Problem,
+        factors: List<Factor>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): List<Factor> {
         // Dominators: every exact `≤`-row in the model (so an increasing chain's pairs can dominate
         // too). Drop candidates: only single-row factors — a multi-row factor (an increasing chain) is
         // never dropped here, since one dominated pair does not make the whole chain redundant.
@@ -473,7 +489,11 @@ internal object RedundantConstraints {
         }
         if (candidates.isEmpty() || dominators.size > SUBSET_DOMINATION_ROW_CAP) return factors
         val dropped = IntHashSet()
-        for (b in candidates) {
+        for ((bi, b) in candidates.withIndex()) {
+            // Poll the presolve deadline: this pairwise scan is O(candidates · dominators) and dominates
+            // subsume on large proportional-row models (Coprime). Bailing keeps the drops found so far —
+            // sound, since each is an independently-valid domination (a partial pass only drops fewer rows).
+            if ((bi and SUBSET_CANCEL_POLL_MASK) == 0 && cancellation()) break
             for (a in dominators) {
                 if (a.factorIndex == b.factorIndex || a.coeffByVar.size >= b.coeffByVar.size) continue
                 if (dominates(problem, a, b)) {

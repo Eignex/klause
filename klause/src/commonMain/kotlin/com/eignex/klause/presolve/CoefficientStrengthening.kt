@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -28,17 +29,23 @@ internal object CoefficientStrengthening {
      * Exact (feasible-set-preserving) and it tightens the LP relaxation the bound participates in.
      * Other factor types pass through untouched.
      */
-    fun strengthenCoefficients(problem: Problem): PassDelta {
+    fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
-        problem.factors.forEachIndexed { i, factor ->
+        val factors = problem.factors
+        for (i in factors.indices) {
+            // Poll the presolve deadline: on a multi-million-row model (Coprime) the per-factor strengthen
+            // is O(factors) and must be interruptible. Bailing returns the strengthenings made so far — a
+            // partial pass is sound (each rewrite is feasible-set-preserving; the rest stay unstrengthened).
+            if ((i and STRENGTHEN_CANCEL_POLL_MASK) == 0 && cancellation()) break
+            val factor = factors[i]
             // An equality whose coefficient GCD does not divide its bound can never hold; replace it by
             // an explicit contradiction (the original is redundant once the problem is infeasible).
             val contradiction = equalityContradiction(factor, problem.intDomains)
             if (contradiction != null) {
                 dropped.add(i)
                 added.addAll(contradiction)
-                return@forEachIndexed
+                continue
             }
             val rewritten = when (factor) {
                 is Linear -> strengthenLinear(factor, problem.intDomains)
@@ -55,6 +62,9 @@ internal object CoefficientStrengthening {
         if (dropped.isEmpty()) return PassDelta()
         return PassDelta(dropped.toIntArray(), added)
     }
+
+    /** Poll the cancellation once per this many strengthened factors (power-of-two mask for a cheap test). */
+    private const val STRENGTHEN_CANCEL_POLL_MASK = 0x3FF
 
     /** The factors that make the model infeasible when [factor] is an equality whose coefficient GCD
      *  `g > 1` does not divide its bound, else `null`. Such an equality `Σ coeffs·x = b` has a
