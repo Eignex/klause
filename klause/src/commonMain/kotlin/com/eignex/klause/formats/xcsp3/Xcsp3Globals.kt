@@ -20,6 +20,7 @@ import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableLongIntMap
 
 // XCSP3 global-constraint family emitters (allDifferent excepted) — split out of Xcsp3.kt.
 
@@ -159,13 +160,13 @@ internal fun Xcsp3.Builder.channel(e: XmlElement) {
     val lists = e.children.filter { it.tag == "list" }
     when (lists.size) {
         1 -> {
-            val f = refList(lists[0].textContent).toIntArray()
+            val f = refList(lists[0].textContent)
             factors.add(Inverse(f = f, g = f))
         }
 
         2 -> {
-            val f = refList(lists[0].textContent).toIntArray()
-            val g = refList(lists[1].textContent).toIntArray()
+            val f = refList(lists[0].textContent)
+            val g = refList(lists[1].textContent)
             // Equal lengths are a bijection (Inverse, Semantics 31: f[i]=j ⟺ g[j]=i). With
             // |X| < |Y| the spec (Semantics 32) is a one-way implication only.
             when {
@@ -565,7 +566,7 @@ private fun Xcsp3.Builder.emitRegular(seqVars: IntArray, automaton: RegularAutom
 }
 
 internal fun Xcsp3.Builder.cumulative(e: XmlElement) {
-    val starts = refList(requireNotNull(e.child("origins")).textContent).toIntArray()
+    val starts = refList(requireNotNull(e.child("origins")).textContent)
     val (durations, durationVars) = taskDims(requireNotNull(e.child("lengths")).textContent)
     val (resources, resourceVars) = taskDims(requireNotNull(e.child("heights")).textContent)
     require(durations.size == starts.size && resources.size == starts.size) {
@@ -590,7 +591,7 @@ internal fun Xcsp3.Builder.cumulative(e: XmlElement) {
     )
     // <ends> binds each task's end variable to start + duration (constant or variable).
     e.child("ends")?.let { endsEl ->
-        val ends = refList(endsEl.textContent).toIntArray()
+        val ends = refList(endsEl.textContent)
         require(ends.size == starts.size) { "cumulative: <ends>/<origins> length mismatch" }
         for (i in starts.indices) {
             if (durationVars.isEmpty()) {
@@ -611,14 +612,14 @@ internal fun Xcsp3.Builder.cumulative(e: XmlElement) {
  *  the constant array holds its domain upper bound (used by [Cumulative] for horizon sizing). */
 internal fun Xcsp3.Builder.taskDims(text: String): Pair<LongArray, IntArray> {
     parseInts(text)?.let { return it.widenToLong() to IntArray(0) }
-    val vars = refList(text).toIntArray()
+    val vars = refList(text)
     return LongArray(vars.size) { domains[vars[it]].max } to vars
 }
 
 internal fun Xcsp3.Builder.circuit(e: XmlElement) {
     val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
     if (offset != 0) throw UnsupportedXcsp3Exception("circuit: only startIndex=0 supported")
-    val succ = refList(listText(e)).toIntArray()
+    val succ = refList(listText(e))
     // XCSP3 `circuit` (Semantics 46) is subcircuit semantics: nodes with succ(i) = i are
     // excluded (self-looping); the rest form a single cycle. It additionally requires a
     // circuit of size > 1. [Subcircuit] captures the cycle-over-included-nodes part but also
@@ -652,7 +653,7 @@ internal fun Xcsp3.Builder.lex(e: XmlElement) {
         postLexChain(cols, strict, swap)
         return
     }
-    val lists = e.children.filter { it.tag == "list" }.map { refList(it.textContent).toIntArray() }
+    val lists = e.children.filter { it.tag == "list" }.map { refList(it.textContent) }
     if (lists.size < 2) throw UnsupportedXcsp3Exception("lex: needs at least two lists")
     postLexChain(lists, strict, swap)
 }
@@ -739,7 +740,7 @@ internal fun Xcsp3.Builder.ordered(e: XmlElement) {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), op, delta - constLens[i]))
         }
     } else {
-        val lenVars = refList(lengthsEl.textContent).toIntArray()
+        val lenVars = refList(lengthsEl.textContent)
         require(lenVars.size == vars.size - 1) { "ordered: <lengths> size != list size - 1" }
         for (i in 0 until vars.size - 1) {
             // vars[i] + length[i] − vars[i+1] ⟨op⟩ delta
@@ -752,7 +753,7 @@ internal fun Xcsp3.Builder.ordered(e: XmlElement) {
 internal fun Xcsp3.Builder.allEqual(e: XmlElement) {
     // <except> weakens the constraint (listed values are exempt); dropping it would be unsound.
     if (e.child("except") != null) throw UnsupportedXcsp3Exception("allEqual with <except>")
-    val vars = refList(listText(e)).toIntArray()
+    val vars = refList(listText(e))
     for (i in 0 until vars.size - 1) {
         factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), LinearOp.EQ, 0))
     }
@@ -809,7 +810,7 @@ internal fun Xcsp3.Builder.cardinality(e: XmlElement) {
 
         // Variable occurrences (a `<list>`/array reference, possibly a wildcard like `g[]`).
         else -> {
-            val occVars = refList(occursText).toIntArray()
+            val occVars = refList(occursText)
             require(occVars.size == values.size) { "cardinality: <values>/<occurs> length mismatch" }
             factors.add(GlobalCardinality(xs = vars, cover = values, countVars = occVars, closed = closed))
         }
@@ -942,7 +943,7 @@ internal fun Xcsp3.Builder.precedence(e: XmlElement) {
         throw UnsupportedXcsp3Exception("precedence: covered form")
     }
     // The list may be a <list> child or, in the symmetry-breaking shorthand, direct content.
-    val vars = refList(listText(e)).toIntArray()
+    val vars = refList(listText(e))
     if (vars.isEmpty()) return
     val values = parseInts(e.child("values")?.textContent)
         ?: vars.flatMap { domainValues(it) }.distinct().sorted().toIntArray()
@@ -950,9 +951,12 @@ internal fun Xcsp3.Builder.precedence(e: XmlElement) {
     if (values.size.toLong() * vars.size * vars.size > negTableCap) {
         throw UnsupportedXcsp3Exception("precedence: too large to decompose")
     }
-    val eqLits = HashMap<Long, Int>()
-    fun eqLit(j: Int, v: Int) = eqLits.getOrPut(j.toLong() shl 32 or (v.toLong() and 0xffffffffL)) {
-        reifyLinear(intArrayOf(1), intArrayOf(vars[j]), LinearOp.EQ, v)
+    val eqLits = MutableLongIntMap()
+    fun eqLit(j: Int, v: Int): Int {
+        val key = j.toLong() shl 32 or (v.toLong() and 0xffffffffL)
+        val existing = eqLits.getOrDefault(key, Int.MIN_VALUE)
+        if (existing != Int.MIN_VALUE) return existing
+        return reifyLinear(intArrayOf(1), intArrayOf(vars[j]), LinearOp.EQ, v).also { eqLits.put(key, it) }
     }
     for (i in 0 until values.size - 1) {
         val s = values[i]
@@ -972,7 +976,7 @@ internal fun Xcsp3.Builder.precedence(e: XmlElement) {
 internal fun Xcsp3.Builder.noOverlap(e: XmlElement) {
     val originsText = requireNotNull(e.child("origins")).textContent
     if ('(' in originsText) return noOverlapMulti(e, originsText)
-    val starts = refList(originsText).toIntArray()
+    val starts = refList(originsText)
     val durations = parseInts(e.child("lengths")?.textContent)
         ?: throw UnsupportedXcsp3Exception("noOverlap: non-constant <lengths>")
     require(durations.size == starts.size) { "noOverlap: <origins>/<lengths> length mismatch" }
@@ -1044,7 +1048,7 @@ internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): Li
 }
 
 internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
-    val vars = refList(listText(e)).toIntArray()
+    val vars = refList(listText(e))
     if (vars.isEmpty()) throw UnsupportedXcsp3Exception("allDifferent: empty list")
     // <except> weakens the constraint: variables taking an exempt value may repeat.
     e.child("except")?.let { exceptEl ->
