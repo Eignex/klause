@@ -4,15 +4,16 @@ import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.solver.Sample
 
 /**
- * OPB pseudo-Boolean front-end (`.opb`). Both satisfaction (`SAT`) and optimisation (`min:`)
- * instances are handled; the objective is always a minimisation. Emits the PB-competition output
- * protocol: an `o <cost>` line per improving incumbent, a final `s SATISFIABLE` / `s OPTIMUM FOUND`
- * / `s UNSATISFIABLE` / `s UNKNOWN` status, and a `v <literals>` line listing each variable `xi`
- * (1-based) as `xi` when true, `-xi` when false. `-s` statistics are emitted as `c` comment lines.
+ * OPB/WBO pseudo-Boolean front-end (`.opb`, `.wbo`). Satisfaction (`SAT`), optimisation (`min:`),
+ * and WBO soft-constraint (weighted-violation) instances are handled; the objective is always a
+ * minimisation. Emits the PB-competition output protocol: an `o <cost>` line per improving
+ * incumbent, a final `s SATISFIABLE` / `s OPTIMUM FOUND` / `s UNSATISFIABLE` / `s UNKNOWN` status,
+ * and a `v <literals>` line listing each variable `xi` (1-based) as `xi` when true, `-xi` when
+ * false. `-s` statistics are emitted as `c` comment lines.
  */
 internal object OpbMode : CliMode {
-    override val names = listOf("opb", "pb")
-    override val extensions = listOf("opb")
+    override val names = listOf("opb", "pb", "wbo")
+    override val extensions = listOf("opb", "wbo")
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
