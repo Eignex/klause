@@ -3,8 +3,8 @@ package com.eignex.klause.backtrack
 import com.eignex.kumulant.stat.decay.EwmaMeanStat
 
 /**
- * EMA-based adaptive restart (Biere-Fröhlich 2015) — the scheme modern CDCL solvers (CaDiCaL, Kissat)
- * run, and the exponential-moving-average counterpart of [GlucoseRestart]'s bounded LBD/trail windows.
+ * EMA-based adaptive restart: the exponential-moving-average counterpart of [GlucoseRestart]'s bounded
+ * LBD/trail windows.
  * Two bias-corrected EWMAs of learned-clause LBD stand in for the recent/global averages: a fast one
  * tracking the last handful of conflicts and a slow one tracking the long run. When the fast average
  * runs hotter than the slow one the recent clauses are low-quality and the search should re-pick. A
@@ -12,7 +12,7 @@ import com.eignex.kumulant.stat.decay.EwmaMeanStat
  * the solver is driving deep toward a model, so the restart is deferred.
  *
  *  - [fastAlpha] / [slowAlpha] — EWMA smoothing factors; the effective window is `~1/alpha` conflicts.
- *    Defaults `2^-5` and `2^-14`, the CaDiCaL/Lingeling values.
+ *    Defaults `2^-5` and `2^-14`.
  *  - [restartMargin] `K` — restart when `recentLbd * K > globalLbd` (recent LBD `~1/K` above the
  *    long-run average). Matches [GlucoseRestart]'s 0.8.
  *  - [blockingFactor] `R` — block the restart when `trailSize > R * globalTrail`. Matches

@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -69,6 +70,29 @@ class PhaseSavingTest {
         phase.onConflictTick()
         phase.onConflictTick()
         assertEquals(listOf(1L, 0L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
+    }
+
+    @Test
+    fun `managed STABLE mode dives on the solution phase`() {
+        val phase = PhaseSaving(1, 0, BacktrackParams(solutionPhasing = true))
+        phase.onSolution(Sample(booleanArrayOf(true), longArrayOf()))
+        phase.setManagedMode(PhaseMode.STABLE)
+        assertEquals(listOf(1L, 0L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
+    }
+
+    @Test
+    fun `managed STABLE mode dives on the solution's integer value`() {
+        val phase = PhaseSaving(0, 1, BacktrackParams(solutionPhasing = true))
+        phase.onSolution(Sample(booleanArrayOf(), longArrayOf(4)))
+        phase.setManagedMode(PhaseMode.STABLE)
+        assertEquals(listOf(4L, 1L, 7L), phase.applyPhase(VarRef.IntVar(0), sequenceOf(1, 4, 7)).toList())
+    }
+
+    @Test
+    fun `solution phasing is a no-op until an incumbent is seen`() {
+        val phase = PhaseSaving(1, 0, BacktrackParams(solutionPhasing = true))
+        phase.setManagedMode(PhaseMode.STABLE)
+        assertEquals(listOf(0L, 1L), phase.applyPhase(VarRef.Bool(0), sequenceOf(0, 1)).toList())
     }
 
     @Test

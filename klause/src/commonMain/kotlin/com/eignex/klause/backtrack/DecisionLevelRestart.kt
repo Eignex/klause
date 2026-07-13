@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
 /**
- * Decision-level moving-average restart (CP-SAT `DL_MOVING_AVERAGE_RESTART`): restart when a recent
- * window of conflict decision levels runs higher than the long-run average — the search is diving deep
+ * Decision-level moving-average restart: restart when a recent window of conflict decision levels runs
+ * higher than the long-run average — the search is diving deep
  * before conflicting, a sign the current region is unproductive and it should re-pick. The complement of
  * [GlucoseRestart]'s LBD signal: LBD measures learned-clause quality, decision level measures how deep
  * the search drove to hit the conflict. The decision level is the trail depth at the conflict (klause's
@@ -11,7 +11,7 @@ package com.eignex.klause.backtrack
  *  - [window] — recent-window capacity; the restart check is gated on the window being full, so tiny
  *    searches never restart.
  *  - [ratio] `K` — restart when `globalAvg < K · recentAvg` (recent decision levels running above the
- *    long-run average). CP-SAT default 1.0.
+ *    long-run average). Defaults to 1.0.
  *
  * The recent window is a circular buffer, fast-cleared on restart so it must refill before it can
  * trigger again (no restart storms).

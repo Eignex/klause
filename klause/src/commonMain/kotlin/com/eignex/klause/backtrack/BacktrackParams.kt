@@ -80,7 +80,7 @@ data class BacktrackParams(
      */
     val adaptiveRestart: Boolean = false,
     /**
-     * EMA-based adaptive restarts (Biere-Fröhlich) — the modern CDCL variant of [adaptiveRestart].
+     * EMA-based adaptive restarts — the moving-average variant of [adaptiveRestart].
      * Instead of [GlucoseRestart]'s bounded LBD/trail windows, restarts are driven by exponential
      * moving averages of learned-clause LBD (a fast recent average against a slow long-run one) with
      * the same trail-size blocking. See [EmaRestart]. Takes precedence over [adaptiveRestart] and
@@ -88,7 +88,7 @@ data class BacktrackParams(
      */
     val emaRestart: Boolean = false,
     /**
-     * Stable/focused mode-switching restarts (the CaDiCaL/Kissat regime) — the mixing default. Within a
+     * Stable/focused mode-switching restarts — the mixing default. Within a
      * single run the search alternates a focused proving mode (frequent adaptive restarts) with a stable
      * dive mode (no restarts, driving deep and holding a good assignment via phase saving), so it is
      * robust on optimization without hand-tuning a Luby base. See [ModeSwitchingRestartSchedule]. Takes
@@ -121,6 +121,14 @@ data class BacktrackParams(
      * random and back. Ignored when [targetPhasing] is false. Must be positive.
      */
     val rephaseInterval: Long = 1000L,
+    /**
+     * Solution-based phasing. When enabled, each new feasible incumbent seeds the phase source with its
+     * Boolean polarities and
+     * integer values, and the stable phase (and the `SOLUTION` rephase mode) dives toward that incumbent
+     * rather than the last-committed value — objective-good rather than quality-blind. Complements
+     * [targetPhasing] (deepest conflict-free prefix) with the full best solution. Disabled by default.
+     */
+    val solutionPhasing: Boolean = false,
     /**
      * Cap on the learned-clause database size. When non-null, a restart-driven
      * forgetting pass runs on every Luby restart (gated by [lubyRestartBase]): clauses

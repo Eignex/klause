@@ -132,9 +132,9 @@ internal class EngineParams(pairs: List<String>) {
  *  engine / the portfolio scenario) — the set that, when present, edits the `cp` arm pool. */
 internal val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
-    "target-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db", "mid-lbd", "vivification",
-    "vivify-batch", "lp-objective-cone", "lp-auto-off-reprobe", "lp-knapsack-lagrangian", "var-selector",
-    "val-selector",
+    "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
+    "mid-lbd", "vivification", "vivify-batch", "lp-objective-cone", "lp-auto-off-reprobe",
+    "lp-knapsack-lagrangian", "var-selector", "val-selector",
 )
 
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
@@ -153,6 +153,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val modeSwitchingRestart = p.bool("mode-switching-restart")
     val phaseSaving = p.bool("phase-saving")
     val targetPhasing = p.bool("target-phasing")
+    val solutionPhasing = p.bool("solution-phasing")
     val rephaseInterval = p.long("rephase-interval")
     val maxLearned = p.int("max-learned")
     val lbdGlue = p.int("lbd-glue")
@@ -167,8 +168,8 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
-        rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch, lpCone, lpAutoOff,
-        lpKnapsack,
+        solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
+        lpCone, lpAutoOff, lpKnapsack,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -180,6 +181,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         modeSwitchingRestart?.let { out = out.copy(modeSwitchingRestart = it) }
         phaseSaving?.let { out = out.copy(phaseSaving = it) }
         targetPhasing?.let { out = out.copy(targetPhasing = it) }
+        solutionPhasing?.let { out = out.copy(solutionPhasing = it) }
         rephaseInterval?.let { out = out.copy(rephaseInterval = it) }
         maxLearned?.let { out = out.copy(maxLearnedClauses = it) }
         lbdGlue?.let { out = out.copy(lbdGlueThreshold = it) }

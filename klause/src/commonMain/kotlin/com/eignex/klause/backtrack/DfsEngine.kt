@@ -248,6 +248,7 @@ internal class DfsEngine<L>(
             val snap = snapshotAssignment(session)
             params.variableSelector.onSolution(snap)
             params.valueSelector.onSolution(snap)
+            phase.onSolution(snap)
             pendingBlock = snap
             descend = false
             return policy.onLeaf(snap)?.let { EngineEvent.Solution(it) }

@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Sample
 import kotlin.random.Random
 
 /**
@@ -25,6 +26,9 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
     private val intPhaseSet: BooleanArray? = if (params.phaseSaving) BooleanArray(numIntVars) else null
     private val boolTarget: BooleanArray? = if (params.targetPhasing) BooleanArray(numBoolVars) else null
     private val boolTargetSet: BooleanArray? = if (params.targetPhasing) BooleanArray(numBoolVars) else null
+    private val solutionBools: BooleanArray? = if (params.solutionPhasing) BooleanArray(numBoolVars) else null
+    private val solutionInts: LongArray? = if (params.solutionPhasing) LongArray(numIntVars) else null
+    private var hasSolution = false
 
     private var bestTrailSize = -1
     private var rephaseMode = RephaseMode.TARGET
@@ -54,43 +58,62 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
             } else {
                 null
             }
-            // Target phasing rotates the polarity source; plain phase saving just uses the
-            // saved value. The chosen value (if any) is tried first, with the heuristic's
-            // order filling the rest.
-            val preferred: Long? = if (boolTarget != null && boolTargetSet != null) {
-                // A managing schedule pins the source (stable → dive on target, focused → plain saved);
-                // otherwise the autonomous rephase rotation chooses.
-                val source = when (managedMode) {
-                    PhaseMode.STABLE -> RephaseMode.TARGET
-                    PhaseMode.FOCUSED -> RephaseMode.SAVED
-                    PhaseMode.UNMANAGED -> rephaseMode
-                }
-                when (source) {
-                    // Target: the deepest conflict-free phase, falling back to saved.
-                    RephaseMode.TARGET -> if (boolTargetSet[v]) (if (boolTarget[v]) 1L else 0L) else savedFirst
-
-                    RephaseMode.SAVED -> savedFirst
-
-                    RephaseMode.TRUE -> 1L
-
-                    RephaseMode.FALSE -> 0L
-
-                    RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1L else 0L
-                }
+            val solutionFirst: Long? = if (solutionBools != null && hasSolution && v < solutionBools.size) {
+                if (solutionBools[v]) 1L else 0L
             } else {
-                savedFirst
+                null
+            }
+            // A managing schedule pins the source (stable → dive on the best solution/target, focused →
+            // plain saved); otherwise the autonomous rephase rotation chooses. Each source falls back to
+            // the saved phase when its array isn't populated, so a disabled feature is a no-op.
+            val source = when (managedMode) {
+                PhaseMode.STABLE -> if (solutionFirst != null) RephaseMode.SOLUTION else RephaseMode.TARGET
+                PhaseMode.FOCUSED -> RephaseMode.SAVED
+                PhaseMode.UNMANAGED -> rephaseMode
+            }
+            val preferred: Long? = when (source) {
+                RephaseMode.SOLUTION -> solutionFirst ?: savedFirst
+
+                RephaseMode.TARGET -> if (boolTarget != null && boolTargetSet != null && boolTargetSet[v]) {
+                    if (boolTarget[v]) 1L else 0L
+                } else {
+                    savedFirst
+                }
+
+                RephaseMode.SAVED -> savedFirst
+
+                RephaseMode.TRUE -> 1L
+
+                RephaseMode.FALSE -> 0L
+
+                RephaseMode.RANDOM -> if ((rng ?: Random.Default).nextBoolean()) 1L else 0L
             }
             if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
         }
 
         is VarRef.IntVar -> {
-            if (intPhase != null && intPhaseSet != null && intPhaseSet[varRef.varId]) {
-                val saved = intPhase[varRef.varId]
-                sequenceOf(saved) + values.filter { it != saved }
-            } else {
-                values
+            val vi = varRef.varId
+            // Stable / SOLUTION mode dives on the incumbent's value (objective-good); otherwise plain
+            // saved value. Out-of-domain values are harmless — [IntNode] clamps the split into the domain.
+            val useSolution = managedMode == PhaseMode.STABLE ||
+                (managedMode == PhaseMode.UNMANAGED && rephaseMode == RephaseMode.SOLUTION)
+            val solutionInt: Long? =
+                if (useSolution && solutionInts != null && hasSolution && vi < solutionInts.size) solutionInts[vi] else null
+            val preferred: Long? = when {
+                solutionInt != null -> solutionInt
+                intPhase != null && intPhaseSet != null && intPhaseSet[vi] -> intPhase[vi]
+                else -> null
             }
+            if (preferred != null) sequenceOf(preferred) + values.filter { it != preferred } else values
         }
+    }
+
+    /** Seed the solution phase source with a new feasible incumbent (see [BacktrackParams.solutionPhasing]). */
+    fun onSolution(sample: Sample) {
+        if (solutionBools == null && solutionInts == null) return
+        solutionBools?.let { sample.bools.copyInto(it, endIndex = minOf(it.size, sample.bools.size)) }
+        solutionInts?.let { sample.ints.copyInto(it, endIndex = minOf(it.size, sample.ints.size)) }
+        hasSolution = true
     }
 
     /** Record [varRef]'s currently-pinned value for phase-saving. Called after every successful pin. */
