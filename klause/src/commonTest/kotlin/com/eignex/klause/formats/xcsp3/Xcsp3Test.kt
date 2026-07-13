@@ -49,6 +49,39 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `matrix allDifferent constrains each row and column not the whole matrix`() {
+        // A 3x3 matrix over 1..3 is SAT as a Latin square (distinct on each row and each column). It
+        // would be UNSAT if flattened to one all-different over all nine cells (nine values from 1..3).
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><array id="x" size="[3][3]"> 1..3 </array></variables>
+              <constraints>
+                <allDifferent><matrix> x[][] </matrix></allDifferent>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val names = Xcsp3.parse(xml).intVarNames
+        val g = sat(xml)
+        fun cell(r: Int, c: Int) = g[names.getValue("x[$r][$c]")]
+        for (i in 0..2) {
+            assertEquals(3, (0..2).map { cell(i, it) }.toSet().size, "row $i must be all-different")
+            assertEquals(3, (0..2).map { cell(it, i) }.toSet().size, "column $i must be all-different")
+        }
+    }
+
+    @Test
+    fun `matrix allDifferent over a sub-range binds the referenced cells`() {
+        // The 2x2 top-left block of a 3x3 array is row/column all-different; pinning x[0][0] = x[0][1]
+        // (same row, both inside the block) must conflict — verifying the `x[0..1][0..1]` axes resolve.
+        val decl = """<instance type="CSP"><variables><array id="x" size="[3][3]"> 1..3 </array></variables>"""
+        val cons = "<allDifferent><matrix> x[0..1][0..1] </matrix></allDifferent>" +
+            "<instantiation><list> x[0][0] x[0][1] </list><values> 1 1 </values></instantiation>"
+        val r = BacktrackSolver(Xcsp3.parse("$decl<constraints>$cons</constraints></instance>").problem)
+            .solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "same-row cells in the sub-range block must be all-different, got $r")
+    }
+
+    @Test
     fun `parses COP with sum constraint and maximize objective and optimizes`() {
         val xml = """
             <instance format="XCSP3" type="COP">
