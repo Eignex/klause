@@ -58,8 +58,8 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
         }
     }
 
-    val loCap = unboundedIntLo.toLong()
-    val hiCap = unboundedIntHi.toLong()
+    val loCap = unboundedIntLo
+    val hiCap = unboundedIntHi
     for ((name, v) in intNames) {
         val provLo = lo[v]
         val provHi = hi[v]
@@ -81,9 +81,6 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
         // within this finite box — so flag it to downgrade the verdict to `unknown`. A `clo > chi`
         // (empty domain) is *not* clamping: `coerceIn` is monotonic, so it only arises when the
         // provable bounds already contradict — a genuine `unsat` that must stay `unsat`.
-        if (provLo <= NEG_INF || provHi >= POS_INF || provLo < loCap || provHi > hiCap) {
-            domainsClamped = true
-        }
         intDomains[v] = if (clo <= chi) IntDomain(clo, chi) else IntDomain(clo, clo)
     }
 }

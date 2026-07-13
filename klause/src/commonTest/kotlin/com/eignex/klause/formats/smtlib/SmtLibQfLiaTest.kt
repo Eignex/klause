@@ -39,8 +39,8 @@ class SmtLibQfLiaTest {
         // (carried as Long), not be misclassified as reals and rejected.
         val p = SmtLibQfLia.parse(
             "(declare-const x Int) (assert (<= x 2147483648)) (assert (>= x 4294967296)) (check-sat)",
-            unboundedIntLo = 0,
-            unboundedIntHi = Int.MAX_VALUE,
+            unboundedIntLo = 0L,
+            unboundedIntHi = Int.MAX_VALUE.toLong(),
         ).problem
         // The relation bounds carry the >32-bit literals; the lower bound 2^32 exceeds the +2^31 domain
         // cap so it clamps, but parsing succeeds with no exception.
@@ -300,5 +300,26 @@ class SmtLibQfLiaTest {
             "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
         )
         assertFalse(parsed.domainsClamped, "both bounds are provable, so an unsat here is sound")
+    }
+
+    @Test
+    fun `OBBT derives a finite bound for an otherwise-unbounded variable`() {
+        // x has no declared bound, but `2*x = 10` pins it to 5. Interval bound inference cannot divide,
+        // so it leaves x unbounded; OBBT solves the LP to x in [5, 5], so the model is not clamped
+        // (an unsat would be sound) and x solves to 5.
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (= (* 2 x) 10))\n(check-sat)"
+        val parsed = SmtLibQfLia.parse(text)
+        assertFalse(parsed.domainsClamped, "OBBT bounded x from the LP, so the model is not clamped")
+        assertEquals(5L, solveFor(text, "x"))
+    }
+
+    @Test
+    fun `an unbounded variable OBBT cannot bound stays clamped but still finds a witness`() {
+        // x > 3 leaves x unbounded above; OBBT cannot bound it, so it falls back to a searchable range
+        // (clamped -> an unsat would be unknown), yet search still finds the witness x = 4.
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
+        val parsed = SmtLibQfLia.parse(text)
+        assertTrue(parsed.domainsClamped, "x is unbounded above; the searchable fallback marks it clamped")
+        assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the fallback range")
     }
 }

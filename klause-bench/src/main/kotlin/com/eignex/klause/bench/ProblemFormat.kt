@@ -81,7 +81,7 @@ internal object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB_QF_LIA
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toIntOrNull() ?: 100_000
+        val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toLongOrNull() ?: 100_000L
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
         val parsed = SmtLibQfLia.parse(file.readText(), -intBound, intBound, strict)
         return Ingested(parsed.problem, parsed.objective)

@@ -3,6 +3,7 @@ import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.SEARCHABLE_UNBOUNDED_CLAMP
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -22,8 +23,8 @@ internal class FlatZincCompiler(
     /** When true, skip redundant/symmetry annotations for LS-track behavior. */
     internal val forLocalSearch: Boolean = false,
     /** Default domain for unbounded `var int` declarations. */
-    internal val unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
-    internal val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+    internal val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+    internal val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
     /** Cooperative cancellation token. */
     internal val cancellation: Cancellation = Cancellation.Never,
 ) {
@@ -112,12 +113,23 @@ internal class FlatZincCompiler(
         }
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
-            FznType.IntAny -> allocInt(d.name, unboundedIntLo.toLong(), unboundedIntHi.toLong())
+
+            FznType.IntAny -> allocInt(
+                d.name,
+                unboundedIntLo.coerceIn(-SEARCHABLE_UNBOUNDED_CLAMP, SEARCHABLE_UNBOUNDED_CLAMP),
+                unboundedIntHi.coerceIn(-SEARCHABLE_UNBOUNDED_CLAMP, SEARCHABLE_UNBOUNDED_CLAMP),
+            )
+
             is FznType.IntRange -> allocInt(d.name, t.lo, t.hi)
+
             is FznType.IntSet -> allocIntSet(d.name, t)
+
             FznType.FloatAny -> failHere("variable `${d.name}`: unbounded `float` not supported; need a range")
+
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
+
             is FznType.SetOfInt -> allocSetVar(d.name, t, d.value)
+
             is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
         recordEnumLabels(d)
@@ -504,8 +516,8 @@ fun parseFlatZinc(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
     forLocalSearch: Boolean = false,
-    unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
-    unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
     cancellation: Cancellation = Cancellation.Never,
 ): FlatZincProgram {
     val tokens = FlatZincLexer(source).tokenize()

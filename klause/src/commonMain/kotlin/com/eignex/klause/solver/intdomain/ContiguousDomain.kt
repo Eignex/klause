@@ -12,8 +12,13 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
     }
 
     // Saturates at Int.MAX_VALUE for spans beyond 32-bit: a wide contiguous domain is never enumerated,
-    // so callers that read size on it want "very large", not an exact (unrepresentable) count.
-    override val size: Int get() = (max - min + 1).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    // so callers that read size on it want "very large", not an exact (unrepresentable) count. A full
+    // Long.MIN..Long.MAX span overflows `max - min` to a negative value, so treat a negative span as
+    // "very large" too rather than letting it wrap to a bogus small count.
+    override val size: Int get() {
+        val span = max - min
+        return if (span < 0L || span >= Int.MAX_VALUE.toLong()) Int.MAX_VALUE else (span + 1L).toInt()
+    }
 
     override val holeCount: Long get() = 0
 

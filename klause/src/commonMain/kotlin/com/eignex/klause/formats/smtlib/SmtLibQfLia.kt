@@ -44,8 +44,8 @@ object SmtLibQfLia {
      *  — the same default int range as the FlatZinc front-end ([com.eignex.klause.config.KlauseConfig]). */
     fun parse(
         text: String,
-        unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
-        unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+        unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+        unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
     ): SmtLibProblem {
         val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds)
@@ -55,10 +55,11 @@ object SmtLibQfLia {
 
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
      *  `internal fun SmtLibQfLia.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
-    internal class Builder(val unboundedIntLo: Int, val unboundedIntHi: Int, val strictBounds: Boolean) : CnfLowering {
+    internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
+        CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
-        private var nextBool = 0
+        internal var nextBool = 0
         internal var nextInt = 0
         internal val intDomains = ArrayList<IntDomain>()
         override val factors = ArrayList<Factor>()
@@ -124,7 +125,7 @@ object SmtLibQfLia {
 
         override fun newBool(): Int = nextBool++
         internal fun newInt(): Int {
-            intDomains.add(IntDomain(unboundedIntLo.toLong(), unboundedIntHi.toLong()))
+            intDomains.add(IntDomain(unboundedIntLo, unboundedIntHi))
             return nextInt++
         }
         internal fun newInt(lo: Long, hi: Long): Int {
@@ -172,6 +173,7 @@ object SmtLibQfLia {
         fun build(): SmtLibProblem {
             inferBounds()
             for (a in asserts) assert(a)
+            boundUnboundedVars()
             val objective = objectiveSpec?.let { (t, neg) -> linearObjective(t, neg) }
             return SmtLibProblem(
                 Problem(

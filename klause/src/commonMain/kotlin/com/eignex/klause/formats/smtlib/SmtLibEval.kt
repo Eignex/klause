@@ -227,11 +227,14 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
     "mod" -> Res.I(divModTerm(args[0].asLin(), args[1].asLin(), quotient = false))
 
     "ite" -> {
-        // v = if cond then a else b: a fresh int pinned to each branch by the condition.
+        // v = if cond then a else b: a fresh int pinned to each branch by the condition. Its domain is
+        // the union of the two branch ranges, so an unbounded default never enters the reified equality.
         val cond = args[0].asLit()
         val a = args[1].asLin()
         val b = args[2].asLin()
-        val self = LinComb(mapOf(newInt() to 1), 0)
+        val (aLo, aHi) = linCombRange(a)
+        val (bLo, bHi) = linCombRange(b)
+        val self = LinComb(mapOf(newInt(minOf(aLo, bLo), maxOf(aHi, bHi)) to 1), 0)
         factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
         factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
         Res.I(self)
@@ -251,9 +254,12 @@ private fun SmtLibQfLia.Builder.postLinearRel(a: LinComb, b: LinComb, op: Linear
     }
 }
 
-/** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. */
+/** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. The fresh
+ *  var is bounded by `x`'s own range so an unbounded default never enters its defining constraints. */
 private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
-    val y = LinComb(mapOf(newInt(0L, unboundedIntHi.toLong()) to 1), 0)
+    val (xLo, xHi) = linCombRange(x)
+    val yHi = maxOf(satAbs(xLo), satAbs(xHi))
+    val y = LinComb(mapOf(newInt(0L, yHi) to 1), 0)
     val negX = x.scaled(-1L)
     postLinearRel(y, x, LinearOp.GE)
     postLinearRel(y, negX, LinearOp.GE)
@@ -262,16 +268,59 @@ private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
 }
 
 /** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and
- *  `0 ≤ m < |d|`. A non-constant divisor is genuinely non-linear, so it is rejected. */
+ *  `0 ≤ m < |d|`. `q` is bounded by `a`'s range / `d` (so `d·q` cannot overflow); a non-constant
+ *  divisor is genuinely non-linear, so it is rejected. */
 private fun SmtLibQfLia.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
     if (b.coeffs.isNotEmpty()) throw UnsupportedSmtException("non-constant divisor in div/mod")
     val d = b.constant
     if (d == 0L) throw UnsupportedSmtException("division by zero in div/mod")
     val absd = if (d < 0) -d else d
+    val (aLo, aHi) = linCombRange(a)
+    val e1 = satFloorDiv(aLo, d)
+    val e2 = satFloorDiv(aHi, d)
     val m = LinComb(mapOf(newInt(0L, absd - 1) to 1), 0)
-    val q = LinComb(mapOf(newInt() to 1), 0)
+    val q = LinComb(mapOf(newInt(satAdd(minOf(e1, e2), -1L), satAdd(maxOf(e1, e2), 1L)) to 1), 0)
     postLinearRel(a, q.scaled(d).plus(m), LinearOp.EQ) // a = d·q + m
     return if (quotient) q else m
+}
+
+/** Effectively-infinite headroom for auxiliary-variable ranges: a bound that leaves room for the
+ *  coefficient/sum arithmetic in the aux var's defining constraints to stay clear of `Long` overflow. */
+private const val AUX_INF = Long.MAX_VALUE / 4
+
+private fun satAbs(x: Long): Long = if (x < 0) satNeg(x) else x
+
+private fun satNeg(x: Long): Long = if (x == Long.MIN_VALUE) AUX_INF else -x
+
+private fun satAdd(a: Long, b: Long): Long {
+    val s = a + b
+    return if (((a xor s) and (b xor s)) < 0) (if (a > 0) AUX_INF else -AUX_INF) else s.coerceIn(-AUX_INF, AUX_INF)
+}
+
+private fun satMul(a: Long, b: Long): Long {
+    if (a == 0L || b == 0L) return 0L
+    val p = a * b
+    return if (p / b != a) (if ((a > 0) == (b > 0)) AUX_INF else -AUX_INF) else p.coerceIn(-AUX_INF, AUX_INF)
+}
+
+private fun satFloorDiv(a: Long, b: Long): Long {
+    val q = a / b
+    return if (a xor b < 0 && q * b != a) q - 1 else q
+}
+
+/** The value range `[lo, hi]` of [lin] over the current integer domains, clamped to ±[AUX_INF] and
+ *  computed with saturating arithmetic so it never overflows on unbounded domains. */
+private fun SmtLibQfLia.Builder.linCombRange(lin: LinComb): Pair<Long, Long> {
+    var lo = lin.constant.coerceIn(-AUX_INF, AUX_INF)
+    var hi = lo
+    for ((v, c) in lin.coeffs) {
+        val d = intDomains[v]
+        val t1 = satMul(c, d.min)
+        val t2 = satMul(c, d.max)
+        lo = satAdd(lo, minOf(t1, t2))
+        hi = satAdd(hi, maxOf(t1, t2))
+    }
+    return lo to hi
 }
 
 /** Reify a two-operand arithmetic relation from its folded operands. */
