@@ -152,6 +152,9 @@ internal class DfsEngine<L>(
 
     private val trail: MutableList<TrailNode> = ArrayList()
     private var pendingBlock: Sample? = null
+
+    // Best pooled solution already adopted as phase hints; identity-gates redundant re-imports.
+    private var lastPooledSolution: Sample? = null
     private var descend = true
     private var decisionsThisRun = 0L
     private var runActive = false
@@ -409,10 +412,26 @@ internal class DfsEngine<L>(
         solver.forgetIfOverCap(session, params)
         if (vivifyEnabled) vivifyCursor = solver.vivify(session, params, vivifyCursor)
         restart.onRestart()
+        importPooledSolution()
         val restartIndex = ++restartCount
         sink?.search?.observeRestart()
         params.onEvent?.invoke(SearchEvent.Restart(restartIndex, decisionsThisRun))
         return null
+    }
+
+    /**
+     * Re-phase toward the best assignment any arm has published (#644 collaboration): if the shared pool
+     * now holds a solution this engine has not yet imported, adopt it as solution-phasing hints so the
+     * stable phase dives toward the global incumbent rather than only this arm's own. Identity-gated so an
+     * unchanged pool costs nothing. Pure heuristic — [PhaseSaving.onSolution]/[PhaseSaving.applyPhase] only
+     * reorder value trials (clamping out-of-domain integers), so a foreign assignment cannot make the
+     * search unsound; a no-op unless [BacktrackParams.solutionPhasing] is on.
+     */
+    private fun importPooledSolution() {
+        val pooled = params.pooledSolutionSupplier?.invoke() ?: return
+        if (pooled === lastPooledSolution) return
+        lastPooledSolution = pooled
+        phase.onSolution(pooled)
     }
 
     /** Pop every decision frame, reverting the session in lockstep, back to the post-seed root. */

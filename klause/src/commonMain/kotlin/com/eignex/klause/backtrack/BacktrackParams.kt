@@ -216,6 +216,15 @@ data class BacktrackParams(
      */
     val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
     /**
+     * Supplier of the best [Sample] any arm has published — the read counterpart of [improvedSolutionSink].
+     * On each restart the engine adopts a not-yet-seen pooled solution as solution-phasing hints (see
+     * [solutionPhasing]) so its stable phase dives toward the globally-good assignment instead of only its
+     * own. Purely heuristic: the assignment reorders value trials (out-of-domain integers are clamped), so
+     * a peer's solution can never make this search unsound. `null` (default) disables it; a no-op unless
+     * [solutionPhasing] is on.
+     */
+    val pooledSolutionSupplier: (() -> Sample?)? = null,
+    /**
      * Sink for the **globally-valid** decision-level-0 integer-variable bound tightenings this worker
      * proves — `(varId, lo, hi)`, each a bound that holds at *every* solution (root propagation, the
      * variable-shaving deductions), published so a portfolio can keep their cross-arm intersection. Only
