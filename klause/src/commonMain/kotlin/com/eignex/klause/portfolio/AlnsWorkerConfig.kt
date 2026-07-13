@@ -37,11 +37,19 @@ internal class AlnsWorkerConfig : WorkerConfig {
         pools: SharedPools?,
     ): PortfolioWorker {
         val workerLabel = "alns/$label"
+        // Cross-repair clause sharing (#644): one pool persists globally-valid learned clauses across
+        // fragments so later repairs re-descend under earlier repairs' learning. Gated for soundness —
+        // the repair learns under assumptions/an incumbent, so its permanent (objective-bound, blocking)
+        // clauses and LP Farkas nogoods hold only under its pins and must not be shared.
+        val repairClauses = SharedClausePool()
         val alns = Alns(
             inner = LocalSearchSolver(problem),
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),
-            backtrackParams = BacktrackParams(randomSeed = seed + index),
+            backtrackParams = BacktrackParams(
+                randomSeed = seed + index,
+                clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true, shareGlobalNogoods = false),
+            ),
         )
         val params = LocalSearchParams(
             randomSeed = seed + index,

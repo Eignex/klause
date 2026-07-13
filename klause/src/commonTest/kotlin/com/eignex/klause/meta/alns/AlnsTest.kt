@@ -6,6 +6,8 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.portfolio.PoolClauseExchange
+import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
@@ -132,6 +134,33 @@ class AlnsTest {
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample), "CP repair reaches the optimal weighted exactly-one")
+    }
+
+    @Test
+    fun `alns CP repair with a gated shared clause pool stays sound and optimal`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        // Cross-repair clause sharing (#644) with the soundness gate: search-conditioned (permanent)
+        // clauses and Farkas nogoods are withheld, so sharing globally-valid learning across repairs
+        // must not prune away the optimum.
+        val pool = SharedClausePool()
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            repairOperators = BacktrackRepair.Defaults,
+            backtrack = BacktrackSolver(problem),
+            backtrackParams = BacktrackParams(
+                clauseExchange = PoolClauseExchange(pool, skipPermanent = true, shareGlobalNogoods = false),
+            ),
+            destroyFraction = 0.5,
+            maxIterations = 10,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        assertNotNull(sample)
+        assertEquals(3.0, objective.evaluate(sample), "gated cross-repair sharing keeps the optimum reachable")
     }
 
     @Test

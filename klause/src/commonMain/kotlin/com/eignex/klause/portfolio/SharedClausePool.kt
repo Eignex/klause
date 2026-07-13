@@ -65,6 +65,13 @@ internal class PoolClauseExchange(
     private val pool: SharedClausePool,
     private val maxLbd: Int = DEFAULT_MAX_LBD,
     private val maxLen: Int = DEFAULT_MAX_LEN,
+    /** Skip permanent (search-conditioned) clauses on export — the incumbent objective bound and
+     *  blocking nogoods. Required for an arm learning under assumptions/an incumbent (LNS repair): those
+     *  clauses hold only under its pins, so sharing them globally is unsound. */
+    private val skipPermanent: Boolean = false,
+    /** Publish globally-valid nogoods (LP Farkas) via [publishGlobal]. An LNS-repair arm derives Farkas
+     *  certificates under its pins, so they are not globally valid there — it disables this. */
+    private val shareGlobalNogoods: Boolean = true,
 ) : ClauseExchange {
     private var cursor = 0
     private val seen = HashSet<Long>()
@@ -93,13 +100,14 @@ internal class PoolClauseExchange(
     /** Publish a globally-valid nogood straight to the pool (no LBD/length filter), deduped by the
      *  `seen` set so this arm neither double-publishes it nor re-imports its own. */
     override fun publishGlobal(clause: SharedClause) {
+        if (!shareGlobalNogoods) return
         if (seen.add(clause.key)) pool.publish(listOf(clause))
     }
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
      *  trail). The `seen` set guards against re-export within a session; the pool de-dups globally. */
     private fun export(session: PropagationSession) {
-        val fresh = session.exportGlueClauses(maxLbd, maxLen).filter { seen.add(it.key) }
+        val fresh = session.exportGlueClauses(maxLbd, maxLen, skipPermanent).filter { seen.add(it.key) }
         if (fresh.isNotEmpty()) pool.publish(fresh)
     }
 

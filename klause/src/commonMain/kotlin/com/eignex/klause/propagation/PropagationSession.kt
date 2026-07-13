@@ -372,9 +372,13 @@ class PropagationSession(
      * literals are decoded to `(intVar, kind, threshold, sign)` via the atom registry; boolean
      * literals travel as-is. Cheap: the glue set is small by construction. (See [ClauseExchange].)
      */
-    fun exportGlueClauses(maxLbd: Int, maxLen: Int): List<SharedClause> {
+    fun exportGlueClauses(maxLbd: Int, maxLen: Int, skipPermanent: Boolean = false): List<SharedClause> {
         val out = ArrayList<SharedClause>()
         for (i in 0 until learnedClauseCount) {
+            // Permanent clauses are the search-conditioned assertions — the incumbent objective bound
+            // (assertObjectiveBound) and blocking nogoods — not globally-valid resolvents. A caller
+            // learning under assumptions/incumbent (LNS repair) must skip them or it poisons peers.
+            if (skipPermanent && learnedClausePermanent(i)) continue
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
             val lits = learnedClauseAt(i).literals
