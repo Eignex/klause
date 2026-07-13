@@ -1,5 +1,6 @@
 package com.eignex.klause.meta.alns
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
@@ -73,6 +74,11 @@ internal class Alns(
      *  Required to make `DestroyOperator.activityBiased(session)` useful — without a
      *  session it falls back to random. Pass `solver.session() as LocalSearchSession`. */
     val session: LocalSearchSession? = null,
+    /** Optional backtrack LCG+LP engine and base params for CP repair ([BacktrackRepair], #644). When
+     *  set, a repair operator can solve each freed fragment with full propagation + clause learning +
+     *  LP bounding under the pin assumptions. Null on a pure-LS ALNS. */
+    val backtrack: Optimizer<BacktrackParams>? = null,
+    val backtrackParams: BacktrackParams? = null,
 ) : Optimizer<LocalSearchParams> {
 
     init {
@@ -144,7 +150,10 @@ internal class Alns(
             }
 
             val pinAssumptions = buildPin(inner.problem, incumbent, freed)
-            val context = RepairContext(inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session)
+            val context = RepairContext(
+                inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
+                backtrack = backtrack, backtrackParams = backtrackParams,
+            )
             val repaired = repairOperators[repairIdx].repair(context)
             if (repaired == null) {
                 destroyBandit.update(destroyIdx, rejectedReward)

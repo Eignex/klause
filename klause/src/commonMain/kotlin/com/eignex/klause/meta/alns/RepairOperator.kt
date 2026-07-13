@@ -1,5 +1,6 @@
 package com.eignex.klause.meta.alns
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
@@ -39,7 +40,10 @@ internal fun interface RepairOperator {
 /** Bundle of everything a [RepairOperator] needs to fill a freed neighbourhood. When
  *  [session] is provided, operators that delegate to the inner solver should route
  *  calls through it so cross-iteration state (DDFW weights, activity recency) survives;
- *  the [inner] reference remains for operators that need raw `Optimizer` access. */
+ *  the [inner] reference remains for operators that need raw `Optimizer` access.
+ *
+ *  [backtrack] / [backtrackParams] are present when the caller supplies a backtrack LCG+LP engine for
+ *  CP repair ([BacktrackRepair]); null on a pure-LS ALNS. */
 internal data class RepairContext(
     val inner: Optimizer<LocalSearchParams>,
     val params: LocalSearchParams,
@@ -49,6 +53,8 @@ internal data class RepairContext(
     val freed: FreedVars,
     val rng: Random = Random.Default,
     val session: LocalSearchSession? = null,
+    val backtrack: Optimizer<BacktrackParams>? = null,
+    val backtrackParams: BacktrackParams? = null,
 )
 
 /**
@@ -69,6 +75,40 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
     }
 
     override fun toString(): String = "InnerLsRepair($label${flipsOverride?.let { ", flips=$it" }.orEmpty()})"
+}
+
+/**
+ * CP repair via the backtrack LCG+LP engine (#644) — the hybrid LS+CP move. Pins the complement of the
+ * freed set as root assumptions and runs a small bounded branch-and-bound over the freed neighbourhood,
+ * so the fragment gets full GAC filtering, clause learning, and LP bounding, unlike the LS/greedy
+ * repairs. The incumbent objective is wired as [BacktrackParams.objectiveBoundSupplier] so the search
+ * prunes against best-known and abandons a hopeless fragment early; only a strictly-improving completion
+ * comes back (else null, which ALNS treats as a rejected iteration). [maxDecisions] is the repair budget
+ * the ALNS bandit picks between — a quick probe vs a deep investment. A no-op (null) when the context
+ * carries no backtrack engine.
+ */
+internal class BacktrackRepair(val label: String = "standard", val maxDecisions: Long = 2_000L) : RepairOperator {
+    override fun repair(context: RepairContext): Sample? {
+        val engine = context.backtrack ?: return null
+        val base = context.backtrackParams ?: return null
+        val incumbentObjective = context.objective.evaluate(context.incumbent)
+        val pinned = base
+            .withAssumptions(context.pinAssumptions)
+            .copy(maxDecisions = maxDecisions, objectiveBoundSupplier = { incumbentObjective })
+        return engine.minimize(context.objective, pinned).assignment
+    }
+
+    override fun toString(): String = "BacktrackRepair($label, maxDecisions=$maxDecisions)"
+
+    companion object {
+        /** Three repair-budget profiles for the ALNS bandit to choose between — quick probe, standard,
+         *  and deep fragment solve. */
+        val Defaults: List<RepairOperator> = listOf(
+            BacktrackRepair(label = "quick", maxDecisions = 500L),
+            BacktrackRepair(label = "standard", maxDecisions = 2_000L),
+            BacktrackRepair(label = "deep", maxDecisions = 10_000L),
+        )
+    }
 }
 
 /**

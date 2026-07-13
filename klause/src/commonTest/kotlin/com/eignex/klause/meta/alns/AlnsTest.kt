@@ -1,5 +1,7 @@
 package com.eignex.klause.meta.alns
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -109,6 +111,27 @@ class AlnsTest {
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
+    }
+
+    @Test
+    fun `alns with backtrack CP repair minimizes weighted exactly-one`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            repairOperators = BacktrackRepair.Defaults,
+            backtrack = BacktrackSolver(problem),
+            backtrackParams = BacktrackParams(),
+            destroyFraction = 0.5,
+            maxIterations = 8,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        assertNotNull(sample)
+        assertEquals(3.0, objective.evaluate(sample), "CP repair reaches the optimal weighted exactly-one")
     }
 
     @Test

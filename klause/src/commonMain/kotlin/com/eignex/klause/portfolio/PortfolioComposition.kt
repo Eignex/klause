@@ -218,6 +218,9 @@ internal object PortfolioComposition {
         if (btCount > 0) {
             arms += btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
         }
+        // Hybrid ALNS with CP repair (#644): a mixed LS+backtrack engine, added last (lowest priority,
+        // pending its credit pass). COP only — it optimises an incumbent, so a CSP has nothing for it.
+        if (scenario.kind == Kind.COP) arms += AlnsWorkerConfig()
         return arms
     }
 }
