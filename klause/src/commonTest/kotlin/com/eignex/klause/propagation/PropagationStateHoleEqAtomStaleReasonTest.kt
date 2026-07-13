@@ -13,12 +13,12 @@ import kotlin.test.assertTrue
 /**
  * Regression for #670. An interior-hole eq atom (`[v = k]` ruled out by a carve at `min < k < max`)
  * rests on its carve-time trail slot. If a later, deeper bound move crosses `k` while `k` sits below
- * the min / above the max, [wakeAtom] re-establishes `[v = k]` false and **overwrites** that slot with
- * the bound move's level and reason. Backtracking the bound move widens it back across `k`, so `k` is
- * an interior hole again — but [resetAtomTrailFor] kept the eq atom (still false) and, before the fix,
- * left the stale bound-move slot in place. The slot then cites a bound atom no longer determined, at a
- * level no longer on the trail; conflict analysis ingested that undetermined atom and aborted the solve
- * ("ingest atom N at lower level undetermined").
+ * the min / above the max, single-establishment [wakeAtom] leaves that first (carve) slot intact
+ * rather than overwriting it with the bound move's level and reason. Backtracking the bound move
+ * widens it back across `k`, so `k` is an interior hole again; the reversible atom trail restores
+ * exactly the carve-time slot. Were the slot instead left citing the bound move, it would name a
+ * bound atom no longer determined, at a level no longer on the trail, and conflict analysis would
+ * ingest that undetermined atom and abort the solve ("ingest atom N at lower level undetermined").
  *
  * The invariant this guards: an atom's derived antecedents ([atomAntecedentsDerived]) must cite only
  * atoms that are currently determined — never one whose truth is undetermined — for every determined

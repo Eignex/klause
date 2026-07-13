@@ -17,10 +17,10 @@ import com.eignex.klause.util.LongArrayList
  *    recorded so replay restores it exactly even when the same var is narrowed several times within
  *    a level.
  *  - 2 — interior carve, journalled as just the carved value (see `logIntCarve`).
- *  - 3 — batched-exclusion carve, an atom-only reset (see `logExclusionCarveAtom`).
  *
- * Atom-table slots are *not* logged per-mutation: `undoTo` reconciles them after restoring each int
- * domain — see `resetAtomTrailFor` / `resetAtomTrailForCarve` (#708).
+ * Atom-table slots are logged on their own reversible trail (`AtomStore.undoAtomId` and parallels),
+ * captured by a [PropagationState.LevelMark]'s atom-undo size and replayed by `undoTo` alongside
+ * these records — so an atom-lit forced directly by a clause backtracks even when no bound moved.
  */
 internal class UndoLog {
     val tag = IntArrayList()
