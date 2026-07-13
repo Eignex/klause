@@ -149,6 +149,7 @@ object PortfolioBuilder {
             cuts,
             SharedObjectiveBound(concurrency.lock()),
             SharedVarBounds(problem.numIntVars, concurrency.lock()),
+            SharedSolutionPool(lock = concurrency.lock()),
         )
     }
 }

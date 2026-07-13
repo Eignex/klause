@@ -61,6 +61,7 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
                     globalVarUpperSupplier = vb::upperOf,
                 )
             }
+            pools?.solutions?.let { sols -> params = params.copy(improvedSolutionSink = sols::publish) }
         }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =

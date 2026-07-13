@@ -210,6 +210,7 @@ internal class ResumableMinimize(
         bestObj = o
         best = sample
         if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
+        params.improvedSolutionSink?.invoke(sample, o)
         params.onEvent?.invoke(SearchEvent.Incumbent(o))
         return MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted)
     }
