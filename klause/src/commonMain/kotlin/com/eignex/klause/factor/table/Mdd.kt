@@ -11,6 +11,7 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
@@ -124,6 +125,106 @@ class Mdd(
 
     override val boolVars: IntArray = EmptyIntArray
     override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
+
+    /**
+     * Minimize the diagram under the current domains: drop states not forward-reachable from [initial]
+     * over in-domain symbols, and states not backward-co-reachable to an accepting state; rebuild over
+     * the surviving states with dense per-layer ids. A permanent structural shrink of what the flattened
+     * transition table otherwise carries for the whole solve — the reduction bound/GAC propagation makes
+     * dynamically, baked in once. Solution-set exact under [domains] (presolve only tightens). Capped by
+     * [MINIMIZE_RECORD_CAP] so a giant diagram isn't re-swept every presolve round; an emptied layer is
+     * left to the propagator to report infeasible.
+     */
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod", "ReturnCount")
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        val records = transitions.size / recordStride
+        if (records == 0 || records > MINIMIZE_RECORD_CAP || initial !in 0 until numStatesPerLayer[0]) {
+            return FactorReduction.Unchanged
+        }
+        val n = seq.size
+        val fwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
+        fwd[0][initial] = true
+        for (i in 0 until n) {
+            val d = domains[seq[i]]
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val src = transitions[p].toInt()
+                val dst = transitions[p + 2].toInt()
+                if (src in fwd[i].indices && fwd[i][src] && transitions[p + 1] in d && dst in fwd[i + 1].indices) {
+                    fwd[i + 1][dst] = true
+                }
+                p += recordStride
+            }
+        }
+        val bwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
+        for (a in accepting) if (a in 0 until numStatesPerLayer[n] && fwd[n][a]) bwd[n][a] = true
+        for (i in n - 1 downTo 0) {
+            val d = domains[seq[i]]
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val src = transitions[p].toInt()
+                val dst = transitions[p + 2].toInt()
+                if (src in fwd[i].indices && fwd[i][src] && transitions[p + 1] in d &&
+                    dst in bwd[i + 1].indices && bwd[i + 1][dst]
+                ) {
+                    bwd[i][src] = true
+                }
+                p += recordStride
+            }
+        }
+        val liveId = Array(n + 1) { l -> IntArray(numStatesPerLayer[l]) { -1 } }
+        val newCounts = IntArray(n + 1)
+        for (l in 0..n) {
+            var id = 0
+            for (s in 0 until numStatesPerLayer[l]) if (fwd[l][s] && bwd[l][s]) liveId[l][s] = id++
+            if (id == 0) return FactorReduction.Unchanged // a layer emptied ⇒ infeasible; the propagator reports it
+            newCounts[l] = id
+        }
+        if (newCounts.contentEquals(numStatesPerLayer)) return FactorReduction.Unchanged // nothing dead
+        val newTransitions = LongArrayList()
+        val newStarts = IntArray(n + 1)
+        for (i in 0 until n) {
+            newStarts[i] = newTransitions.size // element offset into the flat record array, as [layerStarts]
+            val d = domains[seq[i]]
+            var p = layerStarts[i]
+            val end = layerStarts[i + 1]
+            while (p < end) {
+                val src = transitions[p].toInt()
+                val dst = transitions[p + 2].toInt()
+                if (src in liveId[i].indices && liveId[i][src] >= 0 && dst in liveId[i + 1].indices &&
+                    liveId[i + 1][dst] >= 0 && transitions[p + 1] in d
+                ) {
+                    newTransitions.add(liveId[i][src].toLong())
+                    newTransitions.add(transitions[p + 1])
+                    newTransitions.add(liveId[i + 1][dst].toLong())
+                    if (recordStride == 4) newTransitions.add(transitions[p + 3])
+                }
+                p += recordStride
+            }
+        }
+        newStarts[n] = newTransitions.size
+        // Every surviving final-layer state is accepting (live ⊆ accepting), so this collects them all.
+        val newAccepting = IntArrayList()
+        for (a in accepting) {
+            if (a in 0 until numStatesPerLayer[n] && fwd[n][a] && bwd[n][a]) newAccepting.add(liveId[n][a])
+        }
+        return FactorReduction.Rewrite(
+            listOf(
+                Mdd(
+                    seq,
+                    newCounts,
+                    newStarts,
+                    newTransitions.toLongArray(),
+                    liveId[0][initial],
+                    newAccepting.toIntArray(),
+                    recordStride,
+                    cost,
+                ),
+            ),
+        )
+    }
 
     override fun asPropagator(): Propagator = MddPropagator(
         boolVars, intVars, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
@@ -296,5 +397,9 @@ class Mdd(
     private companion object {
         /** Above this many reachable arcs the hull is skipped — the arc columns would dominate. */
         const val MAX_MDD_ARCS: Int = 4096
+
+        /** Above this many transition records [structuralReduce] skips minimization, so a giant diagram
+         *  is not re-swept each presolve round (and is likely already minimal from its lowering). */
+        const val MINIMIZE_RECORD_CAP: Int = 100_000
     }
 }
