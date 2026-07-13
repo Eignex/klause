@@ -42,6 +42,11 @@ object Presolve {
     fun removeRedundantConstraints(problem: Problem): PassDelta =
         RedundantConstraints.removeRedundantConstraints(problem)
 
+    /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
+     *  objective). See [SingletonInequalityProjection]. */
+    fun projectSingletonInequalities(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
+        SingletonInequalityProjection.project(problem, objectiveIntVars)
+
     /** Per-factor structural self-reduction via [com.eignex.klause.solver.Factor.structuralReduce].
      *  See [StructuralReduction]. */
     fun reduceStructural(problem: Problem): PassDelta = StructuralReduction.reduce(problem)
