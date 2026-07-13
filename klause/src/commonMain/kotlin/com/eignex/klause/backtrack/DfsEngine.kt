@@ -214,7 +214,9 @@ internal class DfsEngine<L>(
         rootExhausted = null
         numSeed = assumptions.boolKeys.size + assumptions.intKeys.size
         touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
-        val seedResult = session.seed(assumptions)
+        // Diff against the pins the previous fragment left standing rather than clearing to root: the
+        // shared complement carries over, so re-seeding a small-delta fragment stays cheap (#644).
+        val seedResult = session.reseedFrom(assumptions)
         if (seedResult is PropagationResult.Unsat) {
             recordTouchedSeedLevels(seedResult.conflictLevels)
             rootExhausted =

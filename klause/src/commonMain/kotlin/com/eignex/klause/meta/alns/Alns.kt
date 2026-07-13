@@ -211,18 +211,35 @@ internal class Alns(
         )
     }
 
-    /** Build an [Assumptions] pinning every variable *not* in [freed] to its incumbent value. */
+    /**
+     * Pin every variable *not* in [freed] to its incumbent value, written straight into the sorted
+     * primitive arrays [Assumptions] holds — no per-iteration boxing map. The complement is still most
+     * of the problem, but the reused repair session re-seeds it by diff
+     * ([com.eignex.klause.propagation.PropagationSession.reseedFrom]),
+     * so only the pins that actually changed between fragments cost propagation.
+     */
     private fun buildPin(problem: Problem, incumbent: Sample, freed: FreedVars): Assumptions {
         val freedBoolSet = IntHashSet().apply { for (b in freed.bools) add(b) }
         val freedIntSet = IntHashSet().apply { for (i in freed.ints) add(i) }
-        val pinnedBools = HashMap<Int, Boolean>(problem.numBoolVars)
-        val pinnedInts = HashMap<Int, Long>(problem.numIntVars)
+        val boolKeys = IntArray(problem.numBoolVars - freedBoolSet.size)
+        val boolValues = BooleanArray(boolKeys.size)
+        var bi = 0
         for (b in 0 until problem.numBoolVars) {
-            if (b !in freedBoolSet) pinnedBools[b] = incumbent.bools[b]
+            if (b in freedBoolSet) continue
+            boolKeys[bi] = b
+            boolValues[bi] = incumbent.bools[b]
+            bi++
         }
+        val intKeys = IntArray(problem.numIntVars - freedIntSet.size)
+        val intValues = LongArray(intKeys.size)
+        var ii = 0
         for (i in 0 until problem.numIntVars) {
-            if (i !in freedIntSet) pinnedInts[i] = incumbent.ints[i]
+            if (i in freedIntSet) continue
+            intKeys[ii] = i
+            intValues[ii] = incumbent.ints[i]
+            ii++
         }
-        return Assumptions(pinnedBools, pinnedInts)
+        // Keys emerge ascending from the 0..n scan — exactly the sorted order the array constructor wants.
+        return Assumptions(boolKeys, boolValues, intKeys, intValues)
     }
 }
