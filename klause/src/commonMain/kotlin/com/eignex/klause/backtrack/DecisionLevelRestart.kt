@@ -16,10 +16,7 @@ package com.eignex.klause.backtrack
  * The recent window is a circular buffer, fast-cleared on restart so it must refill before it can
  * trigger again (no restart storms).
  */
-internal class DecisionLevelRestart(
-    private val window: Int = 50,
-    private val ratio: Double = 1.0,
-) {
+internal class DecisionLevelRestart(private val window: Int = 50, private val ratio: Double = 1.0) {
     init {
         require(window > 0) { "window must be positive, got $window" }
         require(ratio > 0.0) { "ratio must be positive, got $ratio" }

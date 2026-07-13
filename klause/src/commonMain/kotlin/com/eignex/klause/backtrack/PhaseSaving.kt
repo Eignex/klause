@@ -93,14 +93,13 @@ internal class PhaseSaving(numBoolVars: Int, numIntVars: Int, private val params
 
         is VarRef.IntVar -> {
             val vi = varRef.varId
-            // Stable / SOLUTION mode dives on the incumbent's value (objective-good); otherwise plain
+            val sols = solutionInts
+            // Stable / SOLUTION mode dives on the incumbent's value (objective-good); otherwise the plain
             // saved value. Out-of-domain values are harmless — [IntNode] clamps the split into the domain.
             val useSolution = managedMode == PhaseMode.STABLE ||
                 (managedMode == PhaseMode.UNMANAGED && rephaseMode == RephaseMode.SOLUTION)
-            val solutionInt: Long? =
-                if (useSolution && solutionInts != null && hasSolution && vi < solutionInts.size) solutionInts[vi] else null
             val preferred: Long? = when {
-                solutionInt != null -> solutionInt
+                useSolution && sols != null && hasSolution && vi < sols.size -> sols[vi]
                 intPhase != null && intPhaseSet != null && intPhaseSet[vi] -> intPhase[vi]
                 else -> null
             }
