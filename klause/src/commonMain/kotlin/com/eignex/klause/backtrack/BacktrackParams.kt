@@ -20,6 +20,7 @@ import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.result.SearchEvent
 
@@ -208,6 +209,12 @@ data class BacktrackParams(
      * no-op without a single ascending objective variable.
      */
     val objectiveLowerBoundSupplier: (() -> Double)? = null,
+    /**
+     * Sink for each improving feasible incumbent this worker finds — its [Sample] and objective, the
+     * assignment companion of [objectiveLowerBoundSink]. A portfolio folds these into a shared solution
+     * pool so peers can dive toward or improve a globally-good assignment. `null` (default) disables it.
+     */
+    val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
     /**
      * Sink for the **globally-valid** decision-level-0 integer-variable bound tightenings this worker
      * proves — `(varId, lo, hi)`, each a bound that holds at *every* solution (root propagation, the
