@@ -322,4 +322,29 @@ class SmtLibQfLiaTest {
         assertTrue(parsed.domainsClamped, "x is unbounded above; the searchable fallback marks it clamped")
         assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the fallback range")
     }
+
+    @Test
+    fun `OBBT bounds a coupled equality system interval inference cannot solve`() {
+        // Neither x nor y has a declared bound; x+y=10 and x-y=4 pin x=7. Interval inference cannot
+        // solve the 2x2 system, so both stay open. OBBT's LP relaxation derives x in [7,7], so the model
+        // is not clamped (an unsat would be sound) and x solves to 7.
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
+            "(assert (= (+ x y) 10))\n(assert (= (- x y) 4))\n(check-sat)"
+        val parsed = SmtLibQfLia.parse(text)
+        assertFalse(parsed.domainsClamped, "OBBT closed both variables from the linear system")
+        assertEquals(7L, solveFor(text, "x"))
+    }
+
+    @Test
+    fun `a divisibility-only unsat over unbounded variables stays clamped`() {
+        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1), but its LP relaxation is
+        // feasible, so OBBT derives no bound and both variables fall back to the searchable range. The
+        // model is clamped, so a search 'unsat' over the box is reported as unknown -- never a false
+        // unsat for the truly unbounded problem.
+        val parsed = SmtLibQfLia.parse(
+            "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
+                "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
+        )
+        assertTrue(parsed.domainsClamped, "OBBT cannot bound an LP-feasible divisibility unsat")
+    }
 }

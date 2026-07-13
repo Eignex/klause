@@ -1,125 +1,98 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.config.SEARCHABLE_UNBOUNDED_CLAMP
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.LpOverflowException
+import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.RevisedSimplex
-import com.eignex.klause.lp.relaxation.CpToLpRelaxation
-import com.eignex.klause.lp.safeObjectiveLowerBound
-import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.objective.LinearObjective
-import kotlin.math.ceil
-import kotlin.math.floor
-
-/** Searchable fallback range for a variable OBBT could not bound: the finite search still finds a
- *  witness within it (SAT), and [SmtLibQfLia.Builder.domainsClamped] downgrades any `unsat` to
- *  `unknown` because such an `unsat` only holds within this box. */
-private val SEARCH_FALLBACK: Long = SEARCHABLE_UNBOUNDED_CLAMP
+import com.eignex.klause.lp.Sense
+import com.eignex.klause.lp.safeVariableBound
 
 /**
- * Turn the effectively-infinite `[Long.MIN, Long.MAX]` domain of every unbounded integer variable into
- * a finite one before search. First **OBBT** (optimization-based bound tightening): the LP relaxation's
- * min/max of the variable is a sound bound (the relaxation contains every integer solution), so a
- * finite LP optimum snaps the domain to it. Any side the LP leaves unbounded falls back to a searchable
- * range and marks the model clamped — so search still finds a SAT witness within it, while an `unsat`
- * over the box is reported as `unknown` (never a false `unsat`). Infinity thus never reaches search.
+ * Close every still-[PresolveDomain.Open] integer variable to a finite domain before search. First
+ * **OBBT** (optimization-based bound tightening): the LP relaxation's min/max of a variable is a sound
+ * bound (the relaxation contains every integer solution), so a finite LP optimum snaps that side shut.
+ * The relaxation is built directly from the linear factors; an unbounded variable side is expressed as a
+ * genuinely infinite LP bound ([LpBuilder.addFreeVar]) and the LP engine reports "unbounded" for an
+ * optimum that only reaches its own frontier — so a derived bound is always real, over the true
+ * unbounded region. Any side OBBT leaves open falls back to a searchable range and marks the model
+ * clamped, so search still finds a SAT witness while an `unsat` over the box is reported as `unknown`
+ * (never a false `unsat`). Infinity thus never reaches search.
  */
 internal fun SmtLibQfLia.Builder.boundUnboundedVars() {
     obbtBounds()
     finalizeDomains()
 }
 
-/** LP-tighten every domain side still reaching the unbounded sentinel. The relaxation is built over a
- *  [Problem.preFolded] problem so it never triggers the root bake (which would iterate the huge span). */
+/** LP-tighten every open domain side via OBBT over a linear relaxation of the current [Linear] factors.
+ *  Only linear constraints enter (fewer constraints ⇒ a looser but still-sound relaxation); each CP
+ *  variable is one LP column, unbounded sides expressed as genuine ±∞. */
 private fun SmtLibQfLia.Builder.obbtBounds() {
-    val lo = unboundedIntLo
-    val hi = unboundedIntHi
-    if ((0 until nextInt).none { intDomains[it].min <= lo || intDomains[it].max >= hi }) return
-    // The LP relaxation does exact `Long` arithmetic on the bounds, which overflows on a literal
-    // Long.MIN/MAX span — so present each unbounded side to the LP as the ±Long/4 [NEG_INF]/[POS_INF]
-    // sentinel (still "effectively infinite" for the relaxation, but overflow-safe).
-    val lpDomains = Array(nextInt) { i ->
-        val d = intDomains[i]
-        val cLo = if (d.min < NEG_INF) NEG_INF else d.min
-        val cHi = if (d.max > POS_INF) POS_INF else d.max
-        if (cLo == d.min && cHi == d.max) d else IntDomain(cLo, cHi)
-    }
-    val p = Problem(
-        numBoolVars = nextBool,
-        numIntVars = nextInt,
-        intDomains = lpDomains,
-        factors = factors.toTypedArray(),
-        preFolded = true,
-    )
-    val session = PropagationSession(p)
-    val objective = LongArray(nextInt)
-    for (v in 0 until nextInt) {
-        val d = intDomains[v]
-        var newMin = d.min
-        var newMax = d.max
-        if (d.max >= hi) lpBound(p, session, objective, v, maximize = true)?.let { if (it < newMax) newMax = it }
-        if (d.min <= lo) lpBound(p, session, objective, v, maximize = false)?.let { if (it > newMin) newMin = it }
-        if (newMin != d.min || newMax != d.max) {
-            intDomains[v] = if (newMin <= newMax) IntDomain(newMin, newMax) else IntDomain(newMin, newMin)
-        }
+    val openVars = (0 until nextInt).filter { intDomains[it] is PresolveDomain.Open }
+    if (openVars.isEmpty()) return
+    val linears = factors.filterIsInstance<Linear>()
+    for (v in openVars) {
+        val d = intDomains[v] as? PresolveDomain.Open ?: continue
+        var newLo = d.lo
+        var newHi = d.hi
+        if (d.openAbove) obbtSolve(linears, v, maximize = true)?.let { newHi = it }
+        if (d.openBelow) obbtSolve(linears, v, maximize = false)?.let { newLo = it }
+        intDomains[v] = openOrFinite(newLo, newHi)
     }
 }
 
-/** A sound finite LP bound on `x[v]` (max when [maximize], else min), or null when the LP leaves it
- *  unbounded / infeasible / fails. Maximisation is `−min(−x)`; the Neumaier–Shcherbina safe bound keeps
- *  it sound under floating error. [objective] is the reusable single-variable objective (zeroed on exit). */
-private fun SmtLibQfLia.Builder.lpBound(
-    p: Problem,
-    session: PropagationSession,
-    objective: LongArray,
-    v: Int,
-    maximize: Boolean,
-): Long? {
-    objective[v] = if (maximize) -1L else 1L
-    val relaxation = CpToLpRelaxation(p, LinearObjective(intCoefficients = objective)).build(session)
-    objective[v] = 0L
-    if (relaxation.model.n == 0) return null
+/** A sound finite LP bound on `target` (its max when [maximize], else its min), or null when the LP
+ *  leaves it unbounded / infeasible / overflows. Each CP variable is a single LP column (coefficient 1);
+ *  only `target`'s column carries the objective cost (`−1` maximizing, `+1` minimizing). */
+private fun SmtLibQfLia.Builder.obbtSolve(linears: List<Linear>, target: Int, maximize: Boolean): Long? {
+    val builder = LpBuilder()
+    val col = IntArray(nextInt)
+    for (v in 0 until nextInt) {
+        val cost = if (v == target) (if (maximize) -1L else 1L) else 0L
+        col[v] = when (val d = intDomains[v]) {
+            is PresolveDomain.Finite -> builder.addVar(d.domain.min, d.domain.max, cost)
+            is PresolveDomain.Open -> builder.addFreeVar(d.lo, d.hi, cost)
+        }
+    }
+    for (f in linears) addFactorRow(builder, col, f)
+    val model = try {
+        builder.build(Sense.MINIMIZE)
+    } catch (_: LpOverflowException) {
+        return null
+    }
     val result = try {
-        RevisedSimplex(relaxation.model).solvePrimal()
+        RevisedSimplex(model).solvePrimal()
     } catch (_: LpOverflowException) {
         return null
     } ?: return null
-    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
-    val bound = safe + relaxation.objectiveConstant.toDouble()
-    if (!bound.isFinite()) return null
-    // A bound at the ±Long/4 sentinel means the LP hit the artificial cap, not a real bound — the
-    // variable is unbounded in that direction, so leave it for the searchable fallback.
-    return if (maximize) {
-        floor(-bound).toLong().let { if (it >= POS_INF) null else it }
-    } else {
-        ceil(bound).toLong().let { if (it <= NEG_INF) null else it }
-    }
+    return model.safeVariableBound(result, col[target], maximize)
 }
 
-/** Clamp any side still at the unbounded sentinel to a searchable range and flag the model clamped. */
+/** Add linear factor [f] (`Σ coeffs·vars op bound`) as an LP row over the mapped columns. Skips a
+ *  non-`≤`/`≥`/`=` relation (a sound loosening: fewer constraints). */
+private fun addFactorRow(builder: LpBuilder, col: IntArray, f: Linear) {
+    val rel = when (f.op) {
+        LinearOp.LE -> Relation.LE
+        LinearOp.GE -> Relation.GE
+        LinearOp.EQ -> Relation.EQ
+        else -> return
+    }
+    val cols = IntArray(f.vars.size) { col[f.vars[it]] }
+    builder.addRow(cols, f.coeffs.copyOf(), rel, f.bound)
+}
+
+/** Close every remaining [PresolveDomain.Open] to the searchable fallback and flag the model clamped. */
 private fun SmtLibQfLia.Builder.finalizeDomains() {
-    val lo = unboundedIntLo
-    val hi = unboundedIntHi
-    // A side still at the unbounded sentinel falls back to a searchable range: the caller's own
-    // [unboundedIntLo]/[unboundedIntHi] when finite, else ±[SEARCH_FALLBACK] (the sentinel itself is
-    // unsearchable). Clamping is lossy, so it flags the model — an `unsat` over the box is `unknown`.
-    val fallbackLo = maxOf(lo, -SEARCH_FALLBACK)
-    val fallbackHi = minOf(hi, SEARCH_FALLBACK)
+    // A side still open falls back to a searchable range: the caller's own finite [unboundedIntLo] /
+    // [unboundedIntHi] when set, else ±[smtSearchBound]. Clamping is lossy, so it flags the model — an
+    // `unsat` over the box becomes `unknown`.
+    val fallbackLo = maxOf(unboundedIntLo, -smtSearchBound)
+    val fallbackHi = minOf(unboundedIntHi, smtSearchBound)
     for (v in 0 until nextInt) {
-        val d = intDomains[v]
-        var newMin = d.min
-        var newMax = d.max
-        if (newMin <= lo) {
-            newMin = fallbackLo
-            domainsClamped = true
-        }
-        if (newMax >= hi) {
-            newMax = fallbackHi
-            domainsClamped = true
-        }
-        if (newMin != d.min || newMax != d.max) {
-            intDomains[v] = if (newMin <= newMax) IntDomain(newMin, newMax) else IntDomain(newMin, newMin)
-        }
+        val d = intDomains[v] as? PresolveDomain.Open ?: continue
+        val newLo = d.lo ?: fallbackLo.also { domainsClamped = true }
+        val newHi = d.hi ?: fallbackHi.also { domainsClamped = true }
+        intDomains[v] = openOrFinite(newLo, newHi)
     }
 }

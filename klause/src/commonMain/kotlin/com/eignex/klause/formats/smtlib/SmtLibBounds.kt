@@ -1,14 +1,15 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.solver.IntDomain
 
 /** Bound inference for the SMT-LIB front-end: a fixpoint over the conjunctive linear relations tightens
- *  each integer variable's `[lo, hi]`, falling back to / clamping into the configured unbounded range. */
+ *  each integer variable's `[lo, hi]`. A bound that stays unprovable is left `null` (infinite) — infinity
+ *  is structural, never a `±Long/4` sentinel — so the result is a [PresolveDomain] (finite or still-open). */
 internal fun SmtLibQfLia.Builder.inferBounds() {
     if (intNames.isEmpty()) return
-    val lo = LongArray(nextInt) { NEG_INF }
-    val hi = LongArray(nextInt) { POS_INF }
+    // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
+    val lo = arrayOfNulls<Long>(nextInt)
+    val hi = arrayOfNulls<Long>(nextInt)
     val relations = ArrayList<Rel>()
     for (a in asserts) collectConjunctiveRelations(a, relations)
 
@@ -22,123 +23,103 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
                 val tv = r.vars[ti]
                 val ct = r.coeffs[ti]
                 if (ct == 0L) continue
-                var sLo = 0L
-                var sHi = 0L
-                var sLoInf = false
-                var sHiInf = false
+                // sLo/sHi accumulate the min/max of Σ_{other} c·x; null once that direction is infinite
+                // (an infinite contributing bound or an overflow — both mean "no finite bound derivable").
+                var sLo: Long? = 0L
+                var sHi: Long? = 0L
                 for (oi in r.vars.indices) {
                     if (oi == ti) continue
                     val c = r.coeffs[oi]
                     val v = r.vars[oi]
-                    val vlo = lo[v]
-                    val vhi = hi[v]
-                    val (clo, chi) = if (c >= 0) {
-                        c * safe(vlo) to c * safe(vhi)
-                    } else {
-                        c * safe(vhi) to c * safe(vlo)
+                    if (sLo != null) {
+                        val b = if (c >= 0) lo[v] else hi[v]
+                        sLo = if (b == null) null else mulAdd(sLo, c, b)
                     }
-                    if (c >= 0) {
-                        if (vlo <= NEG_INF) sLoInf = true
-                        if (vhi >= POS_INF) sHiInf = true
-                    } else {
-                        if (vhi >= POS_INF) sLoInf = true
-                        if (vlo <= NEG_INF) sHiInf = true
+                    if (sHi != null) {
+                        val b = if (c >= 0) hi[v] else lo[v]
+                        sHi = if (b == null) null else mulAdd(sHi, c, b)
                     }
-                    sLo += clo
-                    sHi += chi
                 }
                 val bnd = r.bound
-                if ((r.op == LinearOp.LE || r.op == LinearOp.EQ) && !sLoInf) {
-                    changed = applyCtBound(lo, hi, tv, ct, bnd - sLo, upper = true) || changed
+                if (r.op == LinearOp.LE || r.op == LinearOp.EQ) {
+                    changed = applyCtBound(lo, hi, tv, ct, sLo?.let { subOrNull(bnd, it) }, upper = true) || changed
                 }
-                if ((r.op == LinearOp.GE || r.op == LinearOp.EQ) && !sHiInf) {
-                    changed = applyCtBound(lo, hi, tv, ct, bnd - sHi, upper = false) || changed
+                if (r.op == LinearOp.GE || r.op == LinearOp.EQ) {
+                    changed = applyCtBound(lo, hi, tv, ct, sHi?.let { subOrNull(bnd, it) }, upper = false) || changed
                 }
             }
         }
     }
 
-    val loCap = unboundedIntLo
-    val hiCap = unboundedIntHi
     for ((name, v) in intNames) {
         val provLo = lo[v]
         val provHi = hi[v]
-        var vlo = provLo
-        var vhi = provHi
-        if (vlo <= NEG_INF) {
-            if (strictBounds) throw UnsupportedSmtException("no provable lower bound for '$name'")
-            vlo = loCap
+        if (strictBounds && (provLo == null || provHi == null)) {
+            throw UnsupportedSmtException("no provable ${if (provLo == null) "lower" else "upper"} bound for '$name'")
         }
-        if (vhi >= POS_INF) {
-            if (strictBounds) throw UnsupportedSmtException("no provable upper bound for '$name'")
-            vhi = hiCap
-        }
-        val clo = vlo.coerceIn(loCap, hiCap)
-        val chi = vhi.coerceIn(loCap, hiCap)
-        // The finite domain drops part of the variable's true range when a bound was unprovable
-        // (infinite) or a provable bound lay outside the representable range and was clamped. Any such
-        // narrowing makes an `unsat` result unsound for the original problem — it is only `unsat`
-        // within this finite box — so flag it to downgrade the verdict to `unknown`. A `clo > chi`
-        // (empty domain) is *not* clamping: `coerceIn` is monotonic, so it only arises when the
-        // provable bounds already contradict — a genuine `unsat` that must stay `unsat`.
-        intDomains[v] = if (clo <= chi) IntDomain(clo, chi) else IntDomain(clo, clo)
+        // A still-null side stays Open for OBBT; the searchable-fallback clamp (and the `unknown`
+        // downgrade) is owned by finalizeDomains, not here.
+        intDomains[v] = openOrFinite(provLo, provHi)
     }
 }
 
+// lo/hi are nullable (a null slot is ±infinity), so a primitive LongArray cannot represent them.
+@Suppress("ArrayPrimitive")
 internal fun SmtLibQfLia.Builder.applyCtBound(
-    lo: LongArray,
-    hi: LongArray,
+    lo: Array<Long?>,
+    hi: Array<Long?>,
     tv: Int,
     ct: Long,
-    rhs: Long,
+    rhs: Long?,
     upper: Boolean,
 ): Boolean {
-    var changed = false
-    if (ct > 0) {
-        if (upper) {
-            val b = floorDiv(
-                rhs,
-                ct,
-            )
-            if (b < hi[tv]) {
-                hi[tv] = b
-                changed = true
-            }
+    if (rhs == null) return false
+    // ct>0 with an upper target (or ct<0 with a lower one) yields a floor bound on hi[tv]; the mirror
+    // case yields a ceil bound on lo[tv].
+    return if ((ct > 0) == upper) {
+        val b = floorDiv(rhs, ct)
+        val cur = hi[tv]
+        if (cur == null || b < cur) {
+            hi[tv] = b
+            true
         } else {
-            val b = ceilDiv(
-                rhs,
-                ct,
-            )
-            if (b > lo[tv]) {
-                lo[tv] = b
-                changed = true
-            }
+            false
         }
     } else {
-        if (upper) {
-            val b = ceilDiv(
-                rhs,
-                ct,
-            )
-            if (b > lo[tv]) {
-                lo[tv] = b
-                changed = true
-            }
+        val b = ceilDiv(rhs, ct)
+        val cur = lo[tv]
+        if (cur == null || b > cur) {
+            lo[tv] = b
+            true
         } else {
-            val b = floorDiv(
-                rhs,
-                ct,
-            )
-            if (b < hi[tv]) {
-                hi[tv] = b
-                changed = true
-            }
+            false
         }
     }
-    return changed
 }
 
-internal fun SmtLibQfLia.Builder.safe(x: Long): Long = x.coerceIn(NEG_INF, POS_INF)
+/** `acc + c·x`, or null if either the multiply or the add overflows (treated as an infinite bound).
+ *  Shared with the aux-variable range arithmetic in `SmtLibEval.kt` — infinity is `null`, never a sentinel. */
+internal fun mulAdd(acc: Long, c: Long, x: Long): Long? {
+    if (c != 0L) {
+        val p = c * x
+        if (p / c != x) return null
+        val s = acc + p
+        return if (((acc xor s) and (p xor s)) < 0) null else s
+    }
+    return acc
+}
+
+/** `a - b`, or null on overflow. */
+internal fun subOrNull(a: Long, b: Long): Long? {
+    val d = a - b
+    return if (((a xor b) and (a xor d)) < 0) null else d
+}
+
+/** `a + b`, or null on overflow. */
+internal fun addOrNull(a: Long, b: Long): Long? {
+    val s = a + b
+    return if (((a xor s) and (b xor s)) < 0) null else s
+}
 
 internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
     // Walk the `and` conjunction with an explicit worklist (not recursion), so a degenerate
@@ -183,16 +164,14 @@ internal fun SmtLibQfLia.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     return false
 }
 
-internal const val NEG_INF = Long.MIN_VALUE / 4
-internal const val POS_INF = Long.MAX_VALUE / 4
 private const val MAX_BOUND_ITERS = 64
 
 /** Pure-Kotlin floor/ceil division for multiplatform builds. */
 private fun floorDiv(a: Long, b: Long): Long {
     val q = a / b
-    return (if ((a xor b) < 0 && q * b != a) q - 1 else q).coerceIn(NEG_INF, POS_INF)
+    return if ((a xor b) < 0 && q * b != a) q - 1 else q
 }
 private fun ceilDiv(a: Long, b: Long): Long {
     val q = a / b
-    return (if ((a xor b) > 0 && q * b != a) q + 1 else q).coerceIn(NEG_INF, POS_INF)
+    return if ((a xor b) > 0 && q * b != a) q + 1 else q
 }

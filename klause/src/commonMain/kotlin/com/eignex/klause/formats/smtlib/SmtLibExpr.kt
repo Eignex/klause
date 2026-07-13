@@ -111,10 +111,11 @@ internal fun SmtLibQfLia.Builder.assertDistinct(args: List<SExpr>) {
     if (args.all { !isBoolExpr(it) }) {
         val terms = args.map { linearTerm(it) }
         val simpleVars = terms.mapNotNull { it.asSimpleVar() }
-        if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size) {
+        val allFinite = simpleVars.none { intDomains[it] is PresolveDomain.Open }
+        if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size && allFinite) {
             val vars = simpleVars.toIntArray()
-            val min = vars.minOf { intDomains[it].min }
-            val max = vars.maxOf { intDomains[it].max }
+            val min = vars.minOf { (intDomains[it] as PresolveDomain.Finite).domain.min }
+            val max = vars.maxOf { (intDomains[it] as PresolveDomain.Finite).domain.max }
             factors.add(
                 AllDifferent(vars = vars, domainMin = min, domainSize = (max - min + 1).toInt()),
             )

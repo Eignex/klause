@@ -11,6 +11,7 @@ import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Lit
+import kotlin.math.abs
 
 /**
  * Iterative evaluator for SMT-LIB terms: folds an [SExpr] tree into either a boolean literal or an
@@ -234,7 +235,9 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
         val b = args[2].asLin()
         val (aLo, aHi) = linCombRange(a)
         val (bLo, bHi) = linCombRange(b)
-        val self = LinComb(mapOf(newInt(minOf(aLo, bLo), maxOf(aHi, bHi)) to 1), 0)
+        val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
+        val hiU = if (aHi == null || bHi == null) null else maxOf(aHi, bHi)
+        val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
         factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
         factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
         Res.I(self)
@@ -258,8 +261,7 @@ private fun SmtLibQfLia.Builder.postLinearRel(a: LinComb, b: LinComb, op: Linear
  *  var is bounded by `x`'s own range so an unbounded default never enters its defining constraints. */
 private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
     val (xLo, xHi) = linCombRange(x)
-    val yHi = maxOf(satAbs(xLo), satAbs(xHi))
-    val y = LinComb(mapOf(newInt(0L, yHi) to 1), 0)
+    val y = LinComb(mapOf(newInt(0L, absHi(xLo, xHi)) to 1), 0)
     val negX = x.scaled(-1L)
     postLinearRel(y, x, LinearOp.GE)
     postLinearRel(y, negX, LinearOp.GE)
@@ -268,57 +270,69 @@ private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
 }
 
 /** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and
- *  `0 ≤ m < |d|`. `q` is bounded by `a`'s range / `d` (so `d·q` cannot overflow); a non-constant
- *  divisor is genuinely non-linear, so it is rejected. */
+ *  `0 ≤ m < |d|`. `q` is bounded by `a`'s range / `d`; when `a` is open on the driving side `q` stays
+ *  open (an [PresolveDomain.Open] aux var). A non-constant divisor is genuinely non-linear, so rejected. */
 private fun SmtLibQfLia.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
     if (b.coeffs.isNotEmpty()) throw UnsupportedSmtException("non-constant divisor in div/mod")
     val d = b.constant
     if (d == 0L) throw UnsupportedSmtException("division by zero in div/mod")
     val absd = if (d < 0) -d else d
     val (aLo, aHi) = linCombRange(a)
-    val e1 = satFloorDiv(aLo, d)
-    val e2 = satFloorDiv(aHi, d)
+    // floorDiv is monotone in `a` (increasing for d>0, decreasing for d<0); pick the a-bound driving
+    // each side of q's range, with ±1 slack for the remainder. A null (open) driving bound leaves q open.
+    val qLoA = if (d > 0) aLo else aHi
+    val qHiA = if (d > 0) aHi else aLo
+    val qLo = qLoA?.let { addOrNull(floorDivL(it, d), -1L) }
+    val qHi = qHiA?.let { addOrNull(floorDivL(it, d), 1L) }
     val m = LinComb(mapOf(newInt(0L, absd - 1) to 1), 0)
-    val q = LinComb(mapOf(newInt(satAdd(minOf(e1, e2), -1L), satAdd(maxOf(e1, e2), 1L)) to 1), 0)
+    val q = LinComb(mapOf(newInt(qLo, qHi) to 1), 0)
     postLinearRel(a, q.scaled(d).plus(m), LinearOp.EQ) // a = d·q + m
     return if (quotient) q else m
 }
 
-/** Effectively-infinite headroom for auxiliary-variable ranges: a bound that leaves room for the
- *  coefficient/sum arithmetic in the aux var's defining constraints to stay clear of `Long` overflow. */
-private const val AUX_INF = Long.MAX_VALUE / 4
-
-private fun satAbs(x: Long): Long = if (x < 0) satNeg(x) else x
-
-private fun satNeg(x: Long): Long = if (x == Long.MIN_VALUE) AUX_INF else -x
-
-private fun satAdd(a: Long, b: Long): Long {
-    val s = a + b
-    return if (((a xor s) and (b xor s)) < 0) (if (a > 0) AUX_INF else -AUX_INF) else s.coerceIn(-AUX_INF, AUX_INF)
+/** Upper bound of `|x|` given `x ∈ [lo, hi]` (each null = infinite); null when unbounded either way. */
+private fun absHi(lo: Long?, hi: Long?): Long? {
+    if (lo == null || hi == null) return null
+    val a = if (lo == Long.MIN_VALUE) null else abs(lo)
+    val b = if (hi == Long.MIN_VALUE) null else abs(hi)
+    return if (a == null || b == null) null else maxOf(a, b)
 }
 
-private fun satMul(a: Long, b: Long): Long {
-    if (a == 0L || b == 0L) return 0L
-    val p = a * b
-    return if (p / b != a) (if ((a > 0) == (b > 0)) AUX_INF else -AUX_INF) else p.coerceIn(-AUX_INF, AUX_INF)
-}
-
-private fun satFloorDiv(a: Long, b: Long): Long {
+/** Pure-Kotlin floor division (multiplatform). */
+private fun floorDivL(a: Long, b: Long): Long {
     val q = a / b
     return if (a xor b < 0 && q * b != a) q - 1 else q
 }
 
-/** The value range `[lo, hi]` of [lin] over the current integer domains, clamped to ±[AUX_INF] and
- *  computed with saturating arithmetic so it never overflows on unbounded domains. */
-private fun SmtLibQfLia.Builder.linCombRange(lin: LinComb): Pair<Long, Long> {
-    var lo = lin.constant.coerceIn(-AUX_INF, AUX_INF)
-    var hi = lo
+/** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
+ *  unbounded (an open domain or an arithmetic overflow) — infinity is structural, no `±Long/4`. */
+private fun SmtLibQfLia.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
+    var lo: Long? = lin.constant
+    var hi: Long? = lin.constant
     for ((v, c) in lin.coeffs) {
-        val d = intDomains[v]
-        val t1 = satMul(c, d.min)
-        val t2 = satMul(c, d.max)
-        lo = satAdd(lo, minOf(t1, t2))
-        hi = satAdd(hi, maxOf(t1, t2))
+        val dLo: Long?
+        val dHi: Long?
+        when (val d = intDomains[v]) {
+            is PresolveDomain.Finite -> {
+                dLo = d.domain.min
+                dHi = d.domain.max
+            }
+
+            is PresolveDomain.Open -> {
+                dLo = d.lo
+                dHi = d.hi
+            }
+        }
+        val curLo = lo
+        if (curLo != null) {
+            val bnd = if (c >= 0) dLo else dHi
+            lo = if (bnd == null) null else mulAdd(curLo, c, bnd)
+        }
+        val curHi = hi
+        if (curHi != null) {
+            val bnd = if (c >= 0) dHi else dLo
+            hi = if (bnd == null) null else mulAdd(curHi, c, bnd)
+        }
     }
     return lo to hi
 }

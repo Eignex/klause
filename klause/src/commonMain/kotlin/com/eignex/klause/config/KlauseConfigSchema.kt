@@ -125,6 +125,11 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
     /** Override for [KlauseConfig.unboundedIntHi]. */
     val unboundedIntHi by long(KlauseConfig.DEFAULT.unboundedIntHi) { c, v -> c.copy(unboundedIntHi = v) }
 
+    /** Override for [KlauseConfig.smtUnboundedSearchBound]. */
+    val smtUnboundedSearchBound by long(KlauseConfig.DEFAULT.smtUnboundedSearchBound) { c, v ->
+        c.copy(smtUnboundedSearchBound = v)
+    }
+
     /** Override for [KlauseConfig.floatBuckets]. */
     val floatBuckets by int(KlauseConfig.DEFAULT.floatBuckets) { c, v -> c.copy(floatBuckets = v) }
 

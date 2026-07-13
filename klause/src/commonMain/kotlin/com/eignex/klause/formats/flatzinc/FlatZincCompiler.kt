@@ -3,7 +3,7 @@ import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
-import com.eignex.klause.config.SEARCHABLE_UNBOUNDED_CLAMP
+import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -116,8 +116,8 @@ internal class FlatZincCompiler(
 
             FznType.IntAny -> allocInt(
                 d.name,
-                unboundedIntLo.coerceIn(-SEARCHABLE_UNBOUNDED_CLAMP, SEARCHABLE_UNBOUNDED_CLAMP),
-                unboundedIntHi.coerceIn(-SEARCHABLE_UNBOUNDED_CLAMP, SEARCHABLE_UNBOUNDED_CLAMP),
+                unboundedIntLo.coerceIn(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
+                unboundedIntHi.coerceIn(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
             )
 
             is FznType.IntRange -> allocInt(d.name, t.lo, t.hi)
