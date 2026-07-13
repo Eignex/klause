@@ -44,6 +44,7 @@ class PresolverTest {
             PresolvePass.REMOVE_REDUNDANT,
             PresolvePass.REDUCE_STRUCTURAL,
             PresolvePass.MERGE_DUPLICATE_COLUMNS,
+            PresolvePass.PROJECT_SINGLETON_INEQUALITIES,
             PresolvePass.BREAK_SYMMETRIES,
             PresolvePass.DUAL_FIX,
         )
@@ -158,6 +159,7 @@ class PresolverTest {
                 PresolvePass.REMOVE_REDUNDANT,
                 PresolvePass.REDUCE_STRUCTURAL,
                 PresolvePass.MERGE_DUPLICATE_COLUMNS,
+                PresolvePass.PROJECT_SINGLETON_INEQUALITIES,
             ),
             PresolveConfig.parse("conservative").problemPasses(ctx),
         )

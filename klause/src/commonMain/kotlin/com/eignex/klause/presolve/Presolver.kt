@@ -356,6 +356,21 @@ enum class PresolvePass(
             Presolve.mergeDuplicateColumns(problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars)
     },
 
+    /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
+     *  objective): eliminate it, rewriting the inequality over the remaining terms, and rebuild it at its
+     *  most-permissive bound on reconstruct. Solution-set altering (the pinned rebuild collapses the
+     *  variable's feasible range), so gated off for solution-set-sensitive queries. */
+    PROJECT_SINGLETON_INEQUALITIES(
+        "singleton-column",
+        Stage.PROBLEM,
+        PresolveTiming.FAST,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars)
+    },
+
     /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
     BREAK_SYMMETRIES(
         "symmetry",
