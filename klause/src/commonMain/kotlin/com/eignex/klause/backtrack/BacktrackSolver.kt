@@ -2,8 +2,11 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.lp.LpAutoConfig
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -42,6 +45,38 @@ class BacktrackSolver(override val problem: Problem) :
      *  is superseded per slice). */
     override fun resumable(objective: LinearObjective, params: BacktrackParams): ResumableSearch =
         ResumableMinimize(this, objective, params)
+
+    /**
+     * Open a reusable [RepairSearch] for the LNS destroy/repair loop (#644): one persistent
+     * [ResumableMinimize] whose session (learned-clause DB) and LP relaxation are re-seeded per fragment
+     * via [ResumableMinimize.rebind] instead of rebuilt. The per-fragment objective cutoff is threaded
+     * through the [BacktrackParams.objectiveBoundSupplier] so it prunes against best-known; the caller
+     * keeps that cutoff monotone (see [RepairSearch.repair]). [params] is the base repair config (its own
+     * `objectiveBoundSupplier` is overridden here).
+     */
+    internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
+        var cutoff = Double.POSITIVE_INFINITY
+        val handle = ResumableMinimize(
+            this,
+            objective,
+            params.copy(objectiveBoundSupplier = { cutoff }),
+            pausable = false,
+        )
+        return object : RepairSearch {
+            override fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff0: Double): Sample? {
+                cutoff = cutoff0
+                handle.rebind(assumptions, decisionBudget)
+                var best: Sample? = null
+                while (!handle.isDone) {
+                    val terminal = handle.runSlice(Cancellation.Never, Long.MAX_VALUE) { best = it.sample }
+                    if (terminal != null) break
+                }
+                return best
+            }
+
+            override fun close() = handle.close()
+        }
+    }
 
     override fun describe(params: BacktrackParams): String {
         val lp = params.lpConfig?.let { "config" }
