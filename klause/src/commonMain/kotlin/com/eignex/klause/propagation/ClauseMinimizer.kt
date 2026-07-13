@@ -175,6 +175,7 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
      * keeps the total work linear.
      */
     private fun isRedundant(root: Int, inClause: BooleanArray, cache: MutableIntIntMap): Boolean {
+        val numBoolVars = state.problem.numBoolVars
         val cachedRoot = cache.getOrDefault(root, -1)
         if (cachedRoot >= 0) return cachedRoot == 1
         val rootAnt = graph.antecedentsOf(root) ?: run {
@@ -202,6 +203,18 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
                 val u = Lit.variable(ant[i])
                 i++
                 if (u == v) continue
+                // Two order literals of one integer variable are coupled views of the same domain,
+                // joined by the monotonicity / duality / eq↔bound channeling clauses — and a bound
+                // atom's reason cites the same-var frontier atom by design. Self-subsuming resolution
+                // treats them as independent and can circularly drop the coupled set that jointly
+                // constrains the variable, which is unsound. Keep the literal rather than resolving
+                // through the coupling (the LCG minimizer rule for a variable's auxiliary literals).
+                if (u >= numBoolVars && v >= numBoolVars &&
+                    state.atoms.intVar[u - numBoolVars] == state.atoms.intVar[v - numBoolVars]
+                ) {
+                    failed = true
+                    break
+                }
                 if (graph.levelOf(u) <= 0) continue
                 if (u < inClause.size && inClause[u]) continue
                 // A back-edge to a variable already on the path is a cycle; it can't be proven
