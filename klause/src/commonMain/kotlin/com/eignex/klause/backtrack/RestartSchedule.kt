@@ -3,10 +3,10 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.util.lubyN
 
 /**
- * The phase regime a [RestartSchedule] asks the engine's [PhaseSaving] to run under. [STABLE] dives on
- * the best conflict-free phase (holding progress across restarts); [FOCUSED] uses plain phase saving
- * without the target bias; [UNMANAGED] leaves phasing to its own rephase rotation (the default, so a
- * schedule that doesn't opt in never perturbs phasing).
+ * The phase regime a [RestartSchedule] asks the engine's [PhaseSaving] to run under. [PhaseMode.STABLE]
+ * dives on the best conflict-free phase (holding progress across restarts); [PhaseMode.FOCUSED] uses
+ * plain phase saving without the target bias; [PhaseMode.UNMANAGED] leaves phasing to its own rephase
+ * rotation (the default, so a schedule that doesn't opt in never perturbs phasing).
  */
 internal enum class PhaseMode { UNMANAGED, STABLE, FOCUSED }
 
@@ -38,9 +38,10 @@ internal interface RestartSchedule {
      *  the optimize path). Lets a schedule change regime once the search has something to hold onto. */
     fun onSolution() {}
 
-    /** The phase regime the schedule wants the engine's [PhaseSaving] to run right now. [UNMANAGED]
-     *  (the default) leaves phasing to its own rephase rotation; a schedule that alternates a proving
-     *  and a diving regime returns [STABLE] / [FOCUSED] to couple the polarity source to the mode. */
+    /** The phase regime the schedule wants the engine's [PhaseSaving] to run right now.
+     *  [PhaseMode.UNMANAGED] (the default) leaves phasing to its own rephase rotation; a schedule that
+     *  alternates a proving and a diving regime returns [PhaseMode.STABLE] / [PhaseMode.FOCUSED] to
+     *  couple the polarity source to the mode. */
     fun phaseMode(): PhaseMode = PhaseMode.UNMANAGED
 
     companion object {
