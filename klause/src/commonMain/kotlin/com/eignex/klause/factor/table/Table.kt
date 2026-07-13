@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
@@ -10,6 +11,7 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
@@ -18,6 +20,7 @@ import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.argsortBy
 
@@ -203,6 +206,40 @@ class Table private constructor(
         multiColumnsByVar = multi
     }
 
+    /**
+     * Drop tuples no assignment can use — those with a cell outside its variable's current domain — a
+     * structural shrink the flat tuple set otherwise carries for the whole solve. A single survivor pins
+     * every variable (the table becomes redundant equalities); no survivor is left to the propagator to
+     * report. Ground tables only (a short-support table's ranges/wildcards need the propagator's cell
+     * logic), and capped by [REDUCE_TUPLE_CAP] so a giant table isn't rescanned each presolve round.
+     */
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        if (hi != null || numTuples > REDUCE_TUPLE_CAP) return FactorReduction.Unchanged
+        val survivors = LongArrayList()
+        for (t in 0 until numTuples) {
+            var alive = true
+            var c = 0
+            while (c < arity) {
+                if (tuples[t * arity + c] !in domains[xs[c]]) {
+                    alive = false
+                    break
+                }
+                c++
+            }
+            if (alive) for (k in 0 until arity) survivors.add(tuples[t * arity + k])
+        }
+        val survivorCount = survivors.size / arity
+        return when {
+            survivorCount == numTuples || survivorCount == 0 -> FactorReduction.Unchanged
+
+            survivorCount == 1 -> FactorReduction.Rewrite(
+                List(arity) { c -> Linear(longArrayOf(1L), intArrayOf(xs[c]), LinearOp.EQ, survivors[c]) },
+            )
+
+            else -> FactorReduction.Rewrite(listOf(Table(xs, survivors.toLongArray())))
+        }
+    }
+
     override fun asPropagator(): Propagator = TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi)
 
     override fun asInvariant(): Invariant =
@@ -277,5 +314,9 @@ class Table private constructor(
     private companion object {
         /** Tables with more than this many tuples are skipped — the selector columns would dominate. */
         const val MAX_TUPLES: Int = 1024
+
+        /** Above this many tuples [structuralReduce] skips the dead-tuple scan, so a giant table is not
+         *  re-swept every presolve round. */
+        const val REDUCE_TUPLE_CAP: Int = 4096
     }
 }
