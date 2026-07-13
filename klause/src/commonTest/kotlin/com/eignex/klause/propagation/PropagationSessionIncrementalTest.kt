@@ -194,6 +194,70 @@ class PropagationSessionIncrementalTest {
     }
 
     @Test
+    fun `reseedFrom leaves the session identical to a fresh seed of the same set`() {
+        // Mixed bool/int with a forcing clause and a capacity row, so a re-seed carries implied facts.
+        fun problem() = Problem(
+            numBoolVars = 3,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+            ),
+        )
+        // (from, to) pairs spanning: full rebuild (no shared prefix), kept prefix + suffix swap,
+        // and an identical set (everything kept, nothing pushed).
+        val cases = listOf(
+            Assumptions(bools = mapOf(0 to false)) to Assumptions(bools = mapOf(2 to true), ints = mapOf(0 to 3L)),
+            Assumptions(bools = mapOf(0 to false, 2 to true)) to
+                Assumptions(bools = mapOf(0 to false), ints = mapOf(0 to 3L)),
+            Assumptions(bools = mapOf(0 to false), ints = mapOf(0 to 3L)) to
+                Assumptions(bools = mapOf(0 to false), ints = mapOf(0 to 3L)),
+        )
+        for ((from, to) in cases) {
+            val incremental = PropagationSession(problem())
+            incremental.seed(from)
+            val incrementalResult = incremental.reseedFrom(to)
+
+            val fresh = PropagationSession(problem())
+            val freshResult = fresh.seed(to)
+
+            assertEquals(freshResult, incrementalResult, "implied facts diverge for $from → $to")
+            assertEquals(fresh.currentAssumptions(), incremental.currentAssumptions(), "pin set diverges")
+            assertEquals(fresh.decisionLevel, incremental.decisionLevel, "level count diverges")
+        }
+    }
+
+    @Test
+    fun `reseedFrom pops leftover search decisions above the seed`() {
+        // Seed, then push extra decisions (as a search would), then re-seed a fragment: the leftover
+        // decisions must not survive — the outcome equals a fresh seed of the new fragment.
+        val p = Problem(5, 0, emptyArray(), emptyList())
+        val s = PropagationSession(p)
+        s.seed(Assumptions(bools = mapOf(0 to true)))
+        s.pinBool(3, true)
+        s.pinBool(4, false)
+        assertEquals(3, s.decisionLevel)
+        s.reseedFrom(Assumptions(bools = mapOf(0 to true, 1 to false)))
+        assertEquals(2, s.decisionLevel, "leftover search decisions must be gone")
+        assertEquals(Assumptions(bools = mapOf(0 to true, 1 to false)), s.currentAssumptions())
+    }
+
+    @Test
+    fun `reseedFrom onto an infeasible fragment returns Unsat`() {
+        // (x ∨ y); re-seed both false → conflict, mirroring seed's Unsat contract.
+        val p = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+        )
+        val s = PropagationSession(p)
+        s.seed(Assumptions(bools = mapOf(0 to true)))
+        assertIs<PropagationResult.Unsat>(s.reseedFrom(Assumptions(bools = mapOf(0 to false, 1 to false))))
+    }
+
+    @Test
     fun `exactlyOne chain solved by decisions`() {
         // exactly-one over 4 vars. Pin three to false → the fourth is implied true.
         val p = Problem(

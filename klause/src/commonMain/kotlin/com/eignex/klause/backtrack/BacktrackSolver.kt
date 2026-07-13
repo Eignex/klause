@@ -55,16 +55,16 @@ class BacktrackSolver(override val problem: Problem) :
      * `objectiveBoundSupplier` is overridden here).
      */
     internal fun openRepair(objective: LinearObjective, params: BacktrackParams): RepairSearch {
-        var cutoff = Double.POSITIVE_INFINITY
+        var activeCutoff = Double.POSITIVE_INFINITY
         val handle = ResumableMinimize(
             this,
             objective,
-            params.copy(objectiveBoundSupplier = { cutoff }),
+            params.copy(objectiveBoundSupplier = { activeCutoff }),
             pausable = false,
         )
         return object : RepairSearch {
-            override fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff0: Double): Sample? {
-                cutoff = cutoff0
+            override fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double): Sample? {
+                activeCutoff = cutoff
                 handle.rebind(assumptions, decisionBudget)
                 var best: Sample? = null
                 while (!handle.isDone) {

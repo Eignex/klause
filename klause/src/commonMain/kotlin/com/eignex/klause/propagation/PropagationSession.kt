@@ -181,6 +181,54 @@ class PropagationSession(
         return computeImplied()
     }
 
+    /**
+     * Re-seed to [desired] by diffing against the live pin trail instead of clearing to root and
+     * re-pushing every pin (as [seed] does). The longest bottom prefix of the trail whose pins already
+     * agree with [desired] is kept — its propagation stands untouched — and only the divergent suffix is
+     * popped, then the still-missing pins are pushed. When successive fragments free a small fraction of
+     * the variables, the shared complement stays pinned across calls, so the work scales with the changed
+     * pins rather than the total variable count.
+     *
+     * The outcome is identical to [seed] with the same [desired]: on return the pinned set is exactly
+     * [desired], one decision level per pin. Any leftover search decisions sit above the seed prefix and,
+     * differing from [desired], are popped like any other mismatch. Returns the cumulative implied set
+     * beyond the pins, or the first [PropagationResult.Unsat] a push hits.
+     */
+    fun reseedFrom(desired: Assumptions): PropagationResult {
+        bakedUnsat?.let { return it }
+        var keep = 0
+        while (keep < trail.size) {
+            val e = trail[keep]
+            val agrees = if (trailIsBool(e)) {
+                desired.boolValueOrNull(e) == (boolPinned[e] == 1)
+            } else {
+                val iv = e - problem.numBoolVars
+                intPinnedSet[iv] && desired.intValueOrNull(iv) == intPinnedVal[iv]
+            }
+            if (!agrees) break
+            keep++
+        }
+        popToLevel(keep)
+
+        // Push every desired pin the kept prefix does not already stand — a var still pinned here is one
+        // that survived the diff at its agreed value, so skipping it keeps its level intact.
+        val bk = desired.boolKeys
+        val bv = desired.boolValues
+        for (i in bk.indices) {
+            if (boolPinned[bk[i]] != -1) continue
+            val r = pushBool(bk[i], bv[i])
+            if (r is PropagationResult.Unsat) return r
+        }
+        val ik = desired.intKeys
+        val iv = desired.intValues
+        for (i in ik.indices) {
+            if (intPinnedSet[ik[i]]) continue
+            val r = pushInt(ik[i], iv[i])
+            if (r is PropagationResult.Unsat) return r
+        }
+        return computeImplied()
+    }
+
     /** Drop every decision pin, restoring the primitive pin arrays to "free". Iterates the
      *  trail (the decided vars) rather than clearing the whole arrays. */
     private fun clearPins() {
