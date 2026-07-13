@@ -104,11 +104,17 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             // wins. Runs only when the heap empties (a candidate leaf), so the O(log n) fast path is
             // untouched — `null` now provably means every variable is determined.
             var refilled = false
-            for (v in 0 until numBoolCached) if (session.boolValue(v) == null && !h.contains(v)) {
-                h.restore(v); refilled = true
+            for (v in 0 until numBoolCached) {
+                if (session.boolValue(v) == null && !h.contains(v)) {
+                    h.restore(v)
+                    refilled = true
+                }
             }
-            for (v in 0 until numIntCached) if (session.intDomain(v).size > 1 && !h.contains(numBoolCached + v)) {
-                h.restore(numBoolCached + v); refilled = true
+            for (v in 0 until numIntCached) {
+                if (session.intDomain(v).size > 1 && !h.contains(numBoolCached + v)) {
+                    h.restore(numBoolCached + v)
+                    refilled = true
+                }
             }
             if (!refilled) return null
         }
