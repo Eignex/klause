@@ -141,7 +141,7 @@ class PropagationState(
     }
 
     /** Enqueue [fid] if not already queued this run. */
-    private fun propEnq(fid: Int) {
+    internal fun propEnq(fid: Int) {
         if (propStamp[fid] != propGen) {
             propStamp[fid] = propGen
             propQueue.addLast(fid)
@@ -414,6 +414,12 @@ class PropagationState(
      *  Allocation is lazy via [allocAtom]; the channeling and wake logic lives in `Atoms.kt`. */
     internal val atoms: AtomStore = AtomStore(problem.numIntVars)
 
+    /** LCG channeling clauses (`[x≥k+1]→[x≥k]`, `[x=k]↔[x≥k]∧[x≤k]`, …) accumulated as atoms
+     *  materialize, awaiting registration. [allocAtom] appends here; [flushPendingChanneling]
+     *  drains it into the learned-clause store as permanent clauses at a safe propagation boundary
+     *  (never mid-conflict-analysis, where `allocAtom` also fires). */
+    internal val pendingChanneling: ArrayList<IntArray> = ArrayList()
+
     /** Allocate (or look up) the atom for `[intVar ≥ threshold]` and return its virtual
      *  variable id (past the bool var space). Pair with [Lit.make]
      *  to encode as a positive or negative literal. */
@@ -474,30 +480,72 @@ class PropagationState(
         return litTruth(lit) == false
     }
 
-    /** Assign [lit] to true, recording [antecedents]. Dispatches between bool pins
-     *  ([pinBool]) and atom assignment (re-derived as the corresponding int-bound
-     *  tighten on the underlying var). Returns `false` on conflict. */
+    /** Assign [lit] to true, recording [antecedents] (the forcing clause's other literals).
+     *  Dispatches between bool pins ([pinBool]) and first-class atom assignment ([pinAtomLit]).
+     *  Returns `false` on conflict. */
     fun pinLit(lit: Int, antecedents: IntArray? = null): Boolean {
         val v = Lit.variable(lit)
         val pos = Lit.isPositive(lit)
         if (v < problem.numBoolVars) return pinBoolImpl(v, pos, antecedents)
-        val atomId = atomIdOf(v)
+        return pinAtomLit(atomIdOf(v), pos, antecedents)
+    }
+
+    /**
+     * Assign atom [atomId] to [newT] as a first-class LCG literal: stamp its truth, level and
+     * forcing-clause [antecedents] on the atom trail directly, then reconcile the int domain to
+     * match. A clause (channeling / learned / propagator-explanation) that forces an atom thus
+     * records *itself* as the atom's reason — no reconstruction — which is what makes conflict
+     * analysis resolve through real clauses. For a bound the domain already implies (a looser atom
+     * cascaded by a monotonicity clause) the reconcile tighten is a no-op and the stamped truth
+     * stands; for a genuine narrowing (a learned clause pushing a new bound) it narrows the domain
+     * and channels onward. Returns `false` on conflict.
+     */
+    internal fun pinAtomLit(atomId: Int, newT: Boolean, antecedents: IntArray?): Boolean {
+        val target = if (newT) 1 else 2
+        val cur = atoms.truth[atomId]
+        if (cur == target) return true // already established on this path
         val intVar = atoms.intVar[atomId]
         val k = atoms.threshold[atomId]
+        // A clause propagates a literal only when it is *genuinely unassigned*. The stored `0` is a
+        // cache miss, not proof of that — an atom the live domain already entails (at some lower
+        // level) also reads `0` when it was materialized after its bound crossed. Re-stamping such an
+        // atom at the current level, with this clause as its reason, would mis-date its truth (really
+        // decided earlier) and mis-attribute it, corrupting the levels 1UIP backjumps on. So stamp
+        // directly only when the domain does not yet decide the literal — a real narrowing this clause
+        // is forcing now. Otherwise fall through: an entailed atom keeps its domain-derived level and
+        // channeling reason (a no-op reconcile), and a domain-refuted one conflicts in the reconcile.
+        if (cur == 0 && atomTruthOf(intVar, atoms.kind[atomId], k) == null) {
+            // Stamp the forcing clause as this atom's reason directly — the literal-primary step that
+            // lets conflict analysis and minimization resolve through a real, valid clause instead of
+            // a reconstructed bound reason. Recorded on the reversible atom trail first so backtrack
+            // restores it exactly, and before the reconcile so the narrowing's own [wakeAtom] finds
+            // the truth already set and keeps this clause reason rather than a channeling one.
+            recordAtomTruthChange(atomId)
+            boolPinOrder.add(problem.numBoolVars + atomId)
+            atoms.truth[atomId] = target
+            atoms.lvl[atomId] = currentLevel
+            atoms.ant[atomId] = antecedents
+            // No watcher wake here: the reconcile below narrows the domain across this atom's
+            // threshold, and that narrowing's own [wakeAtom] fires the false-literal watchers (it
+            // finds the truth already stamped and takes its early-return wake path). Waking here as
+            // well would double-drive the channeling clauses and let them re-pin adjacent same-var
+            // atoms ahead of the order the narrowing establishes them in — fabricating a same-var
+            // coupling that 1UIP resolves into an unsound nogood.
+        }
         return when (atoms.kind[atomId]) {
-            AtomKind.GE -> if (pos) {
+            AtomKind.GE -> if (newT) {
                 tightenIntMinImpl(intVar, k, antecedents) // [v ≥ k] true → v.min ≥ k
             } else {
                 tightenIntMaxImpl(intVar, k - 1, antecedents) // [v ≥ k] false → v ≤ k-1
             }
 
-            AtomKind.LE -> if (pos) {
+            AtomKind.LE -> if (newT) {
                 tightenIntMaxImpl(intVar, k, antecedents) // [v ≤ k] true → v.max ≤ k
             } else {
                 tightenIntMinImpl(intVar, k + 1, antecedents) // [v ≤ k] false → v ≥ k+1
             }
 
-            AtomKind.EQ -> if (pos) {
+            AtomKind.EQ -> if (newT) {
                 tightenIntMinImpl(intVar, k, antecedents) && // [v = k] true → v = k
                     tightenIntMaxImpl(intVar, k, antecedents)
             } else {
@@ -519,9 +567,9 @@ class PropagationState(
     /** Per-variable unassign sink invoked by [undoTo]; see its doc. Null = no subscriber. */
     var unassignListener: ((Int) -> Unit)? = null
 
-    /** Undo trail (replaces per-level full-array snapshots) — see [UndoLog]. Appended to by the
-     *  `log*` functions in `Undo.kt`; the atom-table reconciliation it deliberately omits (#708) is
-     *  [undoTo]'s job via [resetAtomTrailFor] / [resetAtomTrailForCarve], with the unified pin trail
+    /** Undo trail for bool/int cells (replaces per-level full-array snapshots) — see [UndoLog].
+     *  Appended to by the `log*` functions in `Undo.kt`. Atom-table slots ride their own reversible
+     *  trail ([AtomStore.undoAtomId] and parallels); [undoTo] replays both, with the pin trail
      *  [boolPinOrder] truncated to the mark so atoms established after it are dropped wholesale. */
     internal val undo: UndoLog = UndoLog()
 
@@ -730,6 +778,7 @@ class PropagationState(
         internal val pinOrderSize: Int,
         internal val snapshottablePayloads: Map<Int, SnapshottablePayload>,
         internal val revSize: Int,
+        internal val atomUndoSize: Int,
     )
 
     /**
@@ -758,6 +807,10 @@ class PropagationState(
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors.clear()
+        // Register any channeling clauses queued since the last fixpoint (as atoms materialized,
+        // including inside the just-finished conflict analysis) before snapshotting the factor
+        // count — a safe boundary with no factor mid-fire.
+        flushPendingChanneling()
         val factorCount = totalFactorCount
         propBegin(factorCount)
         val pollable = cancellation !== Cancellation.Never

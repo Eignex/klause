@@ -10,15 +10,15 @@ import kotlin.test.assertEquals
 
 /**
  * Soundness coverage for the trail-resident order-literal ladder (#588). Atom truth and level are
- * now *stored* on per-atom trail slots and maintained incrementally — set when a bound move crosses
- * the threshold ([wakeAtom]), reconstructed at materialization, and reset by [resetAtomTrailFor]'s
- * range-limited undo (which clears only the order literals whose truth flips). Crucially
- * [atomCurrentTruth] has **no derive fallback** any more: it returns the stored bit verbatim. So the
- * core invariant the whole representation rests on is:
+ * *stored* on per-atom trail slots as a forward cache — set when a bound move crosses the threshold
+ * ([wakeAtom]) or a clause forces the literal ([PropagationState.pinAtomLit]), and restored on
+ * backtrack by the reversible atom trail ([recordAtomTruthChange] / [undoTo]). A cache miss (`0`)
+ * falls back to the domain-derived [atomTruthOf], so the core invariant the whole representation
+ * rests on is:
  *
  *   for every materialized atom, after any sequence of bound moves and backtracks,
- *   the STORED truth ([atomCurrentTruth]) equals the truth DERIVED from the current domain
- *   ([atomTruthOf]).
+ *   the truth read ([atomCurrentTruth]) equals the truth DERIVED from the current domain
+ *   ([atomTruthOf]) — i.e. a *cached* `1`/`2` bit never disagrees with the live domain.
  *
  * A stale slot (a missed flip on undo, an off-by-one in the widened range, a hole eq atom wrongly
  * cleared) breaks this and silently corrupts truth → unsound search. This drives a [PropagationState]
@@ -51,10 +51,11 @@ class PropagationStateTrailResidentAtomSoundnessTest {
     }
 
     /**
-     * Assert the **stored** truth of every materialized atom equals the truth **derived** from the
-     * current domain. This is the soundness-critical invariant: [atomCurrentTruth] reads the stored
-     * [PropagationState.atoms.truth] bit with no domain fallback, so any stale bit (a missed flip on
-     * undo, an off-by-one widened range, a hole eq atom wrongly cleared) silently corrupts truth.
+     * Assert the truth read for every materialized atom equals the truth **derived** from the current
+     * domain. This is the soundness-critical invariant: [atomCurrentTruth] returns the cached
+     * [PropagationState.atoms.truth] bit when present, so any stale *cached* bit — one the reversible
+     * atom trail failed to restore on backtrack — silently corrupts truth. An uncached (`0`) slot
+     * falls back to the domain and so is consistent by construction; the hazard is a surviving `1`/`2`.
      *
      * The stored *level* deliberately is NOT checked: the engine treats a level left high by a pop
      * as a stale advisory and clamps it on read (`maxLevelForVars`), so a stored level above the

@@ -30,12 +30,13 @@ internal class AtomStore(numIntVars: Int) {
     /** Threshold value `k` for the atom. */
     val threshold: LongArrayList = LongArrayList()
 
-    /** Stored truth of this order literal — the canonical, BCP-cheap replacement for deriving it
+    /** Stored truth of this order literal — a BCP-cheap forward cache that avoids re-deriving it
      *  from the int domains on every clause touch (the #588 profile's dominant cost). 0 =
-     *  unassigned, 1 = true, 2 = false. Set by `wakeAtom` the instant a bound move crosses the
-     *  threshold (which is exactly when the truth flips), cleared to 0 on backtrack by
-     *  `resetAtomTrailFor`. A 0 slot on a determined atom (one materialized *after* its bound
-     *  already crossed) falls back to the domain-derived `atomTruthOf` — sound, just not cached. */
+     *  uncached / undetermined, 1 = true, 2 = false. Filled the instant a bound move crosses the
+     *  threshold (`wakeAtom`) or a clause forces the literal (`pinAtomLit`); restored on backtrack
+     *  by the reversible atom trail ([undoAtomId]). A 0 slot is not proof of "undetermined": an atom
+     *  materialized *after* its bound already crossed carries no cached truth, so a read falls back
+     *  to the domain-derived `atomTruthOf` — sound and current, just uncached. */
     val truth: IntArrayList = IntArrayList()
 
     /** Decision level at which this atom's current truth was established (-1 = none, i.e. truth
@@ -72,4 +73,16 @@ internal class AtomStore(numIntVars: Int) {
     /** Factor ids woken by atom-lit transitions during the current propagation step.
      *  Drained alongside dirty-int / dirty-bool processing in `runToFixpoint`. */
     val dirtyFactors: IntArrayDeque = IntArrayDeque(initialCapacity = 8)
+
+    /** Reversible atom-truth trail. Every change to [truth]/[lvl]/[ant] pushes the *prior* value
+     *  here (via `recordAtomTruthChange`) while undo-logging is on; `undoTo` replays it top-down to
+     *  the level mark, restoring each atom to its mark-time truth/level/reason. This makes atom
+     *  assignment (whether by a bound move or by a channeling/learned clause forcing the literal
+     *  directly) backtrack correctly on its own, independent of the domain — the trail the
+     *  literal-primary LCG design needs. Parallel arrays: which atom, and its prior 3-valued truth,
+     *  level and antecedents. */
+    val undoAtomId: IntArrayList = IntArrayList()
+    val undoTruth: IntArrayList = IntArrayList()
+    val undoLvl: IntArrayList = IntArrayList()
+    val undoAnt: ArrayList<IntArray?> = ArrayList()
 }

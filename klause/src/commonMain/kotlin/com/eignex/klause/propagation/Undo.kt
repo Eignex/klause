@@ -51,27 +51,6 @@ internal fun PropagationState.logIntCarve(v: Int, value: Long) {
     undo.holeHistLen.add(0)
 }
 
-/** Journal one interior carve made by a *batched* exclusion ([excludeIntValues]) as an
- *  atom-only reset (tag 3). The whole batch shares a single tag-1 record that restores the
- *  prior domain, hole history and bound order literals wholesale; this record exists only to
- *  flip the carved value's `[v = value]` eq atom back to undetermined on backtrack (tag 1's
- *  range-limited [resetAtomTrailFor] covers the widened bounds, not interior holes). No domain
- *  rebuild on undo, so backtracking a wide batch stays O(carves), not O(carves · holes).
- *  Columns: [UndoLog.carved] = carved value. */
-internal fun PropagationState.logExclusionCarveAtom(v: Int, value: Long) {
-    undo.tag.add(3)
-    undo.varId.add(v)
-    undo.level.add(0)
-    undo.minLvl.add(0)
-    undo.maxLvl.add(0)
-    undo.minReason.add(0)
-    undo.maxReason.add(0)
-    undo.carved.add(value)
-    undo.domain.add(null)
-    undo.minAnt.add(null)
-    undo.maxAnt.add(null)
-    undo.holeHistLen.add(0)
-}
 
 /** Variable id recorded by undo record `i`. */
 internal fun PropagationState.undoVarAt(i: Int): Int = undo.varId[i]
@@ -100,6 +79,7 @@ internal fun PropagationState.mark(): PropagationState.LevelMark {
         pinOrderSize = boolPinOrder.size,
         snapshottablePayloads = payloads ?: emptyPayloads,
         revSize = undo.revTrail.size,
+        atomUndoSize = atoms.undoAtomId.size,
     )
 }
 
@@ -133,10 +113,6 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
             1 -> { // int change — restore the full recorded prior int-var state
                 val v = undo.varId[i]
                 unassigned?.invoke(numBool + v)
-                // Tight bounds before restore — the widened range whose order literals flip
-                // back to undetermined (see [resetAtomTrailFor]).
-                val tightMin = intDomains[v].min
-                val tightMax = intDomains[v].max
                 intDomains[v] = requireNotNull(undo.domain[i])
                 intLevel[v] = undo.level[i]
                 intMinLevel[v] = undo.minLvl[i]
@@ -150,9 +126,6 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistVal[v]?.truncateTo(undo.holeHistLen[i])
                 holeHistLvl[v]?.truncateTo(undo.holeHistLen[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undo.holeHistLen[i]) a.removeAt(a.size - 1) }
-                // Clear only the order literals whose truth flips back to undetermined — the
-                // range the domain just widened over (tight → restored). Must run post-restore.
-                resetAtomTrailFor(v, tightMin, tightMax)
             }
 
             2 -> { // interior carve — re-insert the carved value
@@ -165,13 +138,6 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
                 holeHistVal[v]?.truncateTo(undo.maxReason[i])
                 holeHistLvl[v]?.truncateTo(undo.maxReason[i])
                 holeHistAnt[v]?.let { a -> while (a.size > undo.maxReason[i]) a.removeAt(a.size - 1) }
-                // The re-inserted value's eq atom flips false → undetermined (bounds unchanged).
-                resetAtomTrailForCarve(v, undo.carved[i])
-            }
-
-            3 -> { // batched interior carve — domain restored by this batch's tag-1 record;
-                // only the eq atom needs flipping false → undetermined.
-                resetAtomTrailForCarve(undo.varId[i], undo.carved[i])
             }
 
             else -> error("unknown undo tag")
@@ -197,8 +163,24 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     for ((fid, payload) in mark.snapshottablePayloads) {
         refPayloadStore[fid] = payload.snapshotCopy()
     }
-    // Atoms carry no stored state to reconcile: truth, level and antecedents are all
-    // derived on demand from the domains and histories restored above.
+    // Restore atom truths recorded since the mark (the reversible atom trail): replay top-down so
+    // an atom whose truth changed several times since the mark lands on its mark-time value. This
+    // is the atoms' own assignment trail — an atom-lit forced directly by a channeling / learned
+    // clause (pinAtomLit) is undone here even when its bound never moved, which the former
+    // domain-driven reconcile could not do. Independent of the int/bool cells above (disjoint
+    // state), so the replay order between the two groups is immaterial.
+    var a = atoms.undoAtomId.size - 1
+    while (a >= mark.atomUndoSize) {
+        val id = atoms.undoAtomId[a]
+        atoms.truth[id] = atoms.undoTruth[a]
+        atoms.lvl[id] = atoms.undoLvl[a]
+        atoms.ant[id] = atoms.undoAnt[a]
+        a--
+    }
+    atoms.undoAtomId.truncateTo(mark.atomUndoSize)
+    atoms.undoTruth.truncateTo(mark.atomUndoSize)
+    atoms.undoLvl.truncateTo(mark.atomUndoSize)
+    while (atoms.undoAnt.size > mark.atomUndoSize) atoms.undoAnt.removeAt(atoms.undoAnt.size - 1)
     atoms.dirtyFactors.clear()
     dirtyBools.clear()
     dirtyInts.clear()

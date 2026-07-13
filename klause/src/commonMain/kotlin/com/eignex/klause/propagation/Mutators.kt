@@ -479,10 +479,10 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
         intMaxAntecedents[v] = antMax
     }
     interior?.let { iv ->
-        for (i in 0 until iv.size) {
-            pushHoleHist(v, iv[i], currentLevel, antecedents)
-            if (undoLogging) logExclusionCarveAtom(v, iv[i])
-        }
+        // The carved values' domain is restored wholesale by the single [logIntChange] record above,
+        // and each carved value's `[v = value]` eq atom flips back on the reversible atom trail
+        // (the batch wakes it false through [propagateAtomsForExclusionBatch]); no per-carve record.
+        for (i in 0 until iv.size) pushHoleHist(v, iv[i], currentLevel, antecedents)
     }
     // A batched exclusion can move both endpoints and carve interior holes at once; raise every
     // event kind that actually occurred so typed-event advisors (e.g. a bounds-consistent [Linear]
