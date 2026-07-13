@@ -47,9 +47,8 @@ internal interface RestartSchedule {
         /** Luby decision base for the stable stage of the default cycle. */
         const val STABLE_LUBY_BASE: Long = 100L
 
-        /** The CP-SAT default restart cycle: a Luby stable stage that dives on the best phase, an
-         *  EMA/LBD-adaptive focused stage, and a decision-level-adaptive focused stage — mirroring
-         *  CP-SAT's `LUBY_RESTART, LBD_MOVING_AVERAGE_RESTART, DL_MOVING_AVERAGE_RESTART`. */
+        /** The default restart cycle: a Luby stable stage that dives on the best phase, an EMA/LBD-adaptive
+         *  focused stage, and a decision-level-adaptive focused stage. */
         private fun defaultModeSwitching(): ModeSwitchingRestartSchedule = ModeSwitchingRestartSchedule(
             stages = listOf(
                 RestartStage(LubyRestartSchedule(STABLE_LUBY_BASE), PhaseMode.STABLE),
@@ -61,7 +60,7 @@ internal interface RestartSchedule {
 
         /** The schedule selected by [params], in precedence order: mode-switching when
          *  [BacktrackParams.modeSwitchingRestart], else EMA-adaptive when [BacktrackParams.emaRestart],
-         *  else Glucose-adaptive when [BacktrackParams.adaptiveRestart], else Luby when
+         *  else LBD-adaptive when [BacktrackParams.adaptiveRestart], else Luby when
          *  [BacktrackParams.lubyRestartBase] is set, else a single unbounded run. */
         fun from(params: BacktrackParams): RestartSchedule = when {
             params.modeSwitchingRestart -> defaultModeSwitching()
@@ -101,9 +100,8 @@ internal class LubyRestartSchedule(private val base: Long) : RestartSchedule {
 }
 
 /**
- * Glucose-style adaptive schedule: a [GlucoseRestart] LBD/trail-size detector drives restarts and the
- * per-run budget is disabled (unbounded), so restarts fire on learned-clause quality rather than a
- * fixed decision count.
+ * LBD/trail-size adaptive schedule: a [GlucoseRestart] detector drives restarts and the per-run budget
+ * is disabled (unbounded), so restarts fire on learned-clause quality rather than a fixed decision count.
  */
 internal class AdaptiveRestartSchedule : RestartSchedule {
     private val glucose = GlucoseRestart()
@@ -122,7 +120,7 @@ internal class AdaptiveRestartSchedule : RestartSchedule {
 
 /**
  * EMA-based adaptive schedule: an [EmaRestart] detector drives restarts off exponential moving averages
- * of learned-clause LBD (the CaDiCaL/Kissat scheme) rather than [GlucoseRestart]'s bounded windows. The
+ * of learned-clause LBD rather than [GlucoseRestart]'s bounded windows. The
  * per-run budget is disabled (unbounded), as for [AdaptiveRestartSchedule].
  */
 internal class EmaRestartSchedule : RestartSchedule {
@@ -142,8 +140,8 @@ internal class EmaRestartSchedule : RestartSchedule {
 
 /**
  * Decision-level adaptive schedule: a [DecisionLevelRestart] detector drives restarts off the trail
- * depth at conflicts (CP-SAT `DL_MOVING_AVERAGE_RESTART`), the complement of the LBD-based
- * [AdaptiveRestartSchedule] / [EmaRestartSchedule]. The per-run budget is unbounded.
+ * depth at conflicts, the complement of the LBD-based [AdaptiveRestartSchedule] / [EmaRestartSchedule].
+ * The per-run budget is unbounded.
  */
 internal class DlRestartSchedule : RestartSchedule {
     private val dl = DecisionLevelRestart()
@@ -166,8 +164,8 @@ internal class DlRestartSchedule : RestartSchedule {
 internal class RestartStage(val schedule: RestartSchedule, val phaseMode: PhaseMode)
 
 /**
- * Cycling multi-strategy restart portfolio (the CaDiCaL/Kissat/CP-SAT regime), mixing several schedules
- * within one run to be robust on optimization without hand-tuning. The search cycles the [stages] list:
+ * Cycling multi-strategy restart portfolio, mixing several schedules within one run to be robust on
+ * optimization without hand-tuning. The search cycles the [stages] list:
  * each segment lasts `lubyN(seg) · switchBase` conflicts, then the next stage takes over, so segments
  * lengthen as the search proceeds. A stage's [RestartStage.phaseMode] couples the polarity heuristic to
  * the mode — the typical cycle pairs a [PhaseMode.STABLE] Luby stage (dive on the target phase, holding

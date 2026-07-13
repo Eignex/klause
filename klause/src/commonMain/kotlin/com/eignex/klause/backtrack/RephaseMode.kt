@@ -9,6 +9,9 @@ internal enum class RephaseMode {
     /** Bias toward the deepest conflict-free assignment seen (falls back to saved). */
     TARGET,
 
+    /** Bias toward the best feasible incumbent's value (falls back to saved). */
+    SOLUTION,
+
     /** Plain phase saving — the last value committed for the variable. */
     SAVED,
 
