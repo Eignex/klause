@@ -13,6 +13,7 @@ import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -545,11 +546,13 @@ internal fun linearSolvable(
     definedVars: IntArray = IntArray(0),
     boolFolds: List<DefinitionalSweep.BoolFoldSpec> = emptyList(),
 ): Solvable {
-    // Feasibility sweep derives functionally-defined vars and excludes them from search. Bool AND
-    // folds are kept OUT of it: deriving an OPB product indicator shrinks the search over its
-    // literals, which stalls repair when those literals are feasibility-critical. The gradient view
-    // still reads the folds — it only needs to *evaluate* the objective through them, not exclude them.
-    val sweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars)
+    // Feasibility sweep derives functionally-defined vars and excludes them from search. A bool AND
+    // fold is derived only when all its literals are objective variables: deriving an OPB product
+    // indicator lets local search drop it and re-derive it from its literals, which pays off when
+    // those literals are the ones the objective drives, but stalls repair when they are pure
+    // feasibility-structure variables entangled in the hard constraints.
+    val derivedFolds = if (objective == null) emptyList() else foldsOverObjectiveVars(boolFolds, objective)
+    val sweep = DefinitionalSweep.infer(problem.factors, problem.numIntVars, definedVars, derivedFolds)
     if (objective == null) {
         return Solvable(
             problem = problem, optimize = false, maximize = false,
@@ -558,6 +561,8 @@ internal fun linearSolvable(
             render = render, objectiveValue = null,
         )
     }
+    // The gradient view reads every fold (evaluating through a fold is always safe — it only needs
+    // to see the objective through the indicator, not exclude the indicator from search).
     val objSweep = if (boolFolds.isEmpty()) {
         sweep
     } else {
@@ -577,6 +582,20 @@ internal fun linearSolvable(
         render = render,
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
     )
+}
+
+/** Keep only the AND folds whose every literal is an objective variable (nonzero bool weight). These
+ *  are the OPB product indicators worth deriving in the feasibility sweep — the ones whose literals
+ *  the objective drives, rather than pure feasibility-structure variables whose exclusion stalls
+ *  constraint repair. */
+private fun foldsOverObjectiveVars(
+    folds: List<DefinitionalSweep.BoolFoldSpec>,
+    objective: LinearObjective,
+): List<DefinitionalSweep.BoolFoldSpec> {
+    if (folds.isEmpty()) return folds
+    val bw = objective.boolWeights
+    fun isObjectiveVar(v: Int) = v in bw.indices && bw[v] != 0L
+    return folds.filter { spec -> spec.lits.all { isObjectiveVar(Lit.variable(it)) } }
 }
 
 /** Build a functional-objective gradient view of [objective] over [sweep]'s int and bool cones, or
