@@ -33,6 +33,7 @@ internal class MddIncrementalState(
     private val accepting: IntArray,
     private val recordStride: Int,
     private val cost: Int,
+    index: MddTransitionIndex? = null,
 ) {
     private val n = seq.size
     private val maxStates = numStatesPerLayer.max()
@@ -42,51 +43,13 @@ internal class MddIncrementalState(
     private val bwd = RevLongArray(state, (n + 1) * w)
     private val valid = RevInt(state, 0)
 
-    // Per-layer CSR indices over the transition records. `fwdPtr(layer)[fwdHead(layer)[src] until
-    // fwdHead(layer)[src+1]]` are the transition base offsets whose source is `src`; `bwdPtr`/`bwdHead`
-    // group by destination. Records whose src (resp. dst) is out of its layer's state range are dropped —
-    // such a record never matches a set reachability bit, so the sweeps behave identically. Built once.
-    private val fwdHead = Array(n) { IntArray(0) }
-    private val fwdPtr = Array(n) { IntArray(0) }
-    private val bwdHead = Array(n) { IntArray(0) }
-    private val bwdPtr = Array(n) { IntArray(0) }
-
-    init {
-        for (i in 0 until n) {
-            val numI = numStatesPerLayer[i]
-            val numN = numStatesPerLayer[i + 1]
-            val start = layerStarts[i]
-            val end = layerStarts[i + 1]
-            val fHead = IntArray(numI + 1)
-            val bHead = IntArray(numN + 1)
-            var p = start
-            while (p < end) {
-                val src = transitions[p].toInt()
-                val dst = transitions[p + 2].toInt()
-                if (src in 0 until numI) fHead[src + 1]++
-                if (dst in 0 until numN) bHead[dst + 1]++
-                p += recordStride
-            }
-            for (k in 0 until numI) fHead[k + 1] += fHead[k]
-            for (k in 0 until numN) bHead[k + 1] += bHead[k]
-            val fPtr = IntArray(fHead[numI])
-            val bPtr = IntArray(bHead[numN])
-            val fCur = fHead.copyOf()
-            val bCur = bHead.copyOf()
-            p = start
-            while (p < end) {
-                val src = transitions[p].toInt()
-                val dst = transitions[p + 2].toInt()
-                if (src in 0 until numI) fPtr[fCur[src]++] = p
-                if (dst in 0 until numN) bPtr[bCur[dst]++] = p
-                p += recordStride
-            }
-            fwdHead[i] = fHead
-            fwdPtr[i] = fPtr
-            bwdHead[i] = bHead
-            bwdPtr[i] = bPtr
-        }
-    }
+    // Per-layer CSR indices over the transition records (see [MddTransitionIndex]). Shared across the
+    // factors of a `<group>` of identical diagrams when the caller passes one in; otherwise built here.
+    private val idx = index ?: MddTransitionIndex.build(transitions, layerStarts, numStatesPerLayer, recordStride)
+    private val fwdHead = idx.fwdHead
+    private val fwdPtr = idx.fwdPtr
+    private val bwdHead = idx.bwdHead
+    private val bwdPtr = idx.bwdPtr
 
     private fun testBit(rev: RevLongArray, layer: Int, s: Int): Boolean =
         (rev[layer * w + (s ushr 6)] and (1L shl (s and 63))) != 0L
