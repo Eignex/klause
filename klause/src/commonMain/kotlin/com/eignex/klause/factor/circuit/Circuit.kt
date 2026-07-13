@@ -53,16 +53,18 @@ class Circuit(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Circuit(succ.remapVars(intMap), subcircuit)
 
     /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
-     *  keeps the variables in order rather than sorting them (#443). The circuit vs subcircuit mode is
-     *  kept in the [FactorKind] so the two never share a structural-key bucket. */
-    override fun structuralKey(): StructuralKey = materializeKey(kind(), ::buildKey)
+     *  keeps the variables in order rather than sorting them (#443). The [subcircuit] mode is a key field
+     *  (as [com.eignex.klause.factor.arithmetic.ArrayMinMax] keys its `max`), so a circuit and a
+     *  subcircuit over the same successors never share a bucket. */
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CIRCUIT, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(kind(), boolMap, intMap, ::buildKey)
+        hashRemappedKey(FactorKind.CIRCUIT, boolMap, intMap, ::buildKey)
 
-    private fun kind(): FactorKind = if (subcircuit) FactorKind.SUBCIRCUIT else FactorKind.CIRCUIT
-
-    private fun buildKey(sink: KeySink) = sink.intVars(succ)
+    private fun buildKey(sink: KeySink) {
+        sink.bool(subcircuit)
+        sink.intVars(succ)
+    }
 
     /** Graded cost, dispatched by mode; 0 iff the assignment forms the required single (sub)cycle. */
     private fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int =

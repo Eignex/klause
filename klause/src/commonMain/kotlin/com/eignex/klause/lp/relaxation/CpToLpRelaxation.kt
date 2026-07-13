@@ -214,7 +214,7 @@ internal class CpToLpRelaxation(
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
     private val objectiveCone: Boolean = false,
-    /** When true, build the arc-indicator relaxation of each [Circuit] / [Subcircuit] (degree +
+    /** When true, build the arc-indicator relaxation of each [Circuit] / [Circuit] (degree +
      *  channelling rows over one `y_ij ∈ [0,1]` column per candidate arc). For Circuit it also records
      *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
      *  hull only (its cutset structure differs, #431). Adds O(arcs) columns, so it is gated. */
@@ -418,7 +418,7 @@ internal class CpToLpRelaxation(
         private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
 
         /**
-         * Arc-indicator relaxation of one [Subcircuit] over `succ[0..n)`. As `buildCircuitArcs` but the
+         * Arc-indicator relaxation of one [Circuit] over `succ[0..n)`. As `buildCircuitArcs` but the
          * self-loop arc `y_ii` (= "node i is excluded") is a candidate, so the degree + channel rows
          * describe the **permutation** polytope (each node has exactly one in- and out-arc, fixed points
          * allowed). **No subtour-elimination model is registered**: the Hamiltonian SEC is *unsound* for
@@ -427,7 +427,7 @@ internal class CpToLpRelaxation(
         private fun buildSubcircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
 
         /**
-         * Shared degree + channel arc model for [Circuit] / [Subcircuit]: a `y_ij ∈ [0,1]` column per
+         * Shared degree + channel arc model for [Circuit] / [Circuit]: a `y_ij ∈ [0,1]` column per
          * candidate arc (pinned to 0 when `j` left the live domain), with out-degree / in-degree
          * `= 1` rows and the channel `Σ_j j·y_ij = succ[i]`. Records a [CircuitArcModel] when [sec].
          */

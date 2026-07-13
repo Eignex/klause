@@ -622,7 +622,7 @@ internal fun Xcsp3.Builder.circuit(e: XmlElement) {
     val succ = refList(listText(e))
     // XCSP3 `circuit` (Semantics 46) is subcircuit semantics: nodes with succ(i) = i are
     // excluded (self-looping); the rest form a single cycle. It additionally requires a
-    // circuit of size > 1. [Subcircuit] captures the cycle-over-included-nodes part but also
+    // circuit of size > 1. [Circuit] captures the cycle-over-included-nodes part but also
     // admits the empty (all-excluded) assignment, so pin the number of participating nodes
     // (those with succ(i) ≠ i): to <size> when given, else to "at least one" — which, with
     // Subcircuit's rejection of a lone included node, yields size ≥ 2.

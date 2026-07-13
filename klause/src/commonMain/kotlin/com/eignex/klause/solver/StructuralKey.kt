@@ -80,7 +80,6 @@ internal enum class FactorKind {
     REGULAR,
     MDD,
     CIRCUIT,
-    SUBCIRCUIT,
     CUMULATIVE,
     DIFFN,
     DISJUNCTIVE,

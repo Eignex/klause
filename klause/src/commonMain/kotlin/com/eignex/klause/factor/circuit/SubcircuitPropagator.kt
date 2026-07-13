@@ -11,7 +11,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 
-/** CP implementation for [Subcircuit]: propagation of the optional-cycle constraint over successor vars. */
+/** CP implementation for [Circuit]: propagation of the optional-cycle constraint over successor vars. */
 internal class SubcircuitPropagator(private val succ: IntArray, private val n: Int) : Propagator {
 
     override val initialIntEventWatches: IntArray = buildSuccWatches(succ)
