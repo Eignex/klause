@@ -116,8 +116,14 @@ internal fun PropagationState.allocAtom(intVar: Int, kind: AtomKind, threshold: 
  * [PropagationState.pendingChanneling] and registered as permanent clauses by
  * [flushPendingChanneling] at the next safe propagation boundary — never here, since [allocAtom]
  * also runs inside conflict analysis where the clause store must not be mutated.
+ *
+ * Skipped in incremental-presolve mode: channeling clauses are a search-time LCG reasoning aid, and
+ * presolve only narrows domains (no conflict analysis needs them). Registering them there would push
+ * factors into the learned-clause store while incremental [factorAt] routes every tail id to the
+ * mid-life store, mixing the two stores under one id space.
  */
 internal fun PropagationState.registerChannelingFor(newAtomId: Int) {
+    if (incremental) return
     val v = atoms.intVar[newAtomId]
     val k = atoms.threshold[newAtomId]
     val idx = atoms.byIntVar[v] ?: return
