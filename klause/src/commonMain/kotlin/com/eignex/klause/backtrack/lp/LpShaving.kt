@@ -51,30 +51,67 @@ internal fun LpEngine.shaveObjectiveLb(objectiveVar: Int, ascending: Boolean, to
 internal class ShavedBound(val varId: Int, val lo: Long, val hi: Long)
 
 /**
- * Variable shaving: tighten integer variables' domain bounds
- * by probing. For each variable assume `v ≤ lo` (resp. `v ≥ hi`) and, if the sound propagation + LP
- * relaxation proves that infeasible (`pruneNode` at an *infinite* incumbent, firing only on genuine
- * infeasibility), raise `lo` (lower `hi`). Returns the variables whose declared bounds shaved inward,
- * for the caller to apply to the root. **Sound:** each tightening is backed by a proof that the
- * shaved-off values are infeasible. Bounded by [SHAVE_MAX_ITERS] total probes across all variables.
+ * Variable shaving in two phases: a **coarse OBBT** (optimization-based bound tightening) jump, then a
+ * **fine ±1 probe**. For each integer variable whose domain is wider than the fine pass could ever walk
+ * ([SHAVE_MAX_ITERS]), the coarse phase solves the LP relaxation min/max of that single variable (two
+ * simplex solves, [obbtTighten]) and snaps the box to `[ceil(lpMin), floor(lpMax)]` — reaching, in two
+ * solves, a bound the ±1 probe alone could never step to across an SMT-clamped domain. The fine phase
+ * then probes `v ≤ lo` / `v ≥ hi` for infeasibility, mopping up the residual integrality. Returns the
+ * variables whose declared bounds tightened inward, for the caller to apply to the root.
+ *
+ * **Sound:** the safe LP bound over-estimates the reachable range, so snapping to it drops only
+ * infeasible values, and each ±1 raise is proof-backed; if the coarse box crosses (`lo > hi`) the LP
+ * has proven no integer is feasible, and the crossed bound propagates to `unsat`. Coarse solves are
+ * bounded by [OBBT_MAX_SOLVES], fine probes by [SHAVE_MAX_ITERS], both by [token]. Narrow domains keep
+ * the pure fine behaviour, so this never changes results on ordinary CP models.
  */
 internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound> {
     if (lpRelaxer == null) return emptyList()
     val root = PropagationSession(problem)
     if (root.isUnsatAtRoot) return emptyList()
     val out = ArrayList<ShavedBound>()
+    val objective = LongArray(problem.numIntVars) // reusable single-variable OBBT objective, all-zero
     var probes = 0
+    var obbtSolves = 0
     for (v in 0 until problem.numIntVars) {
-        if (probes >= SHAVE_MAX_ITERS || token()) break
+        if (token()) break
         val d = root.intDomain(v)
         var lo = d.min
         var hi = d.max
         if (lo >= hi) continue
+        if (hi - lo > SHAVE_MAX_ITERS && obbtSolves + 2 <= OBBT_MAX_SOLVES) {
+            val (obbtLo, obbtHi) = obbtTighten(v, lo, hi, objective, token)
+            obbtSolves += 2
+            lo = obbtLo
+            hi = obbtHi
+        }
         while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, lo, atMost = true)) lo += 1
         while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() && infeasibleUnder(v, hi, atMost = false)) hi -= 1
         if (lo != d.min || hi != d.max) out.add(ShavedBound(v, lo, hi))
     }
     return out
+}
+
+/** One coarse **OBBT** step for variable [v]: tighten `[lo, hi]` to the safe LP min/max of `x[v]` (two
+ *  simplex solves). Sound — the safe bound over-estimates the reachable range, so snapping the box to it
+ *  drops only infeasible values. [objective] is the reusable single-variable LP objective (all-zero on
+ *  entry, restored on exit). */
+private fun LpEngine.obbtTighten(
+    v: Int,
+    lo: Long,
+    hi: Long,
+    objective: LongArray,
+    token: Cancellation,
+): Pair<Long, Long> {
+    objective[v] = 1
+    val lpMax = safeMax(problem, objective, token)
+    val lpMin = safeMin(problem, objective, token)
+    objective[v] = 0
+    var newLo = lo
+    var newHi = hi
+    if (lpMax != null && lpMax.isFinite()) newHi = minOf(newHi, floor(lpMax + OBBT_TOL).toLong())
+    if (lpMin != null && lpMin.isFinite()) newLo = maxOf(newLo, ceil(lpMin - OBBT_TOL).toLong())
+    return newLo to newHi
 }
 
 /**
@@ -229,6 +266,14 @@ private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean): Bool
 
 /** Max upward probes for objective shaving before it stops (each probe is one propagation + LP solve). */
 private const val SHAVE_MAX_ITERS = 64
+
+/** Budget for coarse **OBBT** solves in variable shaving (two per tightened wide-domain variable), so a
+ *  large model cannot pay a simplex per variable up front. */
+private const val OBBT_MAX_SOLVES = 256
+
+/** Slack applied to a safe LP min/max before rounding to an integer bound, so floating error only ever
+ *  loosens the coarse **OBBT** box (never claims a tighter bound than the LP proved). */
+private const val OBBT_TOL = 1e-6
 
 /** Slack on the safe min/max bracket when counting integers inside it — widening it only drops removals. */
 private const val EQ_PIN_TOL = 1e-6

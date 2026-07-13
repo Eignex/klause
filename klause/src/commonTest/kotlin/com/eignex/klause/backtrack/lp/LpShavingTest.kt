@@ -157,4 +157,27 @@ class LpShavingTest {
         }
         assertTrue(shaved > 0, "variable shaving never engaged across 300 instances")
     }
+
+    @Test
+    fun `coarse OBBT tightens a wide domain interval propagation leaves loose`() {
+        // x = y + z, y = z, y + z <= 500. Interval bound propagation cannot combine `y = z` with
+        // `y + z <= 500`, so it only proves x <= 1000 (a domain far wider than the fine ±1 probe's 64
+        // steps). The LP sees the polytope corner 2y <= 500, so the coarse OBBT step proves x <= 500.
+        val domains = arrayOf(IntDomain(0, 1_000_000), IntDomain(0, 100_000), IntDomain(0, 100_000)) // x, y, z
+        val factors = arrayOf<Factor>(
+            Linear(intArrayOf(1, -1, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0), // x - y - z = 0
+            Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0), // y - z = 0
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 500), // y + z <= 500
+        )
+        val p = Problem(0, 3, domains, factors)
+        val obj = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L))
+        val engine = LpEngine(
+            p,
+            obj,
+            BacktrackParams(lpPlan = LpPlan(bounding = true)),
+            SolveStatsSink(backend = "shave"),
+        )
+        val xb = engine.shaveVariableBounds(Cancellation.Never).single { it.varId == 0 }
+        assertEquals(500L, xb.hi, "coarse OBBT proves x <= 500 where interval propagation only gives 1000")
+    }
 }
