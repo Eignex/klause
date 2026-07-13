@@ -80,6 +80,15 @@ internal class Alns(
      *  LP bounding under the pin assumptions. Null on a pure-LS ALNS. */
     val backtrack: Optimizer<BacktrackParams>? = null,
     val backtrackParams: BacktrackParams? = null,
+    /** Sink for each improving incumbent this run accepts — its [Sample] and objective. A portfolio folds
+     *  these into the shared solution pool so peer arms (backtrack or LS) can warm-start from them. Null
+     *  disables publishing. */
+    val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
+    /** Supplier of the best [Sample] any arm has published — the read counterpart of [improvedSolutionSink].
+     *  Before each iteration ALNS adopts a not-yet-seen pooled solution that beats its own incumbent, so the
+     *  next neighbourhood is destroyed from the globally-best assignment. Identity-gated; skipped when the
+     *  run carries assumption pins. Null disables it. */
+    val pooledSolutionSupplier: (() -> Sample?)? = null,
 ) : Optimizer<LocalSearchParams> {
 
     init {
@@ -128,6 +137,9 @@ internal class Alns(
         var bestObj = scoring.evaluate(bestSample)
         var incumbent = bestSample
         var incumbentObj = bestObj
+        improvedSolutionSink?.invoke(bestSample, bestObj)
+        // Identity-gates redundant pooled-solution imports across iterations.
+        var lastPooled: Sample? = null
 
         val perIterParams = params.copy(
             maxFlips = flipsPerIteration,
@@ -145,6 +157,24 @@ internal class Alns(
         var iter = 0
         while (iter < maxIterations) {
             if (params.cancellation()) break
+            // Cross-engine flow (#644): adopt a better pooled solution as the incumbent before destroying,
+            // so the next neighbourhood searches around the globally-best assignment any arm has found.
+            // Skipped under assumption pins, which a foreign full assignment may violate.
+            pooledSolutionSupplier?.let { supplier ->
+                if (params.assumptions.isEmpty) {
+                    val pooled = supplier()
+                    if (pooled != null && pooled !== lastPooled) {
+                        lastPooled = pooled
+                        val pooledObj = scoring.evaluate(pooled)
+                        if (pooledObj < bestObj) {
+                            bestSample = pooled
+                            bestObj = pooledObj
+                            incumbent = pooled
+                            incumbentObj = pooledObj
+                        }
+                    }
+                }
+            }
             val destroyIdx = destroyBandit.choose()
             val repairIdx = repairBandit.choose()
             val freed = destroyOperators[destroyIdx]
@@ -195,6 +225,7 @@ internal class Alns(
             if (isNewBest) {
                 bestSample = repaired
                 bestObj = repairedObj
+                improvedSolutionSink?.invoke(repaired, repairedObj)
             }
             if (accept) {
                 incumbent = repaired

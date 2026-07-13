@@ -68,6 +68,21 @@ data class LocalSearchParams(
      */
     val initialAssignment: Sample? = null,
     /**
+     * Sink for each improving feasible incumbent this run finds — its [Sample] and objective. A portfolio
+     * folds these into a shared solution pool so peer arms (backtrack or other LS) can warm-start from a
+     * globally-good assignment. `null` (default) disables it. Ignored by `solve` / `samples` / `enumerate`.
+     */
+    val improvedSolutionSink: ((Sample, Double) -> Unit)? = null,
+    /**
+     * Supplier of the best [Sample] any arm has published — the read counterpart of [improvedSolutionSink].
+     * On each restart the search adopts a not-yet-seen pooled solution that beats its own incumbent as the
+     * restart anchor, letting a peer arm's better assignment pull this walk toward it. Purely heuristic: LS
+     * re-derives cost and feasibility from the assignment, so a peer's solution can never make a result
+     * unsound. Skipped when this run carries assumption pins (a foreign assignment may violate them).
+     * `null` (default) disables it. Ignored by `solve` / `samples` / `enumerate`.
+     */
+    val pooledSolutionSupplier: (() -> Sample?)? = null,
+    /**
      * Soft cap for the graded violation cost (see
      * `compressViolation`). Per-factor residuals at or below this
      * contribute their exact magnitude; above it they grow only logarithmically, so a handful of
