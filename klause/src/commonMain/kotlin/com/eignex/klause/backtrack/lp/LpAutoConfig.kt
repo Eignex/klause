@@ -359,7 +359,7 @@ object LpAutoConfig {
     }
 
     /** Arc-model columns (`Σ` candidate arcs) + degree/channel rows over the under-cap [Circuit] /
-     *  [Subcircuit] factors (mirrors `CpToLpRelaxation.buildArcModel`; subcircuit keeps self-loop arcs). */
+     *  [Circuit] factors (mirrors `CpToLpRelaxation.buildArcModel`; subcircuit keeps self-loop arcs). */
     private fun circuitEstimate(problem: Problem): HullEstimate? {
         var cols = 0L
         var rows = 0L
