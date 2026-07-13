@@ -104,10 +104,53 @@ class ReifiedLinear private constructor(
         // Best-effort: a reified row whose activity or big-M overflows Long is left unrelaxed (the
         // exact helpers below signal it); the propagator and invariant still enforce the constraint.
         try {
+            if (emitExactBinaryEquality(builder)) return
             emitBigMRows(builder)
         } catch (_: LpOverflowException) {
             return
         }
+    }
+
+    /**
+     * Exact convex-hull rows for the common case `aux ⇔ (c·v == bound)` where `v`'s declared domain is a
+     * single pair `{lo, hi}`. Then `c·v` is two-valued, so the indicator is an affine function of it —
+     * `c·v = c·lo + (c·hi − c·lo)·aux` when `bound` is the high value (symmetrically for the low), or
+     * `aux = 0` when `bound` is unreachable. This is the tight replacement for the big-M reification a
+     * binary variable would otherwise get, and it is global (declared-domain based, valid at every node).
+     * It covers the ubiquitous bool↔`{0,1}` channel (`channelBoolTo01`) as well as `±1` product encodings.
+     * Returns whether it emitted (and the caller should skip the big-M rows).
+     */
+    private fun emitExactBinaryEquality(builder: RelaxationBuilder): Boolean {
+        if (op != LinearOp.EQ || vars.size != 1) return false
+        val c = coeffs[0]
+        if (c == 0L) return false
+        val dec = builder.declaredDomain(vars[0])
+        if (dec.size != 2) return false // a size-2 domain's two values are exactly its min and max
+        val loValue = mulExact(c, dec.min)
+        val hiValue = mulExact(c, dec.max)
+        val vCol = builder.intColumn(vars[0])
+        val auxCol = builder.boolColumn(auxBoolVar)
+        when (bound) {
+            // aux ⇔ (c·v == hi): c·v − (hi − lo)·aux = lo.
+            hiValue -> builder.row(
+                intArrayOf(vCol, auxCol),
+                longArrayOf(c, -subExact(hiValue, loValue)),
+                LinearOp.EQ,
+                loValue,
+            )
+
+            // aux ⇔ (c·v == lo): c·v − (lo − hi)·aux = hi.
+            loValue -> builder.row(
+                intArrayOf(vCol, auxCol),
+                longArrayOf(c, -subExact(loValue, hiValue)),
+                LinearOp.EQ,
+                hiValue,
+            )
+
+            // bound is neither reachable value, so the equality never holds and the indicator is false.
+            else -> builder.row(intArrayOf(auxCol), longArrayOf(1L), LinearOp.EQ, 0L)
+        }
+        return true
     }
 
     private fun emitBigMRows(builder: RelaxationBuilder) {
