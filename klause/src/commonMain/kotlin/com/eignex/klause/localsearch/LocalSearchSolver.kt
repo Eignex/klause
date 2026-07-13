@@ -407,6 +407,31 @@ class LocalSearchSolver(
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         var cancelled = false
 
+        // Cross-engine solution flow (#644): before a restart, if the shared pool now holds a better
+        // assignment than this worker's own incumbent, adopt it so the restart anchors on a peer arm's
+        // solution. Identity-gated so an unchanged pool is free; skipped under assumption pins, which a
+        // foreign full assignment may violate. Purely heuristic — the anchor only seeds the next descent.
+        var lastPooled: Sample? = null
+        fun importPooledIncumbent() {
+            val supplier = params.pooledSolutionSupplier ?: return
+            if (!effectiveAssumptions.isEmpty) return
+            val pooled = supplier() ?: return
+            if (pooled === lastPooled) return
+            lastPooled = pooled
+            val pooledObj = objective.evaluate(pooled)
+            if (pooledObj < bestObj) {
+                bestObj = pooledObj
+                bestSample = pooled
+            }
+        }
+
+        // The anchor for a restart: refresh from the pool first, then prefer the incumbent, falling back
+        // to [fallback] (a best-cost-infeasible snapshot) when no feasible incumbent exists yet.
+        fun restartAnchor(fallback: Sample?): Sample? {
+            importPooledIncumbent()
+            return bestSample ?: fallback
+        }
+
         // Each restart counts as one unit of work against maxFlips; otherwise a degenerate objective
         // on a constraint-free problem would loop forever (cost stays 0, descent never improves, and
         // the restart path wouldn't bump totalFlips).
@@ -466,6 +491,7 @@ class LocalSearchSolver(
                     bestSample = snap
                     bestFoundAtMs = sink.elapsedMs()
                     params.onEvent?.invoke(SearchEvent.Incumbent(obj))
+                    params.improvedSolutionSink?.invoke(snap, obj)
                     yield(MinimizeResult.BestFound(snap, obj, TerminationReason.BudgetExhausted))
                 }
                 // Explicit feasible-phase dispatch — exhaustive, no else: every strategy declares its
@@ -485,7 +511,7 @@ class LocalSearchSolver(
                             continue
                         }
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(state, bestSample)
+                        restartAndRepair(state, restartAnchor(null))
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -521,7 +547,7 @@ class LocalSearchSolver(
                         }
                         feasibleMisses = 0
                         restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
-                        restartAndRepair(state, bestSample)
+                        restartAndRepair(state, restartAnchor(null))
                         stallCount++
                         restartCount++
                         flipsSinceRestart = 0
@@ -531,7 +557,7 @@ class LocalSearchSolver(
                 }
             }
             if (restarts.shouldRestart(flipsSinceRestart)) {
-                restartAndRepair(state, bestSample ?: bestCostSnap)
+                restartAndRepair(state, restartAnchor(bestCostSnap))
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++
@@ -543,7 +569,7 @@ class LocalSearchSolver(
             val costBefore = state.cost
             val move = if (unified) descentStrategy.pickMove(state) else strategy.pickMove(state)
             if (move == null) {
-                restartAndRepair(state, bestSample ?: bestCostSnap)
+                restartAndRepair(state, restartAnchor(bestCostSnap))
                 restartCount++
                 flipsSinceRestart = 0
                 totalFlips++

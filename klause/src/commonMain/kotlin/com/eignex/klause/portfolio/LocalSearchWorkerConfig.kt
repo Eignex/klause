@@ -36,7 +36,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
         lsObjective: IncrementalObjective?,
         definitionalSweep: DefinitionalSweep?,
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
-        pools: SharedPools?, // ignored: local search neither learns nor consumes clauses or cuts
+        pools: SharedPools?, // solutions only: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
         // On a COP, every arm optimizes. A recipe that drives objective descent itself (CBLS, SA) needs
         // nothing; a violation-native one (probSAT / WalkSAT / feasibility-jump) gets an `objective ≤
@@ -58,7 +58,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             seedImplicitOnRestart = recipe.seedImplicitOnRestart,
         ).apply { objectiveBound = boundHandle }.session()
         val workerLabel = "ls/$label"
-        val params = LocalSearchParams(
+        var params = LocalSearchParams(
             randomSeed = seed + index,
             costShaping = CostShaping.Linear(lambda = lsLambda),
             // The per-move gradient view of the objective, when the model provides one.
@@ -68,6 +68,11 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             // no-op for the pool's weight-blind arms.
             normalizeWeightsByClass = true,
         )
+        // Bidirectional cross-engine flow (#644): publish incumbents this arm finds and, on restart, anchor
+        // on the pool's global best — so LS and backtrack incumbents circulate both ways through the pool.
+        pools?.solutions?.let { sols ->
+            params = params.copy(improvedSolutionSink = sols::publish, pooledSolutionSupplier = sols::best)
+        }
         return PortfolioWorker.of(
             workerLabel,
             armId,

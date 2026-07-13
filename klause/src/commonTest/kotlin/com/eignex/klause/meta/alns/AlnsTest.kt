@@ -137,6 +137,52 @@ class AlnsTest {
     }
 
     @Test
+    fun `alns publishes its accepted incumbents to the sink`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val published = mutableListOf<Pair<Sample, Double>>()
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            destroyFraction = 0.5,
+            maxIterations = 8,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+            improvedSolutionSink = { sample, obj -> published.add(sample to obj) },
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        assertNotNull(sample)
+        assertTrue(published.isNotEmpty(), "at least the initial incumbent must be published")
+        assertEquals(objective.evaluate(sample), published.minOf { it.second }, "best published equals the result")
+    }
+
+    @Test
+    fun `alns adopts a better pooled solution before destroying`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        var polls = 0
+        val optimal = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            destroyFraction = 0.5,
+            maxIterations = 8,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+            pooledSolutionSupplier = {
+                polls++
+                optimal
+            },
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        assertNotNull(sample)
+        assertTrue(polls > 0, "the pool must be consulted each iteration")
+        assertEquals(3.0, objective.evaluate(sample), "the pooled optimum is adopted as the incumbent")
+    }
+
+    @Test
     fun `alns CP repair with a gated shared clause pool stays sound and optimal`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
