@@ -1,6 +1,7 @@
 package com.eignex.klause.formats
 
 import com.eignex.klause.factor.table.Mdd
+import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.util.LongArrayList
 
 /** The sequence-independent layered structure of a plain (non-cost) [Mdd]: per-layer state counts, the
@@ -17,6 +18,12 @@ internal class LayeredMddData(
     /** Number of sequence positions the diagram accepts (`numStatesPerLayer.size - 1`). */
     val nLayers: Int get() = numStatesPerLayer.size - 1
 
+    // The transition index depends only on the shared structure, so a `<group>`'s diagrams build it once
+    // between them rather than one copy per factor — decisive when a group holds hundreds of wide MDDs.
+    private val sharedIndex by lazy(LazyThreadSafetyMode.NONE) {
+        MddTransitionIndex.build(transitions, layerStarts, numStatesPerLayer, recordStride = 3)
+    }
+
     fun toMdd(seq: IntArray): Mdd = Mdd(
         seq = seq,
         numStatesPerLayer = numStatesPerLayer,
@@ -25,7 +32,7 @@ internal class LayeredMddData(
         initial = initial,
         accepting = accepting,
         recordStride = 3,
-    )
+    ).also { it.transitionIndex = sharedIndex }
 }
 
 /**

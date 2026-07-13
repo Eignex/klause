@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.table.internals.MddIncrementalState
+import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -17,6 +18,7 @@ internal class MddPropagator(
     private val accepting: IntArray,
     private val recordStride: Int,
     private val cost: Int,
+    private val transitionIndex: MddTransitionIndex? = null,
 ) : Propagator {
 
     /** Advisor subscription (#623): the layered reachability sweep reads each sequence variable's
@@ -35,6 +37,7 @@ internal class MddPropagator(
         val inc = (state.refPayload[factorId] as? MddIncrementalState) ?: run {
             val fresh = MddIncrementalState(
                 state, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
+                transitionIndex,
             )
             state.refPayload[factorId] = fresh
             fresh
