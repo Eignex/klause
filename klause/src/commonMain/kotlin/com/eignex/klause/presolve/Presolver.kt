@@ -270,6 +270,18 @@ enum class PresolvePass(
             Presolve.strengthenCoefficients(problem, ctx.cancellation)
     },
 
+    /** Per-variable modular (Diophantine) bound tightening for integer equalities: `Σ aᵢxᵢ = b` confines
+     *  each `xⱼ` to a residue class mod `gcd(aᵢ : i ≠ j)`, moving its bounds inward. Solution-set exact. */
+    REDUCE_DIOPHANTINE(
+        "diophantine",
+        Stage.PROBLEM,
+        PresolveTiming.FAST,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceDiophantine(problem)
+    },
+
     /** One-shot GF(2) elimination over all xor factors: emit implied root unit clauses. */
     DERIVE_XOR_UNITS(
         "xor-units",
