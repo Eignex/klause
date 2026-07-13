@@ -83,19 +83,35 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
         // int branch may only *narrow* the domain (still size > 1 after), so the picked int var
         // is restored — onUnassign fires on widening, not narrowing, and would otherwise never
         // re-offer a still-free int var, making pick return null with variables undetermined.
-        while (h.size > 0) {
-            val id = h.extractMax()
-            if (id < numBoolCached) {
-                if (session.boolValue(id) == null) return VarRef.Bool(id)
-            } else {
-                val intId = id - numBoolCached
-                if (session.intDomain(intId).size > 1) {
-                    h.restore(id)
-                    return VarRef.IntVar(intId)
+        while (true) {
+            while (h.size > 0) {
+                val id = h.extractMax()
+                if (id < numBoolCached) {
+                    if (session.boolValue(id) == null) return VarRef.Bool(id)
+                } else {
+                    val intId = id - numBoolCached
+                    if (session.intDomain(intId).size > 1) {
+                        h.restore(id)
+                        return VarRef.IntVar(intId)
+                    }
                 }
             }
+            // The pop-on-pick scheme (a var leaves the heap when it surfaces assigned, re-added by
+            // [onUnassign] on backtrack) can strand an open variable out of the heap if a re-add is
+            // missed across a restart/backtrack. Reporting `null` then would tell the engine "all
+            // assigned" and let it commit an incomplete assignment as a solution. Before that, rescan
+            // the live domains and re-offer every still-open variable; retry so the max-activity one
+            // wins. Runs only when the heap empties (a candidate leaf), so the O(log n) fast path is
+            // untouched — `null` now provably means every variable is determined.
+            var refilled = false
+            for (v in 0 until numBoolCached) if (session.boolValue(v) == null && !h.contains(v)) {
+                h.restore(v); refilled = true
+            }
+            for (v in 0 until numIntCached) if (session.intDomain(v).size > 1 && !h.contains(numBoolCached + v)) {
+                h.restore(numBoolCached + v); refilled = true
+            }
+            if (!refilled) return null
         }
-        return null
     }
 
     override fun onUnassign(varRef: VarRef) {
