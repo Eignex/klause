@@ -24,7 +24,12 @@ internal object SmtLibMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
             val config = KlauseConfig.current
-            val parsed = SmtLibQfLia.parse(readTextFile(path), config.unboundedIntLo, config.unboundedIntHi)
+            val parsed = SmtLibQfLia.parse(
+                readTextFile(path),
+                config.unboundedIntLo,
+                config.unboundedIntHi,
+                smtSearchBound = config.smtUnboundedSearchBound,
+            )
             domainsClamped = parsed.domainsClamped
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +

@@ -22,6 +22,13 @@ internal class LpRowPremises(val vars: IntArray, val isUpper: BooleanArray, val 
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
 internal enum class Sense { MINIMIZE, MAXIMIZE }
 
+/** The CPU simplex's private, finite stand-in for an unbounded variable bound (`±∞`). Large enough to
+ *  behave as infinity for any realistic model, yet small enough (`Long.MAX / 4`) to leave headroom for
+ *  the exact `subExact`/`mulExact` shift arithmetic in [LpBuilder.build]. A variable that can only be
+ *  optimized *to* this frontier is genuinely unbounded, which [safeVariableBound] reports as null —
+ *  callers express real infinity via [LpBuilder.addFreeVar] and never see this magnitude. */
+internal const val LP_UNBOUNDED_PROBE: Long = Long.MAX_VALUE / 4
+
 /**
  * A bounded-variable LP in the normalized form the revised simplex consumes. All input coefficients,
  * bounds and right-hand sides are integers — this is the "integer based" core: it exploits that every
@@ -98,6 +105,13 @@ internal class LpModel(
      * Defaults to the post-shift [rhs] for models that never rebind.
      */
     val flippedRhs: LongArray = rhs,
+    /** Structural columns whose lower bound is the [LP_UNBOUNDED_PROBE] stand-in for `−∞` rather than a
+     *  real bound (length `n`, all false for ordinary [LpBuilder.addVar] columns). The reject-at-cap
+     *  logic in [safeVariableBound] consults this so an optimum riding to the probe frontier is reported
+     *  unbounded rather than as a spurious finite bound. */
+    val probeClampedLo: BooleanArray = BooleanArray(n),
+    /** Counterpart to [probeClampedLo] for the upper bound (`+∞` stand-in). */
+    val probeClampedHi: BooleanArray = BooleanArray(n),
 ) {
     /** Total variable count: structural plus slack. */
     val numVars: Int get() = n + m
@@ -126,6 +140,7 @@ internal class LpModel(
             upper = newUpper, hasUpper = hasUpper, loShift = lo.copyOf(),
             objConstant = newObjConstant, sense = sense, tag = tag,
             rowGlobal = rowGlobal, rowPremises = rowPremises, flippedRhs = flippedRhs,
+            probeClampedLo = probeClampedLo, probeClampedHi = probeClampedHi,
         )
     }
 
@@ -166,6 +181,11 @@ internal class LpBuilder {
     private val cost = LongArrayList()
     private val tags = IntArrayList()
 
+    // Structural columns whose lower/upper bound is the finite [LP_UNBOUNDED_PROBE] stand-in for ±∞
+    // ([addFreeVar]); surfaced on the built model as probeClampedLo/Hi. Empty in the common case.
+    private val clampedLoCols = HashSet<Int>()
+    private val clampedHiCols = HashSet<Int>()
+
     // A row's coefficients as parallel primitive arrays (column index, value); no boxed map.
     private class RawRow(
         val cols: IntArray,
@@ -197,6 +217,21 @@ internal class LpBuilder {
         this.cost.add(cost)
         tags.add(tag)
         return lo.size - 1
+    }
+
+    /**
+     * Add a structural variable that may be unbounded on either side: a null [lower]/[upper] means `−∞`
+     * / `+∞`. The engine realizes each open side with the finite [LP_UNBOUNDED_PROBE] stand-in (so the
+     * lower-shift normalization and the bounded-variable simplex are unchanged — a single ordinary
+     * column, no free-variable ray) and flags it, so [safeVariableBound] can reject an optimum that only
+     * reaches the probe frontier as truly unbounded. Callers thus express genuine `±∞`; the magnitude
+     * stays private to this package.
+     */
+    fun addFreeVar(lower: Long?, upper: Long?, cost: Long = 0L, tag: Int = -1): Int {
+        val j = addVar(lower ?: -LP_UNBOUNDED_PROBE, upper ?: LP_UNBOUNDED_PROBE, cost, tag)
+        if (lower == null) clampedLoCols.add(j)
+        if (upper == null) clampedHiCols.add(j)
+        return j
     }
 
     /**
@@ -293,6 +328,8 @@ internal class LpBuilder {
             rowGlobal = BooleanArray(m) { rows[it].global },
             rowPremises = Array(m) { rows[it].premises },
             flippedRhs = flippedRhs,
+            probeClampedLo = BooleanArray(n) { it in clampedLoCols },
+            probeClampedHi = BooleanArray(n) { it in clampedHiCols },
         )
     }
 

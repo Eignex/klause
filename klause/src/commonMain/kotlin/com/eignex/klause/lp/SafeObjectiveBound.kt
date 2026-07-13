@@ -1,6 +1,8 @@
 package com.eignex.klause.lp
 
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Neumaier–Shcherbina safe lower bound on the minimized objective `cᵀz` from an *approximate* dual
@@ -71,3 +73,25 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
 
 /** Conservative per-operation relative rounding bound (`> 2⁻⁵³` unit roundoff), with margin. */
 private const val EPS = 2.4e-16
+
+/**
+ * A sound finite bound on structural column [objectiveCol]'s optimum — its **max** when [maximize],
+ * else its **min** — from an already-solved primal [result], or null when the variable is genuinely
+ * unbounded in that direction. The model's objective must be that single column with cost `±1` and no
+ * constant (max is set up as minimizing `−x`). Rigorous under float error via [safeObjectiveLowerBound],
+ * then floored (max) / ceiled (min) to an integer. **Reject-at-cap:** an optimum that only rode the
+ * column to its [LP_UNBOUNDED_PROBE] frontier — the private stand-in for `±∞` on a [LpBuilder.addFreeVar]
+ * side — is reported unbounded (null), never as a spurious bound at the probe magnitude.
+ */
+internal fun LpModel.safeVariableBound(result: FloatLpResult, objectiveCol: Int, maximize: Boolean): Long? {
+    val objMin = safeObjectiveLowerBound(this, result.duals) ?: return null
+    // cost is −1 on the column for a maximization (we minimize −x), +1 for a minimization.
+    val bound = if (maximize) floor(-objMin) else ceil(objMin)
+    if (!bound.isFinite() || bound < Long.MIN_VALUE.toDouble() || bound > Long.MAX_VALUE.toDouble()) return null
+    val clampedThatSide = if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
+    // Reject well below the exact cap: a bound this large is "at the frontier" and means unbounded (a
+    // real bound worth keeping is tiny next to the probe, which is ~Long.MAX/4).
+    val frontier = (LP_UNBOUNDED_PROBE - LP_UNBOUNDED_PROBE / 4).toDouble()
+    if (clampedThatSide && abs(bound) >= frontier) return null
+    return bound.toLong()
+}

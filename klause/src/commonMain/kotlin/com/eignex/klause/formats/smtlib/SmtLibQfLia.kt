@@ -1,12 +1,12 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.config.DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
@@ -47,21 +47,26 @@ object SmtLibQfLia {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
+        smtSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
     ): SmtLibProblem {
-        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds)
+        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, smtSearchBound)
         for (cmd in SExprReader(text).readAll()) b.command(cmd)
         return b.build()
     }
 
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
      *  `internal fun SmtLibQfLia.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
-    internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
-        CnfLowering {
+    internal class Builder(
+        val unboundedIntLo: Long,
+        val unboundedIntHi: Long,
+        val strictBounds: Boolean,
+        val smtSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
+    ) : CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
         internal var nextBool = 0
         internal var nextInt = 0
-        internal val intDomains = ArrayList<IntDomain>()
+        internal val intDomains = ArrayList<PresolveDomain>()
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
         private var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
@@ -125,11 +130,18 @@ object SmtLibQfLia {
 
         override fun newBool(): Int = nextBool++
         internal fun newInt(): Int {
-            intDomains.add(IntDomain(unboundedIntLo, unboundedIntHi))
+            // An unbounded declaration is Open on whichever side the caller left at the `Long.MIN/MAX`
+            // marker; bound inference then closes it (or leaves it open for OBBT).
+            intDomains.add(
+                openOrFinite(
+                    if (unboundedIntLo == Long.MIN_VALUE) null else unboundedIntLo,
+                    if (unboundedIntHi == Long.MAX_VALUE) null else unboundedIntHi,
+                ),
+            )
             return nextInt++
         }
-        internal fun newInt(lo: Long, hi: Long): Int {
-            intDomains.add(IntDomain(lo, hi))
+        internal fun newInt(lo: Long?, hi: Long?): Int {
+            intDomains.add(openOrFinite(lo, hi))
             return nextInt++
         }
 
@@ -175,11 +187,17 @@ object SmtLibQfLia {
             for (a in asserts) assert(a)
             boundUnboundedVars()
             val objective = objectiveSpec?.let { (t, neg) -> linearObjective(t, neg) }
+            // The single search seam: every domain must be Finite by now (boundUnboundedVars closes
+            // every Open one). An Open here would be a bug, but the sealed type kept it from flowing
+            // anywhere a searchable IntDomain was expected, so this cast is the only place it can surface.
+            val domains = Array(intDomains.size) { i ->
+                (intDomains[i] as? PresolveDomain.Finite)?.domain ?: error("open domain reached search")
+            }
             return SmtLibProblem(
                 Problem(
                     numBoolVars = nextBool,
                     numIntVars = nextInt,
-                    intDomains = intDomains.toTypedArray(),
+                    intDomains = domains,
                     factors = factors.toTypedArray(),
                 ),
                 objective,

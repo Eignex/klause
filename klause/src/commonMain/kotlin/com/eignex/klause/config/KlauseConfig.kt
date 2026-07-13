@@ -14,12 +14,16 @@ const val DEFAULT_UNBOUNDED_INT_LO: Long = Long.MIN_VALUE
 /** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */
 const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
 
-/** Magnitude of the *searchable* fallback range an unbounded variable is clamped to when a finite bound
- *  cannot be derived (front-ends without OBBT, or a variable OBBT leaves unbounded): the finite search
- *  still finds a witness within `±[SEARCHABLE_UNBOUNDED_CLAMP]`, while the clamp is flagged so an `unsat`
- *  over the box is reported as `unknown` rather than a false `unsat`. Set to MiniZinc's own default for
- *  an unbounded `var int` (`±10^6`), so a flattened model sees the same implicit range. */
-const val SEARCHABLE_UNBOUNDED_CLAMP: Long = 1_000_000
+/** MiniZinc's own default range for an unbounded `var int` (`±10^6`). This is a *semantic* default: a
+ *  MiniZinc `var int` with no declared bounds genuinely **is** this range, so the FlatZinc front-end
+ *  adopts it and an `unsat` within it is a sound `unsat`. Distinct from [KlauseConfig.smtUnboundedSearchBound],
+ *  which is a finite search window over a *truly* infinite SMT-LIB domain (and downgrades `unsat` to
+ *  `unknown`). */
+const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
+
+/** Default magnitude of the *searchable* window a genuinely unbounded SMT-LIB integer is clamped to once
+ *  OBBT fails to derive a real bound (see [KlauseConfig.smtUnboundedSearchBound]). */
+const val DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND: Long = 1_000_000
 
 /** Default number of uniformly-spaced buckets a `floatVar` is discretised into. 10-bit
  *  precision is enough for typical config-style fractions; raise it for finer granularity. */
@@ -93,6 +97,13 @@ data class KlauseConfig(
 
     /** Upper bound counterpart to [unboundedIntLo]. */
     val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+
+    /** Magnitude of the finite *searchable* window a genuinely unbounded SMT-LIB integer is clamped to
+     *  when OBBT cannot derive a real bound: search still finds a witness within `±this`, but the clamp
+     *  is flagged so an `unsat` over the window becomes `unknown` (never a false `unsat`). Unlike
+     *  [MINIZINC_UNBOUNDED_DEFAULT] this approximates an infinite domain rather than being a real bound;
+     *  widen it (env `KLAUSE_SMT_UNBOUNDED_SEARCH_BOUND`) to trade search cost for SAT reach. */
+    val smtUnboundedSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
 
     /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
      *  count is given. Higher = finer precision, more bits per float var. */
