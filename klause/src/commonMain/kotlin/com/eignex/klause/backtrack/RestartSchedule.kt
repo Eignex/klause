@@ -34,6 +34,10 @@ internal interface RestartSchedule {
     /** Consume a restart once the caller has popped to root — advance the schedule state. */
     fun onRestart() {}
 
+    /** Notify the schedule that a feasible solution was found (the first one, and each improving one on
+     *  the optimize path). Lets a schedule change regime once the search has something to hold onto. */
+    fun onSolution() {}
+
     /** The phase regime the schedule wants the engine's [PhaseSaving] to run right now. [UNMANAGED]
      *  (the default) leaves phasing to its own rephase rotation; a schedule that alternates a proving
      *  and a diving regime returns [STABLE] / [FOCUSED] to couple the polarity source to the mode. */
@@ -47,15 +51,21 @@ internal interface RestartSchedule {
         /** Luby decision base for the stable stage of the default cycle. */
         const val STABLE_LUBY_BASE: Long = 100L
 
-        /** The default restart cycle: a Luby stable stage that dives on the best phase, an EMA/LBD-adaptive
-         *  focused stage, and a decision-level-adaptive focused stage. */
-        private fun defaultModeSwitching(): ModeSwitchingRestartSchedule = ModeSwitchingRestartSchedule(
-            stages = listOf(
-                RestartStage(LubyRestartSchedule(STABLE_LUBY_BASE), PhaseMode.STABLE),
-                RestartStage(EmaRestartSchedule(), PhaseMode.FOCUSED),
-                RestartStage(DlRestartSchedule(), PhaseMode.FOCUSED),
+        /** The default restart policy: dive without restarting until a first feasible solution
+         *  ([DiveUntilFeasibleRestartSchedule]), then run a cycling portfolio — a Luby stable stage that
+         *  dives on the best phase, an EMA/LBD-adaptive focused stage, and a decision-level-adaptive
+         *  focused stage. Restart-heavy search starves first-feasible on deep instances (it caps the
+         *  search depth below where a solution lives); once an incumbent exists, restarts help improve
+         *  and prove it. */
+        private fun defaultModeSwitching(): RestartSchedule = DiveUntilFeasibleRestartSchedule(
+            ModeSwitchingRestartSchedule(
+                stages = listOf(
+                    RestartStage(LubyRestartSchedule(STABLE_LUBY_BASE), PhaseMode.STABLE),
+                    RestartStage(EmaRestartSchedule(), PhaseMode.FOCUSED),
+                    RestartStage(DlRestartSchedule(), PhaseMode.FOCUSED),
+                ),
+                switchBase = DEFAULT_MODE_BASE,
             ),
-            switchBase = DEFAULT_MODE_BASE,
         )
 
         /** The schedule selected by [params], in precedence order: mode-switching when
@@ -75,6 +85,44 @@ internal interface RestartSchedule {
 /** A single unbounded run: never restarts. The default when no schedule is configured. */
 internal object NoRestartSchedule : RestartSchedule {
     override fun shouldRestart(decisionsThisRun: Long): Boolean = false
+}
+
+/**
+ * Feasibility-first gate: dives without restarting until the first feasible solution is seen, then hands
+ * every decision over to [inner]. Restart-heavy schedules starve first-feasible on deep instances — they
+ * cap the search depth below the depth a solution lives at — but a first solution only needs one
+ * sustained dive, and once an incumbent exists restarts help improve and prove it. Reports
+ * [PhaseMode.STABLE] while diving so the engine dives on the target phase, and forwards later solutions
+ * to [inner]. Diving without restarts stays complete (conflict learning still runs), so an infeasible
+ * problem is still decided, just without restart diversification until a solution appears.
+ */
+internal class DiveUntilFeasibleRestartSchedule(private val inner: RestartSchedule) : RestartSchedule {
+    private var engaged = false
+
+    override fun beginRun() {
+        if (engaged) inner.beginRun()
+    }
+
+    override fun recordConflict(lbd: Int, trailSize: Int) {
+        if (engaged) inner.recordConflict(lbd, trailSize)
+    }
+
+    override fun shouldRestart(decisionsThisRun: Long): Boolean = engaged && inner.shouldRestart(decisionsThisRun)
+
+    override fun onRestart() {
+        if (engaged) inner.onRestart()
+    }
+
+    override fun onSolution() {
+        if (engaged) {
+            inner.onSolution()
+        } else {
+            engaged = true
+            inner.beginRun()
+        }
+    }
+
+    override fun phaseMode(): PhaseMode = if (engaged) inner.phaseMode() else PhaseMode.STABLE
 }
 
 /**

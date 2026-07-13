@@ -249,6 +249,7 @@ internal class DfsEngine<L>(
             params.variableSelector.onSolution(snap)
             params.valueSelector.onSolution(snap)
             phase.onSolution(snap)
+            restart.onSolution()
             pendingBlock = snap
             descend = false
             return policy.onLeaf(snap)?.let { EngineEvent.Solution(it) }
