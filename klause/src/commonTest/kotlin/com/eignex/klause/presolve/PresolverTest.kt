@@ -38,6 +38,7 @@ class PresolverTest {
         val ctx = PresolveContext.EMPTY
         val autoProblem = listOf(
             PresolvePass.STRENGTHEN_COEFFICIENTS,
+            PresolvePass.REDUCE_DIOPHANTINE,
             PresolvePass.DERIVE_XOR_UNITS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
             PresolvePass.REMOVE_REDUNDANT,
@@ -151,6 +152,7 @@ class PresolverTest {
         assertEquals(
             listOf(
                 PresolvePass.STRENGTHEN_COEFFICIENTS,
+                PresolvePass.REDUCE_DIOPHANTINE,
                 PresolvePass.DERIVE_XOR_UNITS,
                 PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
                 PresolvePass.REMOVE_REDUNDANT,

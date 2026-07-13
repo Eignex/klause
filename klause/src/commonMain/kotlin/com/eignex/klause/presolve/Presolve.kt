@@ -20,6 +20,10 @@ object Presolve {
     /** One-shot GF(2) elimination over all xor factors. See [XorUnits]. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
 
+    /** Per-variable modular (Diophantine) domain tightening for integer equalities. See
+     *  [DiophantineReduction]. */
+    fun reduceDiophantine(problem: Problem): PassDelta = DiophantineReduction.reduce(problem)
+
     /** Affine variable elimination. See [AffineSingletons]. [incrementalTouchedVars] (from the incremental
      *  round engine) restricts a re-run's candidate scan to the variables the delta changed. */
     fun eliminateAffineSingletons(
