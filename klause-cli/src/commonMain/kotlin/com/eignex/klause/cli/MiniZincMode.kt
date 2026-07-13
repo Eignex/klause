@@ -24,8 +24,8 @@ internal object MiniZincMode : CliMode {
 
     private class Session : ModeSession {
         private var oznPath: String? = null
-        private var unboundedIntLo: Int? = null
-        private var unboundedIntHi: Int? = null
+        private var unboundedIntLo: Long? = null
+        private var unboundedIntHi: Long? = null
         private var outputObjective = false
 
         override fun flags(): List<FlagSpec> = listOf(
@@ -37,8 +37,8 @@ internal object MiniZincMode : CliMode {
                 help = "MiniZinc output model (.ozn) for solution reconstruction",
             ) { oznPath = it },
             // Advanced unbounded-`var int` range knobs (also env-configurable); hidden from --help.
-            FlagSpec(listOf("--unbounded-int-lo"), true) { unboundedIntLo = requireNotNull(it).toInt() },
-            FlagSpec(listOf("--unbounded-int-hi"), true) { unboundedIntHi = requireNotNull(it).toInt() },
+            FlagSpec(listOf("--unbounded-int-lo"), true) { unboundedIntLo = requireNotNull(it).toLong() },
+            FlagSpec(listOf("--unbounded-int-hi"), true) { unboundedIntHi = requireNotNull(it).toLong() },
             // Like `minizinc --output-objective`: append `_objective = <value>;` to each solution
             // so a parser reading the raw solution stream can recover the optimised objective even
             // when the objective var is not in the model's `output` section. Off by default — the

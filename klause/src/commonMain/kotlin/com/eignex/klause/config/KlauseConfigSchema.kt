@@ -120,10 +120,10 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
     val pinAbsentOptVars by bool(KlauseConfig.DEFAULT.pinAbsentOptVars) { c, v -> c.copy(pinAbsentOptVars = v) }
 
     /** Override for [KlauseConfig.unboundedIntLo]. */
-    val unboundedIntLo by int(KlauseConfig.DEFAULT.unboundedIntLo) { c, v -> c.copy(unboundedIntLo = v) }
+    val unboundedIntLo by long(KlauseConfig.DEFAULT.unboundedIntLo) { c, v -> c.copy(unboundedIntLo = v) }
 
     /** Override for [KlauseConfig.unboundedIntHi]. */
-    val unboundedIntHi by int(KlauseConfig.DEFAULT.unboundedIntHi) { c, v -> c.copy(unboundedIntHi = v) }
+    val unboundedIntHi by long(KlauseConfig.DEFAULT.unboundedIntHi) { c, v -> c.copy(unboundedIntHi = v) }
 
     /** Override for [KlauseConfig.floatBuckets]. */
     val floatBuckets by int(KlauseConfig.DEFAULT.floatBuckets) { c, v -> c.copy(floatBuckets = v) }

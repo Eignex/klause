@@ -4,13 +4,22 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 
-/** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries
- *  with no explicit range). Wide enough to absorb typical CP arithmetic without overflow in
- *  factor coefficient × value products; matches the convention used by Gecode / Chuffed. */
-const val DEFAULT_UNBOUNDED_INT_LO: Int = -10_000_000
+/** Default lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries with no
+ *  explicit range, SMT-LIB integers with no provable bound): the full `Long` floor, so the finite
+ *  model can represent any 64-bit integer value without an artificial clamp clipping a legitimate
+ *  one. Callers that do span/coefficient arithmetic on domain bounds must stay overflow-safe (e.g.
+ *  [com.eignex.klause.solver.intdomain.ContiguousDomain] saturates its size). */
+const val DEFAULT_UNBOUNDED_INT_LO: Long = Long.MIN_VALUE
 
 /** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */
-const val DEFAULT_UNBOUNDED_INT_HI: Int = 10_000_000
+const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
+
+/** Magnitude of the *searchable* fallback range an unbounded variable is clamped to when a finite bound
+ *  cannot be derived (front-ends without OBBT, or a variable OBBT leaves unbounded): the finite search
+ *  still finds a witness within `±[SEARCHABLE_UNBOUNDED_CLAMP]`, while the clamp is flagged so an `unsat`
+ *  over the box is reported as `unknown` rather than a false `unsat`. Set to MiniZinc's own default for
+ *  an unbounded `var int` (`±10^6`), so a flattened model sees the same implicit range. */
+const val SEARCHABLE_UNBOUNDED_CLAMP: Long = 1_000_000
 
 /** Default number of uniformly-spaced buckets a `floatVar` is discretised into. 10-bit
  *  precision is enough for typical config-style fractions; raise it for finer granularity. */
@@ -79,11 +88,11 @@ data class KlauseConfig(
     val pinAbsentOptVars: Boolean = true,
 
     /** Lower bound assigned to unbounded `var int` declarations (FlatZinc auxiliaries with no
-     *  explicit range). */
-    val unboundedIntLo: Int = DEFAULT_UNBOUNDED_INT_LO,
+     *  explicit range). Effectively-infinite `Long` sentinel; see [DEFAULT_UNBOUNDED_INT_LO]. */
+    val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
 
     /** Upper bound counterpart to [unboundedIntLo]. */
-    val unboundedIntHi: Int = DEFAULT_UNBOUNDED_INT_HI,
+    val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
 
     /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
      *  count is given. Higher = finer precision, more bits per float var. */
