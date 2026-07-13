@@ -1,6 +1,7 @@
 package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
@@ -134,6 +135,12 @@ internal class Alns(
             // inner solver draw its own per-call seed.
             randomSeed = null,
         )
+        // Persistent CP-repair handle (#644): one session + LP reused across fragments, re-seeded per
+        // neighbourhood, so learned clauses and the LP warm start carry between repairs. Only when a
+        // backtrack engine is supplied; closed at the end of the run.
+        val repairSearch = (backtrack as? BacktrackSolver)?.let { bt ->
+            backtrackParams?.let { bp -> bt.openRepair(objective, bp) }
+        }
 
         var iter = 0
         while (iter < maxIterations) {
@@ -153,6 +160,7 @@ internal class Alns(
             val context = RepairContext(
                 inner, perIterParams, objective, pinAssumptions, incumbent, freed, rng, session,
                 backtrack = backtrack, backtrackParams = backtrackParams,
+                repairSearch = repairSearch, bestObjective = bestObj,
             )
             val repaired = repairOperators[repairIdx].repair(context)
             if (repaired == null) {
@@ -194,6 +202,7 @@ internal class Alns(
             }
             iter++
         }
+        repairSearch?.close()
         // ALNS is incomplete — every successful run returns BestFound, never Optimal.
         return MinimizeResult.BestFound(
             sample = bestSample,

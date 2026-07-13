@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -119,8 +120,9 @@ internal class DfsEngine<L>(
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are
     // assumptions, levels > numSeed are post-seed DFS decisions.
-    private val numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
-    private val touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
+    // var: a repair driver [reseed]s the engine on successive pin sets (LNS), each a fresh seed.
+    private var numSeed = params.assumptions.boolKeys.size + params.assumptions.intKeys.size
+    private var touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
 
     private val phase = PhaseSaving(problem.numBoolVars, problem.numIntVars, params)
     private val onConflictTick: () -> Unit = phase::onConflictTick
@@ -187,9 +189,44 @@ internal class DfsEngine<L>(
         }
     }
 
+    /**
+     * Re-drive this engine on a new [assumptions] set with a fresh [decisionBudget], reusing the
+     * persistent [session] (its learned-clause database and baked root domains), the [PhaseSaving] warm
+     * start, and the heuristics — the seam the LNS destroy/repair loop uses to solve one pinned fragment
+     * after another without rebuilding the session or its LP relaxation. Resets the per-run search state
+     * to root; everything the session holds survives.
+     *
+     * Soundness requirement on the caller: drive successive repairs against a **monotone non-increasing**
+     * objective cutoff. The reused session keeps the permanent objective-bound clauses across reseeds, so
+     * a monotone cutoff makes every stale bound only looser than the current one — it can never wrongly
+     * prune. (Blocking nogoods likewise only forbid already-surfaced assignments.)
+     */
+    fun reseed(assumptions: Assumptions, decisionBudget: Long) {
+        trail.clear()
+        pendingBlock = null
+        descend = true
+        decisionsThisRun = 0
+        runActive = false
+        started = false
+        restartCount = 0
+        decisionsLeft = decisionBudget
+        vivifyCursor = 0
+        rootExhausted = null
+        numSeed = assumptions.boolKeys.size + assumptions.intKeys.size
+        touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
+        val seedResult = session.seed(assumptions)
+        if (seedResult is PropagationResult.Unsat) {
+            recordTouchedSeedLevels(seedResult.conflictLevels)
+            rootExhausted =
+                EngineEvent.Exhausted(solver.coreOf(seedResult), solver.touchedToArray(touchedSeedLevels))
+        } else {
+            params.clauseExchange?.onSearchStart(session)
+        }
+    }
+
     private fun recordTouchedSeedLevels(levels: IntArray) {
-        if (touchedSeedLevels == null) return
-        for (l in levels) if (l in 1..numSeed) touchedSeedLevels.add(l)
+        val touched = touchedSeedLevels ?: return
+        for (l in levels) if (l in 1..numSeed) touched.add(l)
     }
 
     private fun exhausted(): EngineEvent.Exhausted =

@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Optimizer
+import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
@@ -55,6 +56,12 @@ internal data class RepairContext(
     val session: LocalSearchSession? = null,
     val backtrack: Optimizer<BacktrackParams>? = null,
     val backtrackParams: BacktrackParams? = null,
+    /** A persistent repair handle reusing one session + LP across fragments (#644); when present,
+     *  [BacktrackRepair] uses it instead of a fresh solve per repair. */
+    val repairSearch: RepairSearch? = null,
+    /** The monotone (non-increasing) best-so-far objective — the cutoff [BacktrackRepair] prunes the
+     *  fragment against when using [repairSearch] (the reused session needs a monotone cutoff). */
+    val bestObjective: Double = Double.POSITIVE_INFINITY,
 )
 
 /**
@@ -89,6 +96,10 @@ internal class InnerLsRepair(val label: String = "standard", val flipsOverride: 
  */
 internal class BacktrackRepair(val label: String = "standard", val maxDecisions: Long = 2_000L) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
+        // Persistent path (#644): reuse one session + LP across fragments, pruning against the monotone
+        // best-so-far cutoff (the reused session's accumulated objective bounds stay monotone-tightening).
+        context.repairSearch?.let { return it.repair(context.pinAssumptions, maxDecisions, context.bestObjective) }
+        // Fallback: a fresh bounded solve per repair, pruning against this iteration's incumbent.
         val engine = context.backtrack ?: return null
         val base = context.backtrackParams ?: return null
         val incumbentObjective = context.objective.evaluate(context.incumbent)

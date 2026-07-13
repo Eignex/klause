@@ -62,3 +62,21 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
      *  token. */
     fun resumable(objective: LinearObjective, params: P): ResumableSearch
 }
+
+/**
+ * A reusable handle for solving a sequence of pinned sub-problems on one persistent search — the LNS
+ * destroy/repair loop (#644). Each [repair] re-seeds the same session and LP relaxation on a new
+ * assumption set instead of rebuilding, so the learned-clause database and LP warm start carry across
+ * fragments. Single-threaded and stateful; obtain one from a backtrack solver.
+ */
+internal interface RepairSearch : AutoCloseable {
+    /**
+     * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
+     * [cutoff]. The caller MUST keep [cutoff] monotone non-increasing across calls — the reused session
+     * retains permanent objective-bound clauses, so a monotone cutoff keeps every stale bound looser than
+     * the current one (never a wrong prune). Returns the best strictly-better completion found, or null.
+     */
+    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double): Sample?
+
+    override fun close() {}
+}

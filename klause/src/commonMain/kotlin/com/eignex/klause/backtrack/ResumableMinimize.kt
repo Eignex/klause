@@ -14,6 +14,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ResumableSearch
@@ -144,6 +145,21 @@ internal class ResumableMinimize(
 
     override fun close() {
         runCatching { sink.stop() }
+    }
+
+    /**
+     * Re-drive this search on a new [assumptions] set with a fresh [decisionBudget] (#644 LNS repair):
+     * [DfsEngine.reseed]s the persistent session and resets the fragment incumbent, while the LP
+     * relaxation warm start and the session's learned-clause database survive. The caller must drive
+     * successive repairs against a monotone non-increasing objective cutoff (see [DfsEngine.reseed]).
+     */
+    fun rebind(assumptions: Assumptions, decisionBudget: Long) {
+        engine.reseed(assumptions, decisionBudget)
+        best = null
+        bestObj = Double.POSITIVE_INFINITY
+        objVarBest = null
+        lastObjBoundAsserted = null
+        done = null
     }
 
     /** Advance the search to the next reportable event, mapping the engine's [EngineEvent] to a
