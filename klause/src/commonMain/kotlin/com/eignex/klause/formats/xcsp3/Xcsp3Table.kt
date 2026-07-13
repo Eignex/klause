@@ -8,6 +8,8 @@ import com.eignex.klause.formats.trueLit
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableIntIntMap
 
 // `<extension>` (positive/negative table) lowering for the XCSP3 front-end — split out of Xcsp3.kt.
 //
@@ -56,15 +58,50 @@ internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRow
     val arity = vars.size
     val doms = vars.map { domainValues(it) }
     val nRows = rows.lo.size / arity
-    // Ground forbidden rows go in a set for O(1) lookup; rows with a `*`/range cell are scanned.
-    val forbiddenPoints = HashSet<List<Int>>()
+
+    // A tuple of per-column domain indices encodes to a single mixed-radix [Long] in `[0, product)`,
+    // where the domain product is bounded (this path is only taken when it fits [negTableCap]). So the
+    // ground forbidden rows live in a primitive [LongHashSet] and the enumeration probes it by a code
+    // maintained incrementally down the recursion — no boxed tuple per row nor per enumerated point.
+    val stride = LongArray(arity)
+    var acc = 1L
+    for (c in 0 until arity) {
+        stride[c] = acc
+        acc *= doms[c].size
+    }
+    val valueIndex = Array(arity) { c ->
+        val m = MutableIntIntMap(doms[c].size)
+        for (idx in doms[c].indices) m.put(doms[c][idx], idx)
+        m
+    }
+
+    // Ground forbidden rows go in the code set; rows with a `*`/range cell are scanned per combination.
+    // A ground row carrying a value outside its column's domain matches no combination, so it is dropped.
+    val forbiddenPoints = LongHashSet()
     val intervalRows = ArrayList<Int>()
     for (r in 0 until nRows) {
         val point = (0 until arity).all { rows.lo[r * arity + it] == rows.hi[r * arity + it] }
-        if (point) forbiddenPoints.add(List(arity) { rows.lo[r * arity + it].toInt() }) else intervalRows.add(r)
+        if (!point) {
+            intervalRows.add(r)
+            continue
+        }
+        var code = 0L
+        var inDomain = true
+        for (c in 0 until arity) {
+            val idx = valueIndex[c].getOrDefault(rows.lo[r * arity + c].toInt(), -1)
+            if (idx < 0) {
+                inDomain = false
+                break
+            }
+            code += idx * stride[c]
+        }
+        if (inDomain) forbiddenPoints.add(code)
     }
-    fun forbidden(combo: List<Int>): Boolean {
-        if (combo in forbiddenPoints) return true
+
+    val allowed = LongArrayList()
+    var count = 0
+    val combo = IntArray(arity)
+    fun matchesInterval(): Boolean {
         for (r in intervalRows) {
             if ((0 until arity).all { combo[it].toLong() in rows.lo[r * arity + it]..rows.hi[r * arity + it] }) {
                 return true
@@ -72,23 +109,22 @@ internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRow
         }
         return false
     }
-    val allowed = LongArrayList()
-    var count = 0
-    val combo = IntArray(arity)
-    fun rec(p: Int) {
+    fun rec(p: Int, code: Long) {
         if (p == arity) {
-            if (!forbidden(combo.toList())) {
+            if (code !in forbiddenPoints && !matchesInterval()) {
                 for (c in 0 until arity) allowed.add(combo[c].toLong())
                 count++
             }
             return
         }
-        for (value in doms[p]) {
-            combo[p] = value
-            rec(p + 1)
+        val dom = doms[p]
+        val s = stride[p]
+        for (idx in dom.indices) {
+            combo[p] = dom[idx]
+            rec(p + 1, code + idx * s)
         }
     }
-    rec(0)
+    rec(0, 0L)
     if (count == 0) {
         factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
         return
