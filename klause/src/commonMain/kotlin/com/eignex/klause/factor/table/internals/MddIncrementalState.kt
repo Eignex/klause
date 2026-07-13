@@ -15,7 +15,13 @@ import com.eignex.klause.propagation.RevLongArray
  * only the layers a changed position propagates through; a backtrack restores the layers in O(changed
  * words). The cost variant re-derives the cost-variable bounds from the (current) forward lattice.
  *
- * Soundness gated by MddIncrementalTest enumerate-vs-brute under full CDCL across deep backtracking.
+ * Each layer's transition records are indexed by source state (a per-layer CSR: [fwdHead] offsets into
+ * [fwdPtr]) and by destination state ([bwdHead] into [bwdPtr]). The forward, prune, and cost sweeps then
+ * visit only the outgoing records of forward-reachable sources, and the backward sweep only the incoming
+ * records of co-reachable destinations — O(live out-edges) rather than O(all records per layer). Sparse
+ * diagrams (few reachable states per layer) gain the most; a dense diagram does no less work than before.
+ *
+ * Soundness gated by MddPropagatorTest enumerate-vs-brute under full CDCL across deep backtracking.
  */
 internal class MddIncrementalState(
     state: PropagationState,
@@ -36,8 +42,67 @@ internal class MddIncrementalState(
     private val bwd = RevLongArray(state, (n + 1) * w)
     private val valid = RevInt(state, 0)
 
+    // Per-layer CSR indices over the transition records. `fwdPtr(layer)[fwdHead(layer)[src] until
+    // fwdHead(layer)[src+1]]` are the transition base offsets whose source is `src`; `bwdPtr`/`bwdHead`
+    // group by destination. Records whose src (resp. dst) is out of its layer's state range are dropped —
+    // such a record never matches a set reachability bit, so the sweeps behave identically. Built once.
+    private val fwdHead = Array(n) { IntArray(0) }
+    private val fwdPtr = Array(n) { IntArray(0) }
+    private val bwdHead = Array(n) { IntArray(0) }
+    private val bwdPtr = Array(n) { IntArray(0) }
+
+    init {
+        for (i in 0 until n) {
+            val numI = numStatesPerLayer[i]
+            val numN = numStatesPerLayer[i + 1]
+            val start = layerStarts[i]
+            val end = layerStarts[i + 1]
+            val fHead = IntArray(numI + 1)
+            val bHead = IntArray(numN + 1)
+            var p = start
+            while (p < end) {
+                val src = transitions[p].toInt()
+                val dst = transitions[p + 2].toInt()
+                if (src in 0 until numI) fHead[src + 1]++
+                if (dst in 0 until numN) bHead[dst + 1]++
+                p += recordStride
+            }
+            for (k in 0 until numI) fHead[k + 1] += fHead[k]
+            for (k in 0 until numN) bHead[k + 1] += bHead[k]
+            val fPtr = IntArray(fHead[numI])
+            val bPtr = IntArray(bHead[numN])
+            val fCur = fHead.copyOf()
+            val bCur = bHead.copyOf()
+            p = start
+            while (p < end) {
+                val src = transitions[p].toInt()
+                val dst = transitions[p + 2].toInt()
+                if (src in 0 until numI) fPtr[fCur[src]++] = p
+                if (dst in 0 until numN) bPtr[bCur[dst]++] = p
+                p += recordStride
+            }
+            fwdHead[i] = fHead
+            fwdPtr[i] = fPtr
+            bwdHead[i] = bHead
+            bwdPtr[i] = bPtr
+        }
+    }
+
     private fun testBit(rev: RevLongArray, layer: Int, s: Int): Boolean =
         (rev[layer * w + (s ushr 6)] and (1L shl (s and 63))) != 0L
+
+    /** Invoke [action] for each set bit below [cap] in [rev]'s [layer] words (the live states). */
+    private inline fun forEachState(rev: RevLongArray, layer: Int, cap: Int, action: (Int) -> Unit) {
+        val base = layer * w
+        for (k in 0 until w) {
+            var word = rev[base + k]
+            while (word != 0L) {
+                val s = (k shl 6) + word.countTrailingZeroBits()
+                if (s < cap) action(s)
+                word = word and (word - 1)
+            }
+        }
+    }
 
     private fun layerEmpty(rev: RevLongArray, layer: Int): Boolean {
         val base = layer * w
@@ -61,18 +126,21 @@ internal class MddIncrementalState(
     private fun recomputeForward(state: PropagationState, i: Int, scratch: LongArray): Boolean {
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
-        val numI = numStatesPerLayer[i]
         val numN = numStatesPerLayer[i + 1]
-        var p = layerStarts[i]
-        val end = layerStarts[i + 1]
-        while (p < end) {
-            val src = transitions[p].toInt()
-            val sym = transitions[p + 1]
-            val dst = transitions[p + 2].toInt()
-            if (src in 0 until numI && dst in 0 until numN && sym in d.min..d.max && testBit(fwd, i, src)) {
-                scratch[dst ushr 6] = scratch[dst ushr 6] or (1L shl (dst and 63))
+        val head = fwdHead[i]
+        val ptr = fwdPtr[i]
+        forEachState(fwd, i, numStatesPerLayer[i]) { src ->
+            var k = head[src]
+            val e = head[src + 1]
+            while (k < e) {
+                val p = ptr[k]
+                val sym = transitions[p + 1]
+                val dst = transitions[p + 2].toInt()
+                if (sym in d.min..d.max && dst in 0 until numN) {
+                    scratch[dst ushr 6] = scratch[dst ushr 6] or (1L shl (dst and 63))
+                }
+                k++
             }
-            p += recordStride
         }
         return writeLayer(fwd, i + 1, scratch)
     }
@@ -82,19 +150,20 @@ internal class MddIncrementalState(
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
         val numI = numStatesPerLayer[i]
-        val numN = numStatesPerLayer[i + 1]
-        var p = layerStarts[i]
-        val end = layerStarts[i + 1]
-        while (p < end) {
-            val src = transitions[p].toInt()
-            val sym = transitions[p + 1]
-            val dst = transitions[p + 2].toInt()
-            if (src in 0 until numI && dst in 0 until numN && sym in d.min..d.max &&
-                testBit(fwd, i, src) && testBit(bwd, i + 1, dst)
-            ) {
-                scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
+        val head = bwdHead[i]
+        val ptr = bwdPtr[i]
+        forEachState(bwd, i + 1, numStatesPerLayer[i + 1]) { dst ->
+            var k = head[dst]
+            val e = head[dst + 1]
+            while (k < e) {
+                val p = ptr[k]
+                val src = transitions[p].toInt()
+                val sym = transitions[p + 1]
+                if (sym in d.min..d.max && src in 0 until numI && testBit(fwd, i, src)) {
+                    scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
+                }
+                k++
             }
-            p += recordStride
         }
         return writeLayer(bwd, i, scratch)
     }
@@ -123,21 +192,23 @@ internal class MddIncrementalState(
             val span = d.max - d.min + 1
             if (span <= 0) continue
             val survives = LongArray(((span + 63) ushr 6).toInt())
-            val numI = numStatesPerLayer[i]
             val numN = numStatesPerLayer[i + 1]
-            var p = layerStarts[i]
-            val end = layerStarts[i + 1]
-            while (p < end) {
-                val src = transitions[p].toInt()
-                val sym = transitions[p + 1]
-                val dst = transitions[p + 2].toInt()
-                if (sym in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
-                    testBit(fwd, i, src) && testBit(bwd, i + 1, dst)
-                ) {
-                    val off = sym - d.min
-                    survives[(off ushr 6).toInt()] = survives[(off ushr 6).toInt()] or (1L shl (off and 63L).toInt())
+            val head = fwdHead[i]
+            val ptr = fwdPtr[i]
+            forEachState(fwd, i, numStatesPerLayer[i]) { src ->
+                var k = head[src]
+                val e = head[src + 1]
+                while (k < e) {
+                    val p = ptr[k]
+                    val sym = transitions[p + 1]
+                    val dst = transitions[p + 2].toInt()
+                    if (sym in d.min..d.max && dst in 0 until numN && testBit(bwd, i + 1, dst)) {
+                        val off = sym - d.min
+                        survives[(off ushr 6).toInt()] =
+                            survives[(off ushr 6).toInt()] or (1L shl (off and 63L).toInt())
+                    }
+                    k++
                 }
-                p += recordStride
             }
             for (s in d.min..d.max) {
                 val off = s - d.min
@@ -160,24 +231,27 @@ internal class MddIncrementalState(
         }
         for (i in 0 until n) {
             val d = state.intDomains[seq[i]]
-            val numI = numStatesPerLayer[i]
             val numN = numStatesPerLayer[i + 1]
-            var p = layerStarts[i]
-            val end = layerStarts[i + 1]
-            while (p < end) {
-                val src = transitions[p].toInt()
-                val sym = transitions[p + 1]
-                val dst = transitions[p + 2].toInt()
-                val ww = transitions[p + 3]
-                if (sym in d.min..d.max && src in 0 until numI && dst in 0 until numN &&
-                    testBit(fwd, i, src) && testBit(fwd, i + 1, dst)
-                ) {
-                    val nm = minCost[i][src] + ww
-                    if (nm < minCost[i + 1][dst]) minCost[i + 1][dst] = nm
-                    val nM = maxCost[i][src] + ww
-                    if (nM > maxCost[i + 1][dst]) maxCost[i + 1][dst] = nM
+            val head = fwdHead[i]
+            val ptr = fwdPtr[i]
+            forEachState(fwd, i, numStatesPerLayer[i]) { src ->
+                val srcMin = minCost[i][src]
+                val srcMax = maxCost[i][src]
+                var k = head[src]
+                val e = head[src + 1]
+                while (k < e) {
+                    val p = ptr[k]
+                    val sym = transitions[p + 1]
+                    val dst = transitions[p + 2].toInt()
+                    val ww = transitions[p + 3]
+                    if (sym in d.min..d.max && dst in 0 until numN && testBit(fwd, i + 1, dst)) {
+                        val nm = srcMin + ww
+                        if (nm < minCost[i + 1][dst]) minCost[i + 1][dst] = nm
+                        val nM = srcMax + ww
+                        if (nM > maxCost[i + 1][dst]) maxCost[i + 1][dst] = nM
+                    }
+                    k++
                 }
-                p += recordStride
             }
         }
         var bestLo = inf
