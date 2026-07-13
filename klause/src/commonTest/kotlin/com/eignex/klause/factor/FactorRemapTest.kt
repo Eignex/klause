@@ -13,7 +13,6 @@ import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -81,7 +80,7 @@ class FactorRemapTest {
             "SymmetricAllDifferent" to SymmetricAllDifferent(intArrayOf(0, 1, 2)),
             "NValue" to NValue(0, intArrayOf(1, 2, 3)),
             "Circuit" to Circuit(intArrayOf(1, 2, 0)),
-            "Subcircuit" to Subcircuit(intArrayOf(0, 1, 2)),
+            "Subcircuit" to Circuit(intArrayOf(0, 1, 2), subcircuit = true),
             "Cumulative" to Cumulative(intArrayOf(0, 1), longArrayOf(2, 2), longArrayOf(1, 1), 3L),
             "Cumulative(vars)" to Cumulative(
                 intArrayOf(0, 1),

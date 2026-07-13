@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.circuit.Subcircuit
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -626,7 +626,7 @@ internal fun Xcsp3.Builder.circuit(e: XmlElement) {
     // admits the empty (all-excluded) assignment, so pin the number of participating nodes
     // (those with succ(i) ≠ i): to <size> when given, else to "at least one" — which, with
     // Subcircuit's rejection of a lone included node, yields size ≥ 2.
-    factors.add(Subcircuit(succ = succ))
+    factors.add(Circuit(succ = succ, subcircuit = true))
     val included = IntArray(succ.size) { reifyLinear(intArrayOf(1), intArrayOf(succ[it]), LinearOp.NE, it) }
     val sizeEl = e.child("size")
     if (sizeEl != null) {

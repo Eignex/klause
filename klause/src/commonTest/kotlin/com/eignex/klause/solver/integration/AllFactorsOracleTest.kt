@@ -15,7 +15,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -364,7 +363,7 @@ class AllFactorsOracleTest {
     }
 
     @Test fun `subcircuit passes the brute-force propagation and repair oracles`() {
-        val f = Subcircuit(succ = intArrayOf(0, 1, 2))
+        val f = Circuit(succ = intArrayOf(0, 1, 2), subcircuit = true)
         check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
     }
 

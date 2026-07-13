@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.circuit
 
-import com.eignex.klause.factor.circuit.Subcircuit
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.solver.Factor
@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class SubcircuitInvariantTest {
 
     private fun problem(n: Int): Problem {
-        val factor = Subcircuit(succ = IntArray(n) { it })
+        val factor = Circuit(succ = IntArray(n) { it }, subcircuit = true)
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
@@ -76,7 +76,7 @@ class SubcircuitInvariantTest {
     fun `two disjoint included cycles have higher cost than one`() {
         // 6 nodes: two 3-cycles vs. one 6-cycle.
         val n = 6
-        val factor = Subcircuit(succ = IntArray(n) { it })
+        val factor = Circuit(succ = IntArray(n) { it }, subcircuit = true)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = n,

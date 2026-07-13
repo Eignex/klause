@@ -3,7 +3,7 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.circuit.Subcircuit
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.LexLess
@@ -699,7 +699,7 @@ class Xcsp3Test {
             </instance>
         """.trimIndent()
         // XCSP3 circuit is subcircuit semantics: self-loops (s[i]=i) are excluded nodes.
-        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Subcircuit })
+        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Circuit && it.subcircuit })
         val v = sat(xml)
         val included = (0..2).filter { v[it] != it }
         assertTrue(included.isNotEmpty(), "circuit must have size > 1: $v")

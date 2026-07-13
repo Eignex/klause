@@ -10,7 +10,6 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -615,7 +614,7 @@ class SymmetryBreakingTest {
         )
         // Circuit / Subcircuit: position-faithful, and distinct from each other.
         distinct(Circuit(intArrayOf(1, 0)), Circuit(intArrayOf(0, 1)), "succ order")
-        distinct(Circuit(intArrayOf(1, 0)), Subcircuit(intArrayOf(1, 0)), "circuit vs subcircuit")
+        distinct(Circuit(intArrayOf(1, 0)), Circuit(intArrayOf(1, 0), subcircuit = true), "circuit vs subcircuit")
         // NValue: mode, count var, and the counted vars.
         distinct(
             NValue(2, intArrayOf(0, 1), NValue.Mode.Eq),

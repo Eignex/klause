@@ -57,7 +57,6 @@ import com.eignex.klause.solver.Lit
 import kotlin.math.ceil
 import kotlin.math.floor
 import com.eignex.klause.factor.circuit.Circuit as CircuitFactor
-import com.eignex.klause.factor.circuit.Subcircuit as SubcircuitFactor
 import com.eignex.klause.factor.global.AllDifferent as AllDifferentFactor
 import com.eignex.klause.factor.global.GlobalCardinality as GccFactor
 import com.eignex.klause.factor.global.Increasing as IncreasingFactor
@@ -350,7 +349,7 @@ internal fun Lowering.assertCircuit(succ: List<IntExpr>, valueOffset: Int, sub: 
             auxId
         }
     }
-    factors += if (sub) SubcircuitFactor(succ = ids) else CircuitFactor(succ = ids)
+    factors += CircuitFactor(succ = ids, subcircuit = sub)
 }
 
 internal fun Lowering.assertCumulative(expr: CumulativeExpr) {

@@ -12,7 +12,6 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.Inverse
@@ -76,7 +75,7 @@ class FactorRemapKeySinkInvariantTest {
         ),
         "Table" to Table(intArrayOf(3, 7), longArrayOf(0, 0, 1, 4, 2, 2)),
         "Circuit" to Circuit(intArrayOf(3, 1, 5)),
-        "Subcircuit" to Subcircuit(intArrayOf(4, 2, 6)),
+        "Subcircuit" to Circuit(intArrayOf(4, 2, 6), subcircuit = true),
         "LexLess" to LexLess(intArrayOf(1, 3), intArrayOf(5, 0), strict = true),
         "SymmetricAllDifferent" to SymmetricAllDifferent(intArrayOf(2, 4, 6), indexOffset = 0),
         "ValuePrecede" to ValuePrecede(2L, 5L, intArrayOf(1, 3, 0)),

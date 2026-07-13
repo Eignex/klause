@@ -2,7 +2,7 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.circuit.Subcircuit
+import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
@@ -70,7 +70,7 @@ class SubcircuitPropagatorTest {
                 numBoolVars = 0,
                 numIntVars = n,
                 intDomains = Array(n) { IntDomain(los[it].toLong(), his[it].toLong()) },
-                factors = arrayOf<Factor>(Subcircuit(succ = IntArray(n) { it })),
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
             )
             val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
             if (brute > 0) {
@@ -82,7 +82,7 @@ class SubcircuitPropagatorTest {
     }
 
     private fun problem(n: Int, lo: Int = 0, hi: Int = n - 1): Problem {
-        val factor = Subcircuit(succ = IntArray(n) { it })
+        val factor = Circuit(succ = IntArray(n) { it }, subcircuit = true)
         return Problem(
             numBoolVars = 0,
             numIntVars = n,
@@ -94,7 +94,7 @@ class SubcircuitPropagatorTest {
     @Test
     fun `subcircuit subscribes to bound and value events on all succ vars`() {
         val n = 3
-        val factor = Subcircuit(succ = IntArray(n) { it })
+        val factor = Circuit(succ = IntArray(n) { it }, subcircuit = true)
         val watches = factor.asPropagator().initialIntEventWatches
         assertNotNull(watches, "SubcircuitPropagator must opt into typed int events")
         val pairs = watches.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
@@ -127,7 +127,7 @@ class SubcircuitPropagatorTest {
     fun `propagation forces closing edge when only one valid target remains`() {
         // Fixed: succ[0]=1, succ[1]=2. Node 2 must close back to 0 (others claimed or excluded).
         // Domain for succ[2] includes 0, 1, 2 — after propagation succ[2]=0 should be forced.
-        val factor = Subcircuit(succ = intArrayOf(0, 1, 2))
+        val factor = Circuit(succ = intArrayOf(0, 1, 2), subcircuit = true)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,

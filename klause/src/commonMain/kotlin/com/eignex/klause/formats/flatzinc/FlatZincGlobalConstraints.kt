@@ -6,7 +6,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
@@ -302,7 +301,7 @@ internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
             auxId
         }
     }
-    factors.add(if (sub) Subcircuit(succ = ids) else Circuit(succ = ids))
+    factors.add(Circuit(succ = ids, subcircuit = sub))
 }
 
 internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
