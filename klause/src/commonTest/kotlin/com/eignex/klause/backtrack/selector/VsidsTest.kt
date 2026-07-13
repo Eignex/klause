@@ -5,13 +5,18 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.PropagationResult.Unsat
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class VsidsTest {
 
@@ -122,5 +127,23 @@ class VsidsTest {
         val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r2)
         assertEquals(true, r2.assignment.bools[6])
+    }
+
+    @Test
+    fun `pick re-offers an open variable stranded out of the heap`() {
+        // The pop-on-pick scheme drops a variable from the heap when it surfaces assigned, relying on
+        // onUnassign to re-add it on backtrack. If that re-add is missed (as happens under the
+        // portfolio's clause exchange), an open variable is left out of the heap. pick must still
+        // re-offer it — returning null would tell the engine "all assigned" and let it emit an
+        // incomplete assignment as a (unsound) solution.
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
+        val session = PropagationSession(problem)
+        session.seed(Assumptions.None)
+        val vsids = Vsids()
+        val rng = Random(0)
+        session.pinInt(0, 2) // x = 2 (singleton): x surfaces assigned and is dropped from the heap
+        assertNull(vsids.pick(session, rng))
+        session.popLast() // x widens back to [0, 3]; no unassign listener is wired, so the re-add is missed
+        assertEquals(VarRef.IntVar(0), vsids.pick(session, rng), "pick must re-offer the stranded open variable")
     }
 }
