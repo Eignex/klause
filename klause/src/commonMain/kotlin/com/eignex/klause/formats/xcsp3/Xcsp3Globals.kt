@@ -680,8 +680,10 @@ internal fun Xcsp3.Builder.postLexChain(vectors: List<IntArray>, strict: Boolean
     }
 }
 
-/** Rows of a `<matrix>`: explicit `(a,b)(c,d)` tuples, or a compact 2-D array reference such
- *  as `x[][]` reshaped from the cells' trailing `[row][col]` indices. */
+/** Rows of a `<matrix>`: explicit `(a,b)(c,d)` tuples, or a 2-D array reference (`x[][]`,
+ *  `g[1..8][8..15]`). The reference is reshaped from its two index axes — an empty bracket spans the
+ *  array's declared dimension ([Xcsp3.Builder.arrayDims]), a `lo..hi` bracket that inclusive range —
+ *  and each cell is referenced directly by index, so no structure is recovered from generated names. */
 internal fun Xcsp3.Builder.matrixRows(text: String): List<IntArray> {
     val t = text.trim()
     if ('(' in t) {
@@ -697,17 +699,40 @@ internal fun Xcsp3.Builder.matrixRows(text: String): List<IntArray> {
         )
         return rows
     }
-    val idxRe = Regex("""\[(\d+)]""")
-    val cells = t.splitWs().flatMap { expandNames(it) }
-    val byRow = HashMap<Int, MutableList<Pair<Int, Int>>>()
-    for (name in cells) {
-        val idx = idxRe.findAll(name).map { it.groupValues[1].toInt() }.toList()
-        require(idx.size >= 2) { "lex: <matrix> cell '$name' is not 2-D" }
-        byRow.getOrPut(idx[idx.size - 2]) { ArrayList() }.add(idx[idx.size - 1] to ref(name))
+    val open = t.indexOf('[')
+    require(open > 0) { "<matrix> '$t' is neither tuples nor an array reference" }
+    val base = t.substring(0, open)
+    val specs = ArrayList<String>()
+    var i = open
+    while (i < t.length && t[i] == '[') {
+        val close = t.indexOf(']', i)
+        require(close > i) { "<matrix> reference '$t' has an unclosed bracket" }
+        specs.add(t.substring(i + 1, close).trim())
+        i = close + 1
     }
-    return byRow.keys.sorted().map { r ->
-        byRow.getValue(r).sortedBy { it.first }.map { it.second }.toIntArray()
+    require(specs.size == 2 && t.substring(i).isBlank()) {
+        "<matrix> reference '$t' must be a single 2-D array reference"
     }
+    val dims = arrayDims[base]
+    val rowIdx = matrixAxis(base, specs[0], dims?.getOrNull(0))
+    val colIdx = matrixAxis(base, specs[1], dims?.getOrNull(1))
+    return rowIdx.map { r -> IntArray(colIdx.size) { j -> ref("$base[$r][${colIdx[j]}]") } }
+}
+
+/** Indices selected by one `<matrix>` bracket [spec]: `lo..hi` is that inclusive range, a bare
+ *  integer the single index, and an empty spec spans the whole declared dimension [dimSize]. */
+private fun matrixAxis(base: String, spec: String, dimSize: Int?): IntArray = when {
+    spec.isEmpty() -> {
+        val n = dimSize ?: throw UnsupportedXcsp3Exception("<matrix>: array '$base' has no declared shape")
+        IntArray(n) { it }
+    }
+
+    ".." in spec -> spec.split("..").let { (lo, hi) ->
+        val from = lo.trim().toInt()
+        IntArray(hi.trim().toInt() - from + 1) { from + it }
+    }
+
+    else -> intArrayOf(spec.toInt())
 }
 
 /** Fix each listed variable to the corresponding value. */
@@ -1047,7 +1072,21 @@ internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): Li
     return rows
 }
 
+@Suppress("ThrowsCount") // one guard per malformed/unsupported shape (matrix, except, empty list)
 internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
+    // `<matrix>` form: values must be pairwise distinct on each row *and* on each column (not one
+    // all-different over the whole matrix — that would demand more distinct values than the shared
+    // domain holds and spuriously fail, e.g. a Sudoku grid). Rows and columns each get their own.
+    e.child("matrix")?.let { m ->
+        if (e.child("except") != null) throw UnsupportedXcsp3Exception("allDifferent: <matrix> with <except>")
+        val rows = matrixRows(m.textContent)
+        if (rows.isEmpty()) throw UnsupportedXcsp3Exception("allDifferent: empty <matrix>")
+        val width = rows[0].size
+        require(rows.all { it.size == width }) { "allDifferent: ragged <matrix>" }
+        for (row in rows) postAllDifferent(row)
+        for (j in 0 until width) postAllDifferent(IntArray(rows.size) { i -> rows[i][j] })
+        return
+    }
     val vars = refList(listText(e))
     if (vars.isEmpty()) throw UnsupportedXcsp3Exception("allDifferent: empty list")
     // <except> weakens the constraint: variables taking an exempt value may repeat.
@@ -1056,8 +1095,14 @@ internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
             ?: throw UnsupportedXcsp3Exception("allDifferent: non-constant <except>")
         if (except.isNotEmpty()) return allDifferentExcept(vars, except)
     }
-    // A value span beyond Int range would truncate AllDifferent's Int-sized value-indexed
-    // scratch; decompose to pairwise != (sound at any magnitude — <except> was rejected above).
+    postAllDifferent(vars)
+}
+
+/** Post one all-different over [vars] as an [AllDifferent] factor, or as pairwise `!=` when the
+ *  value span would overflow AllDifferent's Int-sized value-indexed scratch (sound at any magnitude).
+ *  Fewer than two variables is vacuous and posts nothing. */
+internal fun Xcsp3.Builder.postAllDifferent(vars: IntArray) {
+    if (vars.size < 2) return
     if (domainSpan(vars) > Int.MAX_VALUE.toLong()) {
         for (a in vars.indices) {
             for (b in a + 1 until vars.size) {

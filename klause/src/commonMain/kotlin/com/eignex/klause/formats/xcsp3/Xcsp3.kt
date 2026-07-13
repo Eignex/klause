@@ -70,6 +70,7 @@ object Xcsp3 {
 
     internal class Builder(val negTableCap: Long) : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
+        internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
         override val factors = ArrayList<Factor>()
         internal var nextBool = 0
@@ -118,6 +119,7 @@ object Xcsp3 {
                     val id = e.attr("id")
                     val dims = Regex("""\[(\d+)]""").findAll(e.attr("size")).map { it.groupValues[1].toInt() }.toList()
                     if (dims.isEmpty()) throw UnsupportedXcsp3Exception("array size '${e.attr("size")}'")
+                    arrayDims[id] = dims.toIntArray() // retained so `<matrix>` refs reshape from the shape
                     val dom = domainFor(e)
 
                     // Declare one variable per cell of the (possibly multi-dimensional) array,
