@@ -12,7 +12,6 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
@@ -176,8 +175,6 @@ object LpAutoConfig {
                 }
 
                 is Circuit -> circuit = true
-
-                is Subcircuit -> circuit = true
 
                 // Both constant- and variable-array Element route to the element hull (the variable case
                 // builds the big-M form); the size guard still caps it internally.
@@ -368,12 +365,9 @@ object LpAutoConfig {
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            val succ = when (f) {
-                is Circuit -> f.succ
-                is Subcircuit -> f.succ
-                else -> continue
-            }
-            val selfLoops = f is Subcircuit
+            val circuitFactor = f as? Circuit ?: continue
+            val succ = circuitFactor.succ
+            val selfLoops = circuitFactor.subcircuit
             val n = succ.size
             if (n < 2) continue
             var arcs = 0L

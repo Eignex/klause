@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -194,7 +193,7 @@ class CircuitInvariantTest {
     // --- from SubcircuitTest (LS tests) ---
 
     private fun fourNodeSubcircuitProblem(): Problem {
-        val factor = Subcircuit(succ = intArrayOf(0, 1, 2, 3))
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3), subcircuit = true)
         return Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -244,7 +243,7 @@ class CircuitInvariantTest {
 
     @Test
     fun `two disjoint cycles among included nodes is violated`() {
-        val factor = Subcircuit(succ = intArrayOf(0, 1, 2, 3, 4, 5))
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3, 4, 5), subcircuit = true)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 6,
@@ -276,7 +275,7 @@ class CircuitInvariantTest {
         numBoolVars = 0,
         numIntVars = 6,
         intDomains = Array(6) { IntDomain(0, 5) },
-        factors = arrayOf<Factor>(Subcircuit(succ = intArrayOf(0, 1, 2, 3, 4, 5))),
+        factors = arrayOf<Factor>(Circuit(succ = intArrayOf(0, 1, 2, 3, 4, 5), subcircuit = true)),
     )
 
     private fun seededSubcircuit(seed: Long): LocalSearchState {

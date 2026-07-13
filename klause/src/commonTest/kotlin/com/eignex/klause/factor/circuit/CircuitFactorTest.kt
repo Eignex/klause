@@ -8,7 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class SuccessorCycleFactorTest {
+class CircuitFactorTest {
 
     @Test
     fun `n equals number of successor variables`() {

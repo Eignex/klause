@@ -6,8 +6,6 @@ import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
-import com.eignex.klause.factor.circuit.SuccessorCycleFactor
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
@@ -262,7 +260,11 @@ class CircuitPropagatorTest {
                 val valid = included.isEmpty() || isSingleCycleOver(s, included)
                 if (valid) brute.add(s.toList())
             }
-            assertEquals(brute, enumerate(problemOf(Subcircuit(IntArray(n) { it }), n), seed), "seed=$seed subcircuit")
+            assertEquals(
+                brute,
+                enumerate(problemOf(Circuit(IntArray(n) { it }, subcircuit = true), n), seed),
+                "seed=$seed subcircuit",
+            )
         }
     }
 
@@ -375,7 +377,7 @@ class CircuitPropagatorTest {
     // --- from SubcircuitTest (CP tests) ---
 
     private fun fourNodeSubcircuitProblem(): Problem {
-        val factor = Subcircuit(succ = intArrayOf(0, 1, 2, 3))
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3), subcircuit = true)
         return Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -427,7 +429,7 @@ class CircuitPropagatorTest {
         // N=5: pin a closed 3-cycle 0->1->2->0 and force node 3 onto the cycle (succ[3]=4, a
         // non-self successor makes 3 definitely included). The sealed 3-cycle can't absorb the
         // extra included node, so the singleton-walk check (includedCount > cycleLen 3) fails.
-        val factor = Subcircuit(succ = intArrayOf(0, 1, 2, 3, 4))
+        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3, 4), subcircuit = true)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 5,
@@ -478,7 +480,7 @@ class CircuitPropagatorTest {
                 numBoolVars = 0,
                 numIntVars = n,
                 intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
-                factors = arrayOf<Factor>(Subcircuit(succ = IntArray(n) { it })),
+                factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
             )
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()

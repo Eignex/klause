@@ -11,7 +11,6 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
-import com.eignex.klause.factor.circuit.Subcircuit
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFlags
@@ -425,7 +424,7 @@ internal class CpToLpRelaxation(
          * allowed). **No subtour-elimination model is registered**: the Hamiltonian SEC is *unsound* for
          * a subcircuit (an all-excluded subset legitimately has no leaving arc).
          */
-        private fun buildSubcircuitArcs(factor: Subcircuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
+        private fun buildSubcircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = true, sec = false)
 
         /**
          * Shared degree + channel arc model for [Circuit] / [Subcircuit]: a `y_ij ∈ [0,1]` column per
@@ -597,8 +596,9 @@ internal class CpToLpRelaxation(
             if (!objectiveCone) {
                 if (circuitArcs) {
                     for (factor in problem.factors) {
-                        if (factor is Circuit) buildCircuitArcs(factor)
-                        if (factor is Subcircuit) buildSubcircuitArcs(factor)
+                        if (factor is Circuit) {
+                            if (factor.subcircuit) buildSubcircuitArcs(factor) else buildCircuitArcs(factor)
+                        }
                     }
                 }
                 cumulativeRelaxation?.let { cumulativeRows(it) }
