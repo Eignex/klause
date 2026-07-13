@@ -99,10 +99,11 @@ class Problem(
 
     /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
      *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
-     *  return themselves. Computed once at construction. */
-    val propagators: Array<out Propagator> by lazy(LazyThreadSafetyMode.NONE) {
-        Array(factors.size) { factors[it].asPropagator() }
-    }
+     *  return themselves. Built lazily on first access so presolve (which rebuilds a [Problem] after
+     *  every pass) doesn't allocate one propagator per factor. Thread-safe init: parallel portfolio
+     *  arms first-touch this concurrently on their own worker threads, so it must publish the array
+     *  safely — same as [invariants]. Computed once, then cached. */
+    val propagators: Array<out Propagator> by lazy { Array(factors.size) { factors[it].asPropagator() } }
 
     /** Invariant objects for the LS engine, one per factor. Factors that have been structurally
      *  split return a dedicated invariant instance from [Factor.asInvariant]; unsplit factors
