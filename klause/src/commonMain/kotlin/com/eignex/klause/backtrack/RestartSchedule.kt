@@ -47,12 +47,14 @@ internal interface RestartSchedule {
         /** Luby decision base for the stable stage of the default cycle. */
         const val STABLE_LUBY_BASE: Long = 100L
 
-        /** The CP-SAT-style default cycle: a Luby stable stage that dives on the target phase, and an
-         *  EMA-adaptive focused stage that restarts on learned-clause quality. */
+        /** The CP-SAT default restart cycle: a Luby stable stage that dives on the best phase, an
+         *  EMA/LBD-adaptive focused stage, and a decision-level-adaptive focused stage — mirroring
+         *  CP-SAT's `LUBY_RESTART, LBD_MOVING_AVERAGE_RESTART, DL_MOVING_AVERAGE_RESTART`. */
         private fun defaultModeSwitching(): ModeSwitchingRestartSchedule = ModeSwitchingRestartSchedule(
             stages = listOf(
                 RestartStage(LubyRestartSchedule(STABLE_LUBY_BASE), PhaseMode.STABLE),
                 RestartStage(EmaRestartSchedule(), PhaseMode.FOCUSED),
+                RestartStage(DlRestartSchedule(), PhaseMode.FOCUSED),
             ),
             switchBase = DEFAULT_MODE_BASE,
         )
@@ -135,6 +137,27 @@ internal class EmaRestartSchedule : RestartSchedule {
 
     override fun onRestart() {
         restartRequested = false
+    }
+}
+
+/**
+ * Decision-level adaptive schedule: a [DecisionLevelRestart] detector drives restarts off the trail
+ * depth at conflicts (CP-SAT `DL_MOVING_AVERAGE_RESTART`), the complement of the LBD-based
+ * [AdaptiveRestartSchedule] / [EmaRestartSchedule]. The per-run budget is unbounded.
+ */
+internal class DlRestartSchedule : RestartSchedule {
+    private val dl = DecisionLevelRestart()
+    private var restartRequested = false
+
+    override fun recordConflict(lbd: Int, trailSize: Int) {
+        if (dl.recordConflict(trailSize)) restartRequested = true
+    }
+
+    override fun shouldRestart(decisionsThisRun: Long): Boolean = restartRequested
+
+    override fun onRestart() {
+        restartRequested = false
+        dl.clearWindow()
     }
 }
 
