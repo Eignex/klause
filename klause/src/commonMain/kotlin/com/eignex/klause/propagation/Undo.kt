@@ -51,7 +51,6 @@ internal fun PropagationState.logIntCarve(v: Int, value: Long) {
     undo.holeHistLen.add(0)
 }
 
-
 /** Variable id recorded by undo record `i`. */
 internal fun PropagationState.undoVarAt(i: Int): Int = undo.varId[i]
 
