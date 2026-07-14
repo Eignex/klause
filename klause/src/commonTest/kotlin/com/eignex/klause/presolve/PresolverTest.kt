@@ -47,6 +47,7 @@ class PresolverTest {
             PresolvePass.PROJECT_SINGLETON_INEQUALITIES,
             PresolvePass.BREAK_SYMMETRIES,
             PresolvePass.DUAL_FIX,
+            PresolvePass.MERGE_AMO_CLIQUES,
         )
         assertEquals(autoProblem, PresolveConfig.parse(null).problemPasses(ctx))
         assertEquals(autoProblem, PresolveConfig.parse("default").problemPasses(ctx))
