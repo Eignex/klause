@@ -273,15 +273,6 @@ internal fun propagateLinearBounds(
         LinearOp.EQ -> if (sumLo > bound || sumHi < bound) return false
         LinearOp.NE -> if (sumLo == bound && sumHi == bound) return false
     }
-    // `Σ cᵢ·xᵢ = bound` ranges over exactly the multiples of `gcd(cᵢ)`, so an integer solution exists
-    // only when that gcd divides `bound` — a check independent of the (possibly very wide) variable
-    // bounds. Catching it here in O(n) short-circuits the O(span) bound-narrowing that would otherwise
-    // grind one step per round toward the empty domain (e.g. `3x + 3y = 1`).
-    if (op == LinearOp.EQ) {
-        var g = 0L
-        for (i in 0 until n) g = gcdLong(g, coeffs[i])
-        if (g > 1L && bound % g != 0L) return false
-    }
     // At the root (level 0) a bound move is a permanent fact whose antecedents are never consumed:
     // conflict analysis runs only above the root, and it drops level-0 literals by their level rather
     // than resolving through their reason. Collecting the reason there is pure waste — and on a wide
@@ -289,6 +280,17 @@ internal fun propagateLinearBounds(
     // (and materializing) a fresh order atom whose sorted-index insert is O(n): O(span²) overall, the
     // #18 root-bake hang. Skip it at the root, leaving the actual bound tightening untouched.
     val rootFact = state.currentLevel == 0
+    // `Σ cᵢ·xᵢ = bound` ranges over exactly the multiples of `gcd(cᵢ)`, so an integer solution exists
+    // only when that gcd divides `bound` — independent of the (possibly very wide) variable bounds, so
+    // it short-circuits the O(span) narrowing toward the empty domain (e.g. `3x + 3y = 1`). It is
+    // loop-invariant (coeffs/bound are fixed), so a feasible equality always passes: running it on
+    // every search propagation would be pure hot-path overhead. Do it only at the root, which catches
+    // the infeasible case once — before any narrowing.
+    if (rootFact && op == LinearOp.EQ) {
+        var g = 0L
+        for (i in 0 until n) g = gcdLong(g, coeffs[i])
+        if (g > 1L && bound % g != 0L) return false
+    }
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]
