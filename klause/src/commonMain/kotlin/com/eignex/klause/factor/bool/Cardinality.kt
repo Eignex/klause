@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -15,6 +16,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -59,6 +61,15 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
         builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())
+    }
+
+    /** Exact linear view: the bounds `min ≤ Σ literals ≤ max` over its Boolean literals. */
+    override val linearRows: List<LinearRow> by lazy {
+        val unit = LongArray(literals.size) { 1L }
+        listOf(
+            LinearRow(EmptyLongArray, EmptyIntArray, LinearOp.GE, min.toLong(), unit, literals),
+            LinearRow(EmptyLongArray, EmptyIntArray, LinearOp.LE, max.toLong(), unit, literals),
+        )
     }
 
     /** Factory methods for this factor. */

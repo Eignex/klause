@@ -57,8 +57,12 @@ internal object DominatedVariables {
         val boolEligible = BooleanArray(nb) { true }
         val alreadyPinned = IntHashSet() // bool vars already forced by a unit clause
         for (f in problem.factors) {
-            val rows = f.linearRows()
-            if (rows != null && rows.all { it.op == LinearOp.LE || it.op == LinearOp.GE }) {
+            val rows = f.linearRows
+            // The integer monotonicity analysis reads the integer side of a row; a row carrying Boolean
+            // literals is left to the bool-side [markBoolSafety] (unifying the two is a follow-up).
+            val monotoneIntRows = rows.isNotEmpty() &&
+                rows.all { (it.op == LinearOp.LE || it.op == LinearOp.GE) && it.boolLits.isEmpty() }
+            if (monotoneIntRows) {
                 // Every exact row is monotone ≤/≥, so each variable has one safe direction per row.
                 for (row in rows) {
                     for (i in row.vars.indices) {
@@ -70,7 +74,7 @@ internal object DominatedVariables {
                     }
                 }
             } else {
-                // An =/≠ row, a factor with no exact linear form, or any other global makes the
+                // An =/≠ row, a factor with no exact integer-linear form, or any other global makes the
                 // single-variable safety undecidable.
                 for (v in f.intVars) intEligible[v] = false
             }

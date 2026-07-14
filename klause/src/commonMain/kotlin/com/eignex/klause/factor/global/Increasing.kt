@@ -59,9 +59,11 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
 
     // Each adjacent pair is the exact row `xs(i+1) − xs(i) ≥ gap`; their conjunction is the chain; the
     // LP relaxation is these rows (via the [Factor.linearize] default).
-    override fun linearRows(): List<LinearRow> = buildList {
-        for (i in 0 until xs.size - 1) {
-            add(LinearRow(longArrayOf(1, -1), intArrayOf(xs[i + 1], xs[i]), LinearOp.GE, gap.toLong()))
+    override val linearRows: List<LinearRow> by lazy {
+        buildList {
+            for (i in 0 until xs.size - 1) {
+                add(LinearRow(longArrayOf(1, -1), intArrayOf(xs[i + 1], xs[i]), LinearOp.GE, gap.toLong()))
+            }
         }
     }
 }

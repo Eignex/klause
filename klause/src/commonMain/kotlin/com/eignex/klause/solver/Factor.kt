@@ -7,6 +7,8 @@ import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 
 /**
  * Structural contract for a constraint in [Problem]: variable membership, remapping, and
@@ -157,17 +159,18 @@ interface Factor {
 
     /**
      * This factor's constraint as one or more **solution-set-exact** [LinearRow]s over its integer
-     * variables, or `null` (the default) when the factor has no exact linear form. "Exact" means the
-     * conjunction of the returned rows accepts exactly the assignments this factor accepts — it *is*
-     * the constraint, not a relaxation. A factor whose only linear form is a relaxation (big-M,
-     * convex hull) must return `null` here and expose that through [linearize] instead.
+     * variables and Boolean literals, or the empty list (the default) when the factor has no exact
+     * linear form. "Exact" means the conjunction of the returned rows accepts exactly the assignments
+     * this factor accepts — it *is* the constraint, not a relaxation. A factor whose only linear form is
+     * a relaxation (big-M, convex hull) leaves this empty and exposes that through [linearize] instead.
      *
      * Lets presolve analyses (redundancy, domination) read the linear content of any factor
-     * uniformly instead of pattern-matching the concrete
-     * [com.eignex.klause.factor.arithmetic.Linear] type. Read-only: it carries no write-back, so
-     * passes that *rewrite* a factor still go through [structuralReduce] / [substituteAffine].
+     * uniformly instead of pattern-matching the concrete factor type. Read-only: it carries no
+     * write-back, so passes that *rewrite* a factor still go through [structuralReduce] /
+     * [substituteAffine]. Cache it in the override (the content is immutable) rather than rebuilding
+     * per call.
      */
-    fun linearRows(): List<LinearRow>? = null
+    val linearRows: List<LinearRow> get() = emptyList()
 
     /** The [Propagator] the CP engine uses for this constraint. */
     fun asPropagator(): Propagator
@@ -183,12 +186,12 @@ interface Factor {
      * and [com.eignex.klause.lp.Contribution.HULL] rows — the kind is chosen per row at emit time.
      *
      * An exact linear row *is* the tightest valid relaxation, so the default emits the factor's
-     * [linearRows] when it exposes one; a factor whose only linear form is a relaxation (big-M, convex
-     * hull) returns `null` from [linearRows] and overrides this to emit that relaxation. Default when
-     * neither applies: nothing (no relaxation).
+     * [linearRows] when it exposes any; a factor whose only linear form is a relaxation (big-M, convex
+     * hull) leaves [linearRows] empty and overrides this to emit that relaxation. Default when neither
+     * applies: nothing (no relaxation).
      */
     fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        linearRows()?.forEach { builder.linearRow(it.op, it.vars, it.coeffs, it.bound) }
+        for (row in linearRows) emitExactRow(builder, row)
     }
 
     /**
@@ -233,4 +236,36 @@ sealed interface FactorReduction {
      */
     class Rewrite(val replacement: List<Factor>, val tightenedBounds: Map<Int, IntRange> = emptyMap()) :
         FactorReduction
+}
+
+/**
+ * Emit one exact [LinearRow] into [builder]. A pure integer row goes through
+ * [RelaxationBuilder.linearRow] verbatim; a row carrying Boolean literals is folded to mixed columns,
+ * each negative literal's `coeff · (1 − x)` moving its constant to the right-hand side. Used by the
+ * default [Factor.linearize] so a factor exposing exact rows needs no bespoke relaxation code.
+ */
+private fun emitExactRow(builder: RelaxationBuilder, row: LinearRow) {
+    if (row.boolLits.isEmpty()) {
+        builder.linearRow(row.op, row.vars, row.coeffs, row.bound)
+        return
+    }
+    val columns = IntArrayList(row.vars.size + row.boolLits.size)
+    val coeffs = LongArrayList(row.vars.size + row.boolLits.size)
+    for (k in row.vars.indices) {
+        columns.add(builder.intColumn(row.vars[k]))
+        coeffs.add(row.coeffs[k])
+    }
+    var rhs = row.bound
+    for (k in row.boolLits.indices) {
+        val lit = row.boolLits[k]
+        val w = row.boolCoeffs[k]
+        columns.add(builder.boolColumn(Lit.variable(lit)))
+        if (Lit.isPositive(lit)) {
+            coeffs.add(w)
+        } else {
+            coeffs.add(-w)
+            rhs -= w
+        }
+    }
+    builder.row(columns.toIntArray(), coeffs.toLongArray(), row.op, rhs)
 }

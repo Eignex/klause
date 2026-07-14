@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -46,13 +48,19 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
 
     override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
+    private val linearOp: LinearOp = when (op) {
+        PbOp.LE -> LinearOp.LE
+        PbOp.GE -> LinearOp.GE
+        PbOp.EQ -> LinearOp.EQ
+    }
+
     /** LP relaxation: the feasibility-defining row `Σ weights·literals ⟨op⟩ bound`. */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        val linearOp = when (op) {
-            PbOp.LE -> LinearOp.LE
-            PbOp.GE -> LinearOp.GE
-            PbOp.EQ -> LinearOp.EQ
-        }
         builder.boolRow(literals, weights, linearOp, bound)
+    }
+
+    /** Exact linear view: the row `Σ weights·literals ⟨op⟩ bound` over its Boolean literals. */
+    override val linearRows: List<LinearRow> by lazy {
+        listOf(LinearRow(EmptyLongArray, EmptyIntArray, linearOp, bound, weights, literals))
     }
 }
