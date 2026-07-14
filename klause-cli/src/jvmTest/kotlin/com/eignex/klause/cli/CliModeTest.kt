@@ -1,9 +1,9 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.lp.LpConfig
-import com.eignex.klause.backtrack.lp.LpEmphasis
-import com.eignex.klause.backtrack.lp.LpTechnique
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.bounding.LpTechnique
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream

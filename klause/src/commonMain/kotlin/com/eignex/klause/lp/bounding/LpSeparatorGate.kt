@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
 /**
  * Per-technique cut-separator activity gate (#59), the per-family analogue of the whole-simplex

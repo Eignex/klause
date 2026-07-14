@@ -15,6 +15,11 @@ import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.lp.bounding.LpAutoConfig
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

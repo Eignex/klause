@@ -2,8 +2,8 @@ package com.eignex.klause.lp.bound
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor

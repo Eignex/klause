@@ -1,5 +1,7 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.lp.bounding.LpEffort
+import com.eignex.klause.lp.bounding.LpEffortLadder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

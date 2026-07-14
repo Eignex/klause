@@ -1,12 +1,12 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.lp.LpEmphasis
-import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.lp.lpHarvestReporting
 import com.eignex.klause.backtrack.lp.lpRootInfeasible
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveConfig

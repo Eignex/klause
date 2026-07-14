@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.lp.bounding.LpSeparatorGate
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

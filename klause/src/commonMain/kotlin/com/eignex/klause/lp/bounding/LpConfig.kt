@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
 /**
  * Cost tier of an LP-relaxation technique — the LP analogue of

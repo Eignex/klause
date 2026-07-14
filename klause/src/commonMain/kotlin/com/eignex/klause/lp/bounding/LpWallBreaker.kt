@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
 /**
  * Wall-clock circuit breaker for an unproductive per-node LP, the backstop for exactly the case

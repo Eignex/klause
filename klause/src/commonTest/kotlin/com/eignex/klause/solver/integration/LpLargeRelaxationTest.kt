@@ -2,12 +2,12 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.lp.LpAutoConfig
-import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.lp.bounding.LpAutoConfig
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -77,7 +77,10 @@ class LpLargeRelaxationTest {
                 }
                 val problem = Problem(0, n, domains, factors.toTypedArray<Factor>())
                 val obj = LinearObjective(intCoefficients = cost)
-                val resolved = BacktrackParams(lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE), randomSeed = 5L)
+                val resolved = BacktrackParams(
+                    lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE),
+                    randomSeed = 5L,
+                )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
@@ -130,7 +133,10 @@ class LpLargeRelaxationTest {
                 )
                 val problem = Problem(0, nx + 1, domains, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = LongArray(nx + 1) { if (it == zVar) 1L else 0L })
-                val resolved = BacktrackParams(lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE), randomSeed = 9L)
+                val resolved = BacktrackParams(
+                    lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE),
+                    randomSeed = 9L,
+                )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
@@ -203,7 +209,10 @@ class LpLargeRelaxationTest {
                 val factors = cons.map { (c, op, r) -> Linear(c, IntArray(n) { it }, op, r) }.toTypedArray<Factor>()
                 val problem = Problem(0, n, domains, factors)
                 val obj = LinearObjective(intCoefficients = LongArray(n) { if (it == 0) 1L else 0L })
-                val resolved = BacktrackParams(lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE), randomSeed = 3L)
+                val resolved = BacktrackParams(
+                    lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE),
+                    randomSeed = 3L,
+                )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
@@ -253,7 +262,10 @@ class LpLargeRelaxationTest {
                 }.toTypedArray<Factor>()
                 val problem = Problem(0, n, domains, factors)
                 val obj = LinearObjective(intCoefficients = cost)
-                val resolved = BacktrackParams(lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE), randomSeed = 7L)
+                val resolved = BacktrackParams(
+                    lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE),
+                    randomSeed = 7L,
+                )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
                 // rootBudgetMillis = 0 ⇒ Cancellation.after(0) is already passed ⇒ every root step bails.

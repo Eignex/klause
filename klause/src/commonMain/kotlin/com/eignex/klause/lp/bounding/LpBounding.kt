@@ -1,9 +1,5 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.backtrack.CUT_POOL_ROUNDS
-import com.eignex.klause.backtrack.GOMORY_CUTS_PER_ROUND
-import com.eignex.klause.backtrack.SEARCH_CUT_ROUNDS
-import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.lp.Basis
 import com.eignex.klause.lp.FloatLpResult
 import com.eignex.klause.lp.IntegerCertificate
@@ -27,14 +23,11 @@ import com.eignex.klause.lp.safeObjectiveLowerBound
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.round
 
 /**
@@ -83,134 +76,6 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
  *  only the pivot path / conditioning, never the certified optimum). */
 internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex =
     RevisedSimplex(model, cancellation)
-
-/** One branch decision on the path from the root in [lbTreeSearch]: pin/bound [varId]. */
-private class LbDecision(val isBool: Boolean, val varId: Int, val lower: Boolean, val bound: Long)
-
-/** An open node in [lbTreeSearch]: its decisions from the root and the LP bound used to order it. */
-private class LbNode(val decisions: List<LbDecision>, val bound: Double)
-
-/**
- * Best-bound (best-first) tree-search subsolver. Explores the
- * branch-and-bound tree expanding the open node with the smallest LP relaxation bound first, diving
- * toward integer-feasible leaves to find good incumbents fast — the complement of depth-first search.
- * Each node re-derives a fresh session from its root decisions, solves the node LP for an ordering
- * bound and a fractional point, and branches on the most-fractional structural variable. A leaf whose
- * LP point is integral is realized through [pinToward] (propagation-checked) into an incumbent.
- *
- * Purely a primal heuristic: it returns only fully-pinned, propagation-feasible incumbents (the caller
- * re-evaluates), and dropping a node only forgoes exploring it — so this never affects soundness or the
- * optimum, exactly like the feasibility pump. Bounded by [LB_TREE_BUDGET] node expansions and a
- * frontier cap; returns the best incumbent found, or null.
- */
-@Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
-internal fun LpEngine.lbTreeSearch(objective: LinearObjective, cancellation: Cancellation): Sample? {
-    val relaxer = lpRelaxer ?: return null
-    var best: Sample? = null
-    var bestObj = Double.POSITIVE_INFINITY
-    val frontier = ArrayList<LbNode>()
-    frontier.add(LbNode(emptyList(), Double.NEGATIVE_INFINITY))
-    var expansions = 0
-    while (frontier.isNotEmpty() && expansions < LB_TREE_BUDGET && !cancellation()) {
-        var bi = 0 // pop the open node with the smallest bound (best-first)
-        for (i in 1 until frontier.size) if (frontier[i].bound < frontier[bi].bound) bi = i
-        val node = frontier.removeAt(bi)
-        if (node.bound >= bestObj) continue // already dominated by the incumbent
-        expansions++
-        val session = PropagationSession(problem)
-        if (session.isUnsatAtRoot) continue
-        if (node.decisions.any { applyLbDecision(session, it) is PropagationResult.Unsat }) continue
-        // The cut-free base relaxation suffices for this primal dive — the harvested cuts only tighten the
-        // ordering bound, never the feasibility of a realized incumbent (which pinToward re-checks).
-        val relaxation = nodeRelaxation(relaxer, session)
-        if (relaxation.model.n == 0) continue
-        val result = dualSimplex(relaxation.model, cancellation).solve() ?: continue // infeasible / unknown ⇒ drop
-        if (result.objective >= bestObj) continue
-        val frac = mostFractionalCol(relaxation, result.primal)
-        if (frac == null) {
-            // Integer LP point: realize it as an incumbent (pinToward propagates + checks feasibility).
-            pinToward(session, relaxation) { col -> if (col in result.primal.indices) result.primal[col] else null }
-                ?.let { s ->
-                    val obj = objective.evaluate(s)
-                    if (obj < bestObj) {
-                        best = s
-                        bestObj = obj
-                    }
-                }
-            continue
-        }
-        val (v, isBool, f) = frac
-        if (isBool) {
-            frontier.add(LbNode(node.decisions + LbDecision(true, v, false, 0L), result.objective))
-            frontier.add(LbNode(node.decisions + LbDecision(true, v, false, 1L), result.objective))
-        } else {
-            frontier.add(LbNode(node.decisions + LbDecision(false, v, false, floor(f).toLong()), result.objective))
-            frontier.add(LbNode(node.decisions + LbDecision(false, v, true, ceil(f).toLong()), result.objective))
-        }
-        while (frontier.size > LB_TREE_FRONTIER_CAP) { // bound memory: drop the worst (highest-bound) node
-            var wi = 0
-            for (i in 1 until frontier.size) if (frontier[i].bound > frontier[wi].bound) wi = i
-            frontier.removeAt(wi)
-        }
-    }
-    return best
-}
-
-/** Apply an [LbDecision] to [session], returning the propagation result (Unsat ⇒ the node is dead). */
-private fun applyLbDecision(session: PropagationSession, d: LbDecision): PropagationResult = when {
-    d.isBool -> session.implyBool(d.varId, d.bound == 1L)
-    d.lower -> session.implyIntAtLeast(d.varId, d.bound)
-    else -> session.implyIntAtMost(d.varId, d.bound)
-}
-
-/** The structural column whose LP value is furthest from an integer, as `(varId, isBool, value)`, or
- *  null when every CP-backed structural column is integral (an integer LP point). */
-private fun mostFractionalCol(relaxation: LpRelaxation, primal: DoubleArray): Triple<Int, Boolean, Double>? {
-    var best: Triple<Int, Boolean, Double>? = null
-    var bestFrac = LB_TREE_FRAC_TOL
-    for (col in relaxation.colVarId.indices) {
-        val v = relaxation.colVarId[col]
-        if (v < 0 || col >= primal.size) continue
-        val lp = primal[col]
-        val frac = abs(lp - round(lp))
-        if (frac > bestFrac) {
-            bestFrac = frac
-            best = Triple(v, relaxation.colIsBool[col], lp)
-        }
-    }
-    return best
-}
-
-/**
- * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score
- * (reduced-cost pseudo-cost × fractionality, [LpHints.branchScore]), or null when LP branching is off,
- * the LP gives no fractional signal, or the residual problem is too wide to scan. Purely advisory — the
- * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
- * branch, so search stays complete and correct regardless. `O(unassigned)` per call, capped.
- */
-internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
-    hints ?: return null
-    if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
-    var best: VarRef? = null
-    var bestScore = LP_BRANCH_MIN_SCORE
-    for (b in 0 until problem.numBoolVars) {
-        if (session.boolValue(b) != null) continue
-        val s = hints.branchScore(VarRef.Bool(b))
-        if (!s.isNaN() && s > bestScore) {
-            bestScore = s
-            best = VarRef.Bool(b)
-        }
-    }
-    for (i in 0 until problem.numIntVars) {
-        if (session.intDomain(i).size <= 1) continue
-        val s = hints.branchScore(VarRef.IntVar(i))
-        if (!s.isNaN() && s > bestScore) {
-            bestScore = s
-            best = VarRef.IntVar(i)
-        }
-    }
-    return best
-}
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
@@ -728,12 +593,15 @@ internal fun LpEngine.harvestRootCuts(
     return pool.cuts()
 }
 
-/** Minimum LP branch score (reduced-cost × fractionality) to override the configured selector; below
- *  this a variable is effectively LP-integral / cost-free, so the configured heuristic decides. */
-private const val LP_BRANCH_MIN_SCORE = 1e-9
+/** Most Gomory cuts to draw from one tableau per separation round (#22). */
+internal const val GOMORY_CUTS_PER_ROUND: Int = 8
 
-/** Skip reduced-cost-average branching above this variable count — the per-decision scan is `O(vars)`. */
-private const val LP_BRANCH_SCAN_CAP = 8192
+/** Separation rounds when harvesting the persistent root cut pool. */
+internal const val CUT_POOL_ROUNDS: Int = 8
+
+/** Separation rounds per during-search node (#41) — fewer than the root harvest, since the node solve
+ *  repeats deeper in the tree. */
+internal const val SEARCH_CUT_ROUNDS: Int = 4
 
 /** [RootRelaxationSize.cost] ceiling above which the harvest skips its shave/redundancy/equality probes:
  *  on a relaxation this large the per-candidate solves dominate the time budget and lose instances the
@@ -741,12 +609,3 @@ private const val LP_BRANCH_SCAN_CAP = 8192
  *  measured ≤ ~48k (evilshop 155×155, the largest gain) while the cost regressions were ≥ ~1.6M
  *  (fast-food 501×1048, diameterc-mst 1797×4066), so the gap is two orders of magnitude. */
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
-
-/** Node-expansion budget for the best-bound tree-search subsolver (each expansion is one node LP). */
-private const val LB_TREE_BUDGET = 256
-
-/** Cap on the best-bound search frontier; the highest-bound nodes are dropped past it (memory bound). */
-private const val LB_TREE_FRONTIER_CAP = 512
-
-/** A structural column's LP value within this of an integer is treated as integral (no branch). */
-private const val LB_TREE_FRAC_TOL = 1e-6

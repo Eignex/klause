@@ -1,10 +1,8 @@
-package com.eignex.klause.backtrack.lp
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
+package com.eignex.klause.lp.bounding
 
 /**
- * The resolved per-technique LP-relaxation plan for a [BacktrackSolver] call. Grouped off
- * [BacktrackParams] so the params' LP surface is just the intent ([BacktrackParams.lpConfig]) plus
+ * The resolved per-technique LP-relaxation plan for a `BacktrackSolver` call. Grouped off
+ * `BacktrackParams` so the params' LP surface is just the intent (`BacktrackParams.lpConfig`) plus
  * this plan. [LpAutoConfig.resolve] OR-es the structurally-applicable techniques onto a base plan;
  * a caller can also set fields here directly to force a technique on regardless of structure.
  */
@@ -176,7 +174,7 @@ data class LpPlan(
      * count-based [bounding] effort ladder cannot reach: an LP whose single solve costs seconds never
      * accumulates the ladder's warmup window of solves, so the ladder never demotes it and it burns the
      * whole budget bounding nothing (elitserien/cyclic-rcpsp: lpMs≈budget, prunes=0). When the total
-     * solve budget is known ([com.eignex.klause.backtrack.BacktrackParams.solveBudgetMillis]), the LP
+     * solve budget is known (`BacktrackParams.solveBudgetMillis`), the LP
      * (one-shot root work + per-node solves) may spend at most `min(this × budget, [lpWallBudgetMillis])`;
      * if it hits that while still under the ladder's warmup and not having pruned, per-node LP bounding is
      * disabled for the rest of the search and the arm runs as a bare combinatorial search. Sound (LP off

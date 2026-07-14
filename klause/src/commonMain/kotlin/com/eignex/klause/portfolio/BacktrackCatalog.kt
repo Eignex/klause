@@ -4,8 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.SelectorPortfolio
-import com.eignex.klause.backtrack.lp.LpConfig
-import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.selector.ActivityBasedSearch
 import com.eignex.klause.backtrack.selector.ConflictOrdering
 import com.eignex.klause.backtrack.selector.DomWdeg
@@ -15,6 +13,8 @@ import com.eignex.klause.backtrack.selector.RegressionVariableSelector
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.util.ArmCatalog
 
 /**
