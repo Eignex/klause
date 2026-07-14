@@ -199,6 +199,11 @@ object SmtLibQfLia {
                     numIntVars = nextInt,
                     intDomains = domains,
                     factors = factors.toTypedArray(),
+                    // Defer the root bake: on a wide clamped domain an integer-infeasible equality (e.g.
+                    // a divisibility contradiction) would grind O(span) at construction. Presolve's
+                    // strengthen pass now catches that infeasibility first, at solve time, before the
+                    // (now-lazy) bake runs.
+                    preFolded = true,
                 ),
                 objective,
                 intVarNames = LinkedHashMap(intNames),

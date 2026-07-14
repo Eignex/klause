@@ -2,7 +2,6 @@ package com.eignex.klause.factor.arithmetic.internals
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lp.gcdLong
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyLongArray
@@ -280,17 +279,6 @@ internal fun propagateLinearBounds(
     // (and materializing) a fresh order atom whose sorted-index insert is O(n): O(span²) overall, the
     // #18 root-bake hang. Skip it at the root, leaving the actual bound tightening untouched.
     val rootFact = state.currentLevel == 0
-    // `Σ cᵢ·xᵢ = bound` ranges over exactly the multiples of `gcd(cᵢ)`, so an integer solution exists
-    // only when that gcd divides `bound` — independent of the (possibly very wide) variable bounds, so
-    // it short-circuits the O(span) narrowing toward the empty domain (e.g. `3x + 3y = 1`). It is
-    // loop-invariant (coeffs/bound are fixed), so a feasible equality always passes: running it on
-    // every search propagation would be pure hot-path overhead. Do it only at the root, which catches
-    // the infeasible case once — before any narrowing.
-    if (rootFact && op == LinearOp.EQ) {
-        var g = 0L
-        for (i in 0 until n) g = gcdLong(g, coeffs[i])
-        if (g > 1L && bound % g != 0L) return false
-    }
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]

@@ -3,6 +3,8 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
@@ -349,13 +351,17 @@ class SmtLibQfLiaTest {
     }
 
     @Test
-    fun `an integer equality whose coefficient gcd cannot divide the bound is unsat`() {
-        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1). The linear propagator's gcd
-        // feasibility check reports this in O(n) instead of narrowing the bounds toward empty one step
-        // per round, which over the default (wide) fallback box would be the #18 O(span) bake hang.
-        val text = "(declare-fun x () Int) (declare-fun y () Int)" +
-            " (assert (= (+ (* 3 x) (* 3 y)) 1)) (check-sat)"
-        val r = BacktrackSolver(SmtLibQfLia.parse(text).problem).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
+    fun `presolve proves a gcd-indivisible equality infeasible before baking the wide domain`() {
+        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1). Coefficient strengthening runs
+        // as the first presolve pass and reports this in O(factors) — before the (deferred) root bake
+        // would narrow the wide clamped domain toward the empty domain one step per round (O(span)).
+        val problem = SmtLibQfLia.parse(
+            "(declare-fun x () Int) (declare-fun y () Int)" +
+                " (assert (= (+ (* 3 x) (* 3 y)) 1)) (check-sat)",
+        ).problem
+        assertTrue(
+            Presolver.run(problem, PresolveConfig.parse("default")).infeasible,
+            "coefficient strengthening should prove the gcd-indivisible equality infeasible",
+        )
     }
 }

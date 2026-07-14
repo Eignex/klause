@@ -6,6 +6,7 @@ import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.lp.lpHarvestReporting
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.PresolveEmphasis
@@ -286,16 +287,24 @@ internal fun Solvable.presolved(
     }
     val objective = linearObjective ?: LinearObjective()
 
-    val seeded = RootBaker.reseed(problem, bakeConfig)
+    // Coefficient strengthening runs first — before [RootBaker.reseed] forces the root bake: a
+    // gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible regardless of the (possibly
+    // very wide) variable bounds, so it is caught in O(factors). The bake would otherwise narrow such an
+    // equality toward the empty domain one step per round — O(span) on a wide clamped domain — before any
+    // pass runs. Skip the reseed and the round loop entirely on this verdict; the tail reports it.
+    val strengthenInfeasible = config.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, context) &&
+        Presolve.strengthenCoefficients(problem).infeasible
+
+    val seeded = if (strengthenInfeasible) problem else RootBaker.reseed(problem, bakeConfig)
     var current = seeded
     val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
     val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
     var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
     // Presolve's infeasibility verdict, taken from [Presolved.infeasible] (the incremental path defers
     // the materialized problem's lazy bake past presolve timing, so this must not force `current.baked`).
-    var infeasible = false
+    var infeasible = strengthenInfeasible
     var round = 0
-    while (round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
+    while (!strengthenInfeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
         val pre = Presolver.run(current, config, context, cancellation)
         infeasible = infeasible || pre.infeasible
         val harvestResult = harvestParams?.let {
@@ -314,7 +323,7 @@ internal fun Solvable.presolved(
         // domain tightenings to chew on, so stop here rather than spend another LP solve to prove it.
         if (harvested === pre.problem) break
     }
-    if (current === problem) return this
+    if (current === problem && !infeasible) return this
 
     // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
     // and the net constraint drop / proven infeasibility, with the LP harvest's own breakdown attached.
