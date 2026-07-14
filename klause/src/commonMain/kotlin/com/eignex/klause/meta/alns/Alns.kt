@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
+import com.eignex.klause.localsearch.PooledSolutionImporter
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -154,8 +155,13 @@ internal class Alns(
         // Build the acceptance policy once the initial objective is known, so a simulated-annealing
         // temperature can be scaled to the problem (see [acceptanceFor]); else use the fixed policy.
         val acceptancePolicy = acceptanceFor?.invoke(bestObj) ?: acceptance
-        // Identity-gates redundant pooled-solution imports across iterations.
-        var lastPooled: Sample? = null
+        // Cross-engine solution flow (#644): adopt a fresher-and-better pooled assignment as the incumbent
+        // before destroying, so the next neighbourhood searches around the globally-best assignment.
+        val pooledImporter = PooledSolutionImporter(
+            supplier = pooledSolutionSupplier,
+            enabled = params.assumptions.isEmpty,
+            evaluate = { scoring.evaluate(it) },
+        )
 
         val perIterParams = params.copy(
             maxFlips = flipsPerIteration,
@@ -173,23 +179,11 @@ internal class Alns(
         var iter = 0
         while (iter < maxIterations) {
             if (params.cancellation()) break
-            // Cross-engine flow (#644): adopt a better pooled solution as the incumbent before destroying,
-            // so the next neighbourhood searches around the globally-best assignment any arm has found.
-            // Skipped under assumption pins, which a foreign full assignment may violate.
-            pooledSolutionSupplier?.let { supplier ->
-                if (params.assumptions.isEmpty) {
-                    val pooled = supplier()
-                    if (pooled != null && pooled !== lastPooled) {
-                        lastPooled = pooled
-                        val pooledObj = scoring.evaluate(pooled)
-                        if (pooledObj < bestObj) {
-                            bestSample = pooled
-                            bestObj = pooledObj
-                            incumbent = pooled
-                            incumbentObj = pooledObj
-                        }
-                    }
-                }
+            pooledImporter.poll(bestObj)?.let { (sample, obj) ->
+                bestSample = sample
+                bestObj = obj
+                incumbent = sample
+                incumbentObj = obj
             }
             val destroyIdx = destroyBandit.choose()
             val repairIdx = repairBandit.choose()
