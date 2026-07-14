@@ -1,8 +1,6 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -17,15 +15,10 @@ import com.eignex.klause.util.IntHashSet
  * monotone `v` (appearing in only one polarity) is a degenerate case: its clauses are satisfiable by the
  * pure value and simply drop, adding no resolvents.
  *
- * Eligibility is deliberately narrow so the elimination and its reconstruction stay in Boolean space:
- *  - `v` must be an objective-free Boolean variable, and
- *  - every factor mentioning `v` must be an all-Boolean [Clause] (`allLiteralsBool`), i.e. no
- *    cardinality / pseudo-Boolean / reified / integer factor and no atom-literal touches `v`.
- *
- * The eliminated `v` is left unconstrained in the reduced problem, so this is **not** solution-set
- * preserving (a complete enumerator over-counts, #507); its value is recovered from the removed clauses
- * by [BveReconstruct]. Resolution of two all-Boolean clauses yields an all-Boolean clause, so the
- * eligibility invariant is preserved and further eliminations can chain on the resolvents.
+ * Operates on the shared [SatClauseDb], so a variable is eliminable only when [SatClauseDb.eligible] —
+ * objective-free and appearing solely in clean all-Boolean clauses. The eliminated `v` is left
+ * unconstrained in the reduced problem, so this is **not** solution-set preserving (a complete
+ * enumerator over-counts, #507); its value is recovered from the removed clauses by [BveReconstruct].
  */
 internal object BoundedVariableElimination {
 
@@ -43,105 +36,30 @@ internal object BoundedVariableElimination {
     ): PassDelta {
         val nb = problem.numBoolVars
         if (nb == 0) return PassDelta()
-        val factors = problem.factors
-
-        // A variable is eliminable only while every factor touching it is a clean all-Boolean clause.
-        val eligible = BooleanArray(nb) { it !in objectiveBoolVars }
-        for (f in factors) {
-            if (isCleanClause(f, nb)) continue
-            for (w in f.boolVars) if (w in 0 until nb) eligible[w] = false
-        }
-        if (!eligible.any { it }) return PassDelta()
-
-        // Clause database over the clean clauses: `slotLits[s]` is a clause (null once removed), `slotOrig`
-        // its input factor index (or -1 for a resolvent). Tautological input clauses are always true, so
-        // they are dropped as vacuous rather than entered.
-        val slotLits = ArrayList<IntArray?>()
-        val slotOrig = IntArrayList()
-        val vacuous = IntArrayList()
-        for (i in factors.indices) {
-            val f = factors[i]
-            if (!isCleanClause(f, nb)) continue
-            val lits = (f as Clause).literals
-            if (isTautology(lits)) {
-                vacuous.add(i)
-            } else {
-                slotLits.add(lits)
-                slotOrig.add(i)
-            }
-        }
-        // Per-variable occurrence lists into the slot database; stale (removed) slots are skipped on read.
-        val occ = Array(nb) { IntArrayList() }
-        for (s in slotLits.indices) slotLits[s]?.let { addOcc(occ, s, it, nb) }
+        val db = SatClauseDb.build(problem, objectiveBoolVars)
 
         val eliminations = ArrayList<VarElim>()
-        var changed = false
-
         // Cheapest-first: a low-degree variable is likeliest to eliminate within the bound.
-        val order = (0 until nb).filter { eligible[it] }.sortedBy { occ[it].size }
+        val order = (0 until nb)
+            .filter { db.eligible[it] }
+            .sortedBy { db.occ(Lit.make(it, true)).size + db.occ(Lit.make(it, false)).size }
         for ((idx, v) in order.withIndex()) {
             if ((idx and CANCEL_POLL_MASK) == 0 && cancellation()) break
-            if (eliminateVar(v, slotLits, slotOrig, occ, nb, eliminations)) changed = true
+            eliminateVar(v, db, eliminations)
         }
 
-        if (!changed && vacuous.isEmpty()) return PassDelta()
-
-        val dropped = IntArrayList()
-        for (i in 0 until vacuous.size) dropped.add(vacuous[i])
-        val added = ArrayList<Factor>()
-        for (s in slotLits.indices) {
-            val lits = slotLits[s]
-            val orig = slotOrig[s]
-            when {
-                lits == null && orig >= 0 -> dropped.add(orig)
-
-                // an input clause consumed by an elimination
-                lits != null && orig < 0 -> added.add(Clause(lits)) // a surviving resolvent
-                // lits != null && orig >= 0: input clause survives unchanged — kept, not in the delta.
-                // lits == null && orig < 0: a resolvent later consumed — nothing to emit.
-            }
-        }
-        return PassDelta(
-            droppedIndices = dropped.toIntArray(),
-            addedFactors = added,
-            reconstruct = BveReconstruct(eliminations)::reconstruct,
-        )
+        return db.toDelta(if (eliminations.isEmpty()) null else BveReconstruct(eliminations)::reconstruct)
     }
 
-    /** Try to eliminate [v] against the live clause database; returns true if it was eliminated. */
-    private fun eliminateVar(
-        v: Int,
-        slotLits: ArrayList<IntArray?>,
-        slotOrig: IntArrayList,
-        occ: Array<IntArrayList>,
-        nb: Int,
-        eliminations: ArrayList<VarElim>,
-    ): Boolean {
-        // Gather v's live clauses, keeping each slot index alongside its (non-null) literals so the commit
-        // can null the slot without re-reading through a nullable.
+    /** Try to eliminate [v] against the live clause database. */
+    private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>) {
         val posSlots = IntArrayList()
         val negSlots = IntArrayList()
         val posLits = ArrayList<IntArray>()
         val negLits = ArrayList<IntArray>()
-        val col = occ[v]
-        val seenSlots = IntHashSet(col.size)
-        for (k in 0 until col.size) {
-            val s = col[k]
-            val lits = slotLits[s] ?: continue
-            if (!seenSlots.add(s)) continue
-            var hasPos = false
-            var hasNeg = false
-            for (l in lits) if (Lit.variable(l) == v) if (Lit.isPositive(l)) hasPos = true else hasNeg = true
-            if (hasPos) {
-                posSlots.add(s)
-                posLits.add(lits)
-            }
-            if (hasNeg) {
-                negSlots.add(s)
-                negLits.add(lits)
-            }
-        }
-        if (posLits.isEmpty() && negLits.isEmpty()) return false
+        gather(db, Lit.make(v, true), posSlots, posLits)
+        gather(db, Lit.make(v, false), negSlots, negLits)
+        if (posLits.isEmpty() && negLits.isEmpty()) return
 
         val clauses = ArrayList<IntArray>(posLits.size + negLits.size)
         clauses.addAll(posLits)
@@ -153,50 +71,35 @@ internal object BoundedVariableElimination {
         if (posLits.isEmpty() || negLits.isEmpty()) {
             resolvents = emptyList()
         } else {
-            if (posLits.size.toLong() * negLits.size > RESOLVENT_PRODUCT_CAP) return false
+            if (posLits.size.toLong() * negLits.size > RESOLVENT_PRODUCT_CAP) return
             val out = ArrayList<IntArray>()
             val seen = HashSet<List<Int>>() // exact literal-set identity — a lossy hash could drop a needed resolvent
             for (a in posLits.indices) {
                 for (b in negLits.indices) {
                     val r = resolve(posLits[a], negLits[b], v) ?: continue // tautology
                     if (seen.add(r.sorted())) out.add(r)
-                    if (out.size > clauses.size) return false // unbounded: give up before committing
+                    if (out.size > clauses.size) return // unbounded: give up before committing
                 }
             }
             resolvents = out
         }
 
         // Commit: remove v's clauses, add the resolvents, and record the removed clauses for reconstruction.
-        for (k in 0 until posSlots.size) slotLits[posSlots[k]] = null
-        for (k in 0 until negSlots.size) slotLits[negSlots[k]] = null
-        for (r in resolvents) {
-            val s = slotLits.size
-            slotLits.add(r)
-            slotOrig.add(-1)
-            addOcc(occ, s, r, nb)
-        }
+        for (k in 0 until posSlots.size) db.remove(posSlots[k])
+        for (k in 0 until negSlots.size) db.remove(negSlots[k])
+        for (r in resolvents) db.add(r)
         eliminations.add(VarElim(v, clauses))
-        return true
     }
 
-    /** Add slot [s] to the occurrence list of every Boolean variable in [lits]. */
-    private fun addOcc(occ: Array<IntArrayList>, s: Int, lits: IntArray, nb: Int) {
-        for (l in lits) {
-            val w = Lit.variable(l)
-            if (w in 0 until nb) occ[w].add(s)
+    /** Collect the live slots (and their literals) that contain [lit] into the parallel lists. */
+    private fun gather(db: SatClauseDb, lit: Int, slots: IntArrayList, lits: ArrayList<IntArray>) {
+        val col = db.occ(lit)
+        for (k in 0 until col.size) {
+            val s = col[k]
+            val c = db.clause(s) ?: continue
+            slots.add(s)
+            lits.add(c)
         }
-    }
-
-    private fun isCleanClause(f: Factor, nb: Int): Boolean = f is Clause && f.allLiteralsBool(nb)
-
-    /** A clause containing a literal and its negation — always true. */
-    private fun isTautology(lits: IntArray): Boolean {
-        val seen = IntHashSet(lits.size)
-        for (l in lits) {
-            if (Lit.negate(l) in seen) return true
-            seen.add(l)
-        }
-        return false
     }
 
     /** Resolve [c1] (contains `+v`) and [c2] (contains `¬v`) on [v]: their literals minus the `v`

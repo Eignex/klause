@@ -474,6 +474,20 @@ enum class PresolvePass(
             Presolve.eliminateBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
+    /** Blocked-clause elimination over the pure-SAT part (#24): drop a clause blocked on an eligible
+     *  literal (every opposite clause clashes elsewhere). The clause is satisfiability-redundant and
+     *  rebuilt on reconstruct, so like BVE it is solution-set-sensitive (#507). */
+    ELIMINATE_BLOCKED_CLAUSES(
+        "bce",
+        Stage.PROBLEM,
+        PresolveTiming.EXHAUSTIVE,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.eliminateBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
+    },
+
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
      *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so it has no
