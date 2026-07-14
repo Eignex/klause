@@ -95,7 +95,7 @@ internal object SolveCore {
             // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); `cp`
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
             // single resolved arm runs as a one-arm pool, subsuming the former naked single engines.
-            Engine.CP, Engine.LS, Engine.MIXED ->
+            Engine.CP, Engine.LS, Engine.MIXED, Engine.ALNS ->
                 runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel)
         }
     }

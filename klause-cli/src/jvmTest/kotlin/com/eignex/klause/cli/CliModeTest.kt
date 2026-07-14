@@ -426,6 +426,17 @@ class CliModeTest {
     }
 
     @Test
+    fun `alns engine optimizes a small cop`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve minimize x;\n")
+            deleteOnExit()
+        }
+        // `-e alns` routes to the hybrid-ALNS portfolio (EngineMix.ALNS). x < 3 over 1..3 ⇒ optimum x = 1.
+        val out = capture { main(arrayOf("-e", "alns", "-p", "2", "-t", "10000", fzn.absolutePath)) }
+        assertTrue("x = 1" in out, out)
+    }
+
+    @Test
     fun `minizinc standard -f -p routes to a parallel portfolio`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
