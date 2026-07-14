@@ -23,12 +23,19 @@ import com.eignex.klause.util.EmptyIntArray
  * clamped to the variable's domain. Terms pair [coeffs] with [vars]; the sum is compared by [op]
  * against [bound].
  */
-class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, override val bound: Long) :
+class Linear private constructor(terms: CoalescedTerms, rawOp: LinearOp, rawBound: Long) :
     Factor,
     LinearRow {
 
+    // Canonicalise inequalities to ≤ at construction — the LP/MIP convention the cut separators
+    // (FlowCoverSeparator, knapsack cover) expect. A ≥ becomes ≤ by negating the coefficients and bound;
+    // = / ≠ keep their orientation. So an inequality [Linear] always reports [op] `LE`, and a constraint
+    // and its negation share a structural key (so the two dedup as one).
+    val op: LinearOp = if (rawOp == LinearOp.GE) LinearOp.LE else rawOp
+    override val bound: Long = if (rawOp == LinearOp.GE) -rawBound else rawBound
     val vars: IntArray = terms.vars
-    val coeffs: LongArray = terms.coeffs
+    val coeffs: LongArray =
+        if (rawOp == LinearOp.GE) LongArray(terms.coeffs.size) { -terms.coeffs[it] } else terms.coeffs
 
     init {
         require(coeffs.isNotEmpty()) { "linear sum must have at least one term" }

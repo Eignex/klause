@@ -52,8 +52,9 @@ class IntOperatorsTest {
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
 
-        assertEquals(LinearOp.GE, linear.op)
-        assertEquals(2L, linear.bound)
+        // `x - y ≥ 2` is canonicalised to `≤` at construction: `−x + y ≤ −2`.
+        assertEquals(LinearOp.LE, linear.op)
+        assertEquals(-2L, linear.bound)
         assertEquals(setOf(1L, -1L), linear.coeffs.toSet())
     }
 
