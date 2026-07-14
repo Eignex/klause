@@ -858,9 +858,10 @@ internal object AffineSingletons {
             for (id in touched) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
-                slots[id] = f.remap(boolMap, intMap)
+                val remapped = f.remap(boolMap, intMap)
+                slots[id] = remapped
                 intOcc[y].removeValue(id)
-                for (v in f.intVars) if (v == y) intOcc[y].add(id)
+                if (remapped.intVars.contains(y)) intOcc[y].add(id)
             }
             intOcc[c.x].clear()
             drop(c.defIdx)
