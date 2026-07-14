@@ -159,15 +159,11 @@ object LpAutoConfig {
                 }
 
                 is Cumulative -> {
+                    cumulative = true
                     scheduling = true
-                    // The no-overlap (unary) case turns the scheduling stack on but not the cumulative
-                    // makespan row / energetic scan — the disjunctive relaxation carries its own bound.
-                    if (!f.unary) {
-                        cumulative = true
-                        // The scan skips factors above its own task cap; they cost nothing.
-                        val t = f.starts.size.toLong()
-                        if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
-                    }
+                    // The scan skips factors above its own task cap; they cost nothing.
+                    val t = f.starts.size.toLong()
+                    if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
                 }
 
                 is PseudoBoolean -> {
