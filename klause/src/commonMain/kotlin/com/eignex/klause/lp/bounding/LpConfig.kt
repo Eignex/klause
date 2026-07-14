@@ -6,7 +6,7 @@ package com.eignex.klause.lp.bounding
  * emphasis level is "how expensive an LP technique may be" — a config-time cost ceiling.
  *
  * This is the **static** half of the LP cost model: it decides which techniques a solve may build. Its
- * **runtime** counterpart is [com.eignex.klause.backtrack.lp.LpEffort] — the per-node effort the
+ * **runtime** counterpart is [LpEffort] — the per-node effort the
  * controller actually pushes the simplex to, descending under cost. The simplex tiers line up rung for
  * rung: [MEDIUM] ↔ `LpEffort.BOUND`, [EXHAUSTIVE] ↔ `LpEffort.CUTS`; [FAST] is the combinatorial arms
  * that sit outside the simplex ladder.

@@ -2,8 +2,6 @@ package com.eignex.klause.bench.tune
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
-import com.eignex.klause.backtrack.lp.LpConfig
-import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.selector.Chb
 import com.eignex.klause.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.backtrack.selector.IndomainMax
@@ -25,6 +23,8 @@ import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 
 /**
  * The backtrack config search space (task #21) — variable/value selectors × restart cadence × phase
