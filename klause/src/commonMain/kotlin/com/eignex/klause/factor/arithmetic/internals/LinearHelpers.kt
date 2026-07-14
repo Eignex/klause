@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic.internals
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.lp.gcdLong
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyLongArray
@@ -272,6 +273,22 @@ internal fun propagateLinearBounds(
         LinearOp.EQ -> if (sumLo > bound || sumHi < bound) return false
         LinearOp.NE -> if (sumLo == bound && sumHi == bound) return false
     }
+    // `Σ cᵢ·xᵢ = bound` ranges over exactly the multiples of `gcd(cᵢ)`, so an integer solution exists
+    // only when that gcd divides `bound` — a check independent of the (possibly very wide) variable
+    // bounds. Catching it here in O(n) short-circuits the O(span) bound-narrowing that would otherwise
+    // grind one step per round toward the empty domain (e.g. `3x + 3y = 1`).
+    if (op == LinearOp.EQ) {
+        var g = 0L
+        for (i in 0 until n) g = gcdLong(g, coeffs[i])
+        if (g > 1L && bound % g != 0L) return false
+    }
+    // At the root (level 0) a bound move is a permanent fact whose antecedents are never consumed:
+    // conflict analysis runs only above the root, and it drops level-0 literals by their level rather
+    // than resolving through their reason. Collecting the reason there is pure waste — and on a wide
+    // domain a slow-converging linear bound narrows ~1 per round for O(span) rounds, each round citing
+    // (and materializing) a fresh order atom whose sorted-index insert is O(n): O(span²) overall, the
+    // #18 root-bake hang. Skip it at the root, leaving the actual bound tightening untouched.
+    val rootFact = state.currentLevel == 0
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]
@@ -287,7 +304,11 @@ internal fun propagateLinearBounds(
             if (rhs % c != 0L) continue
             val forbidden = rhs / c
             if (forbidden < Int.MIN_VALUE || forbidden > Int.MAX_VALUE) continue
-            val ant = collectLinearTightenAntecedents(state, vars, i, extraLit, includeExtraLit = includeExtraLit)
+            val ant = if (rootFact) {
+                null
+            } else {
+                collectLinearTightenAntecedents(state, vars, i, extraLit, includeExtraLit = includeExtraLit)
+            }
             if (!state.excludeIntValue(v, forbidden, ant)) return false
         }
         return true
@@ -297,6 +318,7 @@ internal fun propagateLinearBounds(
     var hiBase: IntArray? = null
     var hiBaseBuilt = false
     fun loReason(i: Int): IntArray? {
+        if (rootFact) return null
         if (!wide) {
             return collectLinearDirAntecedents(
                 state,
@@ -324,6 +346,7 @@ internal fun propagateLinearBounds(
         return loBase
     }
     fun hiReason(i: Int): IntArray? {
+        if (rootFact) return null
         if (!wide) {
             return collectLinearDirAntecedents(
                 state,
