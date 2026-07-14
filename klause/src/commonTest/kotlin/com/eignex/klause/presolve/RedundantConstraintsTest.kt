@@ -106,7 +106,8 @@ class RedundantConstraintsTest {
             ),
         )
         val out = checkPreserved("dominated-ge", problem, expectDrop = true)
-        assertEquals(4L, (out.factors.single() as Linear).bound)
+        // `x ≥ 4` is stored canonically as `−x ≤ −4`; the tighter constraint survives.
+        assertEquals(-4L, (out.factors.single() as Linear).bound)
     }
 
     @Test

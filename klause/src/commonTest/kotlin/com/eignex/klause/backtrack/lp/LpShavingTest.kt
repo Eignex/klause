@@ -81,8 +81,10 @@ class LpShavingTest {
                 token = Cancellation.Never,
             ) ?: return@repeat
             covered++
-            // Brute force the true minimum cost over {0,1}ⁿ (covering rows only; the channelling EQ defines cost).
-            val covering = factors.filterIsInstance<Linear>().filter { it.op == LinearOp.GE }
+            // Brute force the true minimum cost over {0,1}ⁿ (covering rows only; the channelling EQ defines
+            // cost). The covering `≥` rows are canonicalised to `≤` at construction, so filter and test in
+            // that orientation (the feasible set is identical).
+            val covering = factors.filterIsInstance<Linear>().filter { it.op == LinearOp.LE }
             var best = cap + 1
             for (mask in 0 until (1 shl n)) {
                 var ok = true
@@ -91,7 +93,7 @@ class LpShavingTest {
                 for (f in covering) {
                     var s = 0L
                     for (idx in f.vars.indices) s += f.coeffs[idx] * ((mask shr f.vars[idx]) and 1)
-                    if (s < f.bound) {
+                    if (s > f.bound) {
                         ok = false
                         break
                     }
