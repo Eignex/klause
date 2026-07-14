@@ -11,9 +11,12 @@ import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.kumulant.bandit.univariate.BetaBernoulliTS
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit
 import kotlin.random.Random
@@ -468,6 +471,38 @@ class AlnsTest {
             incumbents.zipWithNext().all { (a, b) -> b <= a },
             "the factory's Improving policy must govern, so the incumbent never worsens: $incumbents",
         )
+    }
+
+    /** A local-search stub that never reaches feasibility — its minimize always returns [MinimizeResult.Unknown]. */
+    private class NoFeasibleLs(override val problem: Problem) : Optimizer<LocalSearchParams> {
+        override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
+            MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
+
+        override fun solve(params: LocalSearchParams) = error("unused")
+        override fun samples(params: LocalSearchParams) = error("unused")
+        override fun enumerate(params: LocalSearchParams) = error("unused")
+    }
+
+    @Test
+    fun `falls back to a backtrack bootstrap when local search finds no feasible incumbent`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        // The inner LS never finds feasible; the complete backtrack bootstrap must supply the incumbent so
+        // ALNS optimises instead of returning empty (the dominant issue the bench sweep mined).
+        val alns = Alns(
+            inner = NoFeasibleLs(problem),
+            repairOperators = BacktrackRepair.Defaults,
+            backtrack = BacktrackSolver(problem),
+            backtrackParams = BacktrackParams(),
+            maxIterations = 8,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        assertNotNull(sample, "the backtrack bootstrap must supply a feasible incumbent when LS fails")
+        assertEquals(3.0, objective.evaluate(sample), "the bootstrapped incumbent optimises to the true optimum")
     }
 
     @Test

@@ -9,8 +9,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * JVM-only because we use [Thread] to flip the cancellation flag concurrently. The
@@ -86,6 +90,31 @@ class CancellationTest {
             r is SolveResult.Sat || r is SolveResult.Unknown,
             "expected Sat or Unknown (cancelled), got $r",
         )
+    }
+
+    @Test
+    fun `deadline-backed tokens expose a deadline, plain predicates do not`() {
+        assertNotNull(Cancellation.after(1.seconds).deadline(), "after() is deadline-backed")
+        assertNull(Cancellation.Never.deadline(), "Never carries no deadline")
+        assertNull(Cancellation { false }.deadline(), "a plain predicate carries no deadline")
+    }
+
+    @Test
+    fun `shorten fires earlier than the full deadline and no-ops without one`() {
+        val full = Cancellation.after(100.seconds)
+        val short = full.shorten(0.1)
+        assertTrue(short.deadline()!! < full.deadline()!!, "the shortened token's deadline is earlier")
+        // A deadline-less token can't be shortened — it comes back untouched.
+        val bare = Cancellation.Never.shorten(0.1)
+        assertNull(bare.deadline())
+        assertFalse(bare.isCancelled())
+    }
+
+    @Test
+    fun `or surfaces the earlier deadline`() {
+        val soon = Cancellation.after(1.seconds)
+        val late = Cancellation.after(100.seconds)
+        assertTrue((late or soon).deadline()!! <= soon.deadline()!!, "the composite reports the earlier bound")
     }
 
     private fun unsatThreeBools(): Problem {

@@ -29,6 +29,7 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
 /**
@@ -119,7 +120,14 @@ internal object SolveCore {
         // Anchored once at process start (see CommonOptions.deadlineAtMs) so the bake and the
         // solve share one budget; fall back to a fresh anchor if it was never set.
         val deadline = common.deadlineAtMs ?: common.timeLimitMs?.let { nowMillis() + it }
-        val cancel = if (deadline != null) Cancellation { nowMillis() > deadline } else Cancellation.Never
+        // Deadline-backed (Monotonic) rather than a bare `nowMillis()` predicate, so budget-relative tokens
+        // like [Cancellation.shorten] can be computed from it downstream (the ALNS bootstrap). Fires at the
+        // same absolute instant as the epoch deadline.
+        val cancel = if (deadline != null) {
+            Cancellation.after((deadline - nowMillis()).coerceAtLeast(0L).milliseconds)
+        } else {
+            Cancellation.Never
+        }
         return deadline to cancel
     }
 
