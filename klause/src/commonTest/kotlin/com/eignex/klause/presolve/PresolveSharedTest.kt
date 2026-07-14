@@ -141,4 +141,21 @@ class PresolveSharedTest {
         )
         assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), Presolve.amoCliques(problem))
     }
+
+    @Test
+    fun `maxIntSpan reports the widest integer domain span`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 3), IntDomain(-5, 10), IntDomain(7, 7)),
+            emptyList(),
+        )
+        assertEquals(15L, PresolveShared.maxIntSpan(problem))
+    }
+
+    @Test
+    fun `maxIntSpan saturates an overflowing span rather than wrapping negative`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), emptyList())
+        assertEquals(Long.MAX_VALUE, PresolveShared.maxIntSpan(problem))
+    }
 }

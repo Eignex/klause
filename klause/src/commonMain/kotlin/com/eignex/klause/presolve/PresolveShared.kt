@@ -197,6 +197,18 @@ internal object PresolveShared {
         return g
     }
 
+    /** The widest integer-variable domain span (`max − min`, saturating to [Long.MAX_VALUE] on overflow),
+     *  or 0 when there are no integer variables. A cheap O(numIntVars) gate for the span-sensitive
+     *  presolve steps — it reads each domain's endpoints only, never enumerating values. */
+    fun maxIntSpan(problem: Problem): Long {
+        var widest = 0L
+        for (d in problem.intDomains) {
+            val span = d.max - d.min
+            widest = maxOf(widest, if (span < 0L) Long.MAX_VALUE else span)
+        }
+        return widest
+    }
+
     private fun gcd(a: Long, b: Long): Long {
         var x = if (a < 0) -a else a
         var y = if (b < 0) -b else b

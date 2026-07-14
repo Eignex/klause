@@ -25,6 +25,13 @@ const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
  *  OBBT fails to derive a real bound (see [KlauseConfig.smtUnboundedSearchBound]). */
 const val DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND: Long = 1_000_000
 
+/** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
+ *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a
+ *  genuinely wide domain — where the root bake's bound propagation would grind O(span) — pays for the LP
+ *  feasibility / bound-tightening that runs ahead of the bake. A pure cost gate; the result is unchanged
+ *  either way. Widen or lower it via env `KLAUSE_LARGE_SPAN_THRESHOLD`. */
+const val DEFAULT_LARGE_SPAN_THRESHOLD: Long = 1_000_000
+
 /** Default number of uniformly-spaced buckets a `floatVar` is discretised into. 10-bit
  *  precision is enough for typical config-style fractions; raise it for finer granularity. */
 const val DEFAULT_FLOAT_BUCKETS: Int = 1024
@@ -104,6 +111,11 @@ data class KlauseConfig(
      *  [MINIZINC_UNBOUNDED_DEFAULT] this approximates an infinite domain rather than being a real bound;
      *  widen it (env `KLAUSE_SMT_UNBOUNDED_SEARCH_BOUND`) to trade search cost for SAT reach. */
     val smtUnboundedSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
+
+    /** Integer-domain span above which the span-gated LP presolve steps engage (see
+     *  [DEFAULT_LARGE_SPAN_THRESHOLD]). A pure cost gate — below it, presolve/solve behaviour is
+     *  unchanged; above it, the LP feasibility / bound-tightening runs ahead of the O(span) root bake. */
+    val largeSpanThreshold: Long = DEFAULT_LARGE_SPAN_THRESHOLD,
 
     /** Number of uniformly-spaced buckets a `floatVar` is discretised into when no explicit
      *  count is given. Higher = finer precision, more bits per float var. */

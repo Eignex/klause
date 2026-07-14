@@ -130,6 +130,11 @@ object KlauseConfigSchema : Schema<ConfigSpec>() {
         c.copy(smtUnboundedSearchBound = v)
     }
 
+    /** Override for [KlauseConfig.largeSpanThreshold]. */
+    val largeSpanThreshold by long(KlauseConfig.DEFAULT.largeSpanThreshold) { c, v ->
+        c.copy(largeSpanThreshold = v)
+    }
+
     /** Override for [KlauseConfig.floatBuckets]. */
     val floatBuckets by int(KlauseConfig.DEFAULT.floatBuckets) { c, v -> c.copy(floatBuckets = v) }
 
