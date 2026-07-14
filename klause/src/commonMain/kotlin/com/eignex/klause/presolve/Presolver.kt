@@ -488,6 +488,19 @@ enum class PresolvePass(
             Presolve.eliminateBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
+    /** At-most-one clique merging (#17): grow the pairwise exclusion constraints into maximal cliques and
+     *  materialise each as one `Cardinality(max = 1)`, dropping the binary clauses / smaller at-most-ones
+     *  it subsumes. Solution-set exact (the clique at-most-one equals the pairwise exclusions). */
+    MERGE_AMO_CLIQUES(
+        "amo-clique",
+        Stage.PROBLEM,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.mergeAmoCliques(problem)
+    },
+
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
      *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so it has no
