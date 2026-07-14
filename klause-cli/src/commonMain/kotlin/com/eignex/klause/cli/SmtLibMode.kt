@@ -29,7 +29,7 @@ internal object SmtLibMode : CliMode {
                 readTextFile(path),
                 config.unboundedIntLo,
                 config.unboundedIntHi,
-                smtSearchBound = config.smtUnboundedSearchBound,
+                searchBound = config.unboundedSearchBound,
             )
             domainsClamped = parsed.domainsClamped
             cliLogger(common.verbose).v {

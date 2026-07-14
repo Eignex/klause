@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.config.DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
@@ -49,9 +49,9 @@ object SmtLibQfLia {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
-        smtSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
+        searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     ): SmtLibProblem {
-        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, smtSearchBound)
+        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
         for (cmd in SExprReader(text).readAll()) b.command(cmd)
         return b.build()
     }
@@ -62,7 +62,7 @@ object SmtLibQfLia {
         val unboundedIntLo: Long,
         val unboundedIntHi: Long,
         val strictBounds: Boolean,
-        val smtSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
+        val searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     ) : CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()

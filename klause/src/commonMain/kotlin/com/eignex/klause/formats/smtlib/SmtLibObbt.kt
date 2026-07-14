@@ -85,10 +85,10 @@ private fun addFactorRow(builder: LpBuilder, col: IntArray, f: Linear) {
 /** Close every remaining [PresolveDomain.Open] to the searchable fallback and flag the model clamped. */
 private fun SmtLibQfLia.Builder.finalizeDomains() {
     // A side still open falls back to a searchable range: the caller's own finite [unboundedIntLo] /
-    // [unboundedIntHi] when set, else ±[smtSearchBound]. Clamping is lossy, so it flags the model — an
+    // [unboundedIntHi] when set, else ±[searchBound]. Clamping is lossy, so it flags the model — an
     // `unsat` over the box becomes `unknown`.
-    val fallbackLo = maxOf(unboundedIntLo, -smtSearchBound)
-    val fallbackHi = minOf(unboundedIntHi, smtSearchBound)
+    val fallbackLo = maxOf(unboundedIntLo, -searchBound)
+    val fallbackHi = minOf(unboundedIntHi, searchBound)
     for (v in 0 until nextInt) {
         val d = intDomains[v] as? PresolveDomain.Open ?: continue
         val newLo = d.lo ?: fallbackLo.also { domainsClamped = true }
