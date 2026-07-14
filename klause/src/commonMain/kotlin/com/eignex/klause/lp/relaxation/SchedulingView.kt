@@ -1,12 +1,11 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.lp.bound.CumulativeFlowBound
 import com.eignex.klause.solver.Problem
 
 /**
- * A [Cumulative] / [Disjunctive] normalized to the constant data the LP relaxations and the flow
+ * A [Cumulative] normalized to the constant data the LP relaxations and the flow
  * bound consume: per-task constant duration, **minimum** resource demand, and the **maximum**
  * (declared) capacity. Using the min demand and max capacity keeps every derived constraint a sound
  * relaxation — it can only loosen, never cut off a feasible schedule.
@@ -27,7 +26,7 @@ internal class SchedulingView(
     val capacity: Long,
 )
 
-/** Every [Cumulative] / [Disjunctive] of [problem], normalized; factors the relaxations cannot soundly
+/** Every [Cumulative] of [problem], normalized; factors the relaxations cannot soundly
  *  encode (variable durations, optional tasks, non-positive capacity, empty) are omitted. */
 internal fun schedulingViews(problem: Problem): List<SchedulingView> {
     val out = ArrayList<SchedulingView>()
@@ -45,11 +44,6 @@ internal fun schedulingViews(problem: Problem): List<SchedulingView> {
                     }
                 }
                 out.add(SchedulingView(f.starts, f.durations, res, cap))
-            }
-
-            is Disjunctive -> {
-                if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty() || f.starts.isEmpty()) continue
-                out.add(SchedulingView(f.starts, f.durations, LongArray(f.starts.size) { 1L }, capacity = 1L))
             }
 
             else -> Unit

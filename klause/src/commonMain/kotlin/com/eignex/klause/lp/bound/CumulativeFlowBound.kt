@@ -14,8 +14,8 @@ import com.eignex.klause.util.LongHashSet
 
 /**
  * Preemptive min-cost-flow feasibility bound for the scheduling globals (#454). The exact
- * **preemptive** relaxation of a [com.eignex.klause.factor.scheduling.Cumulative] /
- * [com.eignex.klause.factor.scheduling.Disjunctive]: every task `i` must place its work `Eᵢ = durᵢ·resᵢ`
+ * **preemptive** relaxation of a [com.eignex.klause.factor.scheduling.Cumulative]
+ * (including its unary no-overlap mode): every task `i` must place its work `Eᵢ = durᵢ·resᵢ`
  * somewhere in its release/deadline window `[estᵢ, lstᵢ + durᵢ)` at a rate of at most `resᵢ` per time
  * unit, and at every instant the total rate stays ≤ `capacity`. That is feasible iff a max-flow
  * saturates a transportation network

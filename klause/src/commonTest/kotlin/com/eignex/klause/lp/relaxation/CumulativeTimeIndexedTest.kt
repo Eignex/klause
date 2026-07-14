@@ -6,7 +6,6 @@ import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.LpStatus
 import com.eignex.klause.lp.Relation
@@ -43,7 +42,7 @@ class CumulativeTimeIndexedTest {
         for (i in 0 until n) factors.add(Linear(longArrayOf(1, -1), intArrayOf(n, i), LinearOp.GE, durations[i]))
         factors.add(
             if (disjunctive) {
-                Disjunctive(IntArray(n) { it }, durations)
+                Cumulative.unary(IntArray(n) { it }, durations)
             } else {
                 Cumulative(IntArray(n) { it }, durations, resources, capacity)
             },
@@ -96,7 +95,7 @@ class CumulativeTimeIndexedTest {
             0,
             3,
             Array(3) { IntDomain(0, 20) },
-            arrayOf<Factor>(Disjunctive(intArrayOf(0, 1, 2), longArrayOf(2, 3, 4))),
+            arrayOf<Factor>(Cumulative.unary(intArrayOf(0, 1, 2), longArrayOf(2, 3, 4))),
         )
         // Serial by SPT: starts 0, 2, 5 ⇒ Σ = 7 (the plain LP gives 0).
         assertEquals(0.0, sumStartBound(p, intArrayOf(0, 1, 2), timeIndexed = false), eps)

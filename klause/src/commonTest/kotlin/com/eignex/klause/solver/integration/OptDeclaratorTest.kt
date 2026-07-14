@@ -5,7 +5,6 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -253,7 +252,7 @@ class OptDisjunctiveTest {
     fun `present tasks don't overlap`() {
         val s = S()
         val compiled = s.compile()
-        assertNotNull(compiled.problem.factors.filterIsInstance<Disjunctive>().singleOrNull())
+        assertNotNull(compiled.problem.factors.filterIsInstance<Cumulative>().singleOrNull { it.unary })
         val solver = LocalSearchSolver(
             compiled.problem,
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),

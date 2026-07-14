@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.IntDomain
@@ -198,8 +197,8 @@ class StructuralReductionTest {
             ),
         )
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
-        assertTrue(out.factors.none { it is Cumulative }, "the cumulative is removed")
-        val disj = out.factors.filterIsInstance<Disjunctive>().single()
+        assertTrue(out.factors.none { it is Cumulative && !it.unary }, "the cumulative is reduced to a unary one")
+        val disj = out.factors.filterIsInstance<Cumulative>().single { it.unary }
         assertEquals(listOf(0, 1, 2), disj.starts.toList())
     }
 

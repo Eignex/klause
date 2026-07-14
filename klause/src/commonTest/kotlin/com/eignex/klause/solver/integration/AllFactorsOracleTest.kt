@@ -25,7 +25,6 @@ import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
@@ -380,7 +379,7 @@ class AllFactorsOracleTest {
     }
 
     @Test fun `disjunctive passes the brute-force propagation and repair oracles`() {
-        val f = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(2, 1))
+        val f = Cumulative.unary(starts = intArrayOf(0, 1), durations = longArrayOf(2, 1))
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
     }
 

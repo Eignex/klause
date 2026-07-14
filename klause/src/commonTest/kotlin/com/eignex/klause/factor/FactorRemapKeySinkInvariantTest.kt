@@ -23,7 +23,6 @@ import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
@@ -101,7 +100,12 @@ class FactorRemapKeySinkInvariantTest {
             intArrayOf(9, 10),
             false,
         ),
-        "Disjunctive" to Disjunctive(intArrayOf(1, 2), longArrayOf(3, 4), intArrayOf(pos(0), neg(5)), intArrayOf(6, 7)),
+        "Disjunctive" to Cumulative.unary(
+            intArrayOf(1, 2),
+            longArrayOf(3, 4),
+            intArrayOf(pos(0), neg(5)),
+            intArrayOf(6, 7),
+        ),
         "Mdd" to Mdd(
             intArrayOf(1, 2),
             intArrayOf(1, 1, 1),

@@ -22,6 +22,10 @@ import com.eignex.klause.util.IntIntMap
  * tasks running at that point stays under [capacity]. Task `i` has variable start time
  * `starts(i)`, fixed duration `durations(i) ≥ 0`, fixed resource demand `resources(i) ≥ 0`.
  *
+ * The unit-resource / capacity-1 special case (no two tasks overlap) is the disjunctive
+ * (one-machine) constraint; select it with [Cumulative.unary], which flips [unary] to dispatch the
+ * stronger disjunctive propagator and invariant. See [unary] for the reasoning it enables.
+ *
  * Semantics:
  *  - Task `i` occupies the half-open interval `[starts(i), starts(i) + durations(i))`.
  *  - For every integer time point `t`, `Σ_{i: starts(i) ≤ t < starts(i)+durations(i)} resources(i) ≤ capacity`.
@@ -81,6 +85,12 @@ class Cumulative(
     val resourceVars: IntArray = EmptyIntArray,
     /** Capacity variable id; -1 = use [capacity] as a constant. */
     val capacityVar: Int = -1,
+    /** No-overlap (unary-resource / one-machine) mode. When true the resource is never shared, so the
+     *  factor dispatches the stronger disjunctive reasoning — time-tabling, detectable precedences, and
+     *  unit Θ-tree edge-finding — instead of the cumulative time-tabling propagator. [resources] are unit
+     *  and [capacity] is 1 in this mode (see [Cumulative.unary]); the disjunctive propagator reads only
+     *  the start/duration windows. */
+    val unary: Boolean = false,
 ) : Factor,
     OptionalFactor {
 
@@ -114,15 +124,16 @@ class Cumulative(
         durationVars.remapVars(intMap),
         resourceVars.remapVars(intMap),
         if (capacityVar >= 0) intMap[capacityVar] else capacityVar,
+        unary,
     )
 
     // When no two tasks can run at once — the two smallest resource demands already exceed the capacity
-    // — the resource is never shared, so the cumulative is exactly a [Disjunctive] (no-overlap), whose
-    // theta-tree / edge-finding propagator is both stronger and cheaper for that case. Only constant
+    // — the resource is never shared, so the cumulative is exactly the no-overlap ([unary]) case, whose
+    // theta-tree / edge-finding propagator is both stronger and cheaper. Only constant
     // durations/resources/capacity reduce; a single demand above capacity is left to the propagator to
     // report infeasible.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
-        if (durationVars.isNotEmpty() || resourceVars.isNotEmpty() || capacityVar >= 0 || n < 2) {
+        if (unary || durationVars.isNotEmpty() || resourceVars.isNotEmpty() || capacityVar >= 0 || n < 2) {
             return FactorReduction.Unchanged
         }
         var min1 = Long.MAX_VALUE
@@ -137,7 +148,7 @@ class Cumulative(
             }
         }
         if (min1 + min2 <= capacity) return FactorReduction.Unchanged
-        return FactorReduction.Rewrite(listOf(Disjunctive(starts, durations, presents)))
+        return FactorReduction.Rewrite(listOf(unary(starts, durations, presents)))
     }
 
     /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all
@@ -151,6 +162,7 @@ class Cumulative(
     // durations/resources/capacity are constant magnitudes; starts/durationVars/resourceVars are int-var
     // ids; capacityVar is an int var or a negative sentinel; presents are Boolean literals.
     private fun buildKey(sink: KeySink) {
+        sink.bool(unary)
         sink.long(capacity)
         sink.intVarOrSelf(capacityVar)
         sink.constLongs(durations)
@@ -213,22 +225,46 @@ class Cumulative(
     /** Index of [varId] in `resourceVars`, or `-1` if it is not a resource variable. */
     fun resPosOf(varId: Int): Int = resPos[varId]
 
-    override fun asPropagator(): Propagator = CumulativePropagator(
-        intVars = intVars,
-        starts = starts,
-        durations = durations,
-        resources = resources,
-        capacity = capacity,
-        presents = presents,
-        durationVars = durationVars,
-        resourceVars = resourceVars,
-        capacityVar = capacityVar,
-        n = n,
-        sharpReasonEligible = sharpReasonEligible,
-        constantEnergyAndCap = constantEnergyAndCap,
-    )
+    override fun asPropagator(): Propagator = if (unary) {
+        DisjunctivePropagator(
+            intVars = intVars,
+            starts = starts,
+            durations = durations,
+            presents = presents,
+            durationVars = durationVars,
+            n = n,
+        )
+    } else {
+        CumulativePropagator(
+            intVars = intVars,
+            starts = starts,
+            durations = durations,
+            resources = resources,
+            capacity = capacity,
+            presents = presents,
+            durationVars = durationVars,
+            resourceVars = resourceVars,
+            capacityVar = capacityVar,
+            n = n,
+            sharpReasonEligible = sharpReasonEligible,
+            constantEnergyAndCap = constantEnergyAndCap,
+        )
+    }
 
-    override fun asInvariant(): Invariant = CumulativeInvariant(
+    override fun asInvariant(): Invariant = if (unary) {
+        // The unit-resource / capacity-1 cumulative cost model is the no-overlap gradient.
+        DisjunctiveInvariant(
+            starts = starts,
+            durations = durations,
+            presents = presents,
+            durationVars = durationVars,
+            cumulativeBacking = cumulativeInvariant(),
+        )
+    } else {
+        cumulativeInvariant()
+    }
+
+    private fun cumulativeInvariant(): CumulativeInvariant = CumulativeInvariant(
         starts = starts,
         durations = durations,
         resources = resources,
@@ -242,4 +278,27 @@ class Cumulative(
         durPosOf = ::durPosOf,
         resPosOf = ::resPosOf,
     )
+
+    /** Factories for the [Cumulative] special cases. */
+    companion object {
+        /**
+         * The no-overlap (unary-resource / one-machine) special case: unit demands, capacity 1, [unary]
+         * mode. Tasks may not overlap in time. Dispatches the stronger disjunctive propagator; see the
+         * class KDoc's mode note.
+         */
+        fun unary(
+            starts: IntArray,
+            durations: LongArray,
+            presents: IntArray = EmptyIntArray,
+            durationVars: IntArray = EmptyIntArray,
+        ): Cumulative = Cumulative(
+            starts = starts,
+            durations = durations,
+            resources = LongArray(starts.size) { 1L },
+            capacity = 1L,
+            presents = presents,
+            durationVars = durationVars,
+            unary = true,
+        )
+    }
 }

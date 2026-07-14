@@ -7,7 +7,6 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.lp.LpStatus
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
@@ -48,7 +47,7 @@ class CumulativeRelaxationTest {
         }
         factors.add(
             if (disjunctive) {
-                Disjunctive(IntArray(n) { it }, durations)
+                Cumulative.unary(IntArray(n) { it }, durations)
             } else {
                 Cumulative(IntArray(n) { it }, durations, resources, capacity)
             },

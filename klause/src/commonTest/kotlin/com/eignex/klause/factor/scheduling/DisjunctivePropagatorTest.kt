@@ -5,7 +5,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
@@ -31,7 +30,7 @@ class DisjunctivePropagatorTest {
             numIntVars = 4,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
             factors = arrayOf<Factor>(
-                Disjunctive(starts = intArrayOf(0, 1, 2, 3), durations = longArrayOf(1, 1, 1, 1)),
+                Cumulative.unary(starts = intArrayOf(0, 1, 2, 3), durations = longArrayOf(1, 1, 1, 1)),
             ),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -59,7 +58,7 @@ class DisjunctivePropagatorTest {
             numBoolVars = 0,
             numIntVars = 3,
             intDomains = arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
-            factors = arrayOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(3, 3, 3))),
+            factors = arrayOf<Factor>(Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = longArrayOf(3, 3, 3))),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -85,7 +84,7 @@ class DisjunctivePropagatorTest {
         // Two unit-resource tasks, durations 3 and 3, starts in [0, 5]. A level-1 decision
         // squeezes both starts' max down to 2, so each task occupies a window [est, 2+3) = [0, 5)
         // of length 5 while their combined energy is 6 > 5 — an energetic overload.
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(3, 3))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1), durations = longArrayOf(3, 3))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -116,7 +115,7 @@ class DisjunctivePropagatorTest {
                 numBoolVars = 0,
                 numIntVars = 3,
                 intDomains = Array(3) { IntDomain(0, 3) },
-                factors = listOf<Factor>(Disjunctive(starts = intArrayOf(0, 1, 2), durations = durs)),
+                factors = listOf<Factor>(Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = durs)),
             )
             val brute = HashSet<List<Int>>()
             for (s0 in 0..3) {
@@ -154,7 +153,7 @@ class DisjunctivePropagatorTest {
                     if (i < 3) IntDomain(0, 3) else IntDomain(durVals[i - 3].toLong(), durVals[i - 3].toLong())
                 },
                 factors = listOf<Factor>(
-                    Disjunctive(
+                    Cumulative.unary(
                         starts = intArrayOf(0, 1, 2),
                         durations = longArrayOf(1, 1, 1), // ignored: durationVars takes precedence
                         durationVars = intArrayOf(3, 4, 5),
@@ -187,7 +186,7 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `pairwise detectable precedence pushes the earliest start`() {
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(3, 1))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1), durations = longArrayOf(3, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -212,7 +211,7 @@ class DisjunctivePropagatorTest {
         // dom_2 = [0, 4], task 2 collapses to the singleton {4} → Implied.ints[2] = 4.
         // Pairwise detectable precedences alone cannot derive this because no single
         // pair triggers (est_i + dur_i ≤ lst_j for every i, j pair in [0, 3] dom).
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -232,7 +231,7 @@ class DisjunctivePropagatorTest {
         // the union overflows the window, so it must end before all of {0, 1}, forcing
         // start_2.max ≤ lct({0,1}) − sum_dur({0,1}) − dur_2 = 6 − 4 − 2 = 0. With dom_2 =
         // [0, 4] task 2 collapses to {0}.
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -250,7 +249,7 @@ class DisjunctivePropagatorTest {
         // (mandatory part [1, 2)), task 1 (dur 1, dom [0, 3]) can legitimately run at t=0,
         // before task 0. A flat-add detection would wrongly force task 1 after task 0
         // (start ≥ 2); the sound Env(Θ ∪ {i}) insertion must leave t=0 reachable.
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(1, 1))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1), durations = longArrayOf(1, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -263,7 +262,7 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `BacktrackSolver enumerates exactly the 6 disjunctive schedules of three unit tasks`() {
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(1, 1, 1))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = longArrayOf(1, 1, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -286,7 +285,7 @@ class DisjunctivePropagatorTest {
 
     @Test
     fun `pure pairwise infeasibility is caught`() {
-        val factor = Disjunctive(starts = intArrayOf(0, 1), durations = longArrayOf(1, 1))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1), durations = longArrayOf(1, 1))
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,

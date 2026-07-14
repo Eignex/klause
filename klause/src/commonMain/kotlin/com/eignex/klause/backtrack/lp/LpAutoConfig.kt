@@ -17,7 +17,6 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
@@ -54,7 +53,7 @@ import com.eignex.klause.solver.Problem
  *    so the O(windows² · tasks) window scan stays a bounded fraction of a node's cost (a per-check
  *    budget normalization, [ENERGETIC_OPS_PER_CHECK] — the same class of guard as the tableau
  *    cap, not a tuning judgement); a caller who enabled the check explicitly keeps their cadence.
- *  - **[LpPlan.cumulative]** — a [Cumulative] / [Disjunctive] with a *verifiable*
+ *  - **[LpPlan.cumulative]** — a [Cumulative] with a *verifiable*
  *    makespan variable is present (the energetic makespan LP row, #430). Applicability is the
  *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
  *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
@@ -160,14 +159,16 @@ object LpAutoConfig {
                 }
 
                 is Cumulative -> {
-                    cumulative = true
                     scheduling = true
-                    // The scan skips factors above its own task cap; they cost nothing.
-                    val t = f.starts.size.toLong()
-                    if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
+                    // The no-overlap (unary) case turns the scheduling stack on but not the cumulative
+                    // makespan row / energetic scan — the disjunctive relaxation carries its own bound.
+                    if (!f.unary) {
+                        cumulative = true
+                        // The scan skips factors above its own task cap; they cost nothing.
+                        val t = f.starts.size.toLong()
+                        if (t <= CumulativeEnergeticBound.MAX_TASKS) energeticOps += t * t * t
+                    }
                 }
-
-                is Disjunctive -> scheduling = true
 
                 is PseudoBoolean -> {
                     pseudoBoolean = true
