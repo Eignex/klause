@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 
 /**
  * Disjunction of Boolean literals.
@@ -84,5 +86,10 @@ class Clause(val literals: IntArray) : Factor {
     /** LP relaxation: the feasibility-defining row `Σ literals ≥ 1`. */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
+    }
+
+    /** Exact linear view: the clause `Σ literals ≥ 1` over its Boolean literals. */
+    override val linearRows: List<LinearRow> by lazy {
+        listOf(LinearRow(EmptyLongArray, EmptyIntArray, LinearOp.GE, 1L, LongArray(literals.size) { 1L }, literals))
     }
 }

@@ -83,7 +83,7 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 
-    override fun linearRows(): List<LinearRow> = listOf(LinearRow(coeffs, vars, op, bound))
+    override val linearRows: List<LinearRow> by lazy { listOf(LinearRow(coeffs, vars, op, bound)) }
 }
 
 /** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient

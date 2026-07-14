@@ -126,11 +126,12 @@ internal object RedundantConstraints {
             }
         }
         for (f in deduped) {
-            // Any factor with an exact linear form (a Linear comparator, or each pair of an increasing
-            // chain) feeds the dominator buckets through its rows; PB inequalities, which have no
-            // linear-row view, contribute through ineqNormalForm.
-            val rows = f.linearRows()
-            if (rows != null) {
+            // Any factor with an exact integer-linear form (a Linear comparator, or each pair of an
+            // increasing chain) feeds the dominator buckets through its rows; Boolean-literal rows
+            // (clause / cardinality / pseudo-Boolean) contribute through ineqNormalForm, the bool-aware
+            // path (folding them into this int-keyed bucket is a follow-up).
+            val rows = f.linearRows
+            if (rows.isNotEmpty() && rows.none { it.boolLits.isNotEmpty() }) {
                 for (row in rows) {
                     val n = rowForm(row) ?: continue
                     offer(n.key, n.bound, fromEq = n.fromEq)
@@ -419,8 +420,8 @@ internal object RedundantConstraints {
     /** Replay the from-scratch phase-2 offer sequence for [f]: each exact `≤`-row (a `≥` folded to `≤`,
      *  an `=` contributing both directions), or the whole-factor normal form when it has no row view. */
     private inline fun forEachOffer(f: Factor, action: (key: TermKey, bound: Long, eq: Boolean) -> Unit) {
-        val rows = f.linearRows()
-        if (rows != null) {
+        val rows = f.linearRows
+        if (rows.isNotEmpty() && rows.none { it.boolLits.isNotEmpty() }) {
             for (row in rows) {
                 val n = rowForm(row) ?: continue
                 action(n.key, n.bound, n.fromEq)
@@ -511,7 +512,9 @@ internal object RedundantConstraints {
         val candidates = ArrayList<LeRow>()
         for (i in factors.indices) {
             val f = factors[i]
-            val fRows = f.linearRows() ?: continue
+            val fRows = f.linearRows
+            // This monotone-domination scan reads the integer side; skip Boolean-literal rows for now.
+            if (fRows.isEmpty() || fRows.any { it.boolLits.isNotEmpty() }) continue
             val droppable = f is Linear
             for (row in fRows) {
                 val le = leRowOf(row, i) ?: continue
