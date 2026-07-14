@@ -1,17 +1,17 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.lp.LpEngine
 import com.eignex.klause.backtrack.lp.LpHints
-import com.eignex.klause.backtrack.lp.harvestRootCuts
 import com.eignex.klause.backtrack.lp.lbTreeSearch
 import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
-import com.eignex.klause.backtrack.lp.rootLpRelaxationBound
-import com.eignex.klause.backtrack.lp.shaveObjectiveLb
-import com.eignex.klause.backtrack.lp.shaveVariableBounds
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.harvestRootCuts
+import com.eignex.klause.lp.bounding.rootLpRelaxationBound
+import com.eignex.klause.lp.bounding.shaveObjectiveLb
+import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession

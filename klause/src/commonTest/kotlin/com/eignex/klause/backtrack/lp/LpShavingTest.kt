@@ -2,6 +2,11 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.lp.bounding.shaveObjectiveLb
+import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

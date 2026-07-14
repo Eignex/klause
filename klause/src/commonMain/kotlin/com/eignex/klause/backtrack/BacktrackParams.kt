@@ -1,10 +1,5 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.lp.LpAutoConfig
-import com.eignex.klause.backtrack.lp.LpConfig
-import com.eignex.klause.backtrack.lp.LpEmphasis
-import com.eignex.klause.backtrack.lp.LpParams
-import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
@@ -16,6 +11,11 @@ import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.lp.bounding.LpAutoConfig
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR

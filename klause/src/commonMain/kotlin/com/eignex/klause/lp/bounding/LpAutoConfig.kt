@@ -1,6 +1,5 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
@@ -68,7 +67,7 @@ import com.eignex.klause.solver.Problem
  * internal caps and are not size-gated here. An explicit caller flag bypasses the guard: every flag is
  * OR-ed onto `base`, so an explicit setting is never turned *off*.
  *
- * Called by `BacktrackSolver` under [BacktrackParams.lpConfig] (via [resolve]); also callable
+ * Called by `BacktrackSolver` under `BacktrackParams.lpConfig` (via [resolve]); also callable
  * directly for ahead-of-time configuration (the bench's auto mode).
  */
 object LpAutoConfig {
@@ -93,8 +92,7 @@ object LpAutoConfig {
 
     /** `base` with every structurally-applicable LP technique enabled — i.e. [resolve] at the
      *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). The historical structural auto-config. */
-    fun recommend(problem: Problem, base: LpPlan = LpPlan()): LpPlan =
-        resolve(problem, LpConfig.AGGRESSIVE, base)
+    fun recommend(problem: Problem, base: LpPlan = LpPlan()): LpPlan = resolve(problem, LpConfig.AGGRESSIVE, base)
 
     /**
      * `base` with each LP technique enabled where [problem]'s structure makes it applicable **and**

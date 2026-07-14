@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack.lp
 
+import com.eignex.klause.lp.bounding.LpWallBreaker
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

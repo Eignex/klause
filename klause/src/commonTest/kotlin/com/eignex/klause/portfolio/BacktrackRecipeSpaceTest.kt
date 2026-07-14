@@ -1,6 +1,6 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.backtrack.lp.LpEmphasis
+import com.eignex.klause.lp.bounding.LpEmphasis
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

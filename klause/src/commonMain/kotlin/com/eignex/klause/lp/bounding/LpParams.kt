@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.solver.Cancellation
@@ -23,14 +23,15 @@ class LpParams(
     /** Seed for the feasibility-pump RNG; null picks a fixed default. */
     val randomSeed: Long? = null,
 ) {
+    /** These params with [lpPlan] replaced (the resolved-plan swap [LpEngine] makes after auto-config). */
     fun copy(lpPlan: LpPlan = this.lpPlan): LpParams =
         LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed)
 }
 
 /**
  * The LP-solution sink [LpEngine] records each node's fractional primal and reduced costs into. The
- * search-layer branching-hint store ([LpHints]) implements it; presolve passes no sink. Keeping the engine
- * dependent only on this record interface (not on [LpHints], which reads the backtrack `VarRef` selector
+ * search-layer branching-hint store (`LpHints`) implements it; presolve passes no sink. Keeping the engine
+ * dependent only on this record interface (not on `LpHints`, which reads the backtrack `VarRef` selector
  * type) is what lets the engine live below the search layer.
  */
 internal interface LpHintSink {

@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
 /**
  * Ordered LP effort rungs (#32), cheapest first — the **runtime** counterpart of the static

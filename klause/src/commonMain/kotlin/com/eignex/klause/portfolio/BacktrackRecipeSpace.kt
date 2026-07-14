@@ -2,8 +2,6 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.RestartSchedule
-import com.eignex.klause.backtrack.lp.LpConfig
-import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.selector.ActivityBasedSearch
 import com.eignex.klause.backtrack.selector.DomWdeg
 import com.eignex.klause.backtrack.selector.IndomainMax
@@ -13,6 +11,8 @@ import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.lp.bounding.LpEmphasis
 import kotlin.random.Random
 
 /**

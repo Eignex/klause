@@ -1,6 +1,6 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.lp.LpAutoConfig
+import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
@@ -260,16 +260,6 @@ internal const val CANCEL_CHECK_INTERVAL: Int = 256
 /** Target wall-clock gap (ms) between deadline polls; the adaptive cadence steers toward it so `-t`
  *  overshoot stays ~this small regardless of per-node cost. */
 internal const val CANCEL_CHECK_TARGET_MS: Long = 5
-
-/** Most Gomory cuts to draw from one tableau per separation round (#22). */
-internal const val GOMORY_CUTS_PER_ROUND: Int = 8
-
-/** Separation rounds when harvesting the persistent root cut pool. */
-internal const val CUT_POOL_ROUNDS: Int = 8
-
-/** Separation rounds per during-search node (#41) — fewer than the root harvest, since the node solve
- *  repeats deeper in the tree. */
-internal const val SEARCH_CUT_ROUNDS: Int = 4
 
 /** Cap on cascading CDB backjumps within a single search step. Defensive; under
  *  a well-formed analyzer the loop terminates well before this. */

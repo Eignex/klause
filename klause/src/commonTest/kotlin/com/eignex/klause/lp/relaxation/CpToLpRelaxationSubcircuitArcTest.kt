@@ -2,11 +2,11 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

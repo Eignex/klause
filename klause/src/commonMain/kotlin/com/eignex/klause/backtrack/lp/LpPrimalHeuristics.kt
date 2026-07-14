@@ -3,6 +3,8 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.dualSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult

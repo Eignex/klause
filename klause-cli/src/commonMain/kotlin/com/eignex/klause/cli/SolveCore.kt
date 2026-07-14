@@ -3,9 +3,9 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix

@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
@@ -259,8 +259,9 @@ internal class LpEngine(
     )
     val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null
     private val lpBasisByDepth = ArrayList<Basis?>()
+
     /** LP-solution record sink for branching hints (set by the search when LP branching is on; null in
-     *  presolve). The engine only records into it; the concrete [LpHints] and its selection reads live in
+     *  presolve). The engine only records into it; the concrete `LpHints` and its selection reads live in
      *  the search layer. */
     var lpHints: LpHintSink? = null
     private var lpBackjump: Learned? = null
