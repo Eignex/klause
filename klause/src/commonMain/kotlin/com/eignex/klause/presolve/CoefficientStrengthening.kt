@@ -32,6 +32,7 @@ internal object CoefficientStrengthening {
     fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
+        var infeasible = false
         val factors = problem.factors
         for (i in factors.indices) {
             // Poll the presolve deadline: on a multi-million-row model (Coprime) the per-factor strengthen
@@ -45,6 +46,7 @@ internal object CoefficientStrengthening {
             if (contradiction != null) {
                 dropped.add(i)
                 added.addAll(contradiction)
+                infeasible = true
                 continue
             }
             val rewritten = when (factor) {
@@ -60,7 +62,7 @@ internal object CoefficientStrengthening {
             }
         }
         if (dropped.isEmpty()) return PassDelta()
-        return PassDelta(dropped.toIntArray(), added)
+        return PassDelta(dropped.toIntArray(), added, infeasible = infeasible)
     }
 
     /** Poll the cancellation once per this many strengthened factors (power-of-two mask for a cheap test). */

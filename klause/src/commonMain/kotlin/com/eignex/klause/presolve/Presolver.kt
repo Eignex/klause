@@ -227,6 +227,11 @@ class PassDelta(
     /** Lifts a solution of the transformed problem back to the pass's input, when the pass changed the
      *  variable mapping (affine / dup-columns / implication merges); `null` for a plain transform. */
     val reconstruct: ((Sample) -> Sample)? = null,
+    /** Whether the pass proved the problem infeasible outright (e.g. a gcd-indivisible equality). Lets a
+     *  caller short-circuit — reporting infeasibility without materializing/baking the problem — instead
+     *  of relying on the added contradiction to surface as an `Unsat` bake (which on a wide domain would
+     *  first grind O(span)). */
+    val infeasible: Boolean = false,
 ) {
     /** Whether the pass changed nothing this round — the round engine's fixpoint signal. */
     val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null
@@ -702,6 +707,17 @@ object Presolver {
         val passes = config.problemPasses(context)
         val maxRounds = config.emphasis.maxRounds
         if (passes.isEmpty() || maxRounds == 0) return Presolved(problem, { it })
+        // Coefficient strengthening runs first, before the [PresolveSession] seed forces the root bake:
+        // a gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
+        // variable bounds, so it is caught here in O(factors) rather than letting the seed's bake narrow
+        // it toward the empty domain one step per round — O(span) on a wide domain. Only the infeasible
+        // case short-circuits; a feasible strengthening is recomputed (idempotently) by the round engine
+        // below. (The CLI presolve driver runs the same check before its own [RootBaker] reseed.)
+        if (PresolvePass.STRENGTHEN_COEFFICIENTS in passes &&
+            Presolve.strengthenCoefficients(problem, cancellation).infeasible
+        ) {
+            return Presolved(problem, { it }, infeasible = true)
+        }
         // Hand the round-engine cancellation to the passes so the long-running ones (affine fixpoint,
         // symmetry search) poll it internally — a presolve budget then bounds them, not just the gaps
         // between passes. Derive the underdetermined flag once from the original problem — later rounds

@@ -79,6 +79,14 @@ internal object SolveCore {
         }
         output.begin(solvable.optimize, solvable.maximize)
 
+        // Presolve already proved infeasibility (e.g. a gcd-indivisible equality caught by the
+        // first-running coefficient-strengthening pass): report it directly rather than invoking a
+        // solver, whose root bake would re-derive it by O(span) bound-narrowing on a wide clamped domain.
+        if (solvable.presolve?.infeasible == true) {
+            output.onComplete(Verdict.UNSATISFIABLE)
+            return
+        }
+
         // `-p N` is MiniZinc-standard parallelism = the **core** count (#406). The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
         // engine (fixed) is inherently single-core.
