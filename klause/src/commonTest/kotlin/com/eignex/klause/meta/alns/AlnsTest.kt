@@ -105,7 +105,8 @@ class AlnsTest {
         val inner = LocalSearchSolver(problem)
         val alns = Alns(
             inner = inner,
-            destroyFraction = 0.5,
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
             maxIterations = 8,
             flipsPerIteration = 200L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
@@ -127,7 +128,8 @@ class AlnsTest {
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem),
             backtrackParams = BacktrackParams(),
-            destroyFraction = 0.5,
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
             maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
@@ -146,7 +148,8 @@ class AlnsTest {
         val published = mutableListOf<Pair<Sample, Double>>()
         val alns = Alns(
             inner = LocalSearchSolver(problem),
-            destroyFraction = 0.5,
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
             maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
             improvedSolutionSink = { sample, obj -> published.add(sample to obj) },
@@ -168,7 +171,8 @@ class AlnsTest {
         val optimal = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
         val alns = Alns(
             inner = LocalSearchSolver(problem),
-            destroyFraction = 0.5,
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
             maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
             pooledSolutionSupplier = {
@@ -200,7 +204,8 @@ class AlnsTest {
             backtrackParams = BacktrackParams(
                 clauseExchange = PoolClauseExchange(pool, skipPermanent = true, shareGlobalNogoods = false),
             ),
-            destroyFraction = 0.5,
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
             maxIterations = 10,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
@@ -225,7 +230,8 @@ class AlnsTest {
         val alns = Alns(
             inner = inner,
             repairOperators = listOf(InnerLsRepair("quick", 200L), InnerLsRepair("deep", 1_000L)),
-            destroyFraction = 0.5,
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
             maxIterations = 12,
             flipsPerIteration = 500L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
@@ -413,5 +419,78 @@ class AlnsTest {
         val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 5, flipsPerIteration = 100L)
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
         assertNotNull(sample, "ALNS should still return the initial solve's incumbent")
+    }
+
+    @Test
+    fun `randomized destroy size varies across iterations`() {
+        val problem = Problem(
+            numBoolVars = 20,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(Cardinality(IntArray(20) { Lit.make(it, true) }, min = 5, max = 20)),
+        )
+        val objective = LinearObjective(boolWeights = LongArray(20) { (it + 1).toLong() })
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            minDestroyFraction = 0.1,
+            maxDestroyFraction = 0.6,
+            maxIterations = 20,
+        )
+        alns.minimize(objective, LocalSearchParams(maxFlips = 500L, randomSeed = 1L))
+        val freedCounts = alns.iterationLog.map { it.freedCount }.toSet()
+        assertTrue(freedCounts.size >= 2, "the destroy size must vary across iterations, got $freedCounts")
+    }
+
+    @Test
+    fun `acceptanceFor overrides the fixed acceptance and sees the initial objective`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        var seenInitial = Double.NaN
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
+            maxIterations = 12,
+            // The fixed acceptance would allow worsening incumbents; the factory's Improving must win.
+            acceptance = AcceptanceCriterion.RandomWalk,
+            acceptanceFor = { initial ->
+                seenInitial = initial
+                AcceptanceCriterion.Improving
+            },
+        )
+        alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L))
+        assertTrue(seenInitial.isFinite(), "the factory receives the initial incumbent's objective")
+        val incumbents = alns.iterationLog.map { it.incumbentObjective }
+        assertTrue(
+            incumbents.zipWithNext().all { (a, b) -> b <= a },
+            "the factory's Improving policy must govern, so the incumbent never worsens: $incumbents",
+        )
+    }
+
+    @Test
+    fun `alns with noisy greedy repair still reaches the optimum`() {
+        val factor = Cardinality.exactlyOne(
+            intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
+        )
+        val problem = Problem(4, 0, emptyArray(), listOf(factor))
+        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
+        val alns = Alns(
+            inner = LocalSearchSolver(problem),
+            repairOperators = listOf(GreedyConstructionRepair(noise = 0.5)),
+            minDestroyFraction = 0.5,
+            maxDestroyFraction = 0.5,
+            maxIterations = 20,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
+        )
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        assertNotNull(sample)
+        assertEquals(
+            3.0,
+            objective.evaluate(sample),
+            "insertion noise diversifies but repair stays feasible and optimal",
+        )
     }
 }

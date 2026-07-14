@@ -27,7 +27,7 @@ import kotlin.random.Random
  *      `MultiArmedBandit(BetaBernoulliTS())` for Thompson sampling or any other
  *      kumulant policy).
  *   2. Pick a repair operator from [repairOperators] via [repairBandit].
- *   3. Free `destroyFraction * totalVars` variables; pin the rest at incumbent values
+ *   3. Free a randomized fraction of the variables; pin the rest at incumbent values
  *      via [Assumptions].
  *   4. Hand the pinned problem to the chosen repair operator (typically calls
  *      `inner.minimize` with the pin set; alternative operators can vary the budget,
@@ -55,7 +55,17 @@ internal class Alns(
     val destroyOperators: List<DestroyOperator> = DestroyOperator.Defaults,
     val repairOperators: List<RepairOperator> = RepairOperator.Defaults,
     val acceptance: AcceptanceCriterion = AcceptanceCriterion.Improving,
-    val destroyFraction: Double = 0.25,
+    /** Optional factory building the acceptance criterion from the initial incumbent's objective. A
+     *  simulated-annealing temperature is only meaningful relative to the objective's magnitude, so this
+     *  lets a caller scale the starting temperature to `f(initial)` (a fixed temperature would be inert on
+     *  a large objective and reckless on a tiny one). When null, [acceptance] is used as given. */
+    val acceptanceFor: ((initialObjective: Double) -> AcceptanceCriterion)? = null,
+    /** Bounds on the destroy size, as a fraction of the total variables. Each iteration draws the fraction
+     *  uniformly from `[minDestroyFraction, maxDestroyFraction]` (fixed when they are equal) — the textbook
+     *  ALNS randomized degree of destruction, alternating small refining neighbourhoods with large
+     *  diversifying ones so no single fixed size dominates the search. */
+    val minDestroyFraction: Double = 0.1,
+    val maxDestroyFraction: Double = 0.4,
     val maxIterations: Int = 50,
     val flipsPerIteration: Long = 1_000L,
     val newBestReward: Double = 3.0,
@@ -100,7 +110,10 @@ internal class Alns(
         require(repairOperators.size == repairBandit.nbrArms) {
             "repairBandit arm count ${repairBandit.nbrArms} doesn't match repairOperators ${repairOperators.size}"
         }
-        require(destroyFraction in 0.0..1.0) { "destroyFraction must be in [0, 1], got $destroyFraction" }
+        require(minDestroyFraction in 0.0..1.0) { "minDestroyFraction must be in [0, 1], got $minDestroyFraction" }
+        require(maxDestroyFraction in minDestroyFraction..1.0) {
+            "maxDestroyFraction ($maxDestroyFraction) must be in [minDestroyFraction, 1]"
+        }
     }
 
     override val problem: Problem get() = inner.problem
@@ -138,6 +151,9 @@ internal class Alns(
         var incumbent = bestSample
         var incumbentObj = bestObj
         improvedSolutionSink?.invoke(bestSample, bestObj)
+        // Build the acceptance policy once the initial objective is known, so a simulated-annealing
+        // temperature can be scaled to the problem (see [acceptanceFor]); else use the fixed policy.
+        val acceptancePolicy = acceptanceFor?.invoke(bestObj) ?: acceptance
         // Identity-gates redundant pooled-solution imports across iterations.
         var lastPooled: Sample? = null
 
@@ -177,6 +193,12 @@ internal class Alns(
             }
             val destroyIdx = destroyBandit.choose()
             val repairIdx = repairBandit.choose()
+            // Randomized degree of destruction: a fresh fraction each iteration (textbook ALNS).
+            val destroyFraction = if (maxDestroyFraction > minDestroyFraction) {
+                minDestroyFraction + rng.nextDouble() * (maxDestroyFraction - minDestroyFraction)
+            } else {
+                minDestroyFraction
+            }
             val freed = destroyOperators[destroyIdx]
                 .destroy(rng, inner.problem, incumbent, objective, destroyFraction)
             if (freed.isEmpty) {
@@ -202,7 +224,7 @@ internal class Alns(
             val repairedObj = scoring.evaluate(repaired)
 
             val isNewBest = repairedObj < bestObj
-            val accept = isNewBest || acceptance.accept(repairedObj, incumbentObj, rng)
+            val accept = isNewBest || acceptancePolicy.accept(repairedObj, incumbentObj, rng)
             val reward = when {
                 isNewBest -> newBestReward
                 accept -> acceptedReward
