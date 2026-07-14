@@ -1,7 +1,12 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
@@ -284,5 +289,41 @@ object RootBaker {
         bools[forcedVar] = forcedValue
         implied.forEachBool { k, b -> bools[k] = b }
         implied.forEachInt { k, i -> ints[k] = i }
+    }
+
+    /**
+     * [problem] with an explicit contradiction appended so its bake propagation reports `Unsat` — the
+     * materialization a caller uses when an oracle (e.g. the LP harvest) has certified infeasibility but a
+     * concrete infeasible [Problem] is needed. Two equalities pinning one variable to consecutive values
+     * (or a Boolean forced both ways) are jointly unsatisfiable regardless of domains, so the conflict is
+     * witnessed without depending on the certifying proof being re-derivable downstream.
+     */
+    fun provenInfeasible(problem: Problem, config: BakeConfig): Problem {
+        val factors = ArrayList<Factor>(problem.factors.size + 2)
+        factors.addAll(problem.factors)
+        when {
+            problem.numIntVars > 0 -> {
+                val min = problem.intDomains[0].min
+                val c = if (min < Long.MAX_VALUE) min else min - 1
+                factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
+                factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
+            }
+
+            problem.numBoolVars > 0 -> {
+                factors.add(Clause(intArrayOf(Lit.make(0, true)))) // b0 = true
+                factors.add(Clause(intArrayOf(Lit.make(0, false)))) // b0 = false
+            }
+
+            else -> return problem // no variable to pin a contradiction on (a variable-free problem)
+        }
+        return reseed(
+            Problem(
+                numBoolVars = problem.numBoolVars,
+                numIntVars = problem.numIntVars,
+                intDomains = problem.intDomains.copyOf(),
+                factors = factors,
+            ),
+            config,
+        )
     }
 }

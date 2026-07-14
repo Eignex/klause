@@ -3,8 +3,8 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.lp.LpAutoConfig
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.lp.LpEmphasis
-import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.lp.LpParams
+import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
