@@ -1,13 +1,8 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
@@ -78,7 +73,7 @@ fun lpHarvestReporting(
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
     if (engine.rootInfeasible(cancellation)) {
-        return LpHarvestResult(provenInfeasible(problem, bakeConfig), LpHarvestReport(rootInfeasible = true))
+        return LpHarvestResult(RootBaker.provenInfeasible(problem, bakeConfig), LpHarvestReport(rootInfeasible = true))
     }
     if (!plan.variableShaving && !plan.objectiveShaving) return LpHarvestResult(problem, LpHarvestReport())
 
@@ -149,40 +144,4 @@ fun lpHarvestReporting(
         bakeConfig,
     )
     return LpHarvestResult(transformed, report)
-}
-
-/**
- * [problem] with an explicit contradiction appended so its bake propagation reports `Unsat` — used when
- * the LP harvest has *certified* the root relaxation infeasible. Two equalities pinning one variable to
- * consecutive values (or a Boolean forced both ways) are jointly unsatisfiable regardless of domains, so
- * the conflict is witnessed without depending on the LP proof being re-derivable downstream. Sound: an
- * infeasible problem has no solutions, and the relaxation infeasibility certifies there are none.
- */
-private fun provenInfeasible(problem: Problem, bakeConfig: BakeConfig): Problem {
-    val factors = ArrayList<Factor>(problem.factors.size + 2)
-    factors.addAll(problem.factors)
-    when {
-        problem.numIntVars > 0 -> {
-            val min = problem.intDomains[0].min
-            val c = if (min < Long.MAX_VALUE) min else min - 1
-            factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
-            factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
-        }
-
-        problem.numBoolVars > 0 -> {
-            factors.add(Clause(intArrayOf(Lit.make(0, true)))) // b0 = true
-            factors.add(Clause(intArrayOf(Lit.make(0, false)))) // b0 = false
-        }
-
-        else -> return problem // no variable to pin a contradiction on (a variable-free problem)
-    }
-    return RootBaker.reseed(
-        Problem(
-            numBoolVars = problem.numBoolVars,
-            numIntVars = problem.numIntVars,
-            intDomains = problem.intDomains.copyOf(),
-            factors = factors,
-        ),
-        bakeConfig,
-    )
 }
