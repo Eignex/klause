@@ -4,6 +4,7 @@ import com.eignex.klause.factor.*
 import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
+import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.*

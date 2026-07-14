@@ -16,14 +16,14 @@ const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
 
 /** MiniZinc's own default range for an unbounded `var int` (`±10^6`). This is a *semantic* default: a
  *  MiniZinc `var int` with no declared bounds genuinely **is** this range, so the FlatZinc front-end
- *  adopts it and an `unsat` within it is a sound `unsat`. Distinct from [KlauseConfig.smtUnboundedSearchBound],
+ *  adopts it and an `unsat` within it is a sound `unsat`. Distinct from [KlauseConfig.unboundedSearchBound],
  *  which is a finite search window over a *truly* infinite SMT-LIB domain (and downgrades `unsat` to
  *  `unknown`). */
 const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
 
 /** Default magnitude of the *searchable* window a genuinely unbounded SMT-LIB integer is clamped to once
- *  OBBT fails to derive a real bound (see [KlauseConfig.smtUnboundedSearchBound]). */
-const val DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND: Long = 1_000_000
+ *  OBBT fails to derive a real bound (see [KlauseConfig.unboundedSearchBound]). */
+const val DEFAULT_UNBOUNDED_SEARCH_BOUND: Long = 1_000_000
 
 /** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
  *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a
@@ -109,8 +109,8 @@ data class KlauseConfig(
      *  when OBBT cannot derive a real bound: search still finds a witness within `±this`, but the clamp
      *  is flagged so an `unsat` over the window becomes `unknown` (never a false `unsat`). Unlike
      *  [MINIZINC_UNBOUNDED_DEFAULT] this approximates an infinite domain rather than being a real bound;
-     *  widen it (env `KLAUSE_SMT_UNBOUNDED_SEARCH_BOUND`) to trade search cost for SAT reach. */
-    val smtUnboundedSearchBound: Long = DEFAULT_SMT_UNBOUNDED_SEARCH_BOUND,
+     *  widen it (env `KLAUSE_UNBOUNDED_SEARCH_BOUND`) to trade search cost for SAT reach. */
+    val unboundedSearchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
 
     /** Integer-domain span above which the span-gated LP presolve steps engage (see
      *  [DEFAULT_LARGE_SPAN_THRESHOLD]). A pure cost gate — below it, presolve/solve behaviour is

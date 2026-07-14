@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -91,25 +92,6 @@ sealed interface SolveDirective {
 
         /** Float objective via bucketed int variable. */
         Float,
-    }
-}
-
-/** Bucketing metadata for one float variable lowered to an int bucket index. */
-data class FloatBucketing(
-    /** Backing int var id. */
-    val varId: Int,
-    /** Inclusive lower bound. */
-    val lo: Double,
-    /** Inclusive upper bound. */
-    val hi: Double,
-    /** Number of buckets. */
-    val buckets: Int,
-) {
-    /** Convert one bucket index to its floating value. */
-    fun valueOf(bucketIndex: Int): Double = if (buckets <= 1) {
-        lo
-    } else {
-        lo + bucketIndex * (hi - lo) / (buckets - 1)
     }
 }
 
