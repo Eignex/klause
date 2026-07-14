@@ -7,6 +7,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.impliedEqualities
 import com.eignex.klause.lp.bounding.redundantConstraints
 import com.eignex.klause.lp.bounding.rootInfeasible
+import com.eignex.klause.lp.bounding.rootLpBoundsNoBake
 import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootRelaxationSize
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
@@ -66,6 +67,30 @@ fun lpRootInfeasible(
     cancellation: Cancellation = Cancellation.Never,
 ): Boolean = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-root-feasibility"))
     .rootLpInfeasibleNoBake(cancellation)
+
+/** [problem] with each integer variable's domain tightened by the no-bake root-LP OBBT
+ *  ([LpEngine.rootLpBoundsNoBake]): the pre-bake bound-tightening a presolve pipeline runs on a wide model
+ *  so the O(span) root bake starts from collapsed domains instead of grinding them down one step per round.
+ *  Returns [problem] unchanged when the LP tightens nothing. Solution-set-preserving — only values the LP
+ *  proves no integer solution can take are removed. */
+fun lpRootBounds(
+    problem: Problem,
+    objective: LinearObjective,
+    plan: LpPlan,
+    cancellation: Cancellation = Cancellation.Never,
+): Problem {
+    val engine = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-obbt"))
+    val shaved = engine.rootLpBoundsNoBake(cancellation)
+    if (shaved.isEmpty()) return problem
+    val domains = problem.intDomains.copyOf()
+    for (sb in shaved) domains[sb.varId] = domains[sb.varId].withMinAtLeast(sb.lo).withMaxAtMost(sb.hi)
+    return Problem(
+        numBoolVars = problem.numBoolVars,
+        numIntVars = problem.numIntVars,
+        intDomains = domains,
+        factors = problem.factors,
+    )
+}
 
 /** [lpHarvest] returning, alongside the transformed problem, a breakdown of the LP harvest's own effect
  *  (root infeasibility, bounds shaved, objective floor, constraints removed, equalities added) so a

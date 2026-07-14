@@ -186,6 +186,57 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
 private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellation): Double? =
     safeMin(prob, LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
 
+/** Safe lower bound on `min(coeffs·x)` built straight from the *declared* domains ([RootDomains]) with no
+ *  [PropagationSession] bake — the no-bake analog of [safeMin], for pre-bake OBBT on wide domains. */
+private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
+    val relaxation = try {
+        CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs)).build(RootDomains(problem))
+    } catch (_: LpOverflowException) {
+        return null
+    }
+    if (relaxation.model.n == 0) return null
+    val result = try {
+        dualSimplex(relaxation.model, token).solvePrimal()
+    } catch (_: LpOverflowException) {
+        return null
+    } ?: return null
+    val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
+    return safe + relaxation.objectiveConstant.toDouble()
+}
+
+/** Safe upper bound on `max(coeffs·x)` over the declared domains — `max = −min(−·)`. See [safeMinNoBake]. */
+private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: Cancellation): Double? =
+    safeMinNoBake(LongArray(coeffs.size) { -coeffs[it] }, token)?.let { -it }
+
+/**
+ * Optimisation-based bound tightening with no bake: for each integer variable, the safe LP min / max of
+ * the variable over the root relaxation built from the declared domains ([RootDomains]) tightens its
+ * `[lo, hi]`. One LP solve per bound yields the tightened value *regardless of the domain span* — unlike
+ * [shaveVariableBounds]'s unit-step SAC (which shaves at most [SHAVE_MAX_ITERS] units in total), so it
+ * collapses in one solve a wide clamped domain the root bake would otherwise grind down one step per
+ * round (O(span)). **Sound:** the safe bound over/under-estimates the true LP optimum, which bounds every
+ * integer solution, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables.
+ */
+internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound> {
+    if (lpRelaxer == null || token()) return emptyList()
+    val n = problem.numIntVars
+    val out = ArrayList<ShavedBound>()
+    var done = 0
+    for (v in 0 until n) {
+        if (done >= OBBT_MAX_VARS || token()) break
+        val d = problem.intDomains[v]
+        if (d.min >= d.max) continue
+        done++
+        val coeffs = LongArray(n).also { it[v] = 1L }
+        val lo = safeMinNoBake(coeffs, token)?.let { ceil(it - EQ_PIN_TOL).toLong() }?.coerceAtLeast(d.min) ?: d.min
+        val hi = safeMaxNoBake(coeffs, token)?.let { floor(it + EQ_PIN_TOL).toLong() }?.coerceAtMost(d.max) ?: d.max
+        // `lo > hi` would mean an empty domain (root-infeasible); that verdict is [rootLpInfeasibleNoBake]'s
+        // to make, so skip rather than emit a contradictory bound here.
+        if (lo <= hi && (lo > d.min || hi < d.max)) out.add(ShavedBound(v, lo, hi))
+    }
+    return out
+}
+
 /** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound
  *  oracle [shaveVariableBounds] leans on). A true result proves the whole problem has no solution. Bake
@@ -250,6 +301,10 @@ private fun LpEngine.infeasibleUnder(v: Int, bound: Long, atMost: Boolean): Bool
 
 /** Max upward probes for objective shaving before it stops (each probe is one propagation + LP solve). */
 private const val SHAVE_MAX_ITERS = 64
+
+/** Max integer variables the no-bake OBBT ([rootLpBoundsNoBake]) tightens — two LP solves each. Caps the
+ *  pre-bake cost on wide models; the root bake and the in-loop harvest cover the rest. */
+private const val OBBT_MAX_VARS = 64
 
 /** Slack on the safe min/max bracket when counting integers inside it — widening it only drops removals. */
 private const val EQ_PIN_TOL = 1e-6
