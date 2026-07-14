@@ -12,7 +12,8 @@ import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 
 /**
- * CP propagator for [Disjunctive]. Constructed by [Disjunctive.asPropagator] and provides
+ * CP propagator for the no-overlap case of [com.eignex.klause.factor.scheduling.Cumulative]
+ * (`unary = true`, built via [com.eignex.klause.factor.scheduling.Cumulative.unary]) and provides
  * time-tabling, detectable precedences, and Vilím Θ-tree edge-finding for the unary case.
  */
 internal class DisjunctivePropagator(

@@ -22,7 +22,6 @@ import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
@@ -91,7 +90,7 @@ class FactorRemapTest {
                 resourceVars = intArrayOf(4, 5),
                 capacityVar = 6,
             ),
-            "Disjunctive" to Disjunctive(intArrayOf(0, 1), longArrayOf(2, 2)),
+            "Disjunctive" to Cumulative.unary(intArrayOf(0, 1), longArrayOf(2, 2)),
             "Diffn" to Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(1, 1), longArrayOf(1, 1)),
             "Diffn(vars)" to Diffn(
                 intArrayOf(0, 1),

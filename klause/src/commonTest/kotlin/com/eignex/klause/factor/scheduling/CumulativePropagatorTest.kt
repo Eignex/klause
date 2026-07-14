@@ -8,7 +8,6 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.IntEvent
@@ -815,7 +814,7 @@ class CumulativePropagatorTest {
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
-            Disjunctive(
+            Cumulative.unary(
                 starts = intArrayOf(0, 1, 2),
                 durations = longArrayOf(2, 1, 1),
             ).asPropagator().initialIntEventWatches,
@@ -840,7 +839,7 @@ class CumulativePropagatorTest {
         val durs = longArrayOf(2, 1, 1)
         for (seed in 1L..5L) {
             val factors = listOf<Factor>(
-                Disjunctive(starts = intArrayOf(0, 1, 2), durations = durs),
+                Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = durs),
                 ExcludeOnFix(src = 3, dst = 0),
                 ExcludeOnFix(src = 3, dst = 1),
             )

@@ -66,7 +66,6 @@ import com.eignex.klause.factor.global.Sort as SortFactor
 import com.eignex.klause.factor.global.SymmetricAllDifferent as SymmetricAllDifferentFactor
 import com.eignex.klause.factor.scheduling.Cumulative as CumulativeFactor
 import com.eignex.klause.factor.scheduling.Diffn as DiffnFactor
-import com.eignex.klause.factor.scheduling.Disjunctive as DisjunctiveFactor
 import com.eignex.klause.factor.table.Regular as RegularFactor
 
 /**
@@ -420,7 +419,7 @@ internal fun Lowering.assertCumulativeOpt(expr: CumulativeExprOpt) {
 
 internal fun Lowering.assertDisjunctiveOpt(expr: DisjunctiveExprOpt) {
     val ids = liftToIntRefIds(expr.starts, "disjunctiveOpt")
-    factors += DisjunctiveFactor(
+    factors += CumulativeFactor.unary(
         starts = ids,
         durations = LongArray(expr.durations.size) { expr.durations[it].toLong() },
         presents = lowerPresences(expr.presents),
@@ -459,7 +458,7 @@ internal fun Lowering.assertGccOpt(expr: GccExprOpt) {
 
 internal fun Lowering.assertDisjunctive(expr: DisjunctiveExpr) {
     val ids = liftToIntRefIds(expr.starts, "disjunctive")
-    factors += DisjunctiveFactor(
+    factors += CumulativeFactor.unary(
         starts = ids,
         durations = LongArray(expr.durations.size) { expr.durations[it].toLong() },
     )

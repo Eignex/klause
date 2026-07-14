@@ -16,7 +16,6 @@ import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.packLayeredMdd
@@ -340,7 +339,7 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
     require(c.args.size == 2) { "disjunctive expects 2 args, got ${c.args.size}" }
     val starts = evalIntVarArray(c.args[0])
     val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
-    factors.add(Disjunctive(starts = starts, durations = durations, durationVars = durationVars))
+    factors.add(Cumulative.unary(starts = starts, durations = durations, durationVars = durationVars))
 }
 
 /** Returns `(constOrUbValues, vars)` for int arrays. */

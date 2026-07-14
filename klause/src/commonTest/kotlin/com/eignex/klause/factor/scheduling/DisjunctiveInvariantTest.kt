@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.scheduling.Disjunctive
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class DisjunctiveInvariantTest {
 
     private fun threeUnitTasks(): Problem {
-        val factor = Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(1, 1, 1))
+        val factor = Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = longArrayOf(1, 1, 1))
         return Problem(
             numBoolVars = 0,
             numIntVars = 3,

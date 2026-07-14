@@ -17,7 +17,6 @@ import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.factor.symmetry.SymmetryHandling
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
@@ -703,9 +702,9 @@ class SymmetryBreakingTest {
         )
 
         // Disjunctive.
-        val dis = Disjunctive(intArrayOf(0, 1), longArrayOf(1, 1))
-        distinct(dis, Disjunctive(intArrayOf(0, 1), longArrayOf(1, 2)), "duration")
-        distinct(dis, Disjunctive(intArrayOf(1, 0), longArrayOf(1, 1)), "start order")
+        val dis = Cumulative.unary(intArrayOf(0, 1), longArrayOf(1, 1))
+        distinct(dis, Cumulative.unary(intArrayOf(0, 1), longArrayOf(1, 2)), "duration")
+        distinct(dis, Cumulative.unary(intArrayOf(1, 0), longArrayOf(1, 1)), "start order")
         distinct(dis, cum, "disjunctive vs cumulative")
 
         // Diffn: the nonStrict flag, constant sizes, and coordinate order.
@@ -768,8 +767,8 @@ class SymmetryBreakingTest {
             4,
             arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             listOf(
-                Disjunctive(intArrayOf(0, 1), longArrayOf(1, 1)),
-                Disjunctive(intArrayOf(2, 3), longArrayOf(1, 1)),
+                Cumulative.unary(intArrayOf(0, 1), longArrayOf(1, 1)),
+                Cumulative.unary(intArrayOf(2, 3), longArrayOf(1, 1)),
             ),
         )
         checkBreakingSound("disjunctive-blocks", problem)

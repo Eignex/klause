@@ -4,7 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
-import com.eignex.klause.factor.scheduling.Disjunctive
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -103,7 +103,7 @@ class BranchAndBoundTest {
         // sum, so any feasible is optimal).
         val starts = intArrayOf(0, 1, 2)
         val durations = longArrayOf(2, 2, 2)
-        val factor = Disjunctive(starts = starts, durations = durations)
+        val factor = Cumulative.unary(starts = starts, durations = durations)
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,

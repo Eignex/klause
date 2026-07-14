@@ -9,7 +9,6 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -306,7 +305,7 @@ class BuildersTest {
     }
 
     @Test
-    fun `disjunctive DSL emits a Disjunctive factor`() {
+    fun `disjunctive DSL emits a unary Cumulative factor`() {
         class S : VariableSchema() {
             val t0 by intVar(min = 0, max = 2)
             val t1 by intVar(min = 0, max = 2)
@@ -316,7 +315,7 @@ class BuildersTest {
             }
         }
         val compiled = S().compile()
-        assertTrue(compiled.problem.factors.any { it is Disjunctive })
+        assertTrue(compiled.problem.factors.any { it is Cumulative && it.unary })
         val solver = BacktrackSolver(compiled.problem)
         val samples = solver.enumerate(BacktrackParams()).toList()
         assertEquals(6, samples.size, "expected 3! disjunctive schedules; got $samples")

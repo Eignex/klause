@@ -8,9 +8,9 @@ import com.eignex.klause.util.argsortBy
 import kotlin.math.max
 
 /**
- * LS invariant for [Disjunctive]. Constructed by [Disjunctive.asInvariant] and delegates
- * all cost / delta / repair logic to an internal [CumulativeInvariant] backing at capacity = 1,
- * unit resources.
+ * LS invariant for the no-overlap case of [com.eignex.klause.factor.scheduling.Cumulative]
+ * (`unary = true`) and delegates all cost / delta / repair logic to an internal [CumulativeInvariant]
+ * backing at capacity = 1, unit resources.
  */
 internal class DisjunctiveInvariant(
     private val starts: IntArray,

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.MoveSetOracle
+import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -33,7 +33,7 @@ class StructuredMoveOracleTest {
 
     @Test fun `equal-duration disjunctive start-swaps preserve no-overlap`() {
         oneFactor(
-            Disjunctive(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2)),
+            Cumulative.unary(starts = intArrayOf(0, 1, 2), durations = longArrayOf(2, 2, 2)),
             arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 6)),
         )
     }

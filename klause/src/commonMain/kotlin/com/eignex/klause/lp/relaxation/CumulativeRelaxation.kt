@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.factor.scheduling.Disjunctive
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.LpRowPremises
@@ -22,7 +21,7 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 
 /**
- * Sound LP makespan lower bound for the scheduling globals ([Cumulative] / [Disjunctive]).
+ * Sound LP makespan lower bound for the scheduling globals ([Cumulative]).
  *
  * The start-variable LP has no resource–time coupling, so [CpToLpRelaxation] drops every scheduling
  * global and the only scheduling-aware reasoning, [CumulativeEnergeticBound], is a feasibility test
@@ -46,7 +45,7 @@ import com.eignex.klause.util.MutableIntObjectMap
  * `M`, only the strongest `t1` is ever binding, so each `(global, M)` pair emits exactly **one** row
  * carrying the best edge — and that keeps the row count structural (warm-start safe).
  *
- * The unary [Disjunctive] is the `cap = 1`, `rᵢ = 1` special case, where the bound collapses to the
+ * The unary (no-overlap) case is the `cap = 1`, `rᵢ = 1` special case, where the bound collapses to the
  * one-machine `M ≥ minEst + Σ durᵢ`.
  *
  * ## Soundness
@@ -67,7 +66,7 @@ import com.eignex.klause.util.MutableIntObjectMap
  */
 internal class CumulativeRelaxation(
     private val problem: Problem,
-    /** Project [Cumulative] / [Disjunctive] factors into makespan plans (the original behaviour). */
+    /** Project [Cumulative] factors into makespan plans (the original behaviour). */
     private val includeCumulative: Boolean = true,
     /** Also project each constant-size [Diffn] onto both axes as a cumulative (#655 Tranche C): the
      *  x-axis is `start = xs, dur = widths, res = heights, cap = the max y-extent`, and symmetrically
@@ -264,13 +263,6 @@ internal class CumulativeRelaxation(
                         }
                     }
                     out.add(Sched(f.starts, f.durations, res, cap))
-                }
-
-                is Disjunctive -> {
-                    if (!includeCumulative) continue
-                    if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
-                    if (f.starts.size > MAX_TASKS) continue
-                    out.add(Sched(f.starts, f.durations, LongArray(f.starts.size) { 1L }, cap = 1L))
                 }
 
                 is Diffn -> if (includeDiffn) addDiffnScheds(f, out)
