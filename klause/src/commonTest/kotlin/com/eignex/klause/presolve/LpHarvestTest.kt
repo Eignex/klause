@@ -331,6 +331,35 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `lpRootBounds tightens a coupled domain the LP bounds more tightly than propagation`() {
+        // x <= y and x + y <= 10 over wide domains. Bound propagation only derives x <= 10 (each row in
+        // isolation), but the LP reasons jointly — 2x <= x + y <= 10 — so OBBT tightens x's max to 5 in one
+        // solve, regardless of the 1e9 span the bake would otherwise grind.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10), // x + y <= 10
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), // x - y <= 0  (x <= y)
+            ),
+        )
+        val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
+        assertTrue(tightened !== problem, "OBBT must tighten a domain the LP bounds below propagation")
+        assertEquals(5L, tightened.intDomains[0].max, "the LP proves x <= 5 (2x <= x + y <= 10)")
+    }
+
+    @Test
+    fun `lpRootBounds returns the problem unchanged when the LP tightens nothing`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), arrayOf<Factor>())
+        assertSame(
+            problem,
+            lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true)),
+            "no constraint to tighten against ⇒ the problem is returned unchanged",
+        )
+    }
+
+    @Test
     fun `redundant-constraint removal preserves the feasible set`() {
         val rng = Random(20260702)
         var dropped = 0

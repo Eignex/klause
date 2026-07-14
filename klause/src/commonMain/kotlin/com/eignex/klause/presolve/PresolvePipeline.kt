@@ -75,12 +75,23 @@ object PresolvePipeline {
         // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
         // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
         // bake would reach. Gated on span so small models never pay the LP.
-        val lpInfeasible = !strengthenInfeasible &&
-            Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold &&
+        val wideSpan = Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold
+        val lpInfeasible = !strengthenInfeasible && wideSpan &&
             lpRootInfeasible(problem, objective, LpPlan(bounding = true), cancellation)
         val preBakeInfeasible = strengthenInfeasible || lpInfeasible
 
-        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(problem, bakeConfig)
+        // On a wide but feasible domain the LP still can't be skipped like the infeasible case, but its
+        // optimum-based bound tightening (OBBT, [lpRootBounds]) collapses each variable's clamped domain in
+        // one solve per bound — so the root bake starts from the tightened domains instead of narrowing them
+        // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
+        // span so small models never pay the OBBT; skipped when already proven infeasible.
+        val prebaked = if (!preBakeInfeasible && wideSpan) {
+            lpRootBounds(problem, objective, LpPlan(bounding = true), cancellation)
+        } else {
+            problem
+        }
+
+        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(prebaked, bakeConfig)
         var current = seeded
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
