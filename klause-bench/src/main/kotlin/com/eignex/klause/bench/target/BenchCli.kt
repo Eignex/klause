@@ -60,8 +60,9 @@ import java.util.concurrent.atomic.AtomicInteger
  * Other commands:
  *  - `calibrate [filters…]` — the fair arm tester: run the pool once as a live portfolio and rank
  *    arms into a diverse palette by per-problem best-holder wins (see [calibrate]).
- *  - `reference [filters…]` — harvest per-instance reference optima/bounds (default `backend=cp-sat`)
- *    into the committed table (see [reference]); the gap-to-optimum reward + a soundness oracle.
+ *  - `reference [filters…]` — harvest per-instance reference optima/bounds with a format-native strong
+ *    solver (cp-sat for MiniZinc/XCSP3, clasp for DIMACS/OPB, z3 for SMT-LIB QF_LIA) into the committed
+ *    per-solver tables (see [reference]); the gap-to-optimum reward + a soundness oracle.
  *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
  *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
  *  - `preview [filters…]` — print the instances a run would cover, without running.
@@ -458,7 +459,7 @@ object BenchCli {
         val maximize: Boolean
         when {
             clasp -> {
-                r = cached ?: ClaspReference.run(ref, budget, settings.processors ?: 1)
+                r = cached ?: ClaspReference.run(ref, budget)
                     .also { BenchCache.store(key, it) }
                 // clasp minimises OPB (its only PB sense) and DIMACS has no objective — both `false`.
                 maximize = r.stats["maximize"].toBoolean()
@@ -662,7 +663,7 @@ object BenchCli {
             |Usage:
             |  bench solve [filters…]                solve a selection (the bench's one measurement)
             |  bench calibrate [filters…]            diverse arm palette from a live pool run (kind=cop; engine=mixed|ls|cp, p=)
-            |  bench reference [filters…]            harvest cp-sat optima into the committed reference table (kind=cop)
+            |  bench reference [filters…]            harvest optima/verdicts into per-solver tables (cp-sat/clasp/z3 by format)
             |  bench preview [filters…]              show what a run would cover
             |  bench list [<suite>]                  list suites, or problems in a suite
             |

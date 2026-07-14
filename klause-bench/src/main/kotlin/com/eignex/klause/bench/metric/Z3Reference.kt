@@ -19,6 +19,11 @@ import java.util.concurrent.TimeUnit
 internal object Z3Reference {
     /** The z3 executable, resolved from `PATH` by default; override with `-Dklause.bench.z3=/path/to/z3`. */
     private val BINARY = System.getProperty("klause.bench.z3", "z3")
+
+    /** Hard per-run memory ceiling in MB (`z3 -memory:`), so one instance's blow-up can't exhaust the
+     *  host — the whole-corpus sweep runs many z3 in parallel. Overrun makes z3 abort (→ undecided,
+     *  which is fine for a reference). Override with `-Dklause.bench.z3.memoryMb=`. */
+    private val MEMORY_MB = System.getProperty("klause.bench.z3.memoryMb", "2048")
     private const val EXIT_WAIT_MS = 5_000L
 
     /** Whether a usable z3 is reachable (`z3 --version` exits 0). */
@@ -30,13 +35,17 @@ internal object Z3Reference {
         p.waitFor(EXIT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
-    /** Decide [ref] (a QF_LIA `.smt2`) with z3 under [budget]. z3 enforces the budget itself via
-     *  `-T:<sec>` (a wall-clock limit after which it answers `unknown`); a watchdog force-kills a run
-     *  that ignores it, so one solve can never hang the sweep. */
+    /** Decide [ref] (a QF_LIA `.smt2`) with z3 under [budget]. Bounded so a whole-corpus parallel sweep
+     *  is safe: `-T:<sec>` caps wall-clock (z3 then answers `unknown`), `-memory:<MB>` caps RAM, and
+     *  `sat.threads=1 parallel.enable=false` keep it single-threaded (no fan-out per process). A watchdog
+     *  force-kills a run that ignores its own limits, so one solve can never hang or starve the box. */
     fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
         val file = CorpusFetcher.resolve(ref.source)
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
-        val cmd = listOf(BINARY, "-T:$timeoutSec", "-smt2", file.absolutePath)
+        val cmd = listOf(
+            BINARY, "-T:$timeoutSec", "-memory:$MEMORY_MB", "-smt2",
+            "sat.threads=1", "parallel.enable=false", file.absolutePath,
+        )
         val startNanos = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()
         val watchdog = Thread {

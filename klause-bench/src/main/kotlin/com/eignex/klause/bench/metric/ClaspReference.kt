@@ -59,10 +59,10 @@ internal object ClaspReference {
         p.waitFor(DOCKER_INSPECT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
-    /** Solve [ref] (DIMACS or OPB) with clasp under [budget], pinning it to [workers] threads. The
-     *  instance is piped on stdin (OPB gets its problem line synthesized first). Objective sense is
-     *  always minimise for OPB (clasp's only PB mode); DIMACS has none — both report `maximize=false`. */
-    fun run(ref: ProblemRef, budget: Budget, workers: Int): SolverInvocation.Result {
+    /** Solve [ref] (DIMACS or OPB) with clasp under [budget], single-threaded. The instance is piped on
+     *  stdin (OPB gets its problem line synthesized first). Objective sense is always minimise for OPB
+     *  (clasp's only PB mode); DIMACS has none — both report `maximize=false`. */
+    fun run(ref: ProblemRef, budget: Budget): SolverInvocation.Result {
         val text = CorpusFetcher.resolve(ref.source).readText()
         val input = if (ref.format == Format.OPB) opbWithProblemLine(text) else text
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
@@ -73,14 +73,16 @@ internal object ClaspReference {
             "--rm",
             "-i",
             "--name", name,
-            // Hard resource ceilings so no single container can starve the host (see [MEMORY_LIMIT]).
+            // Hard resource ceilings so no single container can starve the host: memory (see
+            // [MEMORY_LIMIT]) and one CPU, with clasp itself pinned to a single thread — the sweep's
+            // parallelism is its concurrent jobs, not per-solve threads, so the host load stays bounded.
             "--memory", MEMORY_LIMIT,
             "--memory-swap", MEMORY_LIMIT,
-            "--cpus", workers.toString(),
+            "--cpus", "1",
             "--label", CONTAINER_LABEL,
             IMAGE,
             "--time-limit=$timeoutSec",
-            "--parallel-mode=$workers",
+            "--parallel-mode=1",
         )
         val startNanos = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()
