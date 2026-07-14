@@ -243,8 +243,8 @@ class SmtLibQfLiaTest {
         assertTrue(problem.numIntVars >= 1)
     }
 
-    private fun solveFor(text: String, name: String, smtSearchBound: Long = 1_000_000): Long {
-        val parsed = SmtLibQfLia.parse(text, smtSearchBound = smtSearchBound)
+    private fun solveFor(text: String, name: String): Long {
+        val parsed = SmtLibQfLia.parse(text)
         val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints[parsed.intVarNames.getValue(name)]
@@ -290,9 +290,7 @@ class SmtLibQfLiaTest {
 
     @Test
     fun `an unbounded variable marks the model as clamped`() {
-        // A small search bound keeps the clamped fallback box tiny so the root bake stays fast (a wide
-        // box over a residual-unbounded var is the #18 O(span) hang); the clamp decision is unchanged.
-        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)", smtSearchBound = 100)
+        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
         assertTrue(parsed.domainsClamped, "x has no provable upper bound, so it was clamped")
     }
 
@@ -320,11 +318,9 @@ class SmtLibQfLiaTest {
         // x > 3 leaves x unbounded above; OBBT cannot bound it, so it falls back to a searchable range
         // (clamped -> an unsat would be unknown), yet search still finds the witness x = 4.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
-        // Small search bound: the clamped box (and thus the root bake / search) stays tiny, avoiding the
-        // #18 wide-domain O(span) cost while still exercising the clamp-and-find-witness path.
-        val parsed = SmtLibQfLia.parse(text, smtSearchBound = 100)
+        val parsed = SmtLibQfLia.parse(text)
         assertTrue(parsed.domainsClamped, "x is unbounded above; the searchable fallback marks it clamped")
-        assertTrue(solveFor(text, "x", smtSearchBound = 100) > 3L, "search still finds a witness in the box")
+        assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the fallback range")
     }
 
     @Test
@@ -345,14 +341,21 @@ class SmtLibQfLiaTest {
         // feasible, so OBBT derives no bound and both variables fall back to the searchable range. The
         // model is clamped, so a search 'unsat' over the box is reported as unknown -- never a false
         // unsat for the truly unbounded problem.
-        // Small search bound: the clamped fallback box stays tiny, so baking the (integer-infeasible)
-        // `3x+3y=1` over it is fast — a wide box here is the #18 O(span) bound-propagation hang (badly
-        // amplified on native). The clamp decision under test is independent of the box size.
         val parsed = SmtLibQfLia.parse(
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
-            smtSearchBound = 100,
         )
         assertTrue(parsed.domainsClamped, "OBBT cannot bound an LP-feasible divisibility unsat")
+    }
+
+    @Test
+    fun `an integer equality whose coefficient gcd cannot divide the bound is unsat`() {
+        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1). The linear propagator's gcd
+        // feasibility check reports this in O(n) instead of narrowing the bounds toward empty one step
+        // per round, which over the default (wide) fallback box would be the #18 O(span) bake hang.
+        val text = "(declare-fun x () Int) (declare-fun y () Int)" +
+            " (assert (= (+ (* 3 x) (* 3 y)) 1)) (check-sat)"
+        val r = BacktrackSolver(SmtLibQfLia.parse(text).problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 }
