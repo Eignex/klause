@@ -459,6 +459,21 @@ enum class PresolvePass(
         )
     },
 
+    /** Bounded variable elimination over the pure-SAT part (#24): resolve out a Boolean variable that
+     *  occurs only in all-Boolean clauses when doing so does not grow the clause count. The eliminated
+     *  variable is left unconstrained and rebuilt on reconstruct, so — like implication-graph merges —
+     *  it inflates a complete enumerator's count (#507) and is solution-set-sensitive. */
+    ELIMINATE_BOOL_VARS(
+        "bve",
+        Stage.PROBLEM,
+        PresolveTiming.EXHAUSTIVE,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) =
+            Presolve.eliminateBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
+    },
+
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
      *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so it has no

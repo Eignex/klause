@@ -109,6 +109,13 @@ object Presolve {
         cancellation: Cancellation = Cancellation.Never,
     ): Array<IntArray> = ImplicationGraph.implicationGraph(problem, maxCandidates, cancellation)
 
+    /** Bounded variable elimination over the pure-SAT part (#24). See [BoundedVariableElimination]. */
+    fun eliminateBoolVars(
+        problem: Problem,
+        objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta = BoundedVariableElimination.eliminate(problem, objectiveBoolVars, cancellation)
+
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)
 }
