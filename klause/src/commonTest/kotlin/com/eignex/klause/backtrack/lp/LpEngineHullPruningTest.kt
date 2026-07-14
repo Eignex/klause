@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.solver.Cancellation
@@ -37,7 +36,7 @@ class LpEngineHullPruningTest {
         val engine = LpEngine(
             p,
             obj,
-            BacktrackParams(lpPlan = LpPlan(bounding = true, productMcCormick = true, pruneHulls = true)),
+            LpParams(lpPlan = LpPlan(bounding = true, productMcCormick = true, pruneHulls = true)),
             SolveStatsSink(backend = "hull"),
         )
         val original = engine.lpRelaxer
@@ -60,7 +59,7 @@ class LpEngineHullPruningTest {
         val engine = LpEngine(
             p,
             obj,
-            BacktrackParams(lpPlan = LpPlan(bounding = true, table = true, pruneHulls = true)),
+            LpParams(lpPlan = LpPlan(bounding = true, table = true, pruneHulls = true)),
             SolveStatsSink(backend = "hull"),
         )
         val original = engine.lpRelaxer
@@ -87,7 +86,7 @@ class LpEngineHullPruningTest {
         val engine = LpEngine(
             p,
             obj,
-            BacktrackParams(lpPlan = LpPlan(bounding = true, table = true, pruneHulls = true)),
+            LpParams(lpPlan = LpPlan(bounding = true, table = true, pruneHulls = true)),
             SolveStatsSink(backend = "hull"),
         )
         val original = engine.lpRelaxer

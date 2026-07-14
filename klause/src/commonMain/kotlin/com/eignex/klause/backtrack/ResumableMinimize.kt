@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.lp.LpEngine
+import com.eignex.klause.backtrack.lp.LpHints
 import com.eignex.klause.backtrack.lp.harvestRootCuts
 import com.eignex.klause.backtrack.lp.lbTreeSearch
 import com.eignex.klause.backtrack.lp.lpBranchPick
@@ -99,7 +100,16 @@ internal class ResumableMinimize(
     // --- LP-relaxation family state (built once; persists across slices = rolling warm starts).
     // Always constructed so the always-on linear lower bound runs; its internal bounds are null/empty
     // when their feature flag is off. ---
-    private val lpEngine = LpEngine(problem, objective, params, sink)
+    private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink)
+
+    // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
+    // The engine records each node's LP solution into it; the descent reads it for variable/value order.
+    private val lpHints: LpHints? =
+        if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+
+    init {
+        lpEngine.lpHints = lpHints
+    }
 
     private val pruneIf: (PropagationSession) -> Boolean = { session ->
         val externalBound = params.objectiveBoundSupplier?.invoke() ?: Double.POSITIVE_INFINITY
@@ -384,10 +394,10 @@ internal class ResumableMinimize(
 
         // Reduced-cost-average branching: prefer the LP's most cost-impactful fractional variable; null
         // falls back to the configured selector.
-        override fun branchPick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session)
+        override fun branchPick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
 
         override fun orderValues(varRef: VarRef, values: Sequence<Long>): Sequence<Long> =
-            lpEngine.lpHints?.order(varRef, values) ?: values
+            lpHints?.order(varRef, values) ?: values
 
         // Always block this leaf and backtrack (the engine does that); surface it only when it strictly
         // improves the incumbent.

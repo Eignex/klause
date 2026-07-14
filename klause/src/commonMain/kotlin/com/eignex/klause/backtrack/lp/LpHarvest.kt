@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
@@ -44,10 +43,10 @@ import com.eignex.klause.solver.result.SolveStatsSink
 fun lpHarvest(
     problem: Problem,
     objective: LinearObjective,
-    params: BacktrackParams,
+    plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
     cancellation: Cancellation = Cancellation.Never,
-): Problem = lpHarvestReporting(problem, objective, params, bakeConfig, cancellation).problem
+): Problem = lpHarvestReporting(problem, objective, plan, bakeConfig, cancellation).problem
 
 /** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
 class LpHarvestResult(val problem: Problem, val report: LpHarvestReport)
@@ -59,9 +58,9 @@ class LpHarvestResult(val problem: Problem, val report: LpHarvestReport)
 fun lpRootInfeasible(
     problem: Problem,
     objective: LinearObjective,
-    params: BacktrackParams,
+    plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
-): Boolean = LpEngine(problem, objective, params, SolveStatsSink(backend = "lp-root-feasibility"))
+): Boolean = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-root-feasibility"))
     .rootLpInfeasibleNoBake(cancellation)
 
 /** [lpHarvest] returning, alongside the transformed problem, a breakdown of the LP harvest's own effect
@@ -70,18 +69,17 @@ fun lpRootInfeasible(
 fun lpHarvestReporting(
     problem: Problem,
     objective: LinearObjective,
-    params: BacktrackParams,
+    plan: LpPlan,
     bakeConfig: BakeConfig = BakeConfig.NONE,
     cancellation: Cancellation = Cancellation.Never,
 ): LpHarvestResult {
-    val engine = LpEngine(problem, objective, params, SolveStatsSink(backend = "lp-harvest"))
+    val engine = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-harvest"))
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport())
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.
     if (engine.rootInfeasible(cancellation)) {
         return LpHarvestResult(provenInfeasible(problem, bakeConfig), LpHarvestReport(rootInfeasible = true))
     }
-    val plan = engine.params.lpPlan
     if (!plan.variableShaving && !plan.objectiveShaving) return LpHarvestResult(problem, LpHarvestReport())
 
     // Self-limit on the built relaxation's size. The shave / redundancy / equality probes each rebuild and

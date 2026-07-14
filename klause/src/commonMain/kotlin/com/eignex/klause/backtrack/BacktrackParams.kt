@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.lp.LpAutoConfig
 import com.eignex.klause.backtrack.lp.LpConfig
 import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.lp.LpPlan
+import com.eignex.klause.backtrack.lp.LpParams
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
@@ -296,6 +297,9 @@ data class BacktrackParams(
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
 
     override fun withCancellation(cancellation: Cancellation): BacktrackParams = copy(cancellation = cancellation)
+
+    /** The LP-bounding runtime's slice of these params (see [LpParams]) — what [LpEngine] consumes. */
+    fun lpParams(): LpParams = LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed)
 
     private companion object {
         private fun merge(a: Assumptions, b: Assumptions): Assumptions = a.mergedWith(b)
