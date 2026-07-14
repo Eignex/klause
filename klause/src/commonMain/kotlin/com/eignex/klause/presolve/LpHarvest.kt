@@ -1,4 +1,4 @@
-package com.eignex.klause.backtrack.lp
+package com.eignex.klause.presolve
 
 import com.eignex.klause.lp.bounding.LP_HARVEST_MAX_RELAXATION_COST
 import com.eignex.klause.lp.bounding.LpEngine
@@ -11,8 +11,6 @@ import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootRelaxationSize
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
-import com.eignex.klause.presolve.BakeConfig
-import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
