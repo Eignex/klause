@@ -17,7 +17,7 @@ package com.eignex.klause.cli
 
 /** Front-end registry. Order matters only for the default fallback (MiniZinc is the default
  *  because MiniZinc invokes this binary with `.fzn` files and standard flags). */
-internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode, WcnfMode)
+internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, DimacsMode, OpbMode, WcnfMode, MpsMode)
 
 /** Parse args once, select the front-end mode, load the instance and run the shared driver.
  *  See the file header for the full flow. */
