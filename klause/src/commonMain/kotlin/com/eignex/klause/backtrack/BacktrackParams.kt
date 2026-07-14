@@ -298,7 +298,7 @@ data class BacktrackParams(
 
     override fun withCancellation(cancellation: Cancellation): BacktrackParams = copy(cancellation = cancellation)
 
-    /** The LP-bounding runtime's slice of these params (see [LpParams]) — what [LpEngine] consumes. */
+    /** The LP-bounding runtime's slice of these params (see [LpParams]) — what `LpEngine` consumes. */
     fun lpParams(): LpParams = LpParams(lpPlan, lpConfig, cancellation, solveBudgetMillis, randomSeed)
 
     private companion object {

@@ -4,7 +4,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.solver.Cancellation
 
 /**
- * The LP-bounding runtime's own parameters, independent of the search layer's [BacktrackParams]. Both the
+ * The LP-bounding runtime's own parameters, independent of the search layer's `BacktrackParams`. Both the
  * backtrack search (per-node bounding) and presolve (the LP harvest) drive [LpEngine], so its inputs are
  * expressed here in the LP layer rather than pulled from the backtrack params object.
  *

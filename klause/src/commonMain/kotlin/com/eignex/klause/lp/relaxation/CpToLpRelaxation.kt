@@ -343,7 +343,7 @@ internal class CpToLpRelaxation(
         return changed
     }
 
-    /** Per-hull dense-tableau caps. Internal so [com.eignex.klause.backtrack.lp.LpAutoConfig]'s
+    /** Per-hull dense-tableau caps. Internal so [com.eignex.klause.lp.bounding.LpAutoConfig]'s
      *  size guard (#484) estimates each enabled hull against the *same* thresholds the builders skip
      *  at — one source of truth, no drift. */
     internal companion object {
