@@ -52,6 +52,18 @@ fun lpHarvest(
 /** [lpHarvest]'s transformed [problem] paired with the [report] of what the LP harvest contributed. */
 class LpHarvestResult(val problem: Problem, val report: LpHarvestReport)
 
+/** Whether the root LP relaxation is Farkas-certifiably infeasible over [problem]'s declared domains,
+ *  built without the [com.eignex.klause.propagation.PropagationSession] bake fixpoint (O(domain span) on
+ *  wide integer domains). A true result proves [problem] infeasible over its domains — the pre-bake
+ *  short-circuit a presolve pipeline uses to skip the O(span) root bake on a wide, infeasible model. */
+fun lpRootInfeasible(
+    problem: Problem,
+    objective: LinearObjective,
+    params: BacktrackParams,
+    cancellation: Cancellation = Cancellation.Never,
+): Boolean = LpEngine(problem, objective, params, SolveStatsSink(backend = "lp-root-feasibility"))
+    .rootLpInfeasibleNoBake(cancellation)
+
 /** [lpHarvest] returning, alongside the transformed problem, a breakdown of the LP harvest's own effect
  *  (root infeasibility, bounds shaved, objective floor, constraints removed, equalities added) so a
  *  caller can isolate it from the surrounding combinatorial passes. */

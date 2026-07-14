@@ -12,7 +12,6 @@ import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -102,15 +101,15 @@ internal class CumulativeRelaxation(
     val applicable: Boolean get() = plans.isNotEmpty()
 
     /**
-     * The makespan row for [plan] under the live [session]: `capacity·M ≥ rhs`. The `rhs` is the best
+     * The makespan row for [plan] under the live [domains]: `capacity·M ≥ rhs`. The `rhs` is the best
      * energetic left edge over the live earliest-starts; on overflow it degrades to the declared
      * `capacity · M.declaredMin`. The row is global iff every counted task's live earliest-start is
      * still its declared one; otherwise the tightened starts it used are recorded as premises.
      */
-    fun rowSpec(plan: AreaPlan, session: PropagationSession): RowSpec {
+    fun rowSpec(plan: AreaPlan, domains: RelaxationDomains): RowSpec {
         val cap = plan.capacity
         val n = plan.startVars.size
-        val estLive = LongArray(n) { session.intDomain(plan.startVars[it]).min }
+        val estLive = LongArray(n) { domains.intDomain(plan.startVars[it]).min }
         val estDecl = LongArray(n) { problem.intDomains[plan.startVars[it]].min }
         val floor = cap * problem.intDomains[plan.makespanVar].min
 

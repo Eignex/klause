@@ -12,6 +12,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -294,6 +295,39 @@ class LpHarvestTest {
             cancellation = Cancellation.Never,
         ).report
         assertTrue(report.rootInfeasible, "root-LP infeasibility must be recorded in the report")
+    }
+
+    @Test
+    fun `lpRootInfeasible certifies a wide difference cycle without paying the bake fixpoint`() {
+        // x < y and y < x over a span the bake would narrow one step per round (O(span)); the root LP
+        // certifies the contradiction in one solve, so this returns fast regardless of the span.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1),
+            ),
+        )
+        assertTrue(
+            lpRootInfeasible(problem, LinearObjective(), BacktrackParams(lpPlan = LpPlan(bounding = true))),
+            "the root LP must certify the difference cycle infeasible",
+        )
+    }
+
+    @Test
+    fun `lpRootInfeasible does not flag a feasible wide system`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
+            arrayOf<Factor>(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1)),
+        )
+        assertFalse(
+            lpRootInfeasible(problem, LinearObjective(), BacktrackParams(lpPlan = LpPlan(bounding = true))),
+            "a satisfiable relaxation must not be reported infeasible",
+        )
     }
 
     @Test

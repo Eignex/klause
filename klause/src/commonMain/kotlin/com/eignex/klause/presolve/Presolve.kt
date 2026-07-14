@@ -60,6 +60,10 @@ object Presolve {
      *  for clique-aware consumers such as local search. See [PresolveShared]. */
     fun amoCliques(problem: Problem): List<Set<Int>> = PresolveShared.maximalAmoCliques(problem.factors.asList())
 
+    /** The widest integer-variable domain span (see [PresolveShared.maxIntSpan]); a cheap O(numIntVars)
+     *  gate for the span-sensitive presolve steps. */
+    fun maxIntSpan(problem: Problem): Long = PresolveShared.maxIntSpan(problem)
+
     /** Duplicate / parallel integer-column aggregation. See [DuplicateColumns]. */
     fun mergeDuplicateColumns(
         problem: Problem,
