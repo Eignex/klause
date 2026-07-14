@@ -23,10 +23,15 @@ import kotlin.math.ln
  * complement ([BacktrackRepair]) — full propagation, clause learning, and LP bounding on the fragment,
  * unlike a pure-LS repair. An LS-class engine: it optimises anytime and returns
  * [com.eignex.klause.solver.result.MinimizeResult.BestFound], never claiming completeness, so it fits
- * the local-search track. Composed last and only on a COP (it needs an objective to optimise).
+ * the local-search track. COP-oriented (it optimises an incumbent); on a CSP the underlying [Alns]
+ * degrades to its inner LS via `solve`.
+ *
+ * [profile] fixes this arm's regime — its destroy-size band and acceptance temperature; a diverse ALNS
+ * engine cycles [AlnsProfile.Curated] via [diverse]. The default regime is used for the standalone arm
+ * (e.g. the last slot of a mixed portfolio).
  */
-internal class AlnsWorkerConfig : WorkerConfig {
-    override val label: String get() = "alns-cp"
+internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default) : WorkerConfig {
+    override val label: String get() = "alns-${profile.label}"
 
     override fun materialize(
         problem: Problem,
@@ -40,7 +45,7 @@ internal class AlnsWorkerConfig : WorkerConfig {
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?,
     ): PortfolioWorker {
-        val workerLabel = "alns/$label"
+        val workerLabel = "alns/${profile.label}"
         // Cross-repair clause sharing (#644): one pool persists globally-valid learned clauses across
         // fragments so later repairs re-descend under earlier repairs' learning. Gated for soundness —
         // the repair learns under assumptions/an incumbent, so its permanent (objective-bound, blocking)
@@ -58,15 +63,11 @@ internal class AlnsWorkerConfig : WorkerConfig {
                 randomSeed = seed + index,
                 clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true, shareGlobalNogoods = false),
             ),
+            minDestroyFraction = profile.minDestroyFraction,
+            maxDestroyFraction = profile.maxDestroyFraction,
             improvedSolutionSink = solutions?.let { it::publish },
             pooledSolutionSupplier = solutions?.let { it::best },
-            // Textbook simulated-annealing acceptance, temperature scaled to the initial objective so it is
-            // meaningful across problems: a move ~5% worse than the first incumbent accepts with ~50%
-            // probability, then the walk cools toward hill-climbing over the iterations.
-            acceptanceFor = { initialObjective ->
-                val start = (SA_INITIAL_WORSENING * abs(initialObjective) / ln(2.0)).coerceAtLeast(1.0)
-                AcceptanceCriterion.SimulatedAnnealing(Geometric(initialTemperature = start, coolingRate = SA_COOLING))
-            },
+            acceptanceFor = acceptanceFactory(),
         )
         val params = LocalSearchParams(
             randomSeed = seed + index,
@@ -84,12 +85,25 @@ internal class AlnsWorkerConfig : WorkerConfig {
         )
     }
 
-    private companion object {
-        /** Worsening (as a fraction of the initial objective) accepted with ~50% probability at the start
-         *  temperature — the standard ALNS calibration anchor. */
-        const val SA_INITIAL_WORSENING = 0.05
+    /**
+     * This regime's acceptance-policy factory: strict hill-climbing when the profile disables worsening,
+     * else simulated annealing whose start temperature is scaled to the initial objective — a move
+     * `saInitialWorsening` worse than the first incumbent accepts with ~50% probability, then cools.
+     */
+    private fun acceptanceFactory(): (Double) -> AcceptanceCriterion = if (profile.saInitialWorsening <= 0.0) {
+        { AcceptanceCriterion.Improving }
+    } else {
+        { initialObjective ->
+            val start = (profile.saInitialWorsening * abs(initialObjective) / ln(2.0)).coerceAtLeast(1.0)
+            val schedule = Geometric(initialTemperature = start, coolingRate = profile.saCooling)
+            AcceptanceCriterion.SimulatedAnnealing(schedule)
+        }
+    }
 
-        /** Per-iteration geometric cooling rate. Tuning of this (and the anchor above) is calibration #5. */
-        const val SA_COOLING = 0.98
+    companion object {
+        /** [count] diverse ALNS arms cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
+         *  of [LocalSearchWorkerConfig.diverse]. Every slot is a fresh instance even when regimes repeat. */
+        fun diverse(count: Int): List<AlnsWorkerConfig> =
+            List(count) { AlnsWorkerConfig(AlnsProfile.Curated[it % AlnsProfile.Curated.size]) }
     }
 }

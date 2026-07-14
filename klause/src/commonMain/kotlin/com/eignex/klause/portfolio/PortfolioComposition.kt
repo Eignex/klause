@@ -32,6 +32,9 @@ enum class EngineMix {
 
     /** Both — LS streams incumbents while backtrack tightens/proves the bound. */
     MIXED,
+
+    /** Hybrid ALNS arms only — a large-neighbourhood destroy/repair loop with CP repair (#644). */
+    ALNS,
 }
 
 /**
@@ -177,8 +180,15 @@ internal object PortfolioComposition {
             )
 
             EngineMix.MIXED -> mixedArms(scenario)
+
+            EngineMix.ALNS -> alnsArms(count)
         }
     }
+
+    /** The [count] hybrid-ALNS arms, cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
+     *  of [lsArms]. COP-oriented: with no objective each arm's [com.eignex.klause.meta.alns.Alns] degrades
+     *  to its inner local search via `solve`, so the engine is still well-defined on a CSP. */
+    private fun alnsArms(count: Int): List<WorkerConfig> = AlnsWorkerConfig.diverse(count)
 
     /** The [count] LS arms — the curated pool ([pool] == null), else the CLI's resolved pool, each
      *  slot a fresh recipe (wrapping past the pool size). */

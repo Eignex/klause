@@ -202,7 +202,9 @@ object BenchCli {
             return
         }
         val engine = f["engine"]?.lowercase() ?: "mixed"
-        if (engine !in setOf("mixed", "ls", "cp")) error("calibrate engine must be mixed | ls | cp, got '$engine'")
+        if (engine !in setOf("mixed", "ls", "cp", "alns")) {
+            error("calibrate engine must be mixed | ls | cp | alns, got '$engine'")
+        }
         val cores = f["p"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         val entries = BenchLoad.resolveRefs(refs)
@@ -538,13 +540,14 @@ object BenchCli {
     }
 
     /** Map an `engine=` alias to a klause-cli `-e` value. The cli owns the model (fixed | cp | mixed |
-     *  ls); the bench just forwards. */
+     *  ls | alns); the bench just forwards. */
     private fun parseEngine(name: String): String = when (name.lowercase()) {
         "cp", "backtrack", "bt" -> "cp"
         "ls", "localsearch", "local-search" -> "ls"
         "mixed", "portfolio", "pf" -> "mixed"
+        "alns", "lns", "hybrid-lns" -> "alns"
         "fixed", "fd" -> "fixed"
-        else -> error("engine must be fixed|cp|mixed|ls, got '$name'")
+        else -> error("engine must be fixed|cp|mixed|ls|alns, got '$name'")
     }
 
     /** Build the selection from filters: suites (`core` expands to the in-process core;
