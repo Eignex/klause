@@ -6,6 +6,7 @@ import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.Term
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -15,7 +16,6 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
 
 /**
  * Disjunction of Boolean literals.
@@ -29,7 +29,9 @@ import com.eignex.klause.util.EmptyLongArray
  * Tautologies (a variable appearing as both `+v` and `-v`) are detected at construction; we
  * pick those two indices as the watches and the clause is permanently satisfied.
  */
-class Clause(val literals: IntArray) : Factor {
+class Clause(val literals: IntArray) :
+    Factor,
+    LinearRow {
 
     init {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
@@ -88,8 +90,12 @@ class Clause(val literals: IntArray) : Factor {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
     }
 
-    /** Exact linear view: the clause `Σ literals ≥ 1` over its Boolean literals. */
-    override val linearRows: List<LinearRow> by lazy {
-        listOf(LinearRow(EmptyLongArray, EmptyIntArray, LinearOp.GE, 1L, LongArray(literals.size) { 1L }, literals))
-    }
+    // The clause *is* its own exact linear row `Σ literals ≥ 1`, read by presolve with no allocation.
+    override val relation: LinearOp get() = LinearOp.GE
+    override val bound: Long get() = 1L
+    override val size: Int get() = literals.size
+    override fun ref(k: Int): Int = Term.ofLit(literals[k])
+    override fun coeff(k: Int): Long = 1L
+    override val isIntegerOnly: Boolean get() = false
+    override val linearRows: List<LinearRow> get() = listOf(this)
 }

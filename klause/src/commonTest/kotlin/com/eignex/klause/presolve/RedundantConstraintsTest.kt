@@ -289,6 +289,37 @@ class RedundantConstraintsTest {
     }
 
     @Test
+    fun `a pseudo-boolean dominated by a cardinality over the same literals is dropped`() {
+        // AtMostOne(a,b,c) is Σlit ≤ 1, which implies the unit-weight Σlit ≤ 2; the pseudo-Boolean drops.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1),
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2L),
+            ),
+        )
+        val out = checkPbPreserved("cardinality-dominates-pb", problem, expectDrop = true)
+        assertTrue(out.factors.single() is Cardinality, "the cardinality survives as the dominator")
+    }
+
+    @Test
+    fun `a subsumed clause is left to the SAT presolver`() {
+        // a∨b implies a∨b∨c, but clause subsumption is deferred to BVE (#24); this pass leaves both.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                Clause(intArrayOf(pos(0), pos(1))),
+                Clause(intArrayOf(pos(0), pos(1), pos(2))),
+            ),
+        )
+        checkPbPreserved("clause-not-subsumed", problem, expectDrop = false)
+    }
+
+    @Test
     fun `independent pseudo-boolean constraints are left untouched`() {
         // Different weight vectors ⇒ not comparable ⇒ no-op.
         val problem = Problem(

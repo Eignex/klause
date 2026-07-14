@@ -16,7 +16,6 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -63,14 +62,12 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
         builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())
     }
 
-    /** Exact linear view: the bounds `min ≤ Σ literals ≤ max` over its Boolean literals. */
-    override val linearRows: List<LinearRow> by lazy {
-        val unit = LongArray(literals.size) { 1L }
-        listOf(
-            LinearRow(EmptyLongArray, EmptyIntArray, LinearOp.GE, min.toLong(), unit, literals),
-            LinearRow(EmptyLongArray, EmptyIntArray, LinearOp.LE, max.toLong(), unit, literals),
+    /** Exact linear view: the bounds `min ≤ Σ literals ≤ max` over its Boolean literals (unit-weight views). */
+    override val linearRows: List<LinearRow>
+        get() = listOf(
+            LinearRow.ofBools(literals, LinearOp.GE, min.toLong()),
+            LinearRow.ofBools(literals, LinearOp.LE, max.toLong()),
         )
-    }
 
     /** Factory methods for this factor. */
     companion object {

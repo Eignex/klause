@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -61,16 +62,17 @@ internal object DominatedVariables {
             // The integer monotonicity analysis reads the integer side of a row; a row carrying Boolean
             // literals is left to the bool-side [markBoolSafety] (unifying the two is a follow-up).
             val monotoneIntRows = rows.isNotEmpty() &&
-                rows.all { (it.op == LinearOp.LE || it.op == LinearOp.GE) && it.boolLits.isEmpty() }
+                rows.all { (it.relation == LinearOp.LE || it.relation == LinearOp.GE) && it.isIntegerOnly }
             if (monotoneIntRows) {
                 // Every exact row is monotone ≤/≥, so each variable has one safe direction per row.
                 for (row in rows) {
-                    for (i in row.vars.indices) {
-                        val a = row.coeffs[i]
+                    for (i in 0 until row.size) {
+                        val a = row.coeff(i)
                         if (a == 0L) continue
+                        val v = Term.intVar(row.ref(i))
                         // Lowering is safe iff (LE ∧ a>0) ∨ (GE ∧ a<0); raising is the complement.
-                        val loweringSafe = if (row.op == LinearOp.LE) a > 0 else a < 0
-                        if (loweringSafe) upSafe[row.vars[i]] = false else downSafe[row.vars[i]] = false
+                        val loweringSafe = if (row.relation == LinearOp.LE) a > 0 else a < 0
+                        if (loweringSafe) upSafe[v] = false else downSafe[v] = false
                     }
                 }
             } else {

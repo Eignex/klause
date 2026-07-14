@@ -5,6 +5,8 @@ import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
+import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.Term
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -21,7 +23,9 @@ import com.eignex.klause.util.EmptyIntArray
  * clamped to the variable's domain. Terms pair [coeffs] with [vars]; the sum is compared by [op]
  * against [bound].
  */
-class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bound: Long) : Factor {
+class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, override val bound: Long) :
+    Factor,
+    LinearRow {
 
     val vars: IntArray = terms.vars
     val coeffs: LongArray = terms.coeffs
@@ -83,7 +87,19 @@ class Linear private constructor(terms: CoalescedTerms, val op: LinearOp, val bo
 
     override fun asInvariant(): Invariant = LinearInvariant(coeffs, vars, op, bound)
 
-    override val linearRows: List<LinearRow> by lazy { listOf(LinearRow(coeffs, vars, op, bound)) }
+    // The factor *is* its own exact linear row (integer terms), so presolve reads it with no extra
+    // allocation. [linearize] emits the row over the factor's arrays directly rather than through the
+    // interface accessors, keeping the per-node LP path allocation-free.
+    override val size: Int get() = vars.size
+    override fun ref(k: Int): Int = Term.ofIntVar(vars[k])
+    override fun coeff(k: Int): Long = coeffs[k]
+    override val relation: LinearOp get() = op
+    override val isIntegerOnly: Boolean get() = true
+    override val linearRows: List<LinearRow> get() = listOf(this)
+
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        builder.linearRow(op, vars, coeffs, bound)
+    }
 }
 
 /** True when every coefficient and the bound fit 32-bit range — the precondition for the Int-coefficient
