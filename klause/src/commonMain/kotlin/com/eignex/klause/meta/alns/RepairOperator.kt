@@ -10,7 +10,23 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import kotlin.math.abs
 import kotlin.random.Random
+
+/** The objective's largest-magnitude coefficient — the scale ALNS insertion noise is measured in. Zero
+ *  for an empty (constant) objective, so noise is inert where there is nothing to perturb. */
+private fun objectiveScale(objective: LinearObjective): Double {
+    var m = 0L
+    for (w in objective.boolWeights) {
+        val a = abs(w)
+        if (a > m) m = a
+    }
+    for (c in objective.intCoefficients) {
+        val a = abs(c)
+        if (a > m) m = a
+    }
+    return m.toDouble()
+}
 
 /**
  * The "repair" half of an ALNS iteration: fill in the freed variables under the pinned
@@ -34,6 +50,7 @@ internal fun interface RepairOperator {
             InnerLsRepair(label = "quick", flipsOverride = 200L),
             InnerLsRepair(label = "deep", flipsOverride = 5_000L),
             GreedyConstructionRepair(),
+            GreedyConstructionRepair(noise = 0.1),
         )
     }
 }
@@ -140,7 +157,13 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
  * infeasible candidates are scored `+∞` and greedy stays inside the feasible region
  * whenever it can.
  */
-internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
+internal class GreedyConstructionRepair(
+    val intDomainSampleCap: Int = 20,
+    /** Textbook ALNS insertion noise (Ropke & Pisinger): each candidate's score is perturbed by a uniform
+     *  draw in `±noise · maxObjectiveCoefficient`, so the greedy fill occasionally takes a non-locally-best
+     *  value and diversifies. `0.0` (default) is pure greedy; `~0.1` is the usual diversifying setting. */
+    val noise: Double = 0.0,
+) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
@@ -150,12 +173,20 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
 
         val shaping = context.params.costShaping
         fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
+        // Noise scaled to the objective magnitude; a fresh signed jitter per candidate. Added to a finite
+        // score only — an infeasible +∞ stays worst, so noise diversifies but never accepts infeasibility.
+        val noiseScale = noise * objectiveScale(context.objective)
+        fun jittered(score: Double): Double = if (noiseScale > 0.0 && score.isFinite()) {
+            score + noiseScale * (2.0 * context.rng.nextDouble() - 1.0)
+        } else {
+            score
+        }
 
         val boolOrder = context.freed.bools.copyOf().also { it.shuffle(context.rng) }
         for (b in boolOrder) {
             val baseline = currentScore()
             state.apply(Move.BoolFlip(b))
-            val flipped = currentScore()
+            val flipped = jittered(currentScore())
             if (flipped >= baseline) state.apply(Move.BoolFlip(b))
         }
 
@@ -174,7 +205,7 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
             for (v in candidates) {
                 if (v == cur) continue
                 state.apply(Move.IntSet(i, v))
-                val s = currentScore()
+                val s = jittered(currentScore())
                 if (s < bestScore) {
                     bestScore = s
                     bestVal = v
@@ -187,7 +218,7 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
         return state.assignment.snapshot()
     }
 
-    override fun toString(): String = "GreedyConstructionRepair(cap=$intDomainSampleCap)"
+    override fun toString(): String = "GreedyConstructionRepair(cap=$intDomainSampleCap, noise=$noise)"
 }
 
 /**
@@ -203,7 +234,12 @@ internal class GreedyConstructionRepair(val intDomainSampleCap: Int = 20) : Repa
  * has dramatically different costs, regret typically reaches a feasible incumbent in fewer
  * inner LS rounds.
  */
-internal class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
+internal class RegretRepair(
+    val intDomainSampleCap: Int = 20,
+    /** Insertion noise, as in [GreedyConstructionRepair]: candidate scores are perturbed by `±noise ·
+     *  maxObjectiveCoefficient` before the regret ordering, diversifying the assignment. `0.0` disables it. */
+    val noise: Double = 0.0,
+) : RepairOperator {
     override fun repair(context: RepairContext): Sample? {
         val problem = context.inner.problem
         val state = LocalSearchState(problem, context.rng, context.pinAssumptions)
@@ -212,11 +248,17 @@ internal class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
         state.recompute()
         val shaping = context.params.costShaping
         fun currentScore(): Double = shaping.shape(state.cost, context.objective.evaluate(state.assignment.snapshot()))
+        val noiseScale = noise * objectiveScale(context.objective)
+        fun jittered(score: Double): Double = if (noiseScale > 0.0 && score.isFinite()) {
+            score + noiseScale * (2.0 * context.rng.nextDouble() - 1.0)
+        } else {
+            score
+        }
         // Booleans: greedy single pass (regret on a 2-value domain reduces to best-flip).
         for (b in context.freed.bools) {
             val baseline = currentScore()
             state.apply(Move.BoolFlip(b))
-            if (currentScore() >= baseline) state.apply(Move.BoolFlip(b))
+            if (jittered(currentScore()) >= baseline) state.apply(Move.BoolFlip(b))
         }
         // Integers: compute regret per var, sort desc, assign best value in that order.
         data class Slot(val v: Int, val best: Long, val bestScore: Double, val regret: Double)
@@ -235,7 +277,7 @@ internal class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
             for (v in cand) {
                 if (v == cur) continue
                 state.apply(Move.IntSet(i, v))
-                val s = currentScore()
+                val s = jittered(currentScore())
                 if (s < bestScore) {
                     second = bestScore
                     bestScore = s
@@ -256,7 +298,7 @@ internal class RegretRepair(val intDomainSampleCap: Int = 20) : RepairOperator {
         return state.assignment.snapshot()
     }
 
-    override fun toString(): String = "RegretRepair(cap=$intDomainSampleCap)"
+    override fun toString(): String = "RegretRepair(cap=$intDomainSampleCap, noise=$noise)"
 }
 
 /**

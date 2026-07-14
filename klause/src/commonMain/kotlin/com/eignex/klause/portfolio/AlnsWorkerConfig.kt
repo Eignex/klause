@@ -2,16 +2,20 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import kotlin.math.abs
+import kotlin.math.ln
 
 /**
  * A portfolio arm running hybrid ALNS with CP repair (#644): an outer destroy/repair loop over the
@@ -56,6 +60,13 @@ internal class AlnsWorkerConfig : WorkerConfig {
             ),
             improvedSolutionSink = solutions?.let { it::publish },
             pooledSolutionSupplier = solutions?.let { it::best },
+            // Textbook simulated-annealing acceptance, temperature scaled to the initial objective so it is
+            // meaningful across problems: a move ~5% worse than the first incumbent accepts with ~50%
+            // probability, then the walk cools toward hill-climbing over the iterations.
+            acceptanceFor = { initialObjective ->
+                val start = (SA_INITIAL_WORSENING * abs(initialObjective) / ln(2.0)).coerceAtLeast(1.0)
+                AcceptanceCriterion.SimulatedAnnealing(Geometric(initialTemperature = start, coolingRate = SA_COOLING))
+            },
         )
         val params = LocalSearchParams(
             randomSeed = seed + index,
@@ -71,5 +82,14 @@ internal class AlnsWorkerConfig : WorkerConfig {
             objective = objective,
             withWarmStart = { p, sample -> p.copy(initialAssignment = sample) },
         )
+    }
+
+    private companion object {
+        /** Worsening (as a fraction of the initial objective) accepted with ~50% probability at the start
+         *  temperature — the standard ALNS calibration anchor. */
+        const val SA_INITIAL_WORSENING = 0.05
+
+        /** Per-iteration geometric cooling rate. Tuning of this (and the anchor above) is calibration #5. */
+        const val SA_COOLING = 0.98
     }
 }
