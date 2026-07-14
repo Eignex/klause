@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Cancellation
@@ -55,7 +54,7 @@ class LpPrimalHeuristicsFeasibilityPumpTest {
             val engine = LpEngine(
                 p,
                 obj,
-                BacktrackParams(lpPlan = LpPlan(bounding = true, probe = true)),
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
                 SolveStatsSink(backend = "pump-test"),
             )
             val sample = engine.lpFeasibilityPump(obj, Cancellation.Never) ?: return@repeat // infeasible/failed: skip

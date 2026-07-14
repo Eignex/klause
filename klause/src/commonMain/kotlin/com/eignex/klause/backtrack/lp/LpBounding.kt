@@ -188,8 +188,8 @@ private fun mostFractionalCol(relaxation: LpRelaxation, primal: DoubleArray): Tr
  * descent falls back to the configured `VariableSelector` on null, and any chosen variable is a sound
  * branch, so search stays complete and correct regardless. `O(unassigned)` per call, capped.
  */
-internal fun LpEngine.lpBranchPick(session: PropagationSession): VarRef? {
-    val hints = lpHints ?: return null
+internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?): VarRef? {
+    hints ?: return null
     if (problem.numBoolVars + problem.numIntVars > LP_BRANCH_SCAN_CAP) return null // too wide ⇒ delegate
     var best: VarRef? = null
     var bestScore = LP_BRANCH_MIN_SCORE
@@ -256,7 +256,7 @@ internal fun LpEngine.lpBoundAndFix(
     objectiveVar: Int,
     objectiveAscending: Boolean,
     cancellation: Cancellation,
-    hints: LpHints? = null,
+    hints: LpHintSink? = null,
     learn: Boolean = false,
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
@@ -321,7 +321,7 @@ internal fun LpEngine.sparseSafePrune(
     cancellation: Cancellation,
     objectiveVar: Int,
     objectiveAscending: Boolean,
-    hints: LpHints? = null,
+    hints: LpHintSink? = null,
     learn: Boolean = false,
     warm: Basis? = null,
     cutsAllowed: Boolean = false,

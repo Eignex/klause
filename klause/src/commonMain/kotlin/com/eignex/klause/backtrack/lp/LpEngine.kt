@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.Basis
@@ -53,15 +52,15 @@ import kotlin.time.TimeSource
 internal class LpEngine(
     val problem: Problem,
     private val objective: LinearObjective,
-    params0: BacktrackParams,
+    params0: LpParams,
     private val sink: SolveStatsSink,
 ) {
-    /** The relaxation-bound family resolved from the high-level emphasis ([BacktrackParams.lpConfig])
+    /** The relaxation-bound family resolved from the high-level emphasis ([LpParams.lpConfig])
      *  against this problem's structure (#429); with no emphasis set, the explicit
-     *  [BacktrackParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
+     *  [LpParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
      *  the intent→plan step, so callers carry only the intent and never a separately-resolved copy. */
-    val params: BacktrackParams =
-        params0.lpConfig?.let { LpAutoConfig.resolve(problem, it, params0) } ?: params0
+    val params: LpParams =
+        params0.lpConfig?.let { params0.copy(lpPlan = LpAutoConfig.resolve(problem, it, params0.lpPlan)) } ?: params0
 
     /** Construct the relaxer for [plan]'s hull flags, or null when bounding is off. Factored so the
      *  ineffective-hull probe can build variants with whole families ([plan]) or individual factor
@@ -260,7 +259,10 @@ internal class LpEngine(
     )
     val lpNogoods: LpNogoodPool? = if (params.lpPlan.learn) LpNogoodPool() else null
     private val lpBasisByDepth = ArrayList<Basis?>()
-    val lpHints = if (params.lpPlan.branching) LpHints(problem.numIntVars, problem.numBoolVars) else null
+    /** LP-solution record sink for branching hints (set by the search when LP branching is on; null in
+     *  presolve). The engine only records into it; the concrete [LpHints] and its selection reads live in
+     *  the search layer. */
+    var lpHints: LpHintSink? = null
     private var lpBackjump: Learned? = null
 
     // Persistent global LP (#39): for a node-invariant relaxation (no auxiliary columns, no live-M

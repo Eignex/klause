@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Cancellation
@@ -33,7 +32,7 @@ class LpBoundingLbTreeSearchTest {
     }
 
     private fun engine(p: Problem, obj: LinearObjective) =
-        LpEngine(p, obj, BacktrackParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "lbtree"))
+        LpEngine(p, obj, LpParams(lpPlan = LpPlan(bounding = true)), SolveStatsSink(backend = "lbtree"))
 
     @Test
     fun `the subsolver returns only feasible incumbents`() {

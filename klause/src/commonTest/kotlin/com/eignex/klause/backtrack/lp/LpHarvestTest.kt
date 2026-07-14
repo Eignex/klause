@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.propagation.PropagationResult
@@ -24,8 +23,8 @@ import kotlin.test.assertTrue
  */
 class LpHarvestTest {
 
-    private val shavingParams = BacktrackParams(lpPlan = LpPlan(bounding = true, variableShaving = true))
-    private val objShavingParams = BacktrackParams(lpPlan = LpPlan(bounding = true, objectiveShaving = true))
+    private val shavingParams = LpPlan(bounding = true, variableShaving = true)
+    private val objShavingParams = LpPlan(bounding = true, objectiveShaving = true)
 
     @Test
     fun `harvest is a no-op when variable shaving is off`() {
@@ -38,7 +37,7 @@ class LpHarvestTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
         assertSame(
             problem,
-            lpHarvest(problem, obj, BacktrackParams(lpPlan = LpPlan(bounding = true))),
+            lpHarvest(problem, obj, LpPlan(bounding = true)),
             "with variable shaving disabled the harvest must return the problem unchanged",
         )
     }
@@ -311,7 +310,7 @@ class LpHarvestTest {
             ),
         )
         assertTrue(
-            lpRootInfeasible(problem, LinearObjective(), BacktrackParams(lpPlan = LpPlan(bounding = true))),
+            lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
             "the root LP must certify the difference cycle infeasible",
         )
     }
@@ -325,7 +324,7 @@ class LpHarvestTest {
             arrayOf<Factor>(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1)),
         )
         assertFalse(
-            lpRootInfeasible(problem, LinearObjective(), BacktrackParams(lpPlan = LpPlan(bounding = true))),
+            lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
             "a satisfiable relaxation must not be reported infeasible",
         )
     }

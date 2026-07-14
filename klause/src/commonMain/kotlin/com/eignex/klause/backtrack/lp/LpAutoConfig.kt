@@ -93,7 +93,7 @@ object LpAutoConfig {
 
     /** `base` with every structurally-applicable LP technique enabled — i.e. [resolve] at the
      *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). The historical structural auto-config. */
-    fun recommend(problem: Problem, base: BacktrackParams = BacktrackParams()): BacktrackParams =
+    fun recommend(problem: Problem, base: LpPlan = LpPlan()): LpPlan =
         resolve(problem, LpConfig.AGGRESSIVE, base)
 
     /**
@@ -105,7 +105,7 @@ object LpAutoConfig {
      * caller setting is never turned off.
      */
     @Suppress("CyclomaticComplexMethod")
-    fun resolve(problem: Problem, config: LpConfig, base: BacktrackParams = BacktrackParams()): BacktrackParams {
+    fun resolve(problem: Problem, config: LpConfig, base: LpPlan = LpPlan()): LpPlan {
         var lpEmittable = false
         var allDifferent = false
         var globalCardinality = false
@@ -227,7 +227,7 @@ object LpAutoConfig {
                 arrayMinMax || product
         // #571: an explicit objective-cone request drops the disjunctive big-M rows and every variable
         // disconnected from the objective, so it always fits the cap even when the full model is over it.
-        val coneRequested = base.lpPlan.objectiveCone
+        val coneRequested = base.objectiveCone
         val baseFits = coneRequested || cells <= baseCap
         // LP runs whenever the model is structurally amenable, the emphasis permits it, and the base
         // relaxation fits the ceiling (a cone request always fits).
@@ -269,50 +269,48 @@ object LpAutoConfig {
         val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
         return base.copy(
-            lpPlan = base.lpPlan.copy(
-                bounding = base.lpPlan.bounding || lpActive,
-                cuts = base.lpPlan.cuts || cuts,
-                // LP learning rides on the bounding path: the objective-bound reason is built from the
-                // exact basis-certificate the sparse solve already computes.
-                learn = base.lpPlan.learn || lpActive,
-                // The LP-rounding probe solves the root relaxation through the sparse revised simplex.
-                probe = base.lpPlan.probe || lpActive,
-                circuit = base.lpPlan.circuit || (LpTechnique.CIRCUIT in acceptedHulls),
-                element = base.lpPlan.element || (LpTechnique.ELEMENT in acceptedHulls),
-                table = base.lpPlan.table || (LpTechnique.TABLE in acceptedHulls),
-                nValue = base.lpPlan.nValue || (LpTechnique.NVALUE in acceptedHulls),
-                regular = base.lpPlan.regular || (LpTechnique.REGULAR in acceptedHulls),
-                mdd = base.lpPlan.mdd || (LpTechnique.MDD in acceptedHulls),
-                gccCount = base.lpPlan.gccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
-                cumulative = base.lpPlan.cumulative || makespanLp,
-                diffn = base.lpPlan.diffn || (diffnLp && config.resolved(LpTechnique.DIFFN)),
-                cumulativeTimeIndexed = base.lpPlan.cumulativeTimeIndexed ||
-                    (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
-                cumulativeFlow = base.lpPlan.cumulativeFlow ||
-                    (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
-                // ArrayMinMax tight face and Product McCormick: EXHAUSTIVE-tier relaxations,
-                // on when their structure is present and the emphasis permits them.
-                linMaxTightFace = base.lpPlan.linMaxTightFace ||
-                    (lpActive && arrayMinMax && config.resolved(LpTechnique.LINMAX_TIGHT)),
-                productMcCormick = base.lpPlan.productMcCormick ||
-                    (lpActive && product && config.resolved(LpTechnique.PRODUCT_MCCORMICK)),
-                // Implied-bound cuts: a cut family, so requires cuts active + Boolean structure.
-                impliedBoundCuts = base.lpPlan.impliedBoundCuts ||
-                    (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
-                flowCoverCuts = base.lpPlan.flowCoverCuts || (cuts && config.resolved(LpTechnique.FLOW_COVER)),
-                // Boolean RLT: relaxation strengthening; a no-op without 0/1 knapsack rows.
-                booleanRlt = base.lpPlan.booleanRlt || (cuts && config.resolved(LpTechnique.BOOLEAN_RLT)),
-                lagrangian = base.lpPlan.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
-                energeticReasoning = base.lpPlan.energeticReasoning || energetic,
-                // Derive the cadence only when the auto path is the one enabling the check — an
-                // explicit caller enablement keeps the caller's cadence untouched.
-                energeticEvery = if (energetic && !base.lpPlan.energeticReasoning) {
-                    maxOf(base.lpPlan.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
-                        .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                } else {
-                    base.lpPlan.energeticEvery
-                },
-            ),
+            bounding = base.bounding || lpActive,
+            cuts = base.cuts || cuts,
+            // LP learning rides on the bounding path: the objective-bound reason is built from the
+            // exact basis-certificate the sparse solve already computes.
+            learn = base.learn || lpActive,
+            // The LP-rounding probe solves the root relaxation through the sparse revised simplex.
+            probe = base.probe || lpActive,
+            circuit = base.circuit || (LpTechnique.CIRCUIT in acceptedHulls),
+            element = base.element || (LpTechnique.ELEMENT in acceptedHulls),
+            table = base.table || (LpTechnique.TABLE in acceptedHulls),
+            nValue = base.nValue || (LpTechnique.NVALUE in acceptedHulls),
+            regular = base.regular || (LpTechnique.REGULAR in acceptedHulls),
+            mdd = base.mdd || (LpTechnique.MDD in acceptedHulls),
+            gccCount = base.gccCount || (LpTechnique.GCC_COUNT in acceptedHulls),
+            cumulative = base.cumulative || makespanLp,
+            diffn = base.diffn || (diffnLp && config.resolved(LpTechnique.DIFFN)),
+            cumulativeTimeIndexed = base.cumulativeTimeIndexed ||
+                (LpTechnique.CUMULATIVE_TIME_INDEXED in acceptedHulls),
+            cumulativeFlow = base.cumulativeFlow ||
+                (scheduling && config.resolved(LpTechnique.CUMULATIVE_FLOW)),
+            // ArrayMinMax tight face and Product McCormick: EXHAUSTIVE-tier relaxations,
+            // on when their structure is present and the emphasis permits them.
+            linMaxTightFace = base.linMaxTightFace ||
+                (lpActive && arrayMinMax && config.resolved(LpTechnique.LINMAX_TIGHT)),
+            productMcCormick = base.productMcCormick ||
+                (lpActive && product && config.resolved(LpTechnique.PRODUCT_MCCORMICK)),
+            // Implied-bound cuts: a cut family, so requires cuts active + Boolean structure.
+            impliedBoundCuts = base.impliedBoundCuts ||
+                (cuts && problem.numBoolVars > 0 && config.resolved(LpTechnique.IMPLIED_BOUND)),
+            flowCoverCuts = base.flowCoverCuts || (cuts && config.resolved(LpTechnique.FLOW_COVER)),
+            // Boolean RLT: relaxation strengthening; a no-op without 0/1 knapsack rows.
+            booleanRlt = base.booleanRlt || (cuts && config.resolved(LpTechnique.BOOLEAN_RLT)),
+            lagrangian = base.lagrangian || (allDifferent && config.resolved(LpTechnique.LAGRANGIAN)),
+            energeticReasoning = base.energeticReasoning || energetic,
+            // Derive the cadence only when the auto path is the one enabling the check — an
+            // explicit caller enablement keeps the caller's cadence untouched.
+            energeticEvery = if (energetic && !base.energeticReasoning) {
+                maxOf(base.energeticEvery.toLong(), 1L + (energeticOps - 1L) / ENERGETIC_OPS_PER_CHECK)
+                    .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            } else {
+                base.energeticEvery
+            },
         )
     }
 

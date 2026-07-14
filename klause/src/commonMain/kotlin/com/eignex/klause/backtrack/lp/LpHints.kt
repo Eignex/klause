@@ -16,7 +16,7 @@ import kotlin.math.roundToLong
  * `NaN` means "no current LP value" (the LP has not solved for this variable, or not at this node),
  * in which case ordering is left untouched.
  */
-internal class LpHints(numIntVars: Int, numBoolVars: Int) {
+internal class LpHints(numIntVars: Int, numBoolVars: Int) : LpHintSink {
     private val intVal = DoubleArray(numIntVars) { Double.NaN }
     private val boolVal = DoubleArray(numBoolVars) { Double.NaN }
 
@@ -33,7 +33,7 @@ internal class LpHints(numIntVars: Int, numBoolVars: Int) {
      * relaxation's column→variable map. Purely advisory — drives value ([order]) and variable
      * ([branchScore]) selection, never feasibility or the optimum.
      */
-    fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
+    override fun record(relaxation: LpRelaxation, primal: DoubleArray, duals: DoubleArray) {
         val model = relaxation.model
         for (col in relaxation.colVarId.indices) {
             val v = relaxation.colVarId[col]

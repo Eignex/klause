@@ -1,6 +1,5 @@
 package com.eignex.klause.backtrack.lp
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Cancellation
@@ -42,7 +41,7 @@ class LpShavingTest {
         val engine = LpEngine(
             p,
             obj,
-            BacktrackParams(lpPlan = LpPlan(bounding = true)),
+            LpParams(lpPlan = LpPlan(bounding = true)),
             SolveStatsSink(backend = "shave"),
         )
         // cost's declared min is 0; shaving must prove cost ≥ 2 (cost ≤ 1 is infeasible) and stop there.
@@ -72,7 +71,7 @@ class LpShavingTest {
             val engine = LpEngine(
                 p,
                 obj,
-                BacktrackParams(lpPlan = LpPlan(bounding = true)),
+                LpParams(lpPlan = LpPlan(bounding = true)),
                 SolveStatsSink(backend = "shave"),
             )
             val lb = engine.shaveObjectiveLb(
@@ -123,7 +122,7 @@ class LpShavingTest {
             }
             val p = Problem(0, n, domains, factors.toTypedArray())
             val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
-            val params = BacktrackParams(lpPlan = LpPlan(bounding = true))
+            val params = LpParams(lpPlan = LpPlan(bounding = true))
             val engine = LpEngine(p, obj, params, SolveStatsSink(backend = "shave"))
             val bounds = engine.shaveVariableBounds(Cancellation.Never)
             if (bounds.isEmpty()) return@repeat

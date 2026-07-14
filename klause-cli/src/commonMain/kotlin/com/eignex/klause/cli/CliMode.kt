@@ -282,8 +282,8 @@ internal fun Solvable.presolved(
     // solver-side `--lp` emphasis. Solution-set-preserving (every shaved value is proven infeasible), so it
     // is safe even for solution-set-sensitive queries. The harvest's own LP relaxation+shaving is enabled
     // here directly, not drawn from the search params, since those carry the solver's LP intent, not this.
-    val harvestParams = if (config.resolved(PresolvePass.LP_HARVEST, context)) {
-        BacktrackParams(lpPlan = LpPlan(bounding = true, variableShaving = true, objectiveShaving = true))
+    val harvestPlan = if (config.resolved(PresolvePass.LP_HARVEST, context)) {
+        LpPlan(bounding = true, variableShaving = true, objectiveShaving = true)
     } else {
         null
     }
@@ -305,7 +305,7 @@ internal fun Solvable.presolved(
     // bake would reach. Gated on span so small models never pay the LP.
     val lpInfeasible = !strengthenInfeasible &&
         Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold &&
-        lpRootInfeasible(problem, objective, BacktrackParams(lpPlan = LpPlan(bounding = true)), cancellation)
+        lpRootInfeasible(problem, objective, LpPlan(bounding = true), cancellation)
     val preBakeInfeasible = strengthenInfeasible || lpInfeasible
 
     val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(problem, bakeConfig)
@@ -320,7 +320,7 @@ internal fun Solvable.presolved(
     while (!preBakeInfeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
         val pre = Presolver.run(current, config, context, cancellation)
         infeasible = infeasible || pre.infeasible
-        val harvestResult = harvestParams?.let {
+        val harvestResult = harvestPlan?.let {
             lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
         }
         val harvested = harvestResult?.problem ?: pre.problem
