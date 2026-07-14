@@ -1,4 +1,6 @@
 package com.eignex.klause.formats.minizinc
+
+import com.eignex.klause.formats.FormatException
 import kotlin.math.abs
 
 /** Evaluates `.ozn` expressions against solver bindings and renders output text. */
@@ -480,4 +482,4 @@ private fun stringifyForOutput(v: OznValue): String = when (v) {
 private fun formatValue(v: OznValue): String = stringifyForShow(v)
 
 /** Raised when MiniZinc/Ozn expression evaluation fails. */
-class OznEvalException(message: String) : RuntimeException(message)
+class OznEvalException(message: String) : FormatException("MiniZinc output", message)

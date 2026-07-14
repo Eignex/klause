@@ -5,13 +5,15 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** Raised when an SMT-LIB construct outside the supported QF_LIA subset is encountered. */
-class UnsupportedSmtException(msg: String) : RuntimeException("klause SMT-LIB QF_LIA: $msg")
+class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB QF_LIA", msg)
 
 /** One lowered linear relation `Σ coeffs·vars ⟨op⟩ bound` (shared by bound inference and lowering). */
 internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: LinearOp, val bound: Long)
@@ -26,8 +28,8 @@ data class SmtLibProblem(
     val intVarNames: Map<String, Int> = emptyMap(),
     /** Declared `Bool` variable name to bool id. */
     val boolVarNames: Map<String, Int> = emptyMap(),
-    /** True when the parsed objective was a maximize directive. */
-    val maximize: Boolean = false,
+    /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
+    val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     /** True when some integer variable's true (infinite or wider) domain was narrowed to the finite
      *  solver range because no tight bound was provable. An `unsat` over such a clamped model is only
      *  `unsat` within the finite range — the honest verdict for the original problem is `unknown`. */
@@ -208,7 +210,7 @@ object SmtLibQfLia {
                 objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),
-                maximize = objectiveSpec?.second ?: false,
+                sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
                 domainsClamped = domainsClamped,
             )
         }

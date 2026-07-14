@@ -7,7 +7,9 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
@@ -24,7 +26,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
-class UnsupportedXcsp3Exception(msg: String) : RuntimeException("klause XCSP3: $msg")
+class UnsupportedXcsp3Exception(msg: String) : FormatException("XCSP3", msg)
 
 /** A parsed XCSP3 instance lifted into klause's representation. */
 data class Xcsp3Problem(
@@ -34,8 +36,8 @@ data class Xcsp3Problem(
     val objective: LinearObjective?,
     /** Declared variable name to int var id. */
     val intVarNames: Map<String, Int> = emptyMap(),
-    /** True when the parsed objective was maximize. */
-    val maximize: Boolean = false,
+    /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
+    val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     /** Int vars the front-end knows are functionally defined (sound local-search `defines_var` hints). */
     val definedVars: IntArray = IntArray(0),
 )
@@ -833,7 +835,7 @@ object Xcsp3 {
             ),
             objective,
             intVarNames = LinkedHashMap(varIds),
-            maximize = objectiveMaximize,
+            sense = if (objectiveMaximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
             definedVars = definedVars.toIntArray(),
         )
 

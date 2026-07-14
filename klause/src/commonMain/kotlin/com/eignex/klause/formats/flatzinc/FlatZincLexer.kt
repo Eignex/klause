@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.formats.FormatException
+
 /** One lexical token from FlatZinc source. */
 internal sealed interface FznToken {
     val line: Int
@@ -17,7 +19,7 @@ internal sealed interface FznToken {
 
 /** Thrown on malformed FlatZinc with source location. */
 class FlatZincParseException(message: String, sourceLine: Int, sourceCol: Int) :
-    RuntimeException("$message (at $sourceLine:$sourceCol)")
+    FormatException("FlatZinc", "$message (at $sourceLine:$sourceCol)")
 
 /** Single-pass FlatZinc tokenizer. */
 internal class FlatZincLexer(private val src: String) {

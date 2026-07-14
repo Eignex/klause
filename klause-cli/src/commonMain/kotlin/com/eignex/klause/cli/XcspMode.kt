@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Sample
 
@@ -25,7 +26,13 @@ internal object Xcsp3Mode : CliMode {
             }
             val names = parsed.intVarNames
             val render: (Sample) -> String = { s -> renderInstantiation(names, s) }
-            return linearSolvable(parsed.problem, parsed.objective, parsed.maximize, render, parsed.definedVars)
+            return linearSolvable(
+                parsed.problem,
+                parsed.objective,
+                parsed.sense == ObjectiveSense.MAXIMIZE,
+                render,
+                parsed.definedVars,
+            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = XcspOutput()

@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.minizinc
 
+import com.eignex.klause.formats.FormatException
+
 /** Recursive-descent parser for the `.ozn` subset of MiniZinc. */
 internal class OznParser(private val tokens: List<OznToken>) {
     private var pos: Int = 0
@@ -447,4 +449,4 @@ internal class OznParser(private val tokens: List<OznToken>) {
 }
 
 /** Raised when MiniZinc/Ozn parsing fails. */
-class OznParseException(message: String) : RuntimeException(message)
+class OznParseException(message: String) : FormatException("MiniZinc output", message)
