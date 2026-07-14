@@ -6,9 +6,10 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import java.io.File
 
 /**
- * A committed per-instance reference optimum/bound from a strong external solver (OR-Tools CP-SAT).
- * The gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any solver
- * beating a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
+ * A committed per-instance reference optimum/bound from a strong external solver — cp-sat (MiniZinc,
+ * XCSP3), clasp (DIMACS, OPB), or z3 (SMT-LIB QF_LIA), per the instance's format ([solver]). The
+ * gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any solver beating
+ * a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
  */
 internal data class ReferenceEntry(
     /** The instance's corpus (its source collection id, e.g. `hakank` / `minizinc-benchmarks` /
@@ -45,24 +46,39 @@ internal data class ReferenceEntry(
 )
 
 /**
- * The vendored reference table (`klause-bench/reference/references.csv`), instance-keyed. CSV (a header
- * plus one row per instance) rather than JSON: at ~20k entries it is a few times smaller and, being
- * line-oriented, gives clean per-instance VCS diffs (a changed optimum touches one line, not the whole
- * file). Merges are **virtual-best**: a proven optimum always wins, and among unproven bounds the
- * tighter objective (lower for minimize, higher for maximize) wins — so references only ever tighten
- * and unproven bounds stay honest. Regenerable + incremental via `bench reference`.
+ * The vendored reference tables under `klause-bench/reference/`, one CSV **per solver** named after the
+ * solver that produced it (`cp-sat.csv`, `clasp.csv`, `z3.csv`, …) — so each instance's oracle is
+ * traceable to its source and independent solver runs never overwrite one another. [load] unions them
+ * into one instance-keyed view. CSV (a header plus one row per instance) rather than JSON: at ~20k
+ * entries it is a few times smaller and, being line-oriented, gives clean per-instance VCS diffs (a
+ * changed optimum touches one line, not the whole file). Merges are **virtual-best**: a proven optimum
+ * always wins, and among unproven bounds the tighter objective (lower for minimize, higher for
+ * maximize) wins — so references only ever tighten and unproven bounds stay honest. Regenerable +
+ * incremental via `bench reference`.
  */
 internal object ReferenceStore {
+    // No `solver` column: each row's solver is the file it lives in (`<solver>.csv` for a reference
+    // table, `<config>.csv` for a per-run result table), so `readCsv` reads it from the file name.
     private val COLUMNS = listOf(
-        "suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "solver", "budgetMs",
+        "suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "budgetMs",
         "format", "structure", "numGlobal", "numLinear", "boolHeavy",
     )
 
     /** The oracle-only prefix — a legacy row (pre-features) has exactly this many columns and decodes
      *  with blank/null features, so the schema extension stays backward-compatible. */
-    private const val ORACLE_COLUMNS = 9
+    private const val ORACLE_COLUMNS = 8
 
-    private fun file() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference/references.csv")
+    private fun referenceDir() = File(CorpusFetcher.workspaceRoot(), "klause-bench/reference")
+
+    /** The per-solver table file `reference/<solver>.csv`. Each solver writes its own table, so an
+     *  instance's oracle is traceable to the solver that produced it and one solver's run never
+     *  rewrites another's rows. */
+    private fun file(solver: String) = File(referenceDir(), "$solver.csv")
+
+    /** Every committed per-solver table (one `.csv` per solver in `reference/`), name-sorted so the
+     *  union is deterministic. */
+    private fun referenceFiles(): List<File> =
+        referenceDir().listFiles { f -> f.isFile && f.extension == "csv" }?.sortedBy { it.name }.orEmpty()
 
     /** Table key: (suite, problem) — a bare name is not unique across corpora. */
     private fun key(e: ReferenceEntry) = e.suite to e.problem
@@ -77,20 +93,34 @@ internal object ReferenceStore {
         is ProblemSource.InCode -> "in-code"
     }
 
-    fun load(): Map<Pair<String, String>, ReferenceEntry> = readCsv(file()).associateBy { key(it) }
+    /** The merged oracle across every per-solver table, keyed by (suite, problem). Solvers cover
+     *  disjoint corpora, but on any overlap the virtual-best row wins ([isBetter]), so callers see one
+     *  honest optimum per instance regardless of which solver produced it. */
+    fun load(): Map<Pair<String, String>, ReferenceEntry> {
+        val merged = HashMap<Pair<String, String>, ReferenceEntry>()
+        for (f in referenceFiles()) {
+            for (e in readCsv(f)) {
+                val old = merged[key(e)]
+                if (old == null || isBetter(e, old)) merged[key(e)] = e
+            }
+        }
+        return merged
+    }
 
-    /** Read any references.csv-schema file — the committed oracle table, or a per-run result table
-     *  emitted by `solve` — into entries. Lets the analysis (`credit`) read results in the same schema. */
+    /** Read any reference-table-schema file — a committed oracle table, or a per-run result table
+     *  emitted by `solve` — into entries. The solver is the file's base name (`<solver>.csv` /
+     *  `<config>.csv`), not a column. Lets the analysis (`credit`) read results in the same schema. */
     fun readCsv(f: File): List<ReferenceEntry> {
         if (!f.isFile) return emptyList()
+        val solver = f.nameWithoutExtension
         return f.readLines().asSequence()
             .drop(1) // header
             .filter { it.isNotBlank() }
-            .map { decode(parseCsvLine(it)) }
+            .map { decode(parseCsvLine(it), solver) }
             .toList()
     }
 
-    /** Write [entries] to [f] in the references.csv schema (header + one row per entry, sorted by
+    /** Write [entries] to [f] in the reference-table schema (header + one row per entry, sorted by
      *  (suite, problem)) — the single-sourced encoding, used for both the committed table and result
      *  tables. */
     fun writeCsv(f: File, entries: List<ReferenceEntry>) {
@@ -99,59 +129,62 @@ internal object ReferenceStore {
         f.writeText((listOf(COLUMNS.joinToString(",")) + rows).joinToString("\n", postfix = "\n"))
     }
 
-    /** Merge [incoming] into the table (virtual-best) and write it back sorted by (suite, problem).
-     *  Returns (added, tightened, unchanged). */
+    /** Merge [incoming] into each producing solver's table (virtual-best) and write those tables back,
+     *  sorted by (suite, problem). Each entry lands in `reference/<its solver>.csv`. Returns (added,
+     *  tightened, unchanged) totalled across solvers. */
     fun mergeAndSave(incoming: List<ReferenceEntry>): Triple<Int, Int, Int> {
-        val table = load().toMutableMap()
         var added = 0
         var tightened = 0
         var unchanged = 0
-        for (e in incoming) {
-            val old = table[key(e)]
-            when {
-                old == null -> {
-                    table[key(e)] = e
-                    added++
-                }
+        for ((solver, group) in incoming.groupBy { it.solver }) {
+            val f = file(solver)
+            val table = readCsv(f).associateBy { key(it) }.toMutableMap()
+            for (e in group) {
+                val old = table[key(e)]
+                when {
+                    old == null -> {
+                        table[key(e)] = e
+                        added++
+                    }
 
-                isBetter(e, old) -> {
-                    table[key(e)] = e
-                    tightened++
-                }
+                    isBetter(e, old) -> {
+                        table[key(e)] = e
+                        tightened++
+                    }
 
-                else -> unchanged++
+                    else -> unchanged++
+                }
             }
+            writeCsv(f, table.values.toList())
         }
-        write(table)
         return Triple(added, tightened, unchanged)
     }
 
-    /** Merge source-derived [features] (keyed by (suite, problem)) into the table, leaving the oracle
-     *  fields untouched. Returns (updated, unmatched). */
+    /** Merge source-derived [features] (keyed by (suite, problem)) into whichever per-solver table
+     *  holds each instance, leaving the oracle fields untouched. An instance lives in exactly one
+     *  solver's table (disjoint corpora), so each key updates at most one file. Returns (updated,
+     *  unmatched). */
     fun mergeFeatures(features: Map<Pair<String, String>, InstanceFeatures>): Pair<Int, Int> {
-        val table = load().toMutableMap()
-        var updated = 0
-        var unmatched = 0
-        for ((k, feat) in features) {
-            val old = table[k]
-            if (old == null) {
-                unmatched++
-                continue
+        val matched = HashSet<Pair<String, String>>()
+        for (f in referenceFiles()) {
+            val table = readCsv(f).associateBy { key(it) }.toMutableMap()
+            var changed = false
+            for ((k, feat) in features) {
+                val old = table[k] ?: continue
+                table[k] = old.copy(
+                    format = feat.format,
+                    structure = feat.structure,
+                    numGlobal = feat.numGlobal,
+                    numLinear = feat.numLinear,
+                    boolHeavy = feat.boolHeavy,
+                )
+                matched += k
+                changed = true
             }
-            table[k] = old.copy(
-                format = feat.format,
-                structure = feat.structure,
-                numGlobal = feat.numGlobal,
-                numLinear = feat.numLinear,
-                boolHeavy = feat.boolHeavy,
-            )
-            updated++
+            if (changed) writeCsv(f, table.values.toList())
         }
-        write(table)
-        return updated to unmatched
+        return matched.size to (features.size - matched.size)
     }
-
-    private fun write(table: Map<Pair<String, String>, ReferenceEntry>) = writeCsv(file(), table.values.toList())
 
     /** Whether [a] is a strictly better reference than [b]: proven beats unproven; among feasible
      *  bounds the tighter objective wins; any feasible beats none. */
@@ -170,7 +203,6 @@ internal object ReferenceStore {
         e.feasible?.toString().orEmpty(),
         e.proven.toString(),
         e.elapsedMs.toString(),
-        csv(e.solver),
         e.budgetMs.toString(),
         csv(e.format),
         csv(e.structure),
@@ -179,10 +211,11 @@ internal object ReferenceStore {
         e.boolHeavy?.toString().orEmpty(),
     ).joinToString(",")
 
-    /** Parse one CSV data row into a [ReferenceEntry] (test seam over the private decode). */
-    fun parseRow(line: String): ReferenceEntry = decode(parseCsvLine(line))
+    /** Parse one CSV data row into a [ReferenceEntry] with the given [solver] (test seam over the
+     *  private decode; readers pass the source file's base name). */
+    fun parseRow(line: String, solver: String = ""): ReferenceEntry = decode(parseCsvLine(line), solver)
 
-    private fun decode(f: List<String>): ReferenceEntry {
+    private fun decode(f: List<String>, solver: String): ReferenceEntry {
         require(f.size >= ORACLE_COLUMNS) { "reference row has ${f.size} fields, expected >= $ORACLE_COLUMNS: $f" }
         return ReferenceEntry(
             suite = f[0],
@@ -192,14 +225,14 @@ internal object ReferenceStore {
             feasible = f[4].ifEmpty { null }?.toBoolean(),
             proven = f[5].toBoolean(),
             elapsedMs = f[6].toLong(),
-            solver = f[7],
-            budgetMs = f[8].toLong(),
+            budgetMs = f[7].toLong(),
+            solver = solver,
             // Features are absent in a legacy (oracle-only) row — default to blank/null.
-            format = f.getOrElse(9) { "" },
-            structure = f.getOrElse(10) { "" },
-            numGlobal = f.getOrNull(11)?.ifEmpty { null }?.toInt(),
-            numLinear = f.getOrNull(12)?.ifEmpty { null }?.toInt(),
-            boolHeavy = f.getOrNull(13)?.ifEmpty { null }?.toBoolean(),
+            format = f.getOrElse(8) { "" },
+            structure = f.getOrElse(9) { "" },
+            numGlobal = f.getOrNull(10)?.ifEmpty { null }?.toInt(),
+            numLinear = f.getOrNull(11)?.ifEmpty { null }?.toInt(),
+            boolHeavy = f.getOrNull(12)?.ifEmpty { null }?.toBoolean(),
         )
     }
 
