@@ -112,6 +112,23 @@ internal object Suites {
                     format = Format.OPB,
                 )
             },
+            DynamicSuite(
+                "pb07-opb",
+                "PB'07 native pseudo-Boolean OPB benchmarks (fetched, 487 crafted instances; " +
+                    "optimization/decision, linear + non-linear)",
+            ) {
+                CorpusSelection.select(
+                    ExternalCollections.pb07Other,
+                    CorpusSelection.Layout.Flat(
+                        "normalized-PB07",
+                        "opb",
+                        familyOf = { it.substringBeforeLast('/', it) },
+                    ),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.OPTIMIZATION,
+                    format = Format.OPB,
+                )
+            },
             DynamicSuite("xcsp3-cop", "XCSP3 competition COP aggregate 2022-25 (fetched, 1000; cap with max=)") {
                 CorpusSelection.select(
                     ExternalCollections.xcsp3Cop,
@@ -719,6 +736,18 @@ internal object ExternalCollections {
         url = "https://www.cril.univ-artois.fr/PB24/benchs/selected-PB24.tar",
         license = "Pseudo-Boolean Competition (academic benchmarks)",
         reason = "255MB PB'24 selected-benchmark set; fetched rather than vendored",
+        fetch = FetchMethod.Tar,
+    )
+
+    /** PB'07 evaluation "other" benchmarks: 487 native (crafted, not MIP-translated) pseudo-Boolean
+     *  instances across the competition categories (optimization/decision, small/big integer, linear
+     *  and non-linear), each a `.opb.bz2` under `normalized-PB07/`. Standard OPB headers, klause-scale.
+     *  (The archive lists 598, but 111 long factor-mod paths exceed the old tar 100-char name limit.) */
+    val pb07Other = ExternalCollection(
+        id = "pb07-other",
+        url = "http://www.cril.univ-artois.fr/PB07/benchs/PB07-OTHER.tar",
+        license = "PB Evaluation (academic benchmarks)",
+        reason = "31MB PB'07 native pseudo-Boolean set (487 crafted instances); fetched rather than vendored",
         fetch = FetchMethod.Tar,
     )
     val maxsatExactUnweighted = ExternalCollection(
