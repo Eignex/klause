@@ -143,9 +143,8 @@ internal class Alns(
         // Score with the caller's gradient view when one is supplied (it agrees with the linear
         // objective at every feasible point); the inner solves resolve the same view from params.
         val scoring: Objective = params.lsObjective ?: objective
-        // Initial solve to get an incumbent. Route through the session when present so the
-        // first solve seeds DDFW weights / recency for later activity-biased destroys.
-        val initialResult = session?.minimize(objective, params) ?: inner.minimize(objective, params)
+        // Initial incumbent for the destroy/repair loop (LS-first, backtrack-fallback — see below).
+        val initialResult = bootstrapIncumbent(objective, params)
         val initialSample = initialResult.assignment ?: return initialResult
         var bestSample: Sample = initialSample
         var bestObj = scoring.evaluate(bestSample)
@@ -259,6 +258,29 @@ internal class Alns(
     }
 
     /**
+     * The first incumbent for the destroy/repair loop. For a hybrid ALNS (a backtrack engine is present)
+     * seed it with a *budget-bounded complete solve*: complete search reaches a first feasible fast on both
+     * easy and feasibility-tight problems — where local search flails and leaves ALNS with no incumbent at
+     * all (bench-mined) — and hands over a CP-quality start. It is capped to a fraction of the run's budget
+     * (via [com.eignex.klause.solver.Cancellation.shorten]) so destroy/repair keeps the rest, with
+     * [BOOTSTRAP_DECISIONS] as the safeguard for a budget-less (deadline-free) run. A pure-LS ALNS (no
+     * backtrack engine), or a fragment the bootstrap can't seed, falls back to local search.
+     */
+    private fun bootstrapIncumbent(objective: LinearObjective, params: LocalSearchParams): MinimizeResult {
+        val engine = backtrack
+        if (engine != null) {
+            val base = backtrackParams ?: BacktrackParams()
+            val cpResult = engine.minimize(
+                objective,
+                base.copy(maxDecisions = BOOTSTRAP_DECISIONS)
+                    .withCancellation(params.cancellation.shorten(BT_BOOTSTRAP_FRACTION)),
+            )
+            if (cpResult.assignment != null) return cpResult
+        }
+        return session?.minimize(objective, params) ?: inner.minimize(objective, params)
+    }
+
+    /**
      * Pin every variable *not* in [freed] to its incumbent value, written straight into the sorted
      * primitive arrays [Assumptions] holds — no per-iteration boxing map. The complement is still most
      * of the problem, but the reused repair session re-seeds it by diff
@@ -288,5 +310,15 @@ internal class Alns(
         }
         // Keys emerge ascending from the 0..n scan — exactly the sorted order the array constructor wants.
         return Assumptions(boolKeys, boolValues, intKeys, intValues)
+    }
+
+    private companion object {
+        /** Budget slice ([com.eignex.klause.solver.Cancellation.shorten]) the complete-engine bootstrap may
+         *  use before yielding to destroy/repair. Calibration knob (#5). */
+        const val BT_BOOTSTRAP_FRACTION = 0.5
+
+        /** Decision-count safeguard on the complete-engine bootstrap for a deadline-free run, where
+         *  `shorten` cannot bound by time. Big enough to reach a first feasible on tight problems. */
+        const val BOOTSTRAP_DECISIONS = 50_000L
     }
 }

@@ -88,11 +88,11 @@ class SequentialPortfolio(
         require(reseedStaleThreshold >= 0) { "reseedStaleThreshold must be ≥ 0" }
     }
 
-    /** A per-segment cancellation that fires when the global token fires or the slice elapses. */
-    private fun sliceToken(global: Cancellation, sliceMillis: Long): Cancellation {
-        val end = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
-        return Cancellation { global() || end.hasPassedNow() }
-    }
+    /** A per-segment cancellation that fires when the slice elapses or the global token fires. Built from
+     *  [Cancellation.until] (not a bare predicate) so it carries the slice deadline — an arm can then size
+     *  a sub-phase as a fraction of its slice via [Cancellation.shorten] (the ALNS bootstrap). */
+    private fun sliceToken(global: Cancellation, sliceMillis: Long): Cancellation =
+        Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds) or global
 
     /**
      * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat
