@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
+import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
@@ -57,13 +58,19 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
 
     override fun asInvariant(): Invariant = IncreasingInvariant(xs, gap)
 
-    // Each adjacent pair is the exact row `xs(i+1) − xs(i) ≥ gap`; their conjunction is the chain; the
-    // LP relaxation is these rows (via the [Factor.linearize] default).
-    override val linearRows: List<LinearRow> by lazy {
-        buildList {
+    // Each adjacent pair is the exact row `xs(i+1) − xs(i) ≥ gap`; their conjunction is the chain. The
+    // rows are surfaced to presolve; the LP relaxation emits the same pairwise rows directly.
+    override val linearRows: List<LinearRow>
+        get() = buildList {
             for (i in 0 until xs.size - 1) {
-                add(LinearRow(longArrayOf(1, -1), intArrayOf(xs[i + 1], xs[i]), LinearOp.GE, gap.toLong()))
+                add(LinearRow.ofInts(intArrayOf(xs[i + 1], xs[i]), longArrayOf(1, -1), LinearOp.GE, gap.toLong()))
             }
+        }
+
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        val coeffs = longArrayOf(1, -1)
+        for (i in 0 until xs.size - 1) {
+            builder.linearRow(LinearOp.GE, intArrayOf(xs[i + 1], xs[i]), coeffs, gap.toLong())
         }
     }
 }

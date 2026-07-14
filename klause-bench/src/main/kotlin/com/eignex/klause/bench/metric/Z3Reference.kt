@@ -43,8 +43,13 @@ internal object Z3Reference {
         val file = CorpusFetcher.resolve(ref.source)
         val timeoutSec = (budget.timeoutMillis / 1000).coerceAtLeast(1)
         val cmd = listOf(
-            BINARY, "-T:$timeoutSec", "-memory:$MEMORY_MB", "-smt2",
-            "sat.threads=1", "parallel.enable=false", file.absolutePath,
+            BINARY,
+            "-T:$timeoutSec",
+            "-memory:$MEMORY_MB",
+            "-smt2",
+            "sat.threads=1",
+            "parallel.enable=false",
+            file.absolutePath,
         )
         val startNanos = System.nanoTime()
         val proc = ProcessBuilder(cmd).redirectErrorStream(false).start()

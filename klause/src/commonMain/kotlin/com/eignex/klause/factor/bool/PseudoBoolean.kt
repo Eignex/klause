@@ -6,6 +6,7 @@ import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -15,14 +16,15 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.EmptyLongArray
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
  * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum. Terms pair
  * [weights] with [literals]; the sum is compared by [op] against [bound].
  */
-class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp, val bound: Long) : Factor {
+class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp, override val bound: Long) :
+    Factor,
+    LinearRow {
 
     override val intVars: IntArray = EmptyIntArray
 
@@ -48,19 +50,21 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
 
     override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 
-    private val linearOp: LinearOp = when (op) {
+    /** LP relaxation: the feasibility-defining row `Σ weights·literals ⟨op⟩ bound`. */
+    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+        builder.boolRow(literals, weights, relation, bound)
+    }
+
+    // The factor *is* its own exact linear row over its Boolean literals, read by presolve with no
+    // allocation. [relation] maps the native [PbOp] onto the row's [LinearOp] (the two never clash).
+    override val relation: LinearOp = when (op) {
         PbOp.LE -> LinearOp.LE
         PbOp.GE -> LinearOp.GE
         PbOp.EQ -> LinearOp.EQ
     }
-
-    /** LP relaxation: the feasibility-defining row `Σ weights·literals ⟨op⟩ bound`. */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        builder.boolRow(literals, weights, linearOp, bound)
-    }
-
-    /** Exact linear view: the row `Σ weights·literals ⟨op⟩ bound` over its Boolean literals. */
-    override val linearRows: List<LinearRow> by lazy {
-        listOf(LinearRow(EmptyLongArray, EmptyIntArray, linearOp, bound, weights, literals))
-    }
+    override val size: Int get() = literals.size
+    override fun ref(k: Int): Int = Term.ofLit(literals[k])
+    override fun coeff(k: Int): Long = weights[k]
+    override val isIntegerOnly: Boolean get() = false
+    override val linearRows: List<LinearRow> get() = listOf(this)
 }

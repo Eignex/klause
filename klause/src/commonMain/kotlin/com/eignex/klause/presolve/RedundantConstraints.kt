@@ -7,6 +7,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.lp.LinearRow
+import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -126,28 +127,17 @@ internal object RedundantConstraints {
             }
         }
         for (f in deduped) {
-            // Any factor with an exact integer-linear form (a Linear comparator, or each pair of an
-            // increasing chain) feeds the dominator buckets through its rows; Boolean-literal rows
-            // (clause / cardinality / pseudo-Boolean) contribute through ineqNormalForm, the bool-aware
-            // path (folding them into this int-keyed bucket is a follow-up).
-            val rows = f.linearRows
-            if (rows.isNotEmpty() && rows.none { it.boolLits.isNotEmpty() }) {
-                for (row in rows) {
-                    val n = rowForm(row) ?: continue
-                    offer(n.key, n.bound, fromEq = n.fromEq)
-                    if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
-                }
-                continue
+            // Every exact row (integer-linear or Boolean-literal, over any factor) feeds the dominator
+            // buckets through the uniform [offerForms] view; a `≥`/`=` also offers its opposite direction.
+            for (n in offerForms(f)) {
+                offer(n.key, n.bound, fromEq = n.fromEq)
+                if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
             }
-            val n = ineqNormalForm(f) ?: continue
-            offer(n.key, n.bound, fromEq = n.fromEq)
-            // An `=` contributes its bound to both directions, so it can dominate either inequality.
-            if (n.opposite != null) offer(n.opposite.key, n.opposite.bound, fromEq = true)
         }
         val keptRep = HashSet<TermKey>()
         val out = ArrayList<Factor>(deduped.size)
         for (f in deduped) {
-            val n = ineqNormalForm(f)
+            val n = dropForm(f)
             // Keep equalities, ≠, and non-(Linear/PseudoBoolean) factors; they are never dropped here.
             if (n == null || n.fromEq) {
                 out.add(f)
@@ -368,9 +358,9 @@ internal object RedundantConstraints {
             }
             // A factor with no linear/PB row (every Clause, Xor, plain global) offers nothing to the
             // phase-2 dominator buckets, so allocate the touched-key set — and re-derive the row form —
-            // only once it actually offers. On a clause-heavy SAT model phase 2 is entirely no-op, so this
-            // drops one HashSet allocation and one [ineqNormalForm] call per factor. Byte-identical: an
-            // offer-free factor runs the same (empty) phase-2 path either way.
+            // only once it actually offers. On a clause-heavy SAT model phase 2 stays a no-op (clause rows
+            // are skipped by [rowForm]), so this drops one HashSet allocation and one normal-form
+            // derivation per offer-free factor.
             @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer
             var touched: HashSet<TermKey>? = null
             forEachOffer(f) { key, bound, eq ->
@@ -378,7 +368,7 @@ internal object RedundantConstraints {
                 (touched ?: HashSet<TermKey>().also { touched = it }).add(key)
             }
             val keys = touched ?: return
-            val member = ineqNormalForm(f)?.takeIf { !it.fromEq }
+            val member = dropForm(f)?.takeIf { !it.fromEq }
             for (key in keys) {
                 val cand = if (member != null && member.key == key) f else null
                 resolve(buckets.getValue(key), cand, member?.bound ?: 0L, drops)
@@ -418,17 +408,9 @@ internal object RedundantConstraints {
     }
 
     /** Replay the from-scratch phase-2 offer sequence for [f]: each exact `≤`-row (a `≥` folded to `≤`,
-     *  an `=` contributing both directions), or the whole-factor normal form when it has no row view. */
+     *  an `=` contributing both directions). Mirrors the fresh path's [offerForms] loop. */
     private inline fun forEachOffer(f: Factor, action: (key: TermKey, bound: Long, eq: Boolean) -> Unit) {
-        val rows = f.linearRows
-        if (rows.isNotEmpty() && rows.none { it.boolLits.isNotEmpty() }) {
-            for (row in rows) {
-                val n = rowForm(row) ?: continue
-                action(n.key, n.bound, n.fromEq)
-                n.opposite?.let { action(it.key, it.bound, it.fromEq) }
-            }
-        } else {
-            val n = ineqNormalForm(f) ?: return
+        for (n in offerForms(f)) {
             action(n.key, n.bound, n.fromEq)
             n.opposite?.let { action(it.key, it.bound, it.fromEq) }
         }
@@ -474,16 +456,17 @@ internal object RedundantConstraints {
      *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
      *  the dominance ratio check), so skip them. */
     private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
-        val (coeffs, bound) = when (row.op) {
-            LinearOp.LE -> row.coeffs to row.bound
-            LinearOp.GE -> negated(row.coeffs) to -row.bound
+        val raw = LongArray(row.size) { row.coeff(it) }
+        val (coeffs, bound) = when (row.relation) {
+            LinearOp.LE -> raw to row.bound
+            LinearOp.GE -> negated(raw) to -row.bound
             else -> return null
         }
         val g = PresolveShared.gcdOf(coeffs)
-        val map = MutableIntLongMap(row.vars.size)
-        for (i in row.vars.indices) {
+        val map = MutableIntLongMap(row.size)
+        for (i in 0 until row.size) {
             if (coeffs[i] == 0L) continue
-            map.put(row.vars[i], if (g <= 1L) coeffs[i] else coeffs[i] / g)
+            map.put(Term.intVar(row.ref(i)), if (g <= 1L) coeffs[i] else coeffs[i] / g)
         }
         return LeRow(factorIndex, map, if (g <= 1L) bound else bound.floorDiv(g))
     }
@@ -514,7 +497,7 @@ internal object RedundantConstraints {
             val f = factors[i]
             val fRows = f.linearRows
             // This monotone-domination scan reads the integer side; skip Boolean-literal rows for now.
-            if (fRows.isEmpty() || fRows.any { it.boolLits.isNotEmpty() }) continue
+            if (fRows.isEmpty() || fRows.any { !it.isIntegerOnly }) continue
             val droppable = f is Linear
             for (row in fRows) {
                 val le = leRowOf(row, i) ?: continue
@@ -634,83 +617,75 @@ internal object RedundantConstraints {
         fun copyWithOpposite(opp: IneqForm) = IneqForm(key, bound, fromEq, opp)
     }
 
-    /** A single exact [LinearRow] as its `≤`-normalised [IneqForm] (an `=` row carries its opposite
-     *  direction and is never dropped); `null` for a `≠` row. */
-    private fun rowForm(row: LinearRow): IneqForm? = when (row.op) {
-        LinearOp.LE -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = false)
+    /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
+     *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
+    private fun offerForms(f: Factor): List<IneqForm> = f.linearRows.mapNotNull { rowForm(it) }
 
-        LinearOp.GE -> reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = false)
+    /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
+     *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
+     *  rows but is never itself dropped here. */
+    private fun dropForm(f: Factor): IneqForm? = f.linearRows.singleOrNull()?.let { rowForm(it) }
 
-        LinearOp.EQ -> reducedIneq(row.vars, row.coeffs, row.bound, ::leKey, fromEq = true).copyWithOpposite(
-            reducedIneq(row.vars, negated(row.coeffs), -row.bound, ::leKey, fromEq = true),
-        )
+    /**
+     * A single exact [LinearRow] as its `≤`-normalised [IneqForm], keyed uniformly over the row's tagged
+     * term refs — integer-variable and Boolean-literal refs occupy disjoint tag ranges, so an integer
+     * and a Boolean constraint never share a bucket with no extra discriminator. A `≥` folds to `≤` by
+     * negating, an `=` carries its opposite direction. `null` for a `≠` row or a pure clause
+     * `Σ literals ≥ 1` — the clause is kept out of the buckets so a clause-heavy SAT model stays a
+     * phase-2 no-op (clause subsumption is BVE's job, #24).
+     */
+    private fun rowForm(row: LinearRow): IneqForm? {
+        if (isPureClause(row)) return null
+        val refs = IntArray(row.size) { row.ref(it) }
+        val coeffs = LongArray(row.size) { row.coeff(it) }
+        return when (row.relation) {
+            LinearOp.LE -> reducedIneq(refs, coeffs, row.bound, fromEq = false)
 
-        LinearOp.NE -> null
-    }
+            LinearOp.GE -> reducedIneq(refs, negated(coeffs), -row.bound, fromEq = false)
 
-    private fun ineqNormalForm(f: Factor): IneqForm? = when (f) {
-        is Linear -> when (f.op) {
-            LinearOp.LE -> reducedIneq(f.vars, f.coeffs, f.bound, ::leKey, fromEq = false)
-
-            LinearOp.GE -> reducedIneq(f.vars, negated(f.coeffs), -f.bound, ::leKey, fromEq = false)
-
-            LinearOp.EQ -> reducedIneq(f.vars, f.coeffs, f.bound, ::leKey, fromEq = true).copyWithOpposite(
-                reducedIneq(f.vars, negated(f.coeffs), -f.bound, ::leKey, fromEq = true),
+            LinearOp.EQ -> reducedIneq(refs, coeffs, row.bound, fromEq = true).copyWithOpposite(
+                reducedIneq(refs, negated(coeffs), -row.bound, fromEq = true),
             )
 
             LinearOp.NE -> null
         }
+    }
 
-        is PseudoBoolean -> when (f.op) {
-            PbOp.LE -> reducedIneq(f.literals, f.weights, f.bound, ::pbKey, fromEq = false)
-
-            PbOp.GE -> reducedIneq(f.literals, negated(f.weights), -f.bound, ::pbKey, fromEq = false)
-
-            PbOp.EQ -> reducedIneq(f.literals, f.weights, f.bound, ::pbKey, fromEq = true).copyWithOpposite(
-                reducedIneq(f.literals, negated(f.weights), -f.bound, ::pbKey, fromEq = true),
-            )
-        }
-
-        else -> null
+    /** A pure clause `Σ literals ≥ 1` (all-Boolean terms, unit coefficients) — skipped by [rowForm]
+     *  without materialising its terms, so a clause-heavy model pays nothing here. */
+    private fun isPureClause(row: LinearRow): Boolean {
+        if (row.relation != LinearOp.GE || row.bound != 1L) return false
+        for (k in 0 until row.size) if (!Term.isBool(row.ref(k)) || row.coeff(k) != 1L) return false
+        return true
     }
 
     private fun negated(xs: LongArray): LongArray = LongArray(xs.size) { -xs[it] }
 
-    /** A `≤`-form `Σ coeffs·terms ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and
-     *  `2x+2y ≤ 4`) share a bucket even when [CoefficientStrengthening.strengthenCoefficients]
-     *  hasn't normalised them first (#466). Dividing by the coefficient GCD `g` and flooring the bound
-     *  is exact: the left side is a multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`. [keyOf]
-     *  builds the (linear / pb) key. */
-    private fun reducedIneq(
-        terms: IntArray,
-        coeffs: LongArray,
-        bound: Long,
-        keyOf: (IntArray, LongArray, Boolean) -> TermKey,
-        fromEq: Boolean,
-    ): IneqForm {
+    /** A `≤`-form `Σ coeffs·refs ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and `2x+2y ≤ 4`)
+     *  share a bucket even when [CoefficientStrengthening.strengthenCoefficients] hasn't normalised them
+     *  first (#466). Dividing by the coefficient GCD `g` and flooring the bound is exact: the left side is
+     *  a multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`. */
+    private fun reducedIneq(refs: IntArray, coeffs: LongArray, bound: Long, fromEq: Boolean): IneqForm {
         val g = PresolveShared.gcdOf(coeffs)
         return if (g <= 1L) {
-            IneqForm(keyOf(terms, coeffs, false), bound, fromEq)
+            IneqForm(refKey(refs, coeffs), bound, fromEq)
         } else {
-            IneqForm(keyOf(terms, LongArray(coeffs.size) { coeffs[it] / g }, false), bound.floorDiv(g), fromEq)
+            IneqForm(refKey(refs, LongArray(coeffs.size) { coeffs[it] / g }), bound.floorDiv(g), fromEq)
         }
     }
 
-    /** A `≤`-normal-form coefficient-vector bucket key: the `(term, coeff)` pairs sorted by term, with
-     *  an [isPb] linear / pseudo-Boolean discriminator so the two kinds never share a bucket. */
-    private data class TermKey(val isPb: Boolean, val terms: List<Long>)
+    /** A `≤`-normal-form bucket key: the `(ref, coeff)` pairs sorted by ref. Disjoint integer/Boolean ref
+     *  tags keep the two constraint kinds apart, and a literal's polarity is baked into its ref, so `x`
+     *  and `¬x` never share a term (#465). */
+    private data class TermKey(val terms: List<Long>)
 
-    /** Build a [TermKey] over `(ids, coeffs)`: pairs sorted by id, each coefficient negated when [negate]
-     *  (folding `≥` into `≤`). For pseudo-Boolean keys distinct literal ids for opposite polarities keep
-     *  `x` and `¬x` apart (#465). */
-    private fun termKey(isPb: Boolean, ids: IntArray, coeffs: LongArray, negate: Boolean): TermKey {
-        val sign = if (negate) -1L else 1L
-        val terms = ArrayList<Long>(ids.size * 2)
-        for (i in ids.indices.sortedBy { ids[it] }) {
-            terms.add(ids[i].toLong())
-            terms.add(sign * coeffs[i])
+    private fun refKey(refs: IntArray, coeffs: LongArray): TermKey {
+        val terms = ArrayList<Long>(refs.size * 2)
+        for (i in refs.indices.sortedBy { refs[it] }) {
+            terms.add(refs[i].toLong())
+            terms.add(coeffs[i])
         }
-        return TermKey(isPb, terms)
+        return TermKey(terms)
     }
 
     /** A cheap discriminator for Phase-1 duplicate bucketing: a commutative splitmix sum of the variable
@@ -726,10 +701,4 @@ internal object RedundantConstraints {
         for (v in f.boolVars) vsum += splitmix64(v.toLong() or BOOL_VAR_MARK)
         return vsum * 31 + f.structuralKeyWeight
     }
-
-    private fun leKey(vars: IntArray, coeffs: LongArray, negate: Boolean): TermKey =
-        termKey(isPb = false, ids = vars, coeffs = coeffs, negate = negate)
-
-    private fun pbKey(literals: IntArray, weights: LongArray, negate: Boolean): TermKey =
-        termKey(isPb = true, ids = literals, coeffs = weights, negate = negate)
 }

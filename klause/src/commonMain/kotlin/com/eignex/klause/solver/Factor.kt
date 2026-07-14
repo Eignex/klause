@@ -6,9 +6,8 @@ import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.lp.Term
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
 
 /**
  * Structural contract for a constraint in [Problem]: variable membership, remapping, and
@@ -245,27 +244,26 @@ sealed interface FactorReduction {
  * default [Factor.linearize] so a factor exposing exact rows needs no bespoke relaxation code.
  */
 private fun emitExactRow(builder: RelaxationBuilder, row: LinearRow) {
-    if (row.boolLits.isEmpty()) {
-        builder.linearRow(row.op, row.vars, row.coeffs, row.bound)
-        return
-    }
-    val columns = IntArrayList(row.vars.size + row.boolLits.size)
-    val coeffs = LongArrayList(row.vars.size + row.boolLits.size)
-    for (k in row.vars.indices) {
-        columns.add(builder.intColumn(row.vars[k]))
-        coeffs.add(row.coeffs[k])
-    }
+    val n = row.size
+    val columns = IntArray(n)
+    val coeffs = LongArray(n)
     var rhs = row.bound
-    for (k in row.boolLits.indices) {
-        val lit = row.boolLits[k]
-        val w = row.boolCoeffs[k]
-        columns.add(builder.boolColumn(Lit.variable(lit)))
-        if (Lit.isPositive(lit)) {
-            coeffs.add(w)
+    for (k in 0 until n) {
+        val ref = row.ref(k)
+        val c = row.coeff(k)
+        if (Term.isBool(ref)) {
+            val lit = Term.lit(ref)
+            columns[k] = builder.boolColumn(Lit.variable(lit))
+            if (Lit.isPositive(lit)) {
+                coeffs[k] = c
+            } else {
+                coeffs[k] = -c
+                rhs -= c
+            }
         } else {
-            coeffs.add(-w)
-            rhs -= w
+            columns[k] = builder.intColumn(Term.intVar(ref))
+            coeffs[k] = c
         }
     }
-    builder.row(columns.toIntArray(), coeffs.toLongArray(), row.op, rhs)
+    builder.row(columns, coeffs, row.relation, rhs)
 }
