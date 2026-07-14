@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.solver.Sample
 
@@ -38,7 +39,7 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, s) }
-            return linearSolvable(parsed.problem, parsed.objective, parsed.maximize, render)
+            return linearSolvable(parsed.problem, parsed.objective, parsed.sense == ObjectiveSense.MAXIMIZE, render)
         }
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput(domainsClamped)
