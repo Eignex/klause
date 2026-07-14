@@ -1,27 +1,18 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.lp.lpHarvestReporting
-import com.eignex.klause.backtrack.lp.lpRootInfeasible
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
-import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.presolve.BakeConfig
-import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.presolve.PresolveContext
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
-import com.eignex.klause.presolve.Presolver
-import com.eignex.klause.presolve.RootBaker
+import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 
@@ -245,122 +236,31 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
     ) { o.showVersion = true },
 )
 
-/** Round cap for the presolve↔LP-harvest fixpoint (#14): a spin guard, never the real stop. The loop
- *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
-private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
-
 /**
- * Apply a presolve [config] to this Solvable, returning one whose [Solvable.problem] is the
- * transformed problem and whose [Solvable.render] / [Solvable.objectiveValue] reconstruct the
- * solution back to the original variables first. Every other field is valid unchanged because
- * the same-space passes keep variable ids. Returns `this` when nothing changed.
- *
- * Presolve and the LP-relaxation harvest are iterated to a fixpoint (#14): the harvest's proven domain
- * tightenings can unlock further reductions (coefficient strengthening, affine elimination, structural
- * reductions), which can in turn expose more for the next harvest. The loop is self-gating — it runs a
- * second [Presolver.run] only when a harvest actually tightened the problem, so a model with no LP
- * harvest pays for exactly one presolve pass — and bounded by [MAX_PRESOLVE_HARVEST_ROUNDS]. Each
- * round's reconstruct composes in application order: a final-problem solution is lifted back through the
- * later rounds first (the harvest only narrows domains, keeping the variable space, so it adds none).
+ * Apply a presolve [config] to this Solvable, returning one whose [Solvable.problem] is the transformed
+ * problem and whose [Solvable.render] / [Solvable.objectiveValue] reconstruct the solution back to the
+ * original variables first. Every other field is valid unchanged because the same-space passes keep
+ * variable ids. Returns `this` when nothing changed. A thin adapter over [PresolvePipeline] — the
+ * fixpoint pipeline itself lives in the presolve layer; this only re-wraps its result as a [Solvable].
  */
 internal fun Solvable.presolved(
     config: PresolveConfig,
     solutionSetSensitive: Boolean,
     cancellation: Cancellation = Cancellation.Never,
 ): Solvable {
-    // Root-bake probing (failed-literal / SAC), formerly baked into the kernel `Problem` at compile
-    // time, now runs in the presolve lane via [RootBaker]: resolve it from the presolve config once and
-    // thread it through the [PresolveContext] so every rebuild re-derives it, and seed the initial
-    // problem up front so the first presolve round sees the same probed root the old self-bake produced.
-    val bakeConfig = BakeConfig.from(config)
-    val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
-        .withBakeConfig(bakeConfig)
-    // LP-relaxation harvest (#10): fold the LP's proven domain tightenings, redundant-row removals and
-    // implied equalities into the problem permanently so every backend (local search included) sees them —
-    // the backtrack solver's own root shave reaches only its search session. It is a presolve concern, so
-    // it is gated by the `lp-harvest` presolve pass (`--presolve …+lp-harvest`), independent of the
-    // solver-side `--lp` emphasis. Solution-set-preserving (every shaved value is proven infeasible), so it
-    // is safe even for solution-set-sensitive queries. The harvest's own LP relaxation+shaving is enabled
-    // here directly, not drawn from the search params, since those carry the solver's LP intent, not this.
-    val harvestPlan = if (config.resolved(PresolvePass.LP_HARVEST, context)) {
-        LpPlan(bounding = true, variableShaving = true, objectiveShaving = true)
-    } else {
-        null
-    }
-    val objective = linearObjective ?: LinearObjective()
-
-    // Coefficient strengthening runs first — before [RootBaker.reseed] forces the root bake: a
-    // gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible regardless of the (possibly
-    // very wide) variable bounds, so it is caught in O(factors). The bake would otherwise narrow such an
-    // equality toward the empty domain one step per round — O(span) on a wide clamped domain — before any
-    // pass runs. Skip the reseed and the round loop entirely on this verdict; the tail reports it.
-    val strengthenInfeasible = config.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, context) &&
-        Presolve.strengthenCoefficients(problem).infeasible
-
-    // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
-    // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
-    // propagation would grind it out one step per round (O(span)). [lpRootInfeasible] builds the root
-    // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
-    // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
-    // bake would reach. Gated on span so small models never pay the LP.
-    val lpInfeasible = !strengthenInfeasible &&
-        Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold &&
-        lpRootInfeasible(problem, objective, LpPlan(bounding = true), cancellation)
-    val preBakeInfeasible = strengthenInfeasible || lpInfeasible
-
-    val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(problem, bakeConfig)
-    var current = seeded
-    val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
-    val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
-    var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
-    // Presolve's infeasibility verdict, taken from [Presolved.infeasible] (the incremental path defers
-    // the materialized problem's lazy bake past presolve timing, so this must not force `current.baked`).
-    var infeasible = preBakeInfeasible
-    var round = 0
-    while (!preBakeInfeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
-        val pre = Presolver.run(current, config, context, cancellation)
-        infeasible = infeasible || pre.infeasible
-        val harvestResult = harvestPlan?.let {
-            lpHarvestReporting(pre.problem, objective, it, bakeConfig, cancellation)
-        }
-        val harvested = harvestResult?.problem ?: pre.problem
-        // Neither presolve nor the harvest changed anything this round → fixpoint.
-        if (pre.problem === current && harvested === pre.problem) break
-        pre.passesFired.forEach { firedPasses.add(it.id) }
-        harvestResult?.let { harvest += it.report }
-        // The harvest only narrows domains, so it contributes no reconstruct; add presolve's only when it
-        // actually transformed the problem (else it is the identity).
-        if (pre.problem !== current) reconstructs.add(pre.reconstruct)
-        current = harvested
-        // A no-op harvest means the next round's presolve would re-derive the same fixpoint with no new
-        // domain tightenings to chew on, so stop here rather than spend another LP solve to prove it.
-        if (harvested === pre.problem) break
-    }
-    if (current === problem && !infeasible) return this
-
-    // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
-    // and the net constraint drop / proven infeasibility, with the LP harvest's own breakdown attached.
-    val passes = firedPasses.toList() + (if (!harvest.isEmpty) listOf("lp-harvest") else emptyList())
-    val presolveStats = PresolveStats(
-        passes = passes,
-        constraintsRemoved = problem.factors.size - current.factors.size,
-        // From presolve's own verdict (or an LP root-infeasibility), not a forced `current.baked` — the
-        // materialized problem's lazy bake stays out of the presolve timing window.
-        infeasible = infeasible || harvest.rootInfeasible,
-        lpHarvest = harvest.takeUnless { it.isEmpty },
-    )
-    val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
+    val outcome = PresolvePipeline.run(problem, linearObjective, config, solutionSetSensitive, cancellation)
+    if (!outcome.changed) return this
     return Solvable(
-        problem = current,
-        presolve = presolveStats,
+        problem = outcome.problem,
+        presolve = outcome.stats,
         optimize = optimize,
         maximize = maximize,
         lsObjective = lsObjective,
         linearObjective = linearObjective,
         objVarId = objVarId,
         definitionalSweep = definitionalSweep,
-        render = { sample -> render(reconstruct(sample)) },
-        objectiveValue = objectiveValue?.let { ov -> { sample -> ov(reconstruct(sample)) } },
+        render = { sample -> render(outcome.reconstruct(sample)) },
+        objectiveValue = objectiveValue?.let { ov -> { sample -> ov(outcome.reconstruct(sample)) } },
         annotatedBacktrackParams = annotatedBacktrackParams,
     )
 }
