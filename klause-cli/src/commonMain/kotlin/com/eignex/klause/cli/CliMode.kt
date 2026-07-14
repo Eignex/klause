@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.lp.LpEmphasis
 import com.eignex.klause.backtrack.lp.LpPlan
 import com.eignex.klause.backtrack.lp.lpHarvestReporting
+import com.eignex.klause.backtrack.lp.lpRootInfeasible
+import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
@@ -295,16 +297,27 @@ internal fun Solvable.presolved(
     val strengthenInfeasible = config.resolved(PresolvePass.STRENGTHEN_COEFFICIENTS, context) &&
         Presolve.strengthenCoefficients(problem).infeasible
 
-    val seeded = if (strengthenInfeasible) problem else RootBaker.reseed(problem, bakeConfig)
+    // On a genuinely wide integer domain, the LP relaxation proves global infeasibility (e.g. a
+    // difference cycle `x < y ∧ y < x`) in O(one LP solve) — before [RootBaker.reseed]'s bound
+    // propagation would grind it out one step per round (O(span)). [lpRootInfeasible] builds the root
+    // relaxation straight from the declared domains (no bake fixpoint) and certifies infeasibility via
+    // an exact Farkas ray; a true result contains every integer solution, so it is the same verdict the
+    // bake would reach. Gated on span so small models never pay the LP.
+    val lpInfeasible = !strengthenInfeasible &&
+        Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold &&
+        lpRootInfeasible(problem, objective, BacktrackParams(lpPlan = LpPlan(bounding = true)), cancellation)
+    val preBakeInfeasible = strengthenInfeasible || lpInfeasible
+
+    val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(problem, bakeConfig)
     var current = seeded
     val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
     val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
     var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
     // Presolve's infeasibility verdict, taken from [Presolved.infeasible] (the incremental path defers
     // the materialized problem's lazy bake past presolve timing, so this must not force `current.baked`).
-    var infeasible = strengthenInfeasible
+    var infeasible = preBakeInfeasible
     var round = 0
-    while (!strengthenInfeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
+    while (!preBakeInfeasible && round++ < MAX_PRESOLVE_HARVEST_ROUNDS && !cancellation()) {
         val pre = Presolver.run(current, config, context, cancellation)
         infeasible = infeasible || pre.infeasible
         val harvestResult = harvestParams?.let {

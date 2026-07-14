@@ -139,6 +139,34 @@ internal fun LpRelaxation.rebound(session: PropagationSession): LpRelaxation {
 }
 
 /**
+ * The per-variable bounds the relaxation reads to size its columns: an integer variable's live domain
+ * and a Boolean variable's pin (null when free). A [PropagationSession] is one source (its live search
+ * state); [RootDomains] is another (the problem's declared domains, read without running the bake
+ * fixpoint) so a root relaxation can be built in O(model) rather than O(domain span).
+ */
+internal interface RelaxationDomains {
+    /** The live domain of integer variable [varId]. */
+    fun intDomain(varId: Int): IntDomain
+
+    /** The pin of Boolean variable [varId] — `true`/`false` when fixed, null when free. */
+    fun boolValue(varId: Int): Boolean?
+}
+
+/** [RelaxationDomains] over a [Problem]'s declared domains: every integer variable at its full domain
+ *  and every Boolean free. Reads endpoints only, so building a relaxation from it never triggers the
+ *  O(domain span) bake fixpoint a [PropagationSession] runs on construction. */
+internal class RootDomains(private val problem: Problem) : RelaxationDomains {
+    override fun intDomain(varId: Int): IntDomain = problem.intDomains[varId]
+    override fun boolValue(varId: Int): Boolean? = null
+}
+
+/** [RelaxationDomains] backed by a live [PropagationSession]'s search state. */
+private class SessionDomains(private val session: PropagationSession) : RelaxationDomains {
+    override fun intDomain(varId: Int): IntDomain = session.intDomain(varId)
+    override fun boolValue(varId: Int): Boolean? = session.boolValue(varId)
+}
+
+/**
  * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,
  * pulling variable bounds live from the current search node.
  *
@@ -337,9 +365,15 @@ internal class CpToLpRelaxation(
         const val MAX_TI_COLS: Int = 4096
     }
 
-    /** Build the relaxation, optionally appending separator-produced [extraCuts] as extra rows. */
+    /** Build the relaxation from a live [session], optionally appending separator-produced [extraCuts]
+     *  as extra rows. */
     fun build(session: PropagationSession, extraCuts: List<Cut> = emptyList()): LpRelaxation =
-        Assembler(session).assemble(extraCuts)
+        build(SessionDomains(session), extraCuts)
+
+    /** Build the relaxation over [domains], optionally appending separator-produced [extraCuts] as extra
+     *  rows. With [RootDomains] this builds a root relaxation without running the bake fixpoint. */
+    fun build(domains: RelaxationDomains, extraCuts: List<Cut> = emptyList()): LpRelaxation =
+        Assembler(domains).assemble(extraCuts)
 
     private fun intCost(i: Int): Long = objective?.intCoefficients?.getOrElse(i) { 0L } ?: 0L
 
@@ -347,7 +381,7 @@ internal class CpToLpRelaxation(
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
      *  [RelaxationBuilder] so a factor's [com.eignex.klause.solver.Factor.linearize] can emit into it. */
-    private inner class Assembler(private val session: PropagationSession) : RelaxationBuilder {
+    private inner class Assembler(private val domains: RelaxationDomains) : RelaxationBuilder {
         private val builder = LpBuilder()
         private val intCol = IntArray(problem.numIntVars) { -1 }
         private val boolCol = IntArray(problem.numBoolVars) { -1 }
@@ -453,7 +487,7 @@ internal class CpToLpRelaxation(
             val inColsByHead = Array(n) { IntArrayList() }
             // Out-degree and channelling rows, building the (sparse) arc columns on the way.
             for (i in 0 until n) {
-                val live = session.intDomain(succ[i])
+                val live = domains.intDomain(succ[i])
                 val outCols = IntArrayList()
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
@@ -503,7 +537,7 @@ internal class CpToLpRelaxation(
         override fun intColumn(intVar: Int): Int {
             var c = intCol[intVar]
             if (c == -1) {
-                val dom = session.intDomain(intVar)
+                val dom = domains.intDomain(intVar)
                 c = builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
                 intCol[intVar] = c
                 colVarId.add(intVar)
@@ -518,7 +552,7 @@ internal class CpToLpRelaxation(
         override fun boolColumn(boolVar: Int): Int {
             var c = boolCol[boolVar]
             if (c == -1) {
-                val pinned = session.boolValue(boolVar)
+                val pinned = domains.boolValue(boolVar)
                 val lo = if (pinned == true) 1L else 0L
                 val hi = if (pinned == false) 0L else 1L
                 c = builder.addVar(lo, hi, boolCost(boolVar), tag = boolVar)
@@ -714,7 +748,7 @@ internal class CpToLpRelaxation(
          */
         private fun cumulativeRows(rel: CumulativeRelaxation) {
             for (plan in rel.plans) {
-                val spec = rel.rowSpec(plan, session)
+                val spec = rel.rowSpec(plan, domains)
                 // Single-term row capacity·M ≥ rhs; the capacity coefficient is a (possibly wide) Long.
                 builder.addRow(
                     intArrayOf(intColumn(plan.makespanVar)),
@@ -770,7 +804,7 @@ internal class CpToLpRelaxation(
 
         override fun hullEnabled(): Boolean = currentHullEnabled
 
-        override fun liveDomain(intVar: Int): IntDomain = session.intDomain(intVar)
+        override fun liveDomain(intVar: Int): IntDomain = domains.intDomain(intVar)
 
         override fun declaredDomain(intVar: Int): IntDomain = problem.intDomains[intVar]
 
@@ -806,7 +840,7 @@ internal class CpToLpRelaxation(
                 val c = coeffs[j]
                 if (c == 0L) continue
                 val v = colVarId[col]
-                val dom = session.intDomain(v)
+                val dom = domains.intDomain(v)
                 val dec = problem.intDomains[v]
                 if ((c >= 0L) == maxSide) {
                     if (dom.max != dec.max) {

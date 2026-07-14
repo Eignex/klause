@@ -4,7 +4,9 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.integerFarkasRay
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.lp.safeObjectiveLowerBound
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -193,6 +195,25 @@ internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {
     val s = PropagationSession(problem)
     if (s.isUnsatAtRoot) return false
     return pruneNode(s, Double.POSITIVE_INFINITY, -1, true)
+}
+
+/** Whether the root relaxation is Farkas-certifiably infeasible over the problem's *declared* domains,
+ *  built straight from those domains ([RootDomains]) so it never runs the O(domain span) bake fixpoint a
+ *  [PropagationSession] pays on construction — unlike [rootInfeasible], which builds one (and, by design,
+ *  defers to propagation whenever propagation already proves the root Unsat). A certified-infeasible
+ *  relaxation contains every integer solution, so a true result proves the problem infeasible over its
+ *  domains: the same verdict the root bake would grind out, reached in one LP solve. */
+internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
+    val relaxer = lpRelaxer ?: return false
+    if (token()) return false
+    val model = relaxer.build(RootDomains(problem)).model
+    if (model.n == 0) return false
+    val simplex = RevisedSimplex(model, token)
+    // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
+    // dual-unbounded ray that survives exact 128-bit Farkas certification proves genuine infeasibility.
+    if (simplex.solve() != null) return false
+    val floatRay = simplex.infeasibleRay ?: return false
+    return integerFarkasRay(model, floatRay) != null
 }
 
 /** The built root relaxation's columns, rows and nonzeros, plus a per-solve cost proxy. */
