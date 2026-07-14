@@ -11,8 +11,8 @@ import java.util.concurrent.atomic.AtomicLong
  * The DIMACS / OPB reference. cp-sat (OR-Tools) has no native SAT/pseudo-Boolean frontend, so these two
  * Boolean formats are solved by clasp (Potassco) in the [IMAGE] container — a strong complete SAT/PB
  * solver that reads DIMACS CNF and OPB directly, decides SAT/UNSAT, and minimises an OPB `min:` objective
- * to proven optimum. The reference table keys each row by its actual solver (`clasp`), so a Boolean
- * oracle coexists with the cp-sat MiniZinc/XCSP3 oracle in one `references.csv`.
+ * to proven optimum. Its rows are written to their own `reference/clasp.csv`, the Boolean oracle
+ * alongside the cp-sat (MiniZinc/XCSP3) and z3 (SMT-LIB) tables.
  *
  * clasp reads the instance on stdin (so no bind mount is needed). DIMACS is fed verbatim; OPB needs the
  * standard `* #variable= N #constraint= M` problem line, which the vendored instances omit, so it is

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Set-cover credit between per-run result CSVs (references.csv schema, emitted by `bench solve` as
+# Set-cover credit between per-run result CSVs (reference-table schema, emitted by `bench solve` as
 # output/<config>.csv). Joins on (suite, problem), picks each instance's winner(s) — COP: best
 # objective (direction-aware, a proven optimum breaking equal-value ties); CSP: fastest decided run —
 # then reports win-share + a greedy diverse set-cover. `--by structure|format` slices the credit
 # within each feature-column value. Config-level credit (one CSV per config); arm-level credit is the
-# same call over per-arm single-solver CSVs. Pass the committed references.csv as a file to score
-# against the cp-sat baseline.
+# same call over per-arm single-solver CSVs. Pass a committed `reference/<solver>.csv` as a file to
+# score against that solver's baseline.
 #
 #   credit.sh [--by structure|format] <a.csv> <b.csv> [c.csv ...]
 #

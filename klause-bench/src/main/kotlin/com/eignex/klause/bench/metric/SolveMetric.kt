@@ -155,14 +155,14 @@ internal object SolveMetric {
             val mark = if (rec.feasible == null && !rec.proven) "??" else "ok"
             println("$mark [${rec.problem}] $kind = ${display(rec)}")
         }
-        // A per-run result table in the references.csv schema (solver = this config's tag) — the input
+        // A per-run result table in the reference-table schema (solver = this config's tag) — the input
         // `bench credit` compares, keyed by (suite, problem), sliceable by the joined feature columns.
         ReferenceStore.writeCsv(File("output", "$tag.csv"), resultRows)
         println("\n$feasible/${entries.size} feasible, $proved proved  (output/$tag/, output/$tag.csv)")
         return outDir
     }
 
-    /** This run's result for one instance as a references.csv-schema row: `solver` is the config [tag],
+    /** This run's result for one instance as a reference-table-schema row: `solver` is the config [tag],
      *  `elapsedMs` the time-used proxy (time-to-best when solved, else the budget — matching the
      *  `compare.sh` convention), and the source-text features are joined from the committed table
      *  ([ref], null when the instance has no oracle entry). */

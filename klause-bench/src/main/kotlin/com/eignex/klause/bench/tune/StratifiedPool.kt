@@ -8,7 +8,7 @@ import com.eignex.klause.bench.runner.Runners
 import kotlin.random.Random
 
 /**
- * A large sampling pool backed by references.csv (#35). Each candidate ref that has a reference row is
+ * A large sampling pool backed by the reference tables (#35). Each candidate ref that has a reference row is
  * bucketed into a **stratum = (sizeTier, structure)**: `sizeTier` ∈ {S,M,L,XL} splits the pool's cp-sat
  * `elapsedMs` (the difficulty proxy) at its quartiles, and `structure` is the classified column from
  * #40. [sample] draws round-robin across strata and resolves **only** the drawn refs — the whole pool
