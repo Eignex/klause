@@ -67,24 +67,30 @@ internal object Suites {
             },
             DynamicSuite(
                 "smtlib-qflia",
-                "SMT-LIB QF_LIA non-incremental set (fetched, ~13k .smt2; 1/family by default)",
+                "SMT-LIB QF_LIA non-incremental set (fetched, full ~13k .smt2; cap with per-family=/max=)",
             ) {
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfLia,
                     CorpusSelection.Layout.Flat("non-incremental/QF_LIA", "smt2"),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    CorpusSelection.Selection.fromProps(),
                     Category.CSP,
                     format = Format.SMTLIB_QF_LIA,
                 )
             },
-            DynamicSuite("satcomp-2024", "SAT Competition 2024 main track (fetched, 400 application CNF)") {
-                CorpusSelection.select(
-                    ExternalCollections.satComp2024Main,
-                    CorpusSelection.Layout.Flat("", "cnf"),
-                    CorpusSelection.Selection.fromProps(),
-                    Category.SAT,
-                    format = Format.DIMACS,
-                )
+            DynamicSuite(
+                "dimacs-classic",
+                "SATLIB classic structured DIMACS CNF — diverse, small Boolean set " +
+                    "(aim/jnh/dubois/parity/inductive-inference/pigeon-hole/all-interval)",
+            ) {
+                ExternalCollections.dimacsClassic.flatMap { (col, category) ->
+                    CorpusSelection.select(
+                        col,
+                        CorpusSelection.Layout.Flat("", "cnf"),
+                        CorpusSelection.Selection.fromProps(),
+                        category,
+                        format = Format.DIMACS,
+                    )
+                }
             },
             DynamicSuite("pb-comp", "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)") {
                 // The archive ships both `.opb.xz` (linear + non-linear PB) and `.wbo.xz` (soft
@@ -684,14 +690,29 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tarball,
     )
 
-    /** SAT Competition 2024 main-track benchmarks: 400 application/crafted DIMACS CNF instances
-     *  (individually `.cnf.xz`-compressed inside the zip) from the Zenodo release (record 15095752). */
-    val satComp2024Main = ExternalCollection(
-        id = "satcomp-2024-main",
-        url = "https://zenodo.org/records/15095752/files/sat-competition-2024-main-benchmarks.zip?download=1",
-        license = "SAT Competition (academic benchmarks)",
-        reason = "4.3GB application-CNF archive (400 instances); fetched rather than vendored",
-        fetch = FetchMethod.Zip,
+    /** SATLIB "classic" structured DIMACS families — small, hand-picked benchmarks each with a
+     *  distinct structure (artificial random-3SAT, variable-length random, DUBOIS xor-chains, parity
+     *  learning, inductive inference, pigeonhole, all-interval series). Each ships as a flat `*.cnf`
+     *  tarball; the `dimacs-classic` suite selects them all as a diverse, klause-scale Boolean set. */
+    private fun satlibClassic(id: String, path: String) = ExternalCollection(
+        id = "satlib-$id",
+        url = "https://www.cs.ubc.ca/~hoos/SATLIB/Benchmarks/SAT/$path",
+        license = "SATLIB (public benchmarks)",
+        reason = "small classic structured DIMACS family; fetched rather than vendored",
+        fetch = FetchMethod.Tarball,
+    )
+
+    /** The classic families paired with a coarse SAT/UNSAT label (DUBOIS and pigeonhole are wholly
+     *  UNSAT, the rest predominantly SAT); the clasp oracle decides each instance's true verdict, so
+     *  the label is only the suite's category metadata. */
+    val dimacsClassic: List<Pair<ExternalCollection, Category>> = listOf(
+        satlibClassic("aim", "DIMACS/AIM/aim.tar.gz") to Category.SAT,
+        satlibClassic("jnh", "DIMACS/JNH/jnh.tar.gz") to Category.SAT,
+        satlibClassic("dubois", "DIMACS/DUBOIS/dubois.tar.gz") to Category.UNSAT,
+        satlibClassic("parity", "DIMACS/PARITY/parity.tar.gz") to Category.SAT,
+        satlibClassic("ii", "DIMACS/II/inductive-inference.tar.gz") to Category.SAT,
+        satlibClassic("phole", "DIMACS/PHOLE/pigeon-hole.tar.gz") to Category.UNSAT,
+        satlibClassic("ais", "AIS/ais.tar.gz") to Category.SAT,
     )
     val pbComp2024 = ExternalCollection(
         id = "pb-comp-2024",

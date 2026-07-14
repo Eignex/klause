@@ -135,8 +135,8 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
         run("unzip", "-q", "-o", zip.absolutePath, "-d", dir.absolutePath)
         zip.delete()
-        // Competition archives ship instances individually compressed (XCSP3 `*.xml.lzma`, satcomp
-        // `*.cnf.xz`); unzip leaves them packed, so decompress in place to the plain file the
+        // Competition archives ship instances individually compressed (XCSP3 `*.xml.lzma`, MaxSAT
+        // `*.wcnf.xz`); unzip leaves them packed, so decompress in place to the plain file the
         // front-end reads. A no-op for archives with no compressed members.
         decompressInPlace(dir)
     }
