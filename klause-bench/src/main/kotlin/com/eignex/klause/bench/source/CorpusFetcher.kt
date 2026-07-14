@@ -146,6 +146,9 @@ internal object CorpusFetcher {
      *  suffixes competition corpora use; a no-op for anything already plain. Chunked to stay under the
      *  argument-length limit. */
     private fun decompressInPlace(dir: File) {
+        // Some archives (e.g. the 2007 PB tarball) store read-only dirs/files; decompressing in place
+        // must write the plain file and unlink the packed one, which a read-only parent dir forbids.
+        run("chmod", "-R", "u+w", dir.absolutePath)
         for ((ext, tool) in DECOMPRESS_TOOLS) {
             val packed = dir.walkTopDown().filter { it.isFile && it.extension == ext }.map { it.absolutePath }.toList()
             if (packed.isEmpty()) continue
