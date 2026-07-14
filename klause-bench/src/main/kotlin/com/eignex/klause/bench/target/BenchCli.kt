@@ -17,6 +17,7 @@ import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
 import com.eignex.klause.bench.metric.Xcsp3CpSatReference
+import com.eignex.klause.bench.metric.Z3Reference
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -42,7 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * The bench does one thing — **solve** a **selection** of problems with one solver, as a subprocess,
  * saving per-problem output (see [SolveMetric]) plus a per-run `output/<config>.csv` result table in
- * the references.csv schema; the `credit` command / `output/credit.sh` compare those tables, and the
+ * the reference-table schema; the `credit` command / `output/credit.sh` compare those tables, and the
  * `output/compare.sh` MiniZinc-Challenge Borda scorer reads the saved dirs. The run form:
  *
  *   `bench solve [filters…]`   e.g. `bench solve suite=smtlib-core backend=choco`
@@ -103,7 +104,7 @@ object BenchCli {
     }
 
     /** Populate the source-text feature columns (format / structure / global+linear counts / bool-heavy)
-     *  of `references.csv` for the selected instances — the substrate for the stratified pool and for
+     *  of the reference tables for the selected instances — the substrate for the stratified pool and for
      *  data analysis. Streams one source file at a time (no klause compile), so a whole-corpus pass stays
      *  flat in memory; an unreadable/unsupported source is skipped (blank features, counted). */
     private fun classify(filterArgs: List<String>) {
@@ -126,16 +127,16 @@ object BenchCli {
         }
         val (updated, unmatched) = ReferenceStore.mergeFeatures(features)
         println(
-            "classified ${features.size} (skipped $skipped unreadable); references.csv: " +
+            "classified ${features.size} (skipped $skipped unreadable); reference tables: " +
                 "$updated rows updated, $unmatched with no table row",
         )
     }
 
-    /** Credit between per-run result CSVs (emitted by `solve` as `output/<config>.csv`, references.csv
+    /** Credit between per-run result CSVs (emitted by `solve` as `output/<config>.csv`, reference-table
      *  schema): `credit [--by structure|format] <a.csv> <b.csv> [c.csv …]`. Joins on (suite, problem),
      *  picks each instance's winner(s), and reports win-share + a greedy diverse set-cover
      *  ([ResultCredit]). `--by` slices the credit within each feature-column value. Include the
-     *  committed `references.csv` itself as a file to score against the cp-sat baseline. */
+     *  committed `reference/<solver>.csv` as a file to score against that solver's baseline. */
     private fun credit(args: List<String>) {
         val by = args.zipWithNext().firstOrNull { it.first == "--by" }?.second
         val files = args
@@ -244,11 +245,11 @@ object BenchCli {
         }
         // COP (objective) → gap-to-optimum reward; CSP (satisfy) → time-to-first-feasible. The `select`
         // `kind=cop|csp` filter picks which; a mixed selection is scored per-instance by its own kind.
-        // The pool is stratified from references.csv and resolves lazily — only each round's mini-batch is
+        // The pool is stratified from the reference tables and resolves lazily — only each round's mini-batch is
         // built, so a huge selection never materialises (the point of #35).
         val pool = StratifiedPool(select(f))
         if (!pool.isNotEmpty()) {
-            println("(no referenced instances matched — a stratified pool needs references.csv rows)")
+            println("(no referenced instances matched — a stratified pool needs reference-table rows)")
             return
         }
         val rounds = f["rounds"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
@@ -349,20 +350,21 @@ object BenchCli {
 
     /** Harvest per-instance reference optima/bounds into the committed table (see [ReferenceStore]) —
      *  the gap-to-optimum BO reward + a soundness oracle. Runs the reference solver (`backend=`, default
-     *  `cp-sat`) over the selection — cache-replayed if already solved — then merges each optimize
-     *  instance's `{objective, proven}` into `klause-bench/reference/references.csv` (virtual-best).
-     *  Optimize instances only (pass `kind=cop`); match the cached run's `timeout=` to replay it. */
+     *  `cp-sat`) over the selection — cache-replayed if already solved — then merges each instance's
+     *  `{objective, proven}` into its solver's `klause-bench/reference/<solver>.csv` (virtual-best).
+     *  For optima pass `kind=cop`; match the cached run's `timeout=` to replay it. */
     private fun reference(filterArgs: List<String>) {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         // Best strong solver per format: cp-sat for MiniZinc (`minizinc --solver`) and XCSP3 (the CPMpy
         // container — OR-Tools has no XCSP3 frontend), clasp for DIMACS/OPB (the Boolean formats cp-sat
-        // can't read). Other formats have no reference path.
+        // can't read), z3 for SMT-LIB QF_LIA (cp-sat has no SMT frontend). Other formats have no path.
         val refs = select(f).filter {
             it.format == Format.MINIZINC || it.format == Format.XCSP3 ||
-                it.format == Format.DIMACS || it.format == Format.OPB
+                it.format == Format.DIMACS || it.format == Format.OPB ||
+                it.format == Format.SMTLIB_QF_LIA
         }
         if (refs.isEmpty()) {
-            println("(no MiniZinc/XCSP3/DIMACS/OPB problems matched the selection)")
+            println("(no MiniZinc/XCSP3/DIMACS/OPB/SMT-LIB problems matched the selection)")
             return
         }
         val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
@@ -377,6 +379,9 @@ object BenchCli {
         require(!clasp || ClaspReference.imageAvailable()) {
             "DIMACS/OPB reference needs the ${ClaspReference.IMAGE} image " +
                 "(build it: docker build -t ${ClaspReference.IMAGE} klause-bench/clasp)"
+        }
+        require(refs.none { it.format == Format.SMTLIB_QF_LIA } || Z3Reference.available()) {
+            "SMT-LIB QF_LIA reference needs a z3 binary on PATH (`z3 --version`)"
         }
         // Reap containers left by an earlier interrupted run, and again on a graceful stop (each is
         // memory-capped, so a hard kill only ever leaves bounded, short-lived ones).
@@ -412,9 +417,12 @@ object BenchCli {
             pool.shutdown()
         }
         val (added, tightened, unchanged) = ReferenceStore.mergeAndSave(harvested)
+        // Report the solvers that actually produced rows (per-format: cp-sat / clasp / z3), not just
+        // the requested MiniZinc `backend`, so an all-SMT or all-Boolean run names its true oracle.
+        val solvers = harvested.map { it.solver }.distinct().sorted().joinToString("+").ifEmpty { backend }
         println(
             "\nreference table: +$added new, $tightened tightened, $unchanged unchanged " +
-                "(${harvested.size} decisive of ${refs.size} from $backend)",
+                "(${harvested.size} decisive of ${refs.size} from $solvers)",
         )
     }
 
@@ -434,10 +442,16 @@ object BenchCli {
         // table stays honest about which oracle each format came from. All cache and score identically.
         val clasp = ref.format == Format.DIMACS || ref.format == Format.OPB
         val xcsp3 = ref.format == Format.XCSP3
-        val solverId = if (clasp) "clasp" else backend
+        val smt = ref.format == Format.SMTLIB_QF_LIA
+        val solverId = when {
+            clasp -> "clasp"
+            smt -> "z3"
+            else -> backend
+        }
         val cacheTag = when {
             clasp -> "clasp"
             xcsp3 -> "$backend-xcsp3"
+            smt -> "z3"
             else -> backend
         }
         val key = BenchCache.keyFor(ref, cacheTag, budget)
@@ -457,6 +471,11 @@ object BenchCli {
                     .also { BenchCache.store(key, it) }
                 // Objective sense is unknowable without parsing the model; the container carries it in stats.
                 maximize = r.stats["maximize"].toBoolean()
+            }
+
+            smt -> {
+                r = cached ?: Z3Reference.run(ref, budget).also { BenchCache.store(key, it) }
+                maximize = false // QF_LIA benchmarks are decision instances — no objective to orient
             }
 
             else -> {
