@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.global.AllDifferent
@@ -218,6 +219,31 @@ class AffineEliminationTest {
             ),
         )
         checkRoundTrip("alias-into-global", problem, expectEliminated = true, expectSat = true)
+    }
+
+    @Test
+    fun `chained aliases keep a non-linear factor renamed through both steps`() {
+        // m = max(a, b), then m = x, then x = y: aliasing m -> x renames the ArrayMinMax result, and the
+        // second alias x -> y must still see and rewrite that factor. If the first alias fails to register
+        // the renamed factor as an occurrence of x, the second alias skips it and leaves the max dangling
+        // on an eliminated variable — reconstruction then invents a result that violates the max (#1204).
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 5,
+            intDomains = arrayOf(
+                IntDomain(0, 1), // a
+                IntDomain(0, 1), // b
+                IntDomain(0, 1), // m
+                IntDomain(0, 1), // x
+                IntDomain(0, 1), // y
+            ),
+            factors = listOf(
+                ArrayMinMax(result = 2, xs = intArrayOf(0, 1), max = true),
+                Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.EQ, 0), // m = x
+                Linear(intArrayOf(1, -1), intArrayOf(3, 4), LinearOp.EQ, 0), // x = y
+            ),
+        )
+        checkFeasibleSetPreserved("chained-alias-minmax", problem)
     }
 
     @Test
