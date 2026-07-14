@@ -85,12 +85,6 @@ class Cumulative(
     val resourceVars: IntArray = EmptyIntArray,
     /** Capacity variable id; -1 = use [capacity] as a constant. */
     val capacityVar: Int = -1,
-    /** No-overlap (unary-resource / one-machine) mode. When true the resource is never shared, so the
-     *  factor dispatches the stronger disjunctive reasoning — time-tabling, detectable precedences, and
-     *  unit Θ-tree edge-finding — instead of the cumulative time-tabling propagator. [resources] are unit
-     *  and [capacity] is 1 in this mode (see [Cumulative.unary]); the disjunctive propagator reads only
-     *  the start/duration windows. */
-    val unary: Boolean = false,
 ) : Factor,
     OptionalFactor {
 
@@ -124,7 +118,6 @@ class Cumulative(
         durationVars.remapVars(intMap),
         resourceVars.remapVars(intMap),
         if (capacityVar >= 0) intMap[capacityVar] else capacityVar,
-        unary,
     )
 
     // When no two tasks can run at once — the two smallest resource demands already exceed the capacity
@@ -162,7 +155,6 @@ class Cumulative(
     // durations/resources/capacity are constant magnitudes; starts/durationVars/resourceVars are int-var
     // ids; capacityVar is an int var or a negative sentinel; presents are Boolean literals.
     private fun buildKey(sink: KeySink) {
-        sink.bool(unary)
         sink.long(capacity)
         sink.intVarOrSelf(capacityVar)
         sink.constLongs(durations)
@@ -193,6 +185,15 @@ class Cumulative(
 
     /** Number of tasks. */
     val n: Int = starts.size
+
+    /**
+     * No-overlap (unary-resource / one-machine) shape: constant unit demands over a constant capacity of
+     * 1, so the resource is never shared. In this shape [asPropagator] / [asInvariant] dispatch the
+     * stronger disjunctive reasoning (time-tabling, detectable precedences, unit Θ-tree edge-finding);
+     * the propagator reads only the start/duration windows. Build one directly with [Cumulative.unary].
+     */
+    val unary: Boolean =
+        capacityVar < 0 && capacity == 1L && resourceVars.isEmpty() && resources.all { it == 1L }
 
     /** The sharp pointwise time-tabling explanation covers every task as mandatory. Variable durations /
      *  resources / capacity are handled by additionally citing their (fixed-at-propagation) bounds, but
@@ -282,9 +283,9 @@ class Cumulative(
     /** Factories for the [Cumulative] special cases. */
     companion object {
         /**
-         * The no-overlap (unary-resource / one-machine) special case: unit demands, capacity 1, [unary]
-         * mode. Tasks may not overlap in time. Dispatches the stronger disjunctive propagator; see the
-         * class KDoc's mode note.
+         * The no-overlap (unary-resource / one-machine) special case: unit demands over capacity 1, the
+         * [unary] shape. Tasks may not overlap in time. Dispatches the stronger disjunctive propagator;
+         * see the class KDoc's mode note.
          */
         fun unary(
             starts: IntArray,
@@ -298,7 +299,6 @@ class Cumulative(
             capacity = 1L,
             presents = presents,
             durationVars = durationVars,
-            unary = true,
         )
     }
 }
