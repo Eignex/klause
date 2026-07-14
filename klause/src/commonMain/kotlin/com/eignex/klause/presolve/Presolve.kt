@@ -116,6 +116,13 @@ object Presolve {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = BoundedVariableElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
+    /** Blocked-clause elimination over the pure-SAT part (#24). See [BlockedClauseElimination]. */
+    fun eliminateBlockedClauses(
+        problem: Problem,
+        objectiveBoolVars: Set<Int> = emptySet(),
+        cancellation: Cancellation = Cancellation.Never,
+    ): PassDelta = BlockedClauseElimination.eliminate(problem, objectiveBoolVars, cancellation)
+
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)
 }
