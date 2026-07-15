@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.global.internals.GccIncrementalState
 import com.eignex.klause.factor.global.internals.GccPropCache
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -63,6 +64,73 @@ internal class GlobalCardinalityPropagator(
         return out
     }
 
+    /**
+     * Bring [inc]'s reversible `definite`/`possible` counts up to the current domains. A first fire or a
+     * backtrack that restored (widened) any domain forces a full recount; otherwise only the variables
+     * whose domain shrank since the last fire are patched — each deleted cover value drops `possible`,
+     * and a variable reaching a singleton on a cover value is counted into `definite` exactly once. The
+     * per-var `domRef` is then re-based to the current domains for the next delta.
+     */
+    private fun maintainCounts(state: PropagationState, inc: GccIncrementalState) {
+        val n = inc.n
+        var rebuild = inc.valid.value == 0
+        if (!rebuild) {
+            for (i in 0 until n) {
+                val prev = inc.domRef[i].value
+                if (prev == null) {
+                    rebuild = true
+                    break
+                }
+                val cur = state.intDomains[inc.xs[i]]
+                if (cur === prev) continue
+                var widened = false
+                cur.forEach { v -> if (v !in prev) widened = true }
+                if (widened) {
+                    rebuild = true
+                    break
+                }
+            }
+        }
+        if (rebuild) {
+            for (k in 0 until inc.m) {
+                inc.definite[k] = 0
+                inc.possible[k] = 0
+            }
+            for (i in 0 until n) {
+                inc.pinnedCover[i] = -1
+                val d = state.intDomains[inc.xs[i]]
+                d.forEach { v ->
+                    val k = coverIndexByValue.getOrDefault(v, -1)
+                    if (k >= 0) inc.possible[k] = inc.possible[k] + 1
+                }
+                if (d.min == d.max) {
+                    val k = coverIndexByValue.getOrDefault(d.min, -1)
+                    inc.pinnedCover[i] = if (k >= 0) k else -2
+                    if (k >= 0) inc.definite[k] = inc.definite[k] + 1
+                }
+            }
+            inc.valid.set(1)
+        } else {
+            for (i in 0 until n) {
+                val prev = requireNotNull(inc.domRef[i].value)
+                val cur = state.intDomains[inc.xs[i]]
+                if (cur === prev) continue
+                prev.forEach { v ->
+                    if (v !in cur) {
+                        val k = coverIndexByValue.getOrDefault(v, -1)
+                        if (k >= 0) inc.possible[k] = inc.possible[k] - 1
+                    }
+                }
+                if (inc.pinnedCover[i] == -1 && cur.min == cur.max) {
+                    val k = coverIndexByValue.getOrDefault(cur.min, -1)
+                    inc.pinnedCover[i] = if (k >= 0) k else -2
+                    if (k >= 0) inc.definite[k] = inc.definite[k] + 1
+                }
+            }
+        }
+        for (i in 0 until n) inc.domRef[i].set(state.intDomains[inc.xs[i]])
+    }
+
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val cache = (state.refPayload[factorId] as? GccPropCache) ?: run {
             val fresh = GccPropCache(arrayOfNulls(intVars.size))
@@ -120,18 +188,40 @@ internal class GlobalCardinalityPropagator(
             }
         }
         val cvArr = countVars
+        // Per-cover `definite` (vars pinned to cover[k]) and `possible` (vars whose domain holds it)
+        // counts. On the plain (no-presence) path these are maintained incrementally on the undo trail —
+        // a fire patches only the vars whose domain changed since the last fire; the optional-variable
+        // path recounts fully (maybeXs is only non-empty there).
+        val incCounts: GccIncrementalState? = if (presents.isEmpty()) {
+            val cur = cache.inc?.takeIf { it.xs.contentEquals(effectiveXs) && it.m == m }
+                ?: GccIncrementalState(state, effectiveXs, m).also { cache.inc = it }
+            maintainCounts(state, cur)
+            cur
+        } else {
+            null
+        }
         val definite = IntArray(m)
         val possible = IntArray(m)
+        if (incCounts == null) {
+            for (k in cover.indices) {
+                val target = cover[k]
+                for (x in effectiveXs) {
+                    val d = state.intDomains[x]
+                    if (d.min == d.max && d.min == target) definite[k]++
+                    if (target in d) possible[k]++
+                }
+                for (x in maybeXs) {
+                    if (target in state.intDomains[x]) possible[k]++
+                }
+            }
+        } else {
+            for (k in 0 until m) {
+                definite[k] = incCounts.definite[k]
+                possible[k] = incCounts.possible[k]
+            }
+        }
         for (k in cover.indices) {
             val target = cover[k]
-            for (x in effectiveXs) {
-                val d = state.intDomains[x]
-                if (d.min == d.max && d.min == target) definite[k]++
-                if (target in d) possible[k]++
-            }
-            for (x in maybeXs) {
-                if (target in state.intDomains[x]) possible[k]++
-            }
             if (cvArr != null) {
                 if (!state.tightenIntMin(cvArr[k], definite[k].toLong(), gccAntecedents)) {
                     cache.conflictVars = pinnedTo(state, effectiveXs, target)
