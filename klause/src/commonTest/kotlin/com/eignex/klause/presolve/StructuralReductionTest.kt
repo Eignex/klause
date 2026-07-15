@@ -1,10 +1,13 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.model.PbOp
@@ -326,5 +329,116 @@ class StructuralReductionTest {
             out.factors.none { it is PseudoBoolean || it is Cardinality },
             "the always-true constraint is dropped",
         )
+    }
+
+    private fun coeffOf(linear: Linear, v: Int): Long = linear.coeffs[linear.vars.indexOf(v)]
+
+    @Test
+    fun `a fixed operand turns a product into a linear equality`() {
+        // a = 3 fixed, so result = 3·b, i.e. result − 3·b = 0.
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(3, 3), IntDomain(0, 10), IntDomain(0, 100)),
+            listOf(Product(a = 0, b = 1, result = 2)),
+        )
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertTrue(out.factors.none { it is Product }, "the product is linearised")
+        val eq = theLinear(out)
+        assertEquals(LinearOp.EQ, eq.op)
+        assertEquals(0L, eq.bound)
+        assertEquals(1L, coeffOf(eq, 2), "result keeps unit coefficient")
+        assertEquals(-3L, coeffOf(eq, 1), "the operand takes the negated fixed value as coefficient")
+    }
+
+    @Test
+    fun `a product with a zero operand fixes the result to zero`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 0), IntDomain(0, 100)),
+            listOf(Product(a = 0, b = 1, result = 2)),
+        )
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        val eq = theLinear(out)
+        assertEquals(listOf(2), eq.vars.toList(), "only the result remains")
+        assertEquals(0L, eq.bound)
+    }
+
+    @Test
+    fun `a product with two free operands is left untouched`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 100)),
+            listOf(Product(a = 0, b = 1, result = 2)),
+        )
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a genuinely nonlinear product stays")
+    }
+
+    @Test
+    fun `a single-operand maximum becomes a result equality`() {
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 9), IntDomain(0, 9)),
+            listOf(ArrayMinMax(result = 0, xs = intArrayOf(1), max = true)),
+        )
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertTrue(out.factors.none { it is ArrayMinMax }, "the min/max global is removed")
+        val eq = theLinear(out)
+        assertEquals(LinearOp.EQ, eq.op)
+        assertEquals(0L, eq.bound)
+        assertEquals(setOf(0, 1), eq.vars.toSet())
+    }
+
+    @Test
+    fun `a multi-operand maximum is left untouched`() {
+        val problem = Problem(
+            0,
+            3,
+            arrayOf(IntDomain(0, 9), IntDomain(0, 9), IntDomain(0, 9)),
+            listOf(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)),
+        )
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a genuine maximum stays")
+    }
+
+    @Test
+    fun `an nvalue with target equal to arity becomes all-different`() {
+        // n (var 3) = 3 = |xs| forces the three counted vars pairwise distinct.
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(3, 3)),
+            listOf(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
+        )
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertTrue(out.factors.none { it is NValue }, "the nvalue global is removed")
+        val ad = out.factors.filterIsInstance<AllDifferent>().single()
+        assertEquals(listOf(0, 1, 2), ad.vars.toList())
+    }
+
+    @Test
+    fun `an nvalue with target one forces all values equal`() {
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(1, 1)),
+            listOf(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
+        )
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertTrue(out.factors.none { it is NValue }, "the nvalue global is removed")
+        assertEquals(2, out.factors.filterIsInstance<Linear>().size, "two equalities chain the three vars")
+    }
+
+    @Test
+    fun `an nvalue with a free target is left untouched`() {
+        val problem = Problem(
+            0,
+            4,
+            arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(1, 3)),
+            listOf(NValue(n = 3, xs = intArrayOf(0, 1, 2))),
+        )
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "an unpinned nvalue stays")
     }
 }

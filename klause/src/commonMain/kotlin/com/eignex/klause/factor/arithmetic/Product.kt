@@ -7,6 +7,8 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
@@ -30,6 +32,25 @@ class Product(
 ) : Factor {
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Product(intMap[a], intMap[b], intMap[result])
+
+    // A fixed operand collapses the nonlinear product to a linear equality the LP/affine machinery can
+    // then exploit: with `a = c` the constraint is `result = c·b`, i.e. `result − c·b = 0` (and just
+    // `result = 0` when `c = 0`). Solution-set exact given the fixing domain; symmetric in `a` and `b`.
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        val aDom = domains[a]
+        val bDom = domains[b]
+        return when {
+            aDom.min == aDom.max -> fixOperand(aDom.min, b)
+            bDom.min == bDom.max -> fixOperand(bDom.min, a)
+            else -> FactorReduction.Unchanged
+        }
+    }
+
+    private fun fixOperand(c: Long, other: Int): FactorReduction = if (c == 0L) {
+        FactorReduction.Rewrite(listOf(Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, 0L)))
+    } else {
+        FactorReduction.Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
+    }
 
     /** Multiplication is commutative, so the operands [a] and [b] are a set; [result] is positional. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PRODUCT, ::buildKey)
