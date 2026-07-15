@@ -77,6 +77,15 @@ fun MpsModel.toProblem(
 
     val factors = ArrayList<Factor>()
     for (c in constraints) {
+        if (c.indices.isEmpty()) {
+            // A term-free row is `0 OP rhs`. When 0 satisfies the bound the row is redundant — the
+            // common MPS placeholder (e.g. an objective-tracking `ZBESTROW` at `0 <= 0`); drop it.
+            // Otherwise the constraint, and so the whole model, is infeasible.
+            if (!emptyRowHolds(c.lower, c.upper)) {
+                throw MpsFormatException("constraint row '${c.name}' has no variables but its bound is infeasible")
+            }
+            continue
+        }
         if (rowNeedsScaling(c.indices, c.coeffs, c.lower, c.upper, floatBk)) {
             var boundAdjust = 0L
             val coeffs = LongArray(c.indices.size) { j ->
@@ -176,6 +185,11 @@ private inline fun emitRow(
         lower != null -> factors.add(Linear(coeffs, vars, LinearOp.GE, bound(lower)))
     }
 }
+
+/** Whether `0 OP rhs` holds for a term-free row: `0` must clear any lower bound and stay under any
+ *  upper one (a two-sided or `EQ` row folds to `lower <= 0 <= upper`; an absent side is unconstrained). */
+private fun emptyRowHolds(lower: Double?, upper: Double?): Boolean =
+    (lower == null || lower <= 0.0) && (upper == null || upper >= 0.0)
 
 /** Resolve an integer-column bound: `null` or the `1e30` marker clamps to [clampTo] (via [onClamp]). */
 private inline fun intBound(value: Double?, clampTo: Long, onClamp: () -> Unit): Long =

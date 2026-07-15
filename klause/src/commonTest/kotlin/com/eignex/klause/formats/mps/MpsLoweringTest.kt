@@ -44,4 +44,32 @@ class MpsLoweringTest {
         assertEquals(-1000L, compiled.problem.intDomains[0].min)
         assertEquals(1000L, compiled.problem.intDomains[0].max)
     }
+
+    @Test
+    fun `drops a term-free constraint row instead of emitting an empty sum`() {
+        val emptyRow = MpsConstraint("ZBESTROW", IntArray(0), DoubleArray(0), lower = null, upper = 0.0)
+        val realRow = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(MpsVar("x", integer = true, lower = 0.0, upper = 10.0)),
+            listOf(emptyRow, realRow),
+        )
+        // The `0 <= 0` placeholder row is redundant and dropped; only the real row lowers to a factor.
+        assertEquals(1, m.toProblem().problem.factors.size)
+    }
+
+    @Test
+    fun `rejects a term-free row whose bound is infeasible`() {
+        val badRow = MpsConstraint("BAD", IntArray(0), DoubleArray(0), lower = 5.0, upper = null)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(MpsVar("x", integer = true, lower = 0.0, upper = 10.0)),
+            listOf(badRow),
+        )
+        assertFailsWith<MpsFormatException> { m.toProblem() }
+    }
 }
