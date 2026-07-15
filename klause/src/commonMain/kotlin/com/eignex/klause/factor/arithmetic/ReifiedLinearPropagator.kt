@@ -90,7 +90,7 @@ internal class ReifiedLinearPropagator(
             // unsound learned clause — the latent false-UNSAT of #121.
             extraFalsePin = {
                 if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
-                    state.pinBool(auxBoolVar, false, collectHoleAndBoundAntecedents(state, vars))
+                    state.pinBool(auxBoolVar, false, eqUnreachableReason(state))
                 } else {
                     null
                 }
@@ -107,6 +107,31 @@ internal class ReifiedLinearPropagator(
                 }
             },
         )
+    }
+
+    /**
+     * Reason for pinning the indicator false on an unreachable single-term `c·x == bound`. The
+     * equality holds iff `x == bound/c`, so the single fact "`x` cannot take that value" already
+     * implies the body is impossible — a strictly tighter, sound reason than citing every hole of
+     * `x` via [collectHoleAndBoundAntecedents]. Mirrors that collector's original-vs-current
+     * distinction: a value never in the declared domain (or a non-integer target) is structural, so
+     * the pin is a root fact with no antecedent; a value excluded by a bound tighten cites that
+     * bound; an interior hole carved during search cites its eq-atom (the #121 soundness case).
+     */
+    private fun eqUnreachableReason(state: PropagationState): IntArray? {
+        val c = coeffs[0]
+        if (c == 0L || bound % c != 0L) return null
+        val k = bound / c
+        if (k < Int.MIN_VALUE.toLong() || k > Int.MAX_VALUE.toLong()) return null
+        val v = vars[0]
+        val d = state.intDomains[v]
+        val orig = state.problem.intDomains[v]
+        return when {
+            k < orig.min || k > orig.max -> null
+            k < d.min -> intArrayOf(Lit.make(state.atomVarGe(v, d.min), false))
+            k > d.max -> intArrayOf(Lit.make(state.atomVarLe(v, d.max), false))
+            else -> intArrayOf(Lit.make(state.atomVarEq(v, k), true))
+        }
     }
 
     /** For a single-term `c·x = bound`, true when `bound/c` is not an integer in `x`'s current

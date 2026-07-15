@@ -116,10 +116,25 @@ internal class BitsetDomain(
     override fun forEachHoleInRange(lo: Long, hi: Long, action: IntConsumer) {
         val from = if (lo > min) lo else min
         val to = if (hi < max) hi else max
-        var v = from
-        while (v <= to) {
-            if (!Bits.has(bitset, (v - bitsetLo).toInt())) action.accept(v)
-            v++
+        if (from > to) return
+        // Holes are the *zero* bits in [from, to]. Iterate word by word and emit the set bits of the
+        // inverted (range-masked) word: an all-ones word inverts to 0 and is skipped in one step, so a
+        // dense domain with few holes costs O(span/64 + holes) instead of a value-by-value O(span) scan.
+        val fromBit = (from - bitsetLo).toInt()
+        val toBit = (to - bitsetLo).toInt()
+        val firstWord = fromBit ushr 6
+        val lastWord = toBit ushr 6
+        for (w in firstWord..lastWord) {
+            val lowBit = if (w == firstWord) fromBit and 63 else 0
+            val highBit = if (w == lastWord) toBit and 63 else 63
+            val lowMask = -1L shl lowBit
+            val highMask = if (highBit == 63) -1L else (1L shl (highBit + 1)) - 1L
+            var holes = bitset[w].inv() and lowMask and highMask
+            val base = bitsetLo + (w.toLong() shl 6)
+            while (holes != 0L) {
+                action.accept(base + holes.countTrailingZeroBits())
+                holes = holes and (holes - 1L)
+            }
         }
     }
 
