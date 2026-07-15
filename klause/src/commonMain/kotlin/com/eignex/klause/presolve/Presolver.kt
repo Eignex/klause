@@ -299,6 +299,14 @@ enum class PresolvePass(
         override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.deriveXorUnits(problem)
     },
 
+    /** Cross-direction linear bound fusion — over the linear rows on one coefficient vector, an upper
+     *  and lower bound that meet (`l = u`) collapse into an equality (which affine elimination then
+     *  pivots on), and one that crosses (`l > u`) proves infeasibility. Solution-set exact; runs before
+     *  [ELIMINATE_AFFINE_SINGLETONS] so the equalities it mints are available the same round. */
+    FUSE_LINEAR_BOUNDS("fuse-bounds", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.fuseLinearBounds(problem)
+    },
+
     /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
      *  variable is left unconstrained in the presolved problem (its value is rebuilt from its partner
      *  on the way back), so a complete enumerator would branch over its domain and over-count each
