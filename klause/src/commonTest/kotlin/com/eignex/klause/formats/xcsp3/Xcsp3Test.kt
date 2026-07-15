@@ -2,6 +2,7 @@ package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
@@ -27,6 +28,61 @@ class Xcsp3Test {
         val r = BacktrackSolver(Xcsp3.parse(xml).problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return IntArray(r.assignment.ints.size) { r.assignment.ints[it].toInt() }
+    }
+
+    @Test
+    fun `intension disjunctions of single-var comparisons lower to ComparisonClause and enumerate exactly`() {
+        // The two RoomMate intension shapes plus a bare `or`, all over x[0..2] in 0..3.
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><array id="x" size="[3]"> 0..3 </array></variables>
+              <constraints>
+                <intension> imp(gt(x[0],1),lt(x[1],2)) </intension>
+                <intension> imp(eq(x[1],2),eq(x[2],0)) </intension>
+                <intension> or(le(x[0],0),ge(x[2],3)) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val problem = Xcsp3.parse(xml).problem
+        assertTrue(problem.factors.all { it is ComparisonClause }, "each intension must lower to one ComparisonClause")
+        assertEquals(3, problem.factors.size, "no reified auxiliaries or extra clauses")
+
+        val brute = HashSet<List<Long>>()
+        for (a in 0..3) {
+            for (b in 0..3) {
+                for (c in 0..3) {
+                    val ok = (a <= 1 || b < 2) && (b != 2 || c == 0) && (a <= 0 || c >= 3)
+                    if (ok) brute.add(listOf(a.toLong(), b.toLong(), c.toLong()))
+                }
+            }
+        }
+        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
+            .map { it.ints.toList() }.toHashSet()
+        assertEquals(brute, found, "parse+lowering+propagation must enumerate exactly the allowed tuples")
+    }
+
+    @Test
+    fun `negated coefficient comparison lowers with flipped operator`() {
+        // `le(sub(0,x[0]),-3)` is `-x[0] <= -3`, i.e. a -1 coefficient the lowering folds to `x[0] >= 3`.
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><array id="x" size="[2]"> 0..3 </array></variables>
+              <constraints>
+                <intension> or(le(sub(0,x[0]),-3),le(x[1],0)) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val problem = Xcsp3.parse(xml).problem
+        assertTrue(problem.factors.all { it is ComparisonClause }, "the -1 coefficient literal must still fold")
+        val brute = HashSet<List<Long>>()
+        for (a in 0..3) {
+            for (b in 0..3) {
+                if (a >= 3 || b <= 0) brute.add(listOf(a.toLong(), b.toLong()))
+            }
+        }
+        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
+            .map { it.ints.toList() }.toHashSet()
+        assertEquals(brute, found)
     }
 
     @Test
