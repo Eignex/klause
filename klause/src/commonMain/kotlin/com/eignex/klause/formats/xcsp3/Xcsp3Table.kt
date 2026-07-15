@@ -236,14 +236,27 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
             hi.add(Long.MAX_VALUE)
             return
         }
-        val dots = indexOfDotDot(text, a, b)
-        if (dots >= 0) {
-            lo.add(parseLongIn(text, a, dots))
-            hi.add(parseLongIn(text, dots + 2, b))
+        // Single pass: parse the first integer, stopping at the first non-digit. If that is `..` the cell
+        // is a `lo..hi` interval; otherwise it is a point value already fully read. A point cell (the bulk
+        // of a numeric table) is thus scanned once, not twice — parsing digits and separately hunting for
+        // `..` doubled the per-cell work on a multi-MB table.
+        var p = a
+        val neg = p < b && text[p] == '-'
+        if (neg || (p < b && text[p] == '+')) p++
+        require(p < b) { "empty integer in table tuple" }
+        var v = 0L
+        while (p < b && text[p] in '0'..'9') {
+            v = v * 10 + (text[p] - '0')
+            p++
+        }
+        val first = if (neg) -v else v
+        if (p >= b) {
+            lo.add(first)
+            hi.add(first)
         } else {
-            val v = parseLongIn(text, a, b)
-            lo.add(v)
-            hi.add(v)
+            require(p + 1 < b && text[p] == '.' && text[p + 1] == '.') { "non-digit '${text[p]}' in table tuple" }
+            lo.add(first)
+            hi.add(parseLongIn(text, p + 2, b))
         }
     }
 
@@ -291,16 +304,6 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     return ShortRows(lo.toLongArray(), hi.toLongArray())
 }
 
-/** First index `k` in `[from, to)` where `text[k]` and `text[k+1]` are both `.` (a `lo..hi` separator),
- *  or -1. */
-private fun indexOfDotDot(text: String, from: Int, to: Int): Int {
-    var k = from
-    while (k < to - 1) {
-        if (text[k] == '.' && text[k + 1] == '.') return k
-        k++
-    }
-    return -1
-}
 
 /** Parse a base-10 [Long] from `text[from, to)` (an optional sign then digits), without a substring. */
 private fun parseLongIn(text: String, from: Int, to: Int): Long {
