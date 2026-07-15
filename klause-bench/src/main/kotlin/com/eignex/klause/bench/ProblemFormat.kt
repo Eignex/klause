@@ -3,6 +3,8 @@ package com.eignex.klause.bench
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.json.JsonSchema
+import com.eignex.klause.formats.mps.Mps
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.formats.xcsp3.Xcsp3
@@ -88,6 +90,27 @@ internal object SmtLibFormat : ProblemFormat {
     }
 }
 
+/** MPS (MIP) ingest → klause integer model. Parser + lowering live in `com.eignex.klause.formats.mps`;
+ *  this wrapper reads the bench-level search-bound knob and normalises to the minimise-canonical
+ *  objective the runner expects (an MPS `OBJSENSE MAX` negates every coefficient). */
+internal object MpsFormat : ProblemFormat {
+    override val format = Format.MPS
+    override val inProcess = true
+    override fun ingest(file: File): Ingested {
+        val searchBound = System.getProperty("klause.bench.mps.searchBound")?.toLongOrNull() ?: 1_000_000L
+        val compiled = Mps.parse(file.readText()).toProblem(searchBound)
+        val objective = if (compiled.maximize) compiled.objective?.negated() else compiled.objective
+        return Ingested(compiled.problem, objective)
+    }
+
+    /** Minimise-canonical view of a raw MPS maximise objective (the bench always minimises). */
+    private fun LinearObjective.negated(): LinearObjective = LinearObjective(
+        boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
+        intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
+        constant = -constant,
+    )
+}
+
 internal object Formats {
     private val byFormat: Map<Format, ProblemFormat> = listOf(
         DimacsFormat,
@@ -97,6 +120,7 @@ internal object Formats {
         MiniZincFormat,
         Xcsp3Format,
         SmtLibFormat,
+        MpsFormat,
     ).associateBy { it.format }
 
     operator fun get(format: Format): ProblemFormat =

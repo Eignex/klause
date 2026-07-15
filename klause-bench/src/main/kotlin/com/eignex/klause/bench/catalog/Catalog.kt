@@ -37,6 +37,9 @@ enum class Format {
     /** SMT-LIB QF_LIA script. Net-new ingest (phase 3). */
     SMTLIB_QF_LIA,
 
+    /** MPS (Mathematical Programming System) MIP instance. In-process via `Mps.parse(…).toProblem(…)`. */
+    MPS,
+
     /** Programmatic — the instance is built directly in Kotlin, no file. */
     IN_CODE,
 }
