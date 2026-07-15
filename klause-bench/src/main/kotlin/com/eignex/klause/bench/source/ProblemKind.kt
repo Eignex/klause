@@ -2,6 +2,7 @@ package com.eignex.klause.bench.source
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
+import com.eignex.klause.formats.mps.Mps
 
 /**
  * Cheap COP/CSP classifier for the `kind` selection filter. It reads only the **objective
@@ -12,9 +13,9 @@ import com.eignex.klause.bench.catalog.ProblemRef
  *
  * The directive scanned here is the same one each runner turns into the resolved objective —
  * MiniZinc/FlatZinc `solve minimize|maximize`, OPB `min:`/`max:`, SMT-LIB `(minimize|(maximize`,
- * XCSP3 `<objective>` / `type="COP"` — so the verdict matches the resolved problem for any
- * well-formed instance. Formats with no objective notion (DIMACS, JSON schema) and in-code
- * builders (which never carry an objective) are always CSP.
+ * XCSP3 `<objective>` / `type="COP"`, MPS objective-row coefficients — so the verdict matches the
+ * resolved problem for any well-formed instance. Formats with no objective notion (DIMACS, JSON
+ * schema) and in-code builders (which never carry an objective) are always CSP.
  */
 internal object ProblemKind {
     /** True iff [ref] is a constraint *optimization* problem (carries an objective directive). */
@@ -29,10 +30,16 @@ internal object ProblemKind {
                 ref.format == Format.OPB -> OPB_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.SMTLIB_QF_LIA -> SMT_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.XCSP3 -> XCSP_OBJECTIVE.containsMatchIn(text)
+                ref.format == Format.MPS -> mpsHasObjective(text)
                 else -> false
             }
         }
     }
+
+    /** MPS declares a mandatory objective (`N`) row, but its column coefficients may all be absent — a
+     *  pure feasibility model. Parsing is the honest test; a non-empty objective term list means a COP. */
+    private fun mpsHasObjective(text: String): Boolean =
+        runCatching { Mps.parse(text).objective.indices.isNotEmpty() }.getOrDefault(false)
 
     /** A `solve minimize|maximize …;` item, ignoring `%` line comments (MiniZinc/FlatZinc). The
      *  solve item routinely spans multiple lines — `solve :: int_search(…) \n minimize obj;` — so

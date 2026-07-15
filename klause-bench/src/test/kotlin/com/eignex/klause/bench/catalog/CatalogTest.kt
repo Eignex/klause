@@ -93,4 +93,22 @@ class CatalogTest {
             InProcessRunner.resolve(ref) // must not throw
         }
     }
+
+    @Test
+    fun `mps-core resolves integer, bucketed-float and infeasible instances`() {
+        val byName = Catalog.suite("mps-core").problems.associateBy { it.name }
+        assertEquals(4, byName.size)
+        assertEquals(Expected.Unsat, byName.getValue("infeasible-tiny").expected)
+
+        // Integer optimisation: two integer columns and an objective.
+        val blend = InProcessRunner.resolve(ref("mps-core", "blend-tiny"))
+        assertEquals(2, blend.problem.numIntVars)
+        assertNotNull(blend.objective)
+
+        // Pure feasibility: three integer columns.
+        assertEquals(3, InProcessRunner.resolve(ref("mps-core", "feasible-tiny")).problem.numIntVars)
+
+        // A bounded float column is bucketed into a single integer index variable.
+        assertEquals(1, InProcessRunner.resolve(ref("mps-core", "float-tiny")).problem.numIntVars)
+    }
 }

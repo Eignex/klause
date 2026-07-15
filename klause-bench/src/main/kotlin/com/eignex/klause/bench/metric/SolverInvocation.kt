@@ -125,6 +125,12 @@ internal object SolverInvocation {
         }
         return buildList {
             add(bin.absolutePath)
+            // MPS instances (notably extension-less MIPLIB files) can't be auto-detected by suffix;
+            // the bench knows the format, so pass it explicitly.
+            if (entry.ref.format == Format.MPS) {
+                add("--format")
+                add("mps")
+            }
             add(file.absolutePath)
             add("-t")
             add(budget.timeoutMillis.toString())
@@ -219,11 +225,11 @@ internal object SolverInvocation {
 
     /** Which output stream a subprocess emits, so the read loop parses the right markers. References
      *  always speak MiniZinc; klause-cli speaks the front-end bound to the *input* format — MiniZinc
-     *  for `.mzn`/`.fzn`, the XCSP3 competition stream (`s`/`o`/`c key=value`) for `.xml`. */
+     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml` and MPS. */
     private enum class Dialect { MINIZINC, XCSP3 }
 
     private fun dialectFor(solverId: String, format: Format): Dialect =
-        if (solverId == KLAUSE && format == Format.XCSP3) Dialect.XCSP3 else Dialect.MINIZINC
+        if (solverId == KLAUSE && (format == Format.XCSP3 || format == Format.MPS)) Dialect.XCSP3 else Dialect.MINIZINC
 
     private fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
