@@ -21,7 +21,8 @@ internal object Xcsp3Mode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            // Bound the construction-time root bake so loading stays fast on instances whose eager
+            // Optionally bound the construction-time root bake (opt-in via KLAUSE_BAKE_BUDGET_MS; off by
+            // default — see CliKnobs.DEFAULT_BAKE_BUDGET_MS) so loading stays fast on instances whose eager
             // propagation fixpoint (a wide global-cardinality, a multi-MB extension table) would run for
             // seconds; the solver completes any clipped propagation under its own deadline.
             val budgetMs = cliProp(CliKnobs.bakeBudgetMs)?.toLongOrNull() ?: CliKnobs.DEFAULT_BAKE_BUDGET_MS
