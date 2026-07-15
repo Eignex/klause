@@ -17,6 +17,7 @@ import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -102,13 +103,20 @@ internal fun splitCondition(text: String): Pair<String, String> {
 
 /** Parser/compiler for the supported XCSP3 integer subset. */
 object Xcsp3 {
-    /** Parse XCSP3 [text] into an [Xcsp3Problem]. */
-    fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = Builder(negTableCap).run {
+    /** Parse XCSP3 [text] into an [Xcsp3Problem]. [bakeCancellation] bounds the construction-time root
+     *  bake (the propagation fixpoint folded into the problem's domains) — a wall-clock ceiling that only
+     *  clips instances whose root bake would otherwise run for seconds, leaving the residual propagation
+     *  to the solver; a fast bake completes fully and is unaffected. */
+    fun parse(
+        text: String,
+        negTableCap: Long = 1_000_000L,
+        bakeCancellation: Cancellation = Cancellation.Never,
+    ): Xcsp3Problem = Builder(negTableCap).run {
         val root = parseXml(text)
         root.child("variables")?.let { vs -> vs.children.forEach { declareVar(it) } }
         root.child("constraints")?.let { cs -> cs.children.forEach { constraint(it) } }
         root.child("objectives")?.let { objs -> objs.children.firstOrNull()?.let { objective(it) } }
-        build()
+        build(bakeCancellation)
     }
 
     internal class Builder(val negTableCap: Long) : CnfLowering {
@@ -943,12 +951,13 @@ object Xcsp3 {
             return op to (k + delta)
         }
 
-        fun build(): Xcsp3Problem = Xcsp3Problem(
+        fun build(bakeCancellation: Cancellation = Cancellation.Never): Xcsp3Problem = Xcsp3Problem(
             Problem(
                 numBoolVars = nextBool,
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),
                 factors = factors.toTypedArray(),
+                cancellation = bakeCancellation,
             ),
             objective,
             intVarNames = LinkedHashMap(varIds),

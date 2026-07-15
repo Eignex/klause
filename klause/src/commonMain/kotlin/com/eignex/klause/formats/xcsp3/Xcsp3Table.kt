@@ -304,7 +304,6 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     return ShortRows(lo.toLongArray(), hi.toLongArray())
 }
 
-
 /** Parse a base-10 [Long] from `text[from, to)` (an optional sign then digits), without a substring. */
 private fun parseLongIn(text: String, from: Int, to: Int): Long {
     var a = from

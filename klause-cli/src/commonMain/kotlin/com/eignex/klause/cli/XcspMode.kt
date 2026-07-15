@@ -2,7 +2,9 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * XCSP3 front-end (`.xml` / `.xcsp` / `.xcsp3`). Emits the XCSP3 competition output protocol:
@@ -19,7 +21,12 @@ internal object Xcsp3Mode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val parsed = Xcsp3.parse(readTextFile(path))
+            // Bound the construction-time root bake so loading stays fast on instances whose eager
+            // propagation fixpoint (a wide global-cardinality, a multi-MB extension table) would run for
+            // seconds; the solver completes any clipped propagation under its own deadline.
+            val budgetMs = cliProp(CliKnobs.bakeBudgetMs)?.toLongOrNull() ?: CliKnobs.DEFAULT_BAKE_BUDGET_MS
+            val bakeCancellation = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
+            val parsed = Xcsp3.parse(readTextFile(path), bakeCancellation = bakeCancellation)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"
