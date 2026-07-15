@@ -810,10 +810,50 @@ object Xcsp3 {
             if (br <= 0) return listOf(tok)
             val base = tok.substring(0, br)
             val specs = parseBracketSpecs(tok, br) ?: return listOf(tok)
+            // When the base is a declared array of matching rank, generate exactly the referenced cell
+            // names from the per-dimension index ranges (a wildcard spanning `0 until size`) — O(selected)
+            // — instead of scanning every declared cell of the array. Row-major generation matches the
+            // declaration order [declareCells] used, so positional list semantics are preserved.
+            val dims = arrayDims[base]
+            if (dims != null && dims.size == specs.size) {
+                val out = ArrayList<String>()
+                generateCells(base, specs, dims, 0, StringBuilder(base), out)
+                return out
+            }
+            // Fallback (non-array base, or a rank the array's shape doesn't match): scan the base's cells.
             val cells = cellsByBase[base] ?: return emptyList()
             val out = ArrayList<String>()
             for (i in cells.names.indices) if (cellMatches(cells.indices[i], specs)) out.add(cells.names[i])
             return out
+        }
+
+        /** Emit `base[i0][i1]…` for every index tuple in the Cartesian product of the per-dimension ranges
+         *  [specs] gives (a wildcard `[Int.MIN, Int.MAX]` covering `0 until dims(d)`), keeping only names
+         *  that were actually declared. Row-major to match [declareVar]'s cell order. */
+        private fun generateCells(
+            base: String,
+            specs: List<IntArray>,
+            dims: IntArray,
+            dim: Int,
+            sb: StringBuilder,
+            out: ArrayList<String>,
+        ) {
+            if (dim == specs.size) {
+                val name = sb.toString()
+                if (varIds.containsKey(name)) out.add(name)
+                return
+            }
+            val spec = specs[dim]
+            val lo = if (spec[0] == Int.MIN_VALUE) 0 else spec[0]
+            val hi = if (spec[1] == Int.MAX_VALUE) dims[dim] - 1 else spec[1]
+            val mark = sb.length
+            var i = lo
+            while (i <= hi) {
+                sb.append('[').append(i).append(']')
+                generateCells(base, specs, dims, dim + 1, sb, out)
+                sb.setLength(mark)
+                i++
+            }
         }
 
         /** The bracket groups of a reference token from [from] as per-dimension `[lo, hi]` bounds: a fixed
