@@ -24,6 +24,8 @@ internal class GccFlowBuilder {
 
     private var parentEdge = EmptyIntArray
     private var bfsQueue = EmptyIntArray
+    private var level = EmptyIntArray
+    private var edgeIter = EmptyIntArray
 
     fun reset(nodes: Int) {
         if (adj.size < nodes) {
@@ -33,6 +35,8 @@ internal class GccFlowBuilder {
         if (parentEdge.size < nodes) {
             parentEdge = IntArray(nodes)
             bfsQueue = IntArray(nodes)
+            level = IntArray(nodes)
+            edgeIter = IntArray(nodes)
         }
         for (i in 0 until nodes) adj[i].clear()
         edgeTo.clear()
@@ -138,52 +142,71 @@ internal class GccFlowBuilder {
         return seen
     }
 
+    /**
+     * Dinic's max-flow: repeatedly build a BFS level graph over the residual edges, then saturate it with
+     * a blocking flow (a DFS that advances a per-node edge cursor so each edge is examined once per phase).
+     * `O(V²E)` in general and near `O(E√V)` on the unit-capacity variable→value matching graphs the GCC
+     * propagator builds — far below plain Edmonds-Karp's per-augmentation BFS when a matching needs `V`
+     * augmenting paths. Any maximum flow is equally valid for the Régin GAC filtering that reads the final
+     * residual graph, so the value is unchanged.
+     */
     fun maxFlow(source: Int, sink: Int): Int {
         var total = 0
         val srcAdj = adj[source]
         for (k in 0 until srcAdj.size) total += flowOf(srcAdj[k])
-        val parentEdge = this.parentEdge
+        val level = this.level
+        val iter = edgeIter
         val queue = bfsQueue
         while (true) {
-            parentEdge.fill(-1, 0, numNodes)
-            parentEdge[source] = -2
+            level.fill(-1, 0, numNodes)
+            level[source] = 0
             var qHead = 0
             var qTail = 0
             queue[qTail++] = source
-            var found = false
-            while (qHead < qTail && !found) {
+            while (qHead < qTail) {
                 val u = queue[qHead++]
                 val neigh = adj[u]
                 for (k in 0 until neigh.size) {
                     val eIdx = neigh[k]
+                    if (cap[eIdx] <= 0) continue
                     val v = edgeTo[eIdx]
-                    if (parentEdge[v] != -1 || cap[eIdx] <= 0) continue
-                    parentEdge[v] = eIdx
-                    if (v == sink) {
-                        found = true
-                        break
+                    if (level[v] < 0) {
+                        level[v] = level[u] + 1
+                        queue[qTail++] = v
                     }
-                    queue[qTail++] = v
                 }
             }
-            if (!found) break
-            var bottleneck = Int.MAX_VALUE
-            var cur = sink
-            while (cur != source) {
-                val eIdx = parentEdge[cur]
-                if (cap[eIdx] < bottleneck) bottleneck = cap[eIdx]
-                cur = edgeTo[eIdx xor 1]
+            if (level[sink] < 0) break
+            iter.fill(0, 0, numNodes)
+            while (true) {
+                val pushed = blockingDfs(source, sink, Int.MAX_VALUE, level, iter)
+                if (pushed == 0) break
+                total += pushed
             }
-            cur = sink
-            while (cur != source) {
-                val eIdx = parentEdge[cur]
-                cap[eIdx] = cap[eIdx] - bottleneck
-                cap[eIdx xor 1] = cap[eIdx xor 1] + bottleneck
-                cur = edgeTo[eIdx xor 1]
-            }
-            total += bottleneck
         }
         return total
+    }
+
+    /** Push flow along one level-respecting residual path from [u] to [sink], bounded by [limit]. The
+     *  per-node cursor [iter] skips edges already exhausted this phase, so the blocking flow stays linear
+     *  in the edges. Recursion depth is the level-graph height — a handful for the GCC matching graph. */
+    private fun blockingDfs(u: Int, sink: Int, limit: Int, level: IntArray, iter: IntArray): Int {
+        if (u == sink) return limit
+        val neigh = adj[u]
+        while (iter[u] < neigh.size) {
+            val eIdx = neigh[iter[u]]
+            val v = edgeTo[eIdx]
+            if (cap[eIdx] > 0 && level[v] == level[u] + 1) {
+                val pushed = blockingDfs(v, sink, if (limit < cap[eIdx]) limit else cap[eIdx], level, iter)
+                if (pushed > 0) {
+                    cap[eIdx] = cap[eIdx] - pushed
+                    cap[eIdx xor 1] = cap[eIdx xor 1] + pushed
+                    return pushed
+                }
+            }
+            iter[u]++
+        }
+        return 0
     }
 
     fun computeSccResidual(limit: Int, sccId: IntArray) {
