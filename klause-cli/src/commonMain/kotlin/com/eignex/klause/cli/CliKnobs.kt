@@ -38,9 +38,11 @@ internal object CliKnobs {
      *  disables the cap. Defaults to [DEFAULT_BAKE_BUDGET_MS]. */
     val bakeBudgetMs by propertyKnob()
 
-    /** Default load-time root-bake ceiling. Sized so a fast bake (the common case) is untouched while a
-     *  pathological global's fixpoint (a wide global-cardinality, a multi-MB extension table) is clipped,
-     *  keeping cold load bounded; the solver completes any deferred propagation under its own deadline.
-     *  Set against the ~120ms JVM-start + parse floor so a clipped instance's cold load stays under 1s. */
-    const val DEFAULT_BAKE_BUDGET_MS = 600L
+    /** Default load-time root-bake ceiling: `0` = **disabled** (bake to completion). Off by default
+     *  because it is a load-latency-vs-solve-quality trade: a small ceiling bounds cold load (a 600ms cap
+     *  takes the XCSP3 competition corpus from 79.8% to 89.5% loading <1s against the ~120ms JVM+parse
+     *  floor) but clips the root propagation some searches rely on — a `bench solve` A/B at 600ms lost an
+     *  instance klause solves with the full bake (Accordion-11-01). So it stays opt-in via
+     *  `KLAUSE_BAKE_BUDGET_MS`; a caller that values bounded load over that headroom sets it explicitly. */
+    const val DEFAULT_BAKE_BUDGET_MS = 0L
 }
