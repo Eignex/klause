@@ -5,8 +5,8 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.RevisedSimplex
 import com.eignex.klause.lp.Sense
+import com.eignex.klause.lp.newLpSolver
 import com.eignex.klause.lp.safeVariableBound
 
 /**
@@ -62,7 +62,7 @@ private fun SmtLibQfLia.Builder.obbtSolve(linears: List<Linear>, target: Int, ma
         return null
     }
     val result = try {
-        RevisedSimplex(model).solvePrimal()
+        newLpSolver(model).solvePrimal()
     } catch (_: LpOverflowException) {
         return null
     } ?: return null

@@ -6,6 +6,7 @@ import com.eignex.klause.lp.IntegerCertificate
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.TableauCutSolver
 import com.eignex.klause.lp.VarStatus
 import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.cut.Cut
@@ -74,7 +75,7 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
 /** A [RevisedSimplex] over [model]. The simplex always uses Devex pricing, the Harris two-pass ratio
  *  test, the bound-flipping long step and basis equilibration — all correctness-neutral (they change
  *  only the pivot path / conditioning, never the certified optimum). */
-internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): RevisedSimplex =
+internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver =
     RevisedSimplex(model, cancellation)
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an

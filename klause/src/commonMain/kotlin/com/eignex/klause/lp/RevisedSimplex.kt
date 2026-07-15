@@ -46,7 +46,7 @@ internal class RevisedSimplex(
     private val model: LpModel,
     private val cancellation: Cancellation = Cancellation.Never,
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
-) {
+) : TableauCutSolver {
     private val m = model.m
     private val n = model.n
     private val numVars = model.numVars
@@ -76,7 +76,7 @@ internal class RevisedSimplex(
 
     /** The float candidate Farkas ray `ρ = B⁻ᵀeᵣ` at a dual-unbounded termination, for [integerFarkasRay]
      *  to round and certify. Null unless [solve] returned null on infeasibility. */
-    var infeasibleRay: DoubleArray? = null
+    override var infeasibleRay: DoubleArray? = null
         private set
 
     init {
@@ -187,7 +187,7 @@ internal class RevisedSimplex(
      * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
      * sound regardless of how the basis was obtained.
      */
-    fun solve(warm: Basis? = null): FloatLpResult? {
+    override fun solve(warm: Basis?): FloatLpResult? {
         if (warm == null || !tryWarmStart(warm)) coldStart()
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         var factor: EtaBasis = refactor() ?: run {
@@ -383,14 +383,14 @@ internal class RevisedSimplex(
     /** Gomory (Chvátal) integrality cuts from the last optimal basis (#22), up to [maxCuts]; empty if the
      *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
      *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
-    fun gomoryCuts(maxCuts: Int): List<Cut> {
+    override fun gomoryCuts(maxCuts: Int): List<Cut> {
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
     }
 
     /** Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
-    fun mirCuts(maxCuts: Int): List<Cut> {
+    override fun mirCuts(maxCuts: Int): List<Cut> {
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = true)
@@ -582,7 +582,7 @@ internal class RevisedSimplex(
      * reached.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "ReturnCount", "LongMethod")
-    fun solvePrimal(warm: Basis? = null): FloatLpResult? {
+    override fun solvePrimal(warm: Basis?): FloatLpResult? {
         if (warm == null || !tryWarmStart(warm)) lowerStart()
         var factor: EtaBasis = refactor() ?: run {
             lowerStart()
