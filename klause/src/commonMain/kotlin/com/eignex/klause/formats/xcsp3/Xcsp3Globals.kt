@@ -46,25 +46,37 @@ internal fun Xcsp3.Builder.count(e: XmlElement) {
 
 internal fun Xcsp3.Builder.element(e: XmlElement) {
     e.child("matrix")?.let { return elementMatrix(e, it) }
-    val arr = listVars(e)
     val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
     val idx = singleTermVar(
         e.child("index")?.textContent
             ?: throw UnsupportedXcsp3Exception("element: missing <index>"),
     )
+    // A `<list>` of only integer constants is a constant table: build a constant-array [Element]
+    // (arrIsVars = false) so GAC takes the incremental support-count path ([ElementConstState]).
+    // Treating each constant as a singleton fixed var instead sends it down the variable-array path,
+    // which scans the whole result domain for support and prunes one value at a time — quadratic when
+    // the result domain is wide (Wordpress: a 500-entry table into a 0..976000 result).
+    val constArr = parseInts(requireNotNull(e.child("list")).textContent)?.widenToLong()
+    val vars = if (constArr == null) listVars(e) else null
+    val arr = constArr ?: requireNotNull(vars).widenToLong()
+    val arrIsVars = constArr == null
     // The selected element arr[idx] is constrained either directly to a <value> (the eq form)
     // or by a <condition> `(op, operand)` on a fresh var bound to it.
     val condEl = e.child("condition")
     if (condEl != null) {
-        val selected = newAuxVar(domainMin(arr), domainMin(arr) + domainSpan(arr) - 1)
+        val lo: Long
+        val hi: Long
+        if (constArr != null) {
+            lo = constArr.min()
+            hi = constArr.max()
+        } else {
+            val v = requireNotNull(vars)
+            lo = domainMin(v)
+            hi = domainMin(v) + domainSpan(v) - 1
+        }
+        val selected = newAuxVar(lo, hi)
         factors.add(
-            Element(
-                idx = idx,
-                result = selected,
-                arr = arr.widenToLong(),
-                arrIsVars = true,
-                indexOffset = offset,
-            ),
+            Element(idx = idx, result = selected, arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
         )
         postCondition(intArrayOf(1), intArrayOf(selected), condEl.textContent.trim())
         return
@@ -72,13 +84,7 @@ internal fun Xcsp3.Builder.element(e: XmlElement) {
     val value = e.child("value")?.textContent?.trim()
         ?: throw UnsupportedXcsp3Exception("element: missing <value> or <condition>")
     factors.add(
-        Element(
-            idx = idx,
-            result = singleTermVar(value),
-            arr = arr.widenToLong(),
-            arrIsVars = true,
-            indexOffset = offset,
-        ),
+        Element(idx = idx, result = singleTermVar(value), arr = arr, arrIsVars = arrIsVars, indexOffset = offset),
     )
 }
 
