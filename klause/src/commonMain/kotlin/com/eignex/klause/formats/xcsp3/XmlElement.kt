@@ -33,39 +33,99 @@ class XmlElement(
         // A `%`-free text carries no placeholder, so reuse it verbatim rather than scanning it with the
         // parameter regex once per `<args>` row — a group whose template holds a large literal (e.g. an
         // mdd `<transitions>` blob) would otherwise re-match megabytes of text on every instantiation.
-        if ('%' !in directText) {
-            directText
-        } else {
-            PARAM.replace(directText) { m ->
-                when {
-                    m.groupValues[1].isNotEmpty() -> { // %i..%j
-                        val lo = m.groupValues[1].toInt()
-                        val hi = m.groupValues[2].toInt()
-                        (lo..hi).mapNotNull { tokens.getOrNull(it) }.joinToString(" ")
-                    }
-
-                    m.groupValues[3] == "..." ->
-                        tokens.filterIndexed { i, _ -> i !in usedIndices }.joinToString(" ")
-
-                    else -> tokens.getOrNull(m.groupValues[3].toInt()) ?: m.value
-                }
-            }
-        },
+        if ('%' !in directText) directText else expandParams(directText, tokens, usedIndices),
     )
 
     /** Parameter indices explicitly referenced (`%i` / `%i..%j`) in this element's full text —
      *  the complement of what `%...` expands to. */
-    fun explicitParamIndices(): Set<Int> = buildSet {
-        for (m in EXPLICIT_PARAM.findAll(textContent)) {
-            val lo = m.groupValues[1].toInt()
-            val hi = m.groupValues[2].toIntOrNull() ?: lo
-            for (i in lo..hi) add(i)
-        }
-    }
+    fun explicitParamIndices(): Set<Int> = buildSet { collectExplicitParams(textContent, this) }
+}
 
-    private companion object {
-        val PARAM = Regex("""%(\d+)\.\.%(\d+)|%(\.\.\.|\d+)""")
-        val EXPLICIT_PARAM = Regex("""%(\d+)(?:\.\.%(\d+))?""")
+/** Substitute the group-template placeholders in [text]: `%i` → `tokens[i]`, `%i..%j` → the space-joined
+ *  token range, `%...` → the tokens whose index is not in [usedIndices]. A lone `%` (not followed by
+ *  digits or `...`) and an out-of-range `%i` are left verbatim. Hand-scanned — no regex per instantiation. */
+private fun expandParams(text: String, tokens: List<String>, usedIndices: Set<Int>): String {
+    val sb = StringBuilder(text.length)
+    var i = 0
+    val n = text.length
+    while (i < n) {
+        val c = text[i]
+        if (c != '%') {
+            sb.append(c)
+            i++
+            continue
+        }
+        if (text.startsWith("...", i + 1)) {
+            appendJoined(sb, tokens.indices.filter { it !in usedIndices }, tokens)
+            i += 4
+            continue
+        }
+        var j = i + 1
+        while (j < n && text[j].isDigit()) j++
+        if (j == i + 1) { // a bare '%'
+            sb.append('%')
+            i++
+            continue
+        }
+        val lo = text.substring(i + 1, j).toInt()
+        val rangeEnd = rangeUpperEnd(text, j)
+        if (rangeEnd > 0) {
+            val hi = text.substring(j + 3, rangeEnd).toInt()
+            appendJoined(sb, (lo..hi).toList(), tokens)
+            i = rangeEnd
+            continue
+        }
+        val tok = tokens.getOrNull(lo)
+        if (tok != null) sb.append(tok) else sb.append(text, i, j)
+        i = j
+    }
+    return sb.toString()
+}
+
+/** If a `..%<digits>` range tail begins at [at] in [text], the index just past its last digit; else -1. */
+private fun rangeUpperEnd(text: String, at: Int): Int {
+    if (!text.startsWith("..%", at)) return -1
+    var k = at + 3
+    while (k < text.length && text[k].isDigit()) k++
+    return if (k > at + 3) k else -1
+}
+
+private fun appendJoined(sb: StringBuilder, indices: List<Int>, tokens: List<String>) {
+    var first = true
+    for (idx in indices) {
+        val t = tokens.getOrNull(idx) ?: continue
+        if (!first) sb.append(' ')
+        sb.append(t)
+        first = false
+    }
+}
+
+/** Collect every explicitly-referenced parameter index (`%i` / `%i..%j`) in [text] into [into]; a
+ *  `%...` and a lone `%` reference nothing. */
+private fun collectExplicitParams(text: String, into: MutableSet<Int>) {
+    var i = 0
+    val n = text.length
+    while (i < n) {
+        if (text[i] != '%') {
+            i++
+            continue
+        }
+        var j = i + 1
+        while (j < n && text[j].isDigit()) j++
+        if (j == i + 1) {
+            i++
+            continue
+        }
+        val lo = text.substring(i + 1, j).toInt()
+        val rangeEnd = rangeUpperEnd(text, j)
+        if (rangeEnd > 0) {
+            val hi = text.substring(j + 3, rangeEnd).toInt()
+            for (x in lo..hi) into.add(x)
+            i = rangeEnd
+        } else {
+            into.add(lo)
+            i = j
+        }
     }
 }
 
