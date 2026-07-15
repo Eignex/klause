@@ -2,6 +2,7 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.remapLits
 import com.eignex.klause.factor.remapVars
@@ -14,6 +15,7 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.EmptyIntArray
@@ -66,6 +68,39 @@ class NValue(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         NValue(intMap[n], xs.remapVars(intMap), mode, presents.remapLits(boolMap))
+
+    // A fixed distinct-count target degenerates the exact `nvalue` into a simpler global: `n = |xs|`
+    // forces all values distinct (an [AllDifferent] over the union domain), and `n = 1` forces them all
+    // equal (a chain of equalities). Solution-set exact; only the non-optional `Eq` mode qualifies.
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        if (mode != Mode.Eq || presents.isNotEmpty()) return FactorReduction.Unchanged
+        val nDom = domains[n]
+        if (nDom.min != nDom.max) return FactorReduction.Unchanged
+        val target = nDom.min
+        return when {
+            target == xs.size.toLong() && xs.size >= 2 -> allDifferent(domains)
+
+            target == 1L -> FactorReduction.Rewrite(
+                (1 until xs.size).map { Linear(intArrayOf(1, -1), intArrayOf(xs[it], xs[0]), LinearOp.EQ, 0) },
+            )
+
+            else -> FactorReduction.Unchanged
+        }
+    }
+
+    private fun allDifferent(domains: Array<IntDomain>): FactorReduction {
+        var lo = Long.MAX_VALUE
+        var hi = Long.MIN_VALUE
+        for (x in xs) {
+            val d = domains[x]
+            if (d.min < lo) lo = d.min
+            if (d.max > hi) hi = d.max
+        }
+        val span = hi - lo + 1
+        // Guard an oversized union domain: AllDifferent tracks per-value counts over `[lo, lo + span)`.
+        if (span < 1L || span > Int.MAX_VALUE.toLong()) return FactorReduction.Unchanged
+        return FactorReduction.Rewrite(listOf(AllDifferent(xs, domainMin = lo, domainSize = span.toInt())))
+    }
 
     /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with
      *  their presence literal to keep an opt position with its presence); [n] (the count var) and
