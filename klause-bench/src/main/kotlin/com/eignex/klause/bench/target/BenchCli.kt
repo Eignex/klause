@@ -13,6 +13,7 @@ import com.eignex.klause.bench.metric.KlauseSearch
 import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.metric.ResultCredit
+import com.eignex.klause.bench.metric.ScipReference
 import com.eignex.klause.bench.metric.SolveMetric
 import com.eignex.klause.bench.metric.SolveRecord
 import com.eignex.klause.bench.metric.SolverInvocation
@@ -358,14 +359,14 @@ object BenchCli {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         // Best strong solver per format: cp-sat for MiniZinc (`minizinc --solver`) and XCSP3 (the CPMpy
         // container — OR-Tools has no XCSP3 frontend), clasp for DIMACS/OPB (the Boolean formats cp-sat
-        // can't read), z3 for SMT-LIB QF_LIA (cp-sat has no SMT frontend). Other formats have no path.
+        // can't read), z3 for SMT-LIB QF_LIA, SCIP for MPS (MIP). Other formats have no path.
         val refs = select(f).filter {
             it.format == Format.MINIZINC || it.format == Format.XCSP3 ||
                 it.format == Format.DIMACS || it.format == Format.OPB ||
-                it.format == Format.SMTLIB_QF_LIA
+                it.format == Format.SMTLIB_QF_LIA || it.format == Format.MPS
         }
         if (refs.isEmpty()) {
-            println("(no MiniZinc/XCSP3/DIMACS/OPB/SMT-LIB problems matched the selection)")
+            println("(no MiniZinc/XCSP3/DIMACS/OPB/SMT-LIB/MPS problems matched the selection)")
             return
         }
         val backend = (f["backend"] ?: f["reference"] ?: "cp-sat").lowercase()
@@ -384,6 +385,10 @@ object BenchCli {
         require(refs.none { it.format == Format.SMTLIB_QF_LIA } || Z3Reference.available()) {
             "SMT-LIB QF_LIA reference needs a z3 binary on PATH (`z3 --version`)"
         }
+        require(refs.none { it.format == Format.MPS } || ScipReference.imageAvailable()) {
+            "MPS reference needs the ${ScipReference.IMAGE} image " +
+                "(build it: docker build -t ${ScipReference.IMAGE} klause-bench/scip)"
+        }
         // Reap containers left by an earlier interrupted run, and again on a graceful stop (each is
         // memory-capped, so a hard kill only ever leaves bounded, short-lived ones).
         if (refs.any { it.format == Format.XCSP3 }) {
@@ -393,6 +398,10 @@ object BenchCli {
         if (clasp) {
             ClaspReference.reapStragglers()
             Runtime.getRuntime().addShutdownHook(Thread { ClaspReference.reapStragglers() })
+        }
+        if (refs.any { it.format == Format.MPS }) {
+            ScipReference.reapStragglers()
+            Runtime.getRuntime().addShutdownHook(Thread { ScipReference.reapStragglers() })
         }
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
         // `workers=` pins each cp-sat/choco job to that many search workers (default 1): without it the
@@ -413,23 +422,25 @@ object BenchCli {
                     Callable { solveReference(ref, backend, settings, budget, done, refs.size) },
                 )
             }
-                .mapNotNull { it.get() }
+                .map { it.get() }
         } finally {
             pool.shutdown()
         }
         val (added, tightened, unchanged) = ReferenceStore.mergeAndSave(harvested)
-        // Report the solvers that actually produced rows (per-format: cp-sat / clasp / z3), not just
-        // the requested MiniZinc `backend`, so an all-SMT or all-Boolean run names its true oracle.
+        // Report the solvers that actually produced rows (per-format: cp-sat / clasp / z3 / scip), not
+        // just the requested MiniZinc `backend`, so an all-SMT or all-Boolean run names its true oracle.
         val solvers = harvested.map { it.solver }.distinct().sorted().joinToString("+").ifEmpty { backend }
+        val decisive = harvested.count { it.feasible == true || it.proven }
         println(
             "\nreference table: +$added new, $tightened tightened, $unchanged unchanged " +
-                "(${harvested.size} decisive of ${refs.size} from $solvers)",
+                "($decisive decisive, ${harvested.size} rows of ${refs.size} from $solvers)",
         )
     }
 
-    /** Solve one instance with the reference [backend] and turn a decisive result (a feasible witness
-     *  or a proof) into a [ReferenceEntry]; a pure timeout yields null. Reuses [BenchCache], so re-runs
-     *  and resumes replay instantly and a killed sweep loses no completed work. */
+    /** Solve one instance with the reference [backend] and turn the result into a [ReferenceEntry]: a
+     *  feasible witness or a proof when decisive, else an "unknown" row (an undecided timeout or an
+     *  error) so every instance is covered. Reuses [BenchCache], so re-runs and resumes replay instantly
+     *  and a killed sweep loses no completed work. */
     private fun solveReference(
         ref: ProblemRef,
         backend: String,
@@ -437,22 +448,20 @@ object BenchCli {
         budget: Budget,
         counter: AtomicInteger,
         total: Int,
-    ): ReferenceEntry? = runCatching {
+    ): ReferenceEntry = runCatching {
         // Per-format solver: DIMACS/OPB by clasp, XCSP3 by the CPMpy cp-sat container (OR-Tools reads no
         // XCSP3), MiniZinc by `minizinc --solver`. Each row records the solver that produced it, so the
         // table stays honest about which oracle each format came from. All cache and score identically.
         val clasp = ref.format == Format.DIMACS || ref.format == Format.OPB
         val xcsp3 = ref.format == Format.XCSP3
         val smt = ref.format == Format.SMTLIB_QF_LIA
-        val solverId = when {
-            clasp -> "clasp"
-            smt -> "z3"
-            else -> backend
-        }
+        val mps = ref.format == Format.MPS
+        val solverId = solverIdFor(ref, backend)
         val cacheTag = when {
             clasp -> "clasp"
             xcsp3 -> "$backend-xcsp3"
             smt -> "z3"
+            mps -> "scip"
             else -> backend
         }
         val key = BenchCache.keyFor(ref, cacheTag, budget)
@@ -479,6 +488,12 @@ object BenchCli {
                 maximize = false // QF_LIA benchmarks are decision instances — no objective to orient
             }
 
+            mps -> {
+                r = cached ?: ScipReference.run(ref, budget).also { BenchCache.store(key, it) }
+                // SCIP reports the bound in the model's OBJSENSE orientation, carried in stats.
+                maximize = r.stats["maximize"].toBoolean()
+            }
+
             else -> {
                 // MiniZinc: read (optimize, maximize) from the model's solve item.
                 val (optimize, max) = solveKind(ref)
@@ -502,7 +517,9 @@ object BenchCli {
             else -> "??"
         }
         println("[${counter.incrementAndGet()}/$total] ${ref.name} = $verdict")
-        // Decisive = a witness (SAT) or a proof (optimum / UNSAT); a pure timeout stores nothing.
+        // Decisive = a witness (SAT) or a proof (optimum / UNSAT). An undecided timeout still gets a row
+        // — an honest "unknown" (feasible=null, no objective, unproven) — so every instance is covered;
+        // the virtual-best merge keeps it from ever displacing a decisive row.
         if (r.feasible == true || r.proven) {
             ReferenceEntry(
                 ReferenceStore.suiteOf(ref),
@@ -516,12 +533,38 @@ object BenchCli {
                 budget.timeoutMillis,
             )
         } else {
-            null
+            unknownRow(ref, maximize, solverId, budget)
         }
     }.getOrElse {
+        // An instance the reference couldn't even run (parse/solver error) is also uncovered — record an
+        // unknown row so coverage stays complete; the error is logged for visibility.
         println("?? ${ref.name} ERROR: ${it.message ?: it::class.simpleName}")
-        null
+        unknownRow(ref, maximize = false, solver = solverIdFor(ref, backend), budget = budget)
     }
+
+    /** The per-format reference solver id: DIMACS/OPB by clasp, SMT-LIB by z3, MPS by scip, else the
+     *  requested MiniZinc [backend]. One source of truth so the decisive and unknown-row paths agree. */
+    private fun solverIdFor(ref: ProblemRef, backend: String): String = when (ref.format) {
+        Format.DIMACS, Format.OPB -> "clasp"
+        Format.SMTLIB_QF_LIA -> "z3"
+        Format.MPS -> "scip"
+        else -> backend
+    }
+
+    /** An "unknown" reference row for an instance the solver left undecided (timeout) or couldn't run:
+     *  no objective, feasibility unknown, unproven, crediting the full budget as elapsed. */
+    private fun unknownRow(ref: ProblemRef, maximize: Boolean, solver: String, budget: Budget): ReferenceEntry =
+        ReferenceEntry(
+            suite = ReferenceStore.suiteOf(ref),
+            problem = ref.name,
+            maximize = maximize,
+            objective = null,
+            feasible = null,
+            proven = false,
+            elapsedMs = budget.timeoutMillis,
+            solver = solver,
+            budgetMs = budget.timeoutMillis,
+        )
 
     /** Read `(optimize, maximize)` from the model's `solve` item (comments stripped) so the reference
      *  path needs no klause `Problem`. A `satisfy` model — or one whose solve item is not in the top

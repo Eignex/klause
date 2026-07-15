@@ -7,9 +7,9 @@ import java.io.File
 
 /**
  * A committed per-instance reference optimum/bound from a strong external solver — cp-sat (MiniZinc,
- * XCSP3), clasp (DIMACS, OPB), or z3 (SMT-LIB QF_LIA), per the instance's format ([solver]). The
- * gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any solver beating
- * a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
+ * XCSP3), clasp (DIMACS, OPB), z3 (SMT-LIB QF_LIA), or SCIP (MPS), per the instance's format
+ * ([solver]). The gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any
+ * solver beating a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
  */
 internal data class ReferenceEntry(
     /** The instance's corpus (its source collection id, e.g. `hakank` / `minizinc-benchmarks` /
