@@ -64,11 +64,15 @@ private fun reginRebuild(
             matchVal[j] = i
         }
     }
-    val visited = BooleanArray(cap)
-    for (i in 0 until n) {
-        if (matchVar[i] != -1) continue
-        for (k in visited.indices) visited[k] = false
-        if (!reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)) {
+    // Complete the seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)) rather than a
+    // per-variable augmenting search — the dominant cost when the matching is built cold at the root
+    // bake with no warm start. On a non-perfect matching, one augmenting search on a still-free variable
+    // recovers the exact Hall violator (its `visited` set), unchanged from the per-variable path.
+    if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
+        val visited = BooleanArray(cap)
+        for (i in 0 until n) {
+            if (matchVar[i] != -1) continue
+            reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)
             val hall = IntArrayList()
             hall.add(vars[i])
             for (j in 0 until cap) if (visited[j] && matchVal[j] >= 0) hall.add(vars[matchVal[j]])

@@ -96,7 +96,7 @@ internal fun reginFilter(
     // inflate numValues to ≥ n, so this only fires when no excepted value is available.)
     if (numValues < n) return filteredVars
 
-    // ---- Maximum bipartite matching via successive augmenting paths. O(n · |E|). ----
+    // ---- Maximum bipartite matching: warm-started seed completed by Hopcroft-Karp, O(|E|·√n). ----
     val matchVar = IntArray(n) { -1 }
     val matchVal = IntArray(numValues) { -1 }
     val visited = BooleanArray(numValues)
@@ -128,10 +128,12 @@ internal fun reginFilter(
             }
         }
     }
-    for (i in 0 until n) {
-        if (matchVar[i] != -1) continue // already seeded from the warm-start matching
-        for (j in visited.indices) visited[j] = false
-        if (!reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)) {
+    // Complete the (warm-started) seed to a maximum matching in one Hopcroft-Karp pass (O(|E|·√n)).
+    if (!reginHopcroftKarp(n, valuesPerVar, matchVar, matchVal, IntArray(n), IntArray(n))) {
+        for (i in 0 until n) {
+            if (matchVar[i] != -1) continue
+            for (j in visited.indices) visited[j] = false
+            reginTryAugment(i, valuesPerVar, matchVar, matchVal, visited)
             // Augment failed: the saturated values plus their occupants and i form a Hall
             // violator (every one of those vars' domains lies within the visited value set).
             val hall = IntArrayList()
@@ -365,6 +367,96 @@ internal class ReginIncrementalState(state: PropagationState, val vars: IntArray
     /** Each var's [IntDomain] at the end of its last fire — the delta base. Reversible, so it rolls
      *  back with the domains and the `current` ⊆ `domRef` (deletions-only) invariant always holds. */
     val domRef = Array(n) { RevRef<IntDomain?>(state, null) }
+}
+
+/**
+ * Complete the bipartite matching from a (possibly partial, warm-started) seed to a maximum matching
+ * using Hopcroft-Karp: O(|E|·√n) instead of the O(n·|E|) one-var-at-a-time augmenting search — the
+ * dominant cost when a large `alldifferent` is matched from scratch at the root bake (a 2700-var
+ * permutation matching went from seconds to milliseconds). Any maximum matching prunes identically
+ * (Régin filtering is matching-independent), so this changes speed, not results.
+ *
+ * [matchVar] / [matchVal] are updated in place (var→value-id and value-id→var, `-1` = free). Returns
+ * `true` iff the completed matching saturates every variable; on `false` the caller runs one
+ * [reginTryAugment] on a still-free variable to recover the exact Hall violator.
+ * [distScratch]/[queueScratch] are reused per-fire buffers sized to `n`.
+ */
+internal fun reginHopcroftKarp(
+    n: Int,
+    valuesPerVar: Array<IntArray>,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    distScratch: IntArray,
+    queueScratch: IntArray,
+): Boolean {
+    val unmatchedLayer = Int.MAX_VALUE
+    while (true) {
+        // Layer variables by BFS distance from the free variables over alternating edges; a free
+        // value reached in the sweep means an augmenting path of the current shortest length exists.
+        var qHead = 0
+        var qTail = 0
+        for (i in 0 until n) {
+            if (matchVar[i] == -1) {
+                distScratch[i] = 0
+                queueScratch[qTail++] = i
+            } else {
+                distScratch[i] = unmatchedLayer
+            }
+        }
+        var augmentingPathExists = false
+        while (qHead < qTail) {
+            val u = queueScratch[qHead++]
+            val vids = valuesPerVar[u]
+            for (k in vids.indices) {
+                val holder = matchVal[vids[k]]
+                if (holder == -1) {
+                    augmentingPathExists = true
+                } else if (distScratch[holder] == unmatchedLayer) {
+                    distScratch[holder] = distScratch[u] + 1
+                    queueScratch[qTail++] = holder
+                }
+            }
+        }
+        if (!augmentingPathExists) break
+        // Augment every free variable along a shortest layered path found this phase.
+        for (i in 0 until n) {
+            if (matchVar[i] == -1) reginHkAugment(i, valuesPerVar, matchVar, matchVal, distScratch)
+        }
+    }
+    for (i in 0 until n) if (matchVar[i] == -1) return false
+    return true
+}
+
+/** Layered DFS augment for [reginHopcroftKarp]: extend a matching along edges to the next BFS layer,
+ *  marking a dead-ended variable so a later free variable in the same phase skips it. */
+private fun reginHkAugment(
+    u: Int,
+    valuesPerVar: Array<IntArray>,
+    matchVar: IntArray,
+    matchVal: IntArray,
+    dist: IntArray,
+): Boolean {
+    val vids = valuesPerVar[u]
+    for (k in vids.indices) {
+        val vid = vids[k]
+        val holder = matchVal[vid]
+        if (holder == -1 || (
+                dist[holder] == dist[u] + 1 && reginHkAugment(
+                    holder,
+                    valuesPerVar,
+                    matchVar,
+                    matchVal,
+                    dist,
+                )
+                )
+        ) {
+            matchVar[u] = vid
+            matchVal[vid] = u
+            return true
+        }
+    }
+    dist[u] = Int.MAX_VALUE
+    return false
 }
 
 /** Augmenting-path search for maximum bipartite matching. Returns true iff variable `i` can be
