@@ -31,7 +31,7 @@ internal object Suites {
     val all: List<Suite> by lazy {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
-            smtlibCore, xcsp3Core, mznSmoke, satlibUf20, satLadder, satCrafted,
+            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satlibUf20, satLadder, satCrafted, miplib3,
         )
     }
 
@@ -526,6 +526,15 @@ internal object Suites {
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
     }
 
+    private val mpsCore = suite("mps-core", "Curated MPS (MIP) integer + bounded-float instances") {
+        format = Format.MPS
+        license = "internal"
+        vendored("blend-tiny", Category.OPTIMIZATION, Expected.Opt(9))
+        vendored("feasible-tiny", Category.CSP, Expected.Sat)
+        vendored("float-tiny", Category.CSP, Expected.Sat)
+        vendored("infeasible-tiny", Category.UNSAT, Expected.Unsat)
+    }
+
     // --- External SAT collection (auto-fetched SATLIB tarball) ---
 
     private val satlibUf20 = suite("satlib-uf20", "SATLIB uf20-91 SAT instances (auto-fetched sample)") {
@@ -537,6 +546,24 @@ internal object Suites {
         for (n in 1..5) {
             external("uf20-$n", col, "uf20-0$n.cnf", Category.SAT, Expected.Sat)
         }
+    }
+
+    private val miplib3 = suite("miplib3", "MIPLIB 3.0 pure-integer (0/1) MIP instances (auto-fetched)") {
+        // The CONT=0 subset of the classic 1996 library — instances with no continuous columns, which
+        // klause (integer-only) accepts natively; optima are from the MIPLIB 3.0 catalog. Members are
+        // extension-less under the archive's `miplib3/` directory.
+        format = Format.MPS
+        val col = ExternalCollections.miplib3
+        external("stein27", col, "miplib3/stein27", Category.OPTIMIZATION, Expected.Opt(18))
+        external("p0033", col, "miplib3/p0033", Category.OPTIMIZATION, Expected.Opt(3089))
+        external("stein45", col, "miplib3/stein45", Category.OPTIMIZATION, Expected.Opt(30))
+        external("lseu", col, "miplib3/lseu", Category.OPTIMIZATION, Expected.Opt(1120))
+        external("enigma", col, "miplib3/enigma", Category.OPTIMIZATION, Expected.Opt(0))
+        external("mod008", col, "miplib3/mod008", Category.OPTIMIZATION, Expected.Opt(307))
+        external("gt2", col, "miplib3/gt2", Category.OPTIMIZATION, Expected.Opt(21166))
+        external("p0201", col, "miplib3/p0201", Category.OPTIMIZATION, Expected.Opt(7615))
+        external("p0282", col, "miplib3/p0282", Category.OPTIMIZATION, Expected.Opt(258411))
+        external("p0548", col, "miplib3/p0548", Category.OPTIMIZATION, Expected.Opt(8691))
     }
 
     // --- SAT performance datasets ---
@@ -632,6 +659,13 @@ internal object ExternalCollections {
             "current MiniZinc live in this derived copy",
         fetch = FetchMethod.GitClone(depth = 1),
         includeDirs = listOf("minizinc/lib"),
+    )
+    val miplib3 = ExternalCollection(
+        id = "miplib3",
+        url = "https://miplib2010.zib.de/miplib3/miplib3.tar.gz",
+        license = "MIPLIB 3.0 (public academic benchmark)",
+        reason = "65-instance classic MIP library; the pure-integer subset is fetched rather than vendored",
+        fetch = FetchMethod.Tarball,
     )
     val satlibUf20 = ExternalCollection(
         id = "satlib-uf20-91",

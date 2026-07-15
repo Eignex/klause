@@ -27,6 +27,12 @@ Vendored directories and their provenance:
   infeasible, and a disjunction.
 - `xcsp3/` (XCSP3): self-authored, internal — magic series, sum COP, 3x3 magic
   square, graph colouring.
+- `mps/` (MPS / MIP): self-authored, internal — four tiny instances covering the
+  MPS front-end's distinct paths: an integer optimisation (`blend-tiny`), an
+  integer feasibility with an equality row (`feasible-tiny`), a bounded-float
+  column that is bucketed (`float-tiny`), and an infeasible integer model
+  (`infeasible-tiny`). The classic MIPLIB 3.0 set is fetched, not vendored (see
+  the `miplib3` collection in `catalog/Suites.kt`).
 
 MiniZinc smoke models are not copied here. They live at
 `klause-mzn-lib/test-models/` and are referenced by the `mzn-smoke` suite; they
