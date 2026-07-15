@@ -785,11 +785,21 @@ object Xcsp3 {
         // pattern `^base\[…]$` can only match cells of that base, so expansion filters this bucket
         // instead of every declared variable, turning an O(references × variables) scan (pathological
         // with a large array) into O(cells of the base).
-        private val cellsByBase: HashMap<String, ArrayList<String>> by lazy(LazyThreadSafetyMode.NONE) {
-            val index = HashMap<String, ArrayList<String>>()
+        // Each cell name paired with its bracket indices, parsed once at index-build time so reference
+        // expansion never re-parses a cell's `[i][j]` per token — the array-heavy hot path (BusScheduling).
+        private class BaseCells {
+            val names = ArrayList<String>()
+            val indices = ArrayList<IntArray>()
+        }
+
+        private val cellsByBase: HashMap<String, BaseCells> by lazy(LazyThreadSafetyMode.NONE) {
+            val index = HashMap<String, BaseCells>()
             for (name in varIds.keys) {
                 val br = name.indexOf('[')
-                if (br > 0) index.getOrPut(name.substring(0, br)) { ArrayList() }.add(name)
+                if (br <= 0) continue
+                val bucket = index.getOrPut(name.substring(0, br)) { BaseCells() }
+                bucket.names.add(name)
+                bucket.indices.add(bracketInts(name))
             }
             index
         }
@@ -801,7 +811,9 @@ object Xcsp3 {
             val base = tok.substring(0, br)
             val specs = parseBracketSpecs(tok, br) ?: return listOf(tok)
             val cells = cellsByBase[base] ?: return emptyList()
-            return cells.filter { cellMatches(it, specs) }
+            val out = ArrayList<String>()
+            for (i in cells.names.indices) if (cellMatches(cells.indices[i], specs)) out.add(cells.names[i])
+            return out
         }
 
         /** The bracket groups of a reference token from [from] as per-dimension `[lo, hi]` bounds: a fixed
@@ -834,10 +846,9 @@ object Xcsp3 {
             return specs.ifEmpty { null }
         }
 
-        /** Whether cell [name] (same array base as the reference, so only its indices matter) satisfies
-         *  every per-dimension bound in [specs]. */
-        private fun cellMatches(name: String, specs: List<IntArray>): Boolean {
-            val idx = bracketInts(name)
+        /** Whether a cell's pre-parsed bracket indices [idx] (same array base as the reference, so only
+         *  the indices matter) satisfy every per-dimension bound in [specs]. */
+        private fun cellMatches(idx: IntArray, specs: List<IntArray>): Boolean {
             if (idx.size != specs.size) return false
             for (k in specs.indices) if (idx[k] < specs[k][0] || idx[k] > specs[k][1]) return false
             return true
