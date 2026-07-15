@@ -149,6 +149,5 @@ private fun componentObjective(model: LpModel, cols: IntArrayList, cancellation:
         sense = model.sense,
         tag = tag,
     )
-    val result = RevisedSimplex(sub, cancellation).solve() ?: return null
-    return integerCertify(sub, result.duals)
+    return solveAndCertify(sub, cancellation = cancellation).certificate
 }
