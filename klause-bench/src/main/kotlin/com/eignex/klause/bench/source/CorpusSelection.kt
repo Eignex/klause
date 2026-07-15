@@ -129,7 +129,7 @@ internal object CorpusSelection {
             val familyOf: (String) -> String = { it.substringBefore('/') },
         ) : Layout {
             override fun discover(root: File): List<Discovered> {
-                val base = File(root, subDir)
+                val base = if (subDir.isEmpty()) root else File(root, subDir)
                 if (!base.isDirectory) return emptyList()
                 return base.walkTopDown()
                     .filter { it.isFile && it.extension == ext }

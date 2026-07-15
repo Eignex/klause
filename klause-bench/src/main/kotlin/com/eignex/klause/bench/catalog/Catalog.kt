@@ -108,6 +108,10 @@ internal data class ExternalCollection(
     /** Extra include directories (relative to the fetched root) added to the `minizinc` search
      *  path via `-I`, for a corpus that keeps shared included files in a common dir. */
     val includeDirs: List<String> = emptyList(),
+    /** When set, extracted files larger than this many MB are dropped before decompressing — for a
+     *  huge archive (e.g. MIPLIB's `collection.zip`) whose giant instances would bloat the cache and
+     *  only ever time out. Filters on the compressed size, so it runs before the `.gz` expansion. */
+    val maxFileMb: Int? = null,
 )
 
 /** Where a problem's bytes come from. Resolved to a concrete file by `source.CorpusFetcher`. */
