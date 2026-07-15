@@ -3,9 +3,11 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -218,5 +220,111 @@ class StructuralReductionTest {
             ),
         )
         assertTrue(Presolve.reduceStructural(problem).isEmpty, "tasks fit together, so it stays cumulative")
+    }
+
+    private fun pos(v: Int) = Lit.make(v, true)
+
+    private fun pbCardFeasibleCount(problem: Problem, numBool: Int): Int {
+        var count = 0
+        for (mask in 0 until (1 shl numBool)) {
+            val a = BooleanArray(numBool) { (mask shr it) and 1 == 1 }
+            val ok = problem.factors.all { f ->
+                when (f) {
+                    is PseudoBoolean -> {
+                        var s = 0L
+                        for (i in f.literals.indices) {
+                            if (Lit.evaluate(f.literals[i], a[Lit.variable(f.literals[i])])) {
+                                s += f.weights[i]
+                            }
+                        }
+                        when (f.op) {
+                            PbOp.LE -> s <= f.bound
+                            PbOp.GE -> s >= f.bound
+                            PbOp.EQ -> s == f.bound
+                        }
+                    }
+
+                    is Cardinality -> f.literals.count { Lit.evaluate(it, a[Lit.variable(it)]) } in f.min..f.max
+
+                    else -> true
+                }
+            }
+            if (ok) count++
+        }
+        return count
+    }
+
+    private fun theCardinality(problem: Problem): Cardinality = problem.factors.filterIsInstance<Cardinality>().single()
+
+    private fun checkUnitPbBecomesCardinality(numBool: Int, pb: PseudoBoolean): Problem {
+        val problem = Problem(numBool, 0, emptyArray(), listOf(pb))
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertEquals(
+            pbCardFeasibleCount(problem, numBool),
+            pbCardFeasibleCount(out, numBool),
+            "rewrite changed the feasible set",
+        )
+        assertTrue(out.factors.none { it is PseudoBoolean }, "the pseudo-Boolean is rewritten")
+        return out
+    }
+
+    @Test
+    fun `a unit-weight at-most-k pseudo-boolean becomes a cardinality`() {
+        val out = checkUnitPbBecomesCardinality(
+            3,
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2),
+        )
+        val card = theCardinality(out)
+        assertEquals(0, card.min)
+        assertEquals(2, card.max)
+    }
+
+    @Test
+    fun `a unit-weight at-least-k pseudo-boolean becomes a cardinality`() {
+        val out = checkUnitPbBecomesCardinality(
+            3,
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.GE, 2),
+        )
+        val card = theCardinality(out)
+        assertEquals(2, card.min)
+        assertEquals(3, card.max)
+    }
+
+    @Test
+    fun `a unit-weight equality pseudo-boolean becomes an exactly-k cardinality`() {
+        val out = checkUnitPbBecomesCardinality(
+            3,
+            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.EQ, 1),
+        )
+        val card = theCardinality(out)
+        assertEquals(1, card.min)
+        assertEquals(1, card.max)
+    }
+
+    @Test
+    fun `a non-unit pseudo-boolean is left untouched`() {
+        val problem = Problem(
+            2,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(longArrayOf(2, 1), intArrayOf(pos(0), pos(1)), PbOp.LE, 2)),
+        )
+        assertTrue(Presolve.reduceStructural(problem).isEmpty, "a weighted pseudo-Boolean stays as-is")
+    }
+
+    @Test
+    fun `a vacuous unit-weight bound drops the pseudo-boolean`() {
+        // Σlit ≤ 3 over three literals always holds.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 3)),
+        )
+        val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
+        assertTrue(
+            out.factors.none { it is PseudoBoolean || it is Cardinality },
+            "the always-true constraint is dropped",
+        )
     }
 }

@@ -11,6 +11,8 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.FactorReduction
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
@@ -41,6 +43,44 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)
+
+    // Unit weights make `Σ 1·lit ⟨op⟩ bound` a plain count of true literals, i.e. a [Cardinality] — a
+    // single canonical form that shares its dedicated counting propagator and lets an equivalent
+    // pseudo-Boolean and cardinality dedup. (Coefficient strengthening first GCD-reduces equal weights to
+    // unit, so this also catches `Σ c·lit`.) Solution-set exact; a vacuous bound drops the factor, while
+    // an infeasible one is left to propagation. Mixed-polarity literals carry over — [Cardinality] counts
+    // literals, not variables.
+    override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
+        if (weights.any { it != 1L }) return FactorReduction.Unchanged
+        val n = literals.size
+        return when (op) {
+            PbOp.LE -> when {
+                bound >= n -> FactorReduction.Rewrite(emptyList())
+
+                // #true ≤ n always holds
+                bound < 0 -> FactorReduction.Unchanged
+
+                // infeasible; leave to propagation
+                else -> FactorReduction.Rewrite(listOf(Cardinality(literals, min = 0, max = bound.toInt())))
+            }
+
+            PbOp.GE -> when {
+                bound <= 0 -> FactorReduction.Rewrite(emptyList())
+
+                // #true ≥ 0 always holds
+                bound > n -> FactorReduction.Unchanged
+
+                // infeasible
+                else -> FactorReduction.Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = n)))
+            }
+
+            PbOp.EQ -> if (bound in 0..n.toLong()) {
+                FactorReduction.Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = bound.toInt())))
+            } else {
+                FactorReduction.Unchanged // infeasible
+            }
+        }
+    }
 
     override val boolVars: IntArray = literals.litVars()
 
