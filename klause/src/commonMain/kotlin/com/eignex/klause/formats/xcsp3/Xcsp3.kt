@@ -59,6 +59,47 @@ internal fun String.splitWs(): List<String> {
     return out
 }
 
+/** Every `[integer]` group's value in [s], left to right — array `size` dimensions and cell indices.
+ *  Hand-scanned in place of a `\[(\d+)]` findAll. */
+internal fun bracketInts(s: String): IntArray {
+    val out = IntArrayList()
+    var i = 0
+    val n = s.length
+    while (i < n) {
+        if (s[i] != '[') {
+            i++
+            continue
+        }
+        val start = i + 1
+        var j = start
+        while (j < n && s[j] != ']') j++
+        out.add(s.substring(start, j).toInt())
+        i = if (j < n) j + 1 else j
+    }
+    return out.toIntArray()
+}
+
+/** XCSP3 run-length shorthand `vxn` (value `v` repeated `n` times, `n ≥ 0`) as `(v, n)`, or null when
+ *  [tok] is not exactly that shape. Replaces a `(-?\d+)x(\d+)` match. */
+internal fun parseRle(tok: String): Pair<Int, Int>? {
+    val xi = tok.indexOf('x')
+    if (xi <= 0 || xi == tok.length - 1) return null
+    val v = tok.substring(0, xi).toIntOrNull() ?: return null
+    val n = tok.substring(xi + 1).toIntOrNull() ?: return null
+    return if (n < 0) null else v to n
+}
+
+/** Split a `<condition>` `(op, operand)` into operator and operand, trimming whitespace. The first
+ *  comma separates them; the operand may itself hold commas (an `(in, {set})`). */
+internal fun splitCondition(text: String): Pair<String, String> {
+    val t = text.trim()
+    require(t.length >= 2 && t.first() == '(' && t.last() == ')') { "condition '$text'" }
+    val inner = t.substring(1, t.length - 1)
+    val comma = inner.indexOf(',')
+    require(comma >= 0) { "condition '$text'" }
+    return inner.substring(0, comma).trim() to inner.substring(comma + 1).trim()
+}
+
 /** Parser/compiler for the supported XCSP3 integer subset. */
 object Xcsp3 {
     /** Parse XCSP3 [text] into an [Xcsp3Problem]. */
@@ -119,9 +160,9 @@ object Xcsp3 {
 
                 "array" -> {
                     val id = e.attr("id")
-                    val dims = Regex("""\[(\d+)]""").findAll(e.attr("size")).map { it.groupValues[1].toInt() }.toList()
+                    val dims = bracketInts(e.attr("size"))
                     if (dims.isEmpty()) throw UnsupportedXcsp3Exception("array size '${e.attr("size")}'")
-                    arrayDims[id] = dims.toIntArray() // retained so `<matrix>` refs reshape from the shape
+                    arrayDims[id] = dims // retained so `<matrix>` refs reshape from the shape
                     val dom = domainFor(e)
 
                     // Declare one variable per cell of the (possibly multi-dimensional) array,
@@ -293,12 +334,8 @@ object Xcsp3 {
         /** Parse a `<condition>` `(op, rhs)` where rhs is a constant or a variable. Returns the
          *  operator, a constant bound, and the rhs var id when the right-hand side is a variable. */
         internal fun sumCondition(text: String): Triple<LinearOp, Int, Int?> {
-            val m = Regex("""\(\s*(\w+)\s*,\s*(-?\w+(?:\[\d+])*)\s*\)""").find(text)
-                ?: throw UnsupportedXcsp3Exception("condition '$text'")
-            val (op, delta) = relOp(
-                m.groupValues[1],
-            ) ?: throw UnsupportedXcsp3Exception("condition op '${m.groupValues[1]}'")
-            val rhs = m.groupValues[2]
+            val (opTok, rhs) = splitCondition(text)
+            val (op, delta) = relOp(opTok) ?: throw UnsupportedXcsp3Exception("condition op '$opTok'")
             val k = rhs.toIntOrNull()
             return if (k != null) Triple(op, k + delta, null) else Triple(op, delta, ref(rhs))
         }
@@ -306,26 +343,27 @@ object Xcsp3 {
         /** Constrain the linear expression `Σ coeffs·vars` by a `<condition>`: a simple `(op, k|var)`
          *  relation, an `(in, lo..hi)` interval (two bounds), or an `(in, {set})` membership. */
         internal fun postCondition(coeffs: IntArray, vars: IntArray, condText: String) {
-            val interval = Regex("""\(\s*in\s*,\s*(-?\d+)\.\.(-?\d+)\s*\)""").find(condText)
-            if (interval != null) {
-                factors.add(Linear(coeffs, vars, LinearOp.GE, interval.groupValues[1].toInt()))
-                factors.add(Linear(coeffs, vars, LinearOp.LE, interval.groupValues[2].toInt()))
-                return
-            }
-            val set = Regex("""\(\s*in\s*,\s*\{([^}]*)}\s*\)""").find(condText)
-            if (set != null) {
-                val m = if (coeffs.size == 1 && coeffs[0] == 1) {
-                    vars[0]
-                } else {
-                    materializeVar(
-                        LinComb(linMap(coeffs, vars), 0L),
+            val (opTok, operand) = splitCondition(condText)
+            if (opTok == "in") {
+                if (operand.startsWith("{")) {
+                    val m = if (coeffs.size == 1 && coeffs[0] == 1) {
+                        vars[0]
+                    } else {
+                        materializeVar(LinComb(linMap(coeffs, vars), 0L))
+                    }
+                    val members = parseSetMembers(operand.removeSurrounding("{", "}"))
+                    factors.add(
+                        Clause(members.map { reifyLinear(intArrayOf(1), intArrayOf(m), LinearOp.EQ, it) }.toIntArray()),
                     )
+                    return
                 }
-                val members = parseSetMembers(set.groupValues[1])
-                factors.add(
-                    Clause(members.map { reifyLinear(intArrayOf(1), intArrayOf(m), LinearOp.EQ, it) }.toIntArray()),
-                )
-                return
+                val dd = operand.indexOf("..")
+                if (dd >= 0) {
+                    factors.add(Linear(coeffs, vars, LinearOp.GE, operand.substring(0, dd).trim().toInt()))
+                    factors.add(Linear(coeffs, vars, LinearOp.LE, operand.substring(dd + 2).trim().toInt()))
+                    return
+                }
+                throw UnsupportedXcsp3Exception("condition '$condText'")
             }
             val (op, k, rhsVar) = sumCondition(condText)
             if (rhsVar == null) {
@@ -711,10 +749,9 @@ object Xcsp3 {
             val toks = text?.splitWs() ?: return null
             val out = ArrayList<Int>(toks.size)
             for (tok in toks) {
-                val rle = RLE.matchEntire(tok)
+                val rle = parseRle(tok)
                 if (rle != null) {
-                    val v = rle.groupValues[1].toInt()
-                    repeat(rle.groupValues[2].toInt()) { out.add(v) }
+                    repeat(rle.second) { out.add(rle.first) }
                 } else {
                     out.add(tok.toIntOrNull() ?: return null)
                 }
@@ -759,21 +796,51 @@ object Xcsp3 {
 
         internal fun expandNames(tok: String): List<String> {
             if ("[]" !in tok && ".." !in tok) return listOf(tok)
-            val m = ARRAY_REF.find(tok) ?: return listOf(tok)
-            val base = m.groupValues[1]
-            val pattern = StringBuilder("^").append(Regex.escape(base))
-            for (spec in BRACKET.findAll(m.groupValues[2]).map { it.groupValues[1] }) {
-                val range = spec.split("..")
-                val frag = when {
-                    spec.isBlank() -> """\d+"""
-                    range.size == 2 -> "(?:" + (range[0].toInt()..range[1].toInt()).joinToString("|") + ")"
-                    else -> Regex.escape(spec)
-                }
-                pattern.append("""\[""").append(frag).append(']')
-            }
-            val rx = Regex(pattern.append('$').toString())
+            val br = tok.indexOf('[')
+            if (br <= 0) return listOf(tok)
+            val base = tok.substring(0, br)
+            val specs = parseBracketSpecs(tok, br) ?: return listOf(tok)
             val cells = cellsByBase[base] ?: return emptyList()
-            return cells.filter { rx.matches(it) }
+            return cells.filter { cellMatches(it, specs) }
+        }
+
+        /** The bracket groups of a reference token from [from] as per-dimension `[lo, hi]` bounds: a fixed
+         *  `[i]` → `[i, i]`, a range `[lo..hi]` → `[lo, hi]`, a wildcard `[]` → the full integer range. Null
+         *  when the tail is not a clean run of `[...]` groups (the caller then keeps the token verbatim). */
+        private fun parseBracketSpecs(tok: String, from: Int): List<IntArray>? {
+            val specs = ArrayList<IntArray>()
+            var i = from
+            val n = tok.length
+            while (i < n) {
+                if (tok[i] != '[') return null
+                val close = tok.indexOf(']', i + 1)
+                if (close < 0) return null
+                val inner = tok.substring(i + 1, close)
+                val dd = inner.indexOf("..")
+                specs.add(
+                    when {
+                        inner.isEmpty() -> intArrayOf(Int.MIN_VALUE, Int.MAX_VALUE)
+
+                        dd >= 0 -> intArrayOf(
+                            inner.substring(0, dd).toIntOrNull() ?: return null,
+                            inner.substring(dd + 2).toIntOrNull() ?: return null,
+                        )
+
+                        else -> (inner.toIntOrNull() ?: return null).let { intArrayOf(it, it) }
+                    },
+                )
+                i = close + 1
+            }
+            return specs.ifEmpty { null }
+        }
+
+        /** Whether cell [name] (same array base as the reference, so only its indices matter) satisfies
+         *  every per-dimension bound in [specs]. */
+        private fun cellMatches(name: String, specs: List<IntArray>): Boolean {
+            val idx = bracketInts(name)
+            if (idx.size != specs.size) return false
+            for (k in specs.indices) if (idx[k] < specs[k][0] || idx[k] > specs[k][1]) return false
+            return true
         }
         internal fun ref(name: String): Int = varIds[name] ?: throw UnsupportedXcsp3Exception(
             "unknown variable '$name'",
@@ -818,11 +885,10 @@ object Xcsp3 {
         }
 
         internal fun condition(text: String): Pair<LinearOp, Int> {
-            val m = Regex("""\(\s*(\w+)\s*,\s*(-?\d+)\s*\)""").find(text)
+            val (opTok, rhs) = splitCondition(text)
+            val (op, delta) = relOp(opTok) ?: throw UnsupportedXcsp3Exception("condition op '$opTok'")
+            val k = rhs.toIntOrNull()
                 ?: throw UnsupportedXcsp3Exception("condition '$text' (only (op,const) supported)")
-            val k = m.groupValues[2].toInt()
-            val (op, delta) = relOp(m.groupValues[1])
-                ?: throw UnsupportedXcsp3Exception("condition op '${m.groupValues[1]}'")
             return op to (k + delta)
         }
 
@@ -842,9 +908,6 @@ object Xcsp3 {
         companion object {
             internal val REL = setOf("eq", "ne", "le", "lt", "ge", "gt")
             internal val BOOL_FNS = setOf("and", "or", "not", "imp", "iff", "xor")
-            internal val ARRAY_REF = Regex("""^([^\[]+)((?:\[[^\]]*])+)$""")
-            internal val BRACKET = Regex("""\[([^\]]*)]""")
-            internal val RLE = Regex("""(-?\d+)x(\d+)""")
         }
     }
 }
