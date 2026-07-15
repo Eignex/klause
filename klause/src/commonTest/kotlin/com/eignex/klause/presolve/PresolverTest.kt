@@ -42,6 +42,7 @@ class PresolverTest {
             PresolvePass.DERIVE_XOR_UNITS,
             PresolvePass.FUSE_LINEAR_BOUNDS,
             PresolvePass.ELIMINATE_AFFINE_SINGLETONS,
+            PresolvePass.AGGREGATE_SUB_SUMS,
             PresolvePass.REMOVE_REDUNDANT,
             PresolvePass.REDUCE_STRUCTURAL,
             PresolvePass.MERGE_DUPLICATE_COLUMNS,

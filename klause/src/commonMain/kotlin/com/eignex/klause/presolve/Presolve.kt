@@ -50,6 +50,10 @@ object Presolve {
      *  cross). See [LinearBoundFusion]. */
     fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
 
+    /** Common linear sub-sum extraction — fold a sub-sum an equality defines as one variable back into
+     *  the rows that contain it. See [LinearSubSumAggregation]. */
+    fun aggregateSubSums(problem: Problem): PassDelta = LinearSubSumAggregation.aggregateSubSums(problem)
+
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
      *  objective). See [SingletonInequalityProjection]. */
     fun projectSingletonInequalities(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
