@@ -174,39 +174,37 @@ internal class GlobalCardinalityPropagator(
         }
         val source = 0
         val sink = 1
-        val varNode = IntArray(n) { 2 + it }
-        val covNode = IntArray(m) { 2 + n + it }
+        // Node ids: variable i is `2 + i`, cover value k is `2 + n + k` (inlined, no per-fire arrays).
         val otherNode = if (anyOther) 2 + n + m else -1
         val baseNodes = 2 + n + m + (if (anyOther) 1 else 0)
         val superSource = baseNodes
         val superSink = baseNodes + 1
         val totalNodes = baseNodes + 2
         val flow = cache.flow.also { it.reset(totalNodes) }
-        val excess = IntArray(totalNodes)
-        val xToCovEdgeIdx = Array(n) { IntArray(m) { -1 } }
-        val xToOtherEdgeIdx = IntArray(n) { -1 }
+        val excess = cache.excess(totalNodes)
+        val xToCovEdgeIdx = cache.xToCov(n, m) // flattened i*m + k → edge index (-1 = no edge)
+        val xToOtherEdgeIdx = cache.xToOther(n)
         for (i in 0 until n) {
             excess[source] -= 1
-            excess[varNode[i]] += 1
-            flow.addEdge(source, varNode[i], 0)
+            excess[2 + i] += 1
+            flow.addEdge(source, 2 + i, 0)
         }
         for (i in 0 until n) {
             val d = state.intDomains[effectiveXs[i]]
             for (k in 0 until m) {
                 if (cover[k] in d) {
-                    val eIdx = flow.addEdge(varNode[i], covNode[k], 1)
-                    xToCovEdgeIdx[i][k] = eIdx
+                    xToCovEdgeIdx[i * m + k] = flow.addEdge(2 + i, 2 + n + k, 1)
                 }
             }
             if (otherNode != -1 && hasOtherVar[i]) {
-                xToOtherEdgeIdx[i] = flow.addEdge(varNode[i], otherNode, 1)
+                xToOtherEdgeIdx[i] = flow.addEdge(2 + i, otherNode, 1)
             }
         }
         for (k in 0 until m) {
             if (lo[k] > hi[k]) return false
-            excess[covNode[k]] -= lo[k]
+            excess[2 + n + k] -= lo[k]
             excess[sink] += lo[k]
-            flow.addEdge(covNode[k], sink, hi[k] - lo[k])
+            flow.addEdge(2 + n + k, sink, hi[k] - lo[k])
         }
         if (otherNode != -1) {
             flow.addEdge(otherNode, sink, n)
@@ -229,8 +227,8 @@ internal class GlobalCardinalityPropagator(
             val assign = cache.flowAssign ?: RevIntArray(state, n, -1).also { cache.flowAssign = it }
             for (i in 0 until n) {
                 val k = assign[i]
-                if (k in 0 until m && xToCovEdgeIdx[i][k] >= 0) {
-                    flow.augmentThroughEdge(superSource, superSink, varNode[i], covNode[k])
+                if (k in 0 until m && xToCovEdgeIdx[i * m + k] >= 0) {
+                    flow.augmentThroughEdge(superSource, superSink, 2 + i, 2 + n + k)
                 }
             }
         }
@@ -238,7 +236,7 @@ internal class GlobalCardinalityPropagator(
         if (obtained < requiredSSFlow) {
             val reach = flow.residualReachable(superSource)
             val resp = IntArrayList()
-            for (i in 0 until n) if (reach[varNode[i]]) resp.add(effectiveXs[i])
+            for (i in 0 until n) if (reach[2 + i]) resp.add(effectiveXs[i])
             if (cvArr != null) for (k in 0 until m) resp.add(cvArr[k])
             if (resp.size > 0) cache.conflictVars = resp.toIntArray()
             return false
@@ -247,7 +245,7 @@ internal class GlobalCardinalityPropagator(
             for (i in 0 until n) {
                 var chosen = -1
                 for (k in 0 until m) {
-                    val e = xToCovEdgeIdx[i][k]
+                    val e = xToCovEdgeIdx[i * m + k]
                     if (e >= 0 && flow.flowOf(e) > 0) {
                         chosen = k
                         break
@@ -260,14 +258,14 @@ internal class GlobalCardinalityPropagator(
         flow.computeSccResidual(baseNodes, sccId)
         for (i in 0 until n) {
             for (k in 0 until m) {
-                val eIdx = xToCovEdgeIdx[i][k]
+                val eIdx = xToCovEdgeIdx[i * m + k]
                 if (eIdx < 0) continue
                 if (flow.flowOf(eIdx) > 0) continue
-                if (sccId[varNode[i]] == sccId[covNode[k]]) continue
+                if (sccId[2 + i] == sccId[2 + n + k]) continue
                 if (!state.excludeIntValue(effectiveXs[i], cover[k], gccAntecedents)) return false
             }
             val oIdx = xToOtherEdgeIdx[i]
-            if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[varNode[i]] != sccId[otherNode]) {
+            if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[2 + i] != sccId[otherNode]) {
                 val d = state.intDomains[effectiveXs[i]]
                 val toRemove = LongArrayList()
                 d.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
