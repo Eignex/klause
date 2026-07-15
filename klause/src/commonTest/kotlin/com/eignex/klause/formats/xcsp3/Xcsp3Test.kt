@@ -7,6 +7,7 @@ import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.LexLess
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
@@ -504,6 +505,26 @@ class Xcsp3Test {
             """.trimIndent(),
         )
         assertEquals(2, setOf(v[0], v[1], v[2]).size)
+    }
+
+    @Test
+    fun `nValues with a constant bound uses the native factor and enforces the count`() {
+        val xml = """
+            <instance type="CSP"><variables><array id="x" size="[3]"> 0..2 </array></variables>
+            <constraints><nValues><list> x[] </list><condition> (gt,1) </condition></nValues></constraints></instance>
+        """.trimIndent()
+        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is NValue }, "constant bound should use native NValue")
+        val v = sat(xml)
+        assertTrue(setOf(v[0], v[1], v[2]).size > 1, "at least two distinct values")
+    }
+
+    @Test
+    fun `nValues with a variable bound keeps the decomposition`() {
+        val xml = """
+            <instance type="CSP"><variables><array id="x" size="[3]"> 0..2 </array><var id="z"> 2..2 </var></variables>
+            <constraints><nValues><list> x[] </list><condition> (eq,z) </condition></nValues></constraints></instance>
+        """.trimIndent()
+        assertTrue(Xcsp3.parse(xml).problem.factors.none { it is NValue }, "variable bound keeps the decomposition")
     }
 
     @Test

@@ -10,6 +10,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.LexLess
+import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
@@ -932,9 +933,21 @@ internal fun Xcsp3.Builder.knapsack(e: XmlElement) {
 /** `nValues`: the number of distinct values taken across the list — excluding any `<except>`
  *  values — meets the condition. */
 internal fun Xcsp3.Builder.nValues(e: XmlElement) {
-    val except = (parseInts(e.child("except")?.textContent)?.toSet()).orEmpty()
-    val cnt = distinctCountVar(listVars(e), except)
-    postCondition(intArrayOf(1), intArrayOf(cnt), requireNotNull(e.child("condition")).textContent.trim())
+    val vars = listVars(e)
+    val condText = requireNotNull(e.child("condition")).textContent.trim()
+    // Use one native [NValue] factor only when the count meets a CONSTANT bound and there is no <except>.
+    // It replaces the `Σ used[v]` decomposition (an equality reified per (value, variable) pair —
+    // O(range × arity) factors, the dominant build+bake cost on nValues-heavy models). A variable operand
+    // (e.g. `(eq, z)` with z the minimized objective in BinPacking2) keeps the decomposition, whose
+    // per-value indicators give the objective a tight linear relaxation the monolithic factor lacks;
+    // <except> also keeps it, since the native factor counts every distinct value.
+    val constBound = splitCondition(condText).second.toIntOrNull() != null
+    val cnt = if (constBound && e.child("except") == null) {
+        newAuxVar(0L, vars.size.toLong()).also { factors.add(NValue(n = it, xs = vars, mode = NValue.Mode.Eq)) }
+    } else {
+        distinctCountVar(vars, (parseInts(e.child("except")?.textContent)?.toSet()).orEmpty())
+    }
+    postCondition(intArrayOf(1), intArrayOf(cnt), condText)
 }
 
 /** A fresh int var equal to the count of distinct values taken across [vars], decomposed as
