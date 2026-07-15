@@ -688,6 +688,24 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `element over a constant list uses the constant-array factor and selects the value`() {
+        val xml = """
+            <instance type="CSP">
+              <variables>
+                <var id="i"> 0..2 </var><var id="v"> 0..100 </var>
+              </variables>
+              <constraints>
+                <element startIndex="0"><list> 10 20 30 </list><index> i </index><value> v </value></element>
+                <intension> eq(i,1) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Element && !it.arrIsVars })
+        val v = sat(xml)
+        assertEquals(20, v[1])
+    }
+
+    @Test
     fun `element with a condition constrains the selected value`() {
         // t = [1,3,1]; only index 1 selects a value > 2, so the condition forces i = 1.
         val v = sat(

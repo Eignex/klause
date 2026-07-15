@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.propagation.excludeIntValues
+import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -127,6 +128,11 @@ internal class ElementConstState(
         for (id in 0 until numValues) supportCount[id] = counts[id]
         valid.set(1)
 
+        // Root fast path: at decision level 0 no reason is ever consumed (an unconditional root fact
+        // needs none), so restrict both domains to their survivor SETS in one O(#distinct-values) step
+        // instead of scanning the full result span and excluding each unsupported value one by one.
+        if (state.currentLevel == 0) return seedRestrictAtRoot(state, idxDom, resDom, counts)
+
         // Seed: idx positions whose constant is not a live result value, and result values with no
         // supporting position (no constant, or zero live positions). Applying them feeds the cascade.
         val idxSeed = LongArrayList()
@@ -140,6 +146,41 @@ internal class ElementConstState(
             if (id < 0 || counts[id] == 0) resSeed.add(rv)
         }
         return applyThenCascade(state, idxSeed, resSeed)
+    }
+
+    /**
+     * Level-0 GAC by direct survivor-set restriction (see [rebuild]). A constant value-id survives iff
+     * it has a live supporting idx position ([counts] > 0) and is still a live result value; result
+     * keeps exactly those constants, idx keeps exactly the positions holding one of them. Removing the
+     * other idx positions cannot drop a surviving constant's support (its positions all remain), so this
+     * single two-sided restriction is the fixpoint — no cascade needed. [supportCount] is left matching
+     * the restricted domains (survivors keep their count, the rest drop to zero) for any later level-0
+     * delta fire. O(#distinct-values + idx positions), not O(result span).
+     */
+    private fun seedRestrictAtRoot(
+        state: PropagationState,
+        idxDom: IntDomain,
+        resDom: IntDomain,
+        counts: IntArray,
+    ): Boolean {
+        val idSurvives = BooleanArray(numValues)
+        val resSurvivors = LongArrayList()
+        for (id in 0 until numValues) {
+            if (counts[id] > 0 && valueOfId[id] in resDom) {
+                idSurvives[id] = true
+                resSurvivors.add(valueOfId[id])
+            } else {
+                supportCount[id] = 0
+            }
+        }
+        if (!state.restrictIntToSurvivors(result, resSurvivors.toSortedLongArray())) return false
+        // idxDom.forEach is ascending, so the collected survivors are already sorted for the restriction.
+        val idxSurvivors = LongArrayList()
+        idxDom.forEach { iv ->
+            val pos = iv - indexOffset
+            if (pos in 0 until len && idSurvives[idOfPos[pos.toInt()]]) idxSurvivors.add(iv)
+        }
+        return state.restrictIntToSurvivors(idx, idxSurvivors.toLongArray())
     }
 
     /** Incremental fire: account only for the values removed since the last fixpoint, then cascade. */
