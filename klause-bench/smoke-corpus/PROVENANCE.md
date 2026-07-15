@@ -31,8 +31,9 @@ Vendored directories and their provenance:
   MPS front-end's distinct paths: an integer optimisation (`blend-tiny`), an
   integer feasibility with an equality row (`feasible-tiny`), a bounded-float
   column that is bucketed (`float-tiny`), and an infeasible integer model
-  (`infeasible-tiny`). The classic MIPLIB 3.0 set is fetched, not vendored (see
-  the `miplib3` collection in `catalog/Suites.kt`).
+  (`infeasible-tiny`). These are CI smoke instances only — the MPS reference
+  oracle is the fetched MIPLIB 2017 corpus (see the `miplib2017` collection in
+  `catalog/Suites.kt`), not vendored here.
 
 MiniZinc smoke models are not copied here. They live at
 `klause-mzn-lib/test-models/` and are referenced by the `mzn-smoke` suite; they

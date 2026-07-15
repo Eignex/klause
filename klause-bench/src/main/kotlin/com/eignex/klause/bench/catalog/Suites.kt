@@ -31,7 +31,7 @@ internal object Suites {
     val all: List<Suite> by lazy {
         listOf(
             handwrittenCore, slackAllDifferent, dimacsCore, wcnfCore, opbCore, schemaCore,
-            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satlibUf20, satLadder, satCrafted, miplib3,
+            smtlibCore, xcsp3Core, mpsCore, mznSmoke, satlibUf20, satLadder, satCrafted,
         )
     }
 
@@ -75,6 +75,18 @@ internal object Suites {
                     CorpusSelection.Selection.fromProps(),
                     Category.CSP,
                     format = Format.SMTLIB_QF_LIA,
+                )
+            },
+            DynamicSuite(
+                "miplib2017",
+                "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; cap with max=/per-family=)",
+            ) {
+                CorpusSelection.select(
+                    ExternalCollections.miplib2017,
+                    CorpusSelection.Layout.Flat("", "mps"),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.OPTIMIZATION,
+                    format = Format.MPS,
                 )
             },
             DynamicSuite(
@@ -548,24 +560,6 @@ internal object Suites {
         }
     }
 
-    private val miplib3 = suite("miplib3", "MIPLIB 3.0 pure-integer (0/1) MIP instances (auto-fetched)") {
-        // The CONT=0 subset of the classic 1996 library — instances with no continuous columns, which
-        // klause (integer-only) accepts natively; optima are from the MIPLIB 3.0 catalog. Members are
-        // extension-less under the archive's `miplib3/` directory.
-        format = Format.MPS
-        val col = ExternalCollections.miplib3
-        external("stein27", col, "miplib3/stein27", Category.OPTIMIZATION, Expected.Opt(18))
-        external("p0033", col, "miplib3/p0033", Category.OPTIMIZATION, Expected.Opt(3089))
-        external("stein45", col, "miplib3/stein45", Category.OPTIMIZATION, Expected.Opt(30))
-        external("lseu", col, "miplib3/lseu", Category.OPTIMIZATION, Expected.Opt(1120))
-        external("enigma", col, "miplib3/enigma", Category.OPTIMIZATION, Expected.Opt(0))
-        external("mod008", col, "miplib3/mod008", Category.OPTIMIZATION, Expected.Opt(307))
-        external("gt2", col, "miplib3/gt2", Category.OPTIMIZATION, Expected.Opt(21166))
-        external("p0201", col, "miplib3/p0201", Category.OPTIMIZATION, Expected.Opt(7615))
-        external("p0282", col, "miplib3/p0282", Category.OPTIMIZATION, Expected.Opt(258411))
-        external("p0548", col, "miplib3/p0548", Category.OPTIMIZATION, Expected.Opt(8691))
-    }
-
     // --- SAT performance datasets ---
 
     /** SATLIB random-3SAT phase-transition ladder (uf=SAT, uuf=UNSAT), V=50…250 — labelled
@@ -660,12 +654,14 @@ internal object ExternalCollections {
         fetch = FetchMethod.GitClone(depth = 1),
         includeDirs = listOf("minizinc/lib"),
     )
-    val miplib3 = ExternalCollection(
-        id = "miplib3",
-        url = "https://miplib2010.zib.de/miplib3/miplib3.tar.gz",
-        license = "MIPLIB 3.0 (public academic benchmark)",
-        reason = "65-instance classic MIP library; the pure-integer subset is fetched rather than vendored",
-        fetch = FetchMethod.Tarball,
+    val miplib2017 = ExternalCollection(
+        id = "miplib2017",
+        url = "https://miplib.zib.de/downloads/collection.zip",
+        license = "MIPLIB 2017 (academic; freely available for research)",
+        reason = "1065-instance MIP library; the full collection.zip (~3.5GB) is fetched once, then " +
+            "filtered to the <=16MB instances (SCIP references all, klause solves the bounded/integer subset)",
+        fetch = FetchMethod.Zip,
+        maxFileMb = 16,
     )
     val satlibUf20 = ExternalCollection(
         id = "satlib-uf20-91",

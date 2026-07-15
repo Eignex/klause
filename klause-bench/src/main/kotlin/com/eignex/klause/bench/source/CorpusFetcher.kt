@@ -135,10 +135,20 @@ internal object CorpusFetcher {
         URI(c.url).toURL().openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
         run("unzip", "-q", "-o", zip.absolutePath, "-d", dir.absolutePath)
         zip.delete()
+        dropOversized(c, dir)
         // Competition archives ship instances individually compressed (XCSP3 `*.xml.lzma`, MaxSAT
         // `*.wcnf.xz`); unzip leaves them packed, so decompress in place to the plain file the
         // front-end reads. A no-op for archives with no compressed members.
         decompressInPlace(dir)
+    }
+
+    /** Drop extracted files over [ExternalCollection.maxFileMb] (measured on the still-compressed
+     *  size) before the `.gz` expansion, so a huge archive's giant members never inflate the cache. */
+    private fun dropOversized(c: ExternalCollection, dir: File) {
+        val cap = c.maxFileMb?.let { it * 1024L * 1024 } ?: return
+        val victims = dir.walkTopDown().filter { it.isFile && it.length() > cap }.toList()
+        victims.forEach { it.delete() }
+        if (victims.isNotEmpty()) log("dropped ${victims.size} file(s) over ${c.maxFileMb}MB from '${c.id}'")
     }
 
     /** Decompress every individually-compressed instance under [dir] in place, stripping the
