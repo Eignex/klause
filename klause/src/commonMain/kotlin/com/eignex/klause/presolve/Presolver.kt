@@ -329,6 +329,20 @@ enum class PresolvePass(
         )
     },
 
+    /** Common linear sub-sum extraction — the contract-direction mirror of [ELIMINATE_AFFINE_SINGLETONS].
+     *  A sub-sum a unit-pivot equality defines as a single variable is folded back into every other row
+     *  that contains it, collapsing the partner terms into one variable. Solution-set exact (the defining
+     *  equality is retained, no variable eliminated). Runs before [REMOVE_REDUNDANT] so shrunk rows dedup. */
+    AGGREGATE_SUB_SUMS(
+        "aggregate",
+        Stage.PROBLEM,
+        PresolveTiming.MEDIUM,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.aggregateSubSums(problem)
+    },
+
     /** Constraint subsumption / redundant-constraint removal (#447) — drops duplicate factors and
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
