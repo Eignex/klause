@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
@@ -419,7 +420,93 @@ object Xcsp3 {
                     !constRelationHolds(r.op, r.bound) -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
                 }
             } else {
-                factors.add(Clause(intArrayOf(compileBool(node))))
+                // A Boolean combination that is a plain disjunction/implication of single-variable
+                // comparisons is the constraint itself (a [ComparisonClause]) — lowering it directly
+                // avoids a reifying indicator + [ReifiedLinear] per comparison. Anything else keeps the
+                // general Tseitin path.
+                val cc = tryComparisonClause(node)
+                if (cc != null) factors.add(cc) else factors.add(Clause(intArrayOf(compileBool(node))))
+            }
+        }
+
+        /**
+         * [node] as a [ComparisonClause] when it is a disjunction (directly, or via `imp`/`not`) of at
+         * least two single-variable comparisons against constants; `null` otherwise (the caller keeps the
+         * Tseitin path). A single comparison stays on the cheaper [Linear] path, and a negated disjunction
+         * (`¬(a ∨ b)` is a conjunction) is declined since it is not a clause.
+         */
+        private fun tryComparisonClause(node: FExpr): ComparisonClause? {
+            val vars = IntArrayList()
+            val ops = ArrayList<LinearOp>()
+            val consts = ArrayList<Long>()
+            if (!collectClauseLiterals(node, negated = false, vars, ops, consts)) return null
+            if (vars.size < 2) return null
+            return ComparisonClause(vars.toIntArray(), ops.toTypedArray(), consts.toLongArray())
+        }
+
+        private fun collectClauseLiterals(
+            node: FExpr,
+            negated: Boolean,
+            vars: IntArrayList,
+            ops: MutableList<LinearOp>,
+            consts: MutableList<Long>,
+        ): Boolean {
+            if (node !is FExpr.Call) return false
+            when (node.fn) {
+                "not" -> return node.args.size == 1 && collectClauseLiterals(node.args[0], !negated, vars, ops, consts)
+
+                // ¬(a ∨ b) is a conjunction, not a clause.
+                "or" -> return !negated && node.args.all { collectClauseLiterals(it, false, vars, ops, consts) }
+
+                // a ⇒ b ≡ ¬a ∨ b; ¬(a ⇒ b) is a conjunction.
+                "imp" ->
+                    return !negated && node.args.size == 2 &&
+                        collectClauseLiterals(node.args[0], true, vars, ops, consts) &&
+                        collectClauseLiterals(node.args[1], false, vars, ops, consts)
+
+                in REL -> {
+                    if (node.args.size != 2) return false
+                    val lit = singleVarComparison(node) ?: return false
+                    val (v, op, c) = if (negated) negateComparison(lit) else lit
+                    vars.add(v)
+                    ops.add(op)
+                    consts.add(c)
+                    return true
+                }
+
+                else -> return false
+            }
+        }
+
+        /** `node` as a single-variable comparison `(var, op, const)` with unit coefficient (a `-1`
+         *  coefficient is folded by flipping the operator and negating the bound), or `null`. */
+        private fun singleVarComparison(node: FExpr.Call): Triple<Int, LinearOp, Long>? {
+            val r = relationParts(node)
+            if (r.vars.size != 1) return null
+            val bound = r.bound.toLong()
+            return when (r.coeffs[0]) {
+                1 -> Triple(r.vars[0], r.op, bound)
+                -1 -> Triple(r.vars[0], r.op.flipSign(), -bound)
+                else -> null
+            }
+        }
+
+        private fun LinearOp.flipSign(): LinearOp = when (this) {
+            LinearOp.LE -> LinearOp.GE
+            LinearOp.GE -> LinearOp.LE
+            LinearOp.EQ -> LinearOp.EQ
+            LinearOp.NE -> LinearOp.NE
+        }
+
+        /** The complement of a single-variable comparison: `¬(x ≤ c) = x ≥ c+1`, `¬(x ≥ c) = x ≤ c−1`,
+         *  `¬(x = c) = x ≠ c`, `¬(x ≠ c) = x = c`. */
+        private fun negateComparison(lit: Triple<Int, LinearOp, Long>): Triple<Int, LinearOp, Long> {
+            val (v, op, c) = lit
+            return when (op) {
+                LinearOp.LE -> Triple(v, LinearOp.GE, c + 1)
+                LinearOp.GE -> Triple(v, LinearOp.LE, c - 1)
+                LinearOp.EQ -> Triple(v, LinearOp.NE, c)
+                LinearOp.NE -> Triple(v, LinearOp.EQ, c)
             }
         }
 
