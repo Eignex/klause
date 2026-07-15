@@ -63,6 +63,10 @@ object Presolve {
      *  See [StructuralReduction]. */
     fun reduceStructural(problem: Problem): PassDelta = StructuralReduction.reduce(problem)
 
+    /** Fold a reified comparison disjunction (a clause over sole-use single-variable reified-comparison
+     *  indicators) into one [com.eignex.klause.factor.arithmetic.ComparisonClause]. See [ComparisonClauseFold]. */
+    fun foldComparisonClauses(problem: Problem): PassDelta = ComparisonClauseFold.fold(problem)
+
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,
      *  for clique-aware consumers such as local search. See [PresolveShared]. */

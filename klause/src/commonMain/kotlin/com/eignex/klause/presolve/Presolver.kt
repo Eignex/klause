@@ -367,6 +367,21 @@ enum class PresolvePass(
         override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.reduceStructural(problem)
     },
 
+    /** Fold a reified comparison disjunction — a clause over sole-use single-variable reified-comparison
+     *  indicators — into one [com.eignex.klause.factor.arithmetic.ComparisonClause], dropping the
+     *  indicator auxiliaries. The XCSP3 front-end emits the clause directly; this catches the reified
+     *  form other front-ends produce. Not solution-set preserving (the dropped indicators are left
+     *  unconstrained, like affine elimination), so it is gated off under `-a` / `-n N>1`. */
+    FOLD_COMPARISON_CLAUSES(
+        "comparison-clause",
+        Stage.PROBLEM,
+        PresolveTiming.FAST,
+        preservesSolutionSet = false,
+        autoEligible = true,
+    ) {
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.foldComparisonClauses(problem)
+    },
+
     /** Duplicate / parallel column aggregation — the column-side mirror of [REMOVE_REDUNDANT]. Folds
      *  two integer variables with coinciding columns into one aggregate, reconstructing the dropped
      *  variable from the aggregate's value. Like [ELIMINATE_AFFINE_SINGLETONS] the dropped variable is
