@@ -4,6 +4,7 @@ import com.eignex.klause.formats.ObjectiveSense
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -43,6 +44,45 @@ class MpsLoweringTest {
         assertTrue(compiled.clamped)
         assertEquals(-1000L, compiled.problem.intDomains[0].min)
         assertEquals(1000L, compiled.problem.intDomains[0].max)
+    }
+
+    @Test
+    fun `OBBT bounds an unbounded integer side a constraint bounds instead of clamping`() {
+        val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(MpsVar("x", integer = true, lower = 0.0, upper = null)),
+            listOf(row),
+        )
+        val searchBound = 1_000_000L
+        val d = m.toProblem(searchBound = searchBound).let {
+            assertFalse(it.clamped)
+            it.problem.intDomains[0]
+        }
+        // x >= 0, x <= 5: OBBT derives a real (if loose) finite upper — sound (>= 5) and below the clamp.
+        assertEquals(0L, d.min)
+        assertTrue(d.max in 5L until searchBound, "upper ${d.max} not a sound sub-clamp bound")
+    }
+
+    @Test
+    fun `OBBT bounds a doubly-unbounded integer column from a two-sided constraint`() {
+        val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = -4.0, upper = 8.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(MpsVar("x", integer = true, lower = null, upper = null)),
+            listOf(row),
+        )
+        val searchBound = 1_000_000L
+        val d = m.toProblem(searchBound = searchBound).let {
+            assertFalse(it.clamped)
+            it.problem.intDomains[0]
+        }
+        assertTrue(d.min in (-searchBound + 1) until -3L, "lower ${d.min} not a sound sub-clamp bound")
+        assertTrue(d.max in 8L until searchBound, "upper ${d.max} not a sound sub-clamp bound")
     }
 
     @Test
