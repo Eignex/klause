@@ -250,98 +250,166 @@ internal class GlobalCardinalityPropagator(
             }
         }
         if (maybeXs.isNotEmpty()) return true
-        val hasOtherVar = BooleanArray(n)
-        val anyOther = !closed && run {
-            var any = false
-            for (i in 0 until n) {
-                val d = state.intDomains[effectiveXs[i]]
-                var found = false
-                d.forEach { if (!found && !coverIndexByValue.containsKey(it)) found = true }
-                hasOtherVar[i] = found
-                if (found) any = true
-            }
-            any
-        }
         val source = 0
         val sink = 1
-        // Node ids: variable i is `2 + i`, cover value k is `2 + n + k` (inlined, no per-fire arrays).
-        val otherNode = if (anyOther) 2 + n + m else -1
-        val baseNodes = 2 + n + m + (if (anyOther) 1 else 0)
-        val superSource = baseNodes
-        val superSink = baseNodes + 1
-        val totalNodes = baseNodes + 2
-        val flow = cache.flow.also { it.reset(totalNodes) }
-        val excess = cache.excess(totalNodes)
-        val xToCovEdgeIdx = cache.xToCov(n, m) // flattened i*m + k → edge index (-1 = no edge)
-        val xToOtherEdgeIdx = cache.xToOther(n)
-        for (i in 0 until n) {
-            excess[source] -= 1
-            excess[2 + i] += 1
-            flow.addEdge(source, 2 + i, 0)
-        }
-        for (i in 0 until n) {
-            val d = state.intDomains[effectiveXs[i]]
-            for (k in 0 until m) {
-                if (cover[k] in d) {
-                    xToCovEdgeIdx[i * m + k] = flow.addEdge(2 + i, 2 + n + k, 1)
-                }
-            }
-            if (otherNode != -1 && hasOtherVar[i]) {
-                xToOtherEdgeIdx[i] = flow.addEdge(2 + i, otherNode, 1)
-            }
-        }
-        for (k in 0 until m) {
-            if (lo[k] > hi[k]) return false
-            excess[2 + n + k] -= lo[k]
-            excess[sink] += lo[k]
-            flow.addEdge(2 + n + k, sink, hi[k] - lo[k])
-        }
-        if (otherNode != -1) {
-            flow.addEdge(otherNode, sink, n)
-        }
-        excess[sink] -= n
-        excess[source] += n
-        flow.addEdge(sink, source, 0)
-        var requiredSSFlow = 0
-        for (v in 0 until baseNodes) {
-            when {
-                excess[v] > 0 -> {
-                    flow.addEdge(superSource, v, excess[v])
-                    requiredSSFlow += excess[v]
-                }
-
-                excess[v] < 0 -> flow.addEdge(v, superSink, -excess[v])
-            }
-        }
-        if (presents.isEmpty()) {
-            val assign = cache.flowAssign ?: RevIntArray(state, n, -1).also { cache.flowAssign = it }
-            for (i in 0 until n) {
-                val k = assign[i]
-                if (k in 0 until m && xToCovEdgeIdx[i * m + k] >= 0) {
-                    flow.augmentThroughEdge(superSource, superSink, 2 + i, 2 + n + k)
-                }
-            }
-        }
-        val obtained = flow.maxFlow(superSource, superSink)
-        if (obtained < requiredSSFlow) {
-            val reach = flow.residualReachable(superSource)
-            val resp = IntArrayList()
-            for (i in 0 until n) if (reach[2 + i]) resp.add(effectiveXs[i])
-            if (cvArr != null) for (k in 0 until m) resp.add(cvArr[k])
-            if (resp.size > 0) cache.conflictVars = resp.toIntArray()
-            return false
-        }
-        cache.flowAssign?.let { assign ->
-            for (i in 0 until n) {
-                var chosen = -1
+        // Node ids: variable i is `2 + i`, cover value k is `2 + n + k`.
+        val flow = cache.flow
+        // The fixed-bound, no-presence path keeps a persistent, reversible network (see [GccPropCache] /
+        // [GccFlowBuilder]): the edge set is built once for the root (widest) domains and the flow lives on
+        // the undo trail, so a fire only blocks the var→cover edges whose value left and — since removing a
+        // flow-FREE edge cannot lower the (already maximum, still feasible) flow — needs no re-solve. A
+        // removed flow-CARRYING edge (a broken assignment) re-solves the flow on the same structure.
+        val persistentEligible = presents.isEmpty() && countVars == null
+        val xToCovEdgeIdx: IntArray
+        val xToOtherEdgeIdx: IntArray
+        val otherNode: Int
+        val baseNodes: Int
+        val superSource: Int
+        val superSink: Int
+        val requiredSSFlow: Int
+        var needFlowSolve = true // false on the fast reuse path (flow persists, unchanged)
+        if (persistentEligible && cache.structBuilt && flow.frozen && cache.sN == n && cache.sM == m) {
+            xToCovEdgeIdx = cache.pXToCov
+            xToOtherEdgeIdx = cache.xToOther(n) // no-other case: all -1
+            otherNode = -1
+            baseNodes = cache.sBaseNodes
+            superSource = cache.sSuperSource
+            superSink = cache.sSuperSink
+            requiredSSFlow = cache.sRequiredSSFlow
+            var brokeAssignment = false
+            scan@ for (i in 0 until n) {
+                val d = state.intDomains[effectiveXs[i]]
                 for (k in 0 until m) {
                     val e = xToCovEdgeIdx[i * m + k]
-                    if (e >= 0 && flow.flowOf(e) > 0) {
-                        chosen = k
-                        break
+                    if (e >= 0 && cover[k] !in d && flow.flowOf(e) > 0) {
+                        brokeAssignment = true
+                        break@scan
                     }
                 }
-                assign[i] = chosen
+            }
+            if (brokeAssignment) {
+                // Re-solve the flow on the (root-spanning) persistent structure: clear the residual, block
+                // every currently-absent edge, replay the surviving assignment, and top up to max flow.
+                flow.resetFlow()
+                for (i in 0 until n) {
+                    val d = state.intDomains[effectiveXs[i]]
+                    for (k in 0 until m) {
+                        val e = xToCovEdgeIdx[i * m + k]
+                        if (e >= 0 && cover[k] !in d) flow.blockEdge(e)
+                    }
+                }
+            } else {
+                // Fast path: block the newly-absent flow-free edges; the persisted flow stays maximum.
+                needFlowSolve = false
+                for (i in 0 until n) {
+                    val d = state.intDomains[effectiveXs[i]]
+                    for (k in 0 until m) {
+                        val e = xToCovEdgeIdx[i * m + k]
+                        if (e >= 0 && cover[k] !in d && flow.flowOf(e) == 0) flow.blockEdge(e)
+                    }
+                }
+            }
+        } else {
+            val hasOtherVar = BooleanArray(n)
+            val anyOther = !closed && run {
+                var any = false
+                for (i in 0 until n) {
+                    val d = state.intDomains[effectiveXs[i]]
+                    var found = false
+                    d.forEach { if (!found && !coverIndexByValue.containsKey(it)) found = true }
+                    hasOtherVar[i] = found
+                    if (found) any = true
+                }
+                any
+            }
+            otherNode = if (anyOther) 2 + n + m else -1
+            baseNodes = 2 + n + m + (if (anyOther) 1 else 0)
+            superSource = baseNodes
+            superSink = baseNodes + 1
+            flow.reset(baseNodes + 2)
+            val excess = cache.excess(baseNodes + 2)
+            // A persistent structure owns its edge-index map; the pooled buffer is reused per fire.
+            val storePersistent = persistentEligible && !anyOther
+            xToCovEdgeIdx = if (storePersistent) IntArray(n * m) { -1 } else cache.xToCov(n, m)
+            xToOtherEdgeIdx = cache.xToOther(n)
+            for (i in 0 until n) {
+                excess[source] -= 1
+                excess[2 + i] += 1
+                flow.addEdge(source, 2 + i, 0)
+            }
+            for (i in 0 until n) {
+                val d = state.intDomains[effectiveXs[i]]
+                for (k in 0 until m) {
+                    if (cover[k] in d) xToCovEdgeIdx[i * m + k] = flow.addEdge(2 + i, 2 + n + k, 1)
+                }
+                if (otherNode != -1 && hasOtherVar[i]) xToOtherEdgeIdx[i] = flow.addEdge(2 + i, otherNode, 1)
+            }
+            for (k in 0 until m) {
+                if (lo[k] > hi[k]) return false
+                excess[2 + n + k] -= lo[k]
+                excess[sink] += lo[k]
+                flow.addEdge(2 + n + k, sink, hi[k] - lo[k])
+            }
+            if (otherNode != -1) flow.addEdge(otherNode, sink, n)
+            excess[sink] -= n
+            excess[source] += n
+            flow.addEdge(sink, source, 0)
+            var req = 0
+            for (v in 0 until baseNodes) {
+                when {
+                    excess[v] > 0 -> {
+                        flow.addEdge(superSource, v, excess[v])
+                        req += excess[v]
+                    }
+
+                    excess[v] < 0 -> flow.addEdge(v, superSink, -excess[v])
+                }
+            }
+            requiredSSFlow = req
+            if (storePersistent) {
+                cache.structBuilt = true
+                cache.sN = n
+                cache.sM = m
+                cache.sBaseNodes = baseNodes
+                cache.sSuperSource = superSource
+                cache.sSuperSink = superSink
+                cache.sRequiredSSFlow = req
+                cache.pXToCov = xToCovEdgeIdx
+            }
+        }
+        if (needFlowSolve) {
+            if (presents.isEmpty()) {
+                val assign = cache.flowAssign ?: RevIntArray(state, n, -1).also { cache.flowAssign = it }
+                for (i in 0 until n) {
+                    val k = assign[i]
+                    if (k in 0 until m && xToCovEdgeIdx[i * m + k] >= 0) {
+                        flow.augmentThroughEdge(superSource, superSink, 2 + i, 2 + n + k)
+                    }
+                }
+            }
+            val obtained = flow.maxFlow(superSource, superSink)
+            if (obtained < requiredSSFlow) {
+                val reach = flow.residualReachable(superSource)
+                val resp = IntArrayList()
+                for (i in 0 until n) if (reach[2 + i]) resp.add(effectiveXs[i])
+                if (cvArr != null) for (k in 0 until m) resp.add(cvArr[k])
+                if (resp.size > 0) cache.conflictVars = resp.toIntArray()
+                return false
+            }
+            // Persist the just-established flow so later fires reuse it without a rebuild or replay.
+            if (persistentEligible && cache.structBuilt && !flow.frozen) flow.freeze(state)
+            cache.flowAssign?.let { assign ->
+                for (i in 0 until n) {
+                    var chosen = -1
+                    for (k in 0 until m) {
+                        val e = xToCovEdgeIdx[i * m + k]
+                        if (e >= 0 && flow.flowOf(e) > 0) {
+                            chosen = k
+                            break
+                        }
+                    }
+                    assign[i] = chosen
+                }
             }
         }
         val sccId = IntArray(baseNodes) { -1 }
