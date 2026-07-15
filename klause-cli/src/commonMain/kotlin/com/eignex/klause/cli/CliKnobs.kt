@@ -40,6 +40,7 @@ internal object CliKnobs {
 
     /** Default load-time root-bake ceiling. Sized so a fast bake (the common case) is untouched while a
      *  pathological global's fixpoint (a wide global-cardinality, a multi-MB extension table) is clipped,
-     *  keeping cold load bounded; the solver completes any deferred propagation under its own deadline. */
-    const val DEFAULT_BAKE_BUDGET_MS = 800L
+     *  keeping cold load bounded; the solver completes any deferred propagation under its own deadline.
+     *  Set against the ~120ms JVM-start + parse floor so a clipped instance's cold load stays under 1s. */
+    const val DEFAULT_BAKE_BUDGET_MS = 600L
 }
