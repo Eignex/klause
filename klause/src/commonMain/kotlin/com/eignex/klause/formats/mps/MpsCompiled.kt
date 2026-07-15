@@ -7,6 +7,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -44,8 +46,9 @@ private const val MPS_INFINITY = 1e20
 /**
  * Lower an [MpsModel] to a klause [Problem]. klause is integer-only, so:
  *  - **integer columns** become integer variables; a side left unbounded (or at the `1e30` marker) is
- *    clamped to `±[searchBound]` — the shared unbounded-search range (an unbounded `Long` domain would
- *    be an O(span) bake bomb), flagged by [MpsCompiled.clamped].
+ *    first tightened by OBBT ([tightenOpenIntBounds]) over the constraint relaxation, and only a side
+ *    OBBT cannot bound is clamped to `±[searchBound]` — the shared unbounded-search range (an unbounded
+ *    `Long` domain would be an O(span) bake bomb), flagged by [MpsCompiled.clamped].
  *  - **bounded float columns** are discretised into [floatBuckets] buckets (the same config as the DSL),
  *    the solver reasoning over the bucket index; a row that mentions a float, or carries a fractional
  *    coefficient, is scaled by [floatScale] so its coefficients stay integral.
@@ -56,14 +59,13 @@ fun MpsModel.toProblem(
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
 ): MpsCompiled {
-    var clamped = false
     val floatBk = HashMap<Int, FloatBucketing>()
-    val domains = Array(variables.size) { i ->
+    // Per-column bounds for OBBT: a float is a finite bucket range; an integer keeps its true open sides
+    // (null = ±∞) so OBBT can bound the genuine unbounded region before any clamp erases it.
+    val obbtInput = Array(variables.size) { i ->
         val v = variables[i]
         if (v.integer) {
-            val lo = intBound(v.lower, -searchBound) { clamped = true }
-            val hi = intBound(v.upper, searchBound) { clamped = true }
-            if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
+            OpenIntBounds(intBoundOrNull(v.lower), intBoundOrNull(v.upper))
         } else {
             val lo = v.lower
             val hi = v.upper
@@ -71,7 +73,7 @@ fun MpsModel.toProblem(
                 throw MpsFormatException("unbounded float variable '${v.name}' (only bounded floats can be bucketed)")
             }
             floatBk[i] = FloatBucketing(varId = i, lo = lo, hi = hi, buckets = floatBuckets)
-            IntDomain(0L, (floatBuckets - 1).toLong())
+            OpenIntBounds(0L, (floatBuckets - 1).toLong())
         }
     }
 
@@ -96,6 +98,16 @@ fun MpsModel.toProblem(
             val coeffs = LongArray(c.indices.size) { c.coeffs[it].roundToLong() }
             emitRow(factors, coeffs, c.indices, c.lower, c.upper) { it.roundToLong() }
         }
+    }
+
+    // OBBT closes unbounded integer sides against the constraint relaxation before any clamp; a side it
+    // cannot bound falls back to the finite search range and flags the model clamped.
+    val tightened = tightenOpenIntBounds(obbtInput, factors.filterIsInstance<Linear>())
+    var clamped = false
+    val domains = Array(variables.size) { i ->
+        val lo = tightened[i].lo ?: (-searchBound).also { clamped = true }
+        val hi = tightened[i].hi ?: searchBound.also { clamped = true }
+        if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
     }
 
     val objScale = if (objectiveNeedsScaling(floatBk)) floatScale else 1L
@@ -191,13 +203,9 @@ private inline fun emitRow(
 private fun emptyRowHolds(lower: Double?, upper: Double?): Boolean =
     (lower == null || lower <= 0.0) && (upper == null || upper >= 0.0)
 
-/** Resolve an integer-column bound: `null` or the `1e30` marker clamps to [clampTo] (via [onClamp]). */
-private inline fun intBound(value: Double?, clampTo: Long, onClamp: () -> Unit): Long =
-    if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) {
-        onClamp()
-        clampTo
-    } else {
-        value.roundToLong()
-    }
+/** Resolve an integer-column bound to a finite value, or `null` when the side is unbounded (`null` or the
+ *  `1e30` marker) — left open for OBBT to close, else clamped by the caller. */
+private fun intBoundOrNull(value: Double?): Long? =
+    if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) null else value.roundToLong()
 
 private fun isIntegral(value: Double): Boolean = abs(value - value.roundToLong()) <= 1e-6
