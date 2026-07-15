@@ -46,6 +46,10 @@ object Presolve {
     fun removeRedundantConstraints(problem: Problem): PassDelta =
         RedundantConstraints.removeRedundantConstraints(problem)
 
+    /** Cross-direction linear bound fusion (`≤`/`≥` over one vector → `=`, or infeasible when they
+     *  cross). See [LinearBoundFusion]. */
+    fun fuseLinearBounds(problem: Problem): PassDelta = LinearBoundFusion.fuseLinearBounds(problem)
+
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
      *  objective). See [SingletonInequalityProjection]. */
     fun projectSingletonInequalities(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
