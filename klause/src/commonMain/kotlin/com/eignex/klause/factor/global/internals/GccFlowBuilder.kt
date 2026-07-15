@@ -1,23 +1,37 @@
 package com.eignex.klause.factor.global.internals
 
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Minimal Edmonds-Karp max-flow over an integer-capacity graph stored as parallel arrays.
- * Edges come in forward/reverse pairs; even indices are forward edges (with the original
- * capacity), odd indices are residual reverses (initially zero). Flow pushed on edge `e`
- * shows up as `originalCap - cap.get(e)` for forward edges.
+ * Integer max-flow (Dinic's) over a graph stored as parallel arrays. Edges come in forward/reverse
+ * pairs; even indices are forward edges (original capacity), odd indices are residual reverses
+ * (initially zero). Flow pushed on edge `e` is `originalCap - cap(e)` for forward edges.
  *
- * Reusable across propagate calls: [reset] grows the adjacency array on demand, clears the
- * live `[0, numNodes)` lists, and empties the parallel edge arrays — so a fire refills the
- * same backing instead of allocating a fresh graph (the dominant per-fire GCC allocation).
+ * Two lifetimes:
+ *  - **Rebuild** ([reset] + [addEdge]): the structure and residual capacities live in plain
+ *    `IntArrayList`s, refilled per fire — used for the count-var / optional / first-fire paths.
+ *  - **Persistent** ([freeze]): after a build the residual capacities are copied onto the engine undo
+ *    trail ([RevIntArray]), so the flow *survives across fires and restores on backtrack* — the
+ *    variable→value edge set is invariant (built for the root, widest domains), and a fire only blocks
+ *    the edges whose value left ([blockEdge]) and tops the flow back up. This removes the per-fire
+ *    network rebuild and the O(n) warm-start replay (#669).
  */
 internal class GccFlowBuilder {
     private var adj: Array<IntArrayList> = emptyArray()
     private val edgeTo = IntArrayList()
     private val cap = IntArrayList()
     private val originalCap = IntArrayList()
+
+    /** Non-null once [freeze]d: the reversible residual capacities. Reads/writes route through
+     *  [capGet]/[capSet] so the flow rolls back with the engine trail on backtrack. */
+    private var revCap: RevIntArray? = null
+
+    /** Non-null once [freeze]d: per-edge reversible removed flag (1 = the value left the domain).
+     *  A removed edge reads as capacity 0 and flow 0 everywhere, and restores on backtrack. */
+    private var removed: RevIntArray? = null
 
     var numNodes: Int = 0
         private set
@@ -26,6 +40,15 @@ internal class GccFlowBuilder {
     private var bfsQueue = EmptyIntArray
     private var level = EmptyIntArray
     private var edgeIter = EmptyIntArray
+
+    private fun isRemoved(e: Int): Boolean = (removed?.get(e) ?: 0) == 1
+
+    private fun capGet(e: Int): Int = if (isRemoved(e)) 0 else (revCap?.get(e) ?: cap[e])
+
+    private fun capSet(e: Int, v: Int) {
+        val r = revCap
+        if (r != null) r[e] = v else cap[e] = v
+    }
 
     fun reset(nodes: Int) {
         if (adj.size < nodes) {
@@ -42,7 +65,44 @@ internal class GccFlowBuilder {
         edgeTo.clear()
         cap.clear()
         originalCap.clear()
+        revCap = null // back to build mode
+        removed = null
         numNodes = nodes
+    }
+
+    /** Number of directed edges (forward+reverse pairs count as two). */
+    val edgeCount: Int get() = edgeTo.size
+
+    /** Copy the just-built residual capacities onto the engine undo trail so the flow persists across
+     *  fires and restores on backtrack. Called once after a [reset]+[addEdge] build establishes the
+     *  initial feasible max flow; subsequent fires mutate the flow reversibly via [blockEdge]/[maxFlow]. */
+    fun freeze(state: PropagationState) {
+        val r = RevIntArray(state, cap.size)
+        for (e in 0 until cap.size) r[e] = cap[e]
+        revCap = r
+        removed = RevIntArray(state, cap.size)
+    }
+
+    /** Whether the flow is persistent (frozen onto the trail). */
+    val frozen: Boolean get() = revCap != null
+
+    /** Mark forward edge [eIdx] (and its reverse) removed — its value left the domain. Reversible: it
+     *  reads as capacity/flow 0 until a backtrack restores it. Sound only for an edge carrying no flow
+     *  ([flowOf] `== 0`); the caller rebuilds when a flow-carrying edge is removed, since re-routing that
+     *  variable's unit is what the rebuild does. */
+    fun blockEdge(eIdx: Int) {
+        val r = removed ?: return
+        r[eIdx] = 1
+        r[eIdx xor 1] = 1
+    }
+
+    /** Restore every edge to its original capacity with zero flow, keeping the built structure (the
+     *  non-persistent per-fire counterpart to [reset]+re-`addEdge`). */
+    fun resetFlow() {
+        for (e in 0 until edgeTo.size step 2) {
+            capSet(e, originalCap[e])
+            capSet(e + 1, 0)
+        }
     }
 
     fun augmentThroughEdge(source: Int, sink: Int, viaU: Int, viaV: Int): Boolean {
@@ -50,7 +110,7 @@ internal class GccFlowBuilder {
         val nu = adj[viaU]
         for (k in 0 until nu.size) {
             val e = nu[k]
-            if (edgeTo[e] == viaV && cap[e] > 0) {
+            if (edgeTo[e] == viaV && capGet(e) > 0) {
                 viaEdge = e
                 break
             }
@@ -76,7 +136,7 @@ internal class GccFlowBuilder {
                 for (k in 0 until neigh.size) {
                     val e = neigh[k]
                     val v = edgeTo[e]
-                    if (parent[v] != -1 || cap[e] <= 0) continue
+                    if (parent[v] != -1 || capGet(e) <= 0) continue
                     parent[v] = e
                     if (v == sink) {
                         found = true
@@ -91,14 +151,14 @@ internal class GccFlowBuilder {
         var cur = sink
         while (cur != source) {
             val e = parent[cur]
-            if (cap[e] < bottleneck) bottleneck = cap[e]
+            if (capGet(e) < bottleneck) bottleneck = capGet(e)
             cur = edgeTo[e xor 1]
         }
         cur = sink
         while (cur != source) {
             val e = parent[cur]
-            cap[e] = cap[e] - bottleneck
-            cap[e xor 1] = cap[e xor 1] + bottleneck
+            capSet(e, capGet(e) - bottleneck)
+            capSet(e xor 1, capGet(e xor 1) + bottleneck)
             cur = edgeTo[e xor 1]
         }
         return true
@@ -117,7 +177,7 @@ internal class GccFlowBuilder {
         return eIdx
     }
 
-    fun flowOf(eIdx: Int): Int = originalCap[eIdx] - cap[eIdx]
+    fun flowOf(eIdx: Int): Int = if (isRemoved(eIdx)) 0 else originalCap[eIdx] - (revCap?.get(eIdx) ?: cap[eIdx])
 
     fun residualReachable(source: Int): BooleanArray {
         val seen = BooleanArray(numNodes)
@@ -131,7 +191,7 @@ internal class GccFlowBuilder {
             val neigh = adj[u]
             for (i in 0 until neigh.size) {
                 val eIdx = neigh[i]
-                if (cap[eIdx] <= 0) continue
+                if (capGet(eIdx) <= 0) continue
                 val v = edgeTo[eIdx]
                 if (!seen[v]) {
                     seen[v] = true
@@ -146,8 +206,7 @@ internal class GccFlowBuilder {
      * Dinic's max-flow: repeatedly build a BFS level graph over the residual edges, then saturate it with
      * a blocking flow (a DFS that advances a per-node edge cursor so each edge is examined once per phase).
      * `O(V²E)` in general and near `O(E√V)` on the unit-capacity variable→value matching graphs the GCC
-     * propagator builds — far below plain Edmonds-Karp's per-augmentation BFS when a matching needs `V`
-     * augmenting paths. Any maximum flow is equally valid for the Régin GAC filtering that reads the final
+     * propagator builds. Any maximum flow is equally valid for the Régin GAC filtering that reads the final
      * residual graph, so the value is unchanged.
      */
     fun maxFlow(source: Int, sink: Int): Int {
@@ -168,7 +227,7 @@ internal class GccFlowBuilder {
                 val neigh = adj[u]
                 for (k in 0 until neigh.size) {
                     val eIdx = neigh[k]
-                    if (cap[eIdx] <= 0) continue
+                    if (capGet(eIdx) <= 0) continue
                     val v = edgeTo[eIdx]
                     if (level[v] < 0) {
                         level[v] = level[u] + 1
@@ -196,11 +255,12 @@ internal class GccFlowBuilder {
         while (iter[u] < neigh.size) {
             val eIdx = neigh[iter[u]]
             val v = edgeTo[eIdx]
-            if (cap[eIdx] > 0 && level[v] == level[u] + 1) {
-                val pushed = blockingDfs(v, sink, if (limit < cap[eIdx]) limit else cap[eIdx], level, iter)
+            val ce = capGet(eIdx)
+            if (ce > 0 && level[v] == level[u] + 1) {
+                val pushed = blockingDfs(v, sink, if (limit < ce) limit else ce, level, iter)
                 if (pushed > 0) {
-                    cap[eIdx] = cap[eIdx] - pushed
-                    cap[eIdx xor 1] = cap[eIdx xor 1] + pushed
+                    capSet(eIdx, capGet(eIdx) - pushed)
+                    capSet(eIdx xor 1, capGet(eIdx xor 1) + pushed)
                     return pushed
                 }
             }
@@ -216,7 +276,7 @@ internal class GccFlowBuilder {
             for (k in 0 until neigh.size) {
                 val eIdx = neigh[k]
                 val w = edgeTo[eIdx]
-                if (w < limit && cap[eIdx] > 0) nodeAdj[v].add(w)
+                if (w < limit && capGet(eIdx) > 0) nodeAdj[v].add(w)
             }
         }
         val res = reginTarjanScc(nodeAdj, limit)
