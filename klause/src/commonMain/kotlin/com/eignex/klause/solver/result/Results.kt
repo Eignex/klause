@@ -18,6 +18,13 @@ enum class TerminationReason {
     Cancelled,
 
     /**
+     * The backend cannot handle a feature this problem uses, so it declines rather than returning a
+     * possibly-unsound verdict — e.g. local search over a model with LP-only continuous variables, whose
+     * linear rows it does not evaluate. The caller falls back to a backend that supports the feature.
+     */
+    Unsupported,
+
+    /**
      * Complete-backend search space fully explored — no further work to do — but the
      * verdict can't be expressed as Sat / Unsat / Optimal / Infeasible because some
      * stronger context (external bound sharing in a parallel portfolio, an opaque
