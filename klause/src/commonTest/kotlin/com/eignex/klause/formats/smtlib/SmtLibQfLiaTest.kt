@@ -396,4 +396,13 @@ class SmtLibQfLiaTest {
             "coefficient strengthening should prove the gcd-indivisible equality infeasible",
         )
     }
+
+    @Test
+    fun `a stray closing paren is a parse error rather than an infinite loop`() {
+        // A top-level unbalanced ')' must be rejected; previously the reader returned an empty token
+        // without advancing and spun forever.
+        assertFailsWith<IllegalArgumentException> {
+            SmtLibQfLia.parse("(declare-const x Int)\n(assert (>= x 0))\n(check-sat))")
+        }
+    }
 }
