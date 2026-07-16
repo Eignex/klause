@@ -87,9 +87,11 @@ internal fun solveAndCertify(
                 )
             }
         }
+    // A float optimum that cannot be certified exactly (a 128-bit overflow, or a real coefficient the
+    // integer certifier declines) is INDETERMINATE — the float point is not a proof.
     val certificate = integerCertify(model, result.duals)
     return CertifiedLpResult(
-        LpVerdict.OPTIMAL,
+        if (certificate != null) LpVerdict.OPTIMAL else LpVerdict.INDETERMINATE,
         float = result,
         certificate = certificate,
         farkasRay = null,

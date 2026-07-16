@@ -112,9 +112,55 @@ internal class LpModel(
     val probeClampedLo: BooleanArray = BooleanArray(n),
     /** Counterpart to [probeClampedLo] for the upper bound (`+∞` stand-in). */
     val probeClampedHi: BooleanArray = BooleanArray(n),
+    /** Per structural column, true when it is an LP-only continuous (real) column rather than an
+     *  integer/bool one (length `n`, all false for the pure-integer core). A continuous column is present
+     *  in this relaxation but absent from CP search. Informational; the exact-certification decline keys
+     *  off [hasContinuous]. */
+    val colContinuous: BooleanArray = BooleanArray(n),
+    /**
+     * The double-precision form the LP engine solves when real coefficients are present, else null (the
+     * pure-integer core, where the engine reads the [Long] fields directly). It is the single uniform
+     * matrix any engine — sparse simplex, dense, or a first-order GPU solver — consumes; the integer/real
+     * split matters only to certification, which declines while it is present. Its coefficients, bounds,
+     * costs and shift are all `Double`; the CSC mirrors [csc] (structural columns only, slacks implicit).
+     */
+    val doubleView: LpDoubleView? = null,
 ) {
     /** Total variable count: structural plus slack. */
     val numVars: Int get() = n + m
+
+    /** Whether the model carries real coefficients, so it is solved through [doubleView] and the exact
+     *  128-bit integer certification declines (a real coefficient is not integrally certifiable here). */
+    val hasContinuous: Boolean get() = doubleView != null
+
+    /** Objective coefficient of variable [j] as a double (from [doubleView] when present). */
+    fun costD(j: Int): Double = doubleView?.cost?.get(j) ?: cost[j].toDouble()
+
+    /** Right-hand side of row [i] as a double. */
+    fun rhsD(i: Int): Double = doubleView?.rhs?.get(i) ?: rhs[i].toDouble()
+
+    /** Upper bound of variable [j] as a double (meaningful only where [hasFiniteUpper] is true). */
+    fun upperD(j: Int): Double = doubleView?.upper?.get(j) ?: upper[j].toDouble()
+
+    /** Whether variable [j] has a finite upper bound. */
+    fun hasFiniteUpper(j: Int): Boolean = doubleView?.hasUpper?.get(j) ?: hasUpper[j]
+
+    /** Lower-bound shift of structural column [j] as a double. */
+    fun loShiftD(j: Int): Double = doubleView?.loShift?.get(j) ?: loShift[j].toDouble()
+
+    /** Objective constant as a double. */
+    val objConstantD: Double get() = doubleView?.objConstant ?: objConstant.toDouble()
+
+    /** Iterate column [j]'s nonzero structural entries as `(row, value)` in double precision — the
+     *  uniform view the LP engine reads, from [doubleView] when present, else the [Long] CSC widened. */
+    inline fun forEachInColumnD(j: Int, action: (row: Int, value: Double) -> Unit) {
+        val dv = doubleView
+        if (dv != null) {
+            for (k in dv.colPtr[j] until dv.colPtr[j + 1]) action(dv.rowIdx[k], dv.colVal[k])
+        } else {
+            for (k in csc.colPtr[j] until csc.colPtr[j + 1]) action(csc.rowIdx[k], csc.colVal[k].toDouble())
+        }
+    }
 
     /**
      * A model identical in structure ([csc], [cost], [tag], [rowGlobal], [rowPremises], slack
@@ -166,6 +212,25 @@ internal class LpModel(
 internal class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongArray)
 
 /**
+ * The double-precision form of an [LpModel] with real coefficients, built by [LpBuilder.build] when any
+ * continuous column or real-coefficient row is present. The CSC ([colPtr]/[rowIdx]/[colVal]) mirrors
+ * [Csc] over the `n` structural columns (slacks are the implicit unit columns); [cost]/[upper]/[hasUpper]
+ * are length `n + m` and [loShift] length `n`, all in double precision after the same lower-shift /
+ * `>=`-to-`<=` normalizations the [Long] core applies.
+ */
+internal class LpDoubleView(
+    val colPtr: IntArray,
+    val rowIdx: IntArray,
+    val colVal: DoubleArray,
+    val rhs: DoubleArray,
+    val cost: DoubleArray,
+    val upper: DoubleArray,
+    val hasUpper: BooleanArray,
+    val objConstant: Double,
+    val loShift: DoubleArray,
+)
+
+/**
  * Builds an [LpModel] from structural variables and constraint rows. Coefficients are accumulated
  * sparsely during construction and emitted as the CSC core at [build]. The builder owns the
  * normalizations documented on [LpModel]; callers add variables and rows in natural `<=`/`>=`/`=`
@@ -186,7 +251,17 @@ internal class LpBuilder {
     private val clampedLoCols = HashSet<Int>()
     private val clampedHiCols = HashSet<Int>()
 
-    // A row's coefficients as parallel primitive arrays (column index, value); no boxed map.
+    // LP-only continuous columns and their real bounds/cost — the double data the [LpDoubleView] is built
+    // from. Empty for the pure-integer core, which never materializes a double view.
+    private val continuousCols = HashSet<Int>()
+    private val contLo = HashMap<Int, Double>()
+    private val contHi = HashMap<Int, Double>()
+    private val contCost = HashMap<Int, Double>()
+    private var anyRealRow = false
+
+    // A row's coefficients as parallel primitive arrays (column index, value); no boxed map. A real-
+    // coefficient row carries its doubles in [valsD]/[rhsD] and leaves [vals]/[rhs] as unused zeros (the
+    // integer core drops it; the double view is authoritative).
     private class RawRow(
         val cols: IntArray,
         val vals: LongArray,
@@ -194,6 +269,8 @@ internal class LpBuilder {
         val rhs: Long,
         val global: Boolean,
         val premises: LpRowPremises?,
+        val valsD: DoubleArray? = null,
+        val rhsD: Double? = null,
     )
 
     private val rows = ArrayList<RawRow>()
@@ -232,6 +309,47 @@ internal class LpBuilder {
         if (lower == null) clampedLoCols.add(j)
         if (upper == null) clampedHiCols.add(j)
         return j
+    }
+
+    /**
+     * Add an LP-only **continuous** (real) column with domain `[lower, upper]` (a null side is `±∞`,
+     * realized by the [LP_UNBOUNDED_PROBE] stand-in like [addFreeVar]) and real objective coefficient
+     * [cost]. The column is present in the LP but absent from CP search; because it carries real data the
+     * model is solved through the double view and the exact integer certification declines. Returns the
+     * column index. The [Long] slot stays a placeholder zero — the double view is authoritative.
+     */
+    fun addRealVar(lower: Double?, upper: Double?, cost: Double = 0.0, tag: Int = -1): Int {
+        val j = lo.size
+        lo.add(0L)
+        hi.add(0L)
+        this.cost.add(0L)
+        tags.add(tag)
+        continuousCols.add(j)
+        contLo[j] = lower ?: -LP_UNBOUNDED_PROBE.toDouble()
+        contHi[j] = upper ?: LP_UNBOUNDED_PROBE.toDouble()
+        contCost[j] = cost
+        if (lower == null) clampedLoCols.add(j)
+        if (upper == null) clampedHiCols.add(j)
+        return j
+    }
+
+    /** Add a real-coefficient constraint `Σ vals(k)·x_{cols(k)} rel rhs`; like [addRow] but with double
+     *  data. Forces the model onto the double view (and declines integer certification). */
+    fun addRealRow(cols: IntArray, vals: DoubleArray, rel: Relation, rhs: Double) {
+        require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
+        anyRealRow = true
+        rows.add(
+            RawRow(
+                cols.copyOf(),
+                LongArray(cols.size),
+                rel,
+                0L,
+                global = true,
+                premises = null,
+                valsD = vals.copyOf(),
+                rhsD = rhs,
+            ),
+        )
     }
 
     /**
@@ -320,6 +438,8 @@ internal class LpBuilder {
             hasUpper[sc] = rows[i].rel == Relation.EQ
         }
 
+        val doubleView = if (continuousCols.isNotEmpty() || anyRealRow) buildDoubleView(n, m, signedSense) else null
+
         return LpModel(
             n = n, m = m, csc = csc,
             rhs = rhs, cost = cost,
@@ -330,7 +450,80 @@ internal class LpBuilder {
             flippedRhs = flippedRhs,
             probeClampedLo = BooleanArray(n) { it in clampedLoCols },
             probeClampedHi = BooleanArray(n) { it in clampedHiCols },
+            colContinuous = BooleanArray(n) { it in continuousCols },
+            doubleView = doubleView,
         )
+    }
+
+    /** Build the double-precision [LpDoubleView] mirroring the [Long] normalizations (lower-shift,
+     *  `>=`-to-`<=`) in double, from the real column data ([contLo]/[contHi]/[contCost]) and any real
+     *  rows. Integer columns and rows contribute their exact [Long] values widened to double. */
+    private fun buildDoubleView(n: Int, m: Int, signedSense: Long): LpDoubleView {
+        val loD = DoubleArray(n) { contLo[it] ?: lo[it].toDouble() }
+        val hiD = DoubleArray(n) { contHi[it] ?: hi[it].toDouble() }
+        val costRawD = DoubleArray(n) { contCost[it] ?: this.cost[it].toDouble() }
+        val rhsD = DoubleArray(m)
+        for ((i, row) in rows.withIndex()) {
+            val flip = row.rel == Relation.GE
+            val rawRhs = row.rhsD ?: row.rhs.toDouble()
+            var b = if (flip) -rawRhs else rawRhs
+            val rvals = row.valsD ?: DoubleArray(row.vals.size) { row.vals[it].toDouble() }
+            for (k in row.cols.indices) {
+                val j = row.cols[k]
+                val coeff = if (flip) -rvals[k] else rvals[k]
+                b -= coeff * loD[j]
+            }
+            rhsD[i] = b
+        }
+        val colRowBuckets = Array(n) { IntArrayList() }
+        val colValBuckets = Array(n) { ArrayList<Double>() }
+        for ((i, row) in rows.withIndex()) {
+            val flip = row.rel == Relation.GE
+            val rvals = row.valsD ?: DoubleArray(row.vals.size) { row.vals[it].toDouble() }
+            val summed = HashMap<Int, Double>(row.cols.size)
+            for (k in row.cols.indices) {
+                val j = row.cols[k]
+                val coeff = if (flip) -rvals[k] else rvals[k]
+                summed[j] = (summed[j] ?: 0.0) + coeff
+            }
+            for (j in summed.keys.sorted()) {
+                val v = summed.getValue(j)
+                if (v != 0.0) {
+                    colRowBuckets[j].add(i)
+                    colValBuckets[j].add(v)
+                }
+            }
+        }
+        val colPtr = IntArray(n + 1)
+        for (j in 0 until n) colPtr[j + 1] = colPtr[j] + colRowBuckets[j].size
+        val rowIdx = IntArray(colPtr[n])
+        val colVal = DoubleArray(colPtr[n])
+        for (j in 0 until n) {
+            val br = colRowBuckets[j]
+            val bv = colValBuckets[j]
+            var w = colPtr[j]
+            for (k in 0 until br.size) {
+                rowIdx[w] = br[k]
+                colVal[w] = bv[k]
+                w++
+            }
+        }
+        val numVars = n + m
+        val costD = DoubleArray(numVars)
+        val upperD = DoubleArray(numVars)
+        val hasUpperD = BooleanArray(numVars)
+        val signed = signedSense.toDouble()
+        var objConstantD = 0.0
+        for (j in 0 until n) {
+            costD[j] = signed * costRawD[j]
+            upperD[j] = hiD[j] - loD[j]
+            hasUpperD[j] = true
+            objConstantD += costD[j] * loD[j]
+        }
+        for (i in 0 until m) {
+            hasUpperD[n + i] = rows[i].rel == Relation.EQ
+        }
+        return LpDoubleView(colPtr, rowIdx, colVal, rhsD, costD, upperD, hasUpperD, objConstantD, loD)
     }
 
     /** Build the CSC core over the `n` structural columns from the accumulated [rows]: `>=` rows are

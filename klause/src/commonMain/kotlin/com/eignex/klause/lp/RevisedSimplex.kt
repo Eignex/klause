@@ -86,13 +86,13 @@ internal class RevisedSimplex(
         // so each is a tight loop) — count nnz, then fill.
         for (j in 0 until n) {
             var nnz = 0
-            model.forEachInColumn(j) { _, _ -> nnz++ }
+            model.forEachInColumnD(j) { _, _ -> nnz++ }
             val rows = IntArray(nnz)
             val vals = DoubleArray(nnz)
             var k = 0
-            model.forEachInColumn(j) { i, v ->
+            model.forEachInColumnD(j) { i, v ->
                 rows[k] = i
-                vals[k] = v.toDouble()
+                vals[k] = v
                 k++
             }
             colRows[j] = rows
@@ -152,8 +152,7 @@ internal class RevisedSimplex(
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
-    private fun duals(factor: EtaBasis): DoubleArray =
-        factor.btran(DoubleArray(m) { model.cost[basicVar[it]].toDouble() })
+    private fun duals(factor: EtaBasis): DoubleArray = factor.btran(DoubleArray(m) { model.costD(basicVar[it]) })
 
     /** Reset the Devex reference weights to 1 (a fresh reference frame). */
     private fun resetGamma() {
@@ -209,10 +208,10 @@ internal class RevisedSimplex(
             // up (null) — the basis is only a heuristic, so this is sound.
             if (iter % CANCEL_POLL == 0 && cancellation()) return null
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
-            for (i in 0 until m) rhsAdj[i] = model.rhs[i].toDouble()
+            for (i in 0 until m) rhsAdj[i] = model.rhsD(i)
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.AT_UPPER) {
-                    val u = model.upper[j].toDouble()
+                    val u = model.upperD(j)
                     if (j >= n) {
                         rhsAdj[j - n] -= u
                     } else {
@@ -233,7 +232,7 @@ internal class RevisedSimplex(
             for (i in 0 until m) {
                 val v = basicVar[i]
                 val below = -beta[i]
-                val above = if (model.hasUpper[v]) beta[i] - model.upper[v].toDouble() else Double.NEGATIVE_INFINITY
+                val above = if (model.hasFiniteUpper(v)) beta[i] - model.upperD(v) else Double.NEGATIVE_INFINITY
                 val isBelow = below >= above
                 val viol = if (isBelow) below else above
                 if (viol <= TOL) continue
@@ -266,7 +265,7 @@ internal class RevisedSimplex(
                 }
                 if (!eligible) continue
                 pivotRowEntry[j] = a
-                ratioBuf[j] = abs((model.cost[j].toDouble() - dotColumn(y, j)) / a)
+                ratioBuf[j] = abs((model.costD(j) - dotColumn(y, j)) / a)
                 elig.add(j)
             }
             if (elig.isEmpty()) {
@@ -319,7 +318,7 @@ internal class RevisedSimplex(
         var acc = 0.0
         for (idx in elig.indices) {
             val j = elig[idx]
-            val range = if (model.hasUpper[j]) model.upper[j].toDouble() else Double.MAX_VALUE
+            val range = if (model.hasFiniteUpper(j)) model.upperD(j) else Double.MAX_VALUE
             val cap = abs(pivotRowEntry[j]) * range
             val last = idx == elig.size - 1
             if (!last && range < Double.MAX_VALUE && acc + cap < delta - TOL) {
@@ -350,23 +349,23 @@ internal class RevisedSimplex(
     private fun optimal(beta: DoubleArray, factor: EtaBasis): FloatLpResult {
         // Re-add the lower-bound shift the model folded out (c·lo), so [FloatLpResult.objective] is the
         // objective in original coordinates — matching the exact certify.
-        var obj = model.objConstant.toDouble()
+        var obj = model.objConstantD
         for (j in 0 until numVars) {
-            val c = model.cost[j]
-            if (c != 0L && status[j] == VarStatus.AT_UPPER) obj += c.toDouble() * model.upper[j].toDouble()
+            val c = model.costD(j)
+            if (c != 0.0 && status[j] == VarStatus.AT_UPPER) obj += c * model.upperD(j)
         }
         for (i in 0 until m) {
-            val c = model.cost[basicVar[i]]
-            if (c != 0L) obj += c.toDouble() * beta[i]
+            val c = model.costD(basicVar[i])
+            if (c != 0.0) obj += c * beta[i]
         }
         val primal = DoubleArray(n)
         for (j in 0 until n) {
-            primal[j] = model.loShift[j].toDouble() +
-                if (status[j] == VarStatus.AT_UPPER) model.upper[j].toDouble() else 0.0
+            primal[j] = model.loShiftD(j) +
+                if (status[j] == VarStatus.AT_UPPER) model.upperD(j) else 0.0
         }
         for (i in 0 until m) {
             val v = basicVar[i]
-            if (v < n) primal[v] = model.loShift[v].toDouble() + beta[i]
+            if (v < n) primal[v] = model.loShiftD(v) + beta[i]
         }
         val basis = Basis(basicVar.copyOf(), status.copyOf())
         optimalBasis = basis
@@ -384,6 +383,7 @@ internal class RevisedSimplex(
      *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
      *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
     override fun gomoryCuts(maxCuts: Int): List<Cut> {
+        if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
@@ -391,6 +391,7 @@ internal class RevisedSimplex(
 
     /** Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
     override fun mirCuts(maxCuts: Int): List<Cut> {
+        if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()
         val primal = optimalPrimal ?: return emptyList()
         return integerTableauCuts(model, basis, primal, maxCuts, mir = true)
@@ -412,7 +413,7 @@ internal class RevisedSimplex(
             status[model.slackCol(i)] = VarStatus.BASIC
         }
         for (j in 0 until n) {
-            status[j] = if (model.cost[j] >= 0L) VarStatus.AT_LOWER else VarStatus.AT_UPPER
+            status[j] = if (model.costD(j) >= 0.0) VarStatus.AT_LOWER else VarStatus.AT_UPPER
         }
     }
 
@@ -429,10 +430,10 @@ internal class RevisedSimplex(
 
     /** Current basic values `β = B⁻¹(b − Σ_{j nonbasic at upper} A_j·u_j)`. */
     private fun basicValues(factor: EtaBasis): DoubleArray {
-        val rhsAdj = DoubleArray(m) { model.rhs[it].toDouble() }
+        val rhsAdj = DoubleArray(m) { model.rhsD(it) }
         for (j in 0 until numVars) {
             if (status[j] != VarStatus.AT_UPPER) continue
-            val u = model.upper[j].toDouble()
+            val u = model.upperD(j)
             if (j >= n) {
                 rhsAdj[j - n] -= u
             } else {
@@ -448,7 +449,7 @@ internal class RevisedSimplex(
         for (i in 0 until m) {
             if (beta[i] < -FEAS_TOL) return false
             val v = basicVar[i]
-            if (model.hasUpper[v] && beta[i] > model.upper[v].toDouble() + FEAS_TOL) return false
+            if (model.hasFiniteUpper(v) && beta[i] > model.upperD(v) + FEAS_TOL) return false
         }
         return true
     }
@@ -475,7 +476,7 @@ internal class RevisedSimplex(
             var w = 0.0
             for (i in 0 until m) {
                 val v = basicVar[i]
-                val hi = if (model.hasUpper[v]) model.upper[v].toDouble() else Double.MAX_VALUE
+                val hi = if (model.hasFiniteUpper(v)) model.upperD(v) else Double.MAX_VALUE
                 gamma[i] = when {
                     beta[i] < -FEAS_TOL -> {
                         w -= beta[i]
@@ -513,14 +514,14 @@ internal class RevisedSimplex(
             denseColumn(q, aq)
             val alpha = factor.ftran(aq)
             val dir = if (qAtLower) 1.0 else -1.0
-            var tMax = if (model.hasUpper[q]) model.upper[q].toDouble() else Double.MAX_VALUE
+            var tMax = if (model.hasFiniteUpper(q)) model.upperD(q) else Double.MAX_VALUE
             var leaving = -1
             var leavingToUpper = false
             for (i in 0 until m) {
                 val rate = -alpha[i] * dir // dβ_i/dt
                 if (abs(rate) < TOL) continue
                 val v = basicVar[i]
-                val hi = if (model.hasUpper[v]) model.upper[v].toDouble() else Double.MAX_VALUE
+                val hi = if (model.hasFiniteUpper(v)) model.upperD(v) else Double.MAX_VALUE
                 var t = Double.MAX_VALUE
                 var toUpper = false
                 when {
@@ -610,7 +611,7 @@ internal class RevisedSimplex(
             var best = TOL
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC) continue
-                val dj = model.cost[j].toDouble() - dotColumn(y, j)
+                val dj = model.costD(j) - dotColumn(y, j)
                 val atLower = status[j] == VarStatus.AT_LOWER
                 // From lower, increasing improves iff d_j < 0; from upper, decreasing improves iff d_j > 0.
                 val gain = if (atLower) -dj else dj
@@ -632,7 +633,7 @@ internal class RevisedSimplex(
             val alpha = factor.ftran(aq) // α = B⁻¹ A_q
             val dir = if (qAtLower) 1.0 else -1.0 // x_q moves by dir·t, t ≥ 0
             // Ratio test with the entering variable's own bound flip as a candidate blocker.
-            var tMax = if (model.hasUpper[q]) model.upper[q].toDouble() else Double.MAX_VALUE
+            var tMax = if (model.hasFiniteUpper(q)) model.upperD(q) else Double.MAX_VALUE
             var leaving = -1
             var leavingToUpper = false
             var leavingVar = Int.MAX_VALUE
@@ -642,8 +643,8 @@ internal class RevisedSimplex(
                 var toUpper = false
                 if (rate < -TOL) {
                     t = beta[i] / -rate // β_i falls to its lower bound 0
-                } else if (rate > TOL && model.hasUpper[basicVar[i]]) {
-                    t = (model.upper[basicVar[i]].toDouble() - beta[i]) / rate // β_i rises to its upper bound
+                } else if (rate > TOL && model.hasFiniteUpper(basicVar[i])) {
+                    t = (model.upperD(basicVar[i]) - beta[i]) / rate // β_i rises to its upper bound
                     toUpper = true
                 }
                 if (t == Double.MAX_VALUE) continue

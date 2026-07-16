@@ -21,6 +21,7 @@ import kotlin.math.floor
  * authoritative one. A loose result here only costs a missed prune, never correctness.
  */
 internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
+    if (model.hasContinuous) return null // the safe bound reads the Long matrix; a real column is not on it
     val m = model.m
     val n = model.n
     var bound = 0.0
