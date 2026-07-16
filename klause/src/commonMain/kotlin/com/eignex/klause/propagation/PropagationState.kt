@@ -62,6 +62,14 @@ class PropagationState(
      * presolve factors, so every allocation and branch below reduces to the exact prior behaviour.
      */
     internal val incremental: Boolean = false,
+    /**
+     * Opt into the native-SAT BCP lane (#1119 Phase 1). When `true` and the problem is
+     * [com.eignex.klause.solver.Problem.isNativeSatEligible], propagation runs through [NativeSatState]
+     * — an arena-packed two-watched-literal loop — instead of the general factor-queue fixpoint, and
+     * the general per-literal / occurrence watch indices are left unregistered. Defaults to `false`,
+     * so every non-opted state builds and propagates exactly as before.
+     */
+    internal val nativeSat: Boolean = false,
 ) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
@@ -596,8 +604,23 @@ class PropagationState(
      *  push incrementally instead of scanning every variable. */
     val undoTop: Int get() = undo.size
 
+    /** Native-SAT BCP engine when this state opted in and the problem qualifies; null on the
+     *  general LCG path. Its construction reads [boolPinOrder] and the clause arena (both live above),
+     *  so it is declared after them. */
+    internal val nativeEngine: NativeSatState? =
+        if (nativeSat && problem.isNativeSatEligible) NativeSatState(this) else null
+
+    /** Seed reason (all-false clause literals) stashed by [NativeSatState] on a conflict, so
+     *  [PropagationSession] can drive 1UIP through [ConflictAnalyzer.analyzeConflictClause] without a
+     *  factor lookup. Cleared by [undoTo]. */
+    internal var nativeConflictReason: IntArray? = null
+
     init {
-        for (fid in 0 until problem.numFactors) registerFactor(fid, problem.propagators[fid])
+        // The native lane replaces the per-literal / occurrence watch indices with its own arena
+        // watches, so it skips base-factor registration entirely.
+        if (nativeEngine == null) {
+            for (fid in 0 until problem.numFactors) registerFactor(fid, problem.propagators[fid])
+        }
     }
 
     /** Install factor [fid]'s static wakeup subscriptions into the per-literal / per-int-event advisor
@@ -804,6 +827,10 @@ class PropagationState(
         initialFactors: IntArray = EmptyIntArray,
         cancellation: Cancellation = Cancellation.Never,
     ): IntArray? {
+        // The native-SAT lane runs its own arena-packed two-watched-literal BCP; the atom store,
+        // channeling flush, factor queue, and dirty-var drains below are all inert when there are no
+        // integer variables, so it bypasses them entirely.
+        nativeEngine?.let { return it.propagate(allFactors, cancellation) }
         // Clear conflict bookkeeping from any prior run — reusing the state across pushes
         // would otherwise mix old seeds into a new conflict's core.
         conflictSeedFactors.clear()

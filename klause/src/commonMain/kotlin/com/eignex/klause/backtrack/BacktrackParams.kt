@@ -292,6 +292,13 @@ data class BacktrackParams(
      * .Cut.global] cuts cross arms, so importing one only tightens a relaxation.
      */
     val cutExchange: CutExchange? = null,
+    /**
+     * Route an eligible pure-Boolean problem (no integer variables, all clause factors) through the
+     * native-SAT BCP lane (#1119 Phase 1): arena-packed two-watched-literal propagation with no atom
+     * store or factor-queue overhead. Ignored when the problem has integer variables or non-clause
+     * factors. Off by default; the front-end auto-dispatch selects it once the lane is the default.
+     */
+    val nativeSat: Boolean = false,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

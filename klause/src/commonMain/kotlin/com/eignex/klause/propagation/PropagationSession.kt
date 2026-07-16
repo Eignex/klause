@@ -42,9 +42,14 @@ class PropagationSession(
     private val cancellation: Cancellation = Cancellation.Never,
     /** Per-call fire floor before the deadline poll engages; see [PROPAGATION_CANCEL_FLOOR]. */
     propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
+    /** Opt into the native-SAT BCP lane for an eligible pure-Boolean problem (#1119 Phase 1);
+     *  ignored when the problem has integer variables or non-clause factors. */
+    nativeSat: Boolean = false,
 ) {
     private val state: PropagationState =
-        PropagationState(problem, Assumptions.None).also { it.cancelFloor = propagationCancelFloor }
+        PropagationState(problem, Assumptions.None, nativeSat = nativeSat).also {
+            it.cancelFloor = propagationCancelFloor
+        }
 
     /** Subscribe to per-variable unassign events fired by every backtrack/undo; see
      *  [PropagationState.undoTo]. Combined-index encoding: bool id `v`, int id `numBoolVars + v`. */
@@ -539,8 +544,13 @@ class PropagationSession(
         // `currentFactor >= 0`); seed-assumption conflicts don't have a clause-form
         // antecedent to seed analysis with.
         val learned: ConflictAnalyzer.AnalysisResult? = run {
+            val nativeReason = state.nativeConflictReason
             val failingFid = state.currentFactor
             when {
+                // Native lane: the conflicting clause's literals are stashed directly (its factor id
+                // does not index the general learned store), so seed 1UIP from them.
+                nativeReason != null -> state.conflictAnalyzer.analyzeConflictClause(nativeReason)
+
                 failingFid >= 0 -> state.conflictAnalyzer.analyze(failingFid)
 
                 state.lastDecisionConflictVar >= 0 ->

@@ -157,6 +157,13 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     while (revTrail.size > mark.revSize) revTrail.removeAt(revTrail.size - 1)
     boolPinOrder.truncateTo(mark.pinOrderSize)
     levelToDecisionVar.truncateTo(mark.ltdvSize)
+    // The native-SAT BCP cursor must not point past the truncated trail; the surviving prefix is
+    // already propagated, so resume from its end. Any stashed conflict reason belonged to the
+    // rewound state.
+    nativeEngine?.let {
+        it.bcpHead = boolPinOrder.size
+        nativeConflictReason = null
+    }
     // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
     // undo to the same mark returns to the same logical state.
     for ((fid, payload) in mark.snapshottablePayloads) {
