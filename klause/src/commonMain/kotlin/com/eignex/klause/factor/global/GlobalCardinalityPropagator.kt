@@ -300,6 +300,7 @@ internal class GlobalCardinalityPropagator(
             // rerouting that variable's unit along an alternate path. Only if a reroute has no alternate do
             // we fall back to a full re-solve. Either way no O(n) warm-start replay on the common path.
             var needResolve = false
+
             // Block the newly-absent var→cover edges of the changed variables (`dirty` from the int-event
             // delta), recovering a broken assignment in place. Only a variable whose domain shrank can have
             // a newly-absent edge, so scanning just those is complete; a repeated `xs` (one var id → several

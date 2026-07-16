@@ -8,7 +8,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.binarySearchInt
 
@@ -117,7 +116,7 @@ private fun FlatZincCompiler.emitSetInLiteral(elem: FznExpr, values: IntArray, r
     }
     if (rExpr == null) {
         if (membershipLits.isEmpty()) {
-            factors.add(Clause(EmptyIntArray))
+            postFalseFactor()
             return
         }
         factors.add(Cardinality.atLeastOne(membershipLits.toIntArray()))
@@ -334,7 +333,7 @@ internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reif
             val lit = if (strict) Lit.negate(r) else r
             factors.add(Clause(intArrayOf(lit)))
         } else if (strict) {
-            factors.add(Clause(EmptyIntArray))
+            postFalseFactor()
         }
         return
     }

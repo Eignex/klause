@@ -22,7 +22,11 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
         for (vi in xDom.min.toInt()..xDom.max.toInt()) {
             val yIdx = vi - xDom.min.toInt()
             if (yIdx !in ys.indices) {
-                factors.add(Clause(intArrayOf()))
+                // vi is not a valid index into the array, so x cannot take it; forbid just that
+                // value rather than posting an empty clause that would falsely kill the whole model.
+                val xOob = allocBool("__arraysetelem_oob_${vi}_${factors.size}")
+                factors.add(ReifiedLinear(xOob, intArrayOf(1), intArrayOf(x), LinearOp.EQ, vi))
+                factors.add(Clause(intArrayOf(Lit.make(xOob, false))))
                 continue
             }
             val ySet = ys[yIdx]

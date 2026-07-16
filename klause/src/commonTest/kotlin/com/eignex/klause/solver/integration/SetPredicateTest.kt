@@ -37,6 +37,20 @@ class SetPredicateTest {
     }
 
     @Test
+    fun `set_in with no reachable value is unsatisfiable rather than crashing`() {
+        // x's domain is disjoint from the target set, so membership is infeasible. The compiler
+        // posts a false factor; it must not build an empty Clause (which the factor rejects).
+        val src = """
+            var 10..20: x;
+            constraint set_in(x, {1, 2, 3});
+            solve satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        assertIs<SolveResult.Unsat>(r)
+    }
+
+    @Test
     fun `set_in over a hole domain skips hole values and stays satisfiable`() {
         // Regression: set_in(x, lo..hi) lowers to one ReifiedLinear(chan = x==v) per value v
         // in the range, OR-ed via atLeastOne. Values that are interior holes of x's domain
