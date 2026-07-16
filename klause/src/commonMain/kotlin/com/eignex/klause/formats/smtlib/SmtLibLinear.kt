@@ -22,21 +22,33 @@ internal fun SmtLibQfLia.Builder.isArithmeticRelation(t: SExpr.SList): Boolean {
  *  nothing) or false (post the false literal ⇒ unsat) rather than an empty [Linear]. */
 internal fun SmtLibQfLia.Builder.assertLinear(t: SExpr.SList) {
     val rel = relationToLinear(t)
-    if (rel.vars.isEmpty()) {
-        if (!constRelationHolds(rel.op, rel.bound)) forceTrue(Lit.negate(trueLit()))
-        return
+    assertLinearRow(rel.coeffs, rel.vars, rel.op, rel.bound)
+}
+
+/** Post a linear row, or resolve a variable-free relation to trivially-true (post nothing) or
+ *  false (post the false literal ⇒ unsat) — never an empty [Linear]. Shared by the assert and the
+ *  reified-relation paths. */
+internal fun SmtLibQfLia.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) {
+    if (vars.isEmpty()) {
+        if (!constRelationHolds(op, bound)) forceTrue(Lit.negate(trueLit()))
+    } else {
+        factors.add(Linear(coeffs, vars, op, bound))
     }
-    factors.add(Linear(rel.coeffs, rel.vars, rel.op, rel.bound))
+}
+
+/** Require a relation node to have exactly two operands (`(op a b)`), else reject as unsupported. */
+internal fun requireBinaryRelation(node: SExpr.SList, op: String) {
+    if (node.items.size != 3) {
+        throw UnsupportedSmtException(
+            "$op with ${node.items.size - 1} operands not supported as a single linear relation",
+        )
+    }
 }
 
 /** Lower `(op lhs rhs)` to one linear relation. */
 internal fun SmtLibQfLia.Builder.relationToLinear(t: SExpr.SList): Rel {
     val op = (t.items[0] as SExpr.Atom).text
-    if (t.items.size != 3) {
-        throw UnsupportedSmtException(
-            "$op with ${t.items.size - 1} operands not supported as a single linear relation",
-        )
-    }
+    requireBinaryRelation(t, op)
     return relFromOperands(op, linearTerm(t.items[1]), linearTerm(t.items[2]))
 }
 
