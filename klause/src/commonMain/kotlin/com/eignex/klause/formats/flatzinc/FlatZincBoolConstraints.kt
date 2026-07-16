@@ -119,6 +119,7 @@ internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, op: BoolCmpOp) {
 }
 
 internal fun FlatZincCompiler.emitBool2Int(c: FznConstraint) {
+    expectArity(c, 2)
     val b = resolveBoolLit(c.args[0])
     val x = resolveIntVar(c.args[1])
     factors.add(Linear(intArrayOf(1), intArrayOf(x), LinearOp.GE, 0))

@@ -509,6 +509,12 @@ internal class FlatZincCompiler(
     }
 
     internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, 0, 0)
+
+    /** Require constraint [c] to carry exactly [n] arguments, failing with a [FlatZincParseException]
+     *  (not a bare `require`/index crash) when a malformed instance supplies the wrong arity. */
+    internal fun expectArity(c: FznConstraint, n: Int) {
+        if (c.args.size != n) failHere("`${c.name}` expects $n arguments, got ${c.args.size}")
+    }
 }
 
 /** Parse and compile FlatZinc source. */
