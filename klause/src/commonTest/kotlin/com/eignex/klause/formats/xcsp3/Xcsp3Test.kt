@@ -1428,4 +1428,11 @@ class Xcsp3Test {
         assertSame(tables[0].tuples, tables[1].tuples, "rows share the cached tuple array")
         assertSame(tables[1].tuples, tables[2].tuples, "rows share the cached tuple array")
     }
+
+    @Test
+    fun `a truncated intension call fails with a disciplined require error rather than an index out of bounds`() {
+        // A call whose argument list is cut off after '(' must report the missing ')' like the file's
+        // other guarded reads, rather than dereferencing past the end of the input.
+        assertFailsWith<IllegalArgumentException> { FExpr.parse("eq(") }
+    }
 }
