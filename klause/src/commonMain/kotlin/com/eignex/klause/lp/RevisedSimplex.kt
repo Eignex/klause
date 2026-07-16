@@ -3,6 +3,8 @@ package com.eignex.klause.lp
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.koblas.EtaBasis
+import com.eignex.koblas.SparseLu
 import kotlin.math.abs
 
 /**
