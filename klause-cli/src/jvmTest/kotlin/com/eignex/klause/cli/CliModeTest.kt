@@ -9,9 +9,19 @@ import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class CliModeTest {
+
+    @Test
+    fun `numeric flags reject a non-numeric value with a usage error`() {
+        val specs = commonFlagSpecs(CommonOptions())
+        for (flag in listOf("-t", "-r", "-n")) {
+            val e = assertFailsWith<CliUsageException> { parseArgs(arrayOf(flag, "abc"), specs) {} }
+            assertTrue("$flag expects an integer" in e.message.orEmpty(), "$flag: ${e.message}")
+        }
+    }
 
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()

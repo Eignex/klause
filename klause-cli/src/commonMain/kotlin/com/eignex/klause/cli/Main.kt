@@ -22,6 +22,15 @@ internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, 
 /** Parse args once, select the front-end mode, load the instance and run the shared driver.
  *  See the file header for the full flow. */
 fun main(args: Array<String>) {
+    try {
+        run(args)
+    } catch (e: CliUsageException) {
+        errPrintln("klause-cli: ${e.message}")
+        exitCli(2)
+    }
+}
+
+private fun run(args: Array<String>) {
     val common = CommonOptions()
     // One parse over the union of common + every mode's flags. Each mode's flags mutate that
     // mode's own session; we keep every session and use only the one finally selected. (Mode
