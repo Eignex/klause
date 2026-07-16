@@ -2,8 +2,9 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.ClauseTier
-import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
+import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
+import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedPb
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Lit
@@ -33,7 +34,7 @@ internal sealed interface AdvanceOutcome {
      *  hands it to [PropagationSession.addLearnedClause], and resumes with the new
      *  clause now constraining future search and unit-propagating the asserting
      *  literal. */
-    data class Backjump(val learned: Learned) : AdvanceOutcome
+    data class Backjump(val learned: LearnedConstraint) : AdvanceOutcome
 }
 
 internal fun BacktrackSolver.advance(
@@ -44,7 +45,7 @@ internal fun BacktrackSolver.advance(
     decisionsRemaining: () -> Long,
     decrement: () -> Unit,
     sink: SolveStatsSink? = null,
-    relearnTripped: ((Learned) -> Boolean)? = null,
+    relearnTripped: ((LearnedConstraint) -> Boolean)? = null,
     onConflictTick: (() -> Unit)? = null,
     pruneLearned: (() -> Learned?)? = null,
 ): AdvanceOutcome {
@@ -81,7 +82,7 @@ internal fun BacktrackSolver.advance(
             // [backjumpAndLearn]), so the learned nogood both forces its asserting
             // literal now and constrains all future propagation — not just the one-shot
             // jump-distance prune.
-            val learned = r.learnedClause as? ConflictAnalyzer.AnalysisResult.Learned
+            val learned = r.learnedClause as? LearnedConstraint
             // Only take the non-chronological backjump when the clause is a proper
             // 1UIP (asserting) clause — popping to its backjump level then makes it
             // unit and forces the asserting literal. A non-asserting clause (e.g. the
@@ -97,7 +98,7 @@ internal fun BacktrackSolver.advance(
             // conflict falls through to chronological within-node enumeration.
             if (learned != null &&
                 learned.asserting &&
-                learned.literals.none { session.litTruth(it) == true } &&
+                learned.guardLiterals.none { session.litTruth(it) == true } &&
                 relearnTripped?.invoke(learned) != true
             ) {
                 sink?.search?.observeLearn()
@@ -109,7 +110,7 @@ internal fun BacktrackSolver.advance(
             when {
                 learned == null -> sink?.ca?.observeNotApplicable()
                 !learned.asserting -> sink?.ca?.observeNonAsserting()
-                learned.literals.any { session.litTruth(it) == true } -> sink?.ca?.observeRejectedTrueLit()
+                learned.guardLiterals.any { session.litTruth(it) == true } -> sink?.ca?.observeRejectedTrueLit()
             }
             continue
         }
@@ -292,6 +293,7 @@ internal fun BacktrackSolver.vivify(session: PropagationSession, params: Backtra
         cursor = (cursor + 1) % count
         examined++
         if (session.learnedClausePermanent(idx)) continue
+        if (!session.isLearnedClause(idx)) continue // pseudo-Boolean nogoods aren't vivified (#1119)
         val clause = session.learnedClauseAt(idx)
         val lits = clause.literals
         // Pure-Boolean only; nothing to shorten below 3 literals (we never emit units).
@@ -376,7 +378,7 @@ internal enum class BackjumpTerm {
  *     instances; [BackjumpTerm.Stuck] surfaces to the caller in that case.
  */
 internal fun BacktrackSolver.backjumpAndLearn(
-    learned: Learned,
+    learned: LearnedConstraint,
     trail: MutableList<TrailNode>,
     session: PropagationSession,
     @Suppress("UNUSED_PARAMETER") params: BacktrackParams,
@@ -389,7 +391,7 @@ internal fun BacktrackSolver.backjumpAndLearn(
     // always < the conflict's current level), so termination is guaranteed in a
     // sane analyzer — the cap is purely defensive.
     repeat(MAX_CASCADING_BACKJUMPS) {
-        // A non-asserting clause never becomes unit after the backjump, so it can't
+        // A non-asserting constraint never becomes unit after the backjump, so it can't
         // force its asserting literal — fall back to chronological backtracking.
         if (!current.asserting) return BackjumpTerm.Stuck
         // Pop trail + session to the backjump level.
@@ -397,25 +399,26 @@ internal fun BacktrackSolver.backjumpAndLearn(
             session.popLast()
             trail.removeAt(trail.size - 1)
         }
-        // Build the Clause and assert it. The clause's literals are non-empty as
-        // long as the analyzer produced a UIP (always the case in well-formed
-        // calls); if the clause came out empty, fall back to chronological.
-        if (current.literals.isEmpty()) return BackjumpTerm.Stuck
-        val clause = Clause(current.literals)
-        val result = session.addLearnedClause(clause, current.lbd)
+        // Materialize the learned constraint and assert it — a clause for a 1UIP clause, a
+        // pseudo-Boolean constraint for a cutting-planes nogood (#1119 Phase 3). Empty ⇒ stuck.
+        if (current.guardLiterals.isEmpty()) return BackjumpTerm.Stuck
+        val result = when (val c = current) {
+            is Learned -> session.addLearnedClause(Clause(c.literals), c.lbd)
+            is LearnedPb -> session.addLearnedPb(c.weights, c.literals, c.degree, c.lbd)
+        }
         when (result) {
             is PropagationResult.Implied -> return BackjumpTerm.Resume
 
             is PropagationResult.Unsat -> {
                 // Assertion cascaded into another conflict. The session ran the
-                // analyzer on the new conflict; if a new learned clause came back,
+                // analyzer on the new conflict; if a new learned constraint came back,
                 // recurse — otherwise we're stuck.
                 val next = result.learnedClause
-                    as? Learned
+                    as? LearnedConstraint
                     ?: return BackjumpTerm.Stuck
-                // If the new backjump target is level 0 and the clause is empty
+                // If the new backjump target is level 0 and the constraint is empty
                 // after that jump, the whole problem is infeasible.
-                if (next.backjumpLevel == 0 && next.literals.isEmpty()) {
+                if (next.backjumpLevel == 0 && next.guardLiterals.isEmpty()) {
                     return BackjumpTerm.Exhausted
                 }
                 current = next

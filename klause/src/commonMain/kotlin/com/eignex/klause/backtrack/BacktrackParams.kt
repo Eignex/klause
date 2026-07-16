@@ -300,6 +300,14 @@ data class BacktrackParams(
      * requests it (still a no-op on an ineligible problem); `false` forces the general LCG path.
      */
     val nativeSat: Boolean? = null,
+    /**
+     * Learn pseudo-Boolean cutting-planes nogoods on conflicts over pseudo-Boolean constraints (#1119
+     * Phase 3): conflict analysis runs a cutting-planes resolvent (cancellation + rounding + saturation)
+     * with a clause-resolvent fallback, and stores learned PB constraints alongside clauses. Off by
+     * default; ignored on problems with integer variables. A behavior change (unlike the native-SAT lane),
+     * so it stays opt-in pending the per-corpus A/B.
+     */
+    val pbLearning: Boolean = false,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
