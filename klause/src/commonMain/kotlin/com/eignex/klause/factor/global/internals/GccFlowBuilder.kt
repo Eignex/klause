@@ -323,26 +323,98 @@ internal class GccFlowBuilder {
         return 0
     }
 
-    private var sccNodeAdj: Array<IntArrayList> = emptyArray()
+    private var sccIndex = EmptyIntArray
+    private var sccLow = EmptyIntArray
+    private var sccOnStack = BooleanArray(0)
+    private var sccStk = EmptyIntArray
+    private var sccCall = EmptyIntArray
+    private var sccIter = EmptyIntArray
 
+    /**
+     * Residual-SCC labels over nodes `0 until limit`, written into [sccId]. Iterative Tarjan run
+     * *directly* over the residual edges (`adj[v]` filtered by `capGet(e) > 0` and `edgeTo(e) < limit`)
+     * with no materialized adjacency — the per-fire `nodeAdj` build was a top cost on cardinality-heavy
+     * propagation. Visitation order matches the materialized version, and the prune only reads the SCC
+     * partition (not label values), so pruning is unchanged. Scratch buffers are reused across fires.
+     */
     fun computeSccResidual(limit: Int, sccId: IntArray) {
-        // Reuse the residual-adjacency buffer across fires (grown on demand, live prefix cleared) — the
-        // Array-of-lists allocation is a top per-fire cost on cardinality-heavy propagation.
-        if (sccNodeAdj.size < limit) {
-            val old = sccNodeAdj
-            sccNodeAdj = Array(limit) { if (it < old.size) old[it] else IntArrayList() }
+        if (sccIndex.size < limit) {
+            sccIndex = IntArray(limit)
+            sccLow = IntArray(limit)
+            sccOnStack = BooleanArray(limit)
+            sccStk = IntArray(limit)
+            sccCall = IntArray(limit)
+            sccIter = IntArray(limit)
         }
-        val nodeAdj = sccNodeAdj
-        for (v in 0 until limit) {
-            nodeAdj[v].clear()
-            val neigh = adj[v]
-            for (k in 0 until neigh.size) {
-                val eIdx = neigh[k]
-                val w = edgeTo[eIdx]
-                if (w < limit && capGet(eIdx) > 0) nodeAdj[v].add(w)
+        val index = sccIndex
+        val low = sccLow
+        val onStack = sccOnStack
+        val stk = sccStk
+        val call = sccCall
+        val iter = sccIter
+        for (i in 0 until limit) {
+            index[i] = -1
+            onStack[i] = false
+            sccId[i] = -1
+        }
+        var stackTop = 0
+        var nextIndex = 0
+        var nextScc = 0
+        for (start in 0 until limit) {
+            if (index[start] != -1) continue
+            var depth = 0
+            call[0] = start
+            iter[0] = 0
+            index[start] = nextIndex
+            low[start] = nextIndex
+            nextIndex++
+            stk[stackTop++] = start
+            onStack[start] = true
+            while (depth >= 0) {
+                val v = call[depth]
+                val neigh = adj[v]
+                var it = iter[depth]
+                var w = -1
+                while (it < neigh.size) {
+                    val e = neigh[it]
+                    val t = edgeTo[e]
+                    if (t < limit && capGet(e) > 0) {
+                        w = t
+                        break
+                    }
+                    it++
+                }
+                if (w >= 0) {
+                    iter[depth] = it + 1
+                    if (index[w] == -1) {
+                        depth++
+                        call[depth] = w
+                        iter[depth] = 0
+                        index[w] = nextIndex
+                        low[w] = nextIndex
+                        nextIndex++
+                        stk[stackTop++] = w
+                        onStack[w] = true
+                    } else if (onStack[w] && index[w] < low[v]) {
+                        low[v] = index[w]
+                    }
+                } else {
+                    if (low[v] == index[v]) {
+                        while (true) {
+                            val x = stk[--stackTop]
+                            onStack[x] = false
+                            sccId[x] = nextScc
+                            if (x == v) break
+                        }
+                        nextScc++
+                    }
+                    depth--
+                    if (depth >= 0) {
+                        val p = call[depth]
+                        if (low[v] < low[p]) low[p] = low[v]
+                    }
+                }
             }
         }
-        val res = reginTarjanScc(nodeAdj, limit)
-        for (i in 0 until limit) sccId[i] = res[i]
     }
 }
