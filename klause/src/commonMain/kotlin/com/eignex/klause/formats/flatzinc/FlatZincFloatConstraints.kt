@@ -25,7 +25,7 @@ private fun IntArray.toLongs(): LongArray = LongArray(size) { this[it].toLong() 
 
 /** Lower `int2float` as a scaled linear equality on bucket indices. */
 internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xInt = resolveIntVar(c.args[0])
     val yName = (c.args[1] as? FznExpr.Ident)?.name
         ?: failHere("int2float: second arg must be a float var identifier")
@@ -63,7 +63,7 @@ private sealed interface FloatRef {
 
 /** Lower float comparisons on bucket indices. */
 internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp, strict: Boolean, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val a = resolveFloatVarOrConst(c.args[0])
     val b = resolveFloatVarOrConst(c.args[1])
     when {
@@ -136,7 +136,7 @@ internal fun FlatZincCompiler.emitFloatLinearStrict(c: FznConstraint, reified: B
 
 /** Lower `float_min`/`float_max` with inequalities plus equality disjunction. */
 internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val argA = c.args[0]
     val argB = c.args[1]
     val argC = c.args[2]
@@ -171,7 +171,7 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
 
 /** Lower `float_times` to a bucket-index table. */
 internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val aRef = resolveFloatVarOrConst(c.args[0])
     val bRef = resolveFloatVarOrConst(c.args[1])
     val cRef = resolveFloatVarOrConst(c.args[2])
@@ -242,7 +242,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
 
 /** Lower `float_abs(x, y)` (`y = |x|`) to a bucket-index table, mirroring [emitFloatTimes]. */
 internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xRef = resolveFloatVarOrConst(c.args[0])
     val yRef = resolveFloatVarOrConst(c.args[1])
     if (xRef is FloatRef.Const) {
@@ -293,7 +293,7 @@ internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
  *  constant is unrepresentable in the result's bucketing rejects, so a dropped row never silently
  *  forbids a feasible index. */
 internal fun FlatZincCompiler.emitArrayFloatElement(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val idx = resolveIntVar(c.args[0])
     val arr = evalFloatConstArray(c.args[1])
     val xRef = resolveFloatVarOrConst(c.args[2])
@@ -352,7 +352,7 @@ internal fun FlatZincCompiler.evalFloatVarArray(e: FznExpr): List<FloatBucketing
 private data class ScaledFloatLinear(val coeffs: IntArray, val vars: IntArray, val bound: Long)
 
 private fun FlatZincCompiler.resolveScaledFloatLinear(c: FznConstraint, reified: Boolean): ScaledFloatLinear {
-    require(c.args.size == if (reified) 4 else 3)
+    expectArity(c, if (reified) 4 else 3)
     val coefs = evalFloatConstArray(c.args[0])
     val varRefs = evalFloatVarArray(c.args[1])
     val bound = evalFloatConst(c.args[2])

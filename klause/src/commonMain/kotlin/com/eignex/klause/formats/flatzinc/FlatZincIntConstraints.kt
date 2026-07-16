@@ -13,7 +13,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 
 internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val op = when (c.name) {
@@ -45,7 +45,7 @@ internal fun FlatZincCompiler.postLinear(coeffs: LongArray, vars: IntArray, op: 
 }
 
 internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 4 else 3)
+    expectArity(c, if (reified) 4 else 3)
     val coeffs = evalIntConstArrayLong(c.args[0])
     val vars = evalIntVarArray(c.args[1])
     val bound = evalIntConst(c.args[2])
@@ -60,7 +60,7 @@ internal fun FlatZincCompiler.emitIntLinear(c: FznConstraint, reified: Boolean) 
 
 internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
     // Negative coefficients would require bool-to-int channeling.
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val coefs = evalIntConstArrayLong(c.args[0])
     val bools = evalBoolVarArray(c.args[1])
     val bound = evalIntConst(c.args[2])
@@ -74,7 +74,7 @@ internal fun FlatZincCompiler.emitBoolLinear(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitIntTimes(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     factors.add(
         Product(
             a = resolveIntVar(c.args[0]),
@@ -85,7 +85,7 @@ internal fun FlatZincCompiler.emitIntTimes(c: FznConstraint) {
 }
 
 private fun FlatZincCompiler.emitIntAddSub(c: FznConstraint, bCoeff: Int) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val r = resolveIntVar(c.args[2])
@@ -97,7 +97,7 @@ internal fun FlatZincCompiler.emitIntPlus(c: FznConstraint) = emitIntAddSub(c, b
 internal fun FlatZincCompiler.emitIntMinus(c: FznConstraint) = emitIntAddSub(c, bCoeff = -1)
 
 internal fun FlatZincCompiler.emitIntAbs(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val a = resolveIntVar(c.args[0])
     val r = resolveIntVar(c.args[1])
     var i = 0
@@ -105,7 +105,7 @@ internal fun FlatZincCompiler.emitIntAbs(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val r = resolveIntVar(c.args[2])
@@ -117,7 +117,7 @@ internal fun FlatZincCompiler.emitIntMaxMin(c: FznConstraint, max: Boolean) {
 
 /** FlatZinc `int_div` uses truncated-toward-zero semantics. */
 internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val q = resolveIntVar(c.args[2])
@@ -126,7 +126,7 @@ internal fun FlatZincCompiler.emitIntDiv(c: FznConstraint) {
 
 /** `int_mod` shares truncated div/mod lowering with [emitIntDiv]. */
 internal fun FlatZincCompiler.emitIntMod(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val rem = resolveIntVar(c.args[2])
@@ -149,7 +149,7 @@ private fun FlatZincCompiler.emitTruncDivMod(a: Int, b: Int, qVar: Int?, remVar:
 }
 
 internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Boolean) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val idx = resolveIntVar(c.args[0])
     val result = resolveIntVar(c.args[2])
     val arr = if (varArray) {
@@ -161,7 +161,7 @@ internal fun FlatZincCompiler.emitArrayIntElement(c: FznConstraint, varArray: Bo
 }
 
 internal fun FlatZincCompiler.emitIntCmpReif(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val r = Lit.variable(resolveBoolLit(c.args[2]))
@@ -195,7 +195,7 @@ private fun FlatZincCompiler.postHalfReified(
 }
 
 internal fun FlatZincCompiler.emitIntCmpImp(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveIntVar(c.args[0])
     val b = resolveIntVar(c.args[1])
     val guard = resolveBoolLit(c.args[2])
@@ -212,7 +212,7 @@ internal fun FlatZincCompiler.emitIntCmpImp(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitIntLinearImp(c: FznConstraint) {
-    require(c.args.size == 4)
+    expectArity(c, 4)
     val coeffs = evalIntConstArray(c.args[0])
     val vars = evalIntVarArray(c.args[1])
     val bound = evalIntConst(c.args[2]).toInt()
@@ -226,7 +226,7 @@ internal fun FlatZincCompiler.emitIntLinearImp(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitArrayMinMax(c: FznConstraint, max: Boolean) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val result = resolveIntVar(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     factors.add(ArrayMinMax(result = result, xs = xs, max = max))

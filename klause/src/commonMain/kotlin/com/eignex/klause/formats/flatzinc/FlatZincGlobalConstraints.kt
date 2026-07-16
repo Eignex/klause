@@ -26,7 +26,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 internal fun FlatZincCompiler.emitAllDifferentExceptZero(c: FznConstraint) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val vars = evalIntVarArray(c.args[0])
     emitAllDifferentExcept(vars, longArrayOf(0))
 }
@@ -77,7 +77,7 @@ private fun FlatZincCompiler.emitAllDifferentCore(vars: IntArray, exceptSet: Lon
 }
 
 internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val vars = evalIntVarArray(c.args[0])
     if (vars.size < 2) return
     for (i in 1 until vars.size) {
@@ -86,7 +86,7 @@ internal fun FlatZincCompiler.emitAllEqual(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitMember(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xs = evalIntVarArray(c.args[0])
     val y = resolveIntVar(c.args[1])
     val eqLits = IntArray(xs.size) {
@@ -98,21 +98,21 @@ internal fun FlatZincCompiler.emitMember(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitSort(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xs = evalIntVarArray(c.args[0])
     val ys = evalIntVarArray(c.args[1])
     factors.add(Sort(xs, ys))
 }
 
 internal fun FlatZincCompiler.emitSymmetricAllDifferent(c: FznConstraint) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val xs = evalIntVarArray(c.args[0])
     factors.add(SymmetricAllDifferent(xs, indexOffset = 1))
 }
 
 /** Emit `regular(seq, Q, S, d, q0, F)`. */
 internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
-    require(c.args.size == 6)
+    expectArity(c, 6)
     val seq = evalIntVarArray(c.args[0])
     val numStates = evalIntConst(c.args[1]).toInt()
     val numSymbols = evalIntConst(c.args[2]).toInt()
@@ -128,7 +128,7 @@ internal fun FlatZincCompiler.emitRegular(c: FznConstraint) {
 
 /** Emit `mdd(x, ...)` from FlatZinc's node/edge representation. */
 internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
-    require(c.args.size == 7)
+    expectArity(c, 7)
     val seq = evalIntVarArray(c.args[0])
     val n = seq.size
     val level = evalIntConstArray(c.args[2]) // level[node-1], 1-based, nodes 1..N
@@ -195,14 +195,14 @@ internal fun FlatZincCompiler.emitMdd(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitTable(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xs = evalIntVarArray(c.args[0])
     val tuples = evalIntConstArrayLong(c.args[1])
     factors.add(Table(xs, tuples))
 }
 
 internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
-    require(c.args.size == 4)
+    expectArity(c, 4)
     val xs = evalIntVarArray(c.args[0])
     val ys = evalIntVarArray(c.args[1])
     val wConst = tryEvalIntConstArrayLong(c.args[2])
@@ -223,7 +223,7 @@ internal fun FlatZincCompiler.emitDiffn(c: FznConstraint, nonStrict: Boolean) {
 }
 
 internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val s = evalIntConst(c.args[0])
     val t = evalIntConst(c.args[1])
     val xs = evalIntVarArray(c.args[2])
@@ -231,7 +231,7 @@ internal fun FlatZincCompiler.emitValuePrecede(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val values = evalIntConstArrayLong(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     if (xs.isEmpty()) return
@@ -239,14 +239,14 @@ internal fun FlatZincCompiler.emitValuePrecedeChain(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitLexLess(c: FznConstraint, strict: Boolean) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xs = evalIntVarArray(c.args[0])
     val ys = evalIntVarArray(c.args[1])
     factors.add(LexLess(xs, ys, strict))
 }
 
 internal fun FlatZincCompiler.emitNValue(c: FznConstraint, mode: NValue.Mode) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val n = resolveIntVar(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     factors.add(NValue(n, xs, mode))
@@ -254,14 +254,14 @@ internal fun FlatZincCompiler.emitNValue(c: FznConstraint, mode: NValue.Mode) {
 
 internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean) {
     if (withOffsets) {
-        require(c.args.size == 4)
+        expectArity(c, 4)
         val f = evalIntVarArray(c.args[0])
         val fOff = evalIntConst(c.args[1]).toInt()
         val g = evalIntVarArray(c.args[2])
         val gOff = evalIntConst(c.args[3]).toInt()
         factors.add(Inverse(f, g, fOff, gOff))
     } else {
-        require(c.args.size == 2)
+        expectArity(c, 2)
         val f = evalIntVarArray(c.args[0])
         val g = evalIntVarArray(c.args[1])
         factors.add(Inverse(f, g, fOffset = 1, gOffset = 1))
@@ -269,7 +269,7 @@ internal fun FlatZincCompiler.emitInverse(c: FznConstraint, withOffsets: Boolean
 }
 
 internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val vars = evalIntVarArray(c.args[0])
     val bc = c.annotations.any { it.name == "bounds" }
     emitAllDifferentCore(vars, exceptSet = EmptyLongArray, boundsConsistent = bc)
@@ -277,7 +277,7 @@ internal fun FlatZincCompiler.emitAllDifferent(c: FznConstraint) {
 
 /** Emit `circuit` / `subcircuit`, channeling to 0-based values when needed. */
 internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val srcIds = evalIntVarArray(c.args[0])
     val n = srcIds.size
     var offset = Long.MAX_VALUE
@@ -304,7 +304,7 @@ internal fun FlatZincCompiler.emitCircuit(c: FznConstraint, sub: Boolean) {
 }
 
 internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
-    require(c.args.size == 4) { "cumulative expects 4 args, got ${c.args.size}" }
+    expectArity(c, 4)
     val starts = evalIntVarArray(c.args[0])
     val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
     val (resources, resourceVars) = resolveIntArrayConstOrVars(c.args[2])
@@ -323,7 +323,7 @@ internal fun FlatZincCompiler.emitCumulative(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
-    require(c.args.size == 4) { "sliding_sum expects 4 args (low,up,seq,vs), got ${c.args.size}" }
+    expectArity(c, 4)
     val low = evalIntConst(c.args[0]).toInt()
     val up = evalIntConst(c.args[1]).toInt()
     val seq = evalIntConst(c.args[2]).toInt()
@@ -336,7 +336,7 @@ internal fun FlatZincCompiler.emitSlidingSum(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
-    require(c.args.size == 2) { "disjunctive expects 2 args, got ${c.args.size}" }
+    expectArity(c, 2)
     val starts = evalIntVarArray(c.args[0])
     val (durations, durationVars) = resolveIntArrayConstOrVars(c.args[1])
     factors.add(Cumulative.unary(starts = starts, durations = durations, durationVars = durationVars))
@@ -373,7 +373,7 @@ private fun FlatZincCompiler.emitCountComparison(
     tag: String,
     bounds: (n: Int, count: Int) -> Pair<Int, Int>,
 ) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val n = evalIntConst(c.args[0]).toInt()
     val xs = evalIntVarArray(c.args[1])
     val v = evalIntConst(c.args[2]).toInt()
@@ -394,7 +394,7 @@ internal fun FlatZincCompiler.emitAtLeast(c: FznConstraint) =
 internal fun FlatZincCompiler.emitAtMost(c: FznConstraint) = emitCountComparison(c, "atmost") { n, _ -> 0 to n }
 
 internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
-    require(c.args.size == if (variant.lowUp) 4 else 3)
+    expectArity(c, if (variant.lowUp) 4 else 3)
     val xs = evalIntVarArray(c.args[0])
     val cover = evalIntConstArrayLong(c.args[1])
     if (variant.lowUp) {
@@ -436,7 +436,7 @@ internal fun FlatZincCompiler.emitGcc(c: FznConstraint, variant: GccVariant) {
 }
 
 internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val card = evalIntVarArray(c.args[0])
     val value = evalIntConstArrayLong(c.args[1])
     val base = evalIntVarArray(c.args[2])
@@ -445,7 +445,7 @@ internal fun FlatZincCompiler.emitDistribute(c: FznConstraint) {
 
 /** Emit `klause_count_eq(x, y, c)` for constant `y` through GCC. */
 internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val xs = evalIntVarArray(c.args[0])
     val value = evalIntConst(c.args[1])
     val (countConst, countVar) = resolveIntConstOrVar(c.args[2])
@@ -469,7 +469,7 @@ internal fun FlatZincCompiler.emitCountEq(c: FznConstraint) {
 
 /** Emit `among(n, x, v)` through GCC counts plus a sum constraint. */
 internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val n = resolveIntVar(c.args[0])
     val xs = evalIntVarArray(c.args[1])
     val setValues = resolveSetLiteral(c.args[2])
@@ -491,7 +491,7 @@ internal fun FlatZincCompiler.emitAmong(c: FznConstraint) {
 
 internal fun FlatZincCompiler.emitAnnotationConstraint(c: FznConstraint) {
     if (forLocalSearch) return
-    require(c.args.size == 1) { "${c.name} expects 1 arg" }
+    expectArity(c, 1)
     val lit = resolveBoolLit(c.args[0])
     factors.add(Clause(intArrayOf(lit)))
 }
