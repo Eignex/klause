@@ -119,6 +119,9 @@ internal class OznEvaluator(items: List<OznItem>) {
 
     private fun evalComprehension(c: OznExpr.Comprehension, ctx: Context): OznValue {
         val out = ArrayList<OznValue>()
+        // Generator variables are scoped to the comprehension; snapshot and restore locals so they do
+        // not leak into later output items (mirrors the `let` scoping above).
+        val saved = ctx.locals.toMap()
         fun recurse(genIdx: Int) {
             if (genIdx == c.generators.size) {
                 out.add(eval(c.body, ctx))
@@ -165,6 +168,8 @@ internal class OznEvaluator(items: List<OznItem>) {
             }
         }
         recurse(0)
+        ctx.locals.clear()
+        ctx.locals.putAll(saved)
         if (c.isSet) {
             val ints = out.map { (it as OznValue.IntV).value.toInt() }.distinct().sorted().toIntArray()
             return OznValue.SetV(ints)
@@ -394,9 +399,9 @@ internal class OznEvaluator(items: List<OznItem>) {
             // MiniZinc `/` is always float division; integer division is the separate `div` operator.
             "/" -> OznValue.FloatV(lf / rf)
 
-            "div" -> OznValue.IntV(li / ri)
+            "div" -> OznValue.IntV(intDivMod(li, ri, "div"))
 
-            "mod" -> OznValue.IntV(li % ri)
+            "mod" -> OznValue.IntV(intDivMod(li, ri, "mod"))
 
             "<" -> OznValue.BoolV(if (asFloat) lf < rf else li < ri)
 
@@ -412,6 +417,13 @@ internal class OznEvaluator(items: List<OznItem>) {
 
             else -> throw OznEvalException("binary `${e.op}`")
         }
+    }
+
+    /** Integer `div`/`mod`, rejecting a zero divisor as an eval error rather than a raw
+     *  ArithmeticException. [op] is `"div"` or `"mod"`. */
+    private fun intDivMod(a: Long, b: Long, op: String): Long {
+        if (b == 0L) throw OznEvalException("$op by zero")
+        return if (op == "div") a / b else a % b
     }
 
     private data class Numeric(val long: Long, val double: Double, val isFloat: Boolean)
