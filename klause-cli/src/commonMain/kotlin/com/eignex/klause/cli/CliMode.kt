@@ -144,7 +144,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.STANDARD,
         valueLabel = "i",
         help = "stop after reporting i solutions (satisfy)",
-    ) { o.solutionCap = requireNotNull(it).toLong() },
+    ) { o.solutionCap = requireNotNull(it).toLongOrNull() ?: usageError("-n expects an integer, got `$it`") },
     FlagSpec(
         listOf("-s", "--statistics"),
         false,
@@ -163,14 +163,14 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.STANDARD,
         valueLabel = "ms",
         help = "wall-clock time limit in milliseconds",
-    ) { o.timeLimitMs = requireNotNull(it).toLong() },
+    ) { o.timeLimitMs = requireNotNull(it).toLongOrNull() ?: usageError("-t expects an integer, got `$it`") },
     FlagSpec(
         listOf("-r", "--random-seed"),
         true,
         FlagGroup.STANDARD,
         valueLabel = "i",
         help = "random seed",
-    ) { o.randomSeed = requireNotNull(it).toLong() },
+    ) { o.randomSeed = requireNotNull(it).toLongOrNull() ?: usageError("-r expects an integer, got `$it`") },
     FlagSpec(
         listOf("-p", "--parallel"),
         true,
@@ -366,10 +366,11 @@ private fun parseShortCluster(token: String, args: Array<String>, i: Int, byName
     return i + 1
 }
 
-internal fun usageError(msg: String): Nothing {
-    errPrintln("klause-cli: $msg")
-    exitCli(2)
-}
+/** A command-line usage error. [main] catches it to print the message and exit 2; throwing (rather
+ *  than exiting in place) keeps arg parsing testable and unwinds cleanly through the CLI. */
+internal class CliUsageException(message: String) : RuntimeException(message)
+
+internal fun usageError(msg: String): Nothing = throw CliUsageException(msg)
 
 /** Terminal classification reported to an [OutputProtocol] once the solve loop ends. */
 internal enum class Verdict {
