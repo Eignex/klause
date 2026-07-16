@@ -392,9 +392,13 @@ class PropagationSession(
     internal fun analyzeConflictClause(conflictClause: IntArray): ConflictAnalyzer.AnalysisResult =
         state.conflictAnalyzer.analyzeConflictClause(conflictClause)
 
+    /** True when this session runs the native-SAT lane; its learned clauses live in the arena store,
+     *  not the general database, so clause-database introspection routes differently. */
+    val usesNativeSat: Boolean get() = state.nativeEngine != null
+
     /** Current learned-clause count. Used by the engine to decide whether to invoke
      *  [forgetLearnedClauses] based on `BacktrackParams.maxLearnedClauses`. */
-    val learnedClauseCount: Int get() = state.learnedClauses.size
+    val learnedClauseCount: Int get() = state.nativeEngine?.count ?: state.learnedClauses.size
 
     /** LBD of the learned clause at [learnedIndex]. */
     fun learnedClauseLbd(learnedIndex: Int): Int = state.learnedClauseLbd(learnedIndex)
@@ -411,6 +415,11 @@ class PropagationSession(
             ?: error(
                 "learned constraint at $learnedIndex is not a clause; vivification and glue export are clause-only",
             )
+
+    /** Literals of learned clause [learnedIndex]. Routes to the native-SAT store when active (its
+     *  clauses aren't in the general database), else through [learnedClauseAt]. */
+    internal fun learnedClauseLiterals(learnedIndex: Int): IntArray =
+        state.nativeEngine?.literalsOf(learnedIndex) ?: learnedClauseAt(learnedIndex).literals
 
     /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)
@@ -441,7 +450,7 @@ class PropagationSession(
             if (skipPermanent && learnedClausePermanent(i)) continue
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
-            val lits = learnedClauseAt(i).literals
+            val lits = learnedClauseLiterals(i)
             if (lits.size > maxLen) continue
             out.add(asSharedClause(lits, lbd))
         }

@@ -276,6 +276,9 @@ internal fun BacktrackSolver.forgetTiered(
  * it in cannot lose models — checked by the learned-clause / witness validation tests.
  */
 internal fun BacktrackSolver.vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+    // Vivification is inprocessing (#1119 Phase 2); it reads the general learned database, which the
+    // native-SAT lane bypasses. Skip it there until the inprocessing loop is taught the arena store.
+    if (session.usesNativeSat) return 0
     val count = session.learnedClauseCount
     if (count == 0) return 0
     val numBool = session.problem.numBoolVars

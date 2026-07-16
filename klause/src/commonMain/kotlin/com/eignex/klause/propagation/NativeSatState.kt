@@ -37,6 +37,14 @@ internal class NativeSatState(private val state: PropagationState) {
     private val learnedStarts = IntArrayList()
     private var learnedCount = 0
 
+    // Per-learned-clause policy columns, parallel to the learned index — the native mirror of
+    // LearnedClauseDb's forgetting/three-tier metadata. `tier` holds a [ClauseTier] ordinal;
+    // `used` is a 0/1 reuse flag since the last reduction; `permanent` clauses survive every forget.
+    private val learnedLbd = IntArrayList()
+    private val learnedPermanent = IntArrayList()
+    private val learnedTier = IntArrayList()
+    private val learnedUsed = IntArrayList()
+
     // Within-clause indices of the two watched literals per clause handle: watchPos[2h], watchPos[2h+1].
     // A single-literal clause watches nothing (its unit is pinned at root and never unassigned).
     private val watchPos = IntArrayList()
@@ -133,8 +141,8 @@ internal class NativeSatState(private val state: PropagationState) {
      * already false, or just install watches when two or more literals are still open. The trailing
      * [propagate] call continues BCP from any pin this makes.
      */
-    fun addLearned(lits: IntArray): Int {
-        val h = appendLearned(lits)
+    fun addLearned(lits: IntArray, lbd: Int, permanent: Boolean): Int {
+        val h = appendLearned(lits, lbd, permanent)
         val len = lits.size
         if (len == 1) {
             if (state.litFalse(lits[0])) {
@@ -183,14 +191,115 @@ internal class NativeSatState(private val state: PropagationState) {
         return h
     }
 
-    private fun appendLearned(lits: IntArray): Int {
+    private fun appendLearned(lits: IntArray, lbd: Int, permanent: Boolean): Int {
         val i = learnedCount
         learnedStarts.add(learnedLits.size)
         for (l in lits) learnedLits.add(l)
+        learnedLbd.add(lbd)
+        learnedPermanent.add(if (permanent) 1 else 0)
+        learnedTier.add(ClauseTier.UNSET.ordinal)
+        learnedUsed.add(0)
         learnedCount++
         watchPos.add(0)
         watchPos.add(0)
         return baseCount + i
+    }
+
+    // ---- Learned-clause policy accessors (native mirror of the LearnedClauseDb columns) ----
+
+    val count: Int get() = learnedCount
+    fun lbdOf(i: Int): Int = learnedLbd[i]
+    fun permanentOf(i: Int): Boolean = learnedPermanent[i] == 1
+    fun tierOf(i: Int): ClauseTier = ClauseTier.entries[learnedTier[i]]
+    fun setTierOf(i: Int, tier: ClauseTier) {
+        learnedTier[i] = tier.ordinal
+    }
+    fun usedOf(i: Int): Boolean = learnedUsed[i] == 1
+    fun clearUsed(i: Int) {
+        learnedUsed[i] = 0
+    }
+
+    /** Literals of learned clause [i] as a fresh array, for glue export and introspection. */
+    fun literalsOf(i: Int): IntArray = clauseLits(baseCount + i)
+
+    /** Mark learned clause forced by factor id [fid] (if it is one) as reused since the last
+     *  reduction — drives three-tier promotion, mirroring `PropagationState.noteLearnedUse`. */
+    fun markUsed(fid: Int) {
+        val i = fid - baseCount
+        if (i in 0 until learnedCount) learnedUsed[i] = 1
+    }
+
+    /**
+     * Drop every learned clause the [keep] predicate rejects and compact the survivors, renumbering
+     * learned handles contiguously. Base clauses and their watches are untouched; surviving learned
+     * clauses keep their drifted watch positions, and every watch-list entry naming a learned handle is
+     * remapped or removed. Called at a restart boundary to bound the learned database.
+     */
+    fun forget(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+        // old learned index -> new learned index, or -1 if dropped.
+        val remap = IntArray(learnedCount)
+        var survivors = 0
+        for (i in 0 until learnedCount) {
+            remap[i] = if (keep(i, learnedLbd[i])) survivors++ else -1
+        }
+        if (survivors == learnedCount) return // nothing dropped
+
+        // Remap/prune watch-list entries that name a learned handle; base handles pass through.
+        for (lit in watchClauses.indices) {
+            val wc = watchClauses[lit]
+            val wb = watchBlockers[lit]
+            var w = 0
+            for (r in 0 until wc.size) {
+                val h = wc[r]
+                val newH = if (h < baseCount) h else remap[h - baseCount].let { if (it < 0) -1 else baseCount + it }
+                if (newH < 0) continue // dropped clause — skip
+                wc[w] = newH
+                wb[w] = wb[r]
+                w++
+            }
+            wc.truncateTo(w)
+            wb.truncateTo(w)
+        }
+
+        // Rebuild the learned literal buffer, starts, policy columns, and watchPos for survivors.
+        val newLits = IntArrayList()
+        val newStarts = IntArrayList()
+        val newLbd = IntArrayList()
+        val newPermanent = IntArrayList()
+        val newTier = IntArrayList()
+        val newUsed = IntArrayList()
+        val newWatchPos = IntArrayList()
+        newWatchPos.growTo(2 * baseCount)
+        for (h in 0 until baseCount) {
+            newWatchPos[2 * h] = watchPos[2 * h]
+            newWatchPos[2 * h + 1] = watchPos[2 * h + 1]
+        }
+        for (i in 0 until learnedCount) {
+            if (remap[i] < 0) continue
+            val h = baseCount + i
+            newStarts.add(newLits.size)
+            val len = clauseLen(h)
+            for (k in 0 until len) newLits.add(litOf(h, k))
+            newLbd.add(learnedLbd[i])
+            newPermanent.add(learnedPermanent[i])
+            newTier.add(learnedTier[i])
+            newUsed.add(learnedUsed[i])
+            newWatchPos.add(watchPos[2 * h])
+            newWatchPos.add(watchPos[2 * h + 1])
+        }
+        learnedLits.replaceWith(newLits)
+        learnedStarts.replaceWith(newStarts)
+        learnedLbd.replaceWith(newLbd)
+        learnedPermanent.replaceWith(newPermanent)
+        learnedTier.replaceWith(newTier)
+        learnedUsed.replaceWith(newUsed)
+        watchPos.replaceWith(newWatchPos)
+        learnedCount = survivors
+    }
+
+    private fun IntArrayList.replaceWith(other: IntArrayList) {
+        clear()
+        for (i in 0 until other.size) add(other[i])
     }
 
     /** Assert `litOf(h, unitIdx)` as forced by clause [h]. Returns false (and records the conflict)
