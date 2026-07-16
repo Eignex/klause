@@ -13,7 +13,7 @@ import com.eignex.klause.util.binarySearchInt
 
 /** Emit `array_set_element` and `array_var_set_element`. */
 internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Boolean) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val x = resolveIntVar(c.args[0])
     val z = resolveSetVar(c.args[2])
     val xDom = intDomains[x]
@@ -142,7 +142,7 @@ internal fun FlatZincCompiler.emitArraySetElement(c: FznConstraint, varArray: Bo
 }
 
 internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val sets = resolveSetVarArray(c.args[0])
     for (i in sets.indices) {
         for (j in i + 1 until sets.size) {
@@ -167,7 +167,7 @@ internal fun FlatZincCompiler.emitAllDisjoint(c: FznConstraint) {
 
 /** Emit `set_partition_into(arr, U)`. */
 internal fun FlatZincCompiler.emitSetPartitionInto(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val sets = resolveSetVarArray(c.args[0])
     emitAllDisjoint(FznConstraint("all_disjoint", listOf(c.args[0]), emptyList()))
     val uExpr = c.args[1]
@@ -247,7 +247,7 @@ internal fun FlatZincCompiler.emitSetEqChannel(s: SetVarLayout, t: SetVarLayout,
 }
 
 internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val s = resolveSetVar(c.args[0])
     when (val nExpr = c.args[1]) {
         is FznExpr.IntLit -> {
@@ -280,7 +280,7 @@ internal fun FlatZincCompiler.emitSetCard(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     val u = resolveSetVar(c.args[2])
@@ -328,7 +328,7 @@ internal fun FlatZincCompiler.emitSetUnion(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitSetIntersect(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     val u = resolveSetVar(c.args[2])
@@ -354,7 +354,7 @@ private fun FlatZincCompiler.emitIntersectUImpliesInputs(uBit: Int, sBit: Int, t
 }
 
 internal fun FlatZincCompiler.emitSetDiff(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     val u = resolveSetVar(c.args[2])

@@ -13,7 +13,7 @@ import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.solver.Lit
 
 internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val pos = evalBoolVarArray(c.args[0])
     val neg = evalBoolVarArrayNegated(c.args[1])
     factors.add(Clause(pos + neg))
@@ -25,7 +25,7 @@ internal fun FlatZincCompiler.evalBoolVarArrayNegated(e: FznExpr): IntArray {
 }
 
 internal fun FlatZincCompiler.emitBoolEq(c: FznConstraint, negate: Boolean) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val a = resolveBoolLit(c.args[0])
     val b = if (negate) Lit.negate(resolveBoolLit(c.args[1])) else resolveBoolLit(c.args[1])
     factors.add(Clause(intArrayOf(Lit.negate(a), b)))
@@ -33,14 +33,14 @@ internal fun FlatZincCompiler.emitBoolEq(c: FznConstraint, negate: Boolean) {
 }
 
 internal fun FlatZincCompiler.emitBoolXor(c: FznConstraint) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val lits = intArrayOf(resolveBoolLit(c.args[0]), resolveBoolLit(c.args[1]), resolveBoolLit(c.args[2]))
     factors.add(Xor(lits, targetParity = 0))
 }
 
 /** Shared lowering for `array_bool_or` and `array_bool_and`. */
 private fun FlatZincCompiler.emitArrayBoolReduction(c: FznConstraint, isOr: Boolean) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val lits = evalBoolVarArray(c.args[0])
     val r = resolveBoolLit(c.args[1])
     val body = if (isOr) lits else IntArray(lits.size) { Lit.negate(lits[it]) }
@@ -55,7 +55,7 @@ internal fun FlatZincCompiler.emitArrayBoolOr(c: FznConstraint) = emitArrayBoolR
 internal fun FlatZincCompiler.emitArrayBoolAnd(c: FznConstraint) = emitArrayBoolReduction(c, isOr = false)
 
 internal fun FlatZincCompiler.emitBoolAndOr(c: FznConstraint, and: Boolean) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveBoolLit(c.args[0])
     val b = resolveBoolLit(c.args[1])
     val r = resolveBoolLit(c.args[2])
@@ -71,13 +71,13 @@ internal fun FlatZincCompiler.emitBoolAndOr(c: FznConstraint, and: Boolean) {
 }
 
 internal fun FlatZincCompiler.emitArrayBoolXor(c: FznConstraint) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val lits = evalBoolVarArray(c.args[0])
     factors.add(Xor(lits, targetParity = 1))
 }
 
 internal fun FlatZincCompiler.emitBoolCmp(c: FznConstraint, lt: Boolean, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val a = resolveBoolLit(c.args[0])
     val b = resolveBoolLit(c.args[1])
     if (lt) {
@@ -89,7 +89,7 @@ internal fun FlatZincCompiler.emitBoolCmp(c: FznConstraint, lt: Boolean, reified
 }
 
 internal fun FlatZincCompiler.emitBoolCmpReif(c: FznConstraint, op: BoolCmpOp) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val a = resolveBoolLit(c.args[0])
     val b = resolveBoolLit(c.args[1])
     val r = resolveBoolLit(c.args[2])
@@ -132,7 +132,7 @@ internal fun FlatZincCompiler.emitBool2Int(c: FznConstraint) {
 
 /** Shared lowering for bool element constraints. */
 internal fun FlatZincCompiler.emitArrayBoolElement(c: FznConstraint, varArray: Boolean) {
-    require(c.args.size == 3)
+    expectArity(c, 3)
     val idx = resolveIntVar(c.args[0])
     val resultLit = resolveBoolLit(c.args[2])
     val resultInt = channelBoolsToInts(intArrayOf(resultLit), "belem_res")[0]
@@ -156,7 +156,7 @@ internal fun FlatZincCompiler.channelBoolsToInts(lits: IntArray, tag: String): I
 }
 
 internal fun FlatZincCompiler.emitMonotoneBool(c: FznConstraint, op: MonotoneOp) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val lits = evalBoolVarArray(c.args[0])
     if (lits.size < 2) return
     val ints = channelBoolsToInts(lits, "mono")
@@ -170,7 +170,7 @@ private fun FlatZincCompiler.emitMonotoneChain(xs: IntArray, op: MonotoneOp) {
 }
 
 internal fun FlatZincCompiler.emitLexLessBool(c: FznConstraint, strict: Boolean) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xLits = evalBoolVarArray(c.args[0])
     val yLits = evalBoolVarArray(c.args[1])
     val xs = channelBoolsToInts(xLits, "lex_x")
@@ -179,7 +179,7 @@ internal fun FlatZincCompiler.emitLexLessBool(c: FznConstraint, strict: Boolean)
 }
 
 internal fun FlatZincCompiler.emitTableBool(c: FznConstraint) {
-    require(c.args.size == 2)
+    expectArity(c, 2)
     val xLits = evalBoolVarArray(c.args[0])
     val tuplesBool = evalBoolConstArray(c.args[1])
     val xs = channelBoolsToInts(xLits, "tbl")
@@ -188,7 +188,7 @@ internal fun FlatZincCompiler.emitTableBool(c: FznConstraint) {
 }
 
 internal fun FlatZincCompiler.emitMonotone(c: FznConstraint, op: MonotoneOp) {
-    require(c.args.size == 1)
+    expectArity(c, 1)
     val xs = evalIntVarArray(c.args[0])
     if (xs.size < 2) return
     emitMonotoneChain(xs, op)

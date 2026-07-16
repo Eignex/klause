@@ -65,7 +65,7 @@ internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e)
 
 /** Emit `set_in` and `set_in_reif`. */
 internal fun FlatZincCompiler.emitSetIn(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val elem = c.args[0]
     val sExpr = c.args[1]
     val rExpr = if (reified) c.args[2] else null
@@ -214,7 +214,7 @@ private fun FlatZincCompiler.emitSetInVarInt(xVar: Int, xLo: Int, xHi: Int, layo
 }
 
 internal fun FlatZincCompiler.emitSetSubset(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     if (!reified) {
@@ -263,7 +263,7 @@ internal fun FlatZincCompiler.reifyOrOfLits(lits: IntArray, r: Int) {
 }
 
 internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     if (!reified) {
@@ -290,7 +290,7 @@ internal fun FlatZincCompiler.emitSetEq(c: FznConstraint, reified: Boolean) {
 }
 
 internal fun FlatZincCompiler.emitSetNe(c: FznConstraint, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     val eqLit = if (reified) {
@@ -323,7 +323,7 @@ internal fun FlatZincCompiler.resolveSetVarArray(e: FznExpr): List<SetVarLayout>
 
 /** Emit `set_le` / `set_lt` and reified variants. */
 internal fun FlatZincCompiler.emitSetLex(c: FznConstraint, strict: Boolean, reified: Boolean) {
-    require(c.args.size == if (reified) 3 else 2)
+    expectArity(c, if (reified) 3 else 2)
     val s = resolveSetVar(c.args[0])
     val t = resolveSetVar(c.args[1])
     val universe = (s.elements.toSet() + t.elements.toSet()).sorted().toIntArray()
