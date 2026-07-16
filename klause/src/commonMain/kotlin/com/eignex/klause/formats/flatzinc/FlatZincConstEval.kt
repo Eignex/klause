@@ -92,10 +92,17 @@ internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
     is FznExpr.ArrayAccess -> {
         val arr = arrays[e.name] as? FlatZincArray.IntParam
             ?: failHere("`${e.name}` is not an int parameter array")
-        arr.values[e.index - 1]
+        arr.values[arrayOffset(arr.values.size, e.index, e.name)]
     }
 
     else -> failHere("expected int constant, got ${e::class.simpleName}")
+}
+
+/** Validate a 1-based FlatZinc array [index] against [size] and return the 0-based offset, failing
+ *  with a source-located diagnostic rather than an [IndexOutOfBoundsException] on a bad index. */
+internal fun FlatZincCompiler.arrayOffset(size: Int, index: Int, name: String): Int {
+    if (index < 1 || index > size) failHere("array `$name` index $index out of bounds (1..$size)")
+    return index - 1
 }
 
 /** Nullable variant of [evalIntConst]. */
@@ -110,7 +117,7 @@ internal fun FlatZincCompiler.evalIntConstOrNull(e: FznExpr): Long? = when (e) {
         else -> null
     }
 
-    is FznExpr.ArrayAccess -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.get(e.index - 1)
+    is FznExpr.ArrayAccess -> (arrays[e.name] as? FlatZincArray.IntParam)?.values?.getOrNull(e.index - 1)
 
     else -> null
 }
@@ -129,8 +136,8 @@ internal fun FlatZincCompiler.evalFloatConst(e: FznExpr): Double = when (e) {
 
     is FznExpr.ArrayAccess -> {
         when (val arr = arrays[e.name]) {
-            is FlatZincArray.FloatParam -> arr.values[e.index - 1]
-            is FlatZincArray.IntParam -> arr.values[e.index - 1].toDouble()
+            is FlatZincArray.FloatParam -> arr.values[arrayOffset(arr.values.size, e.index, e.name)]
+            is FlatZincArray.IntParam -> arr.values[arrayOffset(arr.values.size, e.index, e.name)].toDouble()
             else -> failHere("`${e.name}` is not a numeric parameter array")
         }
     }
@@ -295,7 +302,7 @@ internal fun FlatZincCompiler.resolveBoolLit(e: FznExpr): Int = when (e) {
         require(arr.elementKind == FlatZincArray.Vars.ElementKind.Bool) {
             "`${e.name}` is not a bool var array"
         }
-        Lit.make(arr.varIds[e.index - 1], true)
+        Lit.make(arr.varIds[arrayOffset(arr.varIds.size, e.index, e.name)], true)
     }
 
     else -> failHere("expected bool var or literal, got ${e::class.simpleName}")
@@ -313,7 +320,7 @@ internal fun FlatZincCompiler.resolveIntVar(e: FznExpr): Int = when (e) {
     is FznExpr.ArrayAccess -> {
         val arr = arrays[e.name] as? FlatZincArray.Vars
             ?: failHere("`${e.name}` is not a var array")
-        arr.varIds[e.index - 1]
+        arr.varIds[arrayOffset(arr.varIds.size, e.index, e.name)]
     }
 
     else -> failHere("expected int var, got ${e::class.simpleName}")
