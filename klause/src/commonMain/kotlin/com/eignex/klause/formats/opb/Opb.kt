@@ -85,7 +85,9 @@ object Opb {
         for (rawLine in text.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty() || line.startsWith("*")) continue
-            tokens.addAll(line.split(WHITESPACE).filter { it.isNotEmpty() })
+            // `;` terminates a statement and need not be whitespace-separated (e.g. `... >= 1;`), so
+            // isolate it into its own token before splitting.
+            tokens.addAll(line.replace(";", " ; ").split(WHITESPACE).filter { it.isNotEmpty() })
         }
 
         val builder = Builder()
