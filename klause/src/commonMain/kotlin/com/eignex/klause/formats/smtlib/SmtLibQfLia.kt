@@ -161,13 +161,27 @@ object SmtLibQfLia {
             val head = (e.items[0] as? SExpr.Atom)?.text ?: return
             when (head) {
                 "declare-const" -> declare(e.atomAt(1, "declare-const name"), e.atomAt(2, "declare-const sort"))
-                "declare-fun" -> declare(e.atomAt(1, "declare-fun name"), e.atomAt(3, "declare-fun sort"))
+                "declare-fun" -> declareFun(e)
                 "define-fun" -> defineFun(e)
                 "assert" -> asserts.add(e.argAt(1, "assert"))
                 "minimize" -> objectiveSpec = e.argAt(1, "minimize") to false
                 "maximize" -> objectiveSpec = e.argAt(1, "maximize") to true
                 else -> Unit // set-logic / set-info / check-sat / get-* / exit — ignored
             }
+        }
+
+        /** Declare `(declare-fun name (argSorts…) sort)`. Only 0-arity functions (constants) are
+         *  supported; a non-empty argument list is a genuine function symbol, which QF_LIA-as-solved
+         *  here cannot treat as a variable, so reject it rather than silently declaring a constant. */
+        private fun declareFun(e: SExpr.SList) {
+            val name = e.atomAt(1, "declare-fun name")
+            val argSorts = e.argAt(2, "declare-fun '$name' argument sorts")
+            if (argSorts !is SExpr.SList || argSorts.items.isNotEmpty()) {
+                throw UnsupportedSmtException(
+                    "declare-fun '$name' with arguments (only 0-arity constants are supported)",
+                )
+            }
+            declare(name, e.atomAt(3, "declare-fun '$name' sort"))
         }
 
         /** Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro. */
