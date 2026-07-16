@@ -175,6 +175,26 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     val aRef = resolveFloatVarOrConst(c.args[0])
     val bRef = resolveFloatVarOrConst(c.args[1])
     val cRef = resolveFloatVarOrConst(c.args[2])
+    // A constant operand makes the product linear (`c = k·x`), so lower it as a float linear equality
+    // rather than a var·var product table — the linear-in-reals refinement of issue #1232. Handles the
+    // common `x·k` / `k·x` with a variable result; the genuinely non-linear var·var case keeps the table.
+    if (cRef is FloatRef.Var && (aRef is FloatRef.Const) != (bRef is FloatRef.Const)) {
+        val k = (aRef as? FloatRef.Const)?.value ?: (bRef as FloatRef.Const).value
+        val xArg = if (aRef is FloatRef.Const) c.args[1] else c.args[0]
+        emitFloatLinear(
+            FznConstraint(
+                "float_lin_eq",
+                listOf(
+                    FznExpr.ArrayLit(listOf(FznExpr.FloatLit(k), FznExpr.FloatLit(-1.0))),
+                    FznExpr.ArrayLit(listOf(xArg, c.args[2])),
+                    FznExpr.FloatLit(0.0),
+                ),
+                emptyList(),
+            ),
+            reified = false,
+        )
+        return
+    }
     if (aRef !is FloatRef.Var || bRef !is FloatRef.Var || cRef !is FloatRef.Var) {
         failHere("float_times with constant operand not yet handled (only var·var=var)")
     }

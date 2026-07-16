@@ -88,6 +88,33 @@ class FlatZincFloatConstraintsTest {
     }
 
     @Test
+    fun `float_times with a constant operand is lowered as a linear product`() {
+        // c = 2.0 * x with x = 2 is linear (no var*var table); c must equal 4.
+        val src = """
+            var 0.0..4.0: x;
+            var 0.0..8.0: c;
+            constraint float_lin_eq([1.0], [x], 2.0);
+            constraint float_times(2.0, x, c);
+            constraint float_lin_eq([1.0], [c], 4.0);
+            solve satisfy;
+        """.trimIndent()
+        assertIs<SolveResult.Sat>(solve(src))
+    }
+
+    @Test
+    fun `float_times with a constant operand rejects a wrong result`() {
+        val src = """
+            var 0.0..4.0: x;
+            var 0.0..8.0: c;
+            constraint float_lin_eq([1.0], [x], 2.0);
+            constraint float_times(2.0, x, c);
+            constraint float_lin_eq([1.0], [c], 6.0);
+            solve satisfy;
+        """.trimIndent()
+        assertIs<SolveResult.Unsat>(solve(src))
+    }
+
+    @Test
     fun `a false float constant comparison is unsatisfiable not a crash`() {
         // Previously posted an empty Clause, which threw IllegalArgumentException at compile time.
         val src = """
