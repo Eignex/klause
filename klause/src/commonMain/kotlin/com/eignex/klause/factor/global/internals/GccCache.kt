@@ -59,6 +59,13 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
     // structure spans the root domains), so it needs no reversibility; only the flow (recomputed each
     // fire from the reversible `flowAssign` warm start) and the domains vary.
     var structBuilt = false
+
+    /** True once the flow network has been built at least once. The persistent structure may only be
+     *  frozen on the FIRST build — that fire sees the widest (root) domains, so the edge set and the
+     *  presence of the "other" (non-cover) node span every later state. A later build runs only when
+     *  search has narrowed domains (`anyOther` may have dropped, edges may be absent), and freezing then
+     *  would miss edges a backtrack restores. */
+    var builtOnce = false
     var sN = 0
     var sM = 0
     var sBaseNodes = 0
