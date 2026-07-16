@@ -417,4 +417,19 @@ class SmtLibQfLiaTest {
             SmtLibQfLia.parse("(declare-const x Int)\n(assert (>= x 0))\n(check-sat))")
         }
     }
+
+    @Test
+    fun `constant folding overflow is rejected rather than silently wrapping`() {
+        // SMT integers are unbounded; folding 2^63-1 + 1 wraps to Long.MIN_VALUE if unchecked, so the
+        // term must be rejected the same way an over-64-bit literal is.
+        val text = "(declare-const x Int) (assert (= x (+ 9223372036854775807 1))) (check-sat)"
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+        assertTrue("overflow" in e.message.orEmpty(), e.message.orEmpty())
+    }
+
+    @Test
+    fun `constant multiplication overflow is rejected`() {
+        val text = "(declare-const x Int) (assert (= x (* 3037000500 3037000500))) (check-sat)"
+        assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+    }
 }

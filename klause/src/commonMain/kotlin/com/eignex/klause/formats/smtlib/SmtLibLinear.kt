@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.addExact
 import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.trueLit
@@ -64,8 +65,17 @@ internal fun SmtLibQfLia.Builder.relFromOperands(op: String, a: LinComb, b: LinC
         ">" -> LinearOp.GE to 1
         else -> throw UnsupportedSmtException("relation '$op'")
     }
-    return Rel(vars, coeffs, linOp, baseBound + delta)
+    return Rel(vars, coeffs, linOp, foldChecked { addExact(baseBound, delta.toLong()) })
 }
+
+/** Run [block], surfacing a folded-term 64-bit overflow as a clean [UnsupportedSmtException].
+ *  SMT integers are unbounded, so an overflow means the term exceeds what the solver represents. */
+internal inline fun <T> foldChecked(block: () -> T): T =
+    try {
+        block()
+    } catch (_: ArithmeticException) {
+        throw UnsupportedSmtException("integer overflow while folding a linear term")
+    }
 
 /** Fold [t] to an integer linear combination (iteratively, via [evalTerm]). */
 internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = (evalTerm(t, Sort.INT) as Res.I).lin
@@ -84,12 +94,13 @@ internal fun SmtLibQfLia.Builder.isRealLiteral(s: String): Boolean = '.' in s &&
 
 private val INTEGER_LITERAL = Regex("-?\\d+")
 
-internal fun SmtLibQfLia.Builder.add(a: LinComb, b: LinComb): LinComb = a.plus(b)
+internal fun SmtLibQfLia.Builder.add(a: LinComb, b: LinComb): LinComb = foldChecked { a.plus(b) }
 
-internal fun SmtLibQfLia.Builder.scale(a: LinComb, k: Long): LinComb = a.scaled(k)
+internal fun SmtLibQfLia.Builder.scale(a: LinComb, k: Long): LinComb = foldChecked { a.scaled(k) }
 
 /** Build linear coefficients for `a - b op 0`. */
-internal fun SmtLibQfLia.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, LongArray, Long> = linCombDiff(a, b)
+internal fun SmtLibQfLia.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, LongArray, Long> =
+    foldChecked { linCombDiff(a, b) }
 
 internal fun SmtLibQfLia.Builder.linearObjective(t: SExpr, negate: Boolean): LinearObjective {
     val lt = linearTerm(t)
