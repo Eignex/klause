@@ -35,6 +35,36 @@ class LpContinuousColumnTest {
     }
 
     @Test
+    fun `certifies an infeasible continuous LP via the rationalized 128-bit Farkas`() {
+        // 0 <= x <= 1 with 2x >= 3 (x >= 1.5) has no feasible point; coefficients rationalize exactly.
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 1.0, cost = 1.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.GE, 3.0)
+        val result = solveAndCertify(b.build(Sense.MINIMIZE))
+        assertEquals(LpVerdict.INFEASIBLE, result.verdict)
+        assertNotNull(result.farkasRay)
+    }
+
+    @Test
+    fun `certifies infeasibility with a fractional but dyadic coefficient`() {
+        // 0.5 x >= 1 (x >= 2) with x <= 1 is infeasible; 0.5 = 2⁻¹ rationalizes at k = 1.
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 1.0, cost = 1.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(0.5), Relation.GE, 1.0)
+        assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
+    }
+
+    @Test
+    fun `declines to certify when a coefficient is not rationalizable in budget`() {
+        // 0.1 is not dyadic within the 40-bit budget; infeasible in reals (0.1x>=1, x<=5 ⇒ x>=10) but the
+        // rationalization declines, so the verdict is INDETERMINATE — sound, never a wrong INFEASIBLE.
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 5.0, cost = 1.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(0.1), Relation.GE, 1.0)
+        assertEquals(LpVerdict.INDETERMINATE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
+    }
+
+    @Test
     fun `minimizes a real objective coefficient over a continuous column`() {
         // minimize 1.5 x  subject to  x >= 2,  x in [0, 10] real  ->  x = 2, objective = 3.0.
         val b = LpBuilder()
