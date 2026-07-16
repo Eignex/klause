@@ -142,6 +142,7 @@ internal class IntegerCertificate(
  *  - a strictly-negative reduced cost on a column with no finite upper bound (unbounded Lagrangian).
  */
 internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): IntegerCertificate? {
+    if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
     val rd = roundDuals(model, y, scaleBits) ?: return null
     val m = model.m
     val n = model.n
@@ -183,6 +184,7 @@ internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEF
  * when neither sign certifies, the rounding fails, or a 128-bit term overflows.
  */
 internal fun integerFarkasRay(model: LpModel, ray: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): LongArray? {
+    if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
     val rd = roundDuals(model, ray, scaleBits) ?: return null
     if (farkasCertifies(model, rd.mult)) return rd.mult
     val neg = LongArray(rd.mult.size) { -rd.mult[it] }
