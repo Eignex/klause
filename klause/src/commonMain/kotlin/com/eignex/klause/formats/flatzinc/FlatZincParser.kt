@@ -8,7 +8,7 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
 
     fun parse(): FznModel {
         while (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "predicate") {
-            skipPredicate()
+            skipUntilSemicolon()
         }
         while (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "annotation") {
             skipUntilSemicolon()
@@ -364,12 +364,6 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
     private fun failHere(msg: String): Nothing {
         val t = peek()
         throw FlatZincParseException(msg, t.line, t.col)
-    }
-    private fun skipPredicate() {
-        while (peek() !is FznToken.Eof) {
-            val t = advance()
-            if (t is FznToken.Punct && t.symbol == ";") return
-        }
     }
     private fun skipUntilSemicolon() {
         while (peek() !is FznToken.Eof) {
