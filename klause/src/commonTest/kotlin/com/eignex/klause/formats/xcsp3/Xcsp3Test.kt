@@ -286,6 +286,29 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `a very wide contiguous domain parses without enumerating every value`() {
+        // A billion-value domain: materializing every value would exhaust the heap; a contiguous
+        // interval parses in constant space and the pin still resolves.
+        val xml = """
+            <instance type="CSP">
+              <variables><var id="a"> 0..1000000000 </var></variables>
+              <constraints><intension> eq(a,999999999) </intension></constraints>
+            </instance>
+        """.trimIndent()
+        assertEquals(999999999, sat(xml)[Xcsp3.parse(xml).intVarNames.getValue("a")], "the pin resolves")
+    }
+
+    @Test
+    fun `a domain with an interior hole excludes the gap value`() {
+        val decl = """<instance type="CSP"><variables><var id="x"> 1..3 5 </var></variables>"""
+        fun solve(c: String): SolveResult = BacktrackSolver(
+            Xcsp3.parse("$decl<constraints>$c</constraints></instance>").problem,
+        ).solve(BacktrackParams())
+        assertTrue(solve("<intension> eq(x,4) </intension>") is SolveResult.Unsat, "4 is a hole, not in the domain")
+        assertTrue(solve("<intension> eq(x,5) </intension>") is SolveResult.Sat, "5 is in the domain")
+    }
+
+    @Test
     fun `an extension table exceeding the row cap is rejected cleanly instead of exhausting the heap`() {
         // Six rows against a cap of 3 must throw a clean UnsupportedXcsp3Exception, not build the arrays.
         val xml = """

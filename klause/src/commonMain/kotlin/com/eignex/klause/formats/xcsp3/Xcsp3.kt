@@ -213,17 +213,40 @@ object Xcsp3 {
         }
 
         internal fun parseDomain(text: String): IntDomain {
-            val values = HashSet<Long>()
+            // Parse the range/singleton tokens into intervals, then build `[lo,hi]` minus only the interior
+            // holes (the gaps between consecutive intervals). Enumerating a range's interior would be
+            // O(span) — a wide domain like `0..1000000000` would exhaust the heap — while a compact
+            // [IntDomain] needs just the holes, which a contiguous range has none of.
+            val intervals = ArrayList<LongArray>()
             for (tok in text.splitWs()) {
                 val r = tok.split("..")
-                if (r.size == 2) for (v in r[0].toLong()..r[1].toLong()) values.add(v) else values.add(tok.toLong())
+                val a = if (r.size == 2) r[0].toLong() else tok.toLong()
+                val b = if (r.size == 2) r[1].toLong() else a
+                require(a <= b) { "invalid domain range '$tok'" }
+                intervals.add(longArrayOf(a, b))
             }
-            if (values.isEmpty()) throw UnsupportedXcsp3Exception("empty domain")
-            val lo = values.min()
-            val hi = values.max()
-            var dom = IntDomain(lo, hi)
-            for (v in lo..hi) if (v !in values) dom = dom.excludeValue(v)
-            return dom
+            if (intervals.isEmpty()) throw UnsupportedXcsp3Exception("empty domain")
+            // XCSP3 lists domain tokens ascending, but sort defensively so the gap walk is correct.
+            intervals.sortBy { it[0] }
+            val lo = intervals.first()[0]
+            var hi = intervals.first()[1]
+            var prevEnd = hi
+            val holes = ArrayList<Long>()
+            for (k in 1 until intervals.size) {
+                val a = intervals[k][0]
+                val b = intervals[k][1]
+                if (a > prevEnd + 1) for (v in prevEnd + 1 until a) holes.add(v)
+                if (b > prevEnd) prevEnd = b
+                if (b > hi) hi = b
+            }
+            val dom = IntDomain(lo, hi)
+            return if (holes.isEmpty()) {
+                dom
+            } else {
+                dom.excludeValues(
+                    holes.toLongArray(),
+                ) ?: throw UnsupportedXcsp3Exception("empty domain")
+            }
         }
 
         fun constraint(e: XmlElement) {
