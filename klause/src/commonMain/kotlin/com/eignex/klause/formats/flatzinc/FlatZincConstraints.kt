@@ -24,7 +24,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "bool_or", "bool_or_reif" -> emitBoolAndOr(c, and = false)
 
-    "bool_xor_reif" -> emitBoolXorReif(c)
+    "bool_xor_reif" -> emitBoolXor(c)
 
     "bool_le" -> emitBoolCmp(c, lt = false, reified = false)
 

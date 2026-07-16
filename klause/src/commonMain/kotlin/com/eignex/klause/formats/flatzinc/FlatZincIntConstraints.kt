@@ -15,7 +15,7 @@ import com.eignex.klause.solver.Lit
 internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
     require(c.args.size == 2)
     val a = resolveIntVar(c.args[0])
-    val b = resolveIntVarOrConst(c.args[1])
+    val b = resolveIntVar(c.args[1])
     val op = when (c.name) {
         "int_le", "int_lt" -> LinearOp.LE
         "int_eq" -> LinearOp.EQ
@@ -28,17 +28,7 @@ internal fun FlatZincCompiler.emitIntCmp(c: FznConstraint) {
         "int_gt" -> 1
         else -> 0
     }
-    factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b.varId), op, strictAdjust - b.offset))
-}
-
-internal data class IntVarRef(val varId: Int, val offset: Int)
-internal fun FlatZincCompiler.resolveIntVarOrConst(e: FznExpr): IntVarRef = when (e) {
-    is FznExpr.IntLit -> {
-        val v = resolveIntVar(e)
-        IntVarRef(v, 0)
-    }
-
-    else -> IntVarRef(resolveIntVar(e), 0)
+    factors.add(Linear(intArrayOf(1, -1), intArrayOf(a, b), op, strictAdjust))
 }
 
 /** Post a linear relation as a hard [Linear], or a [ReifiedLinear] onto [reifyLit] when non-null

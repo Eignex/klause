@@ -141,7 +141,7 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     val argB = c.args[1]
     val argC = c.args[2]
     fun emitIneq(left: FznExpr, right: FznExpr) {
-        val fc = FznConstraint(if (max) "float_le" else "float_le", listOf(left, right), emptyList())
+        val fc = FznConstraint("float_le", listOf(left, right), emptyList())
         emitFloatBinaryCmp(fc, op = LinearOp.LE, strict = false, reified = false)
     }
     if (max) {

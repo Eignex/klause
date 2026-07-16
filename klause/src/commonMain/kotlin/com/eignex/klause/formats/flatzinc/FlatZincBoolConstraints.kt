@@ -70,12 +70,6 @@ internal fun FlatZincCompiler.emitBoolAndOr(c: FznConstraint, and: Boolean) {
     }
 }
 
-internal fun FlatZincCompiler.emitBoolXorReif(c: FznConstraint) {
-    require(c.args.size == 3)
-    val lits = intArrayOf(resolveBoolLit(c.args[0]), resolveBoolLit(c.args[1]), resolveBoolLit(c.args[2]))
-    factors.add(Xor(lits, targetParity = 0))
-}
-
 internal fun FlatZincCompiler.emitArrayBoolXor(c: FznConstraint) {
     require(c.args.size == 1)
     val lits = evalBoolVarArray(c.args[0])
