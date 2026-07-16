@@ -33,6 +33,9 @@ class SExprReader(private val src: String) {
     private fun readExpr(): SExpr {
         skipWs()
         require(pos < src.length) { "unexpected end of input" }
+        // A `)` where an expression is expected is unbalanced: [readToken] would return an empty
+        // token without advancing, spinning [readAll] forever, so reject it here.
+        require(src[pos] != ')') { "unexpected ')'" }
         if (src[pos] != '(') return SExpr.Atom(readToken())
         // Iterative nesting via an explicit stack: SMT-LIB formulas nest thousands of lists deep,
         // which overflows a recursive-descent reader.
