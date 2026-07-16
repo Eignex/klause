@@ -81,6 +81,13 @@ internal class GccPropCache(val cachedDoms: Array<IntDomain?>) {
     private var excessBuf = IntArray(0)
     private var xToCovBuf = IntArray(0)
     private var xToOtherBuf = IntArray(0)
+    private var sccIdBuf = IntArray(0)
+
+    /** Per-node residual-SCC label scratch sized `>= nodes` (written in full by `computeSccResidual`). */
+    fun sccId(nodes: Int): IntArray {
+        if (sccIdBuf.size < nodes) sccIdBuf = IntArray(nodes)
+        return sccIdBuf
+    }
 
     /** `excess` scratch sized `>= nodes`, zeroed over `[0, nodes)`. */
     fun excess(nodes: Int): IntArray {
