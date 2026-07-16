@@ -16,10 +16,11 @@ import com.eignex.klause.propagation.RevLongArray
  * words). The cost variant re-derives the cost-variable bounds from the (current) forward lattice.
  *
  * Each layer's transition records are indexed by source state (a per-layer CSR: [fwdHead] offsets into
- * [fwdPtr]) and by destination state ([bwdHead] into [bwdPtr]). The forward, prune, and cost sweeps then
- * visit only the outgoing records of forward-reachable sources, and the backward sweep only the incoming
- * records of co-reachable destinations — O(live out-edges) rather than O(all records per layer). Sparse
- * diagrams (few reachable states per layer) gain the most; a dense diagram does no less work than before.
+ * [fwdPtr]) and by destination state ([bwdHead] into the inline [bwdSrc]/[bwdSym]). The forward, prune,
+ * and cost sweeps then visit only the outgoing records of forward-reachable sources, and the backward
+ * sweep only the incoming records of co-reachable destinations — O(live out-edges) rather than O(all
+ * records per layer). Sparse diagrams (few reachable states per layer) gain the most; a dense diagram
+ * does no less work than before.
  *
  * Soundness gated by MddPropagatorTest enumerate-vs-brute under full CDCL across deep backtracking.
  */
@@ -49,7 +50,8 @@ internal class MddIncrementalState(
     private val fwdHead = idx.fwdHead
     private val fwdPtr = idx.fwdPtr
     private val bwdHead = idx.bwdHead
-    private val bwdPtr = idx.bwdPtr
+    private val bwdSrc = idx.bwdSrc
+    private val bwdSym = idx.bwdSym
 
     private fun testBit(rev: RevLongArray, layer: Int, s: Int): Boolean =
         (rev[layer * w + (s ushr 6)] and (1L shl (s and 63))) != 0L
@@ -114,14 +116,14 @@ internal class MddIncrementalState(
         val d = state.intDomains[seq[i]]
         val numI = numStatesPerLayer[i]
         val head = bwdHead[i]
-        val ptr = bwdPtr[i]
+        val srcs = bwdSrc[i]
+        val syms = bwdSym[i]
         forEachState(bwd, i + 1, numStatesPerLayer[i + 1]) { dst ->
             var k = head[dst]
             val e = head[dst + 1]
             while (k < e) {
-                val p = ptr[k]
-                val src = transitions[p].toInt()
-                val sym = transitions[p + 1]
+                val src = srcs[k]
+                val sym = syms[k]
                 if (sym in d.min..d.max && src in 0 until numI && testBit(fwd, i, src)) {
                     scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
                 }
@@ -129,6 +131,37 @@ internal class MddIncrementalState(
             }
         }
         return writeLayer(bwd, i, scratch)
+    }
+
+    /**
+     * Backward sweep for the full [rebuild] that also records, into [survives], which symbols keep
+     * position `i` alive: a symbol survives iff some incoming edge on it joins a forward-reachable source
+     * to a backward-co-reachable destination — precisely the edges this scan already keeps. The [rebuild]
+     * then excludes the non-survivors from a cheap per-position loop, so the diagram is never scanned a
+     * third time for a separate prune pass. [survives] is indexed by `sym - d.min` and must be pre-zeroed.
+     */
+    private fun recomputeBackwardCollecting(state: PropagationState, i: Int, scratch: LongArray, survives: LongArray) {
+        scratch.fill(0L)
+        val d = state.intDomains[seq[i]]
+        val numI = numStatesPerLayer[i]
+        val head = bwdHead[i]
+        val srcs = bwdSrc[i]
+        val syms = bwdSym[i]
+        forEachState(bwd, i + 1, numStatesPerLayer[i + 1]) { dst ->
+            var k = head[dst]
+            val e = head[dst + 1]
+            while (k < e) {
+                val src = srcs[k]
+                val sym = syms[k]
+                if (sym in d.min..d.max && src in 0 until numI && testBit(fwd, i, src)) {
+                    scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
+                    val off = (sym - d.min).toInt()
+                    survives[off ushr 6] = survives[off ushr 6] or (1L shl (off and 63))
+                }
+                k++
+            }
+        }
+        writeLayer(bwd, i, scratch)
     }
 
     /** bwd[n] = accepting ∩ fwd[n]. */
@@ -254,9 +287,27 @@ internal class MddIncrementalState(
         }
         if (!anyAcceptingForward()) return false
         recomputeAcceptLayer(scratch)
-        for (i in n - 1 downTo 0) recomputeBackward(state, i, scratch)
+        // Fuse the backward reachability sweep with pruning: the surviving symbols per position fall out of
+        // the same accepting-to-root scan, so the diagram needs no separate full prune pass. Survivors are
+        // collected per layer and the (scan-free) exclusions applied afterwards, so every backward pass
+        // still reads the pre-prune domains — identical to a backward-then-prune ordering.
+        val survivors = Array(n) { i ->
+            val d = state.intDomains[seq[i]]
+            val words = (((d.max - d.min + 1) + 63) ushr 6).toInt().coerceAtLeast(1)
+            LongArray(words)
+        }
+        for (i in n - 1 downTo 0) recomputeBackwardCollecting(state, i, scratch, survivors[i])
         valid.set(1)
-        if (!prune(state, 0, n - 1, ant)) return false
+        for (i in 0 until n) {
+            val d = state.intDomains[seq[i]]
+            val surv = survivors[i]
+            for (s in d.min..d.max) {
+                val off = (s - d.min).toInt()
+                if (((surv[off ushr 6] ushr (off and 63)) and 1L) == 0L) {
+                    if (!state.excludeIntValue(seq[i], s, ant)) return false
+                }
+            }
+        }
         if (cost >= 0 && !tightenCost(state, ant)) return false
         return true
     }
