@@ -22,10 +22,10 @@ import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Sense
 import com.eignex.klause.lp.addExact
-import com.eignex.klause.lp.solveAndCertify
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.Cut
+import com.eignex.klause.lp.solveAndCertify
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -420,6 +420,7 @@ internal class CpToLpRelaxation(
         private val realCol = IntArray(problem.numRealVars) { -1 }
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
+
         // LP column -> real var id it stands for, or -1 for int/bool/aux columns. Lets the leaf verdict
         // read each LP-only continuous column's value back onto its real variable.
         private val colRealId = IntArrayList()

@@ -417,7 +417,12 @@ internal class ResumableMinimize(
             if (problem.numRealVars > 0) {
                 when (leafRealFeasibility(problem, objective, snap)) {
                     LpVerdict.INFEASIBLE -> return null
-                    LpVerdict.INDETERMINATE -> { sawIndeterminateLeaf = true; return null }
+
+                    LpVerdict.INDETERMINATE -> {
+                        sawIndeterminateLeaf = true
+                        return null
+                    }
+
                     LpVerdict.OPTIMAL -> Unit
                 }
             }
