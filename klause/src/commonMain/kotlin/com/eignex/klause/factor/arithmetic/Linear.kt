@@ -18,6 +18,7 @@ import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
+import kotlin.math.roundToLong
 
 /**
  * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
@@ -32,6 +33,12 @@ class Linear private constructor(
     rawBound: Long,
     realVarsIn: IntArray = EmptyIntArray,
     realCoeffsIn: DoubleArray = EmptyDoubleArray,
+    // Double forms used only by an LP-only (real-bearing) row, where coefficients and the bound need not
+    // be integral: the double coefficient of each integer term (index-aligned with [vars]) and the double
+    // right-hand side. The [Long] `coeffs`/`bound` are then rounded placeholders the never-read integer
+    // consumers keep well-formed. Empty / 0 for the integer core.
+    intCoeffsRealIn: DoubleArray = EmptyDoubleArray,
+    realBoundIn: Double = 0.0,
 ) : Factor,
     LinearRow {
 
@@ -60,12 +67,22 @@ class Linear private constructor(
     val realCoeffs: DoubleArray =
         if (rawOp == LinearOp.GE) DoubleArray(realCoeffsIn.size) { -realCoeffsIn[it] } else realCoeffsIn
 
+    /** Double coefficient of each integer term [vars] on an LP-only row (index-aligned with [vars]); the
+     *  authoritative value the relaxation reads, since [coeffs] is only a rounded placeholder here. Empty
+     *  for the integer core. A `>=` row negates these with the rest. */
+    val realIntCoeffs: DoubleArray =
+        if (rawOp == LinearOp.GE) DoubleArray(intCoeffsRealIn.size) { -intCoeffsRealIn[it] } else intCoeffsRealIn
+
+    /** Double right-hand side of an LP-only row ([bound] is only a rounded placeholder here); `>=` negates. */
+    val realBound: Double = if (rawOp == LinearOp.GE) -realBoundIn else realBoundIn
+
     /** Whether this row carries a continuous (real) term, making it an LP-only row (see [realVars]). */
     val hasReals: Boolean get() = realVars.isNotEmpty()
 
     init {
         require(coeffs.isNotEmpty() || realVars.isNotEmpty()) { "linear sum must have at least one term" }
         require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
+        require(!hasReals || realIntCoeffs.size == vars.size) { "real int-coeff/var length mismatch" }
     }
 
     override val intVars: IntArray = vars
@@ -82,9 +99,10 @@ class Linear private constructor(
         this(coalesceLinearTerms(vars, coeffs), op, bound)
 
     /**
-     * Mixed integer + LP-only-real form: `Σ intCoeffs(i)·intVars(i) + Σ realCoeffs(j)·realVars(j) ⟨op⟩
-     * bound`. [realVars] are ids in the problem's real-variable namespace. A row with any real term is
-     * LP-only — it does not propagate in CP (see [realVars]) — so integer-semantics consumers skip it.
+     * Mixed integer + LP-only-real form with integer integer-side data: `Σ intCoeffs(i)·intVars(i) +
+     * Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound`. [realVars] are ids in the problem's real-variable
+     * namespace. A row with any real term is LP-only — it does not propagate in CP (see [realVars]) — so
+     * integer-semantics consumers skip it. Terms are kept in the given order (no coalescing).
      */
     constructor(
         intCoeffs: LongArray,
@@ -93,7 +111,40 @@ class Linear private constructor(
         realVars: IntArray,
         op: LinearOp,
         bound: Long,
-    ) : this(coalesceLinearTerms(intVars, intCoeffs), op, bound, realVars.copyOf(), realCoeffs.copyOf())
+    ) : this(
+        CoalescedTerms(intVars.copyOf(), intCoeffs.copyOf()),
+        op,
+        bound,
+        realVars.copyOf(),
+        realCoeffs.copyOf(),
+        DoubleArray(intCoeffs.size) { intCoeffs[it].toDouble() },
+        bound.toDouble(),
+    )
+
+    /**
+     * General LP-only real form with **double** integer-side coefficients and bound (the MPS / float
+     * frontend case, where a row touching a continuous variable may carry fractional coefficients on its
+     * integer variables and a fractional bound): `Σ intCoeffs(i)·intVars(i) + Σ realCoeffs(j)·realVars(j)
+     * ⟨op⟩ bound`. [realVars] must be non-empty (it is what makes the row LP-only). Terms are kept in the
+     * given order. The [Long] `coeffs`/`bound` become rounded placeholders; the relaxation reads the
+     * double forms.
+     */
+    constructor(
+        intVars: IntArray,
+        intCoeffs: DoubleArray,
+        realVars: IntArray,
+        realCoeffs: DoubleArray,
+        op: LinearOp,
+        bound: Double,
+    ) : this(
+        CoalescedTerms(intVars.copyOf(), LongArray(intCoeffs.size) { intCoeffs[it].roundToLong() }),
+        op,
+        bound.roundToLong(),
+        realVars.copyOf(),
+        realCoeffs.copyOf(),
+        intCoeffs.copyOf(),
+        bound,
+    )
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LINEAR, ::buildKey)
 
@@ -106,20 +157,29 @@ class Linear private constructor(
 
     private fun buildKey(sink: KeySink) {
         sink.enum(op)
-        sink.long(bound)
-        sink.pairsByVarKeyCoalescing(vars) { coeffs[it] }
-        // Distinguish rows that differ only in their continuous terms so symmetry never merges them.
-        for (j in realVars.indices) {
-            sink.long(realVars[j].toLong())
-            sink.long(realCoeffs[j].toRawBits())
+        // A continuous row keys on its exact double bound / integer coefficients (the [Long] forms are
+        // rounded placeholders); an integer row keys on the [Long] bound and coalesced integer terms.
+        if (hasReals) {
+            sink.long(realBound.toRawBits())
+            for (i in vars.indices) {
+                sink.long(vars[i].toLong())
+                sink.long(realIntCoeffs[i].toRawBits())
+            }
+            for (j in realVars.indices) {
+                sink.long(realVars[j].toLong())
+                sink.long(realCoeffs[j].toRawBits())
+            }
+        } else {
+            sink.long(bound)
+            sink.pairsByVarKeyCoalescing(vars) { coeffs[it] }
         }
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (hasReals) {
         // Real var ids live in a separate namespace and are not remapped by [intMap]; the row was
-        // already canonicalised (any `>=` negated) at construction, so re-emit as-is with the op that
-        // reproduces the stored coefficients (LE / EQ / NE — a stored row is never GE).
-        Linear(coeffs, vars.remapVars(intMap), realCoeffs, realVars, op, bound)
+        // already canonicalised (any `>=` negated) at construction, so re-emit as-is (op is LE/EQ/NE,
+        // never GE) via the double form to preserve the exact continuous-row coefficients and bound.
+        Linear(vars.remapVars(intMap), realIntCoeffs, realVars, realCoeffs, op, realBound)
     } else {
         Linear(coeffs, vars.remapVars(intMap), op, bound)
     }
@@ -177,13 +237,13 @@ class Linear private constructor(
         val dcoeffs = DoubleArray(cols.size)
         for (i in vars.indices) {
             cols[i] = builder.intColumn(vars[i])
-            dcoeffs[i] = coeffs[i].toDouble()
+            dcoeffs[i] = realIntCoeffs[i]
         }
         for (j in realVars.indices) {
             cols[vars.size + j] = builder.realColumn(realVars[j])
             dcoeffs[vars.size + j] = realCoeffs[j]
         }
-        builder.realRow(cols, dcoeffs, op, bound.toDouble())
+        builder.realRow(cols, dcoeffs, op, realBound)
     }
 }
 
