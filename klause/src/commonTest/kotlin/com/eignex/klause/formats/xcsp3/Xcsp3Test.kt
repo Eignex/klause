@@ -139,6 +139,20 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `an over-cap run-length coeffs list is rejected rather than allocating unbounded memory`() {
+        // `1x10` expands to ten 1s; with a cap of 4 the expansion must fail fast instead of allocating.
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><var id="a"> 0..2 </var></variables>
+              <constraints>
+                <sum><list> a </list><coeffs> 1x10 </coeffs><condition> (le,4) </condition></sum>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml, negTableCap = 4) }
+    }
+
+    @Test
     fun `parses COP with sum constraint and maximize objective and optimizes`() {
         val xml = """
             <instance format="XCSP3" type="COP">
