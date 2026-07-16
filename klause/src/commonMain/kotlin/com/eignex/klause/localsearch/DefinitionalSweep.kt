@@ -114,7 +114,7 @@ class DefinitionalSweep internal constructor(
                     }
                 }
                 for (f in factors) {
-                    if (f !is Linear || f.op != LinearOp.EQ) continue
+                    if (f !is Linear || f.hasReals || f.op != LinearOp.EQ) continue
                     val j = f.vars.indices.firstOrNull {
                         hinted[f.vars[it]] && (f.coeffs[it] == 1L || f.coeffs[it] == -1L) &&
                             nonProductOcc[f.vars[it]] == 1 &&

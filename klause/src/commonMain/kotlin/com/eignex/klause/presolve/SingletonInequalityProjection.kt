@@ -32,7 +32,9 @@ internal object SingletonInequalityProjection {
         val added = ArrayList<Factor>()
         val pinned = HashMap<Int, Long>()
         problem.factors.forEachIndexed { i, f ->
-            if (f !is Linear || (f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) return@forEachIndexed
+            if (f !is Linear || f.hasReals || (f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) {
+                return@forEachIndexed
+            }
             if (!fitsHalfLong(f.bound)) return@forEachIndexed
             val j = f.vars.indices.firstOrNull { k ->
                 val x = f.vars[k]

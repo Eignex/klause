@@ -745,7 +745,7 @@ internal class CpToLpRelaxation(
             var rltColumns = 0
             for (f in problem.factors) {
                 if (rltColumns >= MAX_RLT_COLUMNS) break
-                if (f !is Linear || f.op != LinearOp.LE) continue
+                if (f !is Linear || f.hasReals || f.op != LinearOp.LE) continue
                 if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
                 if (f.bound < 0 || f.coeffs.any { it <= 0 }) continue
                 if (f.vars.any { problem.intDomains[it].min != 0L || problem.intDomains[it].max != 1L }) continue

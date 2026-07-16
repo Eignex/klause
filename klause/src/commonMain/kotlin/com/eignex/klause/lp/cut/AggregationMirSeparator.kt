@@ -63,7 +63,7 @@ internal class AggregationMirSeparator : CutSeparator {
         val rows = ArrayList<Row>()
         for (factor in ctx.problem.factors) {
             when (factor) {
-                is Linear -> when (factor.op) {
+                is Linear -> if (factor.hasReals) Unit else when (factor.op) {
                     LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
 
                     LinearOp.GE -> addRow(ctx, factor, flip = true, loOf, rows)

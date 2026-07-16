@@ -70,7 +70,7 @@ internal object DiophantineReduction {
     fun reduce(problem: Problem): PassDelta {
         var out: Array<IntDomain>? = null
         for (f in problem.factors) {
-            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2 || !fitsHalfLong(f.bound)) continue
+            if (f !is Linear || f.hasReals || f.op != LinearOp.EQ || f.vars.size < 2 || !fitsHalfLong(f.bound)) continue
             if (f.coeffs.any { !fitsHalfLong(it) }) continue
             val n = f.vars.size
             // Prefix / suffix gcd of |coeffs| so `gcd(aⱼ : j ≠ i)` is O(1) per variable.

@@ -42,7 +42,7 @@ internal object LinearBoundFusion {
         val groups = HashMap<List<Long>, Group>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f !is Linear || f.op == LinearOp.NE) continue
+            if (f !is Linear || f.hasReals || f.op == LinearOp.NE) continue
             val canon = canonicalize(f) ?: continue
             val g = groups.getOrPut(canon.key) {
                 Group().also {
