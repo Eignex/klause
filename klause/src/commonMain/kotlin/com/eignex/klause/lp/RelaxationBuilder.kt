@@ -44,6 +44,26 @@ interface RelaxationBuilder {
     fun boolColumn(boolVar: Int): Int
 
     /**
+     * The LP column handle for LP-only continuous (real) variable [realVar] (raw id in the problem's
+     * real-variable namespace), created on first reference with the variable's declared real bounds and
+     * objective coefficient. A real column is present in this relaxation but absent from CP search — it
+     * has no domain, trail, or branching; the simplex resolves it at nodes and leaves. The default
+     * declines (`-1`) for builders with no real-variable backing (e.g. presolve test fakes); the search
+     * relaxation driver overrides it. See [realRow].
+     */
+    fun realColumn(realVar: Int): Int = -1
+
+    /**
+     * Emit a real-coefficient row `Σ coeffs(k) · columns(k) ⟨op⟩ rhs` over column handles obtained from
+     * [intColumn], [boolColumn], or [realColumn] — the LP-only linear form of a constraint that touches a
+     * continuous variable. Repeated columns are summed and absent columns count as zero. [LinearOp.NE] is
+     * ignored. The row forces the model onto the double-precision view, so the exact integer certification
+     * declines while it is present (its infeasibility is still certified via the rationalized 128-bit
+     * Farkas). The default is a no-op; the search relaxation driver overrides it.
+     */
+    fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double) {}
+
+    /**
      * An auxiliary LP column in `[lo, hi]` with no backing CP variable (e.g. a one-hot selector or a
      * product column). [presence], when given, is a flat list of `(intVar, value)` pairs that must all
      * hold for the column to be present; it lets the persistent relaxation re-bind the column across
