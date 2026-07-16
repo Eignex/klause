@@ -63,10 +63,9 @@ internal class DimacsOutput : OutputProtocol {
 
     override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("c solveTime=${solveTimeMs / 1000.0}")
-        if (stats.run.backend.isNotEmpty()) {
-            println("c nodes=${stats.search.nodes.sum.toLong()}")
-            println("c failures=${stats.search.fails.sum.toLong()}")
-            println("c propagations=${stats.search.propagations.sum.toLong()}")
-        }
+        println("c solutions=$solutions")
+        // Only a systematic backend populates the CDCL search counters; a pure-LS backend (empty name)
+        // has none, so the block is skipped rather than printing a wall of zeros.
+        if (stats.run.backend.isNotEmpty()) printStatPairs("c", searchStatPairs(stats))
     }
 }
