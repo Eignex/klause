@@ -70,12 +70,11 @@ internal fun SmtLibQfLia.Builder.relFromOperands(op: String, a: LinComb, b: LinC
 
 /** Run [block], surfacing a folded-term 64-bit overflow as a clean [UnsupportedSmtException].
  *  SMT integers are unbounded, so an overflow means the term exceeds what the solver represents. */
-internal inline fun <T> foldChecked(block: () -> T): T =
-    try {
-        block()
-    } catch (_: ArithmeticException) {
-        throw UnsupportedSmtException("integer overflow while folding a linear term")
-    }
+internal inline fun <T> foldChecked(block: () -> T): T = try {
+    block()
+} catch (_: ArithmeticException) {
+    throw UnsupportedSmtException("integer overflow while folding a linear term")
+}
 
 /** Fold [t] to an integer linear combination (iteratively, via [evalTerm]). */
 internal fun SmtLibQfLia.Builder.linearTerm(t: SExpr): LinComb = (evalTerm(t, Sort.INT) as Res.I).lin

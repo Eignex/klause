@@ -70,6 +70,13 @@ class PropagationState(
      * so every non-opted state builds and propagates exactly as before.
      */
     internal val nativeSat: Boolean = false,
+    /**
+     * Opt into pseudo-Boolean cutting-planes conflict learning (#1119 Phase 3). When `true` and the
+     * problem is pure-Boolean, [ConflictAnalyzer] runs a [PbConflictResolvent] (with a clause-resolvent
+     * fallback) so conflicts on pseudo-Boolean constraints learn PB nogoods, not just clauses. Defaults
+     * to `false`; ignored on problems with integer variables (order-literal atoms have no PB reason).
+     */
+    internal val pbLearning: Boolean = false,
 ) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
@@ -927,17 +934,24 @@ class PropagationState(
      * current decision level — no scan at all. Atom-lit clauses can fire on an atom that flipped
      * at a sub-decision level, so they keep the literal scan.
      */
-    private fun effectiveLevelFor(f: Propagator, fid: Int): Int = if (f is ClausePropagator) {
-        if (f.allLiteralsBool(problem.numBoolVars)) {
+    private fun effectiveLevelFor(f: Propagator, fid: Int): Int = when {
+        f is ClausePropagator -> if (f.allLiteralsBool(problem.numBoolVars)) {
             levelToDecisionVar.size
         } else {
             maxLevelForClause(f.literals)
         }
-    } else {
-        // A base factor reads its vars from the immutable problem; a mid-life presolve factor
-        // (fid >= baseFactorCount, only in [incremental] mode) from [MidlifeFactors.factors].
-        val factor = if (fid < baseFactorCount) problem.factors[fid] else midlife.factors[fid - baseFactorCount]
-        maxLevelForVars(factor.boolVars, factor.intVars)
+
+        // A learned non-clause constraint (a cutting-planes pseudo-Boolean nogood, #1119 Phase 3) lives in
+        // the learned store, not [problem.factors] / [MidlifeFactors.factors]; read its var footprint off
+        // the propagator itself.
+        fid >= baseFactorCount && !incremental && f is LearnedPropagator -> maxLevelForVars(f.boolVars, f.intVars)
+
+        else -> {
+            // A base factor reads its vars from the immutable problem; a mid-life presolve factor
+            // (fid >= baseFactorCount, only in [incremental] mode) from [MidlifeFactors.factors].
+            val factor = if (fid < baseFactorCount) problem.factors[fid] else midlife.factors[fid - baseFactorCount]
+            maxLevelForVars(factor.boolVars, factor.intVars)
+        }
     }
 
     /**

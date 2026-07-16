@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
+import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
@@ -124,6 +125,7 @@ internal class DfsEngine<L>(
         params.cancellation,
         params.propagationCancelFloor,
         nativeSat = params.nativeSat ?: true,
+        pbLearning = params.pbLearning,
     )
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are
@@ -140,9 +142,9 @@ internal class DfsEngine<L>(
     private var decisionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
 
     private val relearnCounts = MutableLongIntMap()
-    private val relearnTripped: (Learned) -> Boolean = { learned ->
+    private val relearnTripped: (LearnedConstraint) -> Boolean = { learned ->
         var h = 0L
-        for (lit in learned.literals) h += splitmix64(lit.toLong())
+        for (lit in learned.guardLiterals) h += splitmix64(lit.toLong())
         val n = relearnCounts.addTo(h, 1)
         if (n > 1) sink?.search?.observeRelearn()
         n > RELEARN_FALLBACK_THRESHOLD
@@ -377,7 +379,7 @@ internal class DfsEngine<L>(
 
     /** The shared backjump handler: record touched seed levels, feed the restart policy, execute the
      *  backjump+learn, and translate its terminal to an engine event (or null to continue). */
-    private fun handleBackjump(learned: Learned, alignFirst: Boolean): EngineEvent<L>? {
+    private fun handleBackjump(learned: LearnedConstraint, alignFirst: Boolean): EngineEvent<L>? {
         recordTouchedSeedLevels(learned.decisionLevels)
         restart.recordConflict(learned.lbd, trail.size)
         return when (solver.backjumpAndLearn(learned, trail, session, params, alignFirst)) {

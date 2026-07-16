@@ -45,9 +45,12 @@ class PropagationSession(
     /** Opt into the native-SAT BCP lane for an eligible pure-Boolean problem (#1119 Phase 1);
      *  ignored when the problem has integer variables or non-clause factors. */
     nativeSat: Boolean = false,
+    /** Opt into pseudo-Boolean cutting-planes conflict learning (#1119 Phase 3); ignored on problems
+     *  with integer variables. */
+    pbLearning: Boolean = false,
 ) {
     private val state: PropagationState =
-        PropagationState(problem, Assumptions.None, nativeSat = nativeSat).also {
+        PropagationState(problem, Assumptions.None, nativeSat = nativeSat, pbLearning = pbLearning).also {
             it.cancelFloor = propagationCancelFloor
         }
 
@@ -298,16 +301,34 @@ class PropagationSession(
      * learned clause is a constraint over existing variables, not a decision. So no
      * snapshot is pushed and no decision counter is bumped.
      */
-    fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult {
+    fun addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): PropagationResult =
+        registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent) }
+
+    /**
+     * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` (#1119 Phase 3) and
+     * immediately propagate it, exactly as [addLearnedClause] does for a clause. Used by the engine's
+     * cutting-planes backjump to make the learned PB constraint stick and force its asserting literal.
+     */
+    fun addLearnedPb(
+        weights: LongArray,
+        literals: IntArray,
+        degree: Long,
+        lbd: Int,
+        permanent: Boolean = false,
+    ): PropagationResult =
+        registerAndPropagate(base = state.undoTop) { state.addLearnedPb(weights, literals, degree, lbd, permanent) }
+
+    /** Shared body of [addLearnedClause] / [addLearnedPb]: register the constraint via [register], fire it
+     *  once, and either surface the cascaded conflict or re-baseline the level with the asserted facts. */
+    private inline fun registerAndPropagate(base: Int, register: () -> Int): PropagationResult {
         bakedUnsat?.let { return it }
-        val base = state.undoTop
-        val newFid = state.addLearnedClause(clause, lbd, permanent)
+        val newFid = register()
         val conflict = state.runToFixpoint(allFactors = false, initialFactor = newFid, cancellation = cancellation)
         if (conflict != null) return revertAndUnsat(conflict)
-        // The asserted facts are implied by the decisions up to the current level, so they
-        // join the level's baseline: re-snapshot the top mark. Otherwise the next failed
-        // pin's revert — which restores to the top mark — silently rewinds them while the
-        // clause stays registered, and the search can re-derive the same conflict forever.
+        // The asserted facts are implied by the decisions up to the current level, so they join the
+        // level's baseline: re-snapshot the top mark. Otherwise the next failed pin's revert — which
+        // restores to the top mark — silently rewinds them while the constraint stays registered, and the
+        // search can re-derive the same conflict forever.
         levelStates[levelTop - 1] = state.mark()
         return impliedSince(base)
     }
@@ -421,6 +442,12 @@ class PropagationSession(
     internal fun learnedClauseLiterals(learnedIndex: Int): IntArray =
         state.nativeEngine?.literalsOf(learnedIndex) ?: learnedClauseAt(learnedIndex).literals
 
+    /** True iff the learned constraint at [learnedIndex] is a clause (not a pseudo-Boolean constraint) —
+     *  the clause-only passes (vivification, glue export) skip the rest. Native-lane entries are all
+     *  clauses. */
+    internal fun isLearnedClause(learnedIndex: Int): Boolean =
+        state.nativeEngine != null || state.learnedClauses[learnedIndex] is ClausePropagator
+
     /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)
 
@@ -448,6 +475,7 @@ class PropagationSession(
             // (assertObjectiveBound) and blocking nogoods — not globally-valid resolvents. A caller
             // learning under assumptions/incumbent (LNS repair) must skip them or it poisons peers.
             if (skipPermanent && learnedClausePermanent(i)) continue
+            if (!isLearnedClause(i)) continue // pseudo-Boolean nogoods aren't clause-portable (#1119)
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
             val lits = learnedClauseLiterals(i)
@@ -574,7 +602,7 @@ class PropagationSession(
         // vars at the conflict levels" extraction. Sharper conflict focus ⇒ fewer conflicts.
         val bools: IntArray
         val ints: IntArray
-        if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
+        if (learned is ConflictAnalyzer.AnalysisResult.LearnedConstraint) {
             bools = state.conflictAnalyzer.lastBumpBoolVars().toIntArray()
             ints = state.conflictAnalyzer.lastBumpIntVars().toIntArray()
         } else {

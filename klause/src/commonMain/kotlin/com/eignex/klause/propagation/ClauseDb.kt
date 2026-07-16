@@ -2,9 +2,13 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
+import com.eignex.klause.factor.bool.PseudoBooleanPropagator
+import com.eignex.klause.factor.litVars
+import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
@@ -64,6 +68,32 @@ internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: In
     val watchers = clause.initialBoolWatchers
     val blockers = clause.initialBoolWatcherBlockers
     for (i in watchers.indices) installLitWatch(watchers[i], newFid, blockers?.getOrNull(i) ?: NO_BLOCKER)
+    return newFid
+}
+
+/**
+ * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` (#1119 Phase 3) and return
+ * its factor id. Stored in the same [LearnedClauseDb] as clauses (as a [LearnedPropagator]), with the
+ * forgetting policy columns. A PB constraint has no watched-literal scheme, so it wakes on *every* literal
+ * going false — install a watch on each literal (the ≥-form only tightens when a positive-weight literal
+ * turns false), which is sound and keeps the constraint firing on any relevant change.
+ */
+internal fun PropagationState.addLearnedPb(
+    weights: LongArray,
+    literals: IntArray,
+    degree: Long,
+    lbd: Int,
+    permanent: Boolean = false,
+): Int {
+    val prop = PseudoBooleanPropagator(literals.litVars(), EmptyIntArray, weights, literals, PbOp.GE, degree)
+    val newFid = totalFactorCount
+    learned.store.add(prop)
+    learned.lbds.add(lbd)
+    learned.permanent.add(if (permanent) 1 else 0)
+    learned.tier.add(ClauseTier.UNSET.ordinal)
+    learned.usedFlags.add(0)
+    refPayloadStore.add(null)
+    for (lit in literals) installLitWatch(lit, newFid, NO_BLOCKER)
     return newFid
 }
 

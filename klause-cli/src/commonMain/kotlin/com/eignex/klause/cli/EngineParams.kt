@@ -55,7 +55,7 @@ import com.eignex.klause.portfolio.PortfolioScenario
  *
  * Keys per engine:
  *  - `cp`: `bt-arm=label,label` pins named catalog arms, or the per-solver overrides `seed`,
- *    `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`, `var-selector`
+ *    `max-decisions`, `luby`, `phase-saving`, `max-learned`, `lbd-glue`, `pb-learning`, `var-selector`
  *    (see [VarSelectorKind]), `val-selector` (see [ValSelectorKind]), … resolve a one-arm pool
  *    (single-solver heuristic A/B); plus the portfolio knobs below
  *  - `ls`: `strategy` (base `auto` (curated pool, default) | `cbls|feasibilityjump|walksat|probsat|sa`
@@ -134,7 +134,7 @@ internal val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "lp-objective-cone", "lp-auto-off-reprobe",
-    "lp-knapsack-lagrangian", "var-selector", "val-selector",
+    "lp-knapsack-lagrangian", "pb-learning", "var-selector", "val-selector",
 )
 
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
@@ -164,12 +164,13 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val lpCone = p.bool("lp-objective-cone")
     val lpAutoOff = p.bool("lp-auto-off-reprobe")
     val lpKnapsack = p.bool("lp-knapsack-lagrangian")
+    val pbLearning = p.bool("pb-learning")
     val varKind = if (allowSelectors) p.varSelectorKind("var-selector") else null
     val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
-        lpCone, lpAutoOff, lpKnapsack,
+        lpCone, lpAutoOff, lpKnapsack, pbLearning,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -192,6 +193,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
+        pbLearning?.let { out = out.copy(pbLearning = it) }
         varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }
         valKind?.let { out = out.copy(valueSelector = it.selector()) }
         out
