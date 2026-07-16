@@ -903,6 +903,11 @@ object Xcsp3 {
             for (tok in toks) {
                 val rle = parseRle(tok)
                 if (rle != null) {
+                    // Cap the run-length expansion: an unbounded `vxn` count (e.g. `1x2000000000`) would
+                    // otherwise allocate multiple GB before any other limit applies.
+                    if (out.size.toLong() + rle.second > negTableCap) {
+                        throw UnsupportedXcsp3Exception("run-length list exceeds the $negTableCap-element cap")
+                    }
                     repeat(rle.second) { out.add(rle.first) }
                 } else {
                     out.add(tok.toIntOrNull() ?: return null)
