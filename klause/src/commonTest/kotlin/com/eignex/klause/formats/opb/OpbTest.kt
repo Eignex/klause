@@ -62,6 +62,16 @@ class OpbTest {
     }
 
     @Test
+    fun `preserves objective coefficients beyond 53 bits of precision`() {
+        // 2^53 + 1 is the smallest positive integer a Double cannot represent exactly; routing the
+        // coefficient through Double would round it to 2^53.
+        val big = 9007199254740993L
+        val out = Opb.parse("min: $big x1 ;\n+1 x1 >= 0 ;\n")
+        val obj = assertNotNull(out.objective)
+        assertEquals(big, obj.boolWeights[0])
+    }
+
+    @Test
     fun `reifies a product term to an and indicator`() {
         val text = "+1 x1 x2 >= 1 ;"
         val out = Opb.parse(text)

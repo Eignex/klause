@@ -13,7 +13,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntDoubleMap
+import com.eignex.klause.util.MutableIntLongMap
 
 /** Parsed OPB instance and optional objective. */
 data class OpbProblem(
@@ -86,8 +86,8 @@ object Opb {
         // Declared variables occupy ids 0..maxIndex-1; seed the counter so indicators land above them.
         for (t in tokens) varIndexOrNull(t)?.let { if (it > builder.numVars) builder.numVars = it }
 
-        val objWeights = MutableIntDoubleMap()
-        var objConstant = 0.0
+        val objWeights = MutableIntLongMap()
+        var objConstant = 0L
         var hasObjective = false
         // WBO soft constraints: a cost bound `soft: top` and the (cost, violation-literal) pairs.
         var softTop: Long? = null
@@ -108,7 +108,7 @@ object Opb {
                 for (term in parseTerms(stmt.subList(1, stmt.size))) {
                     addObjectiveTerm(
                         objWeights,
-                        term.coef.toDouble(),
+                        term.coef,
                         builder.literalFor(term.lits),
                     ) { objConstant += it }
                 }
@@ -133,8 +133,8 @@ object Opb {
                     ReifiedPseudoBoolean(sat, relation.weights, relation.literals, relation.op, relation.bound),
                 )
                 hasObjective = true
-                objWeights.addTo(sat, -softCost.toDouble())
-                objConstant += softCost.toDouble()
+                objWeights.addTo(sat, -softCost)
+                objConstant += softCost
                 softCosts.add(softCost)
                 softViolations.add(Lit.make(sat, positive = false))
             }
@@ -153,8 +153,8 @@ object Opb {
             null
         } else {
             val weights = LongArray(builder.numVars)
-            objWeights.forEach { v, w -> weights[v] = w.toLong() }
-            LinearObjective(boolWeights = weights, intCoefficients = EmptyLongArray, constant = objConstant.toLong())
+            objWeights.forEach { v, w -> weights[v] = w }
+            LinearObjective(boolWeights = weights, intCoefficients = EmptyLongArray, constant = objConstant)
         }
         val problem = Problem(
             numBoolVars = builder.numVars,
@@ -167,10 +167,10 @@ object Opb {
 
     /** Fold `weight·lit` into the objective, rewriting a negated literal `c·(~x)` as `c·(1 − x)`. */
     private inline fun addObjectiveTerm(
-        objWeights: MutableIntDoubleMap,
-        weight: Double,
+        objWeights: MutableIntLongMap,
+        weight: Long,
         lit: Int,
-        addConstant: (Double) -> Unit,
+        addConstant: (Long) -> Unit,
     ) {
         val v = Lit.variable(lit)
         if (Lit.isPositive(lit)) {
