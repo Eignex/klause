@@ -93,7 +93,15 @@ data class LinearObjective(
         return total
     }
 
-    override fun evaluate(sample: Sample): Double = evaluateLong(sample).toDouble()
+    override fun evaluate(sample: Sample): Double {
+        // The discrete part is exact; the continuous part is the LP-only real terms, present in [sample]
+        // only at a leaf where the residual LP resolved them (issue #1232).
+        var total = evaluateLong(sample).toDouble()
+        for (r in 0 until minOf(sample.reals.size, realCoefficients.size)) {
+            total += realCoefficients[r] * sample.reals[r]
+        }
+        return total
+    }
 
     /** Exact integer objective value of the live [assignment]; lower is better. Reads variables in
      *  place — no [Sample] copy — so the descent loop can score every iteration allocation-free. */

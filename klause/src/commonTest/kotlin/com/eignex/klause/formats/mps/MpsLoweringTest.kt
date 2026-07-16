@@ -5,7 +5,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MpsLoweringTest {
@@ -16,18 +15,22 @@ class MpsLoweringTest {
         MpsModel("m", ObjectiveSense.MINIMIZE, noObjective, vars.toList(), emptyList())
 
     @Test
-    fun `rejects an unbounded float column`() {
-        val m = model(MpsVar("x", integer = false, lower = 0.0, upper = null))
-        assertFailsWith<MpsFormatException> { m.toProblem() }
+    fun `keeps an unbounded float column as an open LP-only continuous variable`() {
+        val compiled = model(MpsVar("x", integer = false, lower = 0.0, upper = null)).toProblem()
+        assertEquals(1, compiled.floatColumns)
+        assertEquals(1, compiled.problem.numRealVars)
+        assertEquals(0.0, compiled.problem.realLower[0])
+        assertTrue(compiled.problem.realUpper[0].isInfinite())
     }
 
     @Test
-    fun `buckets a bounded float column into the configured buckets`() {
-        val compiled = model(MpsVar("x", integer = false, lower = 0.0, upper = 10.0)).toProblem(floatBuckets = 100)
+    fun `lowers a bounded float column to an LP-only continuous variable with its real bounds`() {
+        val compiled = model(MpsVar("x", integer = false, lower = 0.0, upper = 10.0)).toProblem()
         assertEquals(1, compiled.floatColumns)
-        assertEquals(0L, compiled.problem.intDomains[0].min)
-        assertEquals(99L, compiled.problem.intDomains[0].max) // buckets - 1
-        assertNotNull(compiled.floatBucketings[0])
+        assertEquals(1, compiled.problem.numRealVars)
+        assertEquals(0, compiled.problem.numIntVars)
+        assertEquals(0.0, compiled.problem.realLower[0])
+        assertEquals(10.0, compiled.problem.realUpper[0])
     }
 
     @Test

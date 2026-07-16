@@ -415,7 +415,8 @@ internal class ResumableMinimize(
         // them; an uncertifiable residual taints the terminal verdict to `unknown`.
         override fun onLeaf(snap: Sample): MinimizeResult.WithSample? {
             if (problem.numRealVars > 0) {
-                when (leafRealFeasibility(problem, objective, snap)) {
+                val res = leafRealFeasibility(problem, objective, snap)
+                when (res.verdict) {
                     LpVerdict.INFEASIBLE -> return null
 
                     LpVerdict.INDETERMINATE -> {
@@ -423,7 +424,12 @@ internal class ResumableMinimize(
                         return null
                     }
 
-                    LpVerdict.OPTIMAL -> Unit
+                    // Complete the assignment with the LP's continuous values, and score the objective
+                    // over the full solution (its real part is resolved by the LP, not by CP).
+                    LpVerdict.OPTIMAL -> {
+                        val full = snap.copy(reals = res.reals)
+                        return recordIfImproving(full, objective.evaluate(full))
+                    }
                 }
             }
             return recordIfImproving(snap, objective.evaluate(snap))
