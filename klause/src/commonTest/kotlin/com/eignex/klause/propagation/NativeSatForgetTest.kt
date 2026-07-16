@@ -65,6 +65,20 @@ class NativeSatForgetTest {
     }
 
     @Test
+    fun `native lane engages only for an eligible problem`() {
+        val eligible = PropagationSession(
+            Problem(
+                numBoolVars = 2,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
+            ),
+            nativeSat = true,
+        )
+        assertTrue(eligible.usesNativeSat, "an eligible pure-CNF session must use the native lane")
+    }
+
+    @Test
     fun `glue export reads native learned clause literals`() {
         val session = session(3, intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         session.addLearnedClause(Clause(or(0, false, 1, true)), lbd = 2)

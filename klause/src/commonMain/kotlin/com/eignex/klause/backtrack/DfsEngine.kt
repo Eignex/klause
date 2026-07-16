@@ -116,8 +116,15 @@ internal class DfsEngine<L>(
         valueSelector = params0.valueSelector.fresh(),
     )
     private val problem = solver.problem
-    private val session =
-        PropagationSession(problem, params.cancellation, params.propagationCancelFloor, nativeSat = params.nativeSat)
+
+    // null = auto-dispatch: the native-SAT lane engages exactly when the baked problem is eligible
+    // (PropagationState gates on that anyway). An explicit true/false overrides the auto choice.
+    private val session = PropagationSession(
+        problem,
+        params.cancellation,
+        params.propagationCancelFloor,
+        nativeSat = params.nativeSat ?: true,
+    )
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are
     // assumptions, levels > numSeed are post-seed DFS decisions.
