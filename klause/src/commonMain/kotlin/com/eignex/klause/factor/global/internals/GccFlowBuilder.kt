@@ -323,9 +323,18 @@ internal class GccFlowBuilder {
         return 0
     }
 
+    private var sccNodeAdj: Array<IntArrayList> = emptyArray()
+
     fun computeSccResidual(limit: Int, sccId: IntArray) {
-        val nodeAdj = Array(limit) { IntArrayList() }
+        // Reuse the residual-adjacency buffer across fires (grown on demand, live prefix cleared) — the
+        // Array-of-lists allocation is a top per-fire cost on cardinality-heavy propagation.
+        if (sccNodeAdj.size < limit) {
+            val old = sccNodeAdj
+            sccNodeAdj = Array(limit) { if (it < old.size) old[it] else IntArrayList() }
+        }
+        val nodeAdj = sccNodeAdj
         for (v in 0 until limit) {
+            nodeAdj[v].clear()
             val neigh = adj[v]
             for (k in 0 until neigh.size) {
                 val eIdx = neigh[k]
