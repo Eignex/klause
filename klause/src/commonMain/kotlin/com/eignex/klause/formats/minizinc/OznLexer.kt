@@ -3,7 +3,19 @@ package com.eignex.klause.formats.minizinc
 /** Tokenizer for the MiniZinc syntax subset used in `.ozn` files. */
 internal class OznLexer(private val source: String) {
     private var pos: Int = 0
-    private val line: Int get() = source.substring(0, pos).count { it == '\n' } + 1
+
+    // Line tracking. `pos` only advances, so counting newlines forward from the last scanned offset
+    // makes [lineAt] O(1) amortized — the old `substring(0, pos).count { '\n' }` per token was O(n²)
+    // over a large `.ozn`.
+    private var lineNo: Int = 1
+    private var lineScanned: Int = 0
+    private fun lineAt(): Int {
+        while (lineScanned < pos) {
+            if (source[lineScanned] == '\n') lineNo++
+            lineScanned++
+        }
+        return lineNo
+    }
 
     fun tokenize(): List<OznToken> {
         val out = ArrayList<OznToken>()
@@ -12,7 +24,7 @@ internal class OznLexer(private val source: String) {
             if (pos >= source.length) break
             out.add(nextToken())
         }
-        out.add(OznToken(OznTokenKind.EOF, "", line))
+        out.add(OznToken(OznTokenKind.EOF, "", lineAt()))
         return out
     }
 
@@ -38,7 +50,7 @@ internal class OznLexer(private val source: String) {
     }
 
     private fun nextToken(): OznToken {
-        val ln = line
+        val ln = lineAt()
         val c = source[pos]
         return when {
             c == '"' -> stringLit(ln)
