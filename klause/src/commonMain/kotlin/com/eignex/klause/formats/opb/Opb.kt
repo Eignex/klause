@@ -36,6 +36,9 @@ object Opb {
     /** A signed integer literal, used to tell an out-of-64-bit-range value from a non-numeric token. */
     private val INTEGER = Regex("[+-]?\\d+")
 
+    /** Whitespace token splitter, compiled once instead of per line. */
+    private val WHITESPACE = Regex("\\s+")
+
     /** A parsed term: [coef] times the conjunction of [lits] (a single literal when linear). */
     private class Term(val coef: Long, val lits: IntArrayList)
 
@@ -79,7 +82,7 @@ object Opb {
         for (rawLine in text.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty() || line.startsWith("*")) continue
-            tokens.addAll(line.split(Regex("\\s+")).filter { it.isNotEmpty() })
+            tokens.addAll(line.split(WHITESPACE).filter { it.isNotEmpty() })
         }
 
         val builder = Builder()
