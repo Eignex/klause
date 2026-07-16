@@ -68,8 +68,12 @@ internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: In
 }
 
 /** Convenience overload that converts a structural [Clause] to its [ClausePropagator] before registering. */
-internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): Int =
-    addLearnedClause(clause.asPropagator() as ClausePropagator, lbd, permanent)
+internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): Int {
+    // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches,
+    // not the general learned database; lbd/permanent policy columns land with the forgetting pass.
+    nativeEngine?.let { return it.addLearned(clause.literals) }
+    return addLearnedClause(clause.asPropagator() as ClausePropagator, lbd, permanent)
+}
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
 internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int = learned.lbds[learnedIndex]

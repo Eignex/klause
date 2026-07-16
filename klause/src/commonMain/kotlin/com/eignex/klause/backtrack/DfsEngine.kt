@@ -116,7 +116,8 @@ internal class DfsEngine<L>(
         valueSelector = params0.valueSelector.fresh(),
     )
     private val problem = solver.problem
-    private val session = PropagationSession(problem, params.cancellation, params.propagationCancelFloor)
+    private val session =
+        PropagationSession(problem, params.cancellation, params.propagationCancelFloor, nativeSat = params.nativeSat)
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are
     // assumptions, levels > numSeed are post-seed DFS decisions.
