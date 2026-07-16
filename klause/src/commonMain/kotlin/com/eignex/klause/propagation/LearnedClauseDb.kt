@@ -1,12 +1,14 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Learned-clause database for [PropagationState]: the clauses plus the parallel policy columns the
- * three-tier reduction (#201) and forgetting passes read. Registration, lookup and pruning live in
- * `ClauseDb.kt`.
+ * Learned-constraint database for [PropagationState]: the constraints learned during search plus the
+ * parallel policy columns the three-tier reduction (#201) and forgetting passes read. Registration,
+ * lookup and pruning live in `ClauseDb.kt`. Every learned constraint is stored as a [Propagator] so the
+ * database is agnostic to the learned-constraint kind (#1119); today the only kind is a
+ * [com.eignex.klause.factor.bool.ClausePropagator], but a pseudo-Boolean cutting-planes propagator slots
+ * in without touching the policy columns or the forgetting machinery.
  */
 internal class LearnedClauseDb(
     /** Count of binary (2-literal) clauses known — original problem clauses plus learned ones.
@@ -15,12 +17,12 @@ internal class LearnedClauseDb(
      *  pass — never correctness. */
     var binaryClauseCount: Int,
 ) {
-    /** Learned clauses accumulated during search (LCG-style nogoods produced by [ConflictAnalyzer]).
+    /** Learned constraints accumulated during search (LCG-style nogoods produced by [ConflictAnalyzer]).
      *  Their factor ids live in `[problem.numFactors, totalFactorCount)` — treat them like any other
-     *  Clause via `factorAt`; they participate in propagation through the per-literal watcher index
-     *  just like static clauses. Survives `restore` (clauses are facts about the original problem,
-     *  not trail state); pruned by `forgetLearnedClauses`. */
-    val store = ArrayList<ClausePropagator>()
+     *  [Propagator] via `factorAt`; they participate in propagation through the per-literal watcher index
+     *  just like static factors. Survives `restore` (learned constraints are facts about the original
+     *  problem, not trail state); pruned by `forgetLearnedClauses`. */
+    val store = ArrayList<LearnedPropagator>()
 
     /** LBD (Literal Block Distance) per learned clause, parallel to [store]. Glucose-style glue
      *  metric: lower = more re-usable. Forgetting policies key on this to decide which clauses to

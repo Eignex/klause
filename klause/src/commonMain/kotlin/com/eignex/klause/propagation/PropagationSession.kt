@@ -397,8 +397,15 @@ class PropagationSession(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
-    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass (#203). */
-    internal fun learnedClauseAt(learnedIndex: Int): ClausePropagator = state.learnedClauses[learnedIndex]
+    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass (#203) and the
+     *  glue-clause export, both clause-only. Fails loudly on a non-clause learned constraint rather than
+     *  through a bare cast: when PB learning lands (#1119) those passes must gain a clause filter, and this
+     *  message points at the site that needs it instead of surfacing an opaque ClassCastException. */
+    internal fun learnedClauseAt(learnedIndex: Int): ClausePropagator =
+        state.learnedClauses[learnedIndex] as? ClausePropagator
+            ?: error(
+                "learned constraint at $learnedIndex is not a clause; vivification and glue export are clause-only",
+            )
 
     /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)

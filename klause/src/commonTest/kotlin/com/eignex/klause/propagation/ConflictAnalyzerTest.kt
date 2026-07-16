@@ -311,8 +311,8 @@ class ConflictAnalyzerTest {
             state.learnedClauses.size,
             "expected 2 clauses kept after dropping the high-LBD one",
         )
-        assertContentEquals(c0.literals, state.learnedClauses[0].literals)
-        assertContentEquals(c2.literals, state.learnedClauses[1].literals)
+        assertContentEquals(c0.literals, (state.learnedClauses[0] as ClausePropagator).literals)
+        assertContentEquals(c2.literals, (state.learnedClauses[1] as ClausePropagator).literals)
         assertTrue(
             !state.watches.byLit[Lit.make(1, false)].toIntArray().toList().contains(fid1),
             "watcher entry for the dropped clause should be removed",

@@ -1,10 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
 
 /**
  * First-UIP (Unique Implication Point) conflict analyzer — the classical CDCL clause-learning
@@ -14,6 +12,13 @@ import com.eignex.klause.util.IntHashSet
  * remains — the UIP. The conjunction of negated literals on the learned clause is forbidden by
  * the original problem, so adding it prunes any future search path that would re-derive the
  * same conflict.
+ *
+ * This class is the graph-walking driver: it implements [ReasonGraph] (the frozen implication
+ * graph — variable universe, decision levels, antecedents), seeds the analysis from a conflict
+ * reason, and selects the pivot to resolve at each step in reverse-assignment order along the
+ * pin trail. The "reason → resolvent" step — folding an antecedent into the accumulating nogood,
+ * detecting the UIP, and materialising the result — is delegated to a [ConflictResolvent]
+ * ([ClauseResolvent] by default), so the same driver serves any learned-constraint algebra (#1119).
  *
  * The implication graph spans **bool vars and int order literals** uniformly: bool antecedents
  * come from [PropagationState.boolAntecedents], order-literal antecedents from each atom's
@@ -31,16 +36,12 @@ import com.eignex.klause.util.IntHashSet
  */
 internal class ConflictAnalyzer internal constructor(private val state: PropagationState) : ReasonGraph {
 
-    /** Learned-clause post-processing (self-subsuming + binary minimization); reads levels and
-     *  antecedents back through this analyzer's [ReasonGraph] view so its atom-level memo is shared. */
-    private val minimizer = ClauseMinimizer(state, this)
+    /** The accumulating nogood and the "reason → resolvent" step; clause resolution by default. */
+    private val resolvent: ConflictResolvent = ClauseResolvent(state, this)
 
-    // Reusable per-analysis scratch — grown once and cleared per call instead of
-    // reallocating O(numVars) BooleanArrays on every conflict. [universe] is the live
-    // var space (bool vars + atoms) for the current analysis; all loops bound by it, since
-    // a buffer may be larger than the current universe after a deeper earlier conflict.
+    // Reusable per-analysis scratch — [universe] is the live var space (bool vars + atoms) for the
+    // current analysis, exposed to the minimizer and resolvent through [universeSize].
     private var universe = 0
-    private var seen = EmptyBooleanArray
 
     // Per-analysis memo of atomLevelForConflict (#561). Within one analysis the search path is
     // frozen — domains are never mutated, only the implication graph is walked — so an atom's
@@ -53,53 +54,14 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private var atomLevelStamp = EmptyIntArray
     private var atomLevelEpoch = 0
 
-    // Variables already resolved out as a pivot this analysis. Order literals established on the
-    // current path carry a real trail position (#708) and resolve in reverse-assignment order like
-    // bools, but one materialised *mid-analysis* (an opposing bound a reason cites, never woken) has
-    // no trail position and its derived antecedents can present a same-level cycle (A's reason
-    // mentions B and vice-versa). Once a var has been resolved we must never re-ingest it, or the
-    // 1UIP loop ping-pongs forever (and grows [bumpIntVars] until OOM). In the acyclic bool case
-    // this never triggers.
-    private var resolved = EmptyBooleanArray
-
-    // Variables encountered (resolved through or kept) during the most recent analysis —
-    // the canonical CDCL VSIDS bump set (MiniSAT/Glucose bump every var seen while walking
-    // the implication graph, not just the decision vars at the conflict levels). Recorded
-    // as a side effect of [ingestReason]; bool-var ids in [bumpBool], underlying int-var
-    // ids (decoded from touched atoms) in [bumpInt]. Reused across analyses to avoid
-    // per-conflict allocation; the engine reads them after [analyze] when a clause is learned.
-    private val bumpBoolVars = IntArrayList()
-    private val bumpIntVars = IntArrayList()
-
-    // Atom-vars marked seen this analysis. The 1UIP pivot scan walks the unified pin trail
-    // ([PropagationState.boolPinOrder]); this list is the fallback frontier for atoms that are seen
-    // but NOT on the trail — ones materialised mid-analysis (off the trail, no pin position) — so
-    // the scan can still find them without sweeping all `atomCount` atoms (O(frontier), not
-    // O(total)). A superset of the currently-seen atoms (never pruned), so the scan re-checks
-    // `seen[v]`. Cleared per analysis.
-    private val seenAtomList = IntArrayList()
-
-    // O(1) membership index for the leaf-literal dedup in [ingestReason] / [drainSeenAsLeaves],
-    // replacing per-literal linear scans of `learned` that made analysis quadratic in clause size.
-    // Every literal added is `Lit.make(v, !currentTruth(v))` — one literal per variable, so this is
-    // equivalent to a by-variable dedup. Reused across analyses, cleared per call.
-    private val litsInLearned = IntHashSet()
-
     /** Bool vars seen during the last analysis (the VSIDS bump set). Valid only when the
      *  last call returned [AnalysisResult.Learned]; cleared at the start of each analysis. */
-    fun lastBumpBoolVars(): IntArrayList = bumpBoolVars
+    fun lastBumpBoolVars(): IntArrayList = resolvent.bumpBoolVars
 
     /** Underlying int vars seen during the last analysis (via touched atom-lits). */
-    fun lastBumpIntVars(): IntArrayList = bumpIntVars
+    fun lastBumpIntVars(): IntArrayList = resolvent.bumpIntVars
 
     override fun universeSize(): Int = universe
-
-    /** Return [arr] if already ≥ [n], else a fresh array; either way clear `[0, n)` to false. */
-    private fun scratch(arr: BooleanArray, n: Int): BooleanArray {
-        val a = if (arr.size >= n) arr else BooleanArray(n)
-        a.fill(false, 0, n)
-        return a
-    }
 
     sealed interface AnalysisResult {
         /** A learned conflict clause with its backjump target and glue metric. */
@@ -214,35 +176,26 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     private fun analyzeFromSeed(seedReason: IntArray, currentLevel: Int): AnalysisResult {
         if (currentLevel <= 0) return AnalysisResult.NotApplicable
 
-        // Standard 1UIP loop with bool + atom support. The `seen` array spans
+        // Standard 1UIP loop with bool + atom support. The frontier (owned by [resolvent]) spans
         // [0, numBoolVars + atomCount): low indices are bool vars, high indices are virtual
         // atom-vars. Both share the unified pin trail [boolPinOrder] for reverse-order pivot
         // selection; an atom materialised mid-analysis has no pin position and is swept from the
-        // [seenAtomList] fallback after the trail is exhausted at currentLevel.
+        // [ConflictResolvent.offTrailFrontier] fallback after the trail is exhausted at currentLevel.
         val numBoolVars = state.problem.numBoolVars
         val atomCount = state.atoms.intVar.size
         universe = numBoolVars + atomCount
-        seen = scratch(seen, universe)
-        resolved = scratch(resolved, universe)
         if (atomLevelStamp.size < atomCount) {
             atomLevelStamp = IntArray(atomCount)
             atomLevelMemo = IntArray(atomCount)
             atomLevelEpoch = 0 // fresh arrays read as epoch 0, so don't start at 0
         }
         atomLevelEpoch++
-        seenAtomList.clear()
-        litsInLearned.clear()
-        bumpBoolVars.clear()
-        bumpIntVars.clear()
-        var currentLevelCount = 0
-        val learned = IntArrayList(seedReason.size)
+        resolvent.reset(universe)
 
-        ingestReason(seedReason, learned, currentLevel) {
-            currentLevelCount++
-        }
+        resolvent.resolve(seedReason, currentLevel)
 
-        if (currentLevelCount == 0) {
-            return finalizeClause(learned, currentLevel)
+        if (resolvent.liveAtCurrentLevel == 0) {
+            return resolvent.finalizeResult(currentLevel)
         }
 
         // Pin-trail cursor for the 1UIP pivot scan. The pivot is always the most-recent still-seen
@@ -259,14 +212,14 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         var pinCursor = state.boolPinOrder.size - 1
         var rescanFromTop = true
         while (true) {
-            // Resolved / lower-level literals (`seen` cleared) are skipped. `scanFrom` is the trail
-            // top on a re-armed rescan, else the descending cursor.
+            // Resolved / lower-level literals (no longer frontier) are skipped. `scanFrom` is the
+            // trail top on a re-armed rescan, else the descending cursor.
             var pivot = -1
             var pivotPos = -1
             val scanFrom = if (rescanFromTop) state.boolPinOrder.size - 1 else pinCursor
             for (i in scanFrom downTo 0) {
                 val v = state.boolPinOrder[i]
-                if (!seen[v]) continue
+                if (!resolvent.isFrontier(v)) continue
                 val lvl = if (v < numBoolVars) state.boolLevel[v] else cachedAtomLevel(v - numBoolVars)
                 if (lvl == currentLevel) {
                     pivot = v
@@ -283,10 +236,11 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // Fallback for an atom materialised mid-analysis — cited by a derived reason, never
                 // woken, hence absent from the pin trail. Scan the seen-atom frontier by its
                 // [atomLevelForConflict]-derived level. Stale / duplicate entries are skipped by the
-                // `seen[v]` recheck.
-                for (k in 0 until seenAtomList.size) {
-                    val v = seenAtomList[k]
-                    if (seen[v] && cachedAtomLevel(v - numBoolVars) == currentLevel) {
+                // [ConflictResolvent.isFrontier] recheck.
+                val offTrail = resolvent.offTrailFrontier
+                for (k in 0 until offTrail.size) {
+                    val v = offTrail[k]
+                    if (resolvent.isFrontier(v) && cachedAtomLevel(v - numBoolVars) == currentLevel) {
                         pivot = v
                         break
                     }
@@ -296,47 +250,22 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
                 // so re-arm the full rescan for the next iteration.
                 rescanFromTop = true
             }
-            seen[pivot] = false
-            resolved[pivot] = true
-            currentLevelCount--
-            if (currentLevelCount == 0) {
-                addLearned(learned, uipLit(pivot))
-                return finalizeClause(learned, currentLevel)
+            resolvent.resolveOut(pivot)
+            if (resolvent.liveAtCurrentLevel == 0) {
+                resolvent.addAsserting(pivot)
+                return resolvent.finalizeResult(currentLevel)
             }
             val antecedents = antecedentsOf(pivot)
                 ?: run {
                     // Leaf pivot — promote and drain the rest.
-                    addLearned(learned, uipLit(pivot))
-                    drainSeenAsLeaves(learned)
-                    return finalizeClause(learned, currentLevel)
+                    resolvent.addAsserting(pivot)
+                    resolvent.drainFrontier()
+                    return resolvent.finalizeResult(currentLevel)
                 }
-            ingestReason(antecedents, learned, currentLevel) {
-                currentLevelCount++
-            }
+            resolvent.resolve(antecedents, currentLevel)
         }
-        drainSeenAsLeaves(learned)
-        return finalizeClause(learned, currentLevel)
-    }
-
-    /** Append [lit] to [learned] and record it in [litsInLearned] so the leaf-literal dedup stays
-     *  O(1). Every literal reaches the clause through here, keeping the index exact. */
-    private fun addLearned(learned: IntArrayList, lit: Int) {
-        learned.add(lit)
-        litsInLearned.add(lit)
-    }
-
-    /** Produce the literal for [pivot] as it should appear in the learned clause —
-     *  the negation of its current truth value, for both bool and atom pivots. */
-    private fun uipLit(pivot: Int): Int {
-        val numBoolVars = state.problem.numBoolVars
-        return if (pivot < numBoolVars) {
-            val pinned = state.boolValues[pivot] ?: error("UIP bool var $pivot unpinned")
-            Lit.make(pivot, !pinned)
-        } else {
-            val atomId = pivot - numBoolVars
-            val holds = state.atomCurrentTruth(atomId) ?: error("UIP atom $atomId undetermined")
-            Lit.make(pivot, !holds)
-        }
+        resolvent.drainFrontier()
+        return resolvent.finalizeResult(currentLevel)
     }
 
     /** Antecedents of `v`, or null when `v` is a decision/leaf — or when `v` falls outside
@@ -355,48 +284,12 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
     }
 
     /**
-     * Apply self-subsuming-resolution minimization, then compute backjump level + LBD
-     * on the final clause and wrap into [AnalysisResult.Learned]. Single tail call from
-     * every exit path of [analyze] so all exit shapes get the same post-processing.
+     * Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
+     * and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the
+     * trail-resident establishment level on the current path, which is consistent for the
+     * whole analysis (the path is frozen) and so yields a sound backjump level / LBD / asserting
+     * flag (#76).
      */
-    private fun finalizeClause(learned: IntArrayList, currentLevel: Int): AnalysisResult.Learned {
-        val minimized = minimizer.reduce(learned, currentLevel)
-        val levels = distinctLevelsOf(minimized)
-        // A proper 1UIP clause carries exactly one literal at the conflict level; that lone
-        // literal becomes the unit-asserting literal after the backjump. A conflict that genuinely
-        // rests on several literals at the conflict level (rare since order literals became
-        // trail-resident, #708) leaves more than one — such a clause is not unit after any
-        // backjump, so the engine must not try to assert it.
-        var atConflictLevel = 0
-        for (i in 0 until minimized.size) {
-            if (levelOf(Lit.variable(minimized[i])) == currentLevel) atConflictLevel++
-        }
-        return AnalysisResult.Learned(
-            minimized.toIntArray(),
-            backjumpLevelOf(minimized, currentLevel),
-            levels.size,
-            levels,
-            asserting = atConflictLevel == 1,
-        )
-    }
-
-    /** Sorted-ascending array of distinct decision levels touched by [learned]. Shares
-     *  its scan with `lbdOf` (whose count is just `levels.size`); finalize computes both
-     *  in one pass via this helper. */
-    private fun distinctLevelsOf(learned: IntArrayList): IntArray {
-        if (learned.size == 0) return EmptyIntArray
-        val seen = IntHashSet(learned.size)
-        for (i in 0 until learned.size) seen.add(levelOf(Lit.variable(learned[i])))
-        val out = seen.toIntArray()
-        out.sort()
-        return out
-    }
-
-    /** Unified level lookup that handles both bool vars (via [PropagationState.boolLevel])
-     *  and atom vars. Atom levels come from [PropagationState.atomLevelForConflict] — the
-     *  trail-resident establishment level on the current path, which is consistent for the
-     *  whole analysis (the path is frozen) and so yields a sound backjump level / LBD / asserting
-     *  flag (#76). */
     override fun levelOf(v: Int): Int {
         val numBoolVars = state.problem.numBoolVars
         return if (v < numBoolVars) {
@@ -418,108 +311,5 @@ internal class ConflictAnalyzer internal constructor(private val state: Propagat
         atomLevelMemo[id] = lv
         atomLevelStamp[id] = atomLevelEpoch
         return lv
-    }
-
-    /**
-     * Add each literal in [reason] to either the working `seen` set (if it's at
-     * [currentLevel] — resolution will continue through it) or directly to [learned]
-     * (lower level — it's part of the final clause). Increments [bumpCurrentLevel] for
-     * each new-at-current-level variable so the caller can track resolution progress.
-     */
-    private fun ingestReason(
-        reason: IntArray,
-        learned: IntArrayList,
-        currentLevel: Int,
-        bumpCurrentLevel: () -> Unit,
-    ) {
-        val numBoolVars = state.problem.numBoolVars
-        for (lit in reason) {
-            val v = Lit.variable(lit)
-            if (v >= universe) {
-                // An atom materialised mid-analysis — derived antecedents allocate the
-                // opposing-bound atoms they cite. It has no frontier slot, so keep the
-                // literal in the clause as a leaf (deduped via [litsInLearned]): adding a
-                // literal only weakens the clause, while dropping it would silently strengthen
-                // the nogood past what was derived.
-                if (!litsInLearned.contains(lit)) {
-                    addLearned(learned, lit)
-                    if (levelOf(v) == currentLevel) bumpCurrentLevel()
-                }
-                continue
-            }
-            if (seen[v]) continue // already in the frontier
-            if (resolved[v]) {
-                // Resolved out as a pivot already. The bool implication graph is acyclic, so a
-                // resolved bool never legitimately recurs and is safely skipped. Atom antecedents
-                // have no trail order and can form same-level cycles (see [resolved]); a resolved
-                // atom can recur as a genuine premise — typically the opposite-polarity bound of
-                // the same int var. Skipping it then drops a literal the nogood needs, producing an
-                // unsound clause that prunes feasible solutions and over-proves optimality.
-                // Keep that literal instead (deduped via [litsInLearned]). Re-resolving the atom
-                // would risk the ping-pong the guard prevents; merely adding a literal only weakens
-                // the clause, so it stays sound. A second current-level literal makes the clause
-                // non-asserting, which [finalizeClause] flags so the engine backtracks chronologically.
-                if (v >= numBoolVars && !litsInLearned.contains(lit)) {
-                    addLearned(learned, lit)
-                }
-                continue
-            }
-            val lvl = levelOf(v)
-            if (lvl <= 0) continue
-            seen[v] = true
-            // Record for the VSIDS bump set (every conflict-side var, MiniSAT-style).
-            if (v < numBoolVars) {
-                bumpBoolVars.add(v)
-            } else {
-                bumpIntVars.add(state.atoms.intVar[v - numBoolVars])
-                seenAtomList.add(v) // frontier atom — candidate for the 1UIP atom-pivot scan
-            }
-            if (lvl == currentLevel) {
-                bumpCurrentLevel()
-            } else {
-                if (v < numBoolVars) {
-                    val pinned = state.boolValues[v] ?: error("seen var $v not pinned")
-                    addLearned(learned, Lit.make(v, !pinned))
-                } else {
-                    val atomId = v - numBoolVars
-                    val holds = state.atomCurrentTruth(atomId)
-                        ?: error("ingest atom $atomId at lower level undetermined")
-                    addLearned(learned, Lit.make(v, !holds))
-                }
-            }
-        }
-    }
-
-    /** Convert every still-seen variable into a literal in [learned], deduped via [litsInLearned]. */
-    private fun drainSeenAsLeaves(learned: IntArrayList) {
-        val numBoolVars = state.problem.numBoolVars
-        for (v in 0 until universe) {
-            if (!seen[v]) continue
-            val lit: Int = if (v < numBoolVars) {
-                val pinned = state.boolValues[v] ?: continue
-                Lit.make(v, !pinned)
-            } else {
-                val atomId = v - numBoolVars
-                val holds = state.atomCurrentTruth(atomId) ?: continue
-                Lit.make(v, !holds)
-            }
-            if (!litsInLearned.contains(lit)) addLearned(learned, lit)
-        }
-    }
-
-    /**
-     * Backjump target: the second-highest decision level among the learned literals'
-     * variables. The asserting literal (UIP) sits at [currentLevel]; we want to pop back
-     * to the level just past the next-highest, so the learned clause becomes unit (only
-     * the UIP literal remains undetermined) and propagation can re-fire it as a forced
-     * pin.
-     */
-    private fun backjumpLevelOf(learned: IntArrayList, currentLevel: Int): Int {
-        var best = 0
-        for (i in 0 until learned.size) {
-            val lvl = levelOf(Lit.variable(learned[i]))
-            if (lvl < currentLevel && lvl > best) best = lvl
-        }
-        return best
     }
 }
