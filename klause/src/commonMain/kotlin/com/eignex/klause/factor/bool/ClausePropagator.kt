@@ -4,14 +4,17 @@ import com.eignex.klause.factor.bool.internals.findNonFalseLitExcept
 import com.eignex.klause.factor.bool.internals.litFalseInPropState
 import com.eignex.klause.factor.bool.internals.litTrueInPropState
 import com.eignex.klause.factor.bool.internals.pinUnitLit
+import com.eignex.klause.propagation.LearnedPropagator
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.moveBoolWatcher
 import com.eignex.klause.solver.Lit
 
 /** CP propagator for [Clause]: two-watched-literal propagation over a disjunction of literals. */
-internal class ClausePropagator(val boolVars: IntArray, val intVars: IntArray, internal val literals: IntArray) :
-    Propagator {
+internal class ClausePropagator(
+    override val boolVars: IntArray,
+    override val intVars: IntArray,
+    internal val literals: IntArray,
+) : LearnedPropagator {
 
     private var pureBoolMemo: Int = -1
 

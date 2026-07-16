@@ -356,8 +356,8 @@ class PropagationState(
     private val nonBoolWatcherOcc: Array<IntArray> = problem.nonBoolWatcherBoolOccurrences
     private val nonIntEventWatcherOcc: Array<IntArray> = problem.nonIntEventWatcherIntOccurrences
 
-    /** Clauses learned during conflict analysis. */
-    internal val learnedClauses: List<ClausePropagator> get() = learned.store
+    /** Constraints learned during conflict analysis (clause-only today; see [LearnedClauseDb]). */
+    internal val learnedClauses: List<LearnedPropagator> get() = learned.store
 
     /** True iff any binary clause is known — the gate for binary-resolution minimization. */
     val hasBinaryClauses: Boolean get() = learned.binaryClauseCount > 0
