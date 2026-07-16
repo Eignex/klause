@@ -327,8 +327,13 @@ internal class GlobalCardinalityPropagator(
             superSink = baseNodes + 1
             flow.reset(baseNodes + 2)
             val excess = cache.excess(baseNodes + 2)
-            // A persistent structure owns its edge-index map; the pooled buffer is reused per fire.
-            val storePersistent = persistentEligible && !anyOther
+            // Freeze a persistent structure only on the FIRST build: that fire sees the widest (root)
+            // domains, so its edge set and no-other layout span every later state. `anyOther` is not
+            // monotone (search can prune then a backtrack restore a non-cover value), so persisting on a
+            // later build could omit edges/other-node the restored domain needs. A persistent structure
+            // owns its edge-index map; the pooled buffer is reused per fire otherwise.
+            val storePersistent = persistentEligible && !anyOther && !cache.builtOnce
+            cache.builtOnce = true
             xToCovEdgeIdx = if (storePersistent) IntArray(n * m) { -1 } else cache.xToCov(n, m)
             xToOtherEdgeIdx = cache.xToOther(n)
             for (i in 0 until n) {
