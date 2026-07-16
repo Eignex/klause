@@ -109,14 +109,15 @@ internal fun SmtLibQfLia.Builder.evalTerm(root: SExpr, sort: Sort): Res {
 /** Push the frames for `(let (bindings) body)`: evaluate each binding value, build the scope, run the
  *  body, then pop — all in-stack, so nested lets never recurse through [evalTerm]. */
 private fun SmtLibQfLia.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
-    val bindingList = node.items[1] as? SExpr.SList ?: throw UnsupportedSmtException("malformed let bindings")
+    val bindingList = node.argAt(1, "let bindings") as? SExpr.SList
+        ?: throw UnsupportedSmtException("malformed let bindings")
     val pairs = bindingList.items.map { it as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding") }
-    val names = pairs.map { (it.items[0] as SExpr.Atom).text }
-    val valueExprs = pairs.map { it.items[1] }
+    val names = pairs.map { it.atomAt(0, "let binding name") }
+    val valueExprs = pairs.map { it.argAt(1, "let binding value") }
     val bools = BooleanArray(pairs.size) { isBoolExpr(valueExprs[it]) }
     // LIFO: values first, then build the scope, then the body, then pop.
     work.addLast(Frame.PopScope)
-    work.addLast(Frame.Eval(node.items[2], sort))
+    work.addLast(Frame.Eval(node.argAt(2, "let body"), sort))
     work.addLast(Frame.MakeScope(names, bools))
     for (i in valueExprs.indices.reversed()) {
         work.addLast(Frame.Eval(valueExprs[i], if (bools[i]) Sort.BOOL else Sort.INT))
@@ -165,7 +166,7 @@ private fun SmtLibQfLia.Builder.childTasks(node: SExpr.SList, sort: Sort): List<
 
 /** Combine a list node's already-folded child results [args] into this node's [Res]. */
 private fun SmtLibQfLia.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
-    val head = (node.items[0] as SExpr.Atom).text
+    val head = node.atomAt(0, "operator")
     return if (sort == Sort.BOOL) combineBool(node, head, args) else combineInt(head, args)
 }
 
