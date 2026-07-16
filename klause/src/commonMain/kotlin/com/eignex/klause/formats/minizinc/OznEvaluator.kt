@@ -388,7 +388,8 @@ internal class OznEvaluator(items: List<OznItem>) {
             "+" -> if (asFloat) OznValue.FloatV(lf + rf) else OznValue.IntV(li + ri)
             "-" -> if (asFloat) OznValue.FloatV(lf - rf) else OznValue.IntV(li - ri)
             "*" -> if (asFloat) OznValue.FloatV(lf * rf) else OznValue.IntV(li * ri)
-            "/" -> if (asFloat) OznValue.FloatV(lf / rf) else OznValue.IntV(li / ri)
+            // MiniZinc `/` is always float division; integer division is the separate `div` operator.
+            "/" -> OznValue.FloatV(lf / rf)
             "div" -> OznValue.IntV(li / ri)
             "mod" -> OznValue.IntV(li % ri)
             "<" -> OznValue.BoolV(if (asFloat) lf < rf else li < ri)
