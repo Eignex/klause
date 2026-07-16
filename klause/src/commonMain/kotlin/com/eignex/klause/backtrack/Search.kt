@@ -157,8 +157,14 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
         if (problem.numRealVars == 0) return snap
         return when (leafRealFeasibility(problem, objective = null, sample = snap)) {
             LpVerdict.OPTIMAL -> snap
-            LpVerdict.INFEASIBLE -> null // reals cannot complete this assignment — reject and backtrack
-            LpVerdict.INDETERMINATE -> { sawIndeterminate = true; null }
+
+            LpVerdict.INFEASIBLE -> null
+
+            // reals cannot complete this assignment — reject and backtrack
+            LpVerdict.INDETERMINATE -> {
+                sawIndeterminate = true
+                null
+            }
         }
     }
 

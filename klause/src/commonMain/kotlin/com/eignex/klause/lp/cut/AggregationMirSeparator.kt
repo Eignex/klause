@@ -63,17 +63,21 @@ internal class AggregationMirSeparator : CutSeparator {
         val rows = ArrayList<Row>()
         for (factor in ctx.problem.factors) {
             when (factor) {
-                is Linear -> if (factor.hasReals) Unit else when (factor.op) {
-                    LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
+                is Linear -> if (factor.hasReals) {
+                    Unit
+                } else {
+                    when (factor.op) {
+                        LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
 
-                    LinearOp.GE -> addRow(ctx, factor, flip = true, loOf, rows)
+                        LinearOp.GE -> addRow(ctx, factor, flip = true, loOf, rows)
 
-                    LinearOp.EQ -> {
-                        addRow(ctx, factor, flip = false, loOf, rows)
-                        addRow(ctx, factor, flip = true, loOf, rows)
+                        LinearOp.EQ -> {
+                            addRow(ctx, factor, flip = false, loOf, rows)
+                            addRow(ctx, factor, flip = true, loOf, rows)
+                        }
+
+                        else -> Unit // NE has no valid linear relaxation row
                     }
-
-                    else -> Unit // NE has no valid linear relaxation row
                 }
 
                 is PseudoBoolean -> {

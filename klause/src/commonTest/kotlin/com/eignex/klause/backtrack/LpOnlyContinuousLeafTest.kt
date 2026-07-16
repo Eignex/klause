@@ -20,16 +20,15 @@ import kotlin.test.assertIs
  */
 class LpOnlyContinuousLeafTest {
 
-    private fun problem(numInt: Int, intDoms: Array<IntDomain>, realLo: Double, realHi: Double, row: Linear) =
-        Problem(
-            numBoolVars = 0,
-            numIntVars = numInt,
-            intDomains = intDoms,
-            factors = arrayOf<Factor>(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(realLo),
-            realUpper = doubleArrayOf(realHi),
-        )
+    private fun problem(numInt: Int, intDoms: Array<IntDomain>, realLo: Double, realHi: Double, row: Linear) = Problem(
+        numBoolVars = 0,
+        numIntVars = numInt,
+        intDomains = intDoms,
+        factors = arrayOf<Factor>(row),
+        numRealVars = 1,
+        realLower = doubleArrayOf(realLo),
+        realUpper = doubleArrayOf(realHi),
+    )
 
     @Test
     fun `feasible residual real LP withholds SAT pending exact feasibility certification`() {

@@ -32,8 +32,7 @@ class Linear private constructor(
     rawBound: Long,
     realVarsIn: IntArray = EmptyIntArray,
     realCoeffsIn: DoubleArray = EmptyDoubleArray,
-) :
-    Factor,
+) : Factor,
     LinearRow {
 
     // Canonicalise inequalities to ≤ at construction — the LP/MIP convention the cut separators
@@ -55,6 +54,9 @@ class Linear private constructor(
      * coefficients alongside the integer ones.
      */
     val realVars: IntArray = realVarsIn
+
+    /** Double coefficient of each [realVars] term, index-aligned; a `>=` row negates them with the
+     *  integer coefficients (see [realVars]). */
     val realCoeffs: DoubleArray =
         if (rawOp == LinearOp.GE) DoubleArray(realCoeffsIn.size) { -realCoeffsIn[it] } else realCoeffsIn
 
@@ -113,15 +115,14 @@ class Linear private constructor(
         }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        if (hasReals) {
-            // Real var ids live in a separate namespace and are not remapped by [intMap]; the row was
-            // already canonicalised (any `>=` negated) at construction, so re-emit as-is with the op that
-            // reproduces the stored coefficients (LE / EQ / NE — a stored row is never GE).
-            Linear(coeffs, vars.remapVars(intMap), realCoeffs, realVars, op, bound)
-        } else {
-            Linear(coeffs, vars.remapVars(intMap), op, bound)
-        }
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (hasReals) {
+        // Real var ids live in a separate namespace and are not remapped by [intMap]; the row was
+        // already canonicalised (any `>=` negated) at construction, so re-emit as-is with the op that
+        // reproduces the stored coefficients (LE / EQ / NE — a stored row is never GE).
+        Linear(coeffs, vars.remapVars(intMap), realCoeffs, realVars, op, bound)
+    } else {
+        Linear(coeffs, vars.remapVars(intMap), op, bound)
+    }
 
     /**
      * A pure binary value relation `c·x ⟨=|≠⟩ c·y` — two terms with opposite-equal coefficients and a
@@ -152,8 +153,7 @@ class Linear private constructor(
     override fun asPropagator(): Propagator =
         if (hasReals) NoPropagator else LinearPropagator(boolVars, intVars, coeffs, vars, op, bound)
 
-    override fun asInvariant(): Invariant =
-        if (hasReals) NoInvariant else LinearInvariant(coeffs, vars, op, bound)
+    override fun asInvariant(): Invariant = if (hasReals) NoInvariant else LinearInvariant(coeffs, vars, op, bound)
 
     // The factor *is* its own exact linear row (integer terms), so presolve reads it with no extra
     // allocation. [linearize] emits the row over the factor's arrays directly rather than through the

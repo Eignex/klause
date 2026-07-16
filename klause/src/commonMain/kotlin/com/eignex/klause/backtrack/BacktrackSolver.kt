@@ -111,7 +111,7 @@ class BacktrackSolver(override val problem: Problem) :
                             core = outcome.core,
                             stats = stats,
                             assumptionCore =
-                                projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
+                            projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
                         )
                     }
 
