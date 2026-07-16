@@ -3,6 +3,7 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.global.internals.GccIncrementalState
 import com.eignex.klause.factor.global.internals.GccPropCache
+import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.RevIntArray
@@ -10,6 +11,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableLongIntMap
 
 /** CP propagation logic for `global_cardinality`. */
@@ -27,6 +29,28 @@ internal class GlobalCardinalityPropagator(
     private val definitelyPresentGccFn: (Int, PropagationState) -> Boolean,
     private val definitelyAbsentGccFn: (Int, PropagationState) -> Boolean,
 ) : Propagator {
+
+    // Plain (no-presence) path: subscribe to every int-domain event on the constrained variables and
+    // consume the dirty-variable delta, so a fire re-blocks only the var→cover edges of the variables
+    // that actually changed instead of the O(n·m) full scan. The optional-variable path keeps the
+    // occurrence-list wakeup (its presence bools are not int events).
+    override val initialIntEventWatches: IntArray? =
+        if (presents.isEmpty()) allEventWatches(intVars) else null
+
+    override val consumesIntEventDelta: Boolean = presents.isEmpty()
+
+    /** var id → its index in [xs], to map the changed-variable delta onto the block scan (plain path). */
+    private val xsIndexOf: MutableIntIntMap = MutableIntIntMap(xs.size)
+
+    /** Whether [xs] repeats a variable — then one var id maps to several indices and the delta-driven
+     *  block scan (which keys on a single index) would miss one, so that path scans every variable. */
+    private val xsHasDups: Boolean = run {
+        var dup = false
+        for (i in xs.indices) {
+            if (xsIndexOf.containsKey(xs[i])) dup = true else xsIndexOf.put(xs[i], i)
+        }
+        dup
+    }
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = withPresencePremises(
         state,
@@ -137,15 +161,10 @@ internal class GlobalCardinalityPropagator(
             state.refPayload[factorId] = fresh
             fresh
         }
-        if (presents.isEmpty() && intVars.isNotEmpty()) {
-            var changed = false
-            for (i in intVars.indices) {
-                if (cache.cachedDoms[i] !== state.intDomains[intVars[i]]) {
-                    changed = true
-                    break
-                }
-            }
-            if (!changed && cache.cachedDoms[0] != null) return true
+        // Plain path: the changed-variable delta drives the fast-path skip and the incremental block scan.
+        val dirty = if (presents.isEmpty()) state.drainIntEventDirtyVars(factorId) else EmptyIntArray
+        if (presents.isEmpty() && intVars.isNotEmpty() && cache.cachedDoms[0] != null && dirty.isEmpty()) {
+            return true
         }
         cache.conflictVars = null
         val origIdx: IntArray = if (presents.isEmpty()) {
@@ -281,7 +300,11 @@ internal class GlobalCardinalityPropagator(
             // rerouting that variable's unit along an alternate path. Only if a reroute has no alternate do
             // we fall back to a full re-solve. Either way no O(n) warm-start replay on the common path.
             var needResolve = false
-            for (i in 0 until n) {
+            // Block the newly-absent var→cover edges of the changed variables (`dirty` from the int-event
+            // delta), recovering a broken assignment in place. Only a variable whose domain shrank can have
+            // a newly-absent edge, so scanning just those is complete; a repeated `xs` (one var id → several
+            // indices) can't be keyed by the delta, so that rare case scans every variable.
+            fun blockVar(i: Int) {
                 val d = state.intDomains[effectiveXs[i]]
                 for (k in 0 until m) {
                     val e = xToCovEdgeIdx[i * m + k]
@@ -291,6 +314,14 @@ internal class GlobalCardinalityPropagator(
                     } else {
                         flow.blockEdge(e)
                     }
+                }
+            }
+            if (xsHasDups) {
+                for (i in 0 until n) blockVar(i)
+            } else {
+                for (dv in dirty) {
+                    val i = xsIndexOf.getOrDefault(dv, -1)
+                    if (i >= 0) blockVar(i)
                 }
             }
             if (needResolve) {
@@ -416,7 +447,7 @@ internal class GlobalCardinalityPropagator(
                 }
             }
         }
-        val sccId = IntArray(baseNodes) { -1 }
+        val sccId = cache.sccId(baseNodes)
         flow.computeSccResidual(baseNodes, sccId)
         for (i in 0 until n) {
             for (k in 0 until m) {
