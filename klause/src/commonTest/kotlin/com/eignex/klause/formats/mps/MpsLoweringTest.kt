@@ -56,14 +56,13 @@ class MpsLoweringTest {
             listOf(MpsVar("x", integer = true, lower = 0.0, upper = null)),
             listOf(row),
         )
-        val searchBound = 1_000_000L
-        val d = m.toProblem(searchBound = searchBound).let {
+        val d = m.toProblem(searchBound = 1_000_000L).let {
             assertFalse(it.clamped)
             it.problem.intDomains[0]
         }
-        // x >= 0, x <= 5: OBBT derives a real (if loose) finite upper — sound (>= 5) and below the clamp.
+        // x >= 0, x <= 5: exact-certified OBBT tightens the open upper side to exactly 5, no clamp.
         assertEquals(0L, d.min)
-        assertTrue(d.max in 5L until searchBound, "upper ${d.max} not a sound sub-clamp bound")
+        assertEquals(5L, d.max)
     }
 
     @Test
@@ -76,13 +75,12 @@ class MpsLoweringTest {
             listOf(MpsVar("x", integer = true, lower = null, upper = null)),
             listOf(row),
         )
-        val searchBound = 1_000_000L
-        val d = m.toProblem(searchBound = searchBound).let {
+        val d = m.toProblem(searchBound = 1_000_000L).let {
             assertFalse(it.clamped)
             it.problem.intDomains[0]
         }
-        assertTrue(d.min in (-searchBound + 1) until -3L, "lower ${d.min} not a sound sub-clamp bound")
-        assertTrue(d.max in 8L until searchBound, "upper ${d.max} not a sound sub-clamp bound")
+        assertEquals(-4L, d.min)
+        assertEquals(8L, d.max)
     }
 
     @Test

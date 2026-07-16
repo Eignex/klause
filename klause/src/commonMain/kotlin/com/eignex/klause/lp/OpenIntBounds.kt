@@ -90,5 +90,5 @@ private fun obbtBound(
     } catch (_: LpOverflowException) {
         return null
     } ?: return null
-    return model.safeVariableBound(result, col[target], maximize)
+    return model.tightVariableBound(result, col[target], maximize)
 }

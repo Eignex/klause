@@ -3,19 +3,16 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import kotlin.test.Test
-import kotlin.test.assertNotNull
+import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class ObbtBoundsTest {
 
     @Test
-    fun `closes an open upper side a constraint bounds`() {
+    fun `closes an open upper side a constraint bounds to the exact bound`() {
         val rows = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), rows)
-        // A sound bound the caller can commit as a finite domain (loose is fine — never below the true max 5).
-        val hi = assertNotNull(out[0].hi)
-        assertTrue(hi >= 5L, "unsound upper bound $hi below the true max 5")
+        assertEquals(5L, out[0].hi) // exact certification tightens the free-column bound to the true max
     }
 
     @Test
@@ -32,8 +29,7 @@ class ObbtBoundsTest {
             Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.EQ, 0),
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, null)), rows)
-        val xHi = assertNotNull(out[0].hi)
-        val yHi = assertNotNull(out[1].hi)
-        assertTrue(xHi >= 4L && yHi >= 4L, "unsound bounds x<=$xHi y<=$yHi below the true max 4")
+        assertEquals(4L, out[0].hi)
+        assertEquals(4L, out[1].hi)
     }
 }
