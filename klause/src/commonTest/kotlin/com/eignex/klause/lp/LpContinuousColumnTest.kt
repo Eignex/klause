@@ -27,6 +27,11 @@ class LpContinuousColumnTest {
         val float = assertNotNull(result.float)
         assertEquals(1.5, float.objective, 1e-9)
         assertEquals(1.5, float.primal[x], 1e-9)
+        // The Neumaier–Shcherbina safe bound now works over the real columns: a sound lower bound on the
+        // true minimum (never above it), usable for node/leaf pruning even though the exact verdict is
+        // withheld.
+        val safe = assertNotNull(result.safeLowerBound)
+        assertTrue(safe <= 1.5 + 1e-9, "safe bound $safe exceeds the optimum 1.5")
     }
 
     @Test

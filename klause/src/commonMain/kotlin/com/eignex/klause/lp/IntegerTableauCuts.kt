@@ -2,8 +2,8 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.util.IntArrayList
-import com.eignex.koblas.SparseLu
 import com.eignex.klause.util.LongArrayList
+import com.eignex.koblas.SparseLu
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.sqrt

@@ -21,7 +21,9 @@ import kotlin.math.floor
  * authoritative one. A loose result here only costs a missed prune, never correctness.
  */
 internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
-    if (model.hasContinuous) return null // the safe bound reads the Long matrix; a real column is not on it
+    // The Neumaier–Shcherbina bound is sound over real data too, so it reads the double view when the
+    // model has continuous columns — an integer model's accessors return the same widened Long values,
+    // so the integer path is unchanged.
     val m = model.m
     val n = model.n
     var bound = 0.0
@@ -29,7 +31,7 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
     for (i in 0 until m) {
         val yi = y[i]
         if (!yi.isFinite()) return null
-        val t = yi * model.rhs[i].toDouble()
+        val t = yi * model.rhsD(i)
         bound += t
         sumMag += abs(t)
     }
@@ -44,8 +46,8 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
             var acc = 0.0
             var mag = 0.0
             var t = terms
-            model.forEachInColumn(j) { i, a ->
-                val term = y[i] * a.toDouble()
+            model.forEachInColumnD(j) { i, a ->
+                val term = y[i] * a
                 acc += term
                 mag += abs(term)
                 t++
@@ -54,21 +56,21 @@ internal fun safeObjectiveLowerBound(model: LpModel, y: DoubleArray): Double? {
             colMag = mag
             terms = t
         }
-        val cj = model.cost[j].toDouble()
+        val cj = model.costD(j)
         val dj = cj - atj
         // Rigorous lower bound on the true reduced cost: subtract the rounding error of forming dj.
         val djErr = (abs(cj) + colMag) * (terms + 1).toDouble() * EPS
         val worstDj = dj - djErr
         if (worstDj < 0.0) {
-            if (!model.hasUpper[j]) return null // unbounded below
-            val contrib = worstDj * model.upper[j].toDouble()
+            if (!model.hasFiniteUpper(j)) return null // unbounded below
+            val contrib = worstDj * model.upperD(j)
             bound += contrib
             sumMag += abs(contrib)
         }
     }
     val sumErr = (m + model.numVars + 2).toDouble() * EPS * sumMag
     // Re-add the lower-bound-shift constant the relaxation folded out (exact; matches DualSimplex).
-    val safe = bound - sumErr + model.objConstant.toDouble()
+    val safe = bound - sumErr + model.objConstantD
     return if (safe.isFinite()) safe else null
 }
 
