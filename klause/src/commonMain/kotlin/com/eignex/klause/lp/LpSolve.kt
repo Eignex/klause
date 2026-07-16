@@ -88,10 +88,18 @@ internal fun solveAndCertify(
             }
         }
     // A float optimum that cannot be certified exactly (a 128-bit overflow, or a real coefficient the
-    // integer certifier declines) is INDETERMINATE — the float point is not a proof.
+    // integer certifier declines) is INDETERMINATE — the float point is not a proof. An integer model is
+    // certified by the exact dual bound ([integerCertify]); a continuous model has no integer dual bound,
+    // so its feasibility is certified by reconstructing the reported basis's point exactly
+    // ([exactBasisFeasible]) — enough for a definitive SAT verdict at a leaf.
     val certificate = integerCertify(model, result.duals)
+    val verdict = when {
+        certificate != null -> LpVerdict.OPTIMAL
+        model.hasContinuous && exactBasisFeasible(model, result.basis) == true -> LpVerdict.OPTIMAL
+        else -> LpVerdict.INDETERMINATE
+    }
     return CertifiedLpResult(
-        if (certificate != null) LpVerdict.OPTIMAL else LpVerdict.INDETERMINATE,
+        verdict,
         float = result,
         certificate = certificate,
         farkasRay = null,
