@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.EmptyDoubleArray
 import kotlin.random.Random
 
 /**
@@ -64,6 +65,10 @@ data class Sample(
     val bools: BooleanArray,
     /** Integer values indexed by int var id. May exceed 32-bit range. */
     val ints: LongArray,
+    /** Values of the LP-only continuous (real) variables, indexed by real var id; empty for the
+     *  integer/Boolean core. Populated at a search leaf from the residual LP solution (issue #1232), so a
+     *  hybrid MIP/CP solution carries its continuous part. */
+    val reals: DoubleArray = EmptyDoubleArray,
 ) {
 
     /** Hamming distance to [other]: number of variable slots that differ. Caller must
@@ -78,7 +83,9 @@ data class Sample(
 
     override fun equals(other: Any?): Boolean {
         if (other !is Sample) return false
-        return bools.contentEquals(other.bools) && ints.contentEquals(other.ints)
+        return bools.contentEquals(other.bools) && ints.contentEquals(other.ints) &&
+            reals.contentEquals(other.reals)
     }
-    override fun hashCode(): Int = 31 * bools.contentHashCode() + ints.contentHashCode()
+    override fun hashCode(): Int =
+        31 * (31 * bools.contentHashCode() + ints.contentHashCode()) + reals.contentHashCode()
 }

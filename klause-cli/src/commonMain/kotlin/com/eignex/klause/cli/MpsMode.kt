@@ -8,8 +8,9 @@ import com.eignex.klause.solver.Sample
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
- * klause's integer model (see [com.eignex.klause.formats.mps.toProblem]: integer columns direct,
- * bounded floats bucketed, unbounded floats rejected, unbounded ints clamped to the search range).
+ * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
+ * variables, float columns become LP-only continuous variables the simplex resolves, unbounded ints
+ * clamped to the search range).
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
  * `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c` comment lines.
  */
@@ -43,13 +44,12 @@ internal object MpsMode : CliMode {
     }
 }
 
-/** Render an MPS solution line: `v name=value` per column, a bucketed float shown as its real value. */
+/** Render an MPS solution line: `v name=value` per column, a continuous column shown as its LP value. */
 internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildString {
     append("v")
-    for ((name, id) in compiled.varNames) {
-        val bucketing = compiled.floatBucketings[id]
-        val value = if (bucketing != null) bucketing.valueOf(s.ints[id].toInt()) else s.ints[id]
-        append(" $name=$value")
+    for (col in compiled.columns) {
+        val value = if (col.real) s.reals[col.id] else s.ints[col.id]
+        append(" ${col.name}=$value")
     }
 }
 

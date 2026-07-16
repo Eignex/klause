@@ -34,6 +34,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -193,8 +194,24 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
  * the fixed values and only the LP-only real rows can bind — making this exactly a residual real-LP
  * feasibility test. Called only when the problem declares continuous variables.
  */
-internal fun leafRealFeasibility(problem: Problem, objective: LinearObjective?, sample: Sample): LpVerdict =
-    solveAndCertify(CpToLpRelaxation(problem, objective).build(SampleDomains(sample)).model).verdict
+internal fun leafRealFeasibility(problem: Problem, objective: LinearObjective?, sample: Sample): LeafRealResult {
+    val relaxation = CpToLpRelaxation(problem, objective).build(SampleDomains(sample))
+    val certified = solveAndCertify(relaxation.model)
+    if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
+    val primal = certified.float?.primal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]).
+    val reals = DoubleArray(problem.numRealVars)
+    val colRealId = relaxation.colRealId
+    for (col in colRealId.indices) {
+        val r = colRealId[col]
+        if (r >= 0) reals[r] = primal[col]
+    }
+    return LeafRealResult(LpVerdict.OPTIMAL, reals)
+}
+
+/** The residual-LP verdict at a leaf plus, on [LpVerdict.OPTIMAL], the continuous variables' solved
+ *  values (indexed by real var id) that complete the discrete assignment into a full solution. */
+internal class LeafRealResult(val verdict: LpVerdict, val reals: DoubleArray)
 
 /**
  * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,
