@@ -5,6 +5,7 @@ import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DimacsTest {
@@ -156,6 +157,14 @@ class DimacsTest {
         assertEquals(1, w.numOriginalBoolVars)
         assertEquals(1, w.problem.numBoolVars)
         assertEquals(0L, w.objective.constant)
+    }
+
+    @Test
+    fun `old wcnf rejects a literal beyond the declared variable count`() {
+        // The old header fixes nvars; a literal past it must be rejected with a clear diagnostic (as the
+        // CNF path does) rather than crashing with a raw index-out-of-bounds deeper in construction.
+        val ex = assertFailsWith<IllegalArgumentException> { Dimacs.parseWcnf("p wcnf 2 1 10\n10 1 3 0\n") }
+        assertTrue(ex.message?.contains("out of range") == true, "unclear diagnostic: ${ex.message}")
     }
 
     @Test

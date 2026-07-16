@@ -130,8 +130,14 @@ object Dimacs {
                     break
                 }
                 val v = abs(lit) - 1
-                if (!hasOldHeader && v + 1 > numVars) numVars = v + 1
-                require(v >= 0) { "Literal $lit out of range" }
+                // New-format instances carry no header, so the variable count grows to fit each literal;
+                // an old-header instance must stay within the declared `nvars`, as the CNF path enforces —
+                // a literal past it would index a nonexistent variable.
+                if (hasOldHeader) {
+                    require(v in 0 until numVars) { "Literal $lit out of range [1, $numVars]" }
+                } else if (v + 1 > numVars) {
+                    numVars = v + 1
+                }
                 lits.add(Lit.make(v, positive = lit > 0))
             }
             require(terminated) { "wcnf clause not terminated by 0: '$rawLine'" }
