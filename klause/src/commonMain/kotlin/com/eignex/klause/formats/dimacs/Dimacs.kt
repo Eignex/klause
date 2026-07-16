@@ -18,13 +18,23 @@ object Dimacs {
     fun parse(text: String): Problem {
         var numVars = -1
         val clauses = mutableListOf<Clause>()
+        // A bare `0` with no accumulated literals is the empty clause (⊥) — an unsatisfiable instance —
+        // unless it sits in the legacy trailing `%` block, where a lone `0` is an end-of-file sentinel.
+        var triviallyUnsat = false
+        var sawTrailer = false
 
         @Suppress("DoubleMutabilityForCollection") // reset to a new list per clause
         var current: IntArrayList? = null
         for (rawLine in text.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty()) continue
-            if (line.startsWith("c") || line.startsWith("%")) continue
+            if (line.startsWith("c")) continue
+            // `%` begins the SATLIB trailing block; keep reading (some files put a `%` comment before the
+            // header) but stop treating a bare `0` as ⊥ from here on — it is the trailer sentinel.
+            if (line.startsWith("%")) {
+                sawTrailer = true
+                continue
+            }
             if (line.startsWith("p ") || line.startsWith("p\t")) {
                 val parts = line.split(Regex("\\s+"))
                 require(parts.size >= 4 && parts[1] == "cnf") {
@@ -40,7 +50,12 @@ object Dimacs {
                     ?: error("Unparseable DIMACS token: '$token'")
                 if (lit == 0) {
                     val acc = current
-                    if (acc != null && !acc.isEmpty()) clauses += Clause(acc.toIntArray())
+                    // A `0` terminates the clause; with no literals it is the empty clause (⊥), except in
+                    // the trailing `%` block where a lone `0` is a sentinel to ignore.
+                    when {
+                        acc != null && !acc.isEmpty() -> clauses += Clause(acc.toIntArray())
+                        !sawTrailer -> triviallyUnsat = true
+                    }
                     current = null
                 } else {
                     val v = abs(lit) - 1
@@ -54,15 +69,21 @@ object Dimacs {
         }
         require(current == null) { "DIMACS file ends mid-clause (no terminating 0)" }
         require(numVars >= 0) { "DIMACS file has no `p cnf` header" }
+        // The empty clause is ⊥; a [Clause] needs a non-empty literal set, so force a contradiction on a
+        // fresh marker variable (as the WCNF path does) to reject the instance.
+        val totalVars = numVars + if (triviallyUnsat) 1 else 0
+        val factors = ArrayList<Factor>(clauses.size + if (triviallyUnsat) 2 else 0)
+        factors.addAll(clauses)
+        if (triviallyUnsat) {
+            val marker = numVars
+            factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
+            factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
+        }
         return Problem(
-            numBoolVars = numVars,
+            numBoolVars = totalVars,
             numIntVars = 0,
             intDomains = emptyArray(),
-            factors = Array<Factor>(
-                clauses.size,
-            ) {
-                clauses[it]
-            },
+            factors = factors.toTypedArray(),
         )
     }
 

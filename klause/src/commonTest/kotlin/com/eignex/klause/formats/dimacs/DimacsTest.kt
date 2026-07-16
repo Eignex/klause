@@ -165,4 +165,17 @@ class DimacsTest {
         assertTrue(w.problem.factors.any { it is Clause })
         assertEquals(2, w.problem.factors.count { it is Clause && it.literals.size == 1 })
     }
+
+    @Test
+    fun `a bare zero empty clause makes the cnf instance unsatisfiable`() {
+        // `0` with no preceding literals is the empty clause (⊥); it must force a contradiction on a fresh
+        // marker variable, not be silently dropped (which would report the instance satisfiable).
+        val problem = Dimacs.parse("p cnf 2 2\n1 2 0\n0\n")
+        assertEquals(3, problem.numBoolVars, "a marker variable is appended for the empty clause")
+        assertEquals(
+            2,
+            problem.factors.count { it is Clause && it.literals.size == 1 },
+            "the empty clause becomes two contradictory unit clauses on the marker",
+        )
+    }
 }
