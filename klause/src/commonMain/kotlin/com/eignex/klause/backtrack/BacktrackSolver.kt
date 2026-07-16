@@ -101,11 +101,19 @@ class BacktrackSolver(override val problem: Problem) :
             return when (outcome) {
                 is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
 
-                is SearchOutcome.Exhausted -> SolveResult.Unsat(
-                    core = outcome.core,
-                    stats = stats,
-                    assumptionCore = projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
-                )
+                is SearchOutcome.Exhausted ->
+                    if (outcome.indeterminate) {
+                        // A leaf's continuous LP could not be certified either way, so the tree is not
+                        // provably all-infeasible — report `unknown` rather than an unsound UNSAT.
+                        SolveResult.Unknown(TerminationReason.Unsupported, stats)
+                    } else {
+                        SolveResult.Unsat(
+                            core = outcome.core,
+                            stats = stats,
+                            assumptionCore =
+                                projectTouchedToAssumptions(params.assumptions, outcome.touchedAssumptionLevels),
+                        )
+                    }
 
                 SearchOutcome.BudgetCapped -> {
                     sink.timedOut = true

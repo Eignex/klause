@@ -17,10 +17,12 @@ import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpRowPremises
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Sense
 import com.eignex.klause.lp.addExact
+import com.eignex.klause.lp.solveAndCertify
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
 import com.eignex.klause.lp.cut.Cut
@@ -30,6 +32,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -169,6 +172,29 @@ private class SessionDomains(private val session: PropagationSession) : Relaxati
     override fun intDomain(varId: Int): IntDomain = session.intDomain(varId)
     override fun boolValue(varId: Int): Boolean? = session.boolValue(varId)
 }
+
+/** [RelaxationDomains] pinning every integer variable to its value in a full-assignment [sample] and
+ *  every Boolean to its bit — the leaf view where the residual LP over the continuous columns is all
+ *  that remains undecided (see [leafRealFeasibility]). */
+private class SampleDomains(private val sample: Sample) : RelaxationDomains {
+    override fun intDomain(varId: Int): IntDomain = sample.ints[varId].let { IntDomain(it, it) }
+    override fun boolValue(varId: Int): Boolean = sample.bools[varId]
+}
+
+/**
+ * The certified feasibility verdict of the LP-only continuous relaxation at a full-assignment leaf
+ * [sample], with every discrete variable pinned to its assigned value so the LP decides only the
+ * continuous columns. [LpVerdict.OPTIMAL] means the reals have a feasible completion — the leaf is a
+ * genuine solution; [LpVerdict.INFEASIBLE] (exact Farkas) means none exists — the leaf must be rejected;
+ * [LpVerdict.INDETERMINATE] means neither could be certified within the 128-bit budget, so the leaf's
+ * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
+ *
+ * The discrete constraints already hold at a CP-consistent leaf, so their linear rows are satisfiable by
+ * the fixed values and only the LP-only real rows can bind — making this exactly a residual real-LP
+ * feasibility test. Called only when the problem declares continuous variables.
+ */
+internal fun leafRealFeasibility(problem: Problem, objective: LinearObjective?, sample: Sample): LpVerdict =
+    solveAndCertify(CpToLpRelaxation(problem, objective).build(SampleDomains(sample)).model).verdict
 
 /**
  * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,

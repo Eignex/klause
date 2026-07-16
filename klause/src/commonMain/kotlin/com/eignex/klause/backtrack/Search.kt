@@ -2,9 +2,12 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VarRef
+import com.eignex.klause.lp.LpVerdict
+import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
@@ -56,8 +59,14 @@ internal sealed interface SearchOutcome {
      *  search — feeds the assumption-core projection in
      *  [com.eignex.klause.solver.result.satisfyUnderAssumptions]. Empty when no seed was
      *  in play or no conflict referenced a seed level. */
-    data class Exhausted(val core: UnsatCore? = null, val touchedAssumptionLevels: IntArray = EmptyIntArray) :
-        SearchOutcome
+    data class Exhausted(
+        val core: UnsatCore? = null,
+        val touchedAssumptionLevels: IntArray = EmptyIntArray,
+        /** True when a leaf was reached whose residual LP-only continuous relaxation could not be
+         *  certified feasible or infeasible (see `leafRealFeasibility`), so the tree is not provably
+         *  all-infeasible — the terminal verdict must be `unknown`, not UNSAT. */
+        val indeterminate: Boolean = false,
+    ) : SearchOutcome
     data object BudgetCapped : SearchOutcome
 }
 
@@ -134,10 +143,24 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
  * surfaced, so this only returns the sample. On a budget exit the trailing glue clauses are published
  * for cross-arm import (#381).
  */
-private class SatPolicy(private val params: BacktrackParams) : SearchPolicy<Sample> {
+private class SatPolicy(private val params: BacktrackParams, private val problem: Problem) : SearchPolicy<Sample> {
+    /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so the
+     *  final Exhausted verdict must degrade to `unknown` rather than UNSAT. */
+    var sawIndeterminate = false
+        private set
+
     override fun cancelled(): Boolean = params.cancellation()
 
-    override fun onLeaf(snap: Sample): Sample = snap
+    override fun onLeaf(snap: Sample): Sample? {
+        // With LP-only continuous variables, a CP-consistent leaf is a solution only if the residual real
+        // LP is feasible — the real rows have no propagator, so CP alone has not enforced them.
+        if (problem.numRealVars == 0) return snap
+        return when (leafRealFeasibility(problem, objective = null, sample = snap)) {
+            LpVerdict.OPTIMAL -> snap
+            LpVerdict.INFEASIBLE -> null // reals cannot complete this assignment — reject and backtrack
+            LpVerdict.INDETERMINATE -> { sawIndeterminate = true; null }
+        }
+    }
 
     override fun onBudgetExit(session: PropagationSession) {
         params.clauseExchange?.onSearchEnd(session)
@@ -153,13 +176,14 @@ internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
 ): Sequence<SearchOutcome> = sequence {
-    val engine = DfsEngine(this@driveSearch, params, sink, SatPolicy(params))
+    val policy = SatPolicy(params, this@driveSearch.problem)
+    val engine = DfsEngine(this@driveSearch, params, sink, policy)
     while (true) {
         when (val e = engine.runUntilEvent()) {
             is EngineEvent.Solution -> yield(SearchOutcome.Found(e.payload))
 
             is EngineEvent.Exhausted -> {
-                yield(SearchOutcome.Exhausted(e.core, e.touched))
+                yield(SearchOutcome.Exhausted(e.core, e.touched, policy.sawIndeterminate))
                 return@sequence
             }
 
