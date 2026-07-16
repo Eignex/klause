@@ -10,12 +10,12 @@ internal data class LinComb(val coeffs: Map<Int, Long>, val constant: Long) {
     /** Sum of two combinations (coefficients added per variable, constants added). */
     fun plus(other: LinComb): LinComb {
         val m = HashMap(coeffs)
-        for ((v, c) in other.coeffs) m[v] = (m[v] ?: 0L) + c
-        return LinComb(m, constant + other.constant)
+        for ((v, c) in other.coeffs) m[v] = addExact(m[v] ?: 0L, c)
+        return LinComb(m, addExact(constant, other.constant))
     }
 
     /** This combination scaled by [k]. */
-    fun scaled(k: Long): LinComb = LinComb(coeffs.mapValues { it.value * k }, constant * k)
+    fun scaled(k: Long): LinComb = LinComb(coeffs.mapValues { mulExact(it.value, k) }, mulExact(constant, k))
 
     /** The single variable id when this is exactly `1·v` (no constant, one unit coefficient), else null. */
     fun asSimpleVar(): Int? =
@@ -29,9 +29,34 @@ internal data class LinComb(val coeffs: Map<Int, Long>, val constant: Long) {
  */
 internal fun linCombDiff(a: LinComb, b: LinComb, delta: Long = 0L): Triple<IntArray, LongArray, Long> {
     val combined = HashMap(a.coeffs)
-    for ((v, c) in b.coeffs) combined[v] = (combined[v] ?: 0L) - c
+    for ((v, c) in b.coeffs) combined[v] = subExact(combined[v] ?: 0L, c)
     combined.entries.removeAll { it.value == 0L }
-    val bound = b.constant - a.constant + delta
+    val bound = addExact(subExact(b.constant, a.constant), delta)
     val vars = combined.keys.toIntArray()
     return Triple(vars, LongArray(vars.size) { combined.getValue(vars[it]) }, bound)
+}
+
+/**
+ * Checked 64-bit arithmetic for term folding. Integer terms in SMT-LIB and XCSP3 are conceptually
+ * unbounded, so a wrapped `Long` result would silently corrupt the folded value; these throw
+ * [ArithmeticException] on overflow so the parser can reject the term instead.
+ */
+internal fun addExact(a: Long, b: Long): Long {
+    val r = a + b
+    if (((a xor r) and (b xor r)) < 0L) throw ArithmeticException("long overflow: $a + $b")
+    return r
+}
+
+internal fun subExact(a: Long, b: Long): Long {
+    val r = a - b
+    if (((a xor b) and (a xor r)) < 0L) throw ArithmeticException("long overflow: $a - $b")
+    return r
+}
+
+internal fun mulExact(a: Long, b: Long): Long {
+    val r = a * b
+    if (a != 0L && (r / a != b || (a == -1L && b == Long.MIN_VALUE))) {
+        throw ArithmeticException("long overflow: $a * $b")
+    }
+    return r
 }

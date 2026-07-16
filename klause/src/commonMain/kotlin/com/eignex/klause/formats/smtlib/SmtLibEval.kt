@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.mulExact
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -214,7 +215,7 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
         val parts = args.map { it.asLin() }
         val nonConst = parts.filter { it.coeffs.isNotEmpty() }
         if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
-        val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> a * c.constant }
+        val k = foldChecked { parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> mulExact(a, c.constant) } }
         if (nonConst.isEmpty()) Res.I(LinComb(emptyMap(), k)) else Res.I(scale(nonConst[0], k))
     }
 
