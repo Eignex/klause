@@ -54,6 +54,18 @@ class DimacsModeTest {
     }
 
     @Test
+    fun `the statistics block prints the solutions count and search counters as c comments`() {
+        val out = capture { main(arrayOf("-s", cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
+        assertTrue("s SATISFIABLE" in out, out)
+        assertTrue(out.lines().any { it.startsWith("v ") }, out)
+        assertTrue("c solutions=" in out, out)
+        assertTrue(
+            out.lines().any { it.startsWith("c ") && "=" in it && "solveTime" !in it },
+            "expected c stat lines: $out",
+        )
+    }
+
+    @Test
     fun `the cnf extension and the explicit format both route to the DIMACS front-end`() {
         val path = cnf("p cnf 1 1\n1 0\n")
         val byExt = capture { main(arrayOf(path)) }
