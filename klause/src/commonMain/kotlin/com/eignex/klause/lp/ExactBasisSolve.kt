@@ -116,13 +116,15 @@ private fun bareissDet(a: Array<LongArray>): Long? {
     for (k in 0 until n) {
         if (a[k][k] == 0L) {
             var swap = -1
-            for (i in k + 1 until n) if (a[i][k] != 0L) {
-                swap = i;
-                break
+            for (i in k + 1 until n) {
+                if (a[i][k] != 0L) {
+                    swap = i
+                    break
+                }
             }
             if (swap == -1) return 0L // a zero column at this stage ⇒ singular
-            val tmp = a[k];
-            a[k] = a[swap];
+            val tmp = a[k]
+            a[k] = a[swap]
             a[swap] = tmp
             sign = -sign
         }
