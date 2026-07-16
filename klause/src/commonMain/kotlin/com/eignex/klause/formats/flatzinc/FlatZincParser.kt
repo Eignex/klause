@@ -72,6 +72,9 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
             require(lo == 1L) {
                 "FlatZinc arrays are 1-indexed; got [$lo..$hi]"
             }
+            require(hi in 0..Int.MAX_VALUE.toLong()) {
+                "FlatZinc array length out of range: [$lo..$hi]"
+            }
             expect("]", "expected `]` closing index range")
             expectKw("of")
             val elementIsVar = matchKw("var")
