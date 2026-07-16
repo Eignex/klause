@@ -4,7 +4,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.LinComb
-import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -250,11 +249,7 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
  *  (posting the false literal when it cannot hold) rather than an empty [Linear] row. */
 private fun SmtLibQfLia.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
     val (vars, coeffs, bound) = diff(a, b)
-    if (vars.isEmpty()) {
-        if (!constRelationHolds(op, bound)) forceTrue(Lit.negate(trueLit()))
-    } else {
-        factors.add(Linear(coeffs, vars, op, bound))
-    }
+    assertLinearRow(coeffs, vars, op, bound)
 }
 
 /** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. The fresh
@@ -339,11 +334,7 @@ private fun SmtLibQfLia.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
 
 /** Reify a two-operand arithmetic relation from its folded operands. */
 private fun SmtLibQfLia.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
-    if (node.items.size != 3) {
-        throw UnsupportedSmtException(
-            "$op with ${node.items.size - 1} operands not supported as a single linear relation",
-        )
-    }
+    requireBinaryRelation(node, op)
     val rel = relFromOperands(op, args[0].asLin(), args[1].asLin())
     return reifyLinear(rel.coeffs, rel.vars, rel.op, rel.bound)
 }
