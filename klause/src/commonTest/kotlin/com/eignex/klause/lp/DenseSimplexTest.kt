@@ -84,7 +84,7 @@ class DenseSimplexTest {
     }
 
     @Test
-    fun `solves a continuous (real-coefficient) LP`() {
+    fun `solves a continuous real-coefficient LP`() {
         // minimize 1.5 x  s.t.  x >= 2,  x in [0, 10] real  ->  objective 3.0.
         val b = LpBuilder()
         val x = b.addRealVar(0.0, 10.0, cost = 1.5)
