@@ -67,6 +67,18 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `declare-fun with arguments is rejected while a 0-arity constant is accepted`() {
+        // A non-empty argument list makes f a genuine function symbol, not a variable; it must not be
+        // silently declared as an Int constant (the arg-sort list was previously ignored).
+        val e = assertFailsWith<UnsupportedSmtException> {
+            SmtLibQfLia.parse("(declare-fun f (Int) Int) (assert (>= f 0)) (check-sat)")
+        }
+        assertTrue("declare-fun" in e.message.orEmpty(), e.message.orEmpty())
+        val p = SmtLibQfLia.parse("(declare-fun f () Int) (assert (>= f 0)) (check-sat)").problem
+        assertEquals(1, p.numIntVars)
+    }
+
+    @Test
     fun `parses conjunctive and disjunctive QF_LIA and solves SAT`() {
         val text = """
             (set-logic QF_LIA)
