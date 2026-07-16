@@ -314,7 +314,7 @@ internal class CumulativeRelaxation(
         init {
             for (f in problem.factors) {
                 when (f) {
-                    is Linear -> if (f.vars.size == 2) addLinearLinks(f)
+                    is Linear -> if (!f.hasReals && f.vars.size == 2) addLinearLinks(f)
 
                     is ArrayMinMax -> if (f.max) {
                         for (x in f.xs) maxResultsOf.getOrPut(x) { IntArrayList() }.add(f.result)

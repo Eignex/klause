@@ -39,7 +39,7 @@ internal class FlowCoverSeparator : CutSeparator {
         val indicator = MutableIntIntMap()
         val vubCap = MutableIntLongMap()
         for (f in problem.factors) {
-            if (f !is Linear || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0L) continue
+            if (f !is Linear || f.hasReals || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0L) continue
             val (y, x, u) = matchVub(f) ?: continue
             if (problem.intDomains[x].min != 0L || problem.intDomains[x].max != 1L) continue // xⱼ ∈ {0,1}
             val cap = minOf(u, problem.intDomains[y].max) // effective flow when xⱼ = 1
@@ -50,7 +50,7 @@ internal class FlowCoverSeparator : CutSeparator {
 
         val cuts = ArrayList<Cut>()
         for (f in problem.factors) {
-            if (f !is Linear || f.op != LinearOp.LE || f.vars.size < 2) continue
+            if (f !is Linear || f.hasReals || f.op != LinearOp.LE || f.vars.size < 2) continue
             val arcs = explicitArcs(f, indicator, vubCap, intColOf)
                 ?: implicitArcs(f, problem, intColOf)
                 ?: continue
