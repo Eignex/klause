@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.log2
 import kotlin.math.roundToLong
 
@@ -184,7 +185,12 @@ internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEF
  * when neither sign certifies, the rounding fails, or a 128-bit term overflows.
  */
 internal fun integerFarkasRay(model: LpModel, ray: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): LongArray? {
-    if (model.hasContinuous) return null // a real coefficient is not integrally certifiable here (Phase 3b)
+    if (model.hasContinuous) {
+        // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
+        // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
+        val integral = rationalizeToIntegerModel(model) ?: return null
+        return integerFarkasRay(integral, ray, scaleBits)
+    }
     val rd = roundDuals(model, ray, scaleBits) ?: return null
     if (farkasCertifies(model, rd.mult)) return rd.mult
     val neg = LongArray(rd.mult.size) { -rd.mult[it] }
@@ -224,6 +230,65 @@ private fun chooseScale(maxY: Double, scaleBits: Int): Int {
     if (maxY <= 0.0) return scaleBits.coerceIn(0, MAX_SCALE_BITS)
     val headroom = MULTIPLIER_BITS - ceil(log2(maxY)).toInt()
     return scaleBits.coerceAtMost(headroom).coerceIn(0, MAX_SCALE_BITS)
+}
+
+/**
+ * A scaled-integer copy of a continuous [model], or null when it cannot be rationalized within budget.
+ * Multiplies the double-view coefficients (matrix, rhs, cost) by a common power of two `2ᵏ` so they
+ * become exact [Long]s, keeping the (integer) variable bounds. The existing 128-bit certifiers then apply
+ * unchanged: scaling by a positive `2ᵏ` leaves the feasible region intact, so an infeasibility (Farkas)
+ * certificate over the scaled model proves the real model infeasible. Returns null — leaving the LP
+ * `INDETERMINATE`, never mis-certified — when a bound is non-integral, a coefficient needs more than
+ * [MAX_SCALE_BITS] fractional bits, or a scaled value escapes the exactly-representable range.
+ */
+internal fun rationalizeToIntegerModel(model: LpModel): LpModel? {
+    val dv = model.doubleView ?: return model
+    val n = model.n
+    val numVars = model.numVars
+    val upper = LongArray(numVars)
+    for (j in 0 until numVars) {
+        if (!dv.hasUpper[j]) continue
+        val u = dv.upper[j]
+        if (!u.isFinite() || u != floor(u) || abs(u) >= MAX_EXACT_INT) return null
+        upper[j] = u.toLong()
+    }
+    val k = commonScaleBits(dv) ?: return null
+    val s = (1L shl k).toDouble()
+    return LpModel(
+        n = n,
+        m = model.m,
+        csc = Csc(
+            dv.colPtr.copyOf(),
+            dv.rowIdx.copyOf(),
+            LongArray(dv.colVal.size) { (dv.colVal[it] * s).roundToLong() },
+        ),
+        rhs = LongArray(model.m) { (dv.rhs[it] * s).roundToLong() },
+        cost = LongArray(numVars) { (dv.cost[it] * s).roundToLong() },
+        upper = upper,
+        hasUpper = dv.hasUpper.copyOf(),
+        loShift = LongArray(n),
+        objConstant = 0L,
+        sense = model.sense,
+        tag = IntArray(n) { -1 },
+    )
+}
+
+/** Smallest power-of-two scale `k ≤ [MAX_SCALE_BITS]` at which every double-view coefficient becomes an
+ *  exact integer within the round-trip range, or null when none does. */
+private fun commonScaleBits(dv: LpDoubleView): Int? {
+    for (k in 0..MAX_SCALE_BITS) {
+        val s = (1L shl k).toDouble()
+        if (exactlyIntegral(dv.colVal, s) && exactlyIntegral(dv.rhs, s) && exactlyIntegral(dv.cost, s)) return k
+    }
+    return null
+}
+
+private fun exactlyIntegral(a: DoubleArray, scale: Double): Boolean {
+    for (x in a) {
+        val v = x * scale
+        if (!v.isFinite() || v != floor(v) || abs(v) >= MAX_EXACT_INT) return false
+    }
+    return true
 }
 
 /** Requested scale: fine enough to keep rounding loss negligible, capped by [chooseScale]. */
