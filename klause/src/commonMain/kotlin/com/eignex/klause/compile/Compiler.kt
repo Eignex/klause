@@ -291,25 +291,23 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
         val combined = subtract(affine(lift(expr.left)), affine(lift(expr.right)))
         val coeffs = combined.coeffs
         val bound = normBound - combined.constant
-        val finalOp = op
-        val finalBound = bound
         if (coeffs.isEmpty()) {
-            val holds = when (finalOp) {
-                IntCmpOp.LE -> 0 <= finalBound
-                IntCmpOp.GE -> 0 >= finalBound
-                IntCmpOp.EQ -> 0 == finalBound
-                IntCmpOp.NE -> 0 != finalBound
+            val holds = when (op) {
+                IntCmpOp.LE -> 0 <= bound
+                IntCmpOp.GE -> 0 >= bound
+                IntCmpOp.EQ -> 0 == bound
+                IntCmpOp.NE -> 0 != bound
                 IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
             }
             return if (holds) trueLit() else falseLit()
         }
         if (coeffs.size == 1) {
             val (name, c) = coeffs.entries.first()
-            return reifySingleVar(name, c, finalOp, finalBound)
+            return reifySingleVar(name, c, op, bound)
         }
         val (varIds, coeffArr) = coeffsToArrays(coeffs)
         val aux = newBoolVar()
-        val linOp = when (finalOp) {
+        val linOp = when (op) {
             IntCmpOp.LE -> LinearOp.LE
 
             IntCmpOp.GE -> LinearOp.GE
@@ -317,13 +315,13 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
             IntCmpOp.EQ -> LinearOp.EQ
 
             IntCmpOp.NE -> {
-                factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, finalBound)
+                factors += ReifiedLinear(aux, coeffArr, varIds, LinearOp.EQ, bound)
                 return Lit.make(aux, positive = false)
             }
 
             IntCmpOp.LT, IntCmpOp.GT -> error("normalized away")
         }
-        factors += ReifiedLinear(aux, coeffArr, varIds, linOp, finalBound)
+        factors += ReifiedLinear(aux, coeffArr, varIds, linOp, bound)
         return Lit.make(aux, positive = true)
     }
 

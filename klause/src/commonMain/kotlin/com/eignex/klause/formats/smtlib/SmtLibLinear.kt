@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
-import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
@@ -28,11 +27,6 @@ internal fun SmtLibQfLia.Builder.assertLinear(t: SExpr.SList) {
         return
     }
     factors.add(Linear(rel.coeffs, rel.vars, rel.op, rel.bound))
-}
-
-internal fun SmtLibQfLia.Builder.reifyRelation(t: SExpr.SList): Int {
-    val rel = relationToLinear(t)
-    return reifyLinear(rel.coeffs, rel.vars, rel.op, rel.bound)
 }
 
 /** Lower `(op lhs rhs)` to one linear relation. */
