@@ -81,6 +81,10 @@ internal class LpRelaxation(
     /** Ids of the factors that emitted at least one [Contribution.HULL] row, in factor order — the
      *  candidates the root pruner (`LpEngine.pruneIneffectiveHulls`) probes for individual removal. */
     val hullFactorIds: IntArray = EmptyIntArray,
+    /** Structural LP column → the LP-only continuous (real) variable id it stands for, or -1 for an
+     *  integer / Boolean / auxiliary column. Lets the leaf verdict read each continuous column's solved
+     *  value back onto its real variable. */
+    val colRealId: IntArray = IntArray(model.n) { -1 },
 )
 
 /**
@@ -379,14 +383,20 @@ internal class CpToLpRelaxation(
 
     private fun boolCost(b: Int): Long = objective?.boolWeights?.getOrElse(b) { 0L } ?: 0L
 
+    private fun realCost(r: Int): Double = objective?.realCoefficients?.getOrElse(r) { 0.0 } ?: 0.0
+
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
      *  [RelaxationBuilder] so a factor's [com.eignex.klause.solver.Factor.linearize] can emit into it. */
     private inner class Assembler(private val domains: RelaxationDomains) : RelaxationBuilder {
         private val builder = LpBuilder()
         private val intCol = IntArray(problem.numIntVars) { -1 }
         private val boolCol = IntArray(problem.numBoolVars) { -1 }
+        private val realCol = IntArray(problem.numRealVars) { -1 }
         private val colVarId = IntArrayList()
         private val colIsBool = IntArrayList() // 0 = int, 1 = bool; densified at the end
+        // LP column -> real var id it stands for, or -1 for int/bool/aux columns. Lets the leaf verdict
+        // read each LP-only continuous column's value back onto its real variable.
+        private val colRealId = IntArrayList()
 
         // Per-column live-bound rule for the persistent relaxation (#39/#43). For an auxiliary column,
         // colReq[c] holds its presence requirement as flat (intVar, value) membership pairs and
@@ -433,6 +443,7 @@ internal class CpToLpRelaxation(
             val c = builder.addVar(lo, hi, cost = 0L, tag = -1)
             colVarId.add(-1)
             colIsBool.add(0)
+            colRealId.add(-1)
             colReq.add(presence)
             colPresentUpper.add(hi)
             return c
@@ -542,6 +553,34 @@ internal class CpToLpRelaxation(
                 intCol[intVar] = c
                 colVarId.add(intVar)
                 colIsBool.add(0)
+                colRealId.add(-1)
+                colReq.add(null)
+                colPresentUpper.add(0L)
+            }
+            return c
+        }
+
+        /**
+         * Column for LP-only continuous variable [realVar], created on first use with its declared real
+         * bounds and objective coefficient. It has no backing CP variable (`colVarId = -1`) so the
+         * persistent relaxation never re-binds it and reduced-cost fixing never maps it to a domain; its
+         * value is read back onto the real variable at the leaf. An open (`±∞`) bound becomes the builder's
+         * probe stand-in via [LpBuilder.addRealVar].
+         */
+        override fun realColumn(realVar: Int): Int {
+            var c = realCol[realVar]
+            if (c == -1) {
+                val lo = problem.realLower[realVar]
+                val hi = problem.realUpper[realVar]
+                c = builder.addRealVar(
+                    lower = if (lo.isFinite()) lo else null,
+                    upper = if (hi.isFinite()) hi else null,
+                    cost = realCost(realVar),
+                )
+                realCol[realVar] = c
+                colVarId.add(-1)
+                colIsBool.add(0)
+                colRealId.add(realVar)
                 colReq.add(null)
                 colPresentUpper.add(0L)
             }
@@ -559,6 +598,7 @@ internal class CpToLpRelaxation(
                 boolCol[boolVar] = c
                 colVarId.add(boolVar)
                 colIsBool.add(1)
+                colRealId.add(-1)
                 colReq.add(null)
                 colPresentUpper.add(0L)
             }
@@ -688,6 +728,7 @@ internal class CpToLpRelaxation(
                 colReq = reqs,
                 colPresentUpper = presentUpper,
                 hullFactorIds = hullFactorIds.toIntArray(),
+                colRealId = IntArray(colRealId.size) { colRealId[it] },
             )
         }
 
@@ -812,6 +853,11 @@ internal class CpToLpRelaxation(
             if (skipRow(contribution)) return
             val rel = relationOf(op) ?: return
             builder.addRow(columns, coeffs, rel, rhs)
+        }
+
+        override fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double) {
+            val rel = relationOf(op) ?: return
+            builder.addRealRow(columns, coeffs, rel, rhs)
         }
 
         override fun bigMRow(

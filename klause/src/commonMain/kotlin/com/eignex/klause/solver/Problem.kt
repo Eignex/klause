@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.extractConflictBools
 import com.eignex.klause.propagation.extractConflictFactors
 import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -82,6 +83,18 @@ class Problem(
      * construction exactly as before, so nothing outside presolve sees a behavioural change.
      */
     val preFolded: Boolean = false,
+    /**
+     * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
+     * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
+     * continuous column but absent from CP search — it has no [intDomains] entry, no trail, and is never
+     * branched. The simplex resolves it at nodes and leaves (see the LP-only-columns hybrid engine,
+     * issue #1232). Zero for the pure integer/Boolean core, which every existing consumer builds.
+     */
+    val numRealVars: Int = 0,
+    /** Lower bound of each real variable (length [numRealVars]); `Double.NEGATIVE_INFINITY` for open. */
+    val realLower: DoubleArray = EmptyDoubleArray,
+    /** Upper bound of each real variable (length [numRealVars]); `Double.POSITIVE_INFINITY` for open. */
+    val realUpper: DoubleArray = EmptyDoubleArray,
 ) {
     /**
      * Domain (bounds) of each integer variable, indexed by int var id. A defensive copy of
@@ -121,6 +134,9 @@ class Problem(
         }
         require(impliedFactorMask == null || impliedFactorMask.size == factors.size) {
             "impliedFactorMask size ${impliedFactorMask?.size} != factors size ${factors.size}"
+        }
+        require(realLower.size == numRealVars && realUpper.size == numRealVars) {
+            "real bound arrays (${realLower.size}/${realUpper.size}) != numRealVars $numRealVars"
         }
     }
 

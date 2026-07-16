@@ -2,6 +2,7 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
 
 /**
@@ -71,6 +72,13 @@ data class LinearObjective(
     val boolWeights: LongArray = EmptyLongArray,
     val intCoefficients: LongArray = EmptyLongArray,
     val constant: Long = 0L,
+    /**
+     * Objective coefficient of each LP-only continuous (real) variable, indexed by real var id (size
+     * `problem.numRealVars`; empty for the integer/Boolean core). The real part of the objective is
+     * resolved by the LP at nodes and leaves, not by [evaluateLong] — the integer/Boolean methods here
+     * cover only the discrete part. See the LP-only-columns hybrid engine (issue #1232).
+     */
+    val realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {
 
     /** Exact integer objective value of [sample]; lower is better. */
@@ -129,13 +137,15 @@ data class LinearObjective(
         if (other !is LinearObjective) return false
         return constant == other.constant &&
             boolWeights.contentEquals(other.boolWeights) &&
-            intCoefficients.contentEquals(other.intCoefficients)
+            intCoefficients.contentEquals(other.intCoefficients) &&
+            realCoefficients.contentEquals(other.realCoefficients)
     }
 
     override fun hashCode(): Int {
         var h = constant.hashCode()
         h = 31 * h + boolWeights.contentHashCode()
         h = 31 * h + intCoefficients.contentHashCode()
+        h = 31 * h + realCoefficients.contentHashCode()
         return h
     }
 }
