@@ -95,3 +95,45 @@ internal fun LpModel.safeVariableBound(result: FloatLpResult, objectiveCol: Int,
     if (clampedThatSide && abs(bound) >= frontier) return null
     return bound.toLong()
 }
+
+/**
+ * The integer-exact twin of [safeVariableBound], from the 128-bit [integerDualLowerBoundCeil] instead of
+ * the float [safeObjectiveLowerBound]. It is tight where the float bound is loose: the safe bound
+ * subtracts a conservative rounding margin from every reduced cost, which for a free column
+ * ([LpBuilder.addFreeVar]) is multiplied by the ~`Long.MAX/4` probe upper and swamps the true bound; the
+ * exact bound carries no such margin, so a free basic column (true reduced cost 0) contributes nothing.
+ * Null on a 128-bit certification overflow (the caller falls back). Same probe-frontier rejection as
+ * [safeVariableBound]: an optimum that only rode the column to its `±∞` stand-in is reported unbounded.
+ */
+internal fun LpModel.exactVariableBound(result: FloatLpResult, objectiveCol: Int, maximize: Boolean): Long? {
+    // ⌈L⌉ on the minimized objective (−x when maximizing, x when minimizing), objConstant folded in.
+    val ceil = integerDualLowerBoundCeil(this, result.duals) ?: return null
+    val bound = if (maximize) {
+        if (ceil == Long.MIN_VALUE) return null // −Long.MIN_VALUE overflows
+        -ceil
+    } else {
+        ceil
+    }
+    val clampedThatSide = if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
+    val frontier = LP_UNBOUNDED_PROBE - LP_UNBOUNDED_PROBE / 4
+    if (clampedThatSide && (bound == Long.MIN_VALUE || abs(bound) >= frontier)) return null
+    return bound
+}
+
+/**
+ * The tightest sound bound on [objectiveCol] from an already-solved [result]: the tighter of the exact
+ * [exactVariableBound] and the float [safeVariableBound]. Both are valid, so the tighter always wins —
+ * the smaller upper bound when [maximize], the larger lower bound otherwise — which never regresses below
+ * the float bound yet captures the exact bound's sharpness on free columns. Null only when neither is
+ * available (both unbounded / overflow).
+ */
+internal fun LpModel.tightVariableBound(result: FloatLpResult, objectiveCol: Int, maximize: Boolean): Long? {
+    val safe = safeVariableBound(result, objectiveCol, maximize)
+    val exact = exactVariableBound(result, objectiveCol, maximize)
+    return when {
+        safe == null -> exact
+        exact == null -> safe
+        maximize -> minOf(safe, exact)
+        else -> maxOf(safe, exact)
+    }
+}

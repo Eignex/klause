@@ -2,6 +2,8 @@ package com.eignex.klause.lp
 
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** The Neumaier–Shcherbina safe bound must never exceed the true optimum (#567 component 3): a
@@ -37,5 +39,24 @@ class SafeObjectiveBoundTest {
         assertTrue(total > 300, "covered only $total instances")
         // The bound should be usefully tight (finite) on the large majority of instances.
         assertTrue(finite >= total * 4 / 5, "safe bound was finite on only $finite/$total")
+    }
+
+    @Test
+    fun `exact variable bound tightens a free column the safe bound leaves loose`() {
+        // maximize x subject to x <= 5, x open above (a free column at the ±∞ probe upper).
+        val b = LpBuilder()
+        val x = b.addFreeVar(0L, null, cost = -1L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.LE, 5L)
+        val model = b.build(Sense.MINIMIZE)
+        val result = assertNotNull(RevisedSimplex(model).solvePrimal())
+
+        val exact = model.exactVariableBound(result, x, maximize = true)
+        val safe = assertNotNull(model.safeVariableBound(result, x, maximize = true))
+        val tight = assertNotNull(model.tightVariableBound(result, x, maximize = true))
+
+        assertEquals(5L, exact, "exact bound should be the true max")
+        assertEquals(5L, tight, "tight bound should match the exact bound")
+        assertTrue(safe >= 5L, "safe bound must stay sound")
+        assertTrue(tight <= safe, "tight bound must not exceed the looser safe bound")
     }
 }
