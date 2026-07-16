@@ -342,10 +342,12 @@ internal class DfsEngine<L>(
             pendingBlock = null
             popTrailToRoot()
             val nogood = session.assignmentNogood(rootBlock.bools, rootBlock.ints)
-            if (nogood.isNotEmpty()) {
-                val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
-                if (res is PropagationResult.Unsat) return exhausted()
-            }
+            // An empty nogood means the leaf rested on no decisions (every variable was forced, or there
+            // are none) — there is nothing to negate, so this single leaf is the whole space and it has
+            // been consumed. Re-descending would revisit it forever; the search is exhausted.
+            if (nogood.isEmpty()) return exhausted()
+            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+            if (res is PropagationResult.Unsat) return exhausted()
             if (policy.assertObjectiveBoundAtRoot(session)) return exhausted()
             descend = true
             return null

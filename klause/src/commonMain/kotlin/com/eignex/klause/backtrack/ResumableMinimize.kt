@@ -7,11 +7,13 @@ import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootCuts
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
+import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -64,6 +66,10 @@ internal class ResumableMinimize(
     private val pausable: Boolean = true,
 ) : ResumableSearch {
     private val problem: Problem = solver.problem
+
+    /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so an
+     *  exhausted search with no incumbent must report `unknown` rather than Infeasible. */
+    private var sawIndeterminateLeaf = false
 
     // #429: the LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
     // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
@@ -200,6 +206,10 @@ internal class ResumableMinimize(
             externalShared -> MinimizeResult.Unknown(TerminationReason.SearchExhausted, stats)
 
             b != null -> MinimizeResult.Optimal(b, bestObj, stats)
+
+            // No incumbent, but a leaf's continuous LP was uncertifiable — the tree is not provably
+            // all-infeasible, so report `unknown` rather than an unsound Infeasible.
+            sawIndeterminateLeaf -> MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
 
             else -> MinimizeResult.Infeasible(core, stats)
         }
@@ -400,9 +410,19 @@ internal class ResumableMinimize(
             lpHints?.order(varRef, values) ?: values
 
         // Always block this leaf and backtrack (the engine does that); surface it only when it strictly
-        // improves the incumbent.
-        override fun onLeaf(snap: Sample): MinimizeResult.WithSample? =
-            recordIfImproving(snap, objective.evaluate(snap))
+        // improves the incumbent. With LP-only continuous variables a leaf is a solution only if the
+        // residual real LP is feasible — the real rows carry no propagator, so CP alone has not enforced
+        // them; an uncertifiable residual taints the terminal verdict to `unknown`.
+        override fun onLeaf(snap: Sample): MinimizeResult.WithSample? {
+            if (problem.numRealVars > 0) {
+                when (leafRealFeasibility(problem, objective, snap)) {
+                    LpVerdict.INFEASIBLE -> return null
+                    LpVerdict.INDETERMINATE -> { sawIndeterminateLeaf = true; return null }
+                    LpVerdict.OPTIMAL -> Unit
+                }
+            }
+            return recordIfImproving(snap, objective.evaluate(snap))
+        }
 
         override fun assertObjectiveBoundAtRoot(session: PropagationSession): Boolean =
             this@ResumableMinimize.assertObjectiveBoundAtRoot()
