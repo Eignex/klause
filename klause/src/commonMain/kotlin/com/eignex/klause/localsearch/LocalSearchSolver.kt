@@ -150,6 +150,13 @@ class LocalSearchSolver(
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
+        if (problem.numRealVars > 0) {
+            // LP-only continuous variables are resolved by the LP relaxation, which local search does not
+            // run; their linear rows carry no invariant, so LS would ignore them and could report a
+            // solution that violates them. Decline rather than return an unsound verdict.
+            sink.stop()
+            return SolveResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
+        }
         val eff = effectiveAssumptions(params.assumptions)
         if (eff == null) {
             sink.stop()
@@ -166,6 +173,9 @@ class LocalSearchSolver(
     }
 
     internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
+        // LP-only continuous variables are not evaluated by local search (see [solveInternal]); stream
+        // nothing rather than assignments that may violate their linear rows.
+        if (problem.numRealVars > 0) return emptySequence()
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
         return streamImpl(params, eff, warm)
     }
