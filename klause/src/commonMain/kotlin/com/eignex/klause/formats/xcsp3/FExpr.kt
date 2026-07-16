@@ -53,6 +53,7 @@ sealed interface FExpr {
                 pos++ // consume '('
                 val args = ArrayList<FExpr>()
                 skipWs()
+                require(pos < s.length) { "expected ')' in '$s'" }
                 if (s[pos] != ')') {
                     while (true) {
                         args.add(parseExpr())
