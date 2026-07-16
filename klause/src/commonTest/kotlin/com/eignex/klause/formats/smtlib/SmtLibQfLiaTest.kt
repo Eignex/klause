@@ -348,6 +348,28 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `a fresh abs over an unbounded operand marks the model clamped`() {
+        // abs(x) with x unbounded: the fresh |x| var must inherit x's open range and be flagged when it
+        // is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
+        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (abs x) 3)) (check-sat)")
+        assertTrue(parsed.domainsClamped, "the fresh abs var inherits x's unbounded range")
+    }
+
+    @Test
+    fun `a fresh div quotient over an unbounded dividend marks the model clamped`() {
+        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (div x 2) 3)) (check-sat)")
+        assertTrue(parsed.domainsClamped, "the fresh quotient var inherits x's unbounded range")
+    }
+
+    @Test
+    fun `a fresh ite over an unbounded branch marks the model clamped`() {
+        val parsed = SmtLibQfLia.parse(
+            "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3)) (check-sat)",
+        )
+        assertTrue(parsed.domainsClamped, "the fresh ite var inherits the unbounded branch's range")
+    }
+
+    @Test
     fun `a divisibility-only unsat over unbounded variables stays clamped`() {
         // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1), but its LP relaxation is
         // feasible, so OBBT derives no bound and both variables fall back to the searchable range. The
