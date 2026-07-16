@@ -36,6 +36,17 @@ class DimacsModeTest {
     }
 
     @Test
+    fun `statistics use the shared search block including the solutions count`() {
+        val out = capture { main(arrayOf("-s", cnf("p cnf 2 2\n1 2 0\n-1 0\n"))) }
+        // The shared searchStatPairs block replaces the former hand-rolled three lines, so the CDCL
+        // counters and the solutions count are all present as `c` comments.
+        assertTrue("c solutions=1" in out, out)
+        for (key in listOf("c nodes=", "c failures=", "c restarts=", "c propagations=", "c learned=")) {
+            assertTrue(key in out, "missing $key in: $out")
+        }
+    }
+
+    @Test
     fun `a contradictory cnf prints s UNSATISFIABLE`() {
         val out = capture { main(arrayOf(cnf("p cnf 1 2\n1 0\n-1 0\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
