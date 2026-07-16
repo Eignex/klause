@@ -147,32 +147,40 @@ object SmtLibQfLia {
             return nextInt++
         }
 
+        /** The [i]-th item of this command as an atom's text, or a clean [UnsupportedSmtException]
+         *  naming [what] when the argument is absent or not an atom (instead of a raw cast/index crash). */
+        private fun SExpr.SList.atomAt(i: Int, what: String): String =
+            (items.getOrNull(i) as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("malformed $what")
+
+        /** The [i]-th item of this command, or a clean [UnsupportedSmtException] naming [what] when absent. */
+        private fun SExpr.SList.argAt(i: Int, what: String): SExpr =
+            items.getOrNull(i) ?: throw UnsupportedSmtException("malformed $what")
+
         fun command(e: SExpr) {
             if (e !is SExpr.SList || e.items.isEmpty()) return
             val head = (e.items[0] as? SExpr.Atom)?.text ?: return
             when (head) {
-                "declare-const" -> declare((e.items[1] as SExpr.Atom).text, (e.items[2] as SExpr.Atom).text)
-                "declare-fun" -> declare((e.items[1] as SExpr.Atom).text, (e.items[3] as SExpr.Atom).text)
+                "declare-const" -> declare(e.atomAt(1, "declare-const name"), e.atomAt(2, "declare-const sort"))
+                "declare-fun" -> declare(e.atomAt(1, "declare-fun name"), e.atomAt(3, "declare-fun sort"))
                 "define-fun" -> defineFun(e)
-                "assert" -> asserts.add(e.items[1])
-                "minimize" -> objectiveSpec = e.items[1] to false
-                "maximize" -> objectiveSpec = e.items[1] to true
+                "assert" -> asserts.add(e.argAt(1, "assert"))
+                "minimize" -> objectiveSpec = e.argAt(1, "minimize") to false
+                "maximize" -> objectiveSpec = e.argAt(1, "maximize") to true
                 else -> Unit // set-logic / set-info / check-sat / get-* / exit — ignored
             }
         }
 
         /** Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro. */
         private fun defineFun(e: SExpr.SList) {
-            val name = (e.items[1] as SExpr.Atom).text
-            val paramList = e.items[2] as? SExpr.SList ?: throw UnsupportedSmtException(
-                "define-fun '$name': bad params",
-            )
+            val name = e.atomAt(1, "define-fun name")
+            val paramList = e.items.getOrNull(2) as? SExpr.SList
+                ?: throw UnsupportedSmtException("define-fun '$name': bad params")
             val params = paramList.items.map { p ->
                 ((p as? SExpr.SList)?.items?.getOrNull(0) as? SExpr.Atom)?.text
                     ?: throw UnsupportedSmtException("define-fun '$name': bad parameter")
             }
-            val retSort = (e.items[3] as SExpr.Atom).text
-            macros[name] = Macro(params, e.items[4], isBool = retSort == "Bool")
+            val retSort = e.atomAt(3, "define-fun '$name' return sort")
+            macros[name] = Macro(params, e.argAt(4, "define-fun '$name' body"), isBool = retSort == "Bool")
         }
 
         private fun declare(name: String, sort: String) {

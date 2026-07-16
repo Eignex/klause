@@ -57,6 +57,16 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `a malformed command is rejected with a clear message not a raw cast crash`() {
+        // A declare-const missing its sort must surface as an UnsupportedSmtException, not a
+        // ClassCastException / IndexOutOfBounds leaking from an unchecked access.
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse("(declare-const x)") }
+        assertTrue("declare-const" in e.message.orEmpty(), e.message.orEmpty())
+        // A declare-const whose name position is a list (not an atom) likewise fails cleanly.
+        assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse("(declare-const (a b) Int)") }
+    }
+
+    @Test
     fun `parses conjunctive and disjunctive QF_LIA and solves SAT`() {
         val text = """
             (set-logic QF_LIA)
