@@ -98,6 +98,45 @@ class NativeSatEngineTest {
     }
 
     @Test
+    fun `native and general lanes agree under aggressive clause forgetting`() {
+        // A tiny learned-clause cap plus restarts forces frequent native forgetting/compaction; a bug in
+        // watch remapping or arena compaction would surface as a wrong verdict or an invalid witness.
+        val rng = Random(31415926L)
+        var forgot = false
+        repeat(60) {
+            val numVars = 8 + rng.nextInt(5)
+            val numClauses = numVars * 4
+            val clauses = List(numClauses) {
+                val vars = mutableSetOf<Int>()
+                while (vars.size < 3) vars.add(rng.nextInt(numVars))
+                IntArray(3).also { arr -> vars.forEachIndexed { i, v -> arr[i] = Lit.make(v, rng.nextBoolean()) } }
+            }
+            val forget = BacktrackParams(
+                randomSeed = 2L,
+                nativeSat = true,
+                maxLearnedClauses = 4,
+                tieredLearnedDb = true,
+                lubyRestartBase = 8L,
+            )
+            val native = BacktrackSolver(cnf(numVars, clauses)).solve(forget)
+            val general = BacktrackSolver(cnf(numVars, clauses)).solve(forget.copy(nativeSat = false))
+            assertEquals(
+                general is SolveResult.Sat,
+                native is SolveResult.Sat,
+                "lanes disagree under forgetting on $it",
+            )
+            if (native is SolveResult.Sat) {
+                forgot = true
+                assertTrue(
+                    satisfies(clauses, native.assignment.bools),
+                    "native witness invalid under forgetting on $it",
+                )
+            }
+        }
+        assertTrue(forgot, "expected at least one SAT instance to exercise the witness check")
+    }
+
+    @Test
     fun `native and general lanes enumerate the same model count`() {
         // Small enough to enumerate fully; exercises the learned-clause store across many backjumps.
         val clauses = listOf(

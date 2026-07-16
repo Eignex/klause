@@ -69,37 +69,47 @@ internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: In
 
 /** Convenience overload that converts a structural [Clause] to its [ClausePropagator] before registering. */
 internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permanent: Boolean = false): Int {
-    // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches,
-    // not the general learned database; lbd/permanent policy columns land with the forgetting pass.
-    nativeEngine?.let { return it.addLearned(clause.literals) }
+    // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches
+    // and policy columns, not the general learned database.
+    nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent) }
     return addLearnedClause(clause.asPropagator() as ClausePropagator, lbd, permanent)
 }
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */
-internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int = learned.lbds[learnedIndex]
+internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int =
+    nativeEngine?.lbdOf(learnedIndex) ?: learned.lbds[learnedIndex]
 
 /** True iff learned clause [learnedIndex] must survive every forgetting pass. */
-internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean = learned.permanent[learnedIndex] == 1
+internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean =
+    nativeEngine?.permanentOf(learnedIndex) ?: (learned.permanent[learnedIndex] == 1)
 
 /** Three-tier (#201) DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
  *  reduction policy classifies it). */
 internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =
-    ClauseTier.entries[learned.tier[learnedIndex]]
+    nativeEngine?.tierOf(learnedIndex) ?: ClauseTier.entries[learned.tier[learnedIndex]]
 
 /** Set the three-tier DB tier of learned clause [learnedIndex] (promotion / demotion /
  *  initial classification by the reduction policy). */
 internal fun PropagationState.setLearnedClauseTier(learnedIndex: Int, tier: ClauseTier) {
+    nativeEngine?.let {
+        it.setTierOf(learnedIndex, tier)
+        return
+    }
     learned.tier[learnedIndex] = tier.ordinal
 }
 
 /** True iff learned clause [learnedIndex] was used (conflict or unit) since the last
  *  reduction. */
 internal fun PropagationState.learnedClauseUsedSinceReduction(learnedIndex: Int): Boolean =
-    learned.usedFlags[learnedIndex] == 1
+    nativeEngine?.usedOf(learnedIndex) ?: (learned.usedFlags[learnedIndex] == 1)
 
 /** Clear the reuse flag for learned clause [learnedIndex] — called for survivors at the
  *  end of a reduction so the next window measures fresh activity. */
 internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
+    nativeEngine?.let {
+        it.clearUsed(learnedIndex)
+        return
+    }
     learned.usedFlags[learnedIndex] = 0
 }
 
@@ -107,6 +117,10 @@ internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
  *  used since the last reduction — it just detected a conflict or forced a unit. Drives
  *  three-tier promotion (#201). */
 internal fun PropagationState.noteLearnedUse(fid: Int) {
+    nativeEngine?.let {
+        it.markUsed(fid)
+        return
+    }
     val idx = fid - problem.numFactors
     if (idx in 0 until learned.usedFlags.size) learned.usedFlags[idx] = 1
 }
@@ -126,6 +140,10 @@ internal fun PropagationState.noteLearnedUse(fid: Int) {
  * Cost is amortised across infrequent calls (typical: once per Luby restart).
  */
 internal fun PropagationState.forgetLearnedClauses(keep: (learnedIndex: Int, lbd: Int) -> Boolean) {
+    nativeEngine?.let {
+        it.forget(keep)
+        return
+    }
     val n = learned.size
     if (n == 0) return
     val remap = IntArray(n) // remap[i] = new learned index, or -1 if dropped
