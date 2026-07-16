@@ -105,6 +105,60 @@ internal class GccFlowBuilder {
         }
     }
 
+    /**
+     * Recover the flow after the saturated forward edge [e] = [tail]→[head] (a variable's assignment) is
+     * removed: cancel its one unit and reroute [tail]→[head] along an alternate residual path (excluding
+     * [e]), preserving the flow value. Returns true if rerouted — then the caller blocks [e]; false if no
+     * alternate exists (the unit cannot be re-placed locally), leaving [e]'s flow restored so the caller
+     * falls back to a full re-solve. Keeps the persistent flow maximum without the O(n) warm-start replay.
+     */
+    fun recoverEdge(e: Int, tail: Int, head: Int): Boolean {
+        capSet(e, capGet(e) + 1) // e: flow 1 → 0
+        capSet(e xor 1, capGet(e xor 1) - 1)
+        if (bfsReroute(tail, head, e)) return true
+        capSet(e, capGet(e) - 1) // restore e's unit
+        capSet(e xor 1, capGet(e xor 1) + 1)
+        return false
+    }
+
+    /** BFS a single unit of residual flow from [s] to [t] excluding edge [ex] (and its reverse); push it
+     *  if a path is found. Reuses the [parentEdge]/[bfsQueue] scratch. */
+    private fun bfsReroute(s: Int, t: Int, ex: Int): Boolean {
+        val parent = parentEdge
+        parent.fill(-1, 0, numNodes)
+        parent[s] = -2
+        val q = bfsQueue
+        var h = 0
+        var tl = 0
+        q[tl++] = s
+        var found = false
+        while (h < tl && !found) {
+            val u = q[h++]
+            val neigh = adj[u]
+            for (k in 0 until neigh.size) {
+                val e = neigh[k]
+                if (e == ex || e == (ex xor 1)) continue
+                val v = edgeTo[e]
+                if (parent[v] != -1 || capGet(e) <= 0) continue
+                parent[v] = e
+                if (v == t) {
+                    found = true
+                    break
+                }
+                q[tl++] = v
+            }
+        }
+        if (!found) return false
+        var cur = t
+        while (cur != s) {
+            val e = parent[cur]
+            capSet(e, capGet(e) - 1)
+            capSet(e xor 1, capGet(e xor 1) + 1)
+            cur = edgeTo[e xor 1]
+        }
+        return true
+    }
+
     fun augmentThroughEdge(source: Int, sink: Int, viaU: Int, viaV: Int): Boolean {
         var viaEdge = -1
         val nu = adj[viaU]

@@ -276,20 +276,26 @@ internal class GlobalCardinalityPropagator(
             superSource = cache.sSuperSource
             superSink = cache.sSuperSink
             requiredSSFlow = cache.sRequiredSSFlow
-            var brokeAssignment = false
-            scan@ for (i in 0 until n) {
+            // Incremental repair: block every newly-absent var→cover edge; a flow-free one just drops out
+            // (the flow stays maximum), a flow-carrying one (a broken assignment) is recovered in place by
+            // rerouting that variable's unit along an alternate path. Only if a reroute has no alternate do
+            // we fall back to a full re-solve. Either way no O(n) warm-start replay on the common path.
+            var needResolve = false
+            for (i in 0 until n) {
                 val d = state.intDomains[effectiveXs[i]]
                 for (k in 0 until m) {
                     val e = xToCovEdgeIdx[i * m + k]
-                    if (e >= 0 && cover[k] !in d && flow.flowOf(e) > 0) {
-                        brokeAssignment = true
-                        break@scan
+                    if (e < 0 || cover[k] in d) continue
+                    if (flow.flowOf(e) > 0) {
+                        if (flow.recoverEdge(e, 2 + i, 2 + n + k)) flow.blockEdge(e) else needResolve = true
+                    } else {
+                        flow.blockEdge(e)
                     }
                 }
             }
-            if (brokeAssignment) {
-                // Re-solve the flow on the (root-spanning) persistent structure: clear the residual, block
-                // every currently-absent edge, replay the surviving assignment, and top up to max flow.
+            if (needResolve) {
+                // A variable's unit could not be rerouted locally: clear the residual, block every absent
+                // edge, and re-solve from the surviving assignment (replay + max flow) below.
                 flow.resetFlow()
                 for (i in 0 until n) {
                     val d = state.intDomains[effectiveXs[i]]
@@ -299,15 +305,8 @@ internal class GlobalCardinalityPropagator(
                     }
                 }
             } else {
-                // Fast path: block the newly-absent flow-free edges; the persisted flow stays maximum.
+                // Fully recovered in place: the flow is still maximum and feasible.
                 needFlowSolve = false
-                for (i in 0 until n) {
-                    val d = state.intDomains[effectiveXs[i]]
-                    for (k in 0 until m) {
-                        val e = xToCovEdgeIdx[i * m + k]
-                        if (e >= 0 && cover[k] !in d && flow.flowOf(e) == 0) flow.blockEdge(e)
-                    }
-                }
             }
         } else {
             val hasOtherVar = BooleanArray(n)
