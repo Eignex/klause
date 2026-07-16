@@ -2,7 +2,6 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.result.SolveStats
 
 /**
  * DIMACS **CNF** front-end (`.cnf`) for Boolean satisfiability. Emits the SAT-competition
@@ -40,32 +39,17 @@ internal fun renderDimacsModel(numVars: Int, s: Sample): String = buildString {
     append(" 0")
 }
 
-/** DIMACS output protocol: `s SATISFIABLE`/`s UNSATISFIABLE`/`s UNKNOWN` + the buffered model on sat. */
-internal class DimacsOutput : OutputProtocol {
-    private var best: String? = null
+/** DIMACS output protocol: `s SATISFIABLE`/`s UNSATISFIABLE`/`s UNKNOWN` + the buffered model on sat.
+ *  Shares the buffered-model plumbing with the other competition front-ends via [BufferedBestOutput]. */
+internal class DimacsOutput : BufferedBestOutput() {
+    override val commentPrefix: String = "c"
 
-    override fun onSolution(rendered: String, objective: Long?) {
-        best = rendered
+    override fun statusLine(verdict: Verdict): String = when (verdict) {
+        Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "s SATISFIABLE"
+        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+        Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
-    override fun onComplete(verdict: Verdict) {
-        when (verdict) {
-            Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> {
-                println("s SATISFIABLE")
-                best?.let { println(it) }
-            }
-
-            Verdict.UNSATISFIABLE -> println("s UNSATISFIABLE")
-
-            Verdict.UNKNOWN -> println("s UNKNOWN")
-        }
-    }
-
-    override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
-        println("c solveTime=${solveTimeMs / 1000.0}")
-        println("c solutions=$solutions")
-        // Only a systematic backend populates the CDCL search counters; a pure-LS backend (empty name)
-        // has none, so the block is skipped rather than printing a wall of zeros.
-        if (stats.run.backend.isNotEmpty()) printStatPairs("c", searchStatPairs(stats))
-    }
+    // SAT competition output carries the full search-counter block.
+    override fun keepStat(key: String): Boolean = true
 }
