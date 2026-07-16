@@ -14,6 +14,10 @@ object Dimacs {
     /** Hard-clause sentinel when `top` is absent in `.wcnf`. */
     private const val HARD_WEIGHT_SENTINEL: Long = Long.MAX_VALUE
 
+    /** Whitespace token splitter, compiled once (a per-line `Regex(...)` recompiled over a large
+     *  competition instance dominated tokenization). */
+    private val WHITESPACE = Regex("\\s+")
+
     /** Parse DIMACS CNF/WCNF [text] into a [Problem]. */
     fun parse(text: String): Problem {
         var numVars = -1
@@ -36,7 +40,7 @@ object Dimacs {
                 continue
             }
             if (line.startsWith("p ") || line.startsWith("p\t")) {
-                val parts = line.split(Regex("\\s+"))
+                val parts = line.split(WHITESPACE)
                 require(parts.size >= 4 && parts[1] == "cnf") {
                     "Expected `p cnf <nvars> <nclauses>` header, got: '$rawLine'"
                 }
@@ -44,7 +48,7 @@ object Dimacs {
                 continue
             }
             if (numVars < 0) error("DIMACS body before `p cnf` header: '$rawLine'")
-            for (token in line.split(Regex("\\s+"))) {
+            for (token in line.split(WHITESPACE)) {
                 if (token.isEmpty()) continue
                 val lit = token.toIntOrNull()
                     ?: error("Unparseable DIMACS token: '$token'")
@@ -114,7 +118,7 @@ object Dimacs {
             if (line.isEmpty()) continue
             if (line.startsWith("c") || line.startsWith("%")) continue
             if (line.startsWith("p ") || line.startsWith("p\t")) {
-                val parts = line.split(Regex("\\s+"))
+                val parts = line.split(WHITESPACE)
                 require(parts.size >= 4 && parts[1] == "wcnf") {
                     "Expected `p wcnf <nvars> <nclauses> [<top>]` header, got: '$rawLine'"
                 }
@@ -123,7 +127,7 @@ object Dimacs {
                 hasOldHeader = true
                 continue
             }
-            val tokens = line.split(Regex("\\s+")).filter { it.isNotEmpty() }
+            val tokens = line.split(WHITESPACE).filter { it.isNotEmpty() }
             if (tokens.isEmpty()) continue
             val isHard: Boolean
             val weight: Long
