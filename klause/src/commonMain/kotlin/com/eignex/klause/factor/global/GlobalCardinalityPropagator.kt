@@ -287,6 +287,10 @@ internal class GlobalCardinalityPropagator(
         val superSink: Int
         val requiredSSFlow: Int
         var needFlowSolve = true // false on the fast reuse path (flow persists, unchanged)
+        // Whether the residual graph changed this fire. A rebuild always changes it; a reuse fire that
+        // blocks no edge and reroutes nothing leaves the flow byte-identical to the previous fire, so its
+        // SCC partition and prune are unchanged — the pass already reached fixpoint and can be skipped.
+        var residualChanged = true
         if (persistentEligible && cache.structBuilt && flow.frozen && cache.sN == n && cache.sM == m) {
             xToCovEdgeIdx = cache.pXToCov
             xToOtherEdgeIdx = cache.xToOther(n) // no-other case: all -1
@@ -300,6 +304,7 @@ internal class GlobalCardinalityPropagator(
             // rerouting that variable's unit along an alternate path. Only if a reroute has no alternate do
             // we fall back to a full re-solve. Either way no O(n) warm-start replay on the common path.
             var needResolve = false
+            var touchedFlow = false
 
             // Block the newly-absent var→cover edges of the changed variables (`dirty` from the int-event
             // delta), recovering a broken assignment in place. Only a variable whose domain shrank can have
@@ -310,6 +315,7 @@ internal class GlobalCardinalityPropagator(
                 for (k in 0 until m) {
                     val e = xToCovEdgeIdx[i * m + k]
                     if (e < 0 || cover[k] in d) continue
+                    touchedFlow = true
                     if (flow.flowOf(e) > 0) {
                         if (flow.recoverEdge(e, 2 + i, 2 + n + k)) flow.blockEdge(e) else needResolve = true
                     } else {
@@ -325,6 +331,7 @@ internal class GlobalCardinalityPropagator(
                     if (i >= 0) blockVar(i)
                 }
             }
+            residualChanged = touchedFlow
             if (needResolve) {
                 // A variable's unit could not be rerouted locally: clear the residual, block every absent
                 // edge, and re-solve from the surviving assignment (replay + max flow) below.
@@ -447,6 +454,12 @@ internal class GlobalCardinalityPropagator(
                     assign[i] = chosen
                 }
             }
+        }
+        if (!residualChanged) {
+            // Flow byte-identical to the previous fire: the residual SCC and every prune it implies are
+            // unchanged and were already applied, so recomputing them can only reproduce the same fixpoint.
+            if (presents.isEmpty()) for (i in intVars.indices) cache.cachedDoms[i] = state.intDomains[intVars[i]]
+            return true
         }
         val sccId = cache.sccId(baseNodes)
         flow.computeSccResidual(baseNodes, sccId)
