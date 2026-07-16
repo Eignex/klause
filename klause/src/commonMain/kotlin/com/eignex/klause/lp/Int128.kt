@@ -157,6 +157,56 @@ internal class Int128 {
     }
 
     /**
+     * The **exact** quotient `value / d` as a `Long`, or null when [overflow] latched, [d] is zero, the
+     * division is not exact (nonzero remainder), or the quotient does not fit a `Long`. Unlike
+     * [floorDivPositive] this never rounds — it is for fraction-free (Bareiss) elimination, where each
+     * step's division is guaranteed exact and the result must be carried as an exact integer; a nonzero
+     * remainder or an out-of-range quotient signals the exact solve cannot continue in 128 bits (the
+     * caller then declines, keeping soundness).
+     */
+    fun divExactByLong(d: Long): Long? {
+        if (overflow || d == 0L) return null
+        val negResult = (hi < 0L) != (d < 0L)
+        // Unsigned magnitude of the 128-bit dividend.
+        val uLo: ULong
+        val uHi: ULong
+        if (hi < 0L) {
+            uLo = 0uL - lo.toULong()
+            val borrow = if (lo != 0L) 1uL else 0uL
+            uHi = hi.toULong().inv() + (1uL - borrow)
+        } else {
+            uLo = lo.toULong()
+            uHi = hi.toULong()
+        }
+        val dd = if (d < 0L) 0uL - d.toULong() else d.toULong()
+        var qHi = 0uL
+        var qLo = 0uL
+        var rem = 0uL
+        for (bit in 127 downTo 0) {
+            // Guard the remainder shift: dd ≤ 2⁶³ (|Long|), so rem stays below 2⁶⁴ across the loop only
+            // when dd fits 63 bits; a full-64-bit |d| (Long.MIN_VALUE magnitude 2⁶³) still fits since rem < dd ≤ 2⁶³.
+            rem = rem shl 1
+            val nextBit = if (bit >= 64) (uHi shr (bit - 64)) and 1uL else (uLo shr bit) and 1uL
+            rem = rem or nextBit
+            if (rem >= dd) {
+                rem -= dd
+                if (bit >= 64) qHi = qHi or (1uL shl (bit - 64)) else qLo = qLo or (1uL shl bit)
+            }
+        }
+        if (rem != 0uL) return null // not exactly divisible
+        if (qHi != 0uL) return null // quotient exceeds 64 bits
+        return if (negResult) {
+            when {
+                qLo <= Long.MAX_VALUE.toULong() -> -(qLo.toLong())
+                qLo == Long.MAX_VALUE.toULong() + 1uL -> Long.MIN_VALUE
+                else -> null
+            }
+        } else {
+            if (qLo <= Long.MAX_VALUE.toULong()) qLo.toLong() else null
+        }
+    }
+
+    /**
      * `⌊ value / d ⌋` for a **positive** divisor [d], as a `Long`, or null when [overflow] latched or the
      * quotient does not fit a `Long`. Exact floored (toward −∞) division — used for the reduced-cost
      * fixing step count, where the quotient must be a sound (never-too-large) integer bound. The

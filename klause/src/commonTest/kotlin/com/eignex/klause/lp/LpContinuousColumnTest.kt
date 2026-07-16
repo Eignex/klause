@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class LpContinuousColumnTest {
 
     @Test
-    fun `solves a continuous LP in floats and declines exact certification`() {
+    fun `solves a continuous LP in floats and certifies feasibility via the exact basis solve`() {
         // minimize x  subject to  2x >= 3 (x >= 1.5),  x in [0, 10] real.
         val b = LpBuilder()
         val x = b.addRealVar(0.0, 10.0, cost = 1.0)
@@ -20,16 +20,15 @@ class LpContinuousColumnTest {
 
         val result = solveAndCertify(model)
 
-        // The float solve finds the real optimum; the exact integer certifier declines a real column, so
-        // the verdict is INDETERMINATE (sound), not a spurious OPTIMAL proof.
-        assertEquals(LpVerdict.INDETERMINATE, result.verdict)
+        // The float solve finds the real optimum; the exact basis reconstruction certifies the point is
+        // primal-feasible, so the verdict is OPTIMAL (a definitive SAT). No integer dual certificate is
+        // produced for a real model — the feasibility proof stands in for it.
+        assertEquals(LpVerdict.OPTIMAL, result.verdict)
         assertNull(result.certificate)
         val float = assertNotNull(result.float)
         assertEquals(1.5, float.objective, 1e-9)
         assertEquals(1.5, float.primal[x], 1e-9)
-        // The Neumaier–Shcherbina safe bound now works over the real columns: a sound lower bound on the
-        // true minimum (never above it), usable for node/leaf pruning even though the exact verdict is
-        // withheld.
+        // The Neumaier–Shcherbina safe bound is a sound lower bound on the true minimum (never above it).
         val safe = assertNotNull(result.safeLowerBound)
         assertTrue(safe <= 1.5 + 1e-9, "safe bound $safe exceeds the optimum 1.5")
     }

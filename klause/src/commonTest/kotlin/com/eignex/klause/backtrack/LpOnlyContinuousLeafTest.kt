@@ -31,13 +31,21 @@ class LpOnlyContinuousLeafTest {
     )
 
     @Test
-    fun `feasible residual real LP withholds SAT pending exact feasibility certification`() {
-        // x in [0,3], r in [0,10], row x + r <= 5 is feasible (r = 0), but feasibility of a real LP is not
-        // yet exactly certifiable (Phase 8), so the sound verdict is UNKNOWN — never a spurious UNSAT.
+    fun `feasible residual real LP is certified SAT via the exact basis solve`() {
+        // x in [0,3], r in [0,10], row x + r <= 5 is feasible (r = 0); the exact basis reconstruction
+        // certifies the continuous point, so the leaf is a genuine solution.
         val row = Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
         val p = problem(1, arrayOf(IntDomain(0, 3)), 0.0, 10.0, row)
-        val r = assertIs<SolveResult.Unknown>(BacktrackSolver(p).solve(BacktrackParams()))
-        assertEquals(TerminationReason.Unsupported, r.reason)
+        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+    }
+
+    @Test
+    fun `equality-constrained continuous vertex with a rational value is certified SAT`() {
+        // 2 r = 3 forces r = 3/2 — a non-integer vertex whose exact value has denominator det(B) = 2;
+        // the fraction-free basis solve certifies it feasible (0 <= 3/2 <= 10).
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
+        val p = problem(0, emptyArray(), 0.0, 10.0, row)
+        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
     }
 
     @Test
