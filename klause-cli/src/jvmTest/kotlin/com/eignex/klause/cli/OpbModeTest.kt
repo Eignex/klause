@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class OpbModeTest {
@@ -36,6 +37,16 @@ class OpbModeTest {
             "model must cover all vars: $out",
         )
         assertTrue(model.count { !it.startsWith("-") } >= 2, "at least two vars must be true: $out")
+    }
+
+    @Test
+    fun `the model line lists only declared variables not reified product indicators`() {
+        // `x1 x2` mints a Tseitin AND-indicator (a third bool var); it must not leak into the `v` line,
+        // which reports only the declared x1..xN.
+        val out = capture { main(arrayOf(opb("+1 x1 x2 >= 1 ;\n"))) }
+        assertTrue("s SATISFIABLE" in out, out)
+        val model = out.lines().first { it.startsWith("v ") }.removePrefix("v ").trim().split(" ")
+        assertEquals(setOf("x1", "x2"), model.map { it.removePrefix("-") }.toSet(), "only declared vars: $out")
     }
 
     @Test

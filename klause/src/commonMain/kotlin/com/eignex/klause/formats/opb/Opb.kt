@@ -23,6 +23,9 @@ data class OpbProblem(
     val objective: LinearObjective?,
     /** AND-indicator definitions for product terms — the local-search bool functional cone. */
     val boolFolds: List<DefinitionalSweep.BoolFoldSpec> = emptyList(),
+    /** Count of declared `x1..xN` variables. [Problem.numBoolVars] also counts the Tseitin/soft
+     *  indicators appended above them, so a model listing must use this to omit the aux variables. */
+    val numDeclaredVars: Int = 0,
 )
 
 /**
@@ -85,6 +88,8 @@ object Opb {
         val builder = Builder()
         // Declared variables occupy ids 0..maxIndex-1; seed the counter so indicators land above them.
         for (t in tokens) varIndexOrNull(t)?.let { if (it > builder.numVars) builder.numVars = it }
+        // Captured before any indicator is minted, so it counts only the declared `x1..xN`.
+        val numDeclaredVars = builder.numVars
 
         val objWeights = MutableIntDoubleMap()
         var objConstant = 0.0
@@ -162,7 +167,7 @@ object Opb {
             intDomains = emptyArray(),
             factors = builder.factors.toTypedArray(),
         )
-        return OpbProblem(problem, objective, builder.boolFolds)
+        return OpbProblem(problem, objective, builder.boolFolds, numDeclaredVars)
     }
 
     /** Fold `weight·lit` into the objective, rewriting a negated literal `c·(~x)` as `c·(1 − x)`. */
