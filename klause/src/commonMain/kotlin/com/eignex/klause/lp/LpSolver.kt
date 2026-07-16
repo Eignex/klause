@@ -48,9 +48,29 @@ internal interface TableauCutSolver : LpSolver {
 }
 
 /**
- * Construct the LP engine for the general solve/certify path. The single swap point for an alternative
- * engine (a dense simplex for dense MPS, or a first-order primal–dual GPU solver): callers depend only
- * on [LpSolver], never on the concrete engine.
+ * Construct the LP engine for the general solve/certify path — the swap point for an alternative engine
+ * (or, later, a first-order primal–dual GPU solver); callers depend only on [LpSolver].
+ *
+ * A **dense** model whose constraint matrix has filled in picks the [DenseSimplex] (koblas dense LU),
+ * where the sparse [RevisedSimplex]'s `O(nnz)` bookkeeping buys nothing; everything else stays on the
+ * sparse engine. The gate is currently limited to LP-only-continuous (real) models — the integer path is
+ * byte-identity-sensitive, so extending the dense engine there needs a node/propagation A/B first.
  */
 internal fun newLpSolver(model: LpModel, cancellation: Cancellation = Cancellation.Never): LpSolver =
-    RevisedSimplex(model, cancellation)
+    if (model.hasContinuous && isDense(model)) {
+        DenseSimplex(model, cancellation)
+    } else {
+        RevisedSimplex(model, cancellation)
+    }
+
+/** The constraint matrix has filled in enough that the dense engine is worthwhile: a non-trivial matrix
+ *  whose structural nonzero density is at least [DENSE_FILL_THRESHOLD]. */
+private fun isDense(model: LpModel): Boolean {
+    val n = model.n
+    val m = model.m
+    if (n == 0 || m == 0) return false
+    val nnz = (model.doubleView?.colVal?.size ?: model.csc.colVal.size).toLong()
+    return nnz.toDouble() >= DENSE_FILL_THRESHOLD * m.toLong() * n.toLong()
+}
+
+private const val DENSE_FILL_THRESHOLD = 0.5
