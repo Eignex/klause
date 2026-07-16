@@ -293,12 +293,13 @@ data class BacktrackParams(
      */
     val cutExchange: CutExchange? = null,
     /**
-     * Route an eligible pure-Boolean problem (no integer variables, all clause factors) through the
-     * native-SAT BCP lane (#1119 Phase 1): arena-packed two-watched-literal propagation with no atom
-     * store or factor-queue overhead. Ignored when the problem has integer variables or non-clause
-     * factors. Off by default; the front-end auto-dispatch selects it once the lane is the default.
+     * Whether to route an eligible pure-Boolean problem (no integer variables, all clause factors)
+     * through the native-SAT BCP lane (#1119 Phase 1): arena-packed two-watched-literal propagation with
+     * no atom store or factor-queue overhead. `null` (default) auto-dispatches — the lane is selected
+     * exactly when the baked problem is [com.eignex.klause.solver.Problem.isNativeSatEligible]. `true`
+     * requests it (still a no-op on an ineligible problem); `false` forces the general LCG path.
      */
-    val nativeSat: Boolean = false,
+    val nativeSat: Boolean? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

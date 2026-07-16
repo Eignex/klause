@@ -42,6 +42,18 @@ class NativeSatEngineTest {
     }
 
     @Test
+    fun `default params auto-dispatch an eligible problem and solve it correctly`() {
+        // nativeSat defaults to null (auto): an eligible pure-CNF problem must solve correctly with no
+        // explicit lane selection — the front-end dispatch that routes DIMACS / SAT-pure XCSP3 in.
+        val clauses = listOf(
+            intArrayOf(Lit.make(0, true), Lit.make(1, false)),
+            intArrayOf(Lit.make(0, false), Lit.make(2, true)),
+        )
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(cnf(3, clauses)).solve(BacktrackParams(randomSeed = 0L)))
+        assertTrue(satisfies(clauses, sat.assignment.bools), "auto-dispatched witness must satisfy")
+    }
+
+    @Test
     fun `native lane proves UNSAT on a contradiction`() {
         val clauses = listOf(
             intArrayOf(Lit.make(0, true)),
