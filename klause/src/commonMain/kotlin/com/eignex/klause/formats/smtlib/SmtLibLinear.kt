@@ -48,7 +48,7 @@ internal fun requireBinaryRelation(node: SExpr.SList, op: String) {
 
 /** Lower `(op lhs rhs)` to one linear relation. */
 internal fun SmtLibQfLia.Builder.relationToLinear(t: SExpr.SList): Rel {
-    val op = (t.items[0] as SExpr.Atom).text
+    val op = t.atomAt(0, "relation operator")
     requireBinaryRelation(t, op)
     return relFromOperands(op, linearTerm(t.items[1]), linearTerm(t.items[2]))
 }

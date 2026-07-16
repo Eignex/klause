@@ -30,19 +30,24 @@ class SExprReader(private val src: String) {
         return out
     }
 
+    // Structural parse failures surface through the catchable FormatException supertype (shared by
+    // every klause front-end), not a raw IllegalArgumentException. Funnelled through one helper so the
+    // sites stay `if (cond) parseError(...)` guards rather than inline `throw` clutter.
+    private fun parseError(msg: String): Nothing = throw UnsupportedSmtException(msg)
+
     private fun readExpr(): SExpr {
         skipWs()
-        require(pos < src.length) { "unexpected end of input" }
+        if (pos >= src.length) parseError("unexpected end of input")
         // A `)` where an expression is expected is unbalanced: [readToken] would return an empty
         // token without advancing, spinning [readAll] forever, so reject it here.
-        require(src[pos] != ')') { "unexpected ')'" }
+        if (src[pos] == ')') parseError("unexpected ')'")
         if (src[pos] != '(') return SExpr.Atom(readToken())
         // Iterative nesting via an explicit stack: SMT-LIB formulas nest thousands of lists deep,
         // which overflows a recursive-descent reader.
         val stack = ArrayDeque<ArrayList<SExpr>>()
         while (true) {
             skipWs()
-            require(pos < src.length) { "unterminated list" }
+            if (pos >= src.length) parseError("unterminated list")
             when (src[pos]) {
                 '(' -> {
                     pos++
@@ -68,7 +73,7 @@ class SExprReader(private val src: String) {
             '|' -> {
                 pos++
                 while (pos < src.length && src[pos] != '|') pos++
-                require(pos < src.length) { "unterminated |quoted symbol|" }
+                if (pos >= src.length) parseError("unterminated |quoted symbol|")
                 pos++
             }
 
@@ -82,7 +87,7 @@ class SExprReader(private val src: String) {
                         pos++
                     }
                 }
-                require(pos < src.length) { "unterminated string literal" }
+                if (pos >= src.length) parseError("unterminated string literal")
                 pos++
             }
 

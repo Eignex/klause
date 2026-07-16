@@ -98,12 +98,12 @@ object SmtLibQfLia {
         /** Compile one `let`'s bindings (in parallel — their values don't see each other) and push them
          *  as a new scope. */
         internal fun pushLetScope(bindingList: SExpr) {
-            require(bindingList is SExpr.SList) { "malformed let bindings" }
+            val list = bindingList as? SExpr.SList ?: throw UnsupportedSmtException("malformed let bindings")
             pushScopeBindings(
-                bindingList.items.map { pair ->
+                list.items.map { pair ->
                     val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
-                    val name = (p.items[0] as SExpr.Atom).text
-                    val expr = p.items[1]
+                    val name = p.atomAt(0, "let binding name")
+                    val expr = p.argAt(1, "let binding value")
                     val b = Binding(isBool = isBoolExpr(expr))
                     if (b.isBool) b.lit = compileBool(expr) else b.lin = linearTerm(expr)
                     name to b
@@ -149,11 +149,11 @@ object SmtLibQfLia {
 
         /** The [i]-th item of this command as an atom's text, or a clean [UnsupportedSmtException]
          *  naming [what] when the argument is absent or not an atom (instead of a raw cast/index crash). */
-        private fun SExpr.SList.atomAt(i: Int, what: String): String =
+        internal fun SExpr.SList.atomAt(i: Int, what: String): String =
             (items.getOrNull(i) as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("malformed $what")
 
         /** The [i]-th item of this command, or a clean [UnsupportedSmtException] naming [what] when absent. */
-        private fun SExpr.SList.argAt(i: Int, what: String): SExpr =
+        internal fun SExpr.SList.argAt(i: Int, what: String): SExpr =
             items.getOrNull(i) ?: throw UnsupportedSmtException("malformed $what")
 
         fun command(e: SExpr) {

@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.formats.FormatException
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.solver.SolveResult
@@ -413,7 +414,7 @@ class SmtLibQfLiaTest {
     fun `a stray closing paren is a parse error rather than an infinite loop`() {
         // A top-level unbalanced ')' must be rejected; previously the reader returned an empty token
         // without advancing and spun forever.
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<FormatException> {
             SmtLibQfLia.parse("(declare-const x Int)\n(assert (>= x 0))\n(check-sat))")
         }
     }
@@ -431,5 +432,34 @@ class SmtLibQfLiaTest {
     fun `constant multiplication overflow is rejected`() {
         val text = "(declare-const x Int) (assert (= x (* 3037000500 3037000500))) (check-sat)"
         assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+    }
+
+    @Test
+    fun `structural s-expression errors surface as a format exception`() {
+        // An unbalanced or unterminated token is a structural parse failure; it must surface through
+        // the catchable FormatException supertype, not a raw IllegalArgumentException from require{}.
+        val malformed = listOf(
+            "(declare-const x Int) (assert (>= x 0",
+            ")",
+            "(declare-const |x",
+            "(assert \"unterminated",
+        )
+        for (text in malformed) {
+            assertFailsWith<FormatException>(text) { SmtLibQfLia.parse(text) }
+        }
+    }
+
+    @Test
+    fun `malformed let bindings surface as a format exception`() {
+        // A missing binding name/value or a non-list binding block must surface through the catchable
+        // FormatException, not a ClassCastException / IndexOutOfBounds from an unchecked head access.
+        val malformed = listOf(
+            "(declare-const x Int) (assert (let (()) (>= x 0)))",
+            "(declare-const x Int) (assert (let x (>= x 0)))",
+            "(declare-const x Int) (assert (>= (let (()) 5) 0))",
+        )
+        for (text in malformed) {
+            assertFailsWith<FormatException>(text) { SmtLibQfLia.parse(text) }
+        }
     }
 }
