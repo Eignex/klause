@@ -37,7 +37,11 @@ data class PresenceSpec(val valueName: String) : VarSpec
 data class NominalSpec(
     /** The mutually-exclusive category labels this variable can take. */
     val labels: List<String>,
-) : VarSpec
+) : VarSpec {
+    init {
+        require(labels.isNotEmpty()) { "NominalSpec needs at least one label" }
+    }
+}
 
 /** An integer variable ranging over the inclusive interval `[min, max]`. */
 @Serializable
@@ -47,7 +51,11 @@ data class IntSpec(
     val min: Int,
     /** Inclusive upper bound of the domain. */
     val max: Int,
-) : VarSpec
+) : VarSpec {
+    init {
+        require(min <= max) { "IntSpec needs min <= max, got [$min, $max]" }
+    }
+}
 
 /**
  * Float variable bucketed to [buckets] uniformly-spaced values across `[min, max]`. The
