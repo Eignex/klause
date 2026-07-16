@@ -296,6 +296,10 @@ object Xcsp3 {
 
                 node is FExpr.Num -> constVar(node.value.toLong())
 
+                node is FExpr.Call && node.fn == "eq" && node.args.size > 2 ->
+                    // n-ary eq as a sum term: reify the all-equal conjunction to a 0/1 int.
+                    litTo01(reifyRel(node))
+
                 node is FExpr.Call && node.fn in REL -> {
                     val r = relationParts(node)
                     if (r.vars.isEmpty()) {
@@ -413,12 +417,16 @@ object Xcsp3 {
                         return
                     }
             }
-            if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
-                val r = relationParts(node)
-                when {
-                    r.vars.isNotEmpty() -> factors.add(Linear(r.coeffs, r.vars, r.op, r.bound))
-                    !constRelationHolds(r.op, r.bound) -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
+            // n-ary eq (x = y = z = …) is the conjunction of its consecutive pairwise equalities, posted
+            // directly as top-level factors (cf. allEqual) rather than reified onto an aux literal.
+            if (node is FExpr.Call && node.fn == "eq" && node.args.size > 2) {
+                for (i in 0 until node.args.size - 1) {
+                    postRel(relationParts(node.args[i], node.args[i + 1], LinearOp.EQ, 0))
                 }
+                return
+            }
+            if (node is FExpr.Call && node.fn in REL && node.args.size == 2) {
+                postRel(relationParts(node))
             } else {
                 // A Boolean combination that is a plain disjunction/implication of single-variable
                 // comparisons is the constraint itself (a [ComparisonClause]) — lowering it directly
@@ -426,6 +434,15 @@ object Xcsp3 {
                 // general Tseitin path.
                 val cc = tryComparisonClause(node)
                 if (cc != null) factors.add(cc) else factors.add(Clause(intArrayOf(compileBool(node))))
+            }
+        }
+
+        /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
+         *  contradiction clause when the constant relation `0 op bound` is false (a true one is dropped). */
+        private fun postRel(r: RelParts) {
+            when {
+                r.vars.isNotEmpty() -> factors.add(Linear(r.coeffs, r.vars, r.op, r.bound))
+                !constRelationHolds(r.op, r.bound) -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
             }
         }
 
@@ -562,6 +579,15 @@ object Xcsp3 {
         override var trueLitCache = -1
 
         internal fun reifyRel(node: FExpr.Call): Int {
+            // n-ary eq reifies to the conjunction of its consecutive pairwise equalities.
+            if (node.fn == "eq" && node.args.size > 2) {
+                return tseitinAnd(
+                    (0 until node.args.size - 1).map {
+                        val r = relationParts(node.args[it], node.args[it + 1], LinearOp.EQ, 0)
+                        reifyLinear(r.coeffs, r.vars, r.op, r.bound)
+                    },
+                )
+            }
             val r = relationParts(node)
             return reifyLinear(r.coeffs, r.vars, r.op, r.bound)
         }
@@ -583,7 +609,15 @@ object Xcsp3 {
          *  variable terms they cancel to an empty var list, leaving the constant relation `0 op bound`. */
         internal fun relationParts(node: FExpr.Call): RelParts {
             val (op, delta) = relOp(node.fn) ?: throw UnsupportedXcsp3Exception("relation '${node.fn}'")
-            val (vars, coeffs, bound) = linCombDiff(linear(node.args[0]), linear(node.args[1]), delta.toLong())
+            // Only eq is n-ary in XCSP3, and its callers fold it pairwise before reaching here.
+            require(node.args.size == 2) { "relation '${node.fn}' expects 2 operands, got ${node.args.size}" }
+            return relationParts(node.args[0], node.args[1], op, delta)
+        }
+
+        /** Lower `lhs op rhs` (with strictness [delta]) to coalesced linear components. When both sides
+         *  share the same variable terms they cancel to an empty var list, leaving the constant `0 op bound`. */
+        internal fun relationParts(lhs: FExpr, rhs: FExpr, op: LinearOp, delta: Int): RelParts {
+            val (vars, coeffs, bound) = linCombDiff(linear(lhs), linear(rhs), delta.toLong())
             // XCSP3 coefficients/bounds originate from Int-valued FExpr numerals, so they fit Int.
             return RelParts(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound.toInt())
         }

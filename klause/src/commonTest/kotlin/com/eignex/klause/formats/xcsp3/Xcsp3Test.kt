@@ -406,6 +406,36 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `n-ary eq constrains every operand to be equal`() {
+        // eq(x,y,z) is all-equal (x = y = z), not just the first pair: pinning x forces y and z.
+        val v = sat(
+            """
+            <instance type="CSP"><variables>
+              <var id="x"> 0..9 </var><var id="y"> 0..9 </var><var id="z"> 0..9 </var>
+            </variables><constraints>
+              <intension> eq(x,y,z) </intension><intension> eq(x,4) </intension>
+            </constraints></instance>
+            """.trimIndent(),
+        )
+        assertEquals(listOf(4, 4, 4), v.take(3))
+
+        // An inequality on the tail operand makes the all-equal chain UNSAT — proving z is constrained,
+        // which the old first-pair-only truncation (x = y, z free) would have missed.
+        val bad =
+            """
+            <instance type="CSP"><variables>
+              <var id="x"> 0..9 </var><var id="y"> 0..9 </var><var id="z"> 0..9 </var>
+            </variables><constraints>
+              <intension> eq(x,y,z) </intension><intension> ne(z,x) </intension>
+            </constraints></instance>
+            """.trimIndent()
+        assertTrue(
+            BacktrackSolver(Xcsp3.parse(bad).problem).solve(BacktrackParams()) is SolveResult.Unsat,
+            "eq(x,y,z) with ne(z,x) must be UNSAT",
+        )
+    }
+
+    @Test
     fun `a boolean subexpression used arithmetically counts as 0 or 1`() {
         val v = sat(
             """
