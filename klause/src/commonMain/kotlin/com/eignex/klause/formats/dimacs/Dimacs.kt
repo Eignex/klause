@@ -44,7 +44,8 @@ object Dimacs {
                 require(parts.size >= 4 && parts[1] == "cnf") {
                     "Expected `p cnf <nvars> <nclauses>` header, got: '$rawLine'"
                 }
-                numVars = parts[2].toInt()
+                numVars = parts[2].toIntOrNull()
+                    ?: error("DIMACS `p cnf` variable count is not a 32-bit integer: '${parts[2]}'")
                 continue
             }
             if (numVars < 0) error("DIMACS body before `p cnf` header: '$rawLine'")
@@ -122,8 +123,11 @@ object Dimacs {
                 require(parts.size >= 4 && parts[1] == "wcnf") {
                     "Expected `p wcnf <nvars> <nclauses> [<top>]` header, got: '$rawLine'"
                 }
-                numVars = parts[2].toInt()
-                if (parts.size >= 5) top = parts[4].toLong()
+                numVars = parts[2].toIntOrNull()
+                    ?: error("DIMACS `p wcnf` variable count is not a 32-bit integer: '${parts[2]}'")
+                if (parts.size >= 5) {
+                    top = parts[4].toLongOrNull() ?: error("DIMACS `p wcnf` top is not a 64-bit integer: '${parts[4]}'")
+                }
                 hasOldHeader = true
                 continue
             }

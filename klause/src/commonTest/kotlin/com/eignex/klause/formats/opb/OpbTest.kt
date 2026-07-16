@@ -37,6 +37,15 @@ class OpbTest {
     }
 
     @Test
+    fun `accepts a terminator glued to the preceding token`() {
+        // The `;` need not be whitespace-separated; `1;` is a well-formed end of statement.
+        val out = Opb.parse("+1 x1 +1 x2 >= 1;")
+        val pb = out.problem.factors[0] as PseudoBoolean
+        assertEquals(PbOp.GE, pb.op)
+        assertEquals(1L, pb.bound)
+    }
+
+    @Test
     fun `parses negated literals`() {
         val text = """
             +1 ~x1 +2 x2 <= 1 ;

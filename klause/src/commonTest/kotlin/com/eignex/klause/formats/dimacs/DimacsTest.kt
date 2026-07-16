@@ -60,6 +60,14 @@ class DimacsTest {
     }
 
     @Test
+    fun `rejects a non-integer cnf variable count with a header diagnostic`() {
+        // An over-Int count must surface a message naming the header field, not a bare
+        // NumberFormatException from toInt().
+        val e = assertFailsWith<IllegalStateException> { Dimacs.parse("p cnf 5000000000 1\n1 0\n") }
+        assertTrue("variable count" in e.message.orEmpty(), e.message.orEmpty())
+    }
+
+    @Test
     fun `ignores trailing percent block`() {
         val text = """
             p cnf 2 1
