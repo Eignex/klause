@@ -53,6 +53,12 @@ internal class MddIncrementalState(
     private val bwdSrc = idx.bwdSrc
     private val bwdSym = idx.bwdSym
 
+    // The diagram's alphabet [minSym, maxSym]; survivor bitsets and the shared root snapshot are keyed by
+    // `sym - minSym`. `symSpan <= 0` marks an edgeless diagram (no sharing).
+    private val minSym = idx.minSym
+    private val symSpan = idx.maxSym - idx.minSym + 1
+    private val symWords = if (symSpan > 0) ((symSpan + 63) ushr 6).toInt() else 0
+
     private fun testBit(rev: RevLongArray, layer: Int, s: Int): Boolean =
         (rev[layer * w + (s ushr 6)] and (1L shl (s and 63))) != 0L
 
@@ -138,7 +144,8 @@ internal class MddIncrementalState(
      * position `i` alive: a symbol survives iff some incoming edge on it joins a forward-reachable source
      * to a backward-co-reachable destination — precisely the edges this scan already keeps. The [rebuild]
      * then excludes the non-survivors from a cheap per-position loop, so the diagram is never scanned a
-     * third time for a separate prune pass. [survives] is indexed by `sym - d.min` and must be pre-zeroed.
+     * third time for a separate prune pass. [survives] is indexed by `sym - minSym` (the alphabet offset,
+     * so the same bitset can seed the shared root snapshot) and must be pre-zeroed.
      */
     private fun recomputeBackwardCollecting(state: PropagationState, i: Int, scratch: LongArray, survives: LongArray) {
         scratch.fill(0L)
@@ -155,13 +162,37 @@ internal class MddIncrementalState(
                 val sym = syms[k]
                 if (sym in d.min..d.max && src in 0 until numI && testBit(fwd, i, src)) {
                     scratch[src ushr 6] = scratch[src ushr 6] or (1L shl (src and 63))
-                    val off = (sym - d.min).toInt()
+                    val off = (sym - minSym).toInt()
                     survives[off ushr 6] = survives[off ushr 6] or (1L shl (off and 63))
                 }
                 k++
             }
         }
         writeLayer(bwd, i, scratch)
+    }
+
+    /** Whether every position still admits the whole alphabet, so the reachability is purely structural
+     *  and can be shared through the root snapshot. */
+    private fun domainsCoverAlphabet(state: PropagationState): Boolean {
+        if (symSpan <= 0) return false
+        for (i in 0 until n) {
+            val d = state.intDomains[seq[i]]
+            if (d.min > minSym || d.max < minSym + symSpan - 1) return false
+        }
+        return true
+    }
+
+    /** Exclude, at position [i], every live domain value that no surviving edge keeps (its alphabet bit is
+     *  clear, or it lies outside the alphabet entirely). Shared by the compute and snapshot-reuse paths. */
+    private fun excludeNonSurvivors(state: PropagationState, i: Int, survives: LongArray, ant: IntArray?): Boolean {
+        val d = state.intDomains[seq[i]]
+        for (s in d.min..d.max) {
+            val off = s - minSym
+            val alive = off in 0 until symSpan &&
+                ((survives[(off ushr 6).toInt()] ushr (off and 63L).toInt()) and 1L) != 0L
+            if (!alive && !state.excludeIntValue(seq[i], s, ant)) return false
+        }
+        return true
     }
 
     /** bwd[n] = accepting ∩ fwd[n]. */
@@ -274,6 +305,17 @@ internal class MddIncrementalState(
     }
 
     private fun rebuild(state: PropagationState, ant: IntArray?): Boolean {
+        // When every position still admits the whole alphabet the reachability is purely structural, so a
+        // `<group>` of identical diagrams computes it once and the rest reuse it — the dominant cost on a
+        // large shared diagram is this per-factor sweep, and at the root every factor would repeat it.
+        if (domainsCoverAlphabet(state)) {
+            idx.rootSnapshot?.let { return applyRootSnapshot(state, it, ant) }
+            return computeReachability(state, ant, snapshot = true)
+        }
+        return computeReachability(state, ant, snapshot = false)
+    }
+
+    private fun computeReachability(state: PropagationState, ant: IntArray?, snapshot: Boolean): Boolean {
         val scratch = LongArray(w)
         for (k in 0 until (n + 1) * w) {
             fwd[k] = 0L
@@ -291,23 +333,30 @@ internal class MddIncrementalState(
         // the same accepting-to-root scan, so the diagram needs no separate full prune pass. Survivors are
         // collected per layer and the (scan-free) exclusions applied afterwards, so every backward pass
         // still reads the pre-prune domains — identical to a backward-then-prune ordering.
-        val survivors = Array(n) { i ->
-            val d = state.intDomains[seq[i]]
-            val words = (((d.max - d.min + 1) + 63) ushr 6).toInt().coerceAtLeast(1)
-            LongArray(words)
-        }
+        val survivors = Array(n) { LongArray(symWords.coerceAtLeast(1)) }
         for (i in n - 1 downTo 0) recomputeBackwardCollecting(state, i, scratch, survivors[i])
         valid.set(1)
-        for (i in 0 until n) {
-            val d = state.intDomains[seq[i]]
-            val surv = survivors[i]
-            for (s in d.min..d.max) {
-                val off = (s - d.min).toInt()
-                if (((surv[off ushr 6] ushr (off and 63)) and 1L) == 0L) {
-                    if (!state.excludeIntValue(seq[i], s, ant)) return false
-                }
-            }
+        // Under full domains the survivors are structural; publish them (and the reachability) once for the
+        // group's remaining factors to reuse.
+        if (snapshot) {
+            idx.rootSnapshot = MddRootSnapshot(
+                LongArray((n + 1) * w) { fwd[it] },
+                LongArray((n + 1) * w) { bwd[it] },
+                survivors,
+            )
         }
+        for (i in 0 until n) if (!excludeNonSurvivors(state, i, survivors[i], ant)) return false
+        if (cost >= 0 && !tightenCost(state, ant)) return false
+        return true
+    }
+
+    private fun applyRootSnapshot(state: PropagationState, snap: MddRootSnapshot, ant: IntArray?): Boolean {
+        for (k in 0 until (n + 1) * w) {
+            fwd[k] = snap.fwd[k]
+            bwd[k] = snap.bwd[k]
+        }
+        valid.set(1)
+        for (i in 0 until n) if (!excludeNonSurvivors(state, i, snap.survivors[i], ant)) return false
         if (cost >= 0 && !tightenCost(state, ant)) return false
         return true
     }
