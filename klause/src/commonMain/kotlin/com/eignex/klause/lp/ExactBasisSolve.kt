@@ -1,5 +1,80 @@
 package com.eignex.klause.lp
 
+import kotlin.math.abs
+import kotlin.math.floor
+import kotlin.math.roundToLong
+
+/**
+ * Exact feasibility of the float primal **point** itself (issue #1232): when every structural value the
+ * float solve reported snaps to an exact dyadic rational `p_j / 2ᴷ`, verify that point satisfies every
+ * row (`Σ aᵢⱼ zⱼ = rhs` for an equality slack, `≤ rhs` for an inequality one) and the box `0 ≤ zⱼ ≤ uⱼ`
+ * exactly, in 128-bit integer arithmetic over the scaled-integer rationalization. Returns true only on a
+ * proven-feasible point; false when the snapped point is not exactly representable or violates a
+ * constraint (the caller then falls back / declines). This is robust where [exactBasisFeasible]'s basis
+ * reconstruction is finicky — e.g. a degenerate inequality-plus-equality vertex — since it checks the
+ * point, not the basis.
+ */
+internal fun exactPointFeasible(model: LpModel, primal: DoubleArray): Boolean {
+    val integral = rationalizeToIntegerModel(model) ?: return false
+    val n = integral.n
+    val m = integral.m
+    // Shifted values zⱼ = primalⱼ − loShiftⱼ, snapped to a common dyadic denominator 2ᴷ (exact only).
+    val z = DoubleArray(n) { primal[it] - model.loShiftD(it) }
+    val k = dyadicScaleBits(z) ?: return false
+    val d = (1L shl k).toDouble()
+    val p = LongArray(n) { (z[it] * d).roundToLong() }
+    // Box: 0 ≤ pⱼ ≤ uⱼ·2ᴷ.
+    for (j in 0 until n) {
+        if (p[j] < 0L) return false
+        if (integral.hasUpper[j]) {
+            val cap = Int128()
+            cap.addProduct(integral.upper[j], 1L shl k)
+            val pj = Int128()
+            pj.addLong(p[j])
+            pj.subtract(cap)
+            // pⱼ > uⱼ·2ᴷ (strictly positive difference) ⇒ out of the box.
+            if (pj.overflow || (pj.isNonNegative() && !(pj.hi == 0L && pj.lo == 0L))) return false
+        }
+    }
+    // Per-row L = Σⱼ aᵢⱼ·pⱼ; compare to rhsᵢ·2ᴷ under the row's relation (equality slack ⇒ ==, else ≤).
+    val lhs = Array(m) { Int128() }
+    for (j in 0 until n) integral.forEachInColumn(j) { i, a -> lhs[i].addProduct(a, p[j]) }
+    for (i in 0 until m) {
+        val r = Int128()
+        r.addProduct(integral.rhs[i], 1L shl k)
+        val diff = lhs[i].copy()
+        diff.subtract(r) // L − rhs·2ᴷ
+        if (diff.overflow) return false
+        val isEquality = integral.hasUpper[integral.slackCol(i)]
+        val sign = when {
+            diff.hi < 0L -> -1
+            diff.hi == 0L && diff.lo == 0L -> 0
+            else -> 1
+        }
+        if (sign > 0) return false // L > rhs violates both `≤` and `==`
+        if (isEquality && sign < 0) return false // L < rhs violates `==`
+    }
+    return true
+}
+
+/** Smallest `k ≤ MAX_SCALE_BITS` making every value in [z] an exact integer multiple of `2⁻ᵏ`, or null. */
+private fun dyadicScaleBits(z: DoubleArray): Int? {
+    for (k in 0..DYADIC_MAX_BITS) {
+        val s = (1L shl k).toDouble()
+        if (z.all {
+                val v = it * s
+                v.isFinite() && v == floor(v) && abs(v) < DYADIC_MAX_INT
+            }
+        ) {
+            return k
+        }
+    }
+    return null
+}
+
+private const val DYADIC_MAX_BITS = 40
+private const val DYADIC_MAX_INT = 9.007199254740992E15
+
 /**
  * Exact primal-feasibility check of a reported LP [Basis] over an integer-coefficient [LpModel], in
  * bounded 128-bit arithmetic — the feasibility twin of [integerFarkasRay] (issue #1232, Phase 8). The

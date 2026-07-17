@@ -95,7 +95,11 @@ internal fun solveAndCertify(
     val certificate = integerCertify(model, result.duals)
     val verdict = when {
         certificate != null -> LpVerdict.OPTIMAL
-        model.hasContinuous && exactBasisFeasible(model, result.basis) == true -> LpVerdict.OPTIMAL
+
+        model.hasContinuous &&
+            (exactBasisFeasible(model, result.basis) == true || exactPointFeasible(model, result.primal)) ->
+            LpVerdict.OPTIMAL
+
         else -> LpVerdict.INDETERMINATE
     }
     return CertifiedLpResult(

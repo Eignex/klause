@@ -29,7 +29,10 @@ class OznApplier(oznSource: String) {
             out[name] = OznValue.IntV(sample.ints[id])
         }
         for ((name, b) in program.floatVarsByName) {
-            out[name] = OznValue.FloatV(b.valueOf(sample.ints[b.varId].toInt()))
+            // An LP-only continuous float carries its value on the sample's reals; a bucketed one via its
+            // bucket index (issue #1232).
+            val value = if (b.lpOnly) sample.reals[b.varId] else b.valueOf(sample.ints[b.varId].toInt())
+            out[name] = OznValue.FloatV(value)
         }
         for ((name, layout) in program.setVarsByName) {
             out[name] = setBindingFrom(layout, sample)

@@ -64,6 +64,17 @@ class LpContinuousColumnTest {
     }
 
     @Test
+    fun `certifies a degenerate inequality-plus-equality feasible vertex via the exact point check`() {
+        // x <= 0.5 and x == 0.5 meet at the degenerate vertex x = 0.5; the basis reconstruction is
+        // finicky there, but the exact dyadic-point check certifies the reported point directly.
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 1.0, cost = 0.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.LE, 0.5)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
+        assertEquals(LpVerdict.OPTIMAL, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
+    }
+
+    @Test
     fun `minimizes a real objective coefficient over a continuous column`() {
         // minimize 1.5 x  subject to  x >= 2,  x in [0, 10] real  ->  x = 2, objective = 3.0.
         val b = LpBuilder()

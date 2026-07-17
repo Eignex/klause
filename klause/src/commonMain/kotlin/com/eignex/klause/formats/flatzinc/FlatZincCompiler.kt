@@ -16,6 +16,11 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.toSortedIntArray
 
+/** Float-constraint names that are non-strict, linear-in-reals and non-reified — the only ones an
+ *  all-LP-only-float lowering emits (as real [com.eignex.klause.factor.arithmetic.Linear] rows). Any other
+ *  float constraint (products, abs, element, min/max, strict `<`, `ne`, reified) forces bucketing. */
+private val FLOAT_LP_ONLY_NAMES = setOf("float_lin_le", "float_lin_eq", "int2float", "float_eq", "float_le")
+
 /** Compile parsed FlatZinc AST into solver data structures. */
 internal class FlatZincCompiler(
     internal val model: FznModel,
@@ -38,11 +43,19 @@ internal class FlatZincCompiler(
     internal val factors = ArrayList<Factor>()
     internal var numBoolVars: Int = 0
 
+    // LP-only continuous columns (issue #1232): when [floatsLpOnly] holds (set by a prepass in [compile]),
+    // scalar float vars are lowered as real variables here rather than bucket-index ints, and the linear
+    // float handlers emit real [Linear] rows the simplex resolves. Parallel real bounds by real var id.
+    internal var floatsLpOnly: Boolean = false
+    internal val realLo = ArrayList<Double>()
+    internal val realHi = ArrayList<Double>()
+
     internal val enumLabelsByVar = HashMap<String, List<String>>()
 
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     fun compile(): FlatZincProgram {
+        floatsLpOnly = floatsAreLpOnly()
         for (decl in model.varDecls) processDecl(decl)
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
@@ -81,6 +94,9 @@ internal class FlatZincCompiler(
             cancellation = cancellation,
             impliedFactorMask = impliedFactorMask,
             hasSymmetryBreaking = hasSymmetryBreaking,
+            numRealVars = realLo.size,
+            realLower = realLo.toDoubleArray(),
+            realUpper = realHi.toDoubleArray(),
         )
         return FlatZincProgram(
             problem = problem,
@@ -373,11 +389,51 @@ internal class FlatZincCompiler(
     }
 
     internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
+        if (floatsLpOnly) {
+            // LP-only continuous column: a real variable, absent from CP search (issue #1232). The linear
+            // float handlers emit real rows over it; the returned id is a real var id (not an int var).
+            val rid = realLo.size
+            realLo.add(lo)
+            realHi.add(hi)
+            floatVars[name] = FloatBucketing(rid, lo, hi, floatBuckets, lpOnly = true)
+            return rid
+        }
         val id = intDomains.size
         intDomains.add(IntDomain(0L, (floatBuckets - 1).toLong()))
         intVars[name] = id
         floatVars[name] = FloatBucketing(id, lo, hi, floatBuckets)
         return id
+    }
+
+    /** Whether every float in the model can be an LP-only continuous variable: no var float array (those
+     *  need an integer-var-id array), and every float-touching constraint is non-strict linear-in-reals
+     *  and non-reified (so the whole float part lowers to real linear rows). Otherwise all floats keep
+     *  bucketing — the whole-problem gate that avoids mixing the two representations in one problem. */
+    private fun floatsAreLpOnly(): Boolean {
+        val hasFloatArray = model.varDecls.any { d ->
+            d.isVar && (d.type as? FznType.Array)?.element.let { it is FznType.FloatRange || it is FznType.FloatAny }
+        }
+        if (hasFloatArray) return false
+        // A float objective would need a real objective threaded through the Long-typed objective machinery;
+        // keep bucketing for it (the bucket int var carries the objective) until that path is built.
+        val objExpr = when (val s = model.solve) {
+            is FznSolve.Minimize -> s.obj
+            is FznSolve.Maximize -> s.obj
+            else -> null
+        }
+        val objName = (objExpr as? FznExpr.Ident)?.name
+        if (objName != null &&
+            model.varDecls.any {
+                it.isVar && it.name == objName &&
+                    (it.type is FznType.FloatRange || it.type is FznType.FloatAny)
+            }
+        ) {
+            return false
+        }
+        return model.constraints.none { c ->
+            val n = c.name
+            (n.startsWith("float_") || n == "int2float" || n == "array_float_element") && n !in FLOAT_LP_ONLY_NAMES
+        }
     }
 
     internal sealed interface ParamValue {

@@ -25,7 +25,7 @@ class FlatZincFloatCompareTest {
         val prog = program(src)
         val sat = assertIs<SolveResult.Sat>(BacktrackSolver(prog.problem).solve(BacktrackParams(randomSeed = 0L)))
         val bk = prog.floatVarsByName.getValue(varName)
-        return bk.valueOf(sat.assignment.ints[bk.varId].toInt())
+        return if (bk.lpOnly) sat.assignment.reals[bk.varId] else bk.valueOf(sat.assignment.ints[bk.varId].toInt())
     }
 
     @Test
