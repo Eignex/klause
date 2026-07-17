@@ -258,7 +258,7 @@ class FlatZincParseTest {
     }
 
     @Test
-    fun `float vars are bucketed and float_lin_le works`() {
+    fun `float vars lower to LP-only columns and float_lin_le works`() {
         val src = """
             var 0.0..10.0: x;
             var 0.0..10.0: y;
@@ -267,13 +267,12 @@ class FlatZincParseTest {
         """.trimIndent()
         val program = parseFlatZinc(src, floatBuckets = 100)
         assertEquals(2, program.floatVarsByName.size)
-        val sample = LocalSearchSolver(program.problem)
-            .sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 3L)).assignment
-        assertNotNull(sample)
-        val xVal = program.floatVarsByName.getValue("x").valueOf(sample.ints[0].toInt())
-        val yVal = program.floatVarsByName.getValue("y").valueOf(sample.ints[1].toInt())
-        // Allow a small tolerance for rounding through the bucket/scale pipeline.
-        assertTrue(xVal + yVal <= 5.0 + 0.5, "x+y = ${xVal + yVal}")
+        // A purely-linear float model lowers to LP-only continuous columns (issue #1232), solved exactly.
+        assertEquals(2, program.problem.numRealVars)
+        val r = assertIs<SolveResult.Sat>(BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 3L)))
+        val xVal = r.assignment.reals[program.floatVarsByName.getValue("x").varId]
+        val yVal = r.assignment.reals[program.floatVarsByName.getValue("y").varId]
+        assertTrue(xVal + yVal <= 5.0 + 1e-6, "x+y = ${xVal + yVal}")
     }
 
     @Test

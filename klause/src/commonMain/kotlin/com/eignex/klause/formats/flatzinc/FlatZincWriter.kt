@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.solver.Sample
 
 /** Render one solved sample in FlatZinc output format. */
@@ -26,7 +27,7 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
             sb.append("$name = ${sample.ints[id]};\n")
         }
         for ((name, b) in program.floatVarsByName) {
-            sb.append("$name = ${b.valueOf(sample.ints[b.varId].toInt())};\n")
+            sb.append("$name = ${floatSolutionValue(b, sample)};\n")
         }
         for ((name, layout) in program.setVarsByName) {
             sb.append("$name = ${renderSet(sample, layout)};\n")
@@ -39,6 +40,11 @@ fun writeFlatZincSolution(program: FlatZincProgram, sample: Sample, outputObject
     return sb.toString()
 }
 
+/** The solved value of a float variable: its LP-only continuous value from [Sample.reals], or the value
+ *  of its bucket index. */
+private fun floatSolutionValue(b: FloatBucketing, sample: Sample): Double =
+    if (b.lpOnly) sample.reals[b.varId] else b.valueOf(sample.ints[b.varId].toInt())
+
 private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
     is SolveDirective.Minimize -> solve.objVar
     is SolveDirective.Maximize -> solve.objVar
@@ -48,7 +54,7 @@ private fun objectiveVarName(solve: SolveDirective): String? = when (solve) {
 private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String): String {
     program.setVarsByName[name]?.let { return renderSet(sample, it) }
     program.boolVarsByName[name]?.let { return sample.bools[it].toString() }
-    program.floatVarsByName[name]?.let { b -> return b.valueOf(sample.ints[b.varId].toInt()).toString() }
+    program.floatVarsByName[name]?.let { b -> return floatSolutionValue(b, sample).toString() }
     program.intVarsByName[name]?.let { return sample.ints[it].toString() }
     throw IllegalArgumentException("output: unknown var `$name`")
 }

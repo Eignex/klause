@@ -6,8 +6,10 @@ import com.eignex.klause.formats.flatzinc.FlatZincParseException
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Bucketed-float FlatZinc lowering: `float_abs` and `array_float_element` map to bucket-index
@@ -85,6 +87,39 @@ class FlatZincFloatConstraintsTest {
             solve satisfy;
         """.trimIndent()
         assertFailsWith<FlatZincParseException> { parseFlatZinc(src, floatBuckets = 2) }
+    }
+
+    @Test
+    fun `a purely-linear float model lowers floats to LP-only continuous columns`() {
+        val program = parseFlatZinc(
+            """
+            var 0.0..10.0: x;
+            constraint float_lin_le([2.0], [x], 6.0);
+            solve satisfy;
+            """.trimIndent(),
+        )
+        // No nonlinear/strict/reified float constraint ⇒ the float is an LP-only real column, not a bucket.
+        assertEquals(1, program.problem.numRealVars)
+        assertEquals(0, program.problem.numIntVars)
+        val r = assertIs<SolveResult.Sat>(BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L)))
+        val x = r.assignment.reals[0]
+        assertTrue(2.0 * x <= 6.0 + 1e-6 && x in 0.0..10.0, "infeasible continuous value x=$x")
+    }
+
+    @Test
+    fun `a nonlinear float constraint keeps the whole model on bucketing`() {
+        val program = parseFlatZinc(
+            """
+            var 0.0..10.0: x;
+            var 0.0..10.0: y;
+            constraint float_lin_le([1.0], [x], 5.0);
+            constraint float_abs(x, y);
+            solve satisfy;
+            """.trimIndent(),
+        )
+        // float_abs is nonlinear ⇒ the whole-problem gate keeps every float bucketed (no real columns).
+        assertEquals(0, program.problem.numRealVars)
+        assertTrue(program.problem.numIntVars >= 2)
     }
 
     @Test

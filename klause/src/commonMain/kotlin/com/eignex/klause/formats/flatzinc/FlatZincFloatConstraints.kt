@@ -6,10 +6,31 @@ import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
 import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.*
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
+    if (floatsLpOnly) {
+        // LP-only floats: emit the raw double coefficients over the real columns, no bucket scaling. The
+        // whole-problem gate guarantees only non-reified LE/EQ float_lin reach here.
+        val coefs = evalFloatConstArray(c.args[0])
+        val varRefs = evalFloatVarArray(c.args[1])
+        val op = if (c.name == "float_lin_eq") LinearOp.EQ else LinearOp.LE
+        factors.add(
+            Linear(
+                EmptyIntArray,
+                EmptyDoubleArray,
+                IntArray(coefs.size) { varRefs[it].varId },
+                coefs,
+                op,
+                evalFloatConst(c.args[2]),
+            ),
+        )
+        return
+    }
     val scaled = resolveScaledFloatLinear(c, reified)
     val op = when (c.name.removeSuffix("_reif")) {
         "float_lin_le" -> LinearOp.LE
@@ -30,6 +51,13 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     val yName = (c.args[1] as? FznExpr.Ident)?.name
         ?: failHere("int2float: second arg must be a float var identifier")
     val yBk = floatVars[yName] ?: failHere("`$yName` is not a float var")
+    if (floatsLpOnly) {
+        // y (real) = x (int): the mixed row 1·x − 1·y = 0.
+        factors.add(
+            Linear(intArrayOf(xInt), doubleArrayOf(1.0), intArrayOf(yBk.varId), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
+        )
+        return
+    }
     val step = if (yBk.buckets > 1) (yBk.hi - yBk.lo) / (yBk.buckets - 1) else 0.0
     val cX = floatScale
     val cIdxY = (-step * floatScale).roundToLong()
@@ -91,6 +119,24 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
         }
 
         else -> Unit
+    }
+    if (floatsLpOnly && !strict && !reified) {
+        // `a OP b` ⟺ `(a − b) OP 0`: real coefficients on the var operands, constants moved to the bound.
+        val rv = IntArrayList()
+        val rc = ArrayList<Double>()
+        var bound = 0.0
+        for ((ref, sign) in listOf(a to 1.0, b to -1.0)) {
+            when (ref) {
+                is FloatRef.Var -> {
+                    rv.add(ref.bk.varId)
+                    rc.add(sign)
+                }
+
+                is FloatRef.Const -> bound -= sign * ref.value
+            }
+        }
+        factors.add(Linear(EmptyIntArray, EmptyDoubleArray, rv.toIntArray(), rc.toDoubleArray(), op, bound))
+        return
     }
     val varSide = if (a is FloatRef.Var) a.bk else (b as FloatRef.Var).bk
     val sign = if (a is FloatRef.Var) 1.0 else -1.0 // coefficient on the var-side arg
