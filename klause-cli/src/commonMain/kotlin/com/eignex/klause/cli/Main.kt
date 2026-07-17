@@ -1,5 +1,7 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.FormatException
+
 /*
  * Unified klause CLI entry point. The CLI is a registry of CliMode front-ends
  * (MiniZinc / XCSP3 / SMT-LIB / DIMACS / OPB); adding a competition front-end is a new CliMode + its
@@ -22,13 +24,30 @@ internal val MODES: List<CliMode> = listOf(MiniZincMode, Xcsp3Mode, SmtLibMode, 
 /** Parse args once, select the front-end mode, load the instance and run the shared driver.
  *  See the file header for the full flow. */
 fun main(args: Array<String>) {
+    val code = runCli(args)
+    if (code != EXIT_OK) exitCli(code)
+}
+
+/** Process exit codes: success returns without touching the exit path; a boundary error uses [EXIT_ERROR]. */
+private const val EXIT_OK = 0
+private const val EXIT_ERROR = 2
+
+/** Run the CLI and map a boundary failure to an exit code, printing its diagnostic to stderr. Split out
+ *  from [main] so the error boundary is observable without terminating the process. */
+internal fun runCli(args: Array<String>): Int =
     try {
         run(args)
+        EXIT_OK
     } catch (e: CliUsageException) {
         errPrintln("klause-cli: ${e.message}")
-        exitCli(2)
+        EXIT_ERROR
+    } catch (e: FormatException) {
+        // A parser rejecting malformed/unsupported input is a user error, not a crash: its message
+        // already carries the `klause <format>: <message>` prefix, so surface it verbatim on stderr
+        // and exit with the CLI error code rather than leaking a stack trace.
+        errPrintln(e.message.orEmpty())
+        EXIT_ERROR
     }
-}
 
 private fun run(args: Array<String>) {
     val common = CommonOptions()

@@ -23,6 +23,21 @@ class CliModeTest {
         }
     }
 
+    @Test
+    fun `a malformed instance surfaces a clean format diagnostic and the cli error code`() {
+        // A syntactically broken FlatZinc file: the front-end parser throws a FormatException from
+        // load. main must catch it at the boundary — a formatted stderr line and exit code 2 — rather
+        // than let it escape as an uncaught stack trace.
+        val fzn = File.createTempFile("clibad", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint not_a_real_builtin(;\n")
+            deleteOnExit()
+        }
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf(fzn.absolutePath)) }
+        assertEquals(2, code, "malformed input must exit with the CLI error code:\n$err")
+        assertTrue(err.trimStart().startsWith("klause FlatZinc:"), "expected a formatted format diagnostic:\n$err")
+    }
+
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()
         val old = System.out
