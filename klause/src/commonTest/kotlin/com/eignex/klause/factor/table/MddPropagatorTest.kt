@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.table.Mdd
+import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -139,6 +140,61 @@ class MddPropagatorTest {
             val found = BacktrackSolver(problem).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "cost MDD (cost∈$costRange): solution set must equal brute force")
+        }
+    }
+
+    @Test
+    fun `MDD factors sharing one transition index reuse the root snapshot and enumerate as brute force`() {
+        // Two factors over disjoint variable pairs bind ONE shared transition index — exactly the `<group>`
+        // shape. The first factor's full-domain root rebuild caches the structural reachability snapshot;
+        // the others reuse it instead of re-scanning the diagram. Enumeration under the CDCL backtracker
+        // must still equal brute force, and the mix of full-domain (snapshot-reusing) and pinned-domain
+        // (recomputing) instances exercises both paths across deep backtracking.
+        val numStatesPerLayer = intArrayOf(1, 2, 1)
+        val layerStarts = intArrayOf(0, 6, 12)
+        val transitions = longArrayOf(
+            0, 1, 0, 0, 2, 1, // layer 0: s0 --1--> s0, --2--> s1
+            0, 2, 0, 1, 1, 0, // layer 1: s0 --2--> term, s1 --1--> term
+        )
+        val shared = MddTransitionIndex.build(transitions, layerStarts, numStatesPerLayer, 3)
+        fun mdd(a: Int, b: Int): Mdd = Mdd(
+            seq = intArrayOf(a, b),
+            numStatesPerLayer = numStatesPerLayer,
+            layerStarts = layerStarts,
+            transitions = transitions,
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 3,
+        ).also { it.transitionIndex = shared }
+        fun accepts(x: Int, y: Int): Boolean = (x == 1 && y == 2) || (x == 2 && y == 1)
+
+        // (domain of the 4 vars): all free, then one pair pinned so its factor recomputes while the other
+        // reuses the shared snapshot.
+        val instances = listOf(
+            intArrayOf(2, 2, 2, 2),
+            intArrayOf(1, 2, 2, 2), // var0 pinned to 1 → first factor non-covering, second still reuses
+        )
+        for ((idx, hi) in instances.withIndex()) {
+            val brute = HashSet<List<Int>>()
+            for (a in 1..hi[0]) {
+                for (b in 1..hi[1]) {
+                    for (c in 1..hi[2]) {
+                        for (d in 1..hi[3]) {
+                            if (accepts(a, b) && accepts(c, d)) brute.add(listOf(a, b, c, d))
+                        }
+                    }
+                }
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 4,
+                intDomains = Array(4) { IntDomain(1, hi[it].toLong()) },
+                factors = arrayOf<Factor>(mdd(0, 1), mdd(2, 3)),
+            )
+            val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
+            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
+            assertEquals(brute, found, "shared-index MDD #$idx: solution set must equal brute force")
         }
     }
 }

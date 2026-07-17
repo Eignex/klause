@@ -8,11 +8,7 @@ package com.eignex.klause.factor.table.internals
  * diagram's `minSym` — that keep the position alive. A reusing factor copies [fwd]/[bwd] and derives its
  * own exclusions by testing its live domain against [survivors], instead of re-scanning the diagram.
  */
-internal class MddRootSnapshot(
-    val fwd: LongArray,
-    val bwd: LongArray,
-    val survivors: Array<LongArray>,
-)
+internal class MddRootSnapshot(val fwd: LongArray, val bwd: LongArray, val survivors: Array<LongArray>)
 
 /**
  * Per-layer CSR indices over a layered MDD's transition records, keyed by source state ([fwdHead] into
