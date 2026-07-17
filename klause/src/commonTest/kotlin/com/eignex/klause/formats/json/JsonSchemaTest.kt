@@ -1,7 +1,9 @@
 package com.eignex.klause.formats.json
 
+import com.eignex.klause.formats.FormatException
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class JsonSchemaTest {
@@ -35,5 +37,22 @@ class JsonSchemaTest {
         assertEquals(1, compiled.problem.numIntVars)
         assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators["type"]?.keys)
         assertTrue("budget" in compiled.intVarIdByName)
+    }
+
+    @Test
+    fun `rejects an unknown key as a format exception`() {
+        val text = """
+            {
+              "entries": {
+                "budget": { "${'$'}type": "int", "min": 0, "max": 100, "maxx": 5 }
+              }
+            }
+        """.trimIndent()
+        assertFailsWith<FormatException> { JsonSchema.parseProblem(text) }
+    }
+
+    @Test
+    fun `wraps a malformed document as a format exception`() {
+        assertFailsWith<FormatException> { JsonSchema.parseProblem("{ not json") }
     }
 }
