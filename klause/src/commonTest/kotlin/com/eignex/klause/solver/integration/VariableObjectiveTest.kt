@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.integration
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -12,8 +14,10 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.maximizeBool
 import com.eignex.klause.solver.objective.minimizeBool
 import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class VariableObjectiveTest {
@@ -114,9 +118,11 @@ class VariableObjectiveTest {
         // Float objectives optimise the integer bucket index (a strictly increasing affine
         // map of the real value), so the objective is integer and the real value is recovered
         // by decode. Minimising the bucket index lands at the minimum real value ≈ -10.
+        // The float is an LP-only continuous column (issue #1232), so the objective is a real objective the
+        // simplex resolves; backtrack minimises it to the real minimum ≈ -10.
         val objective = compiled.minimize(schema.temp)
-        val sample = LocalSearchSolver(compiled.problem)
-            .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
+        val r = BacktrackSolver(compiled.problem).minimize(objective, BacktrackParams(randomSeed = 0L))
+        val sample = assertIs<MinimizeResult.WithSample>(r).sample
         val decoded = compiled.decode(schema.temp, sample)
         assertTrue(decoded < -9.5, "expected minimum near -10, got $decoded")
     }
@@ -130,8 +136,8 @@ class VariableObjectiveTest {
         val compiled = schema.compile()
         // Maximise negates the bucket-index objective; the optimum decodes to the max ≈ 30.
         val objective = compiled.maximize(schema.temp)
-        val sample = LocalSearchSolver(compiled.problem)
-            .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
+        val r = BacktrackSolver(compiled.problem).minimize(objective, BacktrackParams(randomSeed = 0L))
+        val sample = assertIs<MinimizeResult.WithSample>(r).sample
         val decoded = compiled.decode(schema.temp, sample)
         assertTrue(decoded > 29.5, "expected maximum near 30, got $decoded")
     }

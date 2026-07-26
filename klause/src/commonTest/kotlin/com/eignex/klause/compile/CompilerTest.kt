@@ -1,5 +1,7 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
@@ -17,10 +19,12 @@ import com.eignex.klause.schema.minus
 import com.eignex.klause.schema.not
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -118,28 +122,20 @@ class CompilerTest {
     }
 
     @Test
-    fun `float var buckets and decodes`() {
+    fun `float var lowers to an LP-only column and decodes`() {
         class FloatTune : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 11)
             val highRate by constraint { rate ge 0.5 }
         }
         val schema = FloatTune()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem,
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
-        )
-
-        val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 99)).take(40).toList()
-        // The legacy schema-level bucketing exposed exactly 6 feasible values for rate ≥ 0.5
-        // (one per bucket from 0.5..1.0 at 11 buckets). Native floats with backend-level
-        // bucketing produce many more distinct values; just verify diversity and the bound.
-        assertTrue(samples.toSet().size >= 6, "expected ≥6 distinct samples, got ${samples.toSet().size}")
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
-            assertTrue(rate <= 1.0 + 1e-9 && rate >= 0.0 - 1e-9, "rate=$rate out of [0,1]")
-        }
+        // `rate` appears only in a non-strict linear constraint, so it lowers to an LP-only continuous
+        // column (issue #1232) the simplex resolves; its value rides on the solution's reals.
+        assertEquals(1, compiled.problem.numRealVars)
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 99)))
+        val rate = compiled.decode(schema.rate, sat.assignment)
+        assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
+        assertTrue(rate in -1e-9..(1.0 + 1e-9), "rate=$rate out of [0,1]")
     }
 
     @Test

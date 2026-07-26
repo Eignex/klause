@@ -710,10 +710,13 @@ internal class CpToLpRelaxation(
         }
 
         fun assemble(extraCuts: List<Cut>): LpRelaxation {
-            // Materialize objective-only variables first so the relaxed objective is complete.
+            // Materialize objective-only variables first so the relaxed objective is complete — including
+            // LP-only continuous columns (issue #1232), else a real objective term with no constraint on it
+            // never reaches the LP and the objective is not minimised over it.
             objective?.let { obj ->
                 for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
                 for (b in obj.boolWeights.indices) if (obj.boolWeights[b] != 0L) boolColumn(b)
+                for (r in obj.realCoefficients.indices) if (obj.realCoefficients[r] != 0.0) realColumn(r)
             }
             // Cone mode is the minimal linear+Boolean objective-cone probe: the column-heavy hull /
             // circuit / cut / cumulative features are all forced off (see [objectiveCone]). The
