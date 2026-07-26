@@ -345,7 +345,11 @@ private fun SmtLibQfLia.Builder.reifyRelArgs(node: SExpr.SList, op: String, args
 private fun SmtLibQfLia.Builder.distinctFromArgs(args: List<Res>): Int {
     if (args.size < 2) return trueLit()
     val terms = args.map { if (it is Res.B) litToIntTerm(it.lit) else it.asLin() }
-    return tseitinAnd(pairs(terms.size).map { (i, j) -> reifyNe(terms[i], terms[j]) })
+    val neLits = ArrayList<Int>()
+    for (i in terms.indices) {
+        for (j in i + 1 until terms.size) neLits.add(reifyNe(terms[i], terms[j]))
+    }
+    return tseitinAnd(neLits)
 }
 
 /** Fold an atom to a boolean literal or integer term. */
