@@ -151,14 +151,14 @@ internal class OznParser(private val tokens: List<OznToken>) {
     }
 
     private fun parseComparison(): OznExpr {
-        var left = parseAdditive()
+        var left = parseRange()
         while (true) {
             val t = peek()
             val isCmp = t.kind == OznTokenKind.PUNCT && t.text in setOf("<", "<=", ">", ">=", "=", "==", "!=")
             val isIn = t.kind == OznTokenKind.KEYWORD && t.text == "in"
             if (!isCmp && !isIn) break
             val op = advance().text
-            val right = parseAdditive()
+            val right = parseRange()
             left = OznExpr.Binary(if (op == "==") "=" else op, left, right)
         }
         return left
@@ -175,24 +175,26 @@ internal class OznParser(private val tokens: List<OznToken>) {
     }
 
     private fun parseMultiplicative(): OznExpr {
-        var left = parseRange()
+        var left = parseUnary()
         while (true) {
             val t = peek()
             val isPunct = t.kind == OznTokenKind.PUNCT && t.text in setOf("*", "/")
             val isKw = t.kind == OznTokenKind.KEYWORD && t.text in setOf("div", "mod")
             if (!isPunct && !isKw) break
             val op = advance().text
-            val right = parseRange()
+            val right = parseUnary()
             left = OznExpr.Binary(op, left, right)
         }
         return left
     }
 
+    // `..` binds looser than the arithmetic operators but tighter than comparison, so `1..n-1` is
+    // `1..(n-1)` — the ubiquitous MiniZinc index-set idiom — not `(1..n)-1`.
     private fun parseRange(): OznExpr {
-        val left = parseUnary()
+        val left = parseAdditive()
         if (peek().kind == OznTokenKind.PUNCT && peek().text == "..") {
             advance()
-            val right = parseUnary()
+            val right = parseAdditive()
             return OznExpr.Range(left, right)
         }
         return left
