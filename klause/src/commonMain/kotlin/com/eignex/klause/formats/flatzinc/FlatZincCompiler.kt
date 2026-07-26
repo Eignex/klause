@@ -67,10 +67,16 @@ internal class FlatZincCompiler(
             }
         }
         lpOnlyFloats = classifyLpOnlyFloats()
-        for (decl in model.varDecls) processDecl(decl)
+        for (decl in model.varDecls) {
+            currentLine = decl.line
+            currentCol = decl.col
+            processDecl(decl)
+        }
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
         for (c in model.constraints) {
+            currentLine = c.line
+            currentCol = c.col
             val before = factors.size
             processConstraint(c)
             val redundant = c.annotations.any { it.name == "klause_redundant" }
@@ -630,7 +636,12 @@ internal class FlatZincCompiler(
         else -> failHere("unsupported output item: ${e::class.simpleName}")
     }
 
-    internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, 0, 0)
+    // Source position of the declaration/constraint currently being compiled, so a semantic error
+    // (unsupported builtin, arity, domain) reports where it came from rather than `(at 0:0)`.
+    private var currentLine = 0
+    private var currentCol = 0
+
+    internal fun failHere(msg: String): Nothing = throw FlatZincParseException(msg, currentLine, currentCol)
 
     /** Require constraint [c] to carry exactly [n] arguments, failing with a [FlatZincParseException]
      *  (not a bare `require`/index crash) when a malformed instance supplies the wrong arity. */

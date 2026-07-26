@@ -42,9 +42,19 @@ internal data class FznVarDecl(
     val isVar: Boolean,
     val annotations: List<FznAnnotation>,
     val value: FznExpr?,
+    /** Source position of the declaration (0 for a synthetic node), used to locate a compile error. */
+    val line: Int = 0,
+    val col: Int = 0,
 )
 
-internal data class FznConstraint(val name: String, val args: List<FznExpr>, val annotations: List<FznAnnotation>)
+internal data class FznConstraint(
+    val name: String,
+    val args: List<FznExpr>,
+    val annotations: List<FznAnnotation>,
+    /** Source position of the constraint (0 for a synthetic rewrite), used to locate a compile error. */
+    val line: Int = 0,
+    val col: Int = 0,
+)
 
 internal sealed interface FznSolve {
     val annotations: List<FznAnnotation>
