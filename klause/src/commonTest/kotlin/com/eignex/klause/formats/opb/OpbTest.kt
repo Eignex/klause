@@ -7,11 +7,19 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpbTest {
+
+    @Test
+    fun `a malformed opb instance is a catchable format exception`() {
+        // A constraint with no relational operator must surface as an OpbFormatException, catchable via
+        // the shared FormatException supertype rather than a raw IllegalStateException.
+        assertFailsWith<OpbFormatException> { Opb.parse("+1 x1 +2 x2 8 ;\n") }
+    }
 
     @Test
     fun `parses mixed constraints without objective`() {

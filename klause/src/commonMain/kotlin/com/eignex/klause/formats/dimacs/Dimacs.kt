@@ -1,12 +1,32 @@
 package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.FormatException
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.IntArrayList
 import kotlin.math.abs
+
+/** Raised when a DIMACS CNF/WCNF document is malformed, so a caller can catch it via [FormatException]
+ *  like the other input formats. */
+class DimacsFormatException(msg: String) : FormatException("DIMACS", msg)
+
+private fun dimacsError(msg: String): Nothing = throw DimacsFormatException(msg)
+
+private inline fun dimacsRequire(cond: Boolean, msg: () -> String) {
+    if (!cond) throw DimacsFormatException(msg())
+}
+
+/** Parse a 32-bit [role] count, distinguishing a value that exceeds the range from a non-integer. */
+private fun dimacsInt(token: String, role: String): Int = token.toIntOrNull() ?: dimacsError(
+    if (token.toLongOrNull() != null) {
+        "DIMACS $role exceeds the 32-bit integer range: '$token'"
+    } else {
+        "DIMACS $role is not an integer: '$token'"
+    },
+)
 
 /** DIMACS CNF/WCNF parser. */
 object Dimacs {
@@ -41,18 +61,17 @@ object Dimacs {
             }
             if (line.startsWith("p ") || line.startsWith("p\t")) {
                 val parts = line.split(WHITESPACE)
-                require(parts.size >= 4 && parts[1] == "cnf") {
+                dimacsRequire(parts.size >= 4 && parts[1] == "cnf") {
                     "Expected `p cnf <nvars> <nclauses>` header, got: '$rawLine'"
                 }
-                numVars = parts[2].toIntOrNull()
-                    ?: error("DIMACS `p cnf` variable count is not a 32-bit integer: '${parts[2]}'")
+                numVars = dimacsInt(parts[2], "`p cnf` variable count")
                 continue
             }
-            if (numVars < 0) error("DIMACS body before `p cnf` header: '$rawLine'")
+            if (numVars < 0) dimacsError("DIMACS body before `p cnf` header: '$rawLine'")
             for (token in line.split(WHITESPACE)) {
                 if (token.isEmpty()) continue
                 val lit = token.toIntOrNull()
-                    ?: error("Unparseable DIMACS token: '$token'")
+                    ?: dimacsError("Unparseable DIMACS token: '$token'")
                 if (lit == 0) {
                     val acc = current
                     // A `0` terminates the clause; with no literals it is the empty clause (⊥), except in
@@ -64,7 +83,7 @@ object Dimacs {
                     current = null
                 } else {
                     val v = abs(lit) - 1
-                    require(v in 0 until numVars) {
+                    dimacsRequire(v in 0 until numVars) {
                         "Literal $lit out of range [1, $numVars]"
                     }
                     val accum = current ?: IntArrayList().also { current = it }
@@ -72,8 +91,8 @@ object Dimacs {
                 }
             }
         }
-        require(current == null) { "DIMACS file ends mid-clause (no terminating 0)" }
-        require(numVars >= 0) { "DIMACS file has no `p cnf` header" }
+        dimacsRequire(current == null) { "DIMACS file ends mid-clause (no terminating 0)" }
+        dimacsRequire(numVars >= 0) { "DIMACS file has no `p cnf` header" }
         // The empty clause is ⊥; a [Clause] needs a non-empty literal set, so force a contradiction on a
         // fresh marker variable (as the WCNF path does) to reject the instance.
         val totalVars = numVars + if (triviallyUnsat) 1 else 0
@@ -120,13 +139,14 @@ object Dimacs {
             if (line.startsWith("c") || line.startsWith("%")) continue
             if (line.startsWith("p ") || line.startsWith("p\t")) {
                 val parts = line.split(WHITESPACE)
-                require(parts.size >= 4 && parts[1] == "wcnf") {
+                dimacsRequire(parts.size >= 4 && parts[1] == "wcnf") {
                     "Expected `p wcnf <nvars> <nclauses> [<top>]` header, got: '$rawLine'"
                 }
-                numVars = parts[2].toIntOrNull()
-                    ?: error("DIMACS `p wcnf` variable count is not a 32-bit integer: '${parts[2]}'")
+                numVars = dimacsInt(parts[2], "`p wcnf` variable count")
                 if (parts.size >= 5) {
-                    top = parts[4].toLongOrNull() ?: error("DIMACS `p wcnf` top is not a 64-bit integer: '${parts[4]}'")
+                    top = parts[4].toLongOrNull() ?: dimacsError(
+                        "DIMACS `p wcnf` top is not a 64-bit integer: '${parts[4]}'",
+                    )
                 }
                 hasOldHeader = true
                 continue
@@ -142,7 +162,7 @@ object Dimacs {
                 litStart = 1
             } else {
                 weight = tokens[0].toLongOrNull()
-                    ?: error("Unparseable wcnf weight: '${tokens[0]}'")
+                    ?: dimacsError("Unparseable wcnf weight: '${tokens[0]}'")
                 // Keep explicit hard clauses hard when `top` is omitted.
                 isHard = weight >= (top ?: HARD_WEIGHT_SENTINEL)
                 litStart = 1
@@ -152,7 +172,7 @@ object Dimacs {
             var i = litStart
             while (i < tokens.size) {
                 val tok = tokens[i]
-                val lit = tok.toIntOrNull() ?: error("Unparseable wcnf literal: '$tok'")
+                val lit = tok.toIntOrNull() ?: dimacsError("Unparseable wcnf literal: '$tok'")
                 i++
                 if (lit == 0) {
                     terminated = true
@@ -163,14 +183,14 @@ object Dimacs {
                 // an old-header instance must stay within the declared `nvars`, as the CNF path enforces —
                 // a literal past it would index a nonexistent variable.
                 if (hasOldHeader) {
-                    require(v in 0 until numVars) { "Literal $lit out of range [1, $numVars]" }
+                    dimacsRequire(v in 0 until numVars) { "Literal $lit out of range [1, $numVars]" }
                 } else if (v + 1 > numVars) {
                     numVars = v + 1
                 }
                 lits.add(Lit.make(v, positive = lit > 0))
             }
-            require(terminated) { "wcnf clause not terminated by 0: '$rawLine'" }
-            require(i == tokens.size) { "wcnf clause has trailing tokens after 0: '$rawLine'" }
+            dimacsRequire(terminated) { "wcnf clause not terminated by 0: '$rawLine'" }
+            dimacsRequire(i == tokens.size) { "wcnf clause has trailing tokens after 0: '$rawLine'" }
             val clauseLits = lits.toIntArray()
             when {
                 isHard && clauseLits.isEmpty() -> triviallyUnsat = true
