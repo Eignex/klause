@@ -153,6 +153,21 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `an arithmetic expression overflowing 64 bits is rejected as a format exception`() {
+        // A product of three near-max Int constants exceeds Long; folding it must reject the term rather
+        // than silently wrapping.
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><var id="x"> 0..10 </var></variables>
+              <constraints>
+                <intension> eq(mul(2100000000,2100000000,2100000000), x) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml) }
+    }
+
+    @Test
     fun `parses COP with sum constraint and maximize objective and optimizes`() {
         val xml = """
             <instance format="XCSP3" type="COP">
