@@ -8,9 +8,11 @@ import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLibQfLia
 import com.eignex.klause.formats.xcsp3.Xcsp3
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 /** A parsed instance lifted into klause's solver representation, plus an optional objective. */
 internal data class Ingested(val problem: Problem, val objective: LinearObjective? = null)
@@ -98,7 +100,12 @@ internal object MpsFormat : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val searchBound = System.getProperty("klause.bench.mps.searchBound")?.toLongOrNull() ?: 1_000_000L
-        val compiled = Mps.parse(file.readText()).toProblem(searchBound)
+        // Bound load-time OBBT: on a large MPS it solves an LP per open-integer variable and can run for
+        // many minutes, wedging a sweep before the instance is ever solved. A side left un-tightened when
+        // the budget trips is clamped to searchBound (sound — the clamp only loosens).
+        val budgetMs = System.getProperty("klause.bench.mps.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
+        val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
+        val compiled = Mps.parse(file.readText()).toProblem(searchBound, cancellation = cancel)
         val objective = if (compiled.maximize) compiled.objective?.negated() else compiled.objective
         return Ingested(compiled.problem, objective)
     }
