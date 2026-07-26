@@ -168,6 +168,45 @@ class FlatZincFloatConstraintsTest {
     }
 
     @Test
+    fun `an int times real product lowers to LP-only columns and solves exactly`() {
+        val program = parseFlatZinc(
+            """
+            var 1..3: n;
+            var 1.0..3.0: nf;
+            var 0.0..5.0: y;
+            var 0.0..20.0: w;
+            constraint int2float(n, nf);
+            constraint float_times(nf, y, w);
+            constraint float_lin_eq([1.0], [y], 3.0);
+            constraint float_lin_eq([1.0], [w], 9.0);
+            solve satisfy;
+            """.trimIndent(),
+        )
+        // nf (int image), y and w are a purely-linear-plus-int·real component ⇒ LP-only real columns;
+        // only n stays an integer search variable. The product w = n·y with y = 3, w = 9 forces n = 3.
+        assertEquals(3, program.problem.numRealVars)
+        assertEquals(1, program.problem.numIntVars)
+        assertIs<SolveResult.Sat>(BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `an int times real product with no integer completion is UNSAT`() {
+        // w = n·y with y = 3 forces w in {3, 6, 9} across n in 1..3; w = 10 has no integer completion.
+        val src = """
+            var 1..3: n;
+            var 1.0..3.0: nf;
+            var 0.0..5.0: y;
+            var 0.0..20.0: w;
+            constraint int2float(n, nf);
+            constraint float_times(nf, y, w);
+            constraint float_lin_eq([1.0], [y], 3.0);
+            constraint float_lin_eq([1.0], [w], 10.0);
+            solve satisfy;
+        """.trimIndent()
+        assertIs<SolveResult.Unsat>(solve(src))
+    }
+
+    @Test
     fun `a false float constant comparison is unsatisfiable not a crash`() {
         // Previously posted an empty Clause, which threw IllegalArgumentException at compile time.
         val src = """
