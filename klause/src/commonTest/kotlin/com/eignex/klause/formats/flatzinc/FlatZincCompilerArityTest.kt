@@ -14,6 +14,14 @@ class FlatZincCompilerArityTest {
     }
 
     @Test
+    fun `float_div with the wrong arity is a parse error not an index crash`() {
+        // float_div reorders its three args into a float_times before lowering; a truncated call must
+        // fail as a FlatZincParseException, not an IndexOutOfBoundsException from the reorder.
+        val src = "var 0.0..1.0: a;\nvar 0.0..1.0: b;\nconstraint float_div(a, b);\nsolve satisfy;"
+        assertFailsWith<FlatZincParseException> { parseFlatZinc(src) }
+    }
+
+    @Test
     fun `constraint emitters surface a wrong arity as a parse error`() {
         // One malformed instance per constraint-emitter file: the arity guard must route
         // through the located FlatZincParseException rather than a bare require's

@@ -90,13 +90,7 @@ internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name
 
     "array_float_element" -> emitArrayFloatElement(c)
 
-    "float_div" -> emitFloatTimes(
-        FznConstraint(
-            name = "float_times",
-            args = listOf(c.args[1], c.args[2], c.args[0]),
-            annotations = c.annotations,
-        ),
-    )
+    "float_div" -> emitFloatDiv(c)
 
     "all_different_int", "fzn_all_different_int", "klause_all_different_int" -> emitAllDifferent(c)
 
