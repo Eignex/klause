@@ -58,6 +58,13 @@ class SmtLibQfLiaTest {
     }
 
     @Test
+    fun `a bitvector literal is rejected as outside the integer-only fragment`() {
+        val text = "(declare-const x Int) (assert (= x #xFF))"
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+        assertTrue("bitvector literal" in e.message.orEmpty(), e.message.orEmpty())
+    }
+
+    @Test
     fun `a malformed command is rejected with a clear message not a raw cast crash`() {
         // A declare-const missing its sort must surface as an UnsupportedSmtException, not a
         // ClassCastException / IndexOutOfBounds leaking from an unchecked access.

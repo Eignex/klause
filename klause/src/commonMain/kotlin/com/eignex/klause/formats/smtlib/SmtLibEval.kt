@@ -375,6 +375,9 @@ private fun SmtLibQfLia.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if
         isRealLiteral(node.text) ->
             throw UnsupportedSmtException("real literal '${node.text}' (QF_LIA is integer-only)")
 
+        node.text.startsWith("#") ->
+            throw UnsupportedSmtException("bitvector literal '${node.text}' (QF_LIA is integer-only)")
+
         else -> lookup(node.text)?.let { Res.I(intBinding(node.text, it)) }
             ?: Res.I(
                 LinComb(
