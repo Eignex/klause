@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 
 /**
@@ -28,8 +29,13 @@ internal object MpsMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = KlauseConfig.current
+            // Honor `-t` during the load-time bake: MPS OBBT solves an LP per open-int variable, which on a
+            // large model can outlast the whole solve budget before any solver/cancellation exists (mirrors
+            // the MiniZinc/XCSP3 bake bound). A side left un-tightened when the deadline trips is clamped.
+            val bakeCancel =
+                common.deadlineAtMs?.let { d -> Cancellation { nowMillis() > d } } ?: Cancellation.Never
             val compiled = Mps.parse(readTextFile(path))
-                .toProblem(config.unboundedSearchBound, config.floatBuckets, config.floatScale)
+                .toProblem(config.unboundedSearchBound, config.floatBuckets, config.floatScale, bakeCancel)
             clamped = compiled.clamped
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.problem.numIntVars} " +

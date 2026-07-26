@@ -426,7 +426,7 @@ internal class ResumableMinimize(
         // them; an uncertifiable residual taints the terminal verdict to `unknown`.
         override fun onLeaf(snap: Sample): MinimizeResult.WithSample? {
             if (problem.numRealVars > 0) {
-                val res = leafRealFeasibility(problem, objective, snap)
+                val res = leafRealFeasibility(problem, objective, snap, Cancellation { sliceCancelled() })
                 when (res.verdict) {
                     LpVerdict.INFEASIBLE -> return null
 

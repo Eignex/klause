@@ -3,9 +3,13 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.lp.LpVerdict
+import com.eignex.klause.lp.relaxation.leafRealFeasibility
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.TerminationReason
 import kotlin.test.Test
@@ -64,6 +68,21 @@ class LpOnlyContinuousLeafTest {
         val p = problem(0, emptyArray(), 0.0, 5.0, row)
         val r = assertIs<SolveResult.Unknown>(BacktrackSolver(p).solve(BacktrackParams()))
         assertEquals(TerminationReason.Unsupported, r.reason)
+    }
+
+    @Test
+    fun `a tripped deadline degrades the leaf verdict to INDETERMINATE rather than certifying`() {
+        // 2 r = 3 is feasible (r = 3/2) and normally certified SAT; a fired cancellation cuts the residual
+        // LP solve short so the leaf is INDETERMINATE (unknown) — bounding a large leaf LP, never unsound.
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
+        val p = problem(0, emptyArray(), 0.0, 10.0, row)
+        val res = leafRealFeasibility(
+            p,
+            objective = null,
+            sample = Sample(booleanArrayOf(), longArrayOf()),
+            cancellation = Cancellation { true },
+        )
+        assertEquals(LpVerdict.INDETERMINATE, res.verdict)
     }
 
     @Test

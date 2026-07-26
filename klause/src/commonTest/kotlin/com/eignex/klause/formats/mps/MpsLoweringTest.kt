@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.solver.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -66,6 +67,23 @@ class MpsLoweringTest {
         // x >= 0, x <= 5: exact-certified OBBT tightens the open upper side to exactly 5, no clamp.
         assertEquals(0L, d.min)
         assertEquals(5L, d.max)
+    }
+
+    @Test
+    fun `a tripped load deadline skips OBBT and clamps the open side instead of tightening`() {
+        val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(MpsVar("x", integer = true, lower = 0.0, upper = null)),
+            listOf(row),
+        )
+        // With the load deadline already tripped, OBBT runs no LP solves, so the open upper side is clamped
+        // to the search bound rather than tightened to 5 — this is what bounds load on a large model.
+        val compiled = m.toProblem(searchBound = 1_000L, cancellation = Cancellation { true })
+        assertTrue(compiled.clamped)
+        assertEquals(1_000L, compiled.problem.intDomains[0].max)
     }
 
     @Test
