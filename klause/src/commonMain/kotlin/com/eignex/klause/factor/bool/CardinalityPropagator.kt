@@ -102,13 +102,40 @@ internal class CardinalityPropagator(
 
     /**
      * Load the constraint into [acc] as a coefficient-carrying `≥` reason for cutting-planes conflict
-     * analysis (#1119 Phase 3). A cardinality is two unit-weight bounds; the half that forced [forcedLit]
-     * is selected by that literal's polarity: a forced-true own-literal came from the at-least side
-     * (`Σ ℓ ≥ min`), a forced-false one from the at-most side (`Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). Returns
-     * false for a seed (no forced literal, ambiguous), a degenerate bound, or a variable not in scope.
+     * analysis (#1119 Phase 3). A cardinality is two unit-weight bounds; the relevant half is chosen by
+     * [forcedLit] when resolving a pivot (forced-true own-literal ⇒ at-least side `Σ ℓ ≥ min`; forced-false
+     * ⇒ at-most side `Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). For a *seed* (`forcedLit == 0`, the conflicting
+     * constraint) the violated side is detected from [state]: too many true literals ⇒ at-most, too few
+     * non-false ⇒ at-least. Returns false for a degenerate bound or a variable not in scope.
      */
-    fun loadReason(acc: PbAccumulator, forcedLit: Int): Boolean {
-        if (forcedLit == 0) return false
+    fun loadReason(acc: PbAccumulator, forcedLit: Int, state: PropagationState): Boolean {
+        val n = literals.size
+        val ones = LongArray(n) { 1L }
+        fun loadAtLeast() = if (min <= 0) false else acc.loadPb(ones, literals, geBound = min.toLong())
+        fun loadAtMost(): Boolean {
+            if (max >= n) return false
+            val flipped = IntArray(n) { literals[it] xor 1 }
+            return acc.loadPb(ones, flipped, geBound = (n - max).toLong())
+        }
+        if (forcedLit == 0) {
+            // Seed: pick the violated bound from the current assignment.
+            var trueCount = 0
+            var nonFalse = 0
+            for (lit in literals) {
+                val b = state.boolValues[Lit.variable(lit)]
+                if (b == null) {
+                    nonFalse++
+                } else if (Lit.evaluate(lit, b)) {
+                    trueCount++
+                    nonFalse++
+                }
+            }
+            return when {
+                trueCount > max -> loadAtMost()
+                nonFalse < min -> loadAtLeast()
+                else -> false
+            }
+        }
         val v = Lit.variable(forcedLit)
         var occ = 0
         var found = false
@@ -120,17 +147,8 @@ internal class CardinalityPropagator(
             }
         }
         if (!found) return false
-        val n = literals.size
-        val ones = LongArray(n) { 1L }
-        return if (occ == forcedLit) {
-            // At-least side forced this literal true: Σ ℓ ≥ min.
-            if (min <= 0) false else acc.loadPb(ones, literals, geBound = min.toLong())
-        } else {
-            // At-most side forced this literal false: Σ ℓ ≤ max ⇒ Σ ¬ℓ ≥ n − max.
-            if (max >= n) return false
-            val flipped = IntArray(n) { literals[it] xor 1 }
-            acc.loadPb(ones, flipped, geBound = (n - max).toLong())
-        }
+        // Forced-true own-literal ⇒ at-least side needed it; forced-false ⇒ at-most side.
+        return if (occ == forcedLit) loadAtLeast() else loadAtMost()
     }
 
     /** Antecedents for a forced pin. For an at-least pin ([collectTrue] = false) the reason is the

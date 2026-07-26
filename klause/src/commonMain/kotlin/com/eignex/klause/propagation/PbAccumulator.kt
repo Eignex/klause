@@ -146,24 +146,6 @@ internal class PbAccumulator {
     }
 
     /**
-     * Weaken (drop) every literal that is not currently false — except [keepVar] — reducing the degree by
-     * each dropped positive-literal's weight. A sound weakening (`Σ aᵢℓᵢ ≥ d` ⟹ `Σ_{i≠j} aᵢℓᵢ ≥ d − aⱼ`)
-     * that reduces a reason to its falsified core plus the pivot before division, the RoundingSat step
-     * that keeps the resolvent conflicting so the learned cut stays strong. [isFalse] tests a literal
-     * against the current assignment.
-     */
-    fun weakenNonFalsified(keepVar: Int, isFalse: (Int) -> Boolean) {
-        for (v in coef.keys.toList()) {
-            if (v == keepVar) continue
-            val c = coef.getValue(v)
-            if (!isFalse(Lit.make(v, c > 0L))) {
-                if (c > 0L) rhs -= c // positive literal drops the degree by its weight; negative already netted
-                coef.remove(v)
-            }
-        }
-    }
-
-    /**
      * Divide by [d] > 1 and round up (Chvátal-Gomory): every positive-literal coefficient and the degree
      * are replaced by their ceil-division. Sound (a valid cutting plane) and the core strengthening step
      * of cutting-planes learning. [d] is typically the pivot's reason coefficient.

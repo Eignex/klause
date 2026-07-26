@@ -139,10 +139,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         val absA = if (a < 0L) -a else a
         val absB = if (b < 0L) -b else b
-        // RoundingSat reduction: weaken the reason to its falsified core plus the pivot, then divide by
-        // the pivot coefficient rounding up ⇒ its pivot coefficient becomes ±1. The weakening keeps the
-        // combined constraint conflicting so the learned cut stays strong.
-        reason.weakenNonFalsified(pivot) { lit -> state.litFalse(lit) }
+        // Divide the reason by its pivot coefficient, rounding up ⇒ its pivot coefficient becomes ±1.
         reason.divideRoundUp(absB)
         // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
         if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA)) {
@@ -173,8 +170,8 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     private fun loadFactor(fid: Int, target: PbAccumulator, forcedLit: Int): Boolean {
         if (fid < 0) return false
         return when (val f = state.factorAt(fid)) {
-            is PseudoBooleanPropagator -> f.loadReason(target, forcedLit)
-            is CardinalityPropagator -> f.loadReason(target, forcedLit)
+            is PseudoBooleanPropagator -> f.loadReason(target, forcedLit, state)
+            is CardinalityPropagator -> f.loadReason(target, forcedLit, state)
             is ClausePropagator -> target.loadClause(f.literals)
             else -> false
         }
