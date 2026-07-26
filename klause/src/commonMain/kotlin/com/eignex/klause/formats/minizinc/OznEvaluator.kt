@@ -134,11 +134,21 @@ internal class OznEvaluator(items: List<OznItem>) {
                 is OznValue.SetV -> src.values.toList()
 
                 is OznValue.ArrayV -> {
-                    src.elements.forEachIndexed { _, v ->
-                        for (name in gen.names) ctx.locals[name] = v
-                        val whereOk = gen.where?.let { (eval(it, ctx) as OznValue.BoolV).value } ?: true
-                        if (whereOk) recurse(genIdx + 1)
+                    // Each name ranges over the array independently — a cartesian product like the range and
+                    // set sources — rather than a diagonal that binds every name to the same element.
+                    fun loopArray(remaining: List<String>) {
+                        if (remaining.isEmpty()) {
+                            val whereOk = gen.where?.let { (eval(it, ctx) as OznValue.BoolV).value } ?: true
+                            if (whereOk) recurse(genIdx + 1)
+                            return
+                        }
+                        val n = remaining.first()
+                        for (v in src.elements) {
+                            ctx.locals[n] = v
+                            loopArray(remaining.drop(1))
+                        }
                     }
+                    loopArray(gen.names)
                     return
                 }
 
