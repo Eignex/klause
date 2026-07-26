@@ -3,6 +3,7 @@ package com.eignex.klause.formats.opb
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
@@ -14,6 +15,16 @@ import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
+
+/** Raised when an OPB/WBO document is malformed, so a caller can catch it via [FormatException] like
+ *  the other input formats. */
+class OpbFormatException(msg: String) : FormatException("OPB", msg)
+
+private fun opbError(msg: String): Nothing = throw OpbFormatException(msg)
+
+private inline fun opbRequire(cond: Boolean, msg: () -> String) {
+    if (!cond) throw OpbFormatException(msg())
+}
 
 /** Parsed OPB instance and optional objective. */
 data class OpbProblem(
@@ -108,7 +119,7 @@ object Opb {
         while (i < tokens.size) {
             var end = i
             while (end < tokens.size && tokens[end] != ";") end++
-            if (end == tokens.size) error("OPB statement missing ';' terminator near token index $i")
+            if (end == tokens.size) opbError("OPB statement missing ';' terminator near token index $i")
             val stmt = tokens.subList(i, end)
             i = end + 1
             if (stmt.isEmpty()) continue
@@ -194,8 +205,8 @@ object Opb {
     /** Parse a `Σ terms ⟨op⟩ rhs` relation, reifying any product term to an indicator literal. */
     private fun parseRelation(builder: Builder, tokens: List<String>): Relation {
         val opIdx = tokens.indexOfFirst { it == ">=" || it == "<=" || it == "=" }
-        if (opIdx < 0) error("OPB constraint missing relational operator: ${tokens.joinToString(" ")}")
-        require(opIdx + 1 < tokens.size) {
+        if (opIdx < 0) opbError("OPB constraint missing relational operator: ${tokens.joinToString(" ")}")
+        opbRequire(opIdx + 1 < tokens.size) {
             "OPB constraint missing right-hand side: ${tokens.joinToString(" ")}"
         }
         val rhs = parseLong(tokens[opIdx + 1], "constraint rhs")
@@ -203,7 +214,7 @@ object Opb {
             ">=" -> PbOp.GE
             "<=" -> PbOp.LE
             "=" -> PbOp.EQ
-            else -> error("unknown OPB operator '${tokens[opIdx]}'")
+            else -> opbError("unknown OPB operator '${tokens[opIdx]}'")
         }
         val weights = LongArrayList()
         val literals = IntArrayList()
@@ -226,9 +237,9 @@ object Opb {
      * neither be represented nor solved, and treating it as "not an integer" would be misleading.
      */
     private fun parseLong(token: String, role: String): Long = token.toLongOrNull() ?: if (INTEGER.matches(token)) {
-        error("OPB $role exceeds the supported 64-bit range: '$token'")
+        opbError("OPB $role exceeds the supported 64-bit range: '$token'")
     } else {
-        error("OPB $role not an integer: '$token'")
+        opbError("OPB $role not an integer: '$token'")
     }
 
     /** Parse a term sequence: each term is a coefficient followed by one or more literals. */
@@ -243,7 +254,7 @@ object Opb {
                 lits.add(parseLit(tokens[idx]))
                 idx++
             }
-            require(lits.size > 0) { "OPB term missing variable after coefficient '$coef'" }
+            opbRequire(lits.size > 0) { "OPB term missing variable after coefficient '$coef'" }
             terms.add(Term(coef, lits))
         }
         return terms
@@ -264,10 +275,10 @@ object Opb {
     private fun parseLit(token: String): Int {
         val negated = token.startsWith("~")
         val rawVar = if (negated) token.substring(1) else token
-        require(rawVar.startsWith("x")) { "OPB variable must start with 'x', got '$token'" }
+        opbRequire(rawVar.startsWith("x")) { "OPB variable must start with 'x', got '$token'" }
         val v = rawVar.substring(1).toIntOrNull()?.minus(1)
-            ?: error("OPB variable index not parseable: '$token'")
-        require(v >= 0) { "OPB variable index out of range: '$token'" }
+            ?: opbError("OPB variable index not parseable: '$token'")
+        opbRequire(v >= 0) { "OPB variable index out of range: '$token'" }
         return Lit.make(v, positive = !negated)
     }
 }
