@@ -164,13 +164,14 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val lpCone = p.bool("lp-objective-cone")
     val lpAutoOff = p.bool("lp-auto-off-reprobe")
     val lpKnapsack = p.bool("lp-knapsack-lagrangian")
+    val lpBranching = p.bool("lp-branching")
     val pbLearning = p.bool("pb-learning")
     val varKind = if (allowSelectors) p.varSelectorKind("var-selector") else null
     val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
-        lpCone, lpAutoOff, lpKnapsack, pbLearning,
+        lpCone, lpAutoOff, lpKnapsack, lpBranching, pbLearning,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -193,6 +194,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
+        lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }
         valKind?.let { out = out.copy(valueSelector = it.selector()) }
