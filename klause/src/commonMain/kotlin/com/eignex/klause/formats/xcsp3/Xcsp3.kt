@@ -13,6 +13,7 @@ import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
+import com.eignex.klause.formats.mulExact
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
@@ -637,10 +638,18 @@ object Xcsp3 {
             return relationParts(node.args[0], node.args[1], op, delta)
         }
 
+        // Translate a 64-bit overflow from folding an XCSP3 arithmetic expression into a clean
+        // UnsupportedXcsp3Exception — the term exceeds what the solver's integer range represents.
+        private inline fun <T> checkedFold(block: () -> T): T = try {
+            block()
+        } catch (_: ArithmeticException) {
+            throw UnsupportedXcsp3Exception("integer overflow while folding an arithmetic expression")
+        }
+
         /** Lower `lhs op rhs` (with strictness [delta]) to coalesced linear components. When both sides
          *  share the same variable terms they cancel to an empty var list, leaving the constant `0 op bound`. */
         internal fun relationParts(lhs: FExpr, rhs: FExpr, op: LinearOp, delta: Int): RelParts {
-            val (vars, coeffs, bound) = linCombDiff(linear(lhs), linear(rhs), delta.toLong())
+            val (vars, coeffs, bound) = checkedFold { linCombDiff(linear(lhs), linear(rhs), delta.toLong()) }
             // XCSP3 coefficients/bounds originate from Int-valued FExpr numerals, so they fit Int.
             return RelParts(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound.toInt())
         }
@@ -682,7 +691,9 @@ object Xcsp3 {
             return LinearObjective(intCoefficients = arr)
         }
 
-        internal fun linear(e: FExpr): LinComb = when (e) {
+        internal fun linear(e: FExpr): LinComb = checkedFold { linearFold(e) }
+
+        private fun linearFold(e: FExpr): LinComb = when (e) {
             is FExpr.Num -> LinComb(emptyMap(), e.value.toLong())
 
             is FExpr.Ref -> LinComb(mapOf(ref(e.name) to 1L), 0L)
@@ -713,7 +724,7 @@ object Xcsp3 {
                 "mul" -> {
                     val parts = e.args.map { linear(it) }
                     val nonConst = parts.filter { it.coeffs.isNotEmpty() }
-                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> a * c.constant }
+                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> mulExact(a, c.constant) }
                     when {
                         k == 0L -> LinComb(emptyMap(), 0L)
 
