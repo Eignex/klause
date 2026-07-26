@@ -55,11 +55,9 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
             value = parseExpr()
         }
         expect(";", "expected `;` ending declaration")
-        val isVarFinal = isVar || (type is FznType.Array && elementIsVar(type))
+        val isVarFinal = isVar || (type is FznType.Array && type.elementIsVar)
         return FznVarDecl(name, type, isVarFinal, anns, value)
     }
-
-    private fun elementIsVar(t: FznType.Array): Boolean = t.elementIsVar
 
     private fun parseType(): FznType {
         val tok = peek()

@@ -75,8 +75,6 @@ internal fun FlatZincCompiler.compileParamArray(name: String, elem: FznType, lit
         is FznType.Array -> failHere("nested arrays not supported")
     }
 
-internal fun arrayToFlatZincArray(arr: ParamValue.Array): FlatZincArray = arr.arr
-
 internal fun FlatZincCompiler.evalIntConst(e: FznExpr): Long = when (e) {
     is FznExpr.IntLit -> e.value
 
