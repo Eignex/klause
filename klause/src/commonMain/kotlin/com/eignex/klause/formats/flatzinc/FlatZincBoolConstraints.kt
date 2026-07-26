@@ -10,6 +10,8 @@ import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.channelBoolTo01
+import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Lit
 
 internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
@@ -38,16 +40,12 @@ internal fun FlatZincCompiler.emitBoolXor(c: FznConstraint) {
     factors.add(Xor(lits, targetParity = 0))
 }
 
-/** Shared lowering for `array_bool_or` and `array_bool_and`. */
+/** Shared lowering for `array_bool_or` and `array_bool_and`: reify the reduction onto `r`. */
 private fun FlatZincCompiler.emitArrayBoolReduction(c: FznConstraint, isOr: Boolean) {
     expectArity(c, 2)
-    val lits = evalBoolVarArray(c.args[0])
+    val lits = evalBoolVarArray(c.args[0]).toList()
     val r = resolveBoolLit(c.args[1])
-    val body = if (isOr) lits else IntArray(lits.size) { Lit.negate(lits[it]) }
-    factors.add(Clause(body + intArrayOf(if (isOr) Lit.negate(r) else r)))
-    for (l in lits) {
-        factors.add(Clause(if (isOr) intArrayOf(Lit.negate(l), r) else intArrayOf(Lit.negate(r), l)))
-    }
+    if (isOr) tseitinOr(lits, r) else tseitinAnd(lits, r)
 }
 
 internal fun FlatZincCompiler.emitArrayBoolOr(c: FznConstraint) = emitArrayBoolReduction(c, isOr = true)
@@ -59,15 +57,7 @@ internal fun FlatZincCompiler.emitBoolAndOr(c: FznConstraint, and: Boolean) {
     val a = resolveBoolLit(c.args[0])
     val b = resolveBoolLit(c.args[1])
     val r = resolveBoolLit(c.args[2])
-    if (and) {
-        factors.add(Clause(intArrayOf(Lit.negate(r), a)))
-        factors.add(Clause(intArrayOf(Lit.negate(r), b)))
-        factors.add(Clause(intArrayOf(r, Lit.negate(a), Lit.negate(b))))
-    } else {
-        factors.add(Clause(intArrayOf(r, Lit.negate(a))))
-        factors.add(Clause(intArrayOf(r, Lit.negate(b))))
-        factors.add(Clause(intArrayOf(Lit.negate(r), a, b)))
-    }
+    if (and) tseitinAnd(listOf(a, b), r) else tseitinOr(listOf(a, b), r)
 }
 
 internal fun FlatZincCompiler.emitArrayBoolXor(c: FznConstraint) {
