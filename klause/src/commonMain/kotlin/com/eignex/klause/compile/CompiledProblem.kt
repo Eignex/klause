@@ -53,6 +53,10 @@ class CompiledProblem internal constructor(
     /** Label list (in universe-index order) for each nominal-set var. Empty map entry for
      *  int-universe set vars. */
     val setNominalLabels: Map<String, List<String>> = emptyMap(),
+    /** Real (LP-only continuous) variable id by schema name, for floats lowered as LP-only columns
+     *  (issue #1232) rather than bucketed; their value is read from [Sample.reals]. Empty when floats
+     *  are bucketed (see [floatDecoders]). */
+    internal val realVarIdByName: Map<String, Int> = emptyMap(),
 ) {
     /** Return the schema's declared `BacktrackParams` if any, else a fresh default
      *  [BacktrackParams]. Convenience for the common
@@ -133,8 +137,10 @@ class CompiledProblem internal constructor(
         return out
     }
 
-    /** Decode [handle]'s real value from [sample]. */
+    /** Decode [handle]'s real value from [sample] — from [Sample.reals] for an LP-only continuous column
+     *  (issue #1232), else from the bucket index. */
     fun decode(handle: FloatHandle, sample: Sample): Double {
+        realVarIdByName[handle.name]?.let { return sample.reals[it] }
         val spec = floatDecoders[handle.name]
             ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
@@ -181,17 +187,27 @@ class CompiledProblem internal constructor(
      *  bucket id directly with an exact integer objective; `decode(handle, sample)` recovers
      *  the real value for reporting. */
     fun minimize(handle: FloatHandle): LinearObjective {
+        realVarIdByName[handle.name]?.let { return realObjective(it, maximize = false) }
         floatDecoders[handle.name] ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
         return problem.minimizeInt(id)
     }
 
-    /** A [LinearObjective] that maximises [handle] — minimise the negated bucket id. */
+    /** A [LinearObjective] that maximises [handle] — minimise the negated bucket id (or real column). */
     fun maximize(handle: FloatHandle): LinearObjective {
+        realVarIdByName[handle.name]?.let { return realObjective(it, maximize = true) }
         floatDecoders[handle.name] ?: error("No float variable named '${handle.name}'")
         val id = intVarIdByName[handle.name]
             ?: error("Float '${handle.name}' has no int-side id")
         return problem.maximizeInt(id)
+    }
+
+    /** A single-real-column [LinearObjective] over LP-only continuous var [realId]; the always-minimising
+     *  frame negates the coefficient to maximise (issue #1232). */
+    private fun realObjective(realId: Int, maximize: Boolean): LinearObjective {
+        val coeffs = DoubleArray(problem.numRealVars)
+        coeffs[realId] = if (maximize) -1.0 else 1.0
+        return LinearObjective(realCoefficients = coeffs)
     }
 }

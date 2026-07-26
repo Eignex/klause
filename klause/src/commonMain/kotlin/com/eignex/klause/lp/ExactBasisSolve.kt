@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
 import kotlin.math.abs
-import kotlin.math.floor
 import kotlin.math.roundToLong
 
 /**
@@ -15,37 +14,34 @@ import kotlin.math.roundToLong
  * point, not the basis.
  */
 internal fun exactPointFeasible(model: LpModel, primal: DoubleArray): Boolean {
-    val integral = rationalizeToIntegerModel(model) ?: return false
-    val n = integral.n
-    val m = integral.m
-    // Shifted values zⱼ = primalⱼ − loShiftⱼ, snapped to a common dyadic denominator 2ᴷ (exact only).
+    val n = model.n
+    val m = model.m
+    // Shifted point zⱼ = primalⱼ − loShiftⱼ (the constraints/rhs are in shifted, lower-bound-zero coords).
     val z = DoubleArray(n) { primal[it] - model.loShiftD(it) }
-    val k = dyadicScaleBits(z) ?: return false
-    val d = (1L shl k).toDouble()
+    // A common decimal scale D = 10ᵏ turning every coefficient, rhs, bound and point value into an exact
+    // integer within a tight reconstruct tolerance (so 0.1 / 0.3 / 0.6 — dyadic-impossible but decimal —
+    // are handled with small integers). The scale reconstructs the intended decimals the frontend emitted;
+    // certifying the snapped-decimal point is the SAT (feasibility) verdict, not the strict Farkas path.
+    val k = decimalScaleBits(model, z) ?: return false
+    val d = pow10(k)
+    val dLong = pow10Long(k)
     val p = LongArray(n) { (z[it] * d).roundToLong() }
-    // Box: 0 ≤ pⱼ ≤ uⱼ·2ᴷ.
+    // Box: 0 ≤ pⱼ ≤ round(uⱼ·D).
     for (j in 0 until n) {
         if (p[j] < 0L) return false
-        if (integral.hasUpper[j]) {
-            val cap = Int128()
-            cap.addProduct(integral.upper[j], 1L shl k)
-            val pj = Int128()
-            pj.addLong(p[j])
-            pj.subtract(cap)
-            // pⱼ > uⱼ·2ᴷ (strictly positive difference) ⇒ out of the box.
-            if (pj.overflow || (pj.isNonNegative() && !(pj.hi == 0L && pj.lo == 0L))) return false
-        }
+        if (model.hasFiniteUpper(j) && p[j] > (model.upperD(j) * d).roundToLong()) return false
     }
-    // Per-row L = Σⱼ aᵢⱼ·pⱼ; compare to rhsᵢ·2ᴷ under the row's relation (equality slack ⇒ ==, else ≤).
+    // Per-row L = Σⱼ round(aᵢⱼ·D)·pⱼ ; compare to round(rhsᵢ·D)·D under the row's relation
+    // (equality slack ⇒ ==, else ≤) — both sides are the exact integer D²·(a·z) resp. D²·rhs.
     val lhs = Array(m) { Int128() }
-    for (j in 0 until n) integral.forEachInColumn(j) { i, a -> lhs[i].addProduct(a, p[j]) }
+    for (j in 0 until n) model.forEachInColumnD(j) { i, a -> lhs[i].addProduct((a * d).roundToLong(), p[j]) }
     for (i in 0 until m) {
         val r = Int128()
-        r.addProduct(integral.rhs[i], 1L shl k)
+        r.addProduct((model.rhsD(i) * d).roundToLong(), dLong)
         val diff = lhs[i].copy()
-        diff.subtract(r) // L − rhs·2ᴷ
+        diff.subtract(r) // L − rhs·D
         if (diff.overflow) return false
-        val isEquality = integral.hasUpper[integral.slackCol(i)]
+        val isEquality = model.hasFiniteUpper(model.slackCol(i))
         val sign = when {
             diff.hi < 0L -> -1
             diff.hi == 0L && diff.lo == 0L -> 0
@@ -57,23 +53,58 @@ internal fun exactPointFeasible(model: LpModel, primal: DoubleArray): Boolean {
     return true
 }
 
-/** Smallest `k ≤ MAX_SCALE_BITS` making every value in [z] an exact integer multiple of `2⁻ᵏ`, or null. */
-private fun dyadicScaleBits(z: DoubleArray): Int? {
-    for (k in 0..DYADIC_MAX_BITS) {
-        val s = (1L shl k).toDouble()
-        if (z.all {
-                val v = it * s
-                v.isFinite() && v == floor(v) && abs(v) < DYADIC_MAX_INT
-            }
-        ) {
-            return k
+/** Smallest decimal scale exponent `k ≤ DEC_MAX_BITS` at which every coefficient, rhs, finite bound and
+ *  point value of [model]/[z] reconstructs from `round(v·10ᵏ)/10ᵏ` within [DEC_TOL] and stays inside the
+ *  exactly-representable range, or null when none does (a genuinely non-decimal value like 1/3). */
+private fun decimalScaleBits(model: LpModel, z: DoubleArray): Int? {
+    for (k in 0..DEC_MAX_BITS) {
+        val s = pow10(k)
+        var ok = true
+        fun check(v: Double): Boolean {
+            val scaled = v * s
+            if (!scaled.isFinite() || abs(scaled) >= DEC_MAX_INT) return false
+            return abs(scaled.roundToLong() / s - v) <= DEC_TOL
         }
+        for (j in 0 until model.n) {
+            if (!check(z[j])) {
+                ok = false
+                break
+            }
+            if (model.hasFiniteUpper(j) && !check(model.upperD(j))) {
+                ok = false
+                break
+            }
+            model.forEachInColumnD(j) { _, a -> if (!check(a)) ok = false }
+            if (!ok) break
+        }
+        if (ok) {
+            for (i in 0 until model.m) {
+                if (!check(model.rhsD(i))) {
+                    ok = false
+                    break
+                }
+            }
+        }
+        if (ok) return k
     }
     return null
 }
 
-private const val DYADIC_MAX_BITS = 40
-private const val DYADIC_MAX_INT = 9.007199254740992E15
+private fun pow10(k: Int): Double {
+    var r = 1.0
+    repeat(k) { r *= 10.0 }
+    return r
+}
+
+private fun pow10Long(k: Int): Long {
+    var r = 1L
+    repeat(k) { r *= 10L }
+    return r
+}
+
+private const val DEC_MAX_BITS = 9
+private const val DEC_TOL = 1e-9
+private const val DEC_MAX_INT = 9.007199254740992E15
 
 /**
  * Exact primal-feasibility check of a reported LP [Basis] over an integer-coefficient [LpModel], in

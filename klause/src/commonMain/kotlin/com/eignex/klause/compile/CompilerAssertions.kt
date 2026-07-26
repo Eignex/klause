@@ -54,6 +54,8 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.ceil
 import kotlin.math.floor
 import com.eignex.klause.factor.circuit.Circuit as CircuitFactor
@@ -222,6 +224,13 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
         IntCmpOp.EQ -> LinearOp.EQ
 
         IntCmpOp.NE -> LinearOp.NE
+    }
+    if (schemaFloatsLpOnly) {
+        // LP-only continuous columns (issue #1232): emit the raw double coefficients over the real
+        // columns, no bucket scaling. The gate admits only LE/GE/EQ float-linears here.
+        val realVars = IntArray(n) { realVarIdByName.getValue(c.varNames[it]) }
+        factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
+        return
     }
     // Bucketed-int rewrite for the factor list. Reuses the same SCALE
     // historically used by [com.eignex.klause.schema.FloatExpr.multiHandleBucketCompare].
