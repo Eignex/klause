@@ -1,5 +1,7 @@
 package com.eignex.klause.schema
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
@@ -8,8 +10,10 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class IntOperatorsTest {
@@ -418,13 +422,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 1)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate <= 0.5 + 1e-9, "rate=$rate violated rate + 0.1 <= 0.6")
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 1)))
+        val rate = compiled.decode(schema.rate, sat.assignment)
+        assertTrue(rate <= 0.5 + 1e-9, "rate=$rate violated rate + 0.1 <= 0.6")
     }
 
     @Test
@@ -436,13 +436,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 2)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2 * rate >= 0.6")
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 2)))
+        val rate = compiled.decode(schema.rate, sat.assignment)
+        assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2 * rate >= 0.6")
     }
 
     @Test
@@ -516,15 +512,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        // Tolerance reflects backend-bucketing precision: integer-scaled coefficients can
-        // shift the boundary by a fraction of a bucket step (default 1/1023 ~ 1e-3).
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate >= 0.4 - 2e-3, "rate=$rate violated -rate <= -0.4 beyond bucketing tolerance")
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 3)))
+        val rate = compiled.decode(schema.rate, sat.assignment)
+        assertTrue(rate >= 0.4 - 1e-9, "rate=$rate violated -rate <= -0.4")
     }
 
     @Test
@@ -536,13 +526,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 4)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2*rate >= rate+0.3")
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 4)))
+        val rate = compiled.decode(schema.rate, sat.assignment)
+        assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2*rate >= rate+0.3")
     }
 
     @Test
@@ -572,9 +558,9 @@ class IntOperatorsTest {
         val compiled = S().compile()
         // One FloatLinear (rate <= 5.0) - always true.
         assertEquals(1, compiled.problem.factors.size)
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.samples(LocalSearchParams(maxFlips = 1_000, randomSeed = 1)).take(1).toList()
-        assertTrue(samples.isNotEmpty(), "tautology should be satisfied by any assignment")
+        assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 1)),
+        )
     }
 
     @Test
@@ -586,15 +572,10 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 5)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-
-        for (s in samples) {
-            val av = compiled.decode(schema.a, s)
-            val bv = compiled.decode(schema.b, s)
-            assertTrue(av + bv <= 1.0 + 0.1 + 1e-9, "a=$av b=$bv violated a+b <= 1.0")
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 5)))
+        val av = compiled.decode(schema.a, sat.assignment)
+        val bv = compiled.decode(schema.b, sat.assignment)
+        assertTrue(av + bv <= 1.0 + 1e-9, "a=$av b=$bv violated a+b <= 1.0")
     }
 
     @Test
@@ -606,14 +587,10 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 6)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val av = compiled.decode(schema.a, s)
-            val bv = compiled.decode(schema.b, s)
-            assertTrue(av - bv >= 0.5 - 0.1 - 1e-9, "a=$av b=$bv violated a-b >= 0.5")
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 6)))
+        val av = compiled.decode(schema.a, sat.assignment)
+        val bv = compiled.decode(schema.b, sat.assignment)
+        assertTrue(av - bv >= 0.5 - 1e-9, "a=$av b=$bv violated a-b >= 0.5")
     }
 
     @Test
@@ -626,17 +603,12 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-
-        for (s in samples) {
-            val av = compiled.decode(schema.a, s)
-            val bv = compiled.decode(schema.b, s)
-            assertTrue(
-                2 * av + 3 * bv <= 5.0 + 0.8 + 1e-9,
-                "a=$av b=$bv violated 2a + 3b <= 5.0",
-            )
-        }
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 7)))
+        val av = compiled.decode(schema.a, sat.assignment)
+        val bv = compiled.decode(schema.b, sat.assignment)
+        assertTrue(
+            2 * av + 3 * bv <= 5.0 + 1e-9,
+            "a=$av b=$bv violated 2a + 3b <= 5.0",
+        )
     }
 }

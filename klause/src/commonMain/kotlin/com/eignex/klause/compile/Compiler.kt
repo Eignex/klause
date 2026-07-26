@@ -103,6 +103,15 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     val floatMetaBuckets = IntArrayList()
     val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
 
+    // LP-only continuous columns (issue #1232): when [schemaFloatsLpOnly] holds, every schema float is a
+    // real variable (the simplex resolves it) rather than a bucket-index int, and float-linear rows lower
+    // to real [com.eignex.klause.factor.arithmetic.Linear]. `realVarIdByName` maps a float name to its real
+    // var id; parallel real bounds by real var id.
+    var schemaFloatsLpOnly = false
+    val realVarIdByName = mutableMapOf<String, Int>()
+    val realLo = mutableListOf<Double>()
+    val realHi = mutableListOf<Double>()
+
     /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
      *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
      *  `setLayouts["S"].indicatorBoolIds[i]` is the klause bool var that's `true` iff
@@ -413,7 +422,34 @@ fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): Compile
 // Schema-entry driver: turns a SchemaDef into a CompiledProblem by declaring variables,
 // asserting constraints, and packaging the engine state. Kept off the Lowering class so the
 // engine itself stays free of any SchemaDef / schema-shape dependency.
+
+/**
+ * Whether every schema float can be an LP-only continuous variable (issue #1232): the model declares a
+ * float, and every constraint is either a top-level non-strict, non-`ne` [FloatLinearConstraint] or a
+ * constraint that could not hide a float-linear. Conservatively declines (keeps bucketing) on any
+ * compound Boolean top-level constraint (`And`/`Or`/`Not`/`Implies`/`Iff`), which could reify or nest a
+ * float-linear, and on any strict/`ne` float-linear (not exactly LP-representable). A whole-surface gate:
+ * either all floats are LP-only or all bucketed, avoiding a mixed representation in one problem.
+ */
+private fun schemaFloatsAreLpOnly(def: SchemaDef<SchemaEntry>): Boolean {
+    if (def.entries.values.none { it is FloatSpec }) return false
+    for ((_, entry) in def.entries) {
+        if (entry !is NamedConstraint) continue
+        when (val e = entry.expr) {
+            is FloatLinearConstraint -> if (e.op != IntCmpOp.LE && e.op != IntCmpOp.GE && e.op != IntCmpOp.EQ) {
+                return false
+            }
+
+            is And, is Or, is Not, is Implies, is Iff -> return false
+
+            else -> Unit
+        }
+    }
+    return true
+}
+
 private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
+    schemaFloatsLpOnly = schemaFloatsAreLpOnly(def)
     for ((name, entry) in def.entries) {
         when (entry) {
             is BoolSpec -> bindBoolName(name, newBoolVar())
@@ -453,17 +489,25 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             }
 
             is FloatSpec -> {
-                // Floats are bucketed inline so [Problem.factors] stays pure int+bool;
-                // floatMetaIntervals / floatMetaBuckets / floatMetaIntVarIds record the per-var
-                // bucket params the float-linear lowering reads to build the scaled-integer factor.
-                val intId = newIntVar(IntDomain(0L, (entry.buckets - 1).toLong()))
-                bindIntName(name, intId)
                 floatDecoders[name] = entry
-                val fid = floatMetaIntervals.size
-                floatVarIdByName[name] = fid
-                floatMetaIntervals += FloatInterval(entry.min, entry.max)
-                floatMetaIntVarIds.add(intId)
-                floatMetaBuckets.add(entry.buckets)
+                if (schemaFloatsLpOnly) {
+                    // LP-only continuous column: a real variable the simplex resolves (issue #1232), no
+                    // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
+                    val rid = realLo.size
+                    realVarIdByName[name] = rid
+                    realLo += entry.min
+                    realHi += entry.max
+                } else {
+                    // Bucketed inline so [Problem.factors] stays pure int+bool; the parallel floatMeta*
+                    // arrays record the bucket params the float-linear lowering reads.
+                    val intId = newIntVar(IntDomain(0L, (entry.buckets - 1).toLong()))
+                    bindIntName(name, intId)
+                    val fid = floatMetaIntervals.size
+                    floatVarIdByName[name] = fid
+                    floatMetaIntervals += FloatInterval(entry.min, entry.max)
+                    floatMetaIntVarIds.add(intId)
+                    floatMetaBuckets.add(entry.buckets)
+                }
             }
 
             is NamedConstraint -> {}
@@ -488,6 +532,9 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
             numIntVars = numIntVars,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
+            numRealVars = realLo.size,
+            realLower = realLo.toDoubleArray(),
+            realUpper = realHi.toDoubleArray(),
         ),
         boolVarIdByName = boolVarIdByName.toMap(),
         intVarIdByName = intVarIdByName.toMap(),
@@ -495,6 +542,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
         floatDecoders = floatDecoders.toMap(),
         setLayouts = setLayouts.toMap(),
         setNominalLabels = setLabelOrder.toMap(),
+        realVarIdByName = realVarIdByName.toMap(),
     )
 }
 
