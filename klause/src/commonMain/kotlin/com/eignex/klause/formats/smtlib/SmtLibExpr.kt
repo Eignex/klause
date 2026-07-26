@@ -129,7 +129,9 @@ internal fun SmtLibQfLia.Builder.assertDistinct(args: List<SExpr>) {
 
 /** Post pairwise `!=` as linear NE constraints. */
 internal fun SmtLibQfLia.Builder.assertPairwiseNe(terms: List<LinComb>) {
-    for ((i, j) in pairs(terms.size)) factors.add(neLinear(terms[i], terms[j]))
+    for (i in terms.indices) {
+        for (j in i + 1 until terms.size) factors.add(neLinear(terms[i], terms[j]))
+    }
 }
 
 /** Channel a bool literal to a fresh 0/1 int term. */
@@ -142,9 +144,6 @@ internal fun SmtLibQfLia.Builder.litToIntTerm(lit: Int): LinComb {
     channelBoolTo01(factors, w, z)
     return LinComb(mapOf(z to 1), 0)
 }
-
-internal fun SmtLibQfLia.Builder.pairs(n: Int): List<Pair<Int, Int>> =
-    buildList { for (i in 0 until n) for (j in i + 1 until n) add(i to j) }
 
 internal fun SmtLibQfLia.Builder.neLinear(a: LinComb, b: LinComb): Linear {
     val (vars, coeffs, bound) = diff(a, b)
