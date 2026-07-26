@@ -43,11 +43,20 @@ class MpsLoweringTest {
     }
 
     @Test
-    fun `clamps an unbounded integer column to the search range`() {
+    fun `closes an unconstrained unbounded integer column under the small-model box`() {
+        // No rows and no objective: any single value is a witness, so the small-model box is
+        // equisatisfiable and the model is not flagged clamped.
         val compiled = model(MpsVar("x", integer = true, lower = null, upper = null)).toProblem(searchBound = 1000L)
-        assertTrue(compiled.clamped)
-        assertEquals(-1000L, compiled.problem.intDomains[0].min)
-        assertEquals(1000L, compiled.problem.intDomains[0].max)
+        assertFalse(compiled.clamped)
+
+        // Under an objective the box could truncate an unbounded optimum, so the lossy search
+        // window applies and the model is flagged.
+        val minimized = model(MpsVar("x", integer = true, lower = null, upper = null))
+            .copy(objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0))
+            .toProblem(searchBound = 1000L)
+        assertTrue(minimized.clamped)
+        assertEquals(-1000L, minimized.problem.intDomains[0].min)
+        assertEquals(1000L, minimized.problem.intDomains[0].max)
     }
 
     @Test
@@ -71,7 +80,8 @@ class MpsLoweringTest {
 
     @Test
     fun `a tripped load deadline skips OBBT and clamps the open side instead of tightening`() {
-        val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
+        // The huge bound magnitude keeps the small-model box from applying, so the lossy window shows.
+        val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0e12)
         val m = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
@@ -80,7 +90,7 @@ class MpsLoweringTest {
             listOf(row),
         )
         // With the load deadline already tripped, OBBT runs no LP solves, so the open upper side is clamped
-        // to the search bound rather than tightened to 5 — this is what bounds load on a large model.
+        // to the search bound rather than tightened — this is what bounds load on a large model.
         val compiled = m.toProblem(searchBound = 1_000L, cancellation = Cancellation { true })
         assertTrue(compiled.clamped)
         assertEquals(1_000L, compiled.problem.intDomains[0].max)

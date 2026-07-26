@@ -45,6 +45,12 @@ internal class LinearPropagator(
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {
         if (op == LinearOp.NE) return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
         val range = linearSumRange(state, coeffs, vars) // [sumLo, sumHi]
+        if (range[0] == Long.MIN_VALUE && range[1] == Long.MAX_VALUE) {
+            // Overflow-weakened range: the breaching side is unknowable in 64-bit, so a one-sided
+            // reason could omit the bounds that actually prove the conflict. Cite both sides of
+            // every variable — dense but always sufficient.
+            return collectLinearTightenAntecedents(state, vars, excludeIdx = -1, extraLit = 0)
+        }
         val useLo = when (op) {
             LinearOp.LE -> true
             LinearOp.GE -> false
