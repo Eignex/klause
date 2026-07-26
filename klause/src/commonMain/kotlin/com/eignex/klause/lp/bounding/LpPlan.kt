@@ -38,11 +38,12 @@ data class LpPlan(
      */
     val warmStart: Boolean = true,
     /**
-     * LP-guided value ordering (#246): when the per-node LP has solved (requires [bounding]), order
-     * each branch variable's candidate values by closeness to its fractional LP value
-     * (round-toward-LP diving). Pure search-order guidance — it changes which solutions are found
-     * first, never the optimum or feasibility — so it is correctness-neutral. Off by default; a no-op
-     * for variables with no current LP value.
+     * LP-guided branching (#246): when the per-node LP has solved (requires [bounding]), steer each
+     * branch variable by its fresh fractional LP value — an int var splits `x ≤ floor(lp)` (the
+     * dichotomy separating the fractional LP point), an integral value dives round-toward-LP. Pure
+     * search-order guidance — it changes which solutions are found first, never the optimum or
+     * feasibility — so it is correctness-neutral. Off by default; a no-op for variables with no
+     * fresh LP value.
      */
     val branching: Boolean = false,
     /**

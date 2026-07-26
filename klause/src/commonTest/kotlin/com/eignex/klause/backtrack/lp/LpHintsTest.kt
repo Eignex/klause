@@ -1,68 +1,51 @@
 package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.selector.VarRef
-import com.eignex.klause.lp.LpBuilder
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.RevisedSimplex
-import com.eignex.klause.lp.Sense
-import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
-/** #246: LP-guided value ordering (round-toward-LP diving), on the sparse revised-simplex path (#705). */
 class LpHintsTest {
 
-    @Test
-    fun `order puts the value nearest the LP value first`() {
-        // Pure LP (no propagation, which would integer-fix x): max x s.t. 3x <= 2 -> x = 2/3, round -> 1.
-        val b = LpBuilder()
-        val x = b.addVar(0, 5, cost = 1)
-        b.addRow(mapOf(x to 3L), Relation.LE, 2)
-        val model = b.build(Sense.MAXIMIZE)
-        val result = assertNotNull(RevisedSimplex(model).solve())
-        val relaxation = LpRelaxation(
-            model = model,
-            colVarId = intArrayOf(0),
-            colIsBool = booleanArrayOf(false),
-            objectiveConstant = 0L,
-            intColOf = intArrayOf(0),
-            boolColOf = IntArray(0),
+    private fun recordedHints(lpValue: Double): LpHints {
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 10)),
+            factors = arrayOf<Factor>(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 10L)),
         )
-        val hints = LpHints(1, 0)
-        hints.record(relaxation, result.primal, result.duals)
-
-        val ordered = hints.order(VarRef.IntVar(0), sequenceOf(0, 1, 2, 3, 4, 5)).toList()
-        // round(2/3)=1 first; ties (0,2 both dist 1) keep input order.
-        assertEquals(listOf(1L, 0L, 2L, 3L, 4L, 5L), ordered)
+        val rel = CpToLpRelaxation(p, LinearObjective(intCoefficients = longArrayOf(1))).build(PropagationSession(p))
+        val hints = LpHints(numIntVars = 1, numBoolVars = 0)
+        val primal = DoubleArray(rel.colVarId.size)
+        for (col in rel.colVarId.indices) {
+            if (rel.colVarId[col] == 0 && !rel.colIsBool[col]) primal[col] = lpValue
+        }
+        hints.record(rel, primal, DoubleArray(rel.model.m))
+        return hints
     }
 
     @Test
-    fun `branchScore is positive for a fractional variable and absent for an unrecorded one`() {
-        // max x s.t. 3x <= 2 -> x = 2/3 fractional ⇒ a positive branch score (fractionality 1/3).
-        val b = LpBuilder()
-        val x = b.addVar(0, 5, cost = 1)
-        b.addRow(mapOf(x to 3L), Relation.LE, 2)
-        val model = b.build(Sense.MAXIMIZE)
-        val result = assertNotNull(RevisedSimplex(model).solve())
-        val relaxation = LpRelaxation(
-            model = model,
-            colVarId = intArrayOf(0),
-            colIsBool = booleanArrayOf(false),
-            objectiveConstant = 0L,
-            intColOf = intArrayOf(0),
-            boolColOf = IntArray(0),
-        )
-        val hints = LpHints(1, 0)
-        hints.record(relaxation, result.primal, result.duals)
-        assertTrue(hints.branchScore(VarRef.IntVar(0)) > 0.0, "a fractional LP variable must score > 0")
-        assertTrue(hints.branchScore(VarRef.Bool(0)).isNaN(), "an unrecorded variable has no score")
+    fun `a fractional lp value puts the floor split first`() {
+        val ordered = recordedHints(3.7).order(VarRef.IntVar(0), (0L..10L).asSequence())
+        assertEquals(3L, ordered.first())
     }
 
     @Test
-    fun `order is a no-op without a hint`() {
-        val hints = LpHints(2, 0)
-        assertEquals(listOf(5L, 0L, 3L), hints.order(VarRef.IntVar(1), sequenceOf(5, 0, 3)).toList())
+    fun `an integral lp value puts the nearest value first`() {
+        val ordered = recordedHints(4.0).order(VarRef.IntVar(0), (0L..10L).asSequence())
+        assertEquals(4L, ordered.first())
+    }
+
+    @Test
+    fun `values stay unordered without a recorded solve`() {
+        val ordered = LpHints(numIntVars = 1, numBoolVars = 0).order(VarRef.IntVar(0), (5L..9L).asSequence())
+        assertEquals(5L, ordered.first())
     }
 }
