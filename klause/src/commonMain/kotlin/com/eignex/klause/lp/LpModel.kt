@@ -190,6 +190,31 @@ internal class LpModel(
         )
     }
 
+    /**
+     * A model identical in structure and bounds but whose objective is a single unit cost [unitCost] on
+     * structural column [col] and zero elsewhere — the per-variable objective optimization-based bound
+     * tightening ([com.eignex.klause.lp.tightenOpenIntBounds]) swaps in for each open side. The [cost]
+     * array is **shared and mutated in place**: [col] is set to [unitCost] and the column of the previous
+     * call ([prevCol], `-1` on the first) is reset to `0`, so a whole sweep of single-column objectives
+     * allocates no per-solve cost vector and each model is `O(1)` to form. The objective constant tracks
+     * the one nonzero column's shift (`unitCost·loShift[col]`), matching a fresh build with that cost, so
+     * the solve and its dual bound are identical to a per-objective rebuild. Integer models only (a
+     * [doubleView] carries its own cost the [Long] mutation would not reach).
+     */
+    fun withSingleColumnObjective(col: Int, unitCost: Long, prevCol: Int): LpModel {
+        require(doubleView == null) { "withSingleColumnObjective is for pure-integer models" }
+        if (prevCol >= 0) cost[prevCol] = 0L
+        cost[col] = unitCost
+        return LpModel(
+            n = n, m = m, csc = csc, rhs = rhs, cost = cost,
+            upper = upper, hasUpper = hasUpper, loShift = loShift,
+            objConstant = mulExact(unitCost, loShift[col]), sense = sense, tag = tag,
+            rowGlobal = rowGlobal, rowPremises = rowPremises, flippedRhs = flippedRhs,
+            probeClampedLo = probeClampedLo, probeClampedHi = probeClampedHi,
+            colContinuous = colContinuous,
+        )
+    }
+
     /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
 

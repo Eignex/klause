@@ -22,13 +22,22 @@ internal class OpenIntBounds(val lo: Long?, val hi: Long?)
  * This is why it must run before a [com.eignex.klause.solver.Problem]'s finite
  * [com.eignex.klause.solver.IntDomain]s are committed — once a side is clamped the "genuinely infinite"
  * information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ] constraints enter; any other
- * relation is skipped (dropping a constraint only loosens the relaxation, never unsound). Variables are
- * processed in id order and each closed side feeds the later solves.
+ * relation is skipped (dropping a constraint only loosens the relaxation, never unsound).
+ *
+ * The relaxation is built **once** and every open side is a re-solve of that one model with a single ±1
+ * cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and bounds never
+ * change, so the previous optimal basis stays primal-feasible and the primal simplex warm-starts from it
+ * ([LpSolver.solvePrimal]) in a few pivots rather than refactorizing a freshly-built model per side. Each
+ * side's bound is derived over the original (un-tightened) bounds, so — unlike a sequential pass that
+ * feeds each closed side into later solves — a bound is never sharpened by an earlier one; every bound is
+ * still individually sound (the relaxation contains every solution), only potentially looser, which never
+ * removes a feasible point.
  *
  * @param bounds current per-variable bounds, indexed by variable id.
  * @param constraints the linear constraints over those variable ids (an objective is not a constraint;
  *   the caller excludes it).
- * @param cancellation polled between variables so a long presolve can bail early.
+ * @param cancellation polled between variables so a long presolve can bail early — also threaded into each
+ *   solve, so a single overlong LP re-solve is cut off too.
  * @return a fresh bounds array with every provable open side closed.
  */
 internal fun tightenOpenIntBounds(
@@ -36,39 +45,16 @@ internal fun tightenOpenIntBounds(
     constraints: List<Linear>,
     cancellation: Cancellation = Cancellation.Never,
 ): Array<OpenIntBounds> {
-    val work = Array(bounds.size) { bounds[it] }
-    for (v in work.indices) {
-        if (cancellation()) break
-        val cur = work[v]
-        if (cur.lo != null && cur.hi != null) continue
-        // Both directions read the pre-tightening state of v (independent); v's closed bounds then feed
-        // the later variables.
-        val newHi = if (cur.hi == null) obbtBound(work, constraints, v, maximize = true, cancellation) else cur.hi
-        val newLo = if (cur.lo == null) obbtBound(work, constraints, v, maximize = false, cancellation) else cur.lo
-        work[v] = OpenIntBounds(newLo, newHi)
-    }
-    return work
-}
+    val n = bounds.size
+    val work = Array(n) { bounds[it] }
+    if (work.none { it.lo == null || it.hi == null }) return work // nothing open to tighten
 
-/** A sound finite LP bound on variable [target] (its max when [maximize], else its min) over the
- *  relaxation of [constraints] with the current [work] column bounds, or null when the LP leaves it
- *  unbounded / infeasible / overflows. Each variable is one LP column (a null side is a genuine ±∞ free
- *  column); only [target]'s column carries the objective cost (`−1` maximizing, `+1` minimizing). */
-private fun obbtBound(
-    work: Array<OpenIntBounds>,
-    constraints: List<Linear>,
-    target: Int,
-    maximize: Boolean,
-    cancellation: Cancellation,
-): Long? {
+    // Column j is variable j (added in id order); a genuine open side is a free column. Objective is zero
+    // — each solve swaps in its own single-column cost.
     val builder = LpBuilder()
-    val n = work.size
-    val col = IntArray(n)
     for (v in 0 until n) {
-        val cost = if (v == target) (if (maximize) -1L else 1L) else 0L
-        val l = work[v].lo
-        val h = work[v].hi
-        col[v] = if (l != null && h != null) builder.addVar(l, h, cost) else builder.addFreeVar(l, h, cost)
+        val b = work[v]
+        if (b.lo != null && b.hi != null) builder.addVar(b.lo, b.hi) else builder.addFreeVar(b.lo, b.hi)
     }
     for (f in constraints) {
         val rel = when (f.op) {
@@ -77,18 +63,39 @@ private fun obbtBound(
             LinearOp.EQ -> Relation.EQ
             else -> continue
         }
-        val cols = IntArray(f.vars.size) { col[f.vars[it]] }
-        builder.addRow(cols, f.coeffs.copyOf(), rel, f.bound)
+        builder.addRow(IntArray(f.vars.size) { f.vars[it] }, f.coeffs.copyOf(), rel, f.bound)
     }
-    val model = try {
+    val base = try {
         builder.build(Sense.MINIMIZE)
     } catch (_: LpOverflowException) {
-        return null
+        return work // cannot relax; leave every open side to the caller's clamp
     }
-    val result = try {
-        newLpSolver(model, cancellation).solvePrimal()
-    } catch (_: LpOverflowException) {
-        return null
-    } ?: return null
-    return model.tightVariableBound(result, col[target], maximize)
+
+    var warm: Basis? = null
+    var prevCol = -1
+    for (v in 0 until n) {
+        if (cancellation()) break
+        val cur = work[v]
+        if (cur.lo != null && cur.hi != null) continue
+        var newHi = cur.hi
+        var newLo = cur.lo
+        // maximize x_v bounds the open upper side; minimize bounds the open lower side.
+        for (maximize in booleanArrayOf(true, false)) {
+            if (if (maximize) cur.hi != null else cur.lo != null) continue
+            val model = base.withSingleColumnObjective(v, if (maximize) -1L else 1L, prevCol)
+            prevCol = v
+            val result = try {
+                newLpSolver(model, cancellation).solvePrimal(warm)
+            } catch (_: LpOverflowException) {
+                null
+            }
+            if (result != null) {
+                warm = result.basis
+                val bound = model.tightVariableBound(result, v, maximize)
+                if (maximize) newHi = bound else newLo = bound
+            }
+        }
+        work[v] = OpenIntBounds(newLo, newHi)
+    }
+    return work
 }
