@@ -39,6 +39,8 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
     }
 
     private fun parseVarDecl(): FznVarDecl {
+        val startLine = peek().line
+        val startCol = peek().col
         var isVar = false
         if (matchKw("var")) {
             isVar = true
@@ -56,7 +58,7 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
         }
         expect(";", "expected `;` ending declaration")
         val isVarFinal = isVar || (type is FznType.Array && type.elementIsVar)
-        return FznVarDecl(name, type, isVarFinal, anns, value)
+        return FznVarDecl(name, type, isVarFinal, anns, value, startLine, startCol)
     }
 
     private fun parseType(): FznType {
@@ -162,6 +164,8 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
     }
 
     private fun parseConstraint(): FznConstraint {
+        val startLine = peek().line
+        val startCol = peek().col
         expectKw("constraint")
         val name = expectIdent()
         expect("(", "expected `(` after constraint name")
@@ -173,7 +177,7 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
         expect(")", "expected `)` closing constraint args")
         val anns = parseAnnotations()
         expect(";", "expected `;` after constraint")
-        return FznConstraint(name, args, anns)
+        return FznConstraint(name, args, anns, startLine, startCol)
     }
 
     private fun parseSolve(): FznSolve {

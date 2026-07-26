@@ -2,8 +2,17 @@ package com.eignex.klause.formats.flatzinc
 
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class FlatZincCompilerArityTest {
+
+    @Test
+    fun `a semantic compile error reports the constraint's source line`() {
+        // An unsupported builtin sits on line 3; the compile error must be located there, not at 0:0.
+        val src = "var 1..3: x;\nvar 1..3: y;\nconstraint not_a_real_builtin(x, y);\nsolve satisfy;"
+        val e = assertFailsWith<FlatZincParseException> { parseFlatZinc(src) }
+        assertTrue("at 3:" in e.message.orEmpty(), e.message.orEmpty())
+    }
 
     @Test
     fun `bool2int with the wrong arity is a parse error not an index crash`() {
