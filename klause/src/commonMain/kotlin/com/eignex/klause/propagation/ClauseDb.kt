@@ -85,7 +85,15 @@ internal fun PropagationState.addLearnedPb(
     lbd: Int,
     permanent: Boolean = false,
 ): Int {
-    val prop = PseudoBooleanPropagator(literals.litVars(), EmptyIntArray, weights, literals, PbOp.GE, degree, watched = true)
+    val prop = PseudoBooleanPropagator(
+        literals.litVars(),
+        EmptyIntArray,
+        weights,
+        literals,
+        PbOp.GE,
+        degree,
+        watched = true,
+    )
     val newFid = totalFactorCount
     learned.store.add(prop)
     learned.lbds.add(lbd)

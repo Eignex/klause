@@ -104,7 +104,12 @@ class PbLearningTest {
                 }
             }
             val problem = { Problem(numVars, 0, emptyArray(), factors.toTypedArray()) }
-            val forget = BacktrackParams(randomSeed = 5L, pbLearning = true, maxLearnedClauses = 3, lubyRestartBase = 8L)
+            val forget = BacktrackParams(
+                randomSeed = 5L,
+                pbLearning = true,
+                maxLearnedClauses = 3,
+                lubyRestartBase = 8L,
+            )
             val pb = BacktrackSolver(problem()).solve(forget)
             val cl = BacktrackSolver(problem()).solve(forget.copy(pbLearning = false))
             assertEquals(cl is SolveResult.Sat, pb is SolveResult.Sat, "disagree under forgetting on $iter")

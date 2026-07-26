@@ -166,9 +166,11 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     /** Load factor [fid]'s constraint into [target] as a `≥` constraint; false when not a loadable kind.
      *  [forcedLit] (the pivot's now-true literal, or 0 for a seed) selects the propagating half of a
-     *  cardinality or equality reason. */
+     *  cardinality or equality reason. A `boolReason` can name a since-forgotten learned constraint (the
+     *  clause path avoids this by reading `boolAntecedents`), so an out-of-range id falls back to the
+     *  clause-form reason rather than indexing a compacted store. */
     private fun loadFactor(fid: Int, target: PbAccumulator, forcedLit: Int): Boolean {
-        if (fid < 0) return false
+        if (fid < 0 || fid >= state.totalFactorCount) return false
         return when (val f = state.factorAt(fid)) {
             is PseudoBooleanPropagator -> f.loadReason(target, forcedLit, state)
             is CardinalityPropagator -> f.loadReason(target, forcedLit, state)
@@ -234,7 +236,12 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      * For a unit-weight degree-1 constraint (a clause) this reduces exactly to the clause second-highest
      * level. The candidate levels are the distinct decision levels of the constraint's assigned literals.
      */
-    private fun pbAssertion(weights: LongArray, literals: IntArray, degree: Long, currentLevel: Int): Pair<Int, Boolean> {
+    private fun pbAssertion(
+        weights: LongArray,
+        literals: IntArray,
+        degree: Long,
+        currentLevel: Int,
+    ): Pair<Int, Boolean> {
         val cand = IntHashSet(literals.size + 1)
         cand.add(0)
         for (lit in literals) {
