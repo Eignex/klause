@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.remapVars
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
@@ -74,6 +75,11 @@ class Table private constructor(
     // symmetry refinement's per-round hot path. Cleared (recomputed) only when the tuples change.
     private var cachedTupleKey: LongArray? = cachedTupleKey
 
+    /** Shared across the rows of a `<group>` over one relation so a full-table GAC sweep that prunes
+     *  nothing is discovered once and skipped by the rest. Set by the front-end that shares [tuples];
+     *  carried across [remap] (same relation). Null ⇒ a lone table, no group reuse. */
+    internal var groupCache: TableGroupCache? = null
+
     private fun tupleKey(): LongArray = cachedTupleKey ?: run {
         // Rows are a set, so order-independence comes from sorting rows into a canonical order. Short
         // tables tie-break equal-lower-bound rows by their upper bound so the key stays canonical, and
@@ -119,7 +125,7 @@ class Table private constructor(
         tuples,
         hi,
         cachedTupleKey,
-    )
+    ).also { it.groupCache = groupCache }
 
     // Affine substitution `x = scale·replacement + offset` rewrites every column holding x: a row's
     // required value v for x means replacement = (v − offset) / scale, so rows where (v − offset) is
@@ -240,7 +246,8 @@ class Table private constructor(
         }
     }
 
-    override fun asPropagator(): Propagator = TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi)
+    override fun asPropagator(): Propagator =
+        TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi, groupCache)
 
     override fun asInvariant(): Invariant =
         TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi)

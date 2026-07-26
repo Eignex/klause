@@ -3,6 +3,7 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.solver.Lit
@@ -136,7 +137,11 @@ internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRow
  *  row-major cell lower bounds [tuples] and, for a short table, the per-cell upper bounds [hi] (null
  *  for a fully-ground table). [triviallySat] flags a table with a fully unbounded row, which matches
  *  every assignment — the constraint posts nothing. */
-internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray, val hi: LongArray?)
+internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray, val hi: LongArray?) {
+    /** One cache shared by every row of the group instantiating this template (they share [tuples]), so
+     *  a full-table sweep that prunes nothing is discovered once and skipped by the rest. */
+    val groupCache: TableGroupCache = TableGroupCache()
+}
 
 /** Return the support template for [text], reusing the last one when [text] is the same object — the
  *  case for a `<group>`'s rows, which share one `<supports>` String object. */
@@ -157,7 +162,7 @@ internal fun Xcsp3.Builder.postSupportTable(vars: IntArray, text: String) {
     val arity = vars.size
     val tpl = supportTemplateFor(text) { buildSupportTemplate(arity, text) }
     if (tpl.triviallySat) return
-    factors.add(Table(xs = vars, tuples = tpl.tuples, hi = tpl.hi))
+    factors.add(Table(xs = vars, tuples = tpl.tuples, hi = tpl.hi).also { it.groupCache = tpl.groupCache })
 }
 
 private fun Xcsp3.Builder.buildSupportTemplate(arity: Int, text: String): SupportTemplate {

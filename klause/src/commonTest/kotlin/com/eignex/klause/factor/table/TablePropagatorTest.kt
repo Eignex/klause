@@ -3,6 +3,7 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -225,6 +226,56 @@ class TablePropagatorTest {
             val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = (trial + 1).toLong()))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (arity=$arity hi=$hi rows=$numRows): must equal in-domain tuples")
+        }
+    }
+
+    @Test
+    fun `table factors sharing a group cache enumerate exactly the allowed tuples`() {
+        // Several binary tables over disjoint variable pairs bind one shared TableGroupCache — the `<group>`
+        // shape where every row instantiates the same relation. The first row over full domains records the
+        // "prunes no domain" verdict; the others reuse it, skipping their own sweep. Enumeration under the
+        // CDCL backtracker must still equal brute force, and the mix of full-domain (reusing) and pinned
+        // (recomputing) rows exercises both paths across deep backtracking. The relation over {1..4}² allows
+        // every off-diagonal pair (i != j) — dense enough that a full-domain sweep prunes nothing, so the
+        // reuse verdict is both set and hit.
+        val rel = ArrayList<Long>()
+        for (a in 1..4) {
+            for (b in 1..4) {
+                if (a != b) {
+            rel.add(a.toLong())
+            rel.add(b.toLong())
+        }
+            }
+        }
+        val flat = rel.toLongArray()
+        val cache = TableGroupCache()
+        fun mk(v0: Int, v1: Int): Table = Table(xs = intArrayOf(v0, v1), tuples = flat).also { it.groupCache = cache }
+        for ((idx, h0) in listOf(4, 1).withIndex()) {
+            cache.noopMins = null
+            cache.noopMaxs = null
+            val brute = HashSet<List<Int>>()
+            for (a in 1..h0) {
+                for (b in 1..4) {
+                    for (c in 1..4) {
+                        for (d in 1..4) {
+                            for (e in 1..4) {
+                                for (f in 1..4) {
+                                    if (a != b && c != d && e != f) brute.add(listOf(a, b, c, d, e, f))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 6,
+                intDomains = Array(6) { if (it == 0) IntDomain(1, h0.toLong()) else IntDomain(1, 4) },
+                factors = arrayOf<Factor>(mk(0, 1), mk(2, 3), mk(4, 5)),
+            )
+            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L))
+                .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
+            assertEquals(brute, found, "shared-cache table #$idx (var0 hi=$h0): must equal brute force")
         }
     }
 }
