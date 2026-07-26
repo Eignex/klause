@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.bool
 
+import com.eignex.klause.propagation.PbAccumulator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.moveBoolWatcher
@@ -97,6 +98,39 @@ internal class CardinalityPropagator(
             return out
         }
         return null
+    }
+
+    /**
+     * Load the constraint into [acc] as a coefficient-carrying `≥` reason for cutting-planes conflict
+     * analysis (#1119 Phase 3). A cardinality is two unit-weight bounds; the half that forced [forcedLit]
+     * is selected by that literal's polarity: a forced-true own-literal came from the at-least side
+     * (`Σ ℓ ≥ min`), a forced-false one from the at-most side (`Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). Returns
+     * false for a seed (no forced literal, ambiguous), a degenerate bound, or a variable not in scope.
+     */
+    fun loadReason(acc: PbAccumulator, forcedLit: Int): Boolean {
+        if (forcedLit == 0) return false
+        val v = Lit.variable(forcedLit)
+        var occ = 0
+        var found = false
+        for (lit in literals) {
+            if (Lit.variable(lit) == v) {
+                occ = lit
+                found = true
+                break
+            }
+        }
+        if (!found) return false
+        val n = literals.size
+        val ones = LongArray(n) { 1L }
+        return if (occ == forcedLit) {
+            // At-least side forced this literal true: Σ ℓ ≥ min.
+            if (min <= 0) false else acc.loadPb(ones, literals, geBound = min.toLong())
+        } else {
+            // At-most side forced this literal false: Σ ℓ ≤ max ⇒ Σ ¬ℓ ≥ n − max.
+            if (max >= n) return false
+            val flipped = IntArray(n) { literals[it] xor 1 }
+            acc.loadPb(ones, flipped, geBound = (n - max).toLong())
+        }
     }
 
     /** Antecedents for a forced pin. For an at-least pin ([collectTrue] = false) the reason is the

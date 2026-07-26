@@ -85,7 +85,7 @@ internal fun PropagationState.addLearnedPb(
     lbd: Int,
     permanent: Boolean = false,
 ): Int {
-    val prop = PseudoBooleanPropagator(literals.litVars(), EmptyIntArray, weights, literals, PbOp.GE, degree)
+    val prop = PseudoBooleanPropagator(literals.litVars(), EmptyIntArray, weights, literals, PbOp.GE, degree, watched = true)
     val newFid = totalFactorCount
     learned.store.add(prop)
     learned.lbds.add(lbd)
@@ -93,7 +93,11 @@ internal fun PropagationState.addLearnedPb(
     learned.tier.add(ClauseTier.UNSET.ordinal)
     learned.usedFlags.add(0)
     refPayloadStore.add(null)
-    for (lit in literals) installLitWatch(lit, newFid, NO_BLOCKER)
+    // Install only the weighted covering watch set; the constraint wakes when a watched literal goes
+    // false, not on every literal change (#1119 Phase 3 lever 1).
+    val watched = prop.selectWatched(this)
+    for (lit in watched) installLitWatch(lit, newFid, NO_BLOCKER)
+    refPayload[newFid] = watched
     return newFid
 }
 

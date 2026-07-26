@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.CardinalityPropagator
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.solver.Lit
@@ -109,9 +110,10 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     }
 
     /** Load the conflicting constraint: the PB/clause of [seedFactorId] when available, else the
-     *  clause-form seed the driver supplied. */
+     *  clause-form seed the driver supplied. A seed has no forced literal, so cardinality/EQ reasons
+     *  (whose direction is ambiguous without one) fall back to the clause form. */
     private fun loadSeed(reasonLits: IntArray): Boolean {
-        if (seedFactorId >= 0 && loadFactor(seedFactorId, acc)) return true
+        if (seedFactorId >= 0 && loadFactor(seedFactorId, acc, forcedLit = 0)) return true
         return acc.loadClause(reasonLits)
     }
 
@@ -146,21 +148,24 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
      *  [pivot]), else the fallback clause = the driver's antecedents plus [pivot]'s forced literal. */
     private fun loadPivotReason(pivot: Int, fallbackReasonLits: IntArray): Boolean {
         val forcingFid = state.boolReason[pivot]
-        if (loadFactor(forcingFid, reason) && reason.coefOf(pivot) != 0L) return true
+        val forced = Lit.make(pivot, state.boolValueAt(pivot))
+        if (loadFactor(forcingFid, reason, forced) && reason.coefOf(pivot) != 0L) return true
         // Fallback: reconstruct the reason clause. The driver's antecedents omit the forced literal;
         // add it back so the clause mentions the pivot and cancellation can proceed.
-        val forced = Lit.make(pivot, state.boolValueAt(pivot))
         val lits = IntArray(fallbackReasonLits.size + 1)
         fallbackReasonLits.copyInto(lits)
         lits[fallbackReasonLits.size] = forced
         return reason.loadClause(lits)
     }
 
-    /** Load factor [fid]'s constraint into [target] as a `≥` constraint; false when not a loadable kind. */
-    private fun loadFactor(fid: Int, target: PbAccumulator): Boolean {
+    /** Load factor [fid]'s constraint into [target] as a `≥` constraint; false when not a loadable kind.
+     *  [forcedLit] (the pivot's now-true literal, or 0 for a seed) selects the propagating half of a
+     *  cardinality or equality reason. */
+    private fun loadFactor(fid: Int, target: PbAccumulator, forcedLit: Int): Boolean {
         if (fid < 0) return false
         return when (val f = state.factorAt(fid)) {
-            is PseudoBooleanPropagator -> f.loadReason(target)
+            is PseudoBooleanPropagator -> f.loadReason(target, forcedLit)
+            is CardinalityPropagator -> f.loadReason(target, forcedLit)
             is ClausePropagator -> target.loadClause(f.literals)
             else -> false
         }
@@ -176,10 +181,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         if (failed) return ConflictAnalyzer.AnalysisResult.NotApplicable
         val m = acc.materialize() ?: return ConflictAnalyzer.AnalysisResult.NotApplicable
         val levels = distinctLevels(m.literals)
-        var atConflictLevel = 0
-        for (lit in m.literals) if (graph.levelOf(Lit.variable(lit)) == currentLevel) atConflictLevel++
-        val backjump = backjumpLevelOf(m.literals, currentLevel)
-        val asserting = atConflictLevel == 1
+        val (backjump, asserting) = pbAssertion(m.weights, m.literals, m.degree, currentLevel)
         // A unit-weight, degree-1 constraint is exactly a clause; emit it as one so it flows the clause
         // storage/vivification/glue paths rather than a degenerate PB propagator.
         if (m.degree == 1L && m.weights.all { it == 1L }) {
@@ -207,13 +209,51 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         return out
     }
 
-    private fun backjumpLevelOf(literals: IntArray, currentLevel: Int): Int {
-        var best = 0
+    /**
+     * The pseudo-Boolean assertion level: the smallest decision level `L` in `[0, currentLevel)` at which
+     * the learned constraint `Σ weights·literals ≥ degree` becomes non-conflicting *and* forces a literal
+     * once the trail is popped to `L`. Backjumping to that `L` prunes the most search while keeping the
+     * constraint asserting. Returns `(backjumpLevel, asserting)`; if no such level exists the constraint
+     * is non-asserting and the engine falls back to chronological backtracking (always sound).
+     *
+     * For a unit-weight degree-1 constraint (a clause) this reduces exactly to the clause second-highest
+     * level. The candidate levels are the distinct decision levels of the constraint's assigned literals.
+     */
+    private fun pbAssertion(weights: LongArray, literals: IntArray, degree: Long, currentLevel: Int): Pair<Int, Boolean> {
+        val cand = IntHashSet(literals.size + 1)
+        cand.add(0)
         for (lit in literals) {
-            val lvl = graph.levelOf(Lit.variable(lit))
-            if (lvl < currentLevel && lvl > best) best = lvl
+            val v = Lit.variable(lit)
+            if (state.boolAssignedAt(v)) {
+                val lvl = state.boolLevel[v]
+                if (lvl in 1 until currentLevel) cand.add(lvl)
+            }
         }
-        return best
+        val levelsAsc = cand.toIntArray()
+        levelsAsc.sort()
+        for (l in levelsAsc) {
+            if (propagatesAt(weights, literals, degree, l)) return l to true
+        }
+        return 0 to false
+    }
+
+    /** True iff, after popping to level [l], the constraint has slack ≥ 0 and some freed literal (var
+     *  unassigned or assigned above [l]) has weight exceeding the slack — i.e. it force-propagates. */
+    private fun propagatesAt(weights: LongArray, literals: IntArray, degree: Long, l: Int): Boolean {
+        var available = 0L // Σ weights of literals not falsified-and-kept at levels ≤ l
+        var maxFree = 0L // largest weight among freed literals (candidates to be forced)
+        for (i in literals.indices) {
+            val lit = literals[i]
+            val w = weights[i]
+            val v = Lit.variable(lit)
+            val assigned = state.boolAssignedAt(v)
+            val keptFalsified = assigned && state.boolLevel[v] <= l && state.boolValueAt(v) != Lit.isPositive(lit)
+            if (!keptFalsified) available += w
+            val freed = !assigned || state.boolLevel[v] > l
+            if (freed && w > maxFree) maxFree = w
+        }
+        val slack = available - degree
+        return slack >= 0 && maxFree > slack
     }
 
     private companion object {
