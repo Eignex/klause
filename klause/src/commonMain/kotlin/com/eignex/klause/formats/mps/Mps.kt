@@ -2,6 +2,7 @@ package com.eignex.klause.formats.mps
 
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.formats.splitWhitespace
 
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)
@@ -81,10 +82,6 @@ data class MpsModel(
  */
 object Mps {
 
-    /** Whitespace token splitter, compiled once instead of per data line (a large MIPLIB instance has
-     *  hundreds of thousands of `COLUMNS` rows). */
-    private val WHITESPACE = Regex("\\s+")
-
     private enum class Section { NONE, NAME, OBJSENSE, ROWS, COLUMNS, RHS, RANGES, BOUNDS, ENDATA }
 
     private enum class RowType { OBJECTIVE, LE, GE, EQ, FREE }
@@ -120,7 +117,7 @@ object Mps {
             // Comments start with `*`; blank lines are skipped. A line with no leading whitespace and a
             // recognised keyword opens a new section, otherwise it is a data line for the current one.
             if (rawLine.isBlank() || rawLine.startsWith("*")) continue
-            val fields = rawLine.trim().split(WHITESPACE)
+            val fields = rawLine.trim().splitWhitespace()
             if (!rawLine[0].isWhitespace()) {
                 section = openSection(fields).also {
                     if (it == Section.NAME) name = fields.getOrElse(1) { "" }

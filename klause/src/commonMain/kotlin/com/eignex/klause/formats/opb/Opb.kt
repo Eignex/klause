@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
@@ -50,9 +51,6 @@ object Opb {
     /** A signed integer literal, used to tell an out-of-64-bit-range value from a non-numeric token. */
     private val INTEGER = Regex("[+-]?\\d+")
 
-    /** Whitespace token splitter, compiled once instead of per line. */
-    private val WHITESPACE = Regex("\\s+")
-
     /** A parsed term: [coef] times the conjunction of [lits] (a single literal when linear). */
     private class Term(val coef: Long, val lits: IntArrayList)
 
@@ -98,7 +96,7 @@ object Opb {
             if (line.isEmpty() || line.startsWith("*")) continue
             // `;` terminates a statement and need not be whitespace-separated (e.g. `... >= 1;`), so
             // isolate it into its own token before splitting.
-            tokens.addAll(line.replace(";", " ; ").split(WHITESPACE).filter { it.isNotEmpty() })
+            tokens.addAll(line.replace(";", " ; ").splitWhitespace())
         }
 
         val builder = Builder()
