@@ -156,7 +156,7 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
         // LP is feasible — the real rows have no propagator, so CP alone has not enforced them. On success
         // the LP's continuous values complete the assignment into a full solution.
         if (problem.numRealVars == 0) return snap
-        val res = leafRealFeasibility(problem, objective = null, sample = snap)
+        val res = leafRealFeasibility(problem, objective = null, sample = snap, cancellation = params.cancellation)
         return when (res.verdict) {
             LpVerdict.OPTIMAL -> snap.copy(reals = res.reals)
 

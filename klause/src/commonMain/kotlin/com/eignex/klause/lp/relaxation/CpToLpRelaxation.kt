@@ -28,6 +28,7 @@ import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.lp.solveAndCertify
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -194,9 +195,17 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
  * the fixed values and only the LP-only real rows can bind — making this exactly a residual real-LP
  * feasibility test. Called only when the problem declares continuous variables.
  */
-internal fun leafRealFeasibility(problem: Problem, objective: LinearObjective?, sample: Sample): LeafRealResult {
+internal fun leafRealFeasibility(
+    problem: Problem,
+    objective: LinearObjective?,
+    sample: Sample,
+    cancellation: Cancellation = Cancellation.Never,
+): LeafRealResult {
     val relaxation = CpToLpRelaxation(problem, objective).build(SampleDomains(sample))
-    val certified = solveAndCertify(relaxation.model)
+    // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
+    // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
+    // INDETERMINATE, degrading the leaf to `unknown` — never an unsound SAT/UNSAT.
+    val certified = solveAndCertify(relaxation.model, cancellation = cancellation)
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
     val primal = certified.float?.primal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]).

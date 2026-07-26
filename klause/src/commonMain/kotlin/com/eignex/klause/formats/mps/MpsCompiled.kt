@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -65,6 +66,7 @@ fun MpsModel.toProblem(
     searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     @Suppress("UNUSED_PARAMETER") floatBuckets: Int = 0,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
+    cancellation: Cancellation = Cancellation.Never,
 ): MpsCompiled {
     val isFloat = BooleanArray(variables.size) { !variables[it].integer }
     val intVarOf = IntArray(variables.size) { -1 }
@@ -106,8 +108,11 @@ fun MpsModel.toProblem(
     // OBBT over the purely-integer rows only (a real-bearing Linear carries placeholder integer data).
     val intLinears = factors.filterIsInstance<Linear>().filter { !it.hasReals }
 
+    // Bound OBBT by the load deadline: on a large model each open-int side is a full LP solve over the
+    // relaxation, so an unbounded pass could outlast the whole solve budget. A side left un-tightened when
+    // the deadline trips is clamped below (sound — the clamp only ever loosens).
     @Suppress("UNCHECKED_CAST")
-    val tightened = tightenOpenIntBounds(obbtInput as Array<OpenIntBounds>, intLinears)
+    val tightened = tightenOpenIntBounds(obbtInput as Array<OpenIntBounds>, intLinears, cancellation)
     var clamped = false
     val domains = Array(numInt) { j ->
         val lo = tightened[j].lo ?: (-searchBound).also { clamped = true }
