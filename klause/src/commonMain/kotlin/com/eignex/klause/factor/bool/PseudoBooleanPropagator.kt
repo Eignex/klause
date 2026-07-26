@@ -104,16 +104,29 @@ internal class PseudoBooleanPropagator(
      * upper `≤` bound); with no forced literal (a seed) the direction is ambiguous and it falls back to
      * the clause-form reason. Also returns false on overflow.
      */
-    fun loadReason(acc: PbAccumulator, forcedLit: Int = 0): Boolean = when (op) {
+    fun loadReason(acc: PbAccumulator, forcedLit: Int, state: PropagationState): Boolean = when (op) {
         PbOp.GE -> acc.loadPb(weights, literals, geBound = bound)
 
         PbOp.LE -> loadLe(acc)
 
+        // An equality is two `≥` constraints. A resolved pivot picks the half by its forced polarity; a
+        // seed (forcedLit == 0, the conflicting constraint) picks the violated half from [state].
         PbOp.EQ -> when {
-            forcedLit == 0 -> false
-            forcedByGeSide(forcedLit) -> acc.loadPb(weights, literals, geBound = bound)
+            forcedLit != 0 -> if (forcedByGeSide(forcedLit)) acc.loadPb(weights, literals, geBound = bound) else loadLe(acc)
+            geSideViolated(state) -> acc.loadPb(weights, literals, geBound = bound)
             else -> loadLe(acc)
         }
+    }
+
+    /** For a seed equality conflict: true iff the lower-bound half `Σ w·ℓ ≥ bound` is the violated one
+     *  (the achievable sum of the non-false literals falls short of the bound). */
+    private fun geSideViolated(state: PropagationState): Boolean {
+        var nonFalseSum = 0L
+        for (i in literals.indices) {
+            val b = state.boolValues[Lit.variable(literals[i])]
+            if (b == null || Lit.evaluate(literals[i], b)) nonFalseSum += weights[i]
+        }
+        return nonFalseSum < bound
     }
 
     /** Load the `≤` constraint `Σ w·ℓ ≤ bound` as its `≥` complement `Σ w·¬ℓ ≥ (Σw − bound)`. */
