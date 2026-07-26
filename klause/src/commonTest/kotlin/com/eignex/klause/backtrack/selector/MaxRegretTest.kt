@@ -29,6 +29,19 @@ class MaxRegretTest {
     }
 
     @Test
+    fun `MaxRegret regret saturates instead of wrapping on a full long span`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 10), IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+        )
+        val obj = LinearObjective(intCoefficients = longArrayOf(1_000_000L, 2L))
+        val session = PropagationSession(problem)
+        assertEquals(VarRef.IntVar(1), MaxRegret(obj).pick(session, Random(0L)))
+    }
+
+    @Test
     fun `MaxRegret falls through to base when all regrets are zero`() {
         val problem = Problem(
             numBoolVars = 0,

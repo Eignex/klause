@@ -37,6 +37,12 @@ class RunsDomainTest {
     }
 
     @Test
+    fun `sizeLong counts wide runs exactly`() {
+        val wide = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
+        assertEquals(5_000_000_000L, wide.sizeLong)
+    }
+
+    @Test
     fun `lower and higher cross a hole correctly when size saturates`() {
         val d = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
         assertEquals(2_499_999_999L, d.lower(2_500_000_001L))
