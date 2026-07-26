@@ -51,11 +51,21 @@ internal class FlatZincCompiler(
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
 
+    // Float var name -> the integer argument of the `int2float` that defines it (the float is that int's
+    // continuous image). Lets a `float_times` with one such operand lower as an exact int·real product
+    // ([com.eignex.klause.factor.arithmetic.RealProduct]) rather than a bucket table (issue #1232, Phase 7).
+    internal val int2floatSource = HashMap<String, FznExpr>()
+
     internal val enumLabelsByVar = HashMap<String, List<String>>()
 
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     fun compile(): FlatZincProgram {
+        for (c in model.constraints) {
+            if (c.name == "int2float" && c.args.size == 2) {
+                (c.args[1] as? FznExpr.Ident)?.let { int2floatSource[it.name] = c.args[0] }
+            }
+        }
         lpOnlyFloats = classifyLpOnlyFloats()
         for (decl in model.varDecls) processDecl(decl)
         val impliedFactorIds = IntArrayList()
@@ -416,6 +426,22 @@ internal class FlatZincCompiler(
      * built). This per-variable colouring lets a linear-float component be LP-only even when the model
      * also has an unrelated non-linear float elsewhere.
      */
+
+    /** Whether [c] is a `float_times(a, b, result)` with exactly one operand an `int2float` image (an
+     *  integer's continuous shadow) and the other operand and result plain float vars — an int·real
+     *  product that lowers exactly rather than by bucketing (see [int2floatSource] / `emitFloatTimes`). */
+    private fun isIntFloatProduct(c: FznConstraint, scalarFloats: Set<String>): Boolean {
+        if (c.name != "float_times" || c.args.size != 3) return false
+        val a = (c.args[0] as? FznExpr.Ident)?.name ?: return false
+        val b = (c.args[1] as? FznExpr.Ident)?.name ?: return false
+        val r = (c.args[2] as? FznExpr.Ident)?.name ?: return false
+        if (r !in scalarFloats) return false
+        val aInt = a in int2floatSource
+        val bInt = b in int2floatSource
+        if (aInt == bInt) return false // need exactly one integer-backed operand
+        return (if (aInt) b else a) in scalarFloats
+    }
+
     private fun classifyLpOnlyFloats(): Set<String> {
         val scalarFloats = HashSet<String>()
         val floatArrays = HashSet<String>()
@@ -473,7 +499,7 @@ internal class FlatZincCompiler(
             c.args.forEach(::walk)
             if (here.isEmpty() && !touchesFloatArray) continue
             for (k in 1 until here.size) union(here[0], here[k])
-            val eligible = c.name in FLOAT_LP_ONLY_NAMES
+            val eligible = c.name in FLOAT_LP_ONLY_NAMES || isIntFloatProduct(c, scalarFloats)
             if (!eligible || touchesFloatArray) here.forEach { tainted.add(it) }
         }
         val taintedRoots = tainted.map { find(it) }.toHashSet()
