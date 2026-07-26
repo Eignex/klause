@@ -1,6 +1,8 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
+import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 
 /** Bound inference for the SMT-LIB front-end: a fixpoint over the conjunctive linear relations tightens
  *  each integer variable's `[lo, hi]`. A bound that stays unprovable is left `null` (infinite) — infinity
@@ -77,7 +79,7 @@ internal fun SmtLibQfLia.Builder.applyCtBound(
     // ct>0 with an upper target (or ct<0 with a lower one) yields a floor bound on hi[tv]; the mirror
     // case yields a ceil bound on lo[tv].
     return if ((ct > 0) == upper) {
-        val b = floorDiv(rhs, ct)
+        val b = floorDivLong(rhs, ct)
         val cur = hi[tv]
         if (cur == null || b < cur) {
             hi[tv] = b
@@ -86,7 +88,7 @@ internal fun SmtLibQfLia.Builder.applyCtBound(
             false
         }
     } else {
-        val b = ceilDiv(rhs, ct)
+        val b = ceilDivLong(rhs, ct)
         val cur = lo[tv]
         if (cur == null || b > cur) {
             lo[tv] = b
@@ -166,12 +168,3 @@ internal fun SmtLibQfLia.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
 
 private const val MAX_BOUND_ITERS = 64
 
-/** Pure-Kotlin floor/ceil division for multiplatform builds. */
-private fun floorDiv(a: Long, b: Long): Long {
-    val q = a / b
-    return if ((a xor b) < 0 && q * b != a) q - 1 else q
-}
-private fun ceilDiv(a: Long, b: Long): Long {
-    val q = a / b
-    return if ((a xor b) > 0 && q * b != a) q + 1 else q
-}

@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.mulExact
@@ -279,8 +280,8 @@ private fun SmtLibQfLia.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boo
     // each side of q's range, with ±1 slack for the remainder. A null (open) driving bound leaves q open.
     val qLoA = if (d > 0) aLo else aHi
     val qHiA = if (d > 0) aHi else aLo
-    val qLo = qLoA?.let { addOrNull(floorDivL(it, d), -1L) }
-    val qHi = qHiA?.let { addOrNull(floorDivL(it, d), 1L) }
+    val qLo = qLoA?.let { addOrNull(floorDivLong(it, d), -1L) }
+    val qHi = qHiA?.let { addOrNull(floorDivLong(it, d), 1L) }
     val m = LinComb(mapOf(newInt(0L, absd - 1) to 1), 0)
     val q = LinComb(mapOf(newInt(qLo, qHi) to 1), 0)
     postLinearRel(a, q.scaled(d).plus(m), LinearOp.EQ) // a = d·q + m
@@ -293,12 +294,6 @@ private fun absHi(lo: Long?, hi: Long?): Long? {
     val a = if (lo == Long.MIN_VALUE) null else abs(lo)
     val b = if (hi == Long.MIN_VALUE) null else abs(hi)
     return if (a == null || b == null) null else maxOf(a, b)
-}
-
-/** Pure-Kotlin floor division (multiplatform). */
-private fun floorDivL(a: Long, b: Long): Long {
-    val q = a / b
-    return if (a xor b < 0 && q * b != a) q - 1 else q
 }
 
 /** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
