@@ -182,6 +182,12 @@ internal object PresolveShared {
             intDomains = intDomains,
             factors = factors,
             preFolded = problem.preFolded,
+            // The LP-only continuous columns are a separate namespace presolve never touches (real-bearing
+            // rows are guarded out of every pass, and int renumbering leaves real ids alone), so carry it
+            // through unchanged — else the solve loses the reals and the leaf verdict silently no-ops.
+            numRealVars = problem.numRealVars,
+            realLower = problem.realLower,
+            realUpper = problem.realUpper,
         )
         // A preFolded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs

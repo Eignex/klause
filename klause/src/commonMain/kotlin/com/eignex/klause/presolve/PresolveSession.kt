@@ -299,6 +299,9 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             intDomains = if (infeasible) lastFeasibleDomains else state.intDomains,
             factors = live,
             preFolded = true,
+            numRealVars = base.numRealVars,
+            realLower = base.realLower,
+            realUpper = base.realUpper,
         )
         cachedInput = input
         inputDirty = false
@@ -442,6 +445,9 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             intDomains = domains,
             factors = liveFactors(),
             preFolded = true,
+            numRealVars = base.numRealVars,
+            realLower = base.realLower,
+            realUpper = base.realUpper,
         )
     }
 }
