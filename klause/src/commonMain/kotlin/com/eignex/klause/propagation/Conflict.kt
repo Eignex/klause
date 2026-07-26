@@ -38,6 +38,10 @@ internal fun PropagationState.maxLevelForVars(boolVars: IntArray, intVars: IntAr
     // currentLevel and every pin stamped from it.
     val cap = levelToDecisionVar.size
     var max = 0
+    // `max` starts at the floor `0`; when `cap` is `0` (no decisions pushed — the whole root bake and
+    // presolve) the result is already pinned to `cap`, so skip the O(arity) scan entirely. This is the
+    // same clamp the per-var short-circuit applies, hoisted ahead of the loop.
+    if (max >= cap) return cap
     for (v in boolVars) {
         // boolVars may include atom-var ids when a Clause has atom-lits; dispatch.
         val l = if (v < problem.numBoolVars) {
@@ -67,6 +71,7 @@ internal fun PropagationState.maxLevelForClause(literals: IntArray): Int {
     // Clamped to the live decision count for the same reason as [maxLevelForVars].
     val cap = levelToDecisionVar.size
     var max = 0
+    if (max >= cap) return cap // no decisions pushed → result pinned to cap; skip the scan (see maxLevelForVars)
     for (lit in literals) {
         val v = Lit.variable(lit)
         val l = if (v < problem.numBoolVars) boolLevel[v] else atomLevelForConflict(v - problem.numBoolVars)
