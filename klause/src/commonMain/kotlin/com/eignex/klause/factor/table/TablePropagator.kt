@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
+import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
@@ -20,6 +21,10 @@ internal class TablePropagator(
     /** Per-cell upper bound for a short-support table (see [com.eignex.klause.factor.table.Table.hi]);
      *  null when every cell is a point (a ground table). */
     private val hi: LongArray?,
+    /** Shared across a `<group>`'s rows over one relation (#1302 follow-up): caches the "sweep prunes
+     *  nothing" verdict so later rows with the same column bounds skip re-sweeping the shared table.
+     *  Null for a lone table — then every fire sweeps. */
+    private val groupCache: TableGroupCache? = null,
 ) : Propagator {
 
     /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
@@ -62,6 +67,46 @@ internal class TablePropagator(
         val bitsetEligible = (0 until arity).all { col ->
             val d = state.intDomains[xs[col]]
             d.min >= Int.MIN_VALUE.toLong() && d.max <= Int.MAX_VALUE.toLong() && d.max - d.min < MAX_BITSET_SPAN
+        }
+        // Group reuse: when every column still holds its full contiguous domain, whether the sweep prunes
+        // a domain value is a pure function of (relation, column bounds). A dense relation shared across a
+        // group's rows supports every value under full domains, so almost every root fire prunes nothing —
+        // and re-establishing that costs a full-table scan per row. Once one row records the no-prune
+        // verdict for these bounds, siblings with the same full bounds skip their own sweep: they prune
+        // nothing either, and leaving their (still-full) tuple set unfiltered only defers cleanup a real
+        // later fire redoes. Sound only for contiguous domains — a hole could remove a value's only support.
+        val gc = groupCache
+        if (gc != null && bitsetEligible) {
+            var contiguous = true
+            val mins = LongArray(arity)
+            val maxs = LongArray(arity)
+            for (col in 0 until arity) {
+                val d = state.intDomains[xs[col]]
+                mins[col] = d.min
+                maxs[col] = d.max
+                if (d.size.toLong() != d.max - d.min + 1) contiguous = false
+            }
+            if (contiguous && gc.isNoop(mins, maxs)) {
+                s.started = true
+                return true
+            }
+            val ok = propagateBitset(state, s)
+            if (ok) {
+                s.started = true
+                // Record the verdict once: under full contiguous bounds the sweep pruned no domain value
+                // iff every column still spans its bounds (any tuple removal doesn't change a domain).
+                if (contiguous && gc.noopMins == null) {
+                    var noPrune = true
+                    for (col in 0 until arity) {
+                        if (state.intDomains[xs[col]].size.toLong() != maxs[col] - mins[col] + 1) {
+                            noPrune = false
+                            break
+                        }
+                    }
+                    if (noPrune) gc.setNoop(mins, maxs)
+                }
+            }
+            return ok
         }
         val ok = if (bitsetEligible) propagateBitset(state, s) else propagateWide(state, s)
         if (ok) s.started = true
