@@ -139,6 +139,12 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         val absA = if (a < 0L) -a else a
         val absB = if (b < 0L) -b else b
+        // Selective RoundingSat reduction: weaken away only the reason's non-falsified literals whose
+        // coefficient is not divisible by the pivot coefficient — the ones the rounding below would
+        // inflate into spurious slack. Falsified and divisible literals are kept, so unit-weight
+        // (cardinality) reasons are untouched (pivot coefficient 1 divides everything) and the pigeonhole
+        // counting structure survives, while genuine non-unit cuts stay tight.
+        reason.weakenForDivision(pivot, absB) { lit -> state.litFalse(lit) }
         // Divide the reason by its pivot coefficient, rounding up ⇒ its pivot coefficient becomes ±1.
         reason.divideRoundUp(absB)
         // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
