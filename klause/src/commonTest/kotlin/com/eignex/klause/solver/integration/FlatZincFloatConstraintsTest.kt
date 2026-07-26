@@ -107,6 +107,24 @@ class FlatZincFloatConstraintsTest {
     }
 
     @Test
+    fun `per-variable colouring makes a linear float LP-only while a separate nonlinear float buckets`() {
+        val program = parseFlatZinc(
+            """
+            var 0.0..10.0: x;
+            var -5.0..5.0: z;
+            var 0.0..5.0: w;
+            constraint float_lin_le([1.0], [x], 5.0);
+            constraint float_abs(z, w);
+            solve satisfy;
+            """.trimIndent(),
+        )
+        // x's component is purely linear ⇒ one LP-only real column; z and w are tied to float_abs
+        // (nonlinear) ⇒ they stay bucketed as integer columns.
+        assertEquals(1, program.problem.numRealVars)
+        assertTrue(program.problem.numIntVars >= 2, "z and w should remain bucketed int columns")
+    }
+
+    @Test
     fun `a nonlinear float constraint keeps the whole model on bucketing`() {
         val program = parseFlatZinc(
             """

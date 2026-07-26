@@ -13,11 +13,12 @@ import com.eignex.klause.util.LongArrayList
 import kotlin.math.*
 
 internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean) {
-    if (floatsLpOnly) {
-        // LP-only floats: emit the raw double coefficients over the real columns, no bucket scaling. The
-        // whole-problem gate guarantees only non-reified LE/EQ float_lin reach here.
+    val varRefsAll = evalFloatVarArray(c.args[1])
+    if (!reified && varRefsAll.isNotEmpty() && varRefsAll.all { it.lpOnly }) {
+        // LP-only floats: emit the raw double coefficients over the real columns, no bucket scaling. Only
+        // LE/EQ float_lin colours a float LP-only (see classifyLpOnlyFloats), so reified/ne never reach here.
         val coefs = evalFloatConstArray(c.args[0])
-        val varRefs = evalFloatVarArray(c.args[1])
+        val varRefs = varRefsAll
         val op = if (c.name == "float_lin_eq") LinearOp.EQ else LinearOp.LE
         factors.add(
             Linear(
@@ -51,7 +52,7 @@ internal fun FlatZincCompiler.emitInt2Float(c: FznConstraint) {
     val yName = (c.args[1] as? FznExpr.Ident)?.name
         ?: failHere("int2float: second arg must be a float var identifier")
     val yBk = floatVars[yName] ?: failHere("`$yName` is not a float var")
-    if (floatsLpOnly) {
+    if (yBk.lpOnly) {
         // y (real) = x (int): the mixed row 1·x − 1·y = 0.
         factors.add(
             Linear(intArrayOf(xInt), doubleArrayOf(1.0), intArrayOf(yBk.varId), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
@@ -120,7 +121,8 @@ internal fun FlatZincCompiler.emitFloatBinaryCmp(c: FznConstraint, op: LinearOp,
 
         else -> Unit
     }
-    if (floatsLpOnly && !strict && !reified) {
+    val varLpOnly = (a as? FloatRef.Var)?.bk?.lpOnly == true || (b as? FloatRef.Var)?.bk?.lpOnly == true
+    if (varLpOnly && !strict && !reified) {
         // `a OP b` ⟺ `(a − b) OP 0`: real coefficients on the var operands, constants moved to the bound.
         val rv = IntArrayList()
         val rc = ArrayList<Double>()
