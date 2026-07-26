@@ -42,6 +42,11 @@ interface ValueSelector {
     fun onSolution(snapshot: Sample) {}
 }
 
+/** Floor of `(min(d) + max(d)) / 2` without overflow: `d.max - d.min` wraps on spans wider than
+ *  `Long.MAX_VALUE` (e.g. a full-`Long` domain), collapsing the midpoint onto `d.min` and turning
+ *  dichotomic search linear. Shift-and-carry stays exact for every bound pair. */
+internal fun boundsMidpoint(d: IntDomain): Long = (d.min shr 1) + (d.max shr 1) + (d.min and d.max and 1L)
+
 /** Present domain values ordered by distance from [center] (ties prefer the upper value), skipping
  *  holes via the `in d` membership check. The first value drives [IndomainMiddle]/[IndomainMedian]'s
  *  int bound split; the tail keeps the sequence complete for any consumer that enumerates past it. */

@@ -23,4 +23,11 @@ class IndomainMedianTest {
         assertEquals(2L, IndomainMedian.values(session, VarRef.IntVar(0), rng).first())
         assertEquals(3L, IndomainMiddle.values(session, VarRef.IntVar(0), rng).first())
     }
+
+    @Test
+    fun `indomain median falls back to the bounds midpoint on a saturated size`() {
+        val problem = Problem(0, 1, arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)), arrayOf<Factor>())
+        val session = PropagationSession(problem)
+        assertEquals(-1L, IndomainMedian.values(session, VarRef.IntVar(0), rng).first())
+    }
 }

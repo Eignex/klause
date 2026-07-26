@@ -18,7 +18,7 @@ object IndomainSplit : ValueSelector {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            val mid = d.min + (d.max - d.min) / 2
+            val mid = boundsMidpoint(d)
             // The midpoint may sit in a hole; the bound split doesn't care, but the
             // trailing ascending walk keeps the sequence complete for any consumer that
             // enumerates past the first value.

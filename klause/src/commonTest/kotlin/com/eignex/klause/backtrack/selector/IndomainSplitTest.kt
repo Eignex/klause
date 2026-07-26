@@ -28,6 +28,30 @@ class IndomainSplitTest {
     }
 
     @Test
+    fun `indomain split midpoint does not overflow on a full long span`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+        assertEquals(-1L, IndomainSplit.values(session, VarRef.IntVar(0), rng).first())
+    }
+
+    @Test
+    fun `indomain split takes the floor midpoint on negative bounds`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(-9, -4)),
+            factors = arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+        assertEquals(-7L, IndomainSplit.values(session, VarRef.IntVar(0), rng).first())
+    }
+
+    @Test
     fun `indomain split midpoint respects a shifted interval`() {
         val problem = Problem(
             numBoolVars = 0,
