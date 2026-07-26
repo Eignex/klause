@@ -301,13 +301,15 @@ data class BacktrackParams(
      */
     val nativeSat: Boolean? = null,
     /**
-     * Learn pseudo-Boolean cutting-planes nogoods on conflicts over pseudo-Boolean constraints (#1119
-     * Phase 3): conflict analysis runs a cutting-planes resolvent (cancellation + rounding + saturation)
-     * with a clause-resolvent fallback, and stores learned PB constraints alongside clauses. Off by
-     * default; ignored on problems with integer variables. A behavior change (unlike the native-SAT lane),
-     * so it stays opt-in pending the per-corpus A/B.
+     * Whether to learn pseudo-Boolean cutting-planes nogoods on conflicts over pseudo-Boolean / cardinality
+     * constraints (#1119 Phase 3): conflict analysis runs a RoundingSat-style division resolvent seeded
+     * from the violated bound, with a clause-resolvent fallback, and stores learned PB constraints
+     * alongside clauses. `null` (default) auto-dispatches — on for pure-Boolean problems, where it is a
+     * decisive win on counting structure (pigeonhole: polynomial vs the exponential a clause solver
+     * needs) and net-neutral-to-positive elsewhere. `true`/`false` force it; ignored on problems with
+     * integer variables (order-literal atoms carry no PB reason).
      */
-    val pbLearning: Boolean = false,
+    val pbLearning: Boolean? = null,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

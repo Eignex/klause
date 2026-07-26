@@ -125,7 +125,9 @@ internal class DfsEngine<L>(
         params.cancellation,
         params.propagationCancelFloor,
         nativeSat = params.nativeSat ?: true,
-        pbLearning = params.pbLearning,
+        // null = auto: PB cutting-planes learning is on for pure-Boolean problems (PropagationState gates
+        // it to numIntVars == 0 anyway). An explicit true/false overrides.
+        pbLearning = params.pbLearning ?: true,
     )
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are

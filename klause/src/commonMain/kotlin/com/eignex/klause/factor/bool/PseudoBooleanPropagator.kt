@@ -112,8 +112,17 @@ internal class PseudoBooleanPropagator(
         // An equality is two `≥` constraints. A resolved pivot picks the half by its forced polarity; a
         // seed (forcedLit == 0, the conflicting constraint) picks the violated half from [state].
         PbOp.EQ -> when {
-            forcedLit != 0 -> if (forcedByGeSide(forcedLit)) acc.loadPb(weights, literals, geBound = bound) else loadLe(acc)
+            forcedLit != 0 -> if (forcedByGeSide(
+                    forcedLit,
+                )
+            ) {
+                    acc.loadPb(weights, literals, geBound = bound)
+                } else {
+                    loadLe(acc)
+                }
+
             geSideViolated(state) -> acc.loadPb(weights, literals, geBound = bound)
+
             else -> loadLe(acc)
         }
     }
