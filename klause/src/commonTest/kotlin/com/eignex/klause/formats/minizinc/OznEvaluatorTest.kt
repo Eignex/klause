@@ -30,4 +30,12 @@ class OznEvaluatorTest {
         val out = render("output [show(true \\/ false /\\ false)];")
         assertTrue("true" in out, out)
     }
+
+    @Test
+    fun `a multi-name array comprehension is a cartesian product`() {
+        // `[i + j | i, j in [10, 20]]` ranges i and j independently: 10+10, 10+20, 20+10, 20+20. The old
+        // diagonal bound both to the same element, giving only 20 and 40.
+        val out = render("output [show([i + j | i, j in [10, 20]])];")
+        assertTrue("[20, 30, 30, 40]" in out, out)
+    }
 }
