@@ -102,7 +102,7 @@ internal class FlatZincCompiler(
         if (!d.isVar && d.value != null) {
             params[d.name] = evaluateParam(d.value, d.type)
             (params[d.name] as? ParamValue.Array)?.let { arr ->
-                arrays[d.name] = arrayToFlatZincArray(arr)
+                arrays[d.name] = arr.arr
             }
             return
         }
