@@ -14,4 +14,12 @@ class OznEvaluatorTest {
         val out = render("output [show(3 / 2)];")
         assertTrue("1.5" in out, out)
     }
+
+    @Test
+    fun `range binds looser than arithmetic in a generator source`() {
+        // `1..1+2` is `1..3` in MiniZinc (arithmetic binds tighter than `..`), so the comprehension spans
+        // 1, 2, 3. The old ladder parsed `(1..1)+2`, which is not evaluable.
+        val out = render("output [show([i | i in 1..1+2])];")
+        assertTrue("[1, 2, 3]" in out, out)
+    }
 }
