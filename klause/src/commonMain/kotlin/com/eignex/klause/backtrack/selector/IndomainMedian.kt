@@ -17,7 +17,10 @@ object IndomainMedian : ValueSelector {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            centeredDomainValues(d, d.valueAt(d.size / 2))
+            // A saturated size means positional indexing is meaningless; the bounds midpoint is the
+            // exact positional median for the only representation that saturates (a hole-free interval).
+            val median = if (d.size == Int.MAX_VALUE) boundsMidpoint(d) else d.valueAt(d.size / 2)
+            centeredDomainValues(d, median)
         }
     }
 }

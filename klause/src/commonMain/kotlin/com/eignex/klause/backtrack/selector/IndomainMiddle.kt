@@ -17,7 +17,7 @@ object IndomainMiddle : ValueSelector {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            centeredDomainValues(d, d.min + (d.max - d.min) / 2)
+            centeredDomainValues(d, boundsMidpoint(d))
         }
     }
 }
