@@ -207,7 +207,12 @@ object Xcsp3 {
             val alias = e.attr("as")
             if (alias.isBlank()) throw UnsupportedXcsp3Exception("empty domain")
             varIds[alias]?.let { return domains[it] }
-            // An array alias reuses the referenced array's (uniform) cell domain.
+            // An array alias reuses the referenced array's (uniform) cell domain. A declared array's
+            // first cell is `alias[0]…[0]` (one `[0]` per dimension), so index it directly instead of
+            // scanning every variable name; the scan below is a defensive fallback.
+            arrayDims[alias]?.let { dims ->
+                varIds[alias + "[0]".repeat(dims.size)]?.let { return domains[it] }
+            }
             val cell = varIds.keys.firstOrNull { it.startsWith("$alias[") }
                 ?: throw UnsupportedXcsp3Exception("unknown domain alias '$alias'")
             return domains[varIds.getValue(cell)]

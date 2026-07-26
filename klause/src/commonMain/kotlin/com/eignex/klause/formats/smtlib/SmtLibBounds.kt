@@ -167,4 +167,3 @@ internal fun SmtLibQfLia.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
 }
 
 private const val MAX_BOUND_ITERS = 64
-
