@@ -84,14 +84,19 @@ internal fun SmtLibQfLia.Builder.intBinding(name: String, b: SmtLibQfLia.Builder
     return b.lin ?: throw UnsupportedSmtException("'$name' has no compiled Int value")
 }
 
-/** An integer literal — an optionally-signed run of digits, of any magnitude (SMT integers are
- *  arbitrary precision, so this includes values beyond `Int`/`Long`). */
-internal fun SmtLibQfLia.Builder.isIntegerLiteral(s: String): Boolean = INTEGER_LITERAL.matches(s)
+/** An integer literal — an optionally-signed non-empty run of ASCII digits, of any magnitude (SMT
+ *  integers are arbitrary precision, so this includes values beyond `Int`/`Long`). Scanned explicitly
+ *  rather than via a `\d` regex, whose Unicode-digit semantics are not guaranteed identical across KMP
+ *  targets. */
+internal fun SmtLibQfLia.Builder.isIntegerLiteral(s: String): Boolean {
+    val start = if (s.startsWith('-')) 1 else 0
+    if (start >= s.length) return false
+    for (i in start until s.length) if (s[i] !in '0'..'9') return false
+    return true
+}
 
 /** A real literal — a decimal with a fractional point (e.g. `2.6`), which QF_LIA does not permit. */
 internal fun SmtLibQfLia.Builder.isRealLiteral(s: String): Boolean = '.' in s && s.toDoubleOrNull() != null
-
-private val INTEGER_LITERAL = Regex("-?\\d+")
 
 internal fun SmtLibQfLia.Builder.add(a: LinComb, b: LinComb): LinComb = foldChecked { a.plus(b) }
 
