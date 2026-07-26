@@ -82,6 +82,41 @@ class PbLearningTest {
     }
 
     @Test
+    fun `pb learning stays sound under aggressive forgetting`() {
+        // A tiny learned-clause cap plus restarts forces frequent forgetting/compaction of the watched
+        // PB store; a watch-reconcile or compaction bug would surface as a wrong verdict here.
+        val rng = Random(2718281L)
+        var checked = 0
+        repeat(30) { iter ->
+            val numVars = 6 + rng.nextInt(4)
+            val factors = ArrayList<Factor>()
+            repeat(numVars + rng.nextInt(numVars)) {
+                val k = 2 + rng.nextInt(3)
+                val vars = mutableSetOf<Int>()
+                while (vars.size < k) vars.add(rng.nextInt(numVars))
+                val lits = vars.map { v -> Lit.make(v, rng.nextBoolean()) }.toIntArray()
+                val weights = LongArray(k) { (1 + rng.nextInt(4)).toLong() }
+                val total = weights.sum()
+                if (rng.nextBoolean()) {
+                    factors.add(PseudoBoolean(weights, lits, PbOp.GE, 1 + rng.nextLong(total)))
+                } else {
+                    factors.add(PseudoBoolean(weights, lits, PbOp.LE, rng.nextLong(total)))
+                }
+            }
+            val problem = { Problem(numVars, 0, emptyArray(), factors.toTypedArray()) }
+            val forget = BacktrackParams(randomSeed = 5L, pbLearning = true, maxLearnedClauses = 3, lubyRestartBase = 8L)
+            val pb = BacktrackSolver(problem()).solve(forget)
+            val cl = BacktrackSolver(problem()).solve(forget.copy(pbLearning = false))
+            assertEquals(cl is SolveResult.Sat, pb is SolveResult.Sat, "disagree under forgetting on $iter")
+            if (pb is SolveResult.Sat) {
+                checked++
+                assertTrue(satisfies(factors, pb.assignment.bools), "PB witness invalid under forgetting on $iter")
+            }
+        }
+        assertTrue(checked > 0, "expected some SAT instances")
+    }
+
+    @Test
     fun `pb and clause learning agree on random PB instances`() {
         val rng = Random(20260716L)
         var sats = 0
