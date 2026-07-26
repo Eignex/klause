@@ -217,6 +217,19 @@ internal fun FlatZincCompiler.emitFloatMinMax(c: FznConstraint, max: Boolean) {
     )
 }
 
+/** `float_div(a, b, c)` constrains `c = a / b`; model it as `float_times(b, c, a)` (`a = b·c`). The
+ *  arity is checked before the args are reordered so a truncated call fails with a located error. */
+internal fun FlatZincCompiler.emitFloatDiv(c: FznConstraint) {
+    expectArity(c, 3)
+    emitFloatTimes(
+        FznConstraint(
+            name = "float_times",
+            args = listOf(c.args[1], c.args[2], c.args[0]),
+            annotations = c.annotations,
+        ),
+    )
+}
+
 /** Lower `float_times` to a bucket-index table. */
 internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     expectArity(c, 3)
