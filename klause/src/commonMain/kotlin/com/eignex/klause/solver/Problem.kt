@@ -155,6 +155,9 @@ class Problem(
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         preFolded: Boolean = false,
+        numRealVars: Int = 0,
+        realLower: DoubleArray = EmptyDoubleArray,
+        realUpper: DoubleArray = EmptyDoubleArray,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -165,6 +168,9 @@ class Problem(
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         preFolded = preFolded,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
     )
 
     /**

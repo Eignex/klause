@@ -242,6 +242,11 @@ internal class ResumableMinimize(
     /** Fold [sample] (objective [o]) into the incumbent when it strictly improves the best; fires
      *  inline telemetry and returns the incumbent to surface, or null when it isn't an improvement. */
     private fun recordIfImproving(sample: Sample, o: Double): MinimizeResult.WithSample? {
+        // A real-variable problem's incumbent must carry the continuous values a leaf's residual LP
+        // validated and attached; a sample without them came from a heuristic that neither solved nor
+        // certified the reals, so it is neither complete nor sound to surface. Reject it (only the leaf
+        // verdict produces a valid real-var incumbent).
+        if (problem.numRealVars > 0 && sample.reals.size < problem.numRealVars) return null
         if (o >= bestObj) return null
         bestObj = o
         best = sample
@@ -297,19 +302,25 @@ internal class ResumableMinimize(
         // arm's (root propagation + shaving), before any incumbent-relative fixing runs.
         boundExchange.importGlobalVarBounds()
         boundExchange.publishGlobalVarBounds()
-        // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes and
-        // reduced-cost fixing bite from the first node.
-        if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
-            // Single-shot rounding first; if it can't land a feasible point, pump toward one.
-            val seed = lpEngine.lpRoundingProbe(objective, rootToken)
-                ?: lpEngine.lpFeasibilityPump(objective, rootToken)
-            if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
-        }
-        // Best-bound tree-search primal subsolver: dive best-first for an incumbent. Pure heuristic —
-        // the returned assignment is propagation-feasible and re-evaluated here.
-        if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
-            lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
-                recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+        // These primal heuristics seed an integer incumbent from the LP/rounding without solving the
+        // residual real LP, so their sample carries no continuous values and is not certified real-
+        // feasible. With LP-only continuous variables (issue #1232) only the leaf verdict may surface a
+        // solution (it validates the reals and attaches them); skip the heuristics there.
+        if (problem.numRealVars == 0) {
+            // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes and
+            // reduced-cost fixing bite from the first node.
+            if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
+                // Single-shot rounding first; if it can't land a feasible point, pump toward one.
+                val seed = lpEngine.lpRoundingProbe(objective, rootToken)
+                    ?: lpEngine.lpFeasibilityPump(objective, rootToken)
+                if (seed != null) recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+            }
+            // Best-bound tree-search primal subsolver: dive best-first for an incumbent. Pure heuristic —
+            // the returned assignment is propagation-feasible and re-evaluated here.
+            if (lpEngine.params.lpPlan.lbTreeSearch && lpEngine.lpRelaxer != null) {
+                lpEngine.lbTreeSearch(objective, rootToken)?.let { seed ->
+                    recordIfImproving(seed, objective.evaluate(seed))?.let { return it }
+                }
             }
         }
         return null

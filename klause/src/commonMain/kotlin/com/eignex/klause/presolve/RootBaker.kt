@@ -47,6 +47,9 @@ object RootBaker {
             cancellation = problem.cancellation,
             impliedFactorMask = problem.impliedFactorMask,
             hasSymmetryBreaking = problem.hasSymmetryBreaking,
+            numRealVars = problem.numRealVars,
+            realLower = problem.realLower,
+            realUpper = problem.realUpper,
         )
     }
 

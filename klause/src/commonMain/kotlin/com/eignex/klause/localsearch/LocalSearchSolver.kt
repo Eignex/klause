@@ -259,6 +259,13 @@ class LocalSearchSolver(
     ): Sequence<MinimizeResult> = sequence {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
+        if (problem.numRealVars > 0) {
+            // LP-only continuous variables are not evaluated by local search (see [solveInternal]); it
+            // would optimize an incumbent that ignores — and may violate — their linear rows. Decline.
+            sink.stop()
+            yield(MinimizeResult.Unknown(TerminationReason.Unsupported, sink.snapshot()))
+            return@sequence
+        }
         val eff = effectiveAssumptions(params.assumptions)
         if (eff == null) {
             sink.stop()
