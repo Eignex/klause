@@ -52,8 +52,16 @@ interface IntDomain {
 
     /** Number of values in the domain (O(1)). An index/count kept 32-bit: a *materialisable* domain
      *  never holds more than [Int.MAX_VALUE] present values, even when its value span is far wider
-     *  (a wide [ContiguousDomain] reports [Int.MAX_VALUE] — its values are never enumerated). */
+     *  (a wide [ContiguousDomain] reports [Int.MAX_VALUE] — its values are never enumerated).
+     *  Exact only when [enumerable]; a saturated count carries no information beyond "very large". */
     val size: Int
+
+    /** True when [size] is the exact present-value count, so positional access ([valueAt] over
+     *  `0 until size`) covers the whole domain. False for the wide reps whose count exceeds (and
+     *  [size] saturates at) [Int.MAX_VALUE] — a contiguous or run domain spanning beyond 32-bit.
+     *  Such a domain must be processed through its bounds and [forEachHole], never by value
+     *  enumeration or positional indexing. */
+    val enumerable: Boolean get() = true
 
     /** Number of interior holes: values strictly between [min] and [max] that are absent. O(1) or
      *  O(runs) and span-independent — it never walks the gap value by value. Zero for a contiguous

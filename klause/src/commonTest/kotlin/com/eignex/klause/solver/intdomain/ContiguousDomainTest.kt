@@ -30,6 +30,13 @@ class ContiguousDomainTest {
     }
 
     @Test
+    fun `enumerable is false exactly when size saturates`() {
+        assertTrue(ContiguousDomain(1, 10).enumerable)
+        assertFalse(ContiguousDomain(0, 5_000_000_000L).enumerable)
+        assertFalse(ContiguousDomain(Long.MIN_VALUE, Long.MAX_VALUE).enumerable)
+    }
+
+    @Test
     fun `excludeValue absent is identity`() {
         val d = ContiguousDomain(1, 5)
         val e = d.excludeValue(99)

@@ -3,6 +3,7 @@ package com.eignex.klause.solver.intdomain
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RunsDomainTest {
@@ -24,6 +25,23 @@ class RunsDomainTest {
         assertTrue(d is RunsDomain)
         assertEquals(Int.MAX_VALUE, d.size)
         assertEquals(1L, d.holeCount)
+    }
+
+    @Test
+    fun `enumerable follows the exact count not the saturated size`() {
+        val wide = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
+        assertFalse(wide.enumerable)
+        val narrow = ContiguousDomain(0, 100_000).excludeValue(50_000)
+        assertTrue(narrow is RunsDomain)
+        assertTrue(narrow.enumerable)
+    }
+
+    @Test
+    fun `lower and higher cross a hole correctly when size saturates`() {
+        val d = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
+        assertEquals(2_499_999_999L, d.lower(2_500_000_001L))
+        assertEquals(2_500_000_001L, d.higher(2_499_999_999L))
+        assertEquals(2_499_999_999L, d.clamp(2_500_000_000L))
     }
 
     @Test
