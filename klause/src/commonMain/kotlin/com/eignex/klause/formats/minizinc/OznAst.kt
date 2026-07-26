@@ -1,20 +1,10 @@
 package com.eignex.klause.formats.minizinc
 
-/** AST for the `.ozn` subset used by MiniZinc solution output. */
+/** AST for the `.ozn` subset used by MiniZinc solution output. The declared type is only consumed for
+ *  its tokens (the evaluator drives everything off the initializer), so it is not retained. */
 internal sealed interface OznItem {
-    data class VarDecl(val name: String, val type: OznType, val initializer: OznExpr?) : OznItem
+    data class VarDecl(val name: String, val initializer: OznExpr?) : OznItem
     data class Output(val items: List<OznExpr>) : OznItem
-}
-
-/** Types used in `.ozn` variable declarations. */
-internal sealed interface OznType {
-    data object Bool : OznType
-    data object Int : OznType
-    data object Float : OznType
-    data object SetOfInt : OznType
-
-    /** Array type with explicit index ranges. */
-    data class ArrayOf(val indexRanges: List<OznExpr>, val element: OznType) : OznType
 }
 
 internal sealed interface OznExpr {

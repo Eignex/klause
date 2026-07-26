@@ -31,7 +31,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseVarDecl(): OznItem.VarDecl {
         if (peekKeyword("var") || peekKeyword("par")) advance()
-        val type = parseType()
+        parseType()
         expectPunct(":")
         val name = expectIdent()
         while (peekPunct("::")) {
@@ -58,50 +58,37 @@ internal class OznParser(private val tokens: List<OznToken>) {
             null
         }
         expectPunct(";")
-        return OznItem.VarDecl(name, type, init)
+        return OznItem.VarDecl(name, init)
     }
 
-    private fun parseType(): OznType {
+    /** Consume a type's tokens. The declared type carries no semantic weight in `.ozn` evaluation
+     *  (values come from initializers), so nothing is retained. */
+    private fun parseType() {
         if (peekKeyword("array")) {
             advance()
             expectPunct("[")
-            val ranges = parseCommaSeparated(parseExpr()) { parseExpr() }
+            parseCommaSeparated(parseExpr()) { parseExpr() }
             expectPunct("]")
             expectKeyword("of")
-            val element = parseType()
-            return OznType.ArrayOf(ranges, element)
+            parseType()
+            return
         }
         if (peekKeyword("set")) {
             advance()
             expectKeyword("of")
             expectKeyword("int")
-            return OznType.SetOfInt
+            return
         }
         if (peekKeyword("var")) advance() // tolerate `var int`
-        return when {
-            peekKeyword("int") -> {
-                advance()
-                OznType.Int
-            }
-
-            peekKeyword("bool") -> {
-                advance()
-                OznType.Bool
-            }
-
-            peekKeyword("float") -> {
-                advance()
-                OznType.Float
-            }
-
-            else -> {
-                parseExpr()
-                OznType.Int
-            }
+        when {
+            peekKeyword("int") -> advance()
+            peekKeyword("bool") -> advance()
+            peekKeyword("float") -> advance()
+            else -> parseExpr()
         }
     }
 
-    fun parseExpr(): OznExpr = parseLogical()
+    private fun parseExpr(): OznExpr = parseLogical()
 
     private fun parseIf(): OznExpr {
         expectKeyword("if")

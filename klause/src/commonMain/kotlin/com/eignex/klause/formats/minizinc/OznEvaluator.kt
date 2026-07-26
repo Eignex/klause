@@ -19,7 +19,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         if (output == null) {
             for ((name, decl) in decls) {
                 val v = resolveDecl(decl, ctx) ?: continue
-                sb.append("$name = ").append(formatValue(v)).append(";\n")
+                sb.append("$name = ").append(stringifyForShow(v)).append(";\n")
             }
         } else {
             for (e in output.items) {
@@ -503,8 +503,6 @@ private fun stringifyForOutput(v: OznValue): String = when (v) {
     is OznValue.ArrayV -> v.elements.joinToString("") { stringifyForOutput(it) }
     else -> stringifyForShow(v)
 }
-
-private fun formatValue(v: OznValue): String = stringifyForShow(v)
 
 /** Raised when MiniZinc/Ozn expression evaluation fails. */
 class OznEvalException(message: String) : FormatException("MiniZinc output", message)
