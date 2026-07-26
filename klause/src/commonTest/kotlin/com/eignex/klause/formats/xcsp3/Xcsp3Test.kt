@@ -168,6 +168,13 @@ class Xcsp3Test {
     }
 
     @Test
+    fun `a malformed document surfaces as a catchable format exception`() {
+        // An unterminated start tag makes the XML scanner throw; it must reach the caller as an
+        // UnsupportedXcsp3Exception, not the raw IllegalArgumentException from the scanner's require.
+        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse("<a") }
+    }
+
+    @Test
     fun `parses COP with sum constraint and maximize objective and optimizes`() {
         val xml = """
             <instance format="XCSP3" type="COP">

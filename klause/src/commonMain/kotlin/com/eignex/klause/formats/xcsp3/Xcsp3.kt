@@ -109,16 +109,26 @@ object Xcsp3 {
      *  bake (the propagation fixpoint folded into the problem's domains) — a wall-clock ceiling that only
      *  clips instances whose root bake would otherwise run for seconds, leaving the residual propagation
      *  to the solver; a fast bake completes fully and is unaffected. */
+    // The scanners report malformed input via `require` and the throw is re-typed, not swallowed: the
+    // original message is carried into the format exception verbatim.
+    @Suppress("SwallowedException")
     fun parse(
         text: String,
         negTableCap: Long = 1_000_000L,
         bakeCancellation: Cancellation = Cancellation.Never,
-    ): Xcsp3Problem = Builder(negTableCap).run {
-        val root = parseXml(text)
-        root.child("variables")?.let { vs -> vs.children.forEach { declareVar(it) } }
-        root.child("constraints")?.let { cs -> cs.children.forEach { constraint(it) } }
-        root.child("objectives")?.let { objs -> objs.children.firstOrNull()?.let { objective(it) } }
-        build(bakeCancellation)
+    ): Xcsp3Problem = try {
+        Builder(negTableCap).run {
+            val root = parseXml(text)
+            root.child("variables")?.let { vs -> vs.children.forEach { declareVar(it) } }
+            root.child("constraints")?.let { cs -> cs.children.forEach { constraint(it) } }
+            root.child("objectives")?.let { objs -> objs.children.firstOrNull()?.let { objective(it) } }
+            build(bakeCancellation)
+        }
+    } catch (e: IllegalArgumentException) {
+        // The XML / FExpr / tuple scanners report malformed input with `require`, and a few numeric
+        // reads throw NumberFormatException (an IllegalArgumentException) — route both through the
+        // format-typed exception so a caller catches a malformed document like any other format's.
+        throw UnsupportedXcsp3Exception(e.message ?: "malformed XCSP3 document")
     }
 
     internal class Builder(val negTableCap: Long) : CnfLowering {
