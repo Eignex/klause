@@ -27,20 +27,24 @@ internal fun CnfLowering.trueLit(): Int {
     return trueLitCache
 }
 
-/** Tseitin gate for conjunction. */
-internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int {
-    val a = Lit.make(newBool(), true)
-    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(a), l)))
-    factors.add(Clause((lits.map { Lit.negate(it) } + a).toIntArray()))
-    return a
+/** Tseitin gate for conjunction, reified onto a fresh positive literal. */
+internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int = tseitinAnd(lits, Lit.make(newBool(), true))
+
+/** Tseitin gate for conjunction reified onto the caller-provided [target] literal. */
+internal fun CnfLowering.tseitinAnd(lits: List<Int>, target: Int): Int {
+    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(target), l)))
+    factors.add(Clause((lits.map { Lit.negate(it) } + target).toIntArray()))
+    return target
 }
 
-/** Tseitin gate for disjunction. */
-internal fun CnfLowering.tseitinOr(lits: List<Int>): Int {
-    val a = Lit.make(newBool(), true)
-    factors.add(Clause((lits + Lit.negate(a)).toIntArray()))
-    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), a)))
-    return a
+/** Tseitin gate for disjunction, reified onto a fresh positive literal. */
+internal fun CnfLowering.tseitinOr(lits: List<Int>): Int = tseitinOr(lits, Lit.make(newBool(), true))
+
+/** Tseitin gate for disjunction reified onto the caller-provided [target] literal. */
+internal fun CnfLowering.tseitinOr(lits: List<Int>, target: Int): Int {
+    factors.add(Clause((lits + Lit.negate(target)).toIntArray()))
+    for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), target)))
+    return target
 }
 
 /** Tseitin gate for biconditional. */

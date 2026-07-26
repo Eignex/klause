@@ -5,6 +5,7 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -34,15 +35,18 @@ internal class FlatZincCompiler(
     internal val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
     /** Cooperative cancellation token. */
     internal val cancellation: Cancellation = Cancellation.Never,
-) {
+) : CnfLowering {
     internal val params = HashMap<String, ParamValue>()
     internal val boolVars = HashMap<String, Int>()
     internal val intVars = HashMap<String, Int>()
     internal val floatVars = HashMap<String, FloatBucketing>()
     internal val arrays = HashMap<String, FlatZincArray>()
     internal val intDomains = ArrayList<IntDomain>()
-    internal val factors = ArrayList<Factor>()
+    override val factors: MutableList<Factor> = ArrayList()
     internal var numBoolVars: Int = 0
+
+    override fun newBool(): Int = numBoolVars++
+    override var trueLitCache: Int = -1
 
     // LP-only continuous columns (issue #1232): the scalar float var names a prepass ([classifyLpOnlyFloats])
     // colours LP-only — each is lowered as a real variable rather than a bucket-index int, and the linear
