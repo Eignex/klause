@@ -13,16 +13,24 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
         require(runs.size >= 4 && runs.size % 2 == 0) { "RunsDomain needs >= 2 runs" }
     }
 
-    // Saturates at Int.MAX_VALUE (a run may span more than 32 bits); such a domain is never enumerated.
-    override val size: Int = run {
+    // Exact present count, saturated at Long.MAX_VALUE (a single run may span beyond 63 bits, making
+    // even the Long sum wrap; one wrapped addend is always negative, so the check catches it).
+    private val exactSize: Long = run {
         var s = 0L
         var k = 0
         while (k < runs.size) {
-            s += runs[k + 1] - runs[k] + 1
+            val len = runs[k + 1] - runs[k] + 1
+            s = if (len < 0L || s + len < 0L) Long.MAX_VALUE else s + len
+            if (s == Long.MAX_VALUE) break
             k += 2
         }
-        s.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        s
     }
+
+    // Saturates at Int.MAX_VALUE (a run may span more than 32 bits); such a domain is never enumerated.
+    override val size: Int = exactSize.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+
+    override val enumerable: Boolean get() = exactSize <= Int.MAX_VALUE.toLong()
 
     // Summed from the gaps between consecutive runs, so it stays exact even when `size` saturates.
     override val holeCount: Long = run {
@@ -71,6 +79,48 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
     }
 
     override fun contains(value: Long): Boolean = value in min..max && runIndexContaining(value) >= 0
+
+    // The interface defaults binary-search positions in `0 until size`; on a saturated [size] that
+    // misses every value past index Int.MAX_VALUE and returns a wrong neighbour. Search the runs
+    // instead — exact at any width, and O(log runs) rather than O(log size) valueAt walks.
+    override fun lower(value: Long): Long {
+        val cand = value - 1
+        if (cand in this) return cand
+        // Last run starting below [value]; its end is the nearest present value on the left (the run
+        // cannot reach cand, or the fast path above would have hit).
+        var lo = 0
+        var hi = (runs.size shr 1) - 1
+        var ans = 0
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            if (runs[mid shl 1] < value) {
+                ans = mid
+                lo = mid + 1
+            } else {
+                hi = mid - 1
+            }
+        }
+        return minOf(runs[(ans shl 1) + 1], cand)
+    }
+
+    override fun higher(value: Long): Long {
+        val cand = value + 1
+        if (cand in this) return cand
+        // First run starting above [value]; its start is the nearest present value on the right.
+        var lo = 0
+        var hi = (runs.size shr 1) - 1
+        var ans = hi
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            if (runs[mid shl 1] > value) {
+                ans = mid
+                hi = mid - 1
+            } else {
+                lo = mid + 1
+            }
+        }
+        return runs[ans shl 1]
+    }
 
     override fun valueAt(i: Int): Long {
         var rem = i

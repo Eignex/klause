@@ -368,11 +368,11 @@ class Problem(
             // omits). A full contiguous domain has `size == span`, so `size <= holes` excludes it anyway.
             val span = d.max - d.min + 1
             val holeCount = span - d.size
-            // The survivor path enumerates every present value, so it is only valid when [size] is a
-            // genuine small count. A wide contiguous (or huge-run) domain saturates [size] at Int.MAX —
-            // its `holeCount` then looks positive though it is hole-free/few-holed; those fall through to
+            // The survivor path enumerates every present value, so it requires an [IntDomain.enumerable]
+            // domain. A wide contiguous (or huge-run) domain saturates [size] at Int.MAX — its
+            // `holeCount` then looks positive though it is hole-free/few-holed; those fall through to
             // the bound + forEachHole path below (span-independent), never enumerating billions of values.
-            if (span > KlauseConfig.current.bitsetThreshold && d.size < Int.MAX_VALUE && d.size <= holeCount) {
+            if (span > KlauseConfig.current.bitsetThreshold && d.enumerable && d.size <= holeCount) {
                 iSetKeys.add(v)
                 d.forEach { iSetVals.add(it) }
                 iSetOffsets.add(iSetVals.size)

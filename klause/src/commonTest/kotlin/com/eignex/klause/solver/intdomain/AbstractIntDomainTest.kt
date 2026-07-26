@@ -42,4 +42,15 @@ class AbstractIntDomainTest {
         assertTrue(a != c)
         assertTrue(a != d)
     }
+
+    @Test
+    fun `equals and hashCode stay span-independent on non-enumerable domains`() {
+        val a = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
+        val b = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
+        val c = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_001L)
+        assertEquals(a, b)
+        assertEquals(a.hashCode(), b.hashCode())
+        assertTrue(a != c)
+        assertTrue(a != ContiguousDomain(0, 5_000_000_000L))
+    }
 }
