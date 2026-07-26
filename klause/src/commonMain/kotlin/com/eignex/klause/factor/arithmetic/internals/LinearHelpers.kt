@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic.internals
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.lp.Int128
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyLongArray
@@ -233,9 +234,76 @@ internal fun collectLinearStartBoundAntecedents(
 }
 
 /**
+ * Exact 128-bit feasibility check for a linear row whose 64-bit bound arithmetic overflowed.
+ * Detects definite violation only — no tightening — so wide-domain (and fully pinned) states are
+ * still rejected exactly rather than silently passed; the missed tightenings re-run once the
+ * domains narrow back into 64-bit range. Returns `false` iff the row is definitely infeasible.
+ */
+private fun linearFeasible128(
+    state: PropagationState,
+    coeffs: LongArray,
+    vars: IntArray,
+    op: LinearOp,
+    bound: Long,
+): Boolean {
+    val lo = Int128()
+    val hi = Int128()
+    for (i in vars.indices) {
+        val d = state.intDomains[vars[i]]
+        val c = coeffs[i]
+        if (c >= 0L) {
+            lo.addProduct(c, d.min)
+            hi.addProduct(c, d.max)
+        } else {
+            lo.addProduct(c, d.max)
+            hi.addProduct(c, d.min)
+        }
+    }
+    // Shift both extremes by -bound so feasibility reduces to sign tests.
+    lo.addProduct(-1L, bound)
+    hi.addProduct(-1L, bound)
+    if (lo.overflow || hi.overflow) return true
+    val signLo = int128Sign(lo)
+    val signHi = int128Sign(hi)
+    return when (op) {
+        LinearOp.LE -> signLo <= 0
+        LinearOp.GE -> signHi >= 0
+        LinearOp.EQ -> signLo <= 0 && signHi >= 0
+        LinearOp.NE -> !(signLo == 0 && signHi == 0)
+    }
+}
+
+private fun int128Sign(v: Int128): Int = when {
+    v.hi < 0L -> -1
+    v.hi == 0L && v.lo == 0L -> 0
+    else -> 1
+}
+
+/** True iff `a * b` wraps 64-bit range. Both-magnitudes-below-2^31 short-circuits before the
+ *  division so the propagation hot loop pays two xors, not an idiv, on ordinary domains. */
+private fun mulOverflows(a: Long, b: Long): Boolean {
+    if (((a xor (a shr 63)) or (b xor (b shr 63))) ushr 31 == 0L) return false
+    if (a == 0L || b == 0L) return false
+    if (b == -1L) return a == Long.MIN_VALUE
+    return (a * b) / b != a
+}
+
+/** True iff `a + b` wraps 64-bit range. */
+private fun addOverflows(a: Long, b: Long): Boolean = ((a xor (a + b)) and (b xor (a + b))) < 0L
+
+/** True iff `a - b` wraps 64-bit range. */
+private fun subOverflows(a: Long, b: Long): Boolean = ((a xor b) and (a xor (a - b))) < 0L
+
+/**
  * Shared bounds-propagation routine for `Σ coeffs[i] * vars[i] ⟨op⟩ bound`. Used by `Linear`
  * directly and by `ReifiedLinear` when its aux Boolean is pinned. Returns `false` iff the
  * domains became jointly infeasible.
+ *
+ * Overflow-safe on wide (up to full-`Long`) domains: a coefficient-times-bound product that wraps
+ * skips the factor's propagation for the round, and a directional sum that wraps disables only that
+ * side's infeasibility test and tightenings. Wrapped arithmetic must never *strengthen* a bound or
+ * declare a conflict — either would be unsound — so every overflow degrades to weaker propagation.
+ * Bound-split search stays complete regardless: the skipped pruning re-runs on narrower domains.
  */
 internal fun propagateLinearBounds(
     state: PropagationState,
@@ -252,13 +320,20 @@ internal fun propagateLinearBounds(
     val rHi = if (wide) LongArray(n) else EmptyLongArray
     var sumLo = 0L
     var sumHi = 0L
+    var loOverflow = false
+    var hiOverflow = false
     for (i in 0 until n) {
         val d = state.intDomains[vars[i]]
         val c = coeffs[i]
+        if (mulOverflows(c, d.min) || mulOverflows(c, d.max)) {
+            return linearFeasible128(state, coeffs, vars, op, bound)
+        }
         val a = c * d.min
         val b = c * d.max
         val lo = if (a <= b) a else b
         val hi = if (a <= b) b else a
+        loOverflow = loOverflow || addOverflows(sumLo, lo)
+        hiOverflow = hiOverflow || addOverflows(sumHi, hi)
         sumLo += lo
         sumHi += hi
         if (wide) {
@@ -266,11 +341,16 @@ internal fun propagateLinearBounds(
             rHi[i] = hi
         }
     }
+    if (loOverflow || hiOverflow) {
+        // The wrapped side's infeasibility test is meaningless in 64-bit; re-check exactly so a
+        // violated row (in particular at a fully pinned leaf) is still rejected.
+        if (!linearFeasible128(state, coeffs, vars, op, bound)) return false
+    }
     when (op) {
-        LinearOp.LE -> if (sumLo > bound) return false
-        LinearOp.GE -> if (sumHi < bound) return false
-        LinearOp.EQ -> if (sumLo > bound || sumHi < bound) return false
-        LinearOp.NE -> if (sumLo == bound && sumHi == bound) return false
+        LinearOp.LE -> if (!loOverflow && sumLo > bound) return false
+        LinearOp.GE -> if (!hiOverflow && sumHi < bound) return false
+        LinearOp.EQ -> if ((!loOverflow && sumLo > bound) || (!hiOverflow && sumHi < bound)) return false
+        LinearOp.NE -> if (!loOverflow && !hiOverflow && sumLo == bound && sumHi == bound) return false
     }
     // At the root (level 0) a bound move is a permanent fact whose antecedents are never consumed:
     // conflict analysis runs only above the root, and it drops level-0 literals by their level rather
@@ -280,6 +360,7 @@ internal fun propagateLinearBounds(
     // #18 root-bake hang. Skip it at the root, leaving the actual bound tightening untouched.
     val rootFact = state.currentLevel == 0
     if (op == LinearOp.NE) {
+        if (loOverflow || hiOverflow) return true
         for (i in 0 until n) {
             val c = coeffs[i]
             if (c == 0L) continue
@@ -287,9 +368,13 @@ internal fun propagateLinearBounds(
             val d = state.intDomains[v]
             val a = c * d.min
             val b = c * d.max
-            val otherLo = sumLo - (if (a <= b) a else b)
-            val otherHi = sumHi - (if (a <= b) b else a)
+            val loTerm = if (a <= b) a else b
+            val hiTerm = if (a <= b) b else a
+            if (subOverflows(sumLo, loTerm) || subOverflows(sumHi, hiTerm)) continue
+            val otherLo = sumLo - loTerm
+            val otherHi = sumHi - hiTerm
             if (otherLo != otherHi) continue
+            if (subOverflows(bound, otherLo)) continue
             val rhs = bound - otherLo
             if (rhs % c != 0L) continue
             val forbidden = rhs / c
@@ -370,10 +455,12 @@ internal fun propagateLinearBounds(
         val d = state.intDomains[v]
         val a = c * d.min
         val b = c * d.max
-        val otherLo = sumLo - (if (a <= b) a else b)
-        val otherHi = sumHi - (if (a <= b) b else a)
-        if (op == LinearOp.LE || op == LinearOp.EQ) {
-            val slack0 = bound - otherLo
+        val loTerm = if (a <= b) a else b
+        val hiTerm = if (a <= b) b else a
+        if ((op == LinearOp.LE || op == LinearOp.EQ) &&
+            !loOverflow && !subOverflows(sumLo, loTerm) && !subOverflows(bound, sumLo - loTerm)
+        ) {
+            val slack0 = bound - (sumLo - loTerm)
             if (c > 0) {
                 val t = floorDivLong(slack0, c)
                 if (!tightenMaxClamped(state, v, t, loReason(i))) return false
@@ -381,8 +468,10 @@ internal fun propagateLinearBounds(
                 if (!tightenMinClamped(state, v, ceilDivLong(slack0, c), loReason(i))) return false
             }
         }
-        if (op == LinearOp.GE || op == LinearOp.EQ) {
-            val needed = bound - otherHi
+        if ((op == LinearOp.GE || op == LinearOp.EQ) &&
+            !hiOverflow && !subOverflows(sumHi, hiTerm) && !subOverflows(bound, sumHi - hiTerm)
+        ) {
+            val needed = bound - (sumHi - hiTerm)
             if (c > 0) {
                 val t = ceilDivLong(needed, c)
                 if (!tightenMinClamped(state, v, t, hiReason(i))) return false
@@ -403,15 +492,18 @@ internal fun linearSumRange(state: PropagationState, coeffs: LongArray, vars: In
     for (i in vars.indices) {
         val d = state.intDomains[vars[i]]
         val c = coeffs[i]
+        // A wrapped product or sum weakens the range to the full Long interval: consumers treat the
+        // bounds as attainable extremes, so anything narrower than the truth risks a wrong entailment.
+        if (mulOverflows(c, d.min) || mulOverflows(c, d.max)) return longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE)
         val a = c * d.min
         val b = c * d.max
-        if (a <= b) {
-            lo += a
-            hi += b
-        } else {
-            lo += b
-            hi += a
+        val termLo = if (a <= b) a else b
+        val termHi = if (a <= b) b else a
+        if (addOverflows(lo, termLo) || addOverflows(hi, termHi)) {
+            return longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE)
         }
+        lo += termLo
+        hi += termHi
     }
     return longArrayOf(lo, hi)
 }

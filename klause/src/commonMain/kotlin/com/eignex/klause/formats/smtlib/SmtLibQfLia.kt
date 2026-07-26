@@ -71,7 +71,7 @@ object SmtLibQfLia {
         internal val intDomains = ArrayList<PresolveDomain>()
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
-        private var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
+        internal var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
         override var trueLitCache: Int = -1
 
         /** Set once bound inference has to clamp an integer variable to the finite solver range; makes

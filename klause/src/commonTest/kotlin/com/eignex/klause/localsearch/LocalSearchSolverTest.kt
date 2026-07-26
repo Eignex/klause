@@ -13,6 +13,14 @@ import kotlin.test.assertTrue
 class LocalSearchSolverTest {
 
     @Test
+    fun `declines a problem whose int values exceed the 32-bit safe range`() {
+        val wide = 1L shl 62
+        val problem = Problem(0, 1, arrayOf(IntDomain(-wide, wide)), arrayOf<Factor>())
+        val result = LocalSearchSolver(problem).solve(LocalSearchParams(maxFlips = 100, randomSeed = 1))
+        assertTrue(result is SolveResult.Unknown, "expected an unsupported decline, got $result")
+    }
+
+    @Test
     fun `solves simple 3 sat instance`() {
         val clauses = listOf(
             Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
