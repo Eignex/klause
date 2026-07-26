@@ -460,5 +460,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
         ?: throw OznParseException("float literal `${t.text}` is malformed at line ${t.line}")
 }
 
-/** Raised when MiniZinc/Ozn parsing fails. */
+/** Raised when parsing or evaluating MiniZinc `.ozn` output fails — the single catchable exception for
+ *  this front-end, matching the one-class convention of the other formats. */
 class OznParseException(message: String) : FormatException("MiniZinc output", message)

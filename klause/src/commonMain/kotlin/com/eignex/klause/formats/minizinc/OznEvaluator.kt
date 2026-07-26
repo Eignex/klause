@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.minizinc
 
-import com.eignex.klause.formats.FormatException
 import kotlin.math.abs
 
 /** Evaluates `.ozn` expressions against solver bindings and renders output text. */
@@ -49,7 +48,7 @@ internal class OznEvaluator(items: List<OznItem>) {
             ) ?: error("decl `$name` has no value (no initializer, not in bindings)")
         }
         ctx.bindings[name]?.let { return it }
-        throw OznEvalException("unresolved identifier `$name`")
+        throw OznParseException("unresolved identifier `$name`")
     }
 
     private fun eval(e: OznExpr, ctx: Context): OznValue = when (e) {
@@ -77,7 +76,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     is OznValue.IntV -> listOf(v.value.toInt())
                     is OznValue.RangeV -> (v.lo..v.hi).toList()
                     is OznValue.SetV -> v.values.toList()
-                    else -> throw OznEvalException("non-int element in set literal: $v")
+                    else -> throw OznParseException("non-int element in set literal: $v")
                 }
             }
             OznValue.SetV(vals.distinct().sorted().toIntArray())
@@ -107,7 +106,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         is OznExpr.Let -> {
             val saved = ctx.locals.toMap()
             for (d in e.decls) {
-                val v = resolveDecl(d, ctx) ?: throw OznEvalException("let-binding `${d.name}` has no value")
+                val v = resolveDecl(d, ctx) ?: throw OznParseException("let-binding `${d.name}` has no value")
                 ctx.locals[d.name] = v
             }
             val result = eval(e.body, ctx)
@@ -152,7 +151,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     return
                 }
 
-                else -> throw OznEvalException("comprehension source is not iterable: $src")
+                else -> throw OznParseException("comprehension source is not iterable: $src")
             }
             val name = gen.names.first()
             fun loopOver(remaining: List<String>) {
@@ -215,7 +214,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 val rows = r1.size
                 val cols = r2.size
                 if (rows * cols != xs.elements.size) {
-                    throw OznEvalException("array2d size mismatch: ${rows}x$cols != ${xs.elements.size}")
+                    throw OznParseException("array2d size mismatch: ${rows}x$cols != ${xs.elements.size}")
                 }
                 OznValue.Array2dV(xs.elements, r1, r2)
             }
@@ -241,7 +240,7 @@ internal class OznEvaluator(items: List<OznItem>) {
             "abs" -> when (val v = args[0]) {
                 is OznValue.IntV -> OznValue.IntV(if (v.value < 0) -v.value else v.value)
                 is OznValue.FloatV -> OznValue.FloatV(abs(v.value))
-                else -> throw OznEvalException("abs: unsupported arg $v")
+                else -> throw OznParseException("abs: unsupported arg $v")
             }
 
             "min" -> reduceNumeric(args, takeMin = true)
@@ -253,7 +252,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                     is OznValue.ArrayV -> a.elements
                     is OznValue.Array2dV -> a.elements
                     is OznValue.Array3dV -> a.elements
-                    else -> throw OznEvalException("sum: expected array, got $a")
+                    else -> throw OznParseException("sum: expected array, got $a")
                 }
                 if (list.isEmpty()) {
                     OznValue.IntV(0)
@@ -294,7 +293,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 OznValue.StringV(list.joinToString(sep) { stringifyForShow(it) })
             }
 
-            else -> throw OznEvalException("unknown function `${c.name}` in .ozn output")
+            else -> throw OznParseException("unknown function `${c.name}` in .ozn output")
         }
     }
 
@@ -309,7 +308,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         } else {
             args
         }
-        if (list.isEmpty()) throw OznEvalException("min/max: empty")
+        if (list.isEmpty()) throw OznParseException("min/max: empty")
         if (list.all { it is OznValue.IntV }) {
             val v = if (takeMin) {
                 list.minOf { (it as OznValue.IntV).value }
@@ -345,7 +344,7 @@ internal class OznEvaluator(items: List<OznItem>) {
                 tgt.elements[i * tgt.r2.size * tgt.r3.size + j * tgt.r3.size + k]
             }
 
-            else -> throw OznEvalException("subscript on non-array: $tgt")
+            else -> throw OznParseException("subscript on non-array: $tgt")
         }
     }
 
@@ -355,14 +354,14 @@ internal class OznEvaluator(items: List<OznItem>) {
             "-" -> when (v) {
                 is OznValue.IntV -> OznValue.IntV(-v.value)
                 is OznValue.FloatV -> OznValue.FloatV(-v.value)
-                else -> throw OznEvalException("unary -: $v")
+                else -> throw OznParseException("unary -: $v")
             }
 
             "+" -> v
 
             "not" -> OznValue.BoolV(!(v as OznValue.BoolV).value)
 
-            else -> throw OznEvalException("unary `${e.op}`")
+            else -> throw OznParseException("unary `${e.op}`")
         }
     }
 
@@ -393,7 +392,7 @@ internal class OznEvaluator(items: List<OznItem>) {
             return when (r) {
                 is OznValue.RangeV -> OznValue.BoolV(i in r.lo..r.hi)
                 is OznValue.SetV -> OznValue.BoolV(i in r.values)
-                else -> throw OznEvalException("in: rhs not a set/range")
+                else -> throw OznParseException("in: rhs not a set/range")
             }
         }
         val (li, lf, isFloat) = numeric(l)
@@ -425,14 +424,14 @@ internal class OznEvaluator(items: List<OznItem>) {
 
             "!=" -> OznValue.BoolV(if (asFloat) lf != rf else li != ri)
 
-            else -> throw OznEvalException("binary `${e.op}`")
+            else -> throw OznParseException("binary `${e.op}`")
         }
     }
 
     /** Integer `div`/`mod`, rejecting a zero divisor as an eval error rather than a raw
      *  ArithmeticException. [op] is `"div"` or `"mod"`. */
     private fun intDivMod(a: Long, b: Long, op: String): Long {
-        if (b == 0L) throw OznEvalException("$op by zero")
+        if (b == 0L) throw OznParseException("$op by zero")
         return if (op == "div") a / b else a % b
     }
 
@@ -441,7 +440,7 @@ internal class OznEvaluator(items: List<OznItem>) {
         is OznValue.IntV -> Numeric(v.value, v.value.toDouble(), false)
         is OznValue.FloatV -> Numeric(v.value.toLong(), v.value, true)
         is OznValue.BoolV -> Numeric(if (v.value) 1L else 0L, if (v.value) 1.0 else 0.0, false)
-        else -> throw OznEvalException("expected numeric, got $v")
+        else -> throw OznParseException("expected numeric, got $v")
     }
 }
 
@@ -488,7 +487,7 @@ private fun stringifyForShow(v: OznValue): String = when (v) {
 
 private fun stringify2d(v: OznValue): String {
     val a = v as? OznValue.Array2dV
-        ?: throw OznEvalException("show2d: expected 2D array, got $v")
+        ?: throw OznParseException("show2d: expected 2D array, got $v")
     val sb = StringBuilder("[|")
     for (i in 0 until a.r1.size) {
         for (j in 0 until a.r2.size) {
@@ -503,7 +502,7 @@ private fun stringify2d(v: OznValue): String {
 
 private fun stringify3d(v: OznValue): String {
     val a = v as? OznValue.Array3dV
-        ?: throw OznEvalException("show3d: expected 3D array, got $v")
+        ?: throw OznParseException("show3d: expected 3D array, got $v")
     return a.elements.joinToString(", ", "[", "]") { stringifyForShow(it) }
 }
 
@@ -514,5 +513,3 @@ private fun stringifyForOutput(v: OznValue): String = when (v) {
     else -> stringifyForShow(v)
 }
 
-/** Raised when MiniZinc/Ozn expression evaluation fails. */
-class OznEvalException(message: String) : FormatException("MiniZinc output", message)
