@@ -39,9 +39,13 @@ internal class OznLexer(private val source: String) {
                 }
 
                 c == '/' && pos + 1 < source.length && source[pos + 1] == '*' -> {
+                    val commentLine = lineAt()
                     pos += 2
                     while (pos + 1 < source.length && !(source[pos] == '*' && source[pos + 1] == '/')) pos++
-                    if (pos + 1 < source.length) pos += 2
+                    if (pos + 1 >= source.length) {
+                        throw OznParseException("unterminated block comment at line $commentLine")
+                    }
+                    pos += 2
                 }
 
                 else -> return
@@ -66,6 +70,7 @@ internal class OznLexer(private val source: String) {
         val sb = StringBuilder()
         while (pos < source.length && source[pos] != '"') {
             val c = source[pos]
+            if (c == '\n') throw OznParseException("unterminated string literal at line $ln")
             if (c == '\\' && pos + 1 < source.length) {
                 sb.append(
                     when (val n = source[pos + 1]) {
@@ -84,7 +89,8 @@ internal class OznLexer(private val source: String) {
                 pos++
             }
         }
-        if (pos < source.length) pos++
+        if (pos >= source.length) throw OznParseException("unterminated string literal at line $ln")
+        pos++ // consume the closing quote
         return OznToken(OznTokenKind.STRING, sb.toString(), ln)
     }
 
@@ -135,11 +141,15 @@ internal class OznLexer(private val source: String) {
                 return OznToken(OznTokenKind.PUNCT, two, ln)
             }
         }
-        val text = c.toString()
+        if (c !in SINGLE_PUNCT) throw OznParseException("unexpected character `$c` at line $ln")
         pos++
-        return OznToken(OznTokenKind.PUNCT, text, ln)
+        return OznToken(OznTokenKind.PUNCT, c.toString(), ln)
     }
 }
+
+/** Single punctuation characters valid in the `.ozn` subset (two-character operators are matched
+ *  before this fallthrough). Anything else is rejected rather than emitted as a stray token. */
+private val SINGLE_PUNCT: Set<Char> = "()[]{},:;=+-*/<>!.|".toSet()
 
 internal enum class OznTokenKind {
     IDENT,
