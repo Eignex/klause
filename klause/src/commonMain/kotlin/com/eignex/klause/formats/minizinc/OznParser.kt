@@ -123,16 +123,33 @@ internal class OznParser(private val tokens: List<OznToken>) {
         return OznExpr.Let(decls, body)
     }
 
-    private fun parseLogical(): OznExpr {
-        var left = parseComparison()
-        while (peek().kind == OznTokenKind.PUNCT && (
-                peek().text == "\\/" || peek().text == "/\\" ||
-                    peek().text == "->" || peek().text == "<-"
-                )
-        ) {
+    // Boolean connectives, loosest to tightest: implication (`->`/`<-`, right-associative), then
+    // disjunction (`\/`), then conjunction (`/\`) — matching MiniZinc, so `a \/ b /\ c` is `a \/ (b /\ c)`.
+    private fun parseLogical(): OznExpr = parseImplication()
+
+    private fun parseImplication(): OznExpr {
+        val left = parseDisjunction()
+        if (peek().kind == OznTokenKind.PUNCT && (peek().text == "->" || peek().text == "<-")) {
             val op = advance().text
-            val right = parseComparison()
-            left = OznExpr.Binary(op, left, right)
+            return OznExpr.Binary(op, left, parseImplication())
+        }
+        return left
+    }
+
+    private fun parseDisjunction(): OznExpr {
+        var left = parseConjunction()
+        while (peek().kind == OznTokenKind.PUNCT && peek().text == "\\/") {
+            val op = advance().text
+            left = OznExpr.Binary(op, left, parseConjunction())
+        }
+        return left
+    }
+
+    private fun parseConjunction(): OznExpr {
+        var left = parseComparison()
+        while (peek().kind == OznTokenKind.PUNCT && peek().text == "/\\") {
+            val op = advance().text
+            left = OznExpr.Binary(op, left, parseComparison())
         }
         return left
     }
