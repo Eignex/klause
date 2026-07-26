@@ -320,10 +320,10 @@ internal object SymmetryBreaking {
         // and distinct domains distinct keys, so the colour partition — and thus every generator found — is
         // identical to the all-holes seed, at O(min(holes, survivors)) rather than O(span).
         val holeCount = (d.max - d.min + 1) - d.size
-        // Only the survivor form when [size] is a genuine small count: a wide contiguous/huge-run domain
+        // Only the survivor form for an [IntDomain.enumerable] domain: a wide contiguous/huge-run domain
         // saturates [size] at Int.MAX, so its `holeCount` looks positive though it is hole-free/few-holed;
         // it takes the hole form below (forEachHole is empty/small), never allocating a span-sized array.
-        if (d.size < Int.MAX_VALUE && d.size <= holeCount) {
+        if (d.enumerable && d.size <= holeCount) {
             val words = LongArray(4 + d.size)
             words[0] = SPACE_INT
             words[1] = SEED_DOMAIN_SURVIVORS

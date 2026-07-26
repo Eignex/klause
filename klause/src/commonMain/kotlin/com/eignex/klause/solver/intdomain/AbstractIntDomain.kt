@@ -31,7 +31,15 @@ internal abstract class AbstractIntDomain : IntDomain {
 
     override fun equals(other: Any?): Boolean {
         if (other !is IntDomain) return false
-        if (min != other.min || max != other.max || size != other.size) return false
+        if (min != other.min || max != other.max || size != other.size || holeCount != other.holeCount) return false
+        if (!enumerable) {
+            // A saturated size carries no information, but `holeCount` stays exact: with equal bounds
+            // and hole counts, disjointness of this domain's holes from the other's present values
+            // means the hole sets coincide — checked in O(holes), never walking the span.
+            var ok = true
+            forEachHole { v -> if (v in other) ok = false }
+            return ok
+        }
         // Sizes and bounds agree, so `this ⊆ other` ⇒ equal sets.
         var ok = true
         forEach { v -> if (v !in other) ok = false }
@@ -40,6 +48,12 @@ internal abstract class AbstractIntDomain : IntDomain {
 
     override fun hashCode(): Int {
         var h = min.hashCode() * 31 + max.hashCode()
+        if (!enumerable) {
+            // Hash the holes instead of the (un-walkable) values. Consistent with [equals]: a
+            // non-enumerable domain never set-equals an enumerable one — their exact counts differ.
+            forEachHole { v -> h = h * 31 + v.hashCode() }
+            return h
+        }
         forEach { v -> h = h * 31 + v.hashCode() }
         return h
     }

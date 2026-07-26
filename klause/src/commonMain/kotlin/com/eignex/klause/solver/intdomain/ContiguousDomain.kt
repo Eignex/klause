@@ -20,6 +20,11 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
         return if (span < 0L || span >= Int.MAX_VALUE.toLong()) Int.MAX_VALUE else (span + 1L).toInt()
     }
 
+    override val enumerable: Boolean get() {
+        val span = max - min
+        return span in 0L until Int.MAX_VALUE.toLong()
+    }
+
     override val holeCount: Long get() = 0
 
     override fun contains(value: Long): Boolean = value in min..max
