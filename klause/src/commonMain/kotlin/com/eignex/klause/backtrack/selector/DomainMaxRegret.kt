@@ -28,7 +28,7 @@ object DomainMaxRegret : VariableSelector {
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
             if (d.size <= 1) continue
-            val regret = d.valueAt(1) - d.valueAt(0)
+            val regret = (d.valueAt(1) - d.valueAt(0)).let { if (it < 0L) Long.MAX_VALUE else it }
             if (regret > bestRegret) {
                 best = VarRef.IntVar(v)
                 bestRegret = regret

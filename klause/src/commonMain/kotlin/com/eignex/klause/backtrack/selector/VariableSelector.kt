@@ -103,7 +103,7 @@ internal fun pickByActivityWithDomDivider(
             }
         } else {
             val intId = topId - numBool
-            val dom = session.intDomain(intId).size
+            val dom = session.intDomain(intId).sizeLong
             if (dom > 1) {
                 val score = activity / dom.toDouble()
                 if (score > bestScore) {

@@ -34,6 +34,15 @@ object IndomainRandom : ValueSelector {
                     arr.asSequence()
                 }
 
+                !d.enumerable -> sequence {
+                    // A positional shuffle cannot reach values past index 2^31 on a saturated
+                    // domain, so draw the head — the value a bound split actually consumes —
+                    // uniformly from the bounds; the positional tail keeps the sequence non-empty
+                    // for consumers that enumerate further.
+                    yield(d.clamp(randomInBounds(d, rng)))
+                    for (i in 0 until n) yield(d.valueAt(i))
+                }
+
                 else -> sequence {
                     // Lazy Fisher-Yates over domain indices: emit a uniform random permutation
                     // doing O(consumed) work, not O(n). Branch nodes typically read only the first
