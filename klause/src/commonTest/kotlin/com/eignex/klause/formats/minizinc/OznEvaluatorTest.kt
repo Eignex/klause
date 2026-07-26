@@ -22,4 +22,12 @@ class OznEvaluatorTest {
         val out = render("output [show([i | i in 1..1+2])];")
         assertTrue("[1, 2, 3]" in out, out)
     }
+
+    @Test
+    fun `conjunction binds tighter than disjunction`() {
+        // `true \/ false /\ false` is `true \/ (false /\ false)` = true in MiniZinc; the old flat,
+        // left-associative parse gave `(true \/ false) /\ false` = false.
+        val out = render("output [show(true \\/ false /\\ false)];")
+        assertTrue("true" in out, out)
+    }
 }
