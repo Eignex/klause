@@ -16,9 +16,10 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.toSortedIntArray
 
-/** Float-constraint names that are non-strict, linear-in-reals and non-reified — the only ones an
- *  all-LP-only-float lowering emits (as real [com.eignex.klause.factor.arithmetic.Linear] rows). Any other
- *  float constraint (products, abs, element, min/max, strict `<`, `ne`, reified) forces bucketing. */
+/** Float-constraint names that are non-strict, linear-in-reals and non-reified — a float whose whole
+ *  constraint-connected component uses only these is coloured LP-only (see `classifyLpOnlyFloats`) and
+ *  lowered to real [com.eignex.klause.factor.arithmetic.Linear] rows. Any other float constraint
+ *  (products, abs, element, min/max, strict `<`, `ne`, reified) taints its component back to bucketing. */
 private val FLOAT_LP_ONLY_NAMES = setOf("float_lin_le", "float_lin_eq", "int2float", "float_eq", "float_le")
 
 /** Compile parsed FlatZinc AST into solver data structures. */
@@ -43,10 +44,10 @@ internal class FlatZincCompiler(
     internal val factors = ArrayList<Factor>()
     internal var numBoolVars: Int = 0
 
-    // LP-only continuous columns (issue #1232): when [floatsLpOnly] holds (set by a prepass in [compile]),
-    // scalar float vars are lowered as real variables here rather than bucket-index ints, and the linear
+    // LP-only continuous columns (issue #1232): the scalar float var names a prepass ([classifyLpOnlyFloats])
+    // colours LP-only — each is lowered as a real variable rather than a bucket-index int, and the linear
     // float handlers emit real [Linear] rows the simplex resolves. Parallel real bounds by real var id.
-    internal var floatsLpOnly: Boolean = false
+    internal var lpOnlyFloats: Set<String> = emptySet()
     internal val realLo = ArrayList<Double>()
     internal val realHi = ArrayList<Double>()
 
@@ -55,7 +56,7 @@ internal class FlatZincCompiler(
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
     fun compile(): FlatZincProgram {
-        floatsLpOnly = floatsAreLpOnly()
+        lpOnlyFloats = classifyLpOnlyFloats()
         for (decl in model.varDecls) processDecl(decl)
         val impliedFactorIds = IntArrayList()
         var hasSymmetryBreaking = false
@@ -389,7 +390,7 @@ internal class FlatZincCompiler(
     }
 
     internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
-        if (floatsLpOnly) {
+        if (name in lpOnlyFloats) {
             // LP-only continuous column: a real variable, absent from CP search (issue #1232). The linear
             // float handlers emit real rows over it; the returned id is a real var id (not an int var).
             val rid = realLo.size
@@ -405,35 +406,78 @@ internal class FlatZincCompiler(
         return id
     }
 
-    /** Whether every float in the model can be an LP-only continuous variable: no var float array (those
-     *  need an integer-var-id array), and every float-touching constraint is non-strict linear-in-reals
-     *  and non-reified (so the whole float part lowers to real linear rows). Otherwise all floats keep
-     *  bucketing — the whole-problem gate that avoids mixing the two representations in one problem. */
-    private fun floatsAreLpOnly(): Boolean {
-        val hasFloatArray = model.varDecls.any { d ->
-            d.isVar && (d.type as? FznType.Array)?.element.let { it is FznType.FloatRange || it is FznType.FloatAny }
+    /**
+     * Colour each scalar float variable name LP-only or bucketed (issue #1232). A scalar float is LP-only
+     * iff its **constraint-connected component** is purely linear-in-reals: floats that share a constraint
+     * are unioned (a single row is emitted over all of them, so they must share a representation), and a
+     * component is tainted — kept bucketed — if any of its constraints is non-linear / strict / `ne` /
+     * reified, touches a var float **array** (whose elements need an integer-var-id array), or is the
+     * objective (a float objective needs a real objective through the Long-typed machinery, not yet
+     * built). This per-variable colouring lets a linear-float component be LP-only even when the model
+     * also has an unrelated non-linear float elsewhere.
+     */
+    private fun classifyLpOnlyFloats(): Set<String> {
+        val scalarFloats = HashSet<String>()
+        val floatArrays = HashSet<String>()
+        for (d in model.varDecls) {
+            if (!d.isVar) continue
+            val t = d.type
+            if (t is FznType.FloatRange || t is FznType.FloatAny) scalarFloats.add(d.name)
+            if (t is FznType.Array && (t.element is FznType.FloatRange || t.element is FznType.FloatAny)) {
+                floatArrays.add(d.name)
+            }
         }
-        if (hasFloatArray) return false
-        // A float objective would need a real objective threaded through the Long-typed objective machinery;
-        // keep bucketing for it (the bucket int var carries the objective) until that path is built.
-        val objExpr = when (val s = model.solve) {
-            is FznSolve.Minimize -> s.obj
-            is FznSolve.Maximize -> s.obj
+        if (scalarFloats.isEmpty()) return emptySet()
+        val parent = HashMap<String, String>().apply { scalarFloats.forEach { put(it, it) } }
+        fun find(x: String): String {
+            var r = x
+            while (parent[r] != r) r = parent.getValue(r)
+            var c = x
+            while (parent[c] != r) {
+                val next = parent.getValue(c)
+                parent[c] = r
+                c = next
+            }
+            return r
+        }
+        fun union(a: String, b: String) {
+            parent[find(a)] = find(b)
+        }
+        val tainted = HashSet<String>()
+        val objName = when (val s = model.solve) {
+            is FznSolve.Minimize -> (s.obj as? FznExpr.Ident)?.name
+            is FznSolve.Maximize -> (s.obj as? FznExpr.Ident)?.name
             else -> null
         }
-        val objName = (objExpr as? FznExpr.Ident)?.name
-        if (objName != null &&
-            model.varDecls.any {
-                it.isVar && it.name == objName &&
-                    (it.type is FznType.FloatRange || it.type is FznType.FloatAny)
+        if (objName != null && objName in scalarFloats) tainted.add(objName)
+        for (c in model.constraints) {
+            val here = ArrayList<String>()
+            var touchesFloatArray = false
+            fun walk(e: FznExpr) {
+                when (e) {
+                    is FznExpr.Ident -> if (e.name in scalarFloats) {
+                        here.add(
+                            e.name,
+                        )
+                    } else if (e.name in floatArrays) {
+                        touchesFloatArray = true
+                    }
+
+                    is FznExpr.ArrayAccess -> if (e.name in floatArrays) touchesFloatArray = true
+
+                    is FznExpr.ArrayLit -> e.elements.forEach(::walk)
+
+                    else -> Unit
+                }
             }
-        ) {
-            return false
+            c.args.forEach(::walk)
+            if (here.isEmpty() && !touchesFloatArray) continue
+            for (k in 1 until here.size) union(here[0], here[k])
+            val eligible = c.name in FLOAT_LP_ONLY_NAMES
+            if (!eligible || touchesFloatArray) here.forEach { tainted.add(it) }
         }
-        return model.constraints.none { c ->
-            val n = c.name
-            (n.startsWith("float_") || n == "int2float" || n == "array_float_element") && n !in FLOAT_LP_ONLY_NAMES
-        }
+        val taintedRoots = tainted.map { find(it) }.toHashSet()
+        return scalarFloats.filterTo(HashSet()) { find(it) !in taintedRoots }
     }
 
     internal sealed interface ParamValue {
