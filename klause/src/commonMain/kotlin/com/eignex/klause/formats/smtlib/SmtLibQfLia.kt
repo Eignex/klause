@@ -62,7 +62,7 @@ object SmtLibQfLia {
         val unboundedIntLo: Long,
         val unboundedIntHi: Long,
         val strictBounds: Boolean,
-        val searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
+        val searchBound: Long,
     ) : CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
