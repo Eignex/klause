@@ -37,11 +37,20 @@ internal class MddIncrementalState(
     index: MddTransitionIndex? = null,
 ) {
     private val n = seq.size
-    private val maxStates = numStatesPerLayer.max()
-    private val w = (maxStates + 63) ushr 6
 
-    private val fwd = RevLongArray(state, (n + 1) * w)
-    private val bwd = RevLongArray(state, (n + 1) * w)
+    // Each layer's reachability bitset is packed to its OWN width (`ceil(numStatesPerLayer / 64)` words)
+    // rather than a uniform `max(numStatesPerLayer)` width. A layered diagram whose middle layers are far
+    // wider than its ends (word MDDs, e.g. WordDesign2 with one 175k-state layer over ~32k average) would
+    // otherwise pay the widest layer for every layer — a several-fold blow-up per factor, decisive when a
+    // group holds thousands of factors over one diagram. [layerBase] is the prefix-sum word offset of each
+    // layer into [fwd]/[bwd]; [layerWords] its word count; [w] the widest layer's word count (scratch size).
+    private val layerWords = IntArray(seq.size + 1) { (numStatesPerLayer[it] + 63) ushr 6 }
+    private val layerBase = IntArray(seq.size + 2).also { for (i in 0..seq.size) it[i + 1] = it[i] + layerWords[i] }
+    private val totalWords = layerBase[seq.size + 1]
+    private val w = layerWords.max()
+
+    private val fwd = RevLongArray(state, totalWords)
+    private val bwd = RevLongArray(state, totalWords)
     private val valid = RevInt(state, 0)
 
     // Per-layer CSR indices over the transition records (see [MddTransitionIndex]). Shared across the
@@ -60,12 +69,12 @@ internal class MddIncrementalState(
     private val symWords = if (symSpan > 0) ((symSpan + 63) ushr 6).toInt() else 0
 
     private fun testBit(rev: RevLongArray, layer: Int, s: Int): Boolean =
-        (rev[layer * w + (s ushr 6)] and (1L shl (s and 63))) != 0L
+        (rev[layerBase[layer] + (s ushr 6)] and (1L shl (s and 63))) != 0L
 
     /** Invoke [action] for each set bit below [cap] in [rev]'s [layer] words (the live states). */
     private inline fun forEachState(rev: RevLongArray, layer: Int, cap: Int, action: (Int) -> Unit) {
-        val base = layer * w
-        for (k in 0 until w) {
+        val base = layerBase[layer]
+        for (k in 0 until layerWords[layer]) {
             var word = rev[base + k]
             while (word != 0L) {
                 val s = (k shl 6) + word.countTrailingZeroBits()
@@ -76,15 +85,15 @@ internal class MddIncrementalState(
     }
 
     private fun layerEmpty(rev: RevLongArray, layer: Int): Boolean {
-        val base = layer * w
-        for (k in 0 until w) if (rev[base + k] != 0L) return false
+        val base = layerBase[layer]
+        for (k in 0 until layerWords[layer]) if (rev[base + k] != 0L) return false
         return true
     }
 
     private fun writeLayer(rev: RevLongArray, layer: Int, tmp: LongArray): Boolean {
-        val base = layer * w
+        val base = layerBase[layer]
         var changed = false
-        for (k in 0 until w) {
+        for (k in 0 until layerWords[layer]) {
             if (rev[base + k] != tmp[k]) {
                 rev[base + k] = tmp[k]
                 changed = true
@@ -317,7 +326,7 @@ internal class MddIncrementalState(
 
     private fun computeReachability(state: PropagationState, ant: IntArray?, snapshot: Boolean): Boolean {
         val scratch = LongArray(w)
-        for (k in 0 until (n + 1) * w) {
+        for (k in 0 until totalWords) {
             fwd[k] = 0L
             bwd[k] = 0L
         }
@@ -340,8 +349,8 @@ internal class MddIncrementalState(
         // group's remaining factors to reuse.
         if (snapshot) {
             idx.rootSnapshot = MddRootSnapshot(
-                LongArray((n + 1) * w) { fwd[it] },
-                LongArray((n + 1) * w) { bwd[it] },
+                LongArray(totalWords) { fwd[it] },
+                LongArray(totalWords) { bwd[it] },
                 survivors,
             )
         }
@@ -351,7 +360,7 @@ internal class MddIncrementalState(
     }
 
     private fun applyRootSnapshot(state: PropagationState, snap: MddRootSnapshot, ant: IntArray?): Boolean {
-        for (k in 0 until (n + 1) * w) {
+        for (k in 0 until totalWords) {
             fwd[k] = snap.fwd[k]
             bwd[k] = snap.bwd[k]
         }
