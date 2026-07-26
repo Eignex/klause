@@ -117,7 +117,14 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         return acc.loadClause(reasonLits)
     }
 
-    /** Cancel [pivot] between [acc] and the constraint that forced it, then saturate and gcd-normalize. */
+    /**
+     * Cancel [pivot] between the running conflict [acc] and the constraint that forced it, using the
+     * RoundingSat division rule (Elffers-Nordström) rather than classic generalized resolution: divide
+     * the *reason* by its pivot coefficient rounding up (a Chvátal-Gomory cut, so still implied) to make
+     * that coefficient ±1, then add `acc + |coefₐ(pivot)|·reason`. The conflict constraint itself is never
+     * scaled up, so coefficients stay bounded and the learned cut stays strong — the property classic
+     * LCM-scaling resolution loses. Saturate afterward to keep the constraint canonical.
+     */
     private fun cancel(pivot: Int, fallbackReasonLits: IntArray) {
         if (!loadPivotReason(pivot, fallbackReasonLits)) {
             failed = true
@@ -132,15 +139,17 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         val absA = if (a < 0L) -a else a
         val absB = if (b < 0L) -b else b
-        val g = gcd(absA, absB)
-        val mulSelf = absB / g
-        val mulOther = absA / g
-        if (!acc.addScaled(reason, mulSelf, mulOther)) {
+        // RoundingSat reduction: weaken the reason to its falsified core plus the pivot, then divide by
+        // the pivot coefficient rounding up ⇒ its pivot coefficient becomes ±1. The weakening keeps the
+        // combined constraint conflicting so the learned cut stays strong.
+        reason.weakenNonFalsified(pivot) { lit -> state.litFalse(lit) }
+        reason.divideRoundUp(absB)
+        // acc + absA·reason cancels the pivot (opposite signs, |reason pivot| now 1). acc is not scaled.
+        if (!acc.addScaled(reason, mulSelf = 1L, mulOther = absA)) {
             failed = true
             return
         }
         acc.saturate()
-        acc.normalizeByGcd()
         bumpAll(reason)
     }
 
@@ -179,9 +188,18 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
 
     override fun finalizeResult(currentLevel: Int): ConflictAnalyzer.AnalysisResult {
         if (failed) return ConflictAnalyzer.AnalysisResult.NotApplicable
-        val m = acc.materialize() ?: return ConflictAnalyzer.AnalysisResult.NotApplicable
+        val m = acc.materialize() ?: run {
+            failed = true
+            return ConflictAnalyzer.AnalysisResult.NotApplicable
+        }
         val levels = distinctLevels(m.literals)
         val (backjump, asserting) = pbAssertion(m.weights, m.literals, m.degree, currentLevel)
+        // A non-asserting PB nogood makes the engine backtrack chronologically *without learning* — worse
+        // than the clause 1UIP the clause resolvent always yields. Defer to it instead of emitting one.
+        if (!asserting) {
+            failed = true
+            return ConflictAnalyzer.AnalysisResult.NotApplicable
+        }
         // A unit-weight, degree-1 constraint is exactly a clause; emit it as one so it flows the clause
         // storage/vivification/glue paths rather than a degenerate PB propagator.
         if (m.degree == 1L && m.weights.all { it == 1L }) {
@@ -254,18 +272,5 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         val slack = available - degree
         return slack >= 0 && maxFree > slack
-    }
-
-    private companion object {
-        fun gcd(a: Long, b: Long): Long {
-            var x = a
-            var y = b
-            while (y != 0L) {
-                val t = x % y
-                x = y
-                y = t
-            }
-            return if (x < 0L) -x else x
-        }
     }
 }
