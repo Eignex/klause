@@ -105,6 +105,28 @@ class MpsLoweringTest {
     }
 
     @Test
+    fun `OBBT tightens several open variables in one build-once sweep`() {
+        // x, y both open above from 0; x <= 5 and x + y <= 12. OBBT re-solves the one relaxation per
+        // column (warm-started), tightening x to 5 and y to 12 (at x = 0).
+        val cap = MpsConstraint("CAP", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
+        val sum = MpsConstraint("SUM", intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), lower = null, upper = 12.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(
+                MpsVar("x", integer = true, lower = 0.0, upper = null),
+                MpsVar("y", integer = true, lower = 0.0, upper = null),
+            ),
+            listOf(cap, sum),
+        )
+        val compiled = m.toProblem(searchBound = 1_000_000L)
+        assertFalse(compiled.clamped)
+        assertEquals(5L, compiled.problem.intDomains[0].max)
+        assertEquals(12L, compiled.problem.intDomains[1].max)
+    }
+
+    @Test
     fun `drops a term-free constraint row instead of emitting an empty sum`() {
         val emptyRow = MpsConstraint("ZBESTROW", IntArray(0), DoubleArray(0), lower = null, upper = 0.0)
         val realRow = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
