@@ -241,7 +241,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
             OznTokenKind.FLOAT -> {
                 advance()
-                OznExpr.FloatLit(t.text.toDouble())
+                OznExpr.FloatLit(parseDoubleLiteral(t))
             }
 
             OznTokenKind.BOOL -> {
@@ -449,6 +449,9 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     private fun parseLongLiteral(t: OznToken): Long = t.text.toLongOrNull()
         ?: throw OznParseException("integer literal `${t.text}` out of 64-bit range at line ${t.line}")
+
+    private fun parseDoubleLiteral(t: OznToken): Double = t.text.toDoubleOrNull()
+        ?: throw OznParseException("float literal `${t.text}` is malformed at line ${t.line}")
 }
 
 /** Raised when MiniZinc/Ozn parsing fails. */

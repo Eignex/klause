@@ -14,4 +14,14 @@ class OznLexerTest {
         assertEquals(4, tokens.first { it.text == "x" }.line)
         assertEquals(4, tokens.last().line, "EOF reports the final line")
     }
+
+    @Test
+    fun `a float literal with a signed exponent lexes as one float token`() {
+        val nums = OznLexer("1.5e-8").tokenize().filter {
+            it.kind == OznTokenKind.FLOAT || it.kind == OznTokenKind.INT
+        }
+        assertEquals(1, nums.size, "expected a single numeric token")
+        assertEquals(OznTokenKind.FLOAT, nums[0].kind)
+        assertEquals("1.5e-8", nums[0].text)
+    }
 }

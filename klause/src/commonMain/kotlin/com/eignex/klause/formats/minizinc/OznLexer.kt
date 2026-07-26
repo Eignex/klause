@@ -91,14 +91,27 @@ internal class OznLexer(private val source: String) {
     private fun numberOrRange(ln: Int): OznToken {
         val start = pos
         while (pos < source.length && source[pos].isDigit()) pos++
+        var isFloat = false
         if (pos < source.length && source[pos] == '.' &&
             pos + 1 < source.length && source[pos + 1].isDigit()
         ) {
+            isFloat = true
             pos++ // dot
             while (pos < source.length && source[pos].isDigit()) pos++
-            return OznToken(OznTokenKind.FLOAT, source.substring(start, pos), ln)
         }
-        return OznToken(OznTokenKind.INT, source.substring(start, pos), ln)
+        // Optional exponent `e`/`E` with an optional sign and at least one digit; a trailing `e` with no
+        // following digit is left for the next token (a `..` range endpoint never carries an exponent).
+        if (pos < source.length && (source[pos] == 'e' || source[pos] == 'E')) {
+            var k = pos + 1
+            if (k < source.length && (source[k] == '+' || source[k] == '-')) k++
+            if (k < source.length && source[k].isDigit()) {
+                isFloat = true
+                pos = k
+                while (pos < source.length && source[pos].isDigit()) pos++
+            }
+        }
+        val kind = if (isFloat) OznTokenKind.FLOAT else OznTokenKind.INT
+        return OznToken(kind, source.substring(start, pos), ln)
     }
 
     private fun identOrKeyword(ln: Int): OznToken {
