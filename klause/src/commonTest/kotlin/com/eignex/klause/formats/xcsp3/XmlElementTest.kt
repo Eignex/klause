@@ -2,6 +2,7 @@ package com.eignex.klause.formats.xcsp3
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -74,5 +75,11 @@ class XmlElementTest {
     @Test
     fun `missing child returns null`() {
         assertNull(parseXml("<r><a/></r>").child("missing"))
+    }
+
+    @Test
+    fun `rejects a mismatched closing tag`() {
+        val e = assertFailsWith<IllegalArgumentException> { parseXml("<a><b>1</c></a>") }
+        assertTrue("mismatched closing tag" in e.message.orEmpty(), e.message.orEmpty())
     }
 }

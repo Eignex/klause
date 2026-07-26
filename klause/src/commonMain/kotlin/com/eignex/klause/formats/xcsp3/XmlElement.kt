@@ -206,7 +206,8 @@ private class XmlReader(private val s: String) {
 
                     s.startsWith("</", pos) -> {
                         pos += 2
-                        readName()
+                        val closeName = readName()
+                        require(closeName == tag) { "mismatched closing tag </$closeName> for <$tag>" }
                         skipWs()
                         expect('>')
                         break
