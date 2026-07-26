@@ -116,10 +116,10 @@ internal class PseudoBooleanPropagator(
                     forcedLit,
                 )
             ) {
-                    acc.loadPb(weights, literals, geBound = bound)
-                } else {
-                    loadLe(acc)
-                }
+                acc.loadPb(weights, literals, geBound = bound)
+            } else {
+                loadLe(acc)
+            }
 
             geSideViolated(state) -> acc.loadPb(weights, literals, geBound = bound)
 
