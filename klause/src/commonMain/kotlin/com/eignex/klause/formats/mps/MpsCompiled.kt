@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.smallModelIntBound
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -113,10 +114,16 @@ fun MpsModel.toProblem(
     // the deadline trips is clamped below (sound — the clamp only ever loosens).
     @Suppress("UNCHECKED_CAST")
     val tightened = tightenOpenIntBounds(obbtInput as Array<OpenIntBounds>, intLinears, cancellation)
+    // A pure-integer feasibility model whose small-model bound ([smallModelIntBound]) fits keeps
+    // exact verdicts: the finite box is equisatisfiable with the unbounded model, so no clamp flag.
+    // Never under an objective (the box could truncate an unbounded optimum into a spurious finite
+    // one); mixed models and oversized bounds fall back to the lossy searchable window.
+    val small = if (numReal == 0 && objective.indices.isEmpty()) smallModelIntBound(numInt, factors) else null
+    val box = small ?: searchBound
     var clamped = false
     val domains = Array(numInt) { j ->
-        val lo = tightened[j].lo ?: (-searchBound).also { clamped = true }
-        val hi = tightened[j].hi ?: searchBound.also { clamped = true }
+        val lo = tightened[j].lo ?: (-box).also { if (small == null) clamped = true }
+        val hi = tightened[j].hi ?: box.also { if (small == null) clamped = true }
         if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
     }
 

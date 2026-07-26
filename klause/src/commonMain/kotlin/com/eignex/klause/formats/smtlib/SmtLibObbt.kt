@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.lp.OpenIntBounds
+import com.eignex.klause.lp.smallModelIntBound
 import com.eignex.klause.lp.tightenOpenIntBounds
 
 /**
@@ -35,17 +36,25 @@ private fun SmtLibQfLia.Builder.obbtBounds() {
     }
 }
 
-/** Close every remaining [PresolveDomain.Open] to the searchable fallback and flag the model clamped. */
+/** Close every remaining [PresolveDomain.Open] to a finite box: the small-model bound when it fits
+ *  (equisatisfiable, so no flag), else the searchable fallback with the model flagged clamped. */
 private fun SmtLibQfLia.Builder.finalizeDomains() {
-    // A side still open falls back to a searchable range: the caller's own finite [unboundedIntLo] /
-    // [unboundedIntHi] when set, else ±[searchBound]. Clamping is lossy, so it flags the model — an
-    // `unsat` over the box becomes `unknown`.
-    val fallbackLo = maxOf(unboundedIntLo, -searchBound)
-    val fallbackHi = minOf(unboundedIntHi, searchBound)
+    if ((0 until nextInt).none { intDomains[it] is PresolveDomain.Open }) return
+    // The small-model magnitude bound ([smallModelIntBound]) makes the finite box equisatisfiable
+    // with the unbounded model, so an `unsat` inside it stays `unsat`. When it doesn't fit — or the
+    // caller's own [unboundedIntLo]/[unboundedIntHi] narrow it — the box is lossy and flags the
+    // model: an `unsat` over it becomes `unknown`. Feasibility-only: under an objective the box
+    // could truncate an unbounded optimum into a spurious finite one, so it is never applied there.
+    val small = if (objectiveSpec == null) smallModelIntBound(nextInt, factors) else null
+    val boxLo = if (small != null) -small else -searchBound
+    val boxHi = small ?: searchBound
+    val fallbackLo = maxOf(unboundedIntLo, boxLo)
+    val fallbackHi = minOf(unboundedIntHi, boxHi)
+    val lossy = small == null || fallbackLo > boxLo || fallbackHi < boxHi
     for (v in 0 until nextInt) {
         val d = intDomains[v] as? PresolveDomain.Open ?: continue
-        val newLo = d.lo ?: fallbackLo.also { domainsClamped = true }
-        val newHi = d.hi ?: fallbackHi.also { domainsClamped = true }
+        val newLo = d.lo ?: fallbackLo.also { if (lossy) domainsClamped = true }
+        val newHi = d.hi ?: fallbackHi.also { if (lossy) domainsClamped = true }
         intDomains[v] = openOrFinite(newLo, newHi)
     }
 }

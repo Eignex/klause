@@ -21,9 +21,13 @@ const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
  *  `unknown`). */
 const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
 
-/** Default magnitude of the *searchable* window a genuinely unbounded SMT-LIB integer is clamped to once
- *  OBBT fails to derive a real bound (see [KlauseConfig.unboundedSearchBound]). */
-const val DEFAULT_UNBOUNDED_SEARCH_BOUND: Long = 1_000_000
+/** Default magnitude of the *searchable* window a genuinely unbounded SMT-LIB / MPS integer falls back
+ *  to once OBBT and the small-model bound both fail to derive a real one (see
+ *  [KlauseConfig.unboundedSearchBound]). Bound-split search over the window is log-depth and the linear
+ *  propagators are overflow-guarded, so the window covers effectively the whole overflow-safe `Long`
+ *  range: a SAT witness of any representable magnitude is findable, and only `unsat` (sound merely
+ *  within the window) degrades to `unknown`. */
+const val DEFAULT_UNBOUNDED_SEARCH_BOUND: Long = 1L shl 62
 
 /** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
  *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a

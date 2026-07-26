@@ -150,10 +150,12 @@ class LocalSearchSolver(
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
-        if (problem.numRealVars > 0) {
+        if (problem.numRealVars > 0 || hasWideIntValues(problem)) {
             // LP-only continuous variables are resolved by the LP relaxation, which local search does not
             // run; their linear rows carry no invariant, so LS would ignore them and could report a
-            // solution that violates them. Decline rather than return an unsound verdict.
+            // solution that violates them. Domain values past the 32-bit range make the incremental
+            // violation/objective sums wrap, so a reported "solution" may violate factors too.
+            // Decline rather than return an unsound verdict.
             sink.stop()
             return SolveResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
         }
@@ -173,9 +175,9 @@ class LocalSearchSolver(
     }
 
     internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
-        // LP-only continuous variables are not evaluated by local search (see [solveInternal]); stream
-        // nothing rather than assignments that may violate their linear rows.
-        if (problem.numRealVars > 0) return emptySequence()
+        // LP-only continuous variables and wide int values are not soundly evaluated by local search
+        // (see [solveInternal]); stream nothing rather than assignments that may violate factors.
+        if (problem.numRealVars > 0 || hasWideIntValues(problem)) return emptySequence()
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
         return streamImpl(params, eff, warm)
     }
@@ -819,4 +821,14 @@ class LocalSearchSolver(
          *  so the acceptance-ratio estimate is stable yet the schedule still reacts many times. */
         const val ROUND_FEEDBACK_STEPS: Int = 1024
     }
+}
+
+/** True when any int domain holds values past the 32-bit range: local search's incremental
+ *  violation/objective bookkeeping accumulates coefficient-times-value products in plain `Long`
+ *  arithmetic, which can wrap there — an unsound "solution" could slip through. */
+private fun hasWideIntValues(problem: Problem): Boolean {
+    for (d in problem.intDomains) {
+        if (d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
+    }
+    return false
 }

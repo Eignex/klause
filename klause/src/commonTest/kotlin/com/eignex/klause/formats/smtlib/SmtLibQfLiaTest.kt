@@ -321,9 +321,19 @@ class SmtLibQfLiaTest {
     }
 
     @Test
-    fun `an unbounded variable marks the model as clamped`() {
+    fun `a small unbounded system closes under the small-model bound without clamping`() {
+        // One row with tiny coefficients: the small-model bound fits, so the finite box is
+        // equisatisfiable with the unbounded model and no clamp flag is raised.
         val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
-        assertTrue(parsed.domainsClamped, "x has no provable upper bound, so it was clamped")
+        assertFalse(parsed.domainsClamped, "the small-model bound covers this system exactly")
+    }
+
+    @Test
+    fun `an unbounded variable past the small-model range marks the model as clamped`() {
+        val parsed = SmtLibQfLia.parse(
+            "(declare-fun x () Int) (assert (> x 3000000000000)) (check-sat)",
+        )
+        assertTrue(parsed.domainsClamped, "the coefficient magnitude pushes the small-model bound past 2^62")
     }
 
     @Test
@@ -346,13 +356,21 @@ class SmtLibQfLiaTest {
     }
 
     @Test
-    fun `an unbounded variable OBBT cannot bound stays clamped but still finds a witness`() {
-        // x > 3 leaves x unbounded above; OBBT cannot bound it, so it falls back to a searchable range
-        // (clamped -> an unsat would be unknown), yet search still finds the witness x = 4.
+    fun `an unbounded variable OBBT cannot bound still finds a witness`() {
+        // x > 3 leaves x unbounded above; OBBT cannot bound it. The small-model box closes it and
+        // search still finds the witness x = 4.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
         val parsed = SmtLibQfLia.parse(text)
-        assertTrue(parsed.domainsClamped, "x is unbounded above; the searchable fallback marks it clamped")
-        assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the fallback range")
+        assertFalse(parsed.domainsClamped, "the small-model box is equisatisfiable, not a clamp")
+        assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the box")
+    }
+
+    @Test
+    fun `a sat witness beyond the legacy million-value window is found`() {
+        // The searchable fallback spans the overflow-safe Long range, so a witness at 10^10 --
+        // far past the historical +-10^6 window -- is reachable.
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (>= x 10000000000))\n(check-sat)"
+        assertTrue(solveFor(text, "x") >= 10_000_000_000L)
     }
 
     @Test
@@ -371,35 +389,34 @@ class SmtLibQfLiaTest {
     fun `a fresh abs over an unbounded operand marks the model clamped`() {
         // abs(x) with x unbounded: the fresh |x| var must inherit x's open range and be flagged when it
         // is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
-        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (abs x) 3)) (check-sat)")
+        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)")
         assertTrue(parsed.domainsClamped, "the fresh abs var inherits x's unbounded range")
     }
 
     @Test
     fun `a fresh div quotient over an unbounded dividend marks the model clamped`() {
-        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (div x 2) 3)) (check-sat)")
+        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (div x 2) 3000000000000)) (check-sat)")
         assertTrue(parsed.domainsClamped, "the fresh quotient var inherits x's unbounded range")
     }
 
     @Test
     fun `a fresh ite over an unbounded branch marks the model clamped`() {
         val parsed = SmtLibQfLia.parse(
-            "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3)) (check-sat)",
+            "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3000000000000)) (check-sat)",
         )
         assertTrue(parsed.domainsClamped, "the fresh ite var inherits the unbounded branch's range")
     }
 
     @Test
-    fun `a divisibility-only unsat over unbounded variables stays clamped`() {
-        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1), but its LP relaxation is
-        // feasible, so OBBT derives no bound and both variables fall back to the searchable range. The
-        // model is clamped, so a search 'unsat' over the box is reported as unknown -- never a false
-        // unsat for the truly unbounded problem.
+    fun `a divisibility-only unsat over unbounded variables is decided by the small-model box`() {
+        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1), and its LP relaxation is
+        // feasible so OBBT derives no bound. The small-model bound fits, making the finite box
+        // equisatisfiable: the resulting unsat is sound for the unbounded problem, no clamp flag.
         val parsed = SmtLibQfLia.parse(
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
         )
-        assertTrue(parsed.domainsClamped, "OBBT cannot bound an LP-feasible divisibility unsat")
+        assertFalse(parsed.domainsClamped, "the small-model box decides divisibility unsat exactly")
     }
 
     @Test
