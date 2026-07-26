@@ -21,12 +21,6 @@ internal sealed interface PresolveDomain {
         init {
             require(lo == null || hi == null) { "Open needs an open side; use Finite" }
         }
-
-        /** True when there is no provable lower bound yet. */
-        val openBelow: Boolean get() = lo == null
-
-        /** True when there is no provable upper bound yet. */
-        val openAbove: Boolean get() = hi == null
     }
 }
 
