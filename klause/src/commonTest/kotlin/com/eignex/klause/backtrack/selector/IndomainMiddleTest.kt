@@ -18,4 +18,17 @@ class IndomainMiddleTest {
         val session = PropagationSession(problem)
         assertEquals(-1L, IndomainMiddle.values(session, VarRef.IntVar(0), rng).first())
     }
+
+    @Test
+    fun `centered walk terminates near the long range ends`() {
+        val problem = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(Long.MIN_VALUE, Long.MIN_VALUE + 2)),
+            arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+        val values = IndomainMiddle.values(session, VarRef.IntVar(0), rng).take(3).toList()
+        assertEquals(listOf(Long.MIN_VALUE + 1, Long.MIN_VALUE + 2, Long.MIN_VALUE), values)
+    }
 }

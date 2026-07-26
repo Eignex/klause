@@ -44,7 +44,7 @@ internal class MaxRegret(private val objective: LinearObjective, private val bas
             val d = session.intDomain(v)
             if (d.size <= 1) continue
             val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0L
-            val r = abs(c) * (d.max - d.min)
+            val r = saturatingMul(abs(c), saturatingSpan(d))
             if (r > bestRegret) {
                 bestRegret = r
                 best = VarRef.IntVar(v)

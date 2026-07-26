@@ -11,5 +11,5 @@ object SmallestDomain : VariableSelector {
     override fun fresh() = this
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
-        pickByDomainMetric(session, maximize = false, boolScore = 2L) { it.size.toLong() }
+        pickByDomainMetric(session, maximize = false, boolScore = 2L) { it.sizeLong }
 }

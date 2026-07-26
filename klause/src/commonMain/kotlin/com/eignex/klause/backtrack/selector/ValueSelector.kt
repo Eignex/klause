@@ -49,15 +49,42 @@ internal fun boundsMidpoint(d: IntDomain): Long = (d.min shr 1) + (d.max shr 1) 
 
 /** Present domain values ordered by distance from [center] (ties prefer the upper value), skipping
  *  holes via the `in d` membership check. The first value drives [IndomainMiddle]/[IndomainMedian]'s
- *  int bound split; the tail keeps the sequence complete for any consumer that enumerates past it. */
+ *  int bound split; the tail keeps the sequence complete for any consumer that enumerates past it.
+ *  Cursor-based rather than `center ± offset`: the offset arithmetic wraps once a cursor would pass
+ *  a bound near the ends of the `Long` range, turning the walk into an endless spin. */
 internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = sequence {
     if (center in d) yield(center)
-    var off = 1L
-    while (center - off >= d.min || center + off <= d.max) {
-        if (center + off <= d.max && (center + off) in d) yield(center + off)
-        if (center - off >= d.min && (center - off) in d) yield(center - off)
-        off++
+    var up = center
+    var down = center
+    while (up < d.max || down > d.min) {
+        if (up < d.max) {
+            up++
+            if (up in d) yield(up)
+        }
+        if (down > d.min) {
+            down--
+            if (down in d) yield(down)
+        }
     }
+}
+
+/** Uniform random value in `[min(d), max(d)]`, overflow-safe on spans wider than `Long.MAX_VALUE`.
+ *  Snap to a present value with [IntDomain.clamp]; positional sampling via [IntDomain.valueAt] is
+ *  wrong on a non-[IntDomain.enumerable] domain (it only ever reaches the first 2^31 values). */
+internal fun randomInBounds(d: IntDomain, rng: Random): Long {
+    val span = d.max - d.min
+    if (span < 0L || span == Long.MAX_VALUE) return rng.nextLong()
+    return d.min + rng.nextLong(span + 1)
+}
+
+/** `max(d) - min(d)`, saturated at `Long.MAX_VALUE` instead of wrapping on a full-`Long` span. */
+internal fun saturatingSpan(d: IntDomain): Long = (d.max - d.min).let { if (it < 0L) Long.MAX_VALUE else it }
+
+/** `a * b` for non-negative operands, saturated at `Long.MAX_VALUE` instead of wrapping. */
+internal fun saturatingMul(a: Long, b: Long): Long = when {
+    a == 0L || b == 0L -> 0L
+    a > Long.MAX_VALUE / b -> Long.MAX_VALUE
+    else -> a * b
 }
 
 /**
@@ -90,7 +117,13 @@ internal fun probeAndOrder(
                 var i = 0
                 var guard = 0
                 while (i < maxProbes && guard < maxProbes * 8) {
-                    val candidate = d.valueAt(rng.nextInt(d.size))
+                    // Positional sampling is uniform only over an enumerable domain; a saturated
+                    // index space never reaches values past the first 2^31, so sample the bounds.
+                    val candidate = if (d.enumerable) {
+                        d.valueAt(rng.nextInt(d.size))
+                    } else {
+                        d.clamp(randomInBounds(d, rng))
+                    }
                     if (seen.add(candidate)) {
                         sample[i] = candidate
                         i++
@@ -140,7 +173,7 @@ internal fun logRemainingDomainProduct(session: PropagationSession): Double {
     val ln2 = ln(2.0)
     for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += ln2
     for (v in 0 until p.numIntVars) {
-        val sz = session.intDomain(v).size
+        val sz = session.intDomain(v).sizeLong
         if (sz > 1) s += ln(sz.toDouble())
     }
     return s

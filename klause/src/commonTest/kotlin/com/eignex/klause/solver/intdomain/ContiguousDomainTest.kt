@@ -37,6 +37,13 @@ class ContiguousDomainTest {
     }
 
     @Test
+    fun `sizeLong stays exact past the int saturation point`() {
+        assertEquals(10L, ContiguousDomain(1, 10).sizeLong)
+        assertEquals(5_000_000_001L, ContiguousDomain(0, 5_000_000_000L).sizeLong)
+        assertEquals(Long.MAX_VALUE, ContiguousDomain(Long.MIN_VALUE, Long.MAX_VALUE).sizeLong)
+    }
+
+    @Test
     fun `excludeValue absent is identity`() {
         val d = ContiguousDomain(1, 5)
         val e = d.excludeValue(99)

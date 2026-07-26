@@ -63,6 +63,12 @@ interface IntDomain {
      *  enumeration or positional indexing. */
     val enumerable: Boolean get() = true
 
+    /** Exact present-value count as a Long, saturating at [Long.MAX_VALUE] only when the count
+     *  exceeds Long range (a domain spanning more than 2^63 values). Unlike [size] it stays exact
+     *  on wide non-[enumerable] domains, so span-sensitive heuristics can still discriminate
+     *  between them. */
+    val sizeLong: Long get() = size.toLong()
+
     /** Number of interior holes: values strictly between [min] and [max] that are absent. O(1) or
      *  O(runs) and span-independent — it never walks the gap value by value. Zero for a contiguous
      *  domain; may exceed [Int] range for a sparse domain over a wide span. The dual of [size], for
