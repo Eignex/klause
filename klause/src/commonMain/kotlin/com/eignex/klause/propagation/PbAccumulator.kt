@@ -146,6 +146,28 @@ internal class PbAccumulator {
     }
 
     /**
+     * Selective RoundingSat reduction before dividing by [divisor]: weaken away (drop, reducing the degree
+     * by its weight) every literal — except [keepVar] — that is **not currently false** and whose
+     * coefficient is **not divisible** by [divisor]. Those are exactly the literals a subsequent
+     * [divideRoundUp] would round up into spurious slack, so dropping them first keeps the divided
+     * constraint tight (the resolvent stays conflicting). Falsified literals contribute no slack and are
+     * kept; divisible ones divide exactly and are kept — so a unit-weight (`divisor == 1`) reason is left
+     * untouched. Sound: dropping a literal from `Σ aᵢℓᵢ ≥ d` yields `Σ_{i≠j} aᵢℓᵢ ≥ d − aⱼ`.
+     */
+    fun weakenForDivision(keepVar: Int, divisor: Long, isFalse: (Int) -> Boolean) {
+        if (divisor <= 1L) return // everything divides by 1 — nothing to weaken
+        for (v in coef.keys.toList()) {
+            if (v == keepVar) continue
+            val c = coef.getValue(v)
+            val mag = if (c < 0L) -c else c
+            if (mag % divisor == 0L) continue // divides exactly ⇒ no rounding slack
+            if (isFalse(Lit.make(v, c > 0L))) continue // falsified ⇒ contributes no slack
+            if (c > 0L) rhs -= c // drop the literal, reducing the degree by its weight
+            coef.remove(v)
+        }
+    }
+
+    /**
      * Divide by [d] > 1 and round up (Chvátal-Gomory): every positive-literal coefficient and the degree
      * are replaced by their ceil-division. Sound (a valid cutting plane) and the core strengthening step
      * of cutting-planes learning. [d] is typically the pivot's reason coefficient.
