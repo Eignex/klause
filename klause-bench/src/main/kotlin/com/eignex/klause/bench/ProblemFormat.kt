@@ -6,7 +6,7 @@ import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.opb.Opb
-import com.eignex.klause.formats.smtlib.SmtLibQfLia
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
@@ -87,7 +87,7 @@ internal object SmtLibFormat : ProblemFormat {
     override fun ingest(file: File): Ingested {
         val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toLongOrNull() ?: 100_000L
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
-        val parsed = SmtLibQfLia.parse(file.readText(), -intBound, intBound, strict)
+        val parsed = SmtLib.parse(file.readText(), -intBound, intBound, strict)
         return Ingested(parsed.problem, parsed.objective)
     }
 }

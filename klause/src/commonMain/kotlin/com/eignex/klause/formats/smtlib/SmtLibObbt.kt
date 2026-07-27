@@ -13,14 +13,14 @@ import com.eignex.klause.lp.tightenOpenIntBounds
  * marks the model clamped, so search still finds a SAT witness while an `unsat` over the box is reported
  * as `unknown` (never a false `unsat`). Infinity thus never reaches search.
  */
-internal fun SmtLibQfLia.Builder.boundUnboundedVars() {
+internal fun SmtLib.Builder.boundUnboundedVars() {
     obbtBounds()
     finalizeDomains()
 }
 
 /** LP-tighten every open domain side via the shared OBBT helper ([tightenOpenIntBounds]) over the
  *  current [Linear] constraints; only open sides are written back (a finite domain is left as inferred). */
-private fun SmtLibQfLia.Builder.obbtBounds() {
+private fun SmtLib.Builder.obbtBounds() {
     if ((0 until nextInt).none { intDomains[it] is PresolveDomain.Open }) return
     val bounds = Array(nextInt) { v ->
         when (val d = intDomains[v]) {
@@ -28,7 +28,7 @@ private fun SmtLibQfLia.Builder.obbtBounds() {
             is PresolveDomain.Open -> OpenIntBounds(d.lo, d.hi)
         }
     }
-    val tightened = tightenOpenIntBounds(bounds, factors.filterIsInstance<Linear>())
+    val tightened = tightenOpenIntBounds(bounds, factors.filterIsInstance<Linear>().filter { !it.hasReals })
     for (v in 0 until nextInt) {
         if (intDomains[v] is PresolveDomain.Open) {
             intDomains[v] = openOrFinite(tightened[v].lo, tightened[v].hi)
@@ -38,7 +38,7 @@ private fun SmtLibQfLia.Builder.obbtBounds() {
 
 /** Close every remaining [PresolveDomain.Open] to a finite box: the small-model bound when it fits
  *  (equisatisfiable, so no flag), else the searchable fallback with the model flagged clamped. */
-private fun SmtLibQfLia.Builder.finalizeDomains() {
+private fun SmtLib.Builder.finalizeDomains() {
     if ((0 until nextInt).none { intDomains[it] is PresolveDomain.Open }) return
     // The small-model magnitude bound ([smallModelIntBound]) makes the finite box equisatisfiable
     // with the unbounded model, so an `unsat` inside it stays `unsat`. When it doesn't fit — or the

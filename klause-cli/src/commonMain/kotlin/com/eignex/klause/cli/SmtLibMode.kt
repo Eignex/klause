@@ -2,7 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.formats.smtlib.SmtLibQfLia
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.solver.Sample
 
 /**
@@ -25,7 +25,7 @@ internal object SmtLibMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
             val config = KlauseConfig.current
-            val parsed = SmtLibQfLia.parse(
+            val parsed = SmtLib.parse(
                 readTextFile(path),
                 config.unboundedIntLo,
                 config.unboundedIntHi,
@@ -34,11 +34,12 @@ internal object SmtLibMode : CliMode {
             domainsClamped = parsed.domainsClamped
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
-                    "factors=${parsed.problem.numFactors} clamped=$domainsClamped"
+                    "real=${parsed.problem.numRealVars} factors=${parsed.problem.numFactors} clamped=$domainsClamped"
             }
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
-            val render: (Sample) -> String = { s -> renderModel(ints, bools, s) }
+            val reals = parsed.realVarNames
+            val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
             return linearSolvable(parsed.problem, parsed.objective, parsed.sense == ObjectiveSense.MAXIMIZE, render)
         }
 
@@ -47,13 +48,18 @@ internal object SmtLibMode : CliMode {
 }
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
- *  declared variable. */
-internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, s: Sample): String = buildString {
-    append("(\n")
-    for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
-    for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
-    append(")")
-}
+ *  declared variable. Real values come from the leaf LP solve. */
+internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
+    buildString {
+        append("(\n")
+        for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
+        for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
+        for ((name, id) in reals) {
+            val v = if (id < s.reals.size) s.reals[id] else 0.0
+            append("  (define-fun $name () Real $v)\n")
+        }
+        append(")")
+    }
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. When
  *  [domainsClamped] is set, an `unsat` is only `unsat` within the finite solver range — the sound

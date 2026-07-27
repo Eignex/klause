@@ -6,7 +6,7 @@ import com.eignex.klause.solver.IntDomain
  * A per-variable domain **during SMT-LIB presolve**, modelled as a sealed union so that an *open*
  * (as-yet unbounded) integer is simply not representable as a searchable [IntDomain]: the type system —
  * not a runtime guard — enforces that infinity never reaches search. An [Open] domain lives only inside
- * [SmtLibQfLia.Builder] between a variable's declaration and [SmtLibQfLia.Builder.boundUnboundedVars];
+ * [SmtLib.Builder] between a variable's declaration and [SmtLib.Builder.boundUnboundedVars];
  * bound inference and OBBT close the sides they can, and the searchable-fallback clamp closes whatever
  * remains, so every entry is [Finite] by the time a [com.eignex.klause.solver.Problem] is built.
  * Infinity is carried structurally (a `null` bound), never by a `Long.MIN/MAX` or `±Long/4` sentinel.

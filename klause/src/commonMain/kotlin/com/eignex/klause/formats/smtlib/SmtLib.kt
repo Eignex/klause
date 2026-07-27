@@ -12,8 +12,12 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
-/** Raised when an SMT-LIB construct outside the supported QF_LIA subset is encountered. */
-class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB QF_LIA", msg)
+/** Raised when an SMT-LIB construct outside the supported linear-arithmetic subset is encountered. */
+class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB", msg)
+
+/** Reject an unsupported construct with a clean [UnsupportedSmtException]; `Nothing`-typed so call
+ *  sites stay expression-friendly and per-function throw counts stay flat. */
+internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
 
 /** One lowered linear relation `Σ coeffs·vars ⟨op⟩ bound` (shared by bound inference and lowering). */
 internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: LinearOp, val bound: Long)
@@ -28,6 +32,8 @@ data class SmtLibProblem(
     val intVarNames: Map<String, Int> = emptyMap(),
     /** Declared `Bool` variable name to bool id. */
     val boolVarNames: Map<String, Int> = emptyMap(),
+    /** Declared `Real` variable name to LP-only real id. */
+    val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     /** True when some integer variable's true (infinite or wider) domain was narrowed to the finite
@@ -36,12 +42,13 @@ data class SmtLibProblem(
     val domainsClamped: Boolean = false,
 )
 
-/** Parser/compiler for the supported SMT-LIB QF_LIA subset. The [Builder]'s per-concern compilation
- *  steps live in sibling files as extension functions: bound inference in `SmtLibBounds.kt`, boolean /
- *  assert / distinct compilation in `SmtLibExpr.kt`, and linear-term / relation / objective lowering in
- *  `SmtLibLinear.kt`. */
-object SmtLibQfLia {
-    /** Parse SMT-LIB QF_LIA [text] into an [SmtLibProblem]. A variable with no provable bound (and a
+/** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
+ *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
+ *  functions: bound inference in `SmtLibBounds.kt`, boolean / assert / distinct compilation in
+ *  `SmtLibExpr.kt`, linear-term / relation / objective lowering in `SmtLibLinear.kt`, and the real
+ *  (LRA) lowering in `SmtLibReal.kt`. */
+object SmtLib {
+    /** Parse SMT-LIB linear-arithmetic [text] into an [SmtLibProblem]. A variable with no provable bound (and a
      *  derived bound past the range) falls back to / is clamped into `[unboundedIntLo, unboundedIntHi]`
      *  — the same default int range as the FlatZinc front-end ([com.eignex.klause.config.KlauseConfig]). */
     fun parse(
@@ -57,7 +64,7 @@ object SmtLibQfLia {
     }
 
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
-     *  `internal fun SmtLibQfLia.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
+     *  `internal fun SmtLib.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
     internal class Builder(
         val unboundedIntLo: Long,
         val unboundedIntHi: Long,
@@ -66,8 +73,10 @@ object SmtLibQfLia {
     ) : CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
+        internal val realNames = HashMap<String, Int>()
         internal var nextBool = 0
         internal var nextInt = 0
+        internal var nextReal = 0
         internal val intDomains = ArrayList<PresolveDomain>()
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
@@ -82,9 +91,10 @@ object SmtLibQfLia {
          *  A call `(f a…)` is inlined by binding the parameters to the arguments like a `let`. */
         internal val macros = HashMap<String, Macro>()
 
-        internal class Binding(val isBool: Boolean) {
+        internal class Binding(val isBool: Boolean, val isReal: Boolean = false) {
             var lin: LinComb? = null
             var lit: Int? = null
+            var real: RealComb? = null
         }
 
         // Let scoping as a heap-allocated stack, not recursion. `bindingStacks` maps each name to its
@@ -104,8 +114,12 @@ object SmtLibQfLia {
                     val p = pair as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding")
                     val name = p.atomAt(0, "let binding name")
                     val expr = p.argAt(1, "let binding value")
-                    val b = Binding(isBool = isBoolExpr(expr))
-                    if (b.isBool) b.lit = compileBool(expr) else b.lin = linearTerm(expr)
+                    val b = Binding(isBool = isBoolExpr(expr), isReal = !isBoolExpr(expr) && isRealExpr(expr))
+                    when {
+                        b.isBool -> b.lit = compileBool(expr)
+                        b.isReal -> b.real = realTerm(expr)
+                        else -> b.lin = linearTerm(expr)
+                    }
                     name to b
                 },
             )
@@ -201,7 +215,7 @@ object SmtLibQfLia {
             when (sort) {
                 "Int" -> intNames[name] = newInt()
                 "Bool" -> boolNames[name] = newBool()
-                "Real" -> throw UnsupportedSmtException("Real sort for '$name' (QF_LIA is integer-only)")
+                "Real" -> realNames[name] = nextReal++
                 else -> throw UnsupportedSmtException("unsupported sort '$sort' for '$name'")
             }
         }
@@ -210,7 +224,9 @@ object SmtLibQfLia {
             inferBounds()
             for (a in asserts) assert(a)
             boundUnboundedVars()
-            val objective = objectiveSpec?.let { (t, neg) -> linearObjective(t, neg) }
+            val objective = objectiveSpec?.let { (t, neg) ->
+                if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
+            }
             // The single search seam: every domain must be Finite by now (boundUnboundedVars closes
             // every Open one). An Open here would be a bug, but the sealed type kept it from flowing
             // anywhere a searchable IntDomain was expected, so this cast is the only place it can surface.
@@ -223,6 +239,9 @@ object SmtLibQfLia {
                     numIntVars = nextInt,
                     intDomains = domains,
                     factors = factors.toTypedArray(),
+                    numRealVars = nextReal,
+                    realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
+                    realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
                     // Defer the root bake: on a wide clamped domain an integer-infeasible equality (e.g.
                     // a divisibility contradiction) would grind O(span) at construction. Presolve's
                     // strengthen pass now catches that infeasibility first, at solve time, before the
@@ -232,6 +251,7 @@ object SmtLibQfLia {
                 objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),
+                realVarNames = LinkedHashMap(realNames),
                 sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
                 domainsClamped = domainsClamped,
             )
