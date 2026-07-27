@@ -160,6 +160,14 @@ class PropagationSession(
     /** Current int domain after propagation. Always non-empty unless the session is Unsat. */
     fun intDomain(v: Int): IntDomain = state.intDomains[v]
 
+    /** Install (once, at the root) the incremental objective bool lower bound over [weights]; returns
+     *  true while it is live. See [PropagationState.installObjectiveBoolBound]. */
+    fun installObjectiveBoolBound(weights: LongArray): Boolean = state.installObjectiveBoolBound(weights)
+
+    /** O(1) incremental bool part of the trivial objective lower bound; valid only once
+     *  [installObjectiveBoolBound] has returned true. */
+    fun objectiveBoolLowerBound(): Long = state.objectiveBoolLowerBound()
+
     /**
      * Seed with an initial assumption set. Resets any prior trail to level 0 first, then
      * pushes each assumption in iteration order (bools first, then ints). Each gets its own

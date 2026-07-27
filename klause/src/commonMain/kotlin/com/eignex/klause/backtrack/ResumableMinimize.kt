@@ -446,8 +446,13 @@ internal class ResumableMinimize(
             return recordIfImproving(snap, objective.evaluate(snap))
         }
 
-        override fun assertObjectiveBoundAtRoot(session: PropagationSession): Boolean =
-            this@ResumableMinimize.assertObjectiveBoundAtRoot()
+        override fun assertObjectiveBoundAtRoot(session: PropagationSession): Boolean {
+            // Root (level 0) on the live session: install the incremental objective bool lower bound here
+            // so the always-on linear bound is O(1) per node instead of an O(numBoolVars) rescan. Idempotent
+            // — a no-op once installed; the baseline captures the never-undone level-0 assignment.
+            session.installObjectiveBoolBound(objective.boolWeights)
+            return this@ResumableMinimize.assertObjectiveBoundAtRoot()
+        }
 
         override fun drainLpNogoodsAtRestart(session: PropagationSession): Boolean = drainLpNogoods()
 
