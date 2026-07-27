@@ -77,7 +77,10 @@ internal object LinearSubSumAggregation {
             val p = unitPivotIndex(f) ?: continue
             val sign = f.coeffs[p] // ±1
             val form = HashMap<Int, Long>(f.vars.size)
-            for (j in f.vars.indices) if (j != p) form[f.vars[j]] = -sign * f.coeffs[j]
+            // A zero-coefficient term is vacuous (coalescing keeps it, but it names no real partner), so it
+            // is not part of the sub-sum — dropping it also keeps [matchMultiplier]'s `c / A_j` well-defined.
+            for (j in f.vars.indices) if (j != p && f.coeffs[j] != 0L) form[f.vars[j]] = -sign * f.coeffs[j]
+            if (form.size < 2) continue // fewer than two real partners is no sub-sum to aggregate
             out.add(Definition(i, f.vars[p], sign * f.bound, form))
         }
         return out
@@ -114,6 +117,7 @@ internal object LinearSubSumAggregation {
         for ((x, a) in def.form) {
             if (!coeffByVar.containsKey(x)) return null // partner missing → not a full sub-sum
             val c = coeffByVar.getOrDefault(x, 0L)
+            if (a == 0L) return null // a zero form coefficient is no term (collectDefinitions drops these)
             if (c % a != 0L) return null
             val ratio = c / a
             if (ratio == 0L) return null
