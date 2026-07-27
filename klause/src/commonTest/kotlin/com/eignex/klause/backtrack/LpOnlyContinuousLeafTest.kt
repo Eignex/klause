@@ -53,6 +53,55 @@ class LpOnlyContinuousLeafTest {
     }
 
     @Test
+    fun `an infeasible system over a lower-unbounded real column is unsat`() {
+        // x >= 6 and x <= 5 over x in (-inf, +inf): once, folding the probe stand-in into the rhs
+        // doubles collapsed both rows onto the same right-hand side and the leaf blessed a false SAT.
+        val geSix = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 6.0)
+        val leFive = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 5.0)
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(geSix, leFive),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+    }
+
+    @Test
+    fun `a negative witness on a lower-unbounded real column reads back through the split`() {
+        val leMinusSix = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, -6.0)
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(leMinusSix),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val r = assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertEquals(true, r.assignment.reals[0] <= -6.0 + 1e-9)
+    }
+
+    @Test
+    fun `a finite upper bound on a lower-unbounded real column is enforced`() {
+        val geSeven = Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 7.0)
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = arrayOf<Factor>(geSeven),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(5.0),
+        )
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+    }
+
+    @Test
     fun `infeasible residual real LP is certified UNSAT`() {
         // No discrete variables; r in [0,1] with r >= 5 has no feasible point — exact Farkas certifies it.
         val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L)

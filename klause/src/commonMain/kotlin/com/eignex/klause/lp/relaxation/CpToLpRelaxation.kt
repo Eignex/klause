@@ -90,6 +90,10 @@ internal class LpRelaxation(
      *  integer / Boolean / auxiliary column. Lets the leaf verdict read each continuous column's solved
      *  value back onto its real variable. */
     val colRealId: IntArray = IntArray(model.n) { -1 },
+    /** Per structural column, the sign its primal contributes to its real variable's value: a
+     *  lower-unbounded real variable is split `x = x⁺ − x⁻` (two columns, both lower-bounded at 0, so
+     *  no huge lower-shift ever reaches the rhs doubles), and the negative part carries -1. */
+    val colRealSign: IntArray = IntArray(model.n) { 1 },
 )
 
 /**
@@ -208,12 +212,13 @@ internal fun leafRealFeasibility(
     val certified = solveAndCertify(relaxation.model, cancellation = cancellation)
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
     val primal = certified.float?.primal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
-    // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]).
+    // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]);
+    // a split (lower-unbounded) variable accumulates x⁺ − x⁻ across its two columns.
     val reals = DoubleArray(problem.numRealVars)
     val colRealId = relaxation.colRealId
     for (col in colRealId.indices) {
         val r = colRealId[col]
-        if (r >= 0) reals[r] = primal[col]
+        if (r >= 0 && col < primal.size) reals[r] += relaxation.colRealSign[col] * primal[col]
     }
     return LeafRealResult(LpVerdict.OPTIMAL, reals)
 }
@@ -450,6 +455,10 @@ internal class CpToLpRelaxation(
         // LP column -> real var id it stands for, or -1 for int/bool/aux columns. Lets the leaf verdict
         // read each LP-only continuous column's value back onto its real variable.
         private val colRealId = IntArrayList()
+        private val colRealSign = IntArrayList()
+
+        // Primary column -> negative-part column of a split lower-unbounded real variable.
+        private val realNegOf = HashMap<Int, Int>()
 
         // Per-column live-bound rule for the persistent relaxation (#39/#43). For an auxiliary column,
         // colReq[c] holds its presence requirement as flat (intVar, value) membership pairs and
@@ -497,6 +506,7 @@ internal class CpToLpRelaxation(
             colVarId.add(-1)
             colIsBool.add(0)
             colRealId.add(-1)
+            colRealSign.add(1)
             colReq.add(presence)
             colPresentUpper.add(hi)
             return c
@@ -607,6 +617,7 @@ internal class CpToLpRelaxation(
                 colVarId.add(intVar)
                 colIsBool.add(0)
                 colRealId.add(-1)
+                colRealSign.add(1)
                 colReq.add(null)
                 colPresentUpper.add(0L)
             }
@@ -614,30 +625,54 @@ internal class CpToLpRelaxation(
         }
 
         /**
-         * Column for LP-only continuous variable [realVar], created on first use with its declared real
-         * bounds and objective coefficient. It has no backing CP variable (`colVarId = -1`) so the
+         * Column(s) for LP-only continuous variable [realVar], created on first use with its declared
+         * real bounds and objective coefficient. It has no backing CP variable (`colVarId = -1`) so the
          * persistent relaxation never re-binds it and reduced-cost fixing never maps it to a domain; its
-         * value is read back onto the real variable at the leaf. An open (`±∞`) bound becomes the builder's
-         * probe stand-in via [LpBuilder.addRealVar].
+         * value is read back onto the real variable at the leaf.
+         *
+         * A finite lower bound becomes the column's shift as usual. A `−∞` lower bound must NOT become a
+         * probe-magnitude shift: folding `coeff · 2⁶¹` into the rhs doubles annihilates ordinary
+         * right-hand sides (float spacing at that magnitude is 512), which once turned an infeasible
+         * system into a self-consistent — and exactly "certifiable" — corrupted one. Instead the
+         * variable splits as `x = x⁺ − x⁻` with both parts lower-bounded at 0 (upper sides open through
+         * the probe stand-in, which only ever appears as a box bound, never in the rhs); every row and
+         * the objective mirror the negative part with negated coefficients, and a finite upper bound is
+         * enforced by an explicit `x⁺ − x⁻ ≤ hi` row.
          */
         override fun realColumn(realVar: Int): Int {
             var c = realCol[realVar]
             if (c == -1) {
                 val lo = problem.realLower[realVar]
                 val hi = problem.realUpper[realVar]
-                c = builder.addRealVar(
-                    lower = if (lo.isFinite()) lo else null,
-                    upper = if (hi.isFinite()) hi else null,
-                    cost = realCost(realVar),
-                )
+                if (lo.isFinite()) {
+                    c = builder.addRealVar(
+                        lower = lo,
+                        upper = if (hi.isFinite()) hi else null,
+                        cost = realCost(realVar),
+                    )
+                    registerRealCol(realVar, sign = 1)
+                } else {
+                    c = builder.addRealVar(lower = 0.0, upper = null, cost = realCost(realVar))
+                    registerRealCol(realVar, sign = 1)
+                    val neg = builder.addRealVar(lower = 0.0, upper = null, cost = -realCost(realVar))
+                    registerRealCol(realVar, sign = -1)
+                    realNegOf[c] = neg
+                    if (hi.isFinite()) {
+                        builder.addRealRow(intArrayOf(c, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
+                    }
+                }
                 realCol[realVar] = c
-                colVarId.add(-1)
-                colIsBool.add(0)
-                colRealId.add(realVar)
-                colReq.add(null)
-                colPresentUpper.add(0L)
             }
             return c
+        }
+
+        private fun registerRealCol(realVar: Int, sign: Int) {
+            colVarId.add(-1)
+            colIsBool.add(0)
+            colRealId.add(realVar)
+            colRealSign.add(sign)
+            colReq.add(null)
+            colPresentUpper.add(0L)
         }
 
         /** Column for Boolean variable `boolVar`; bounds collapse to a point if it is pinned this node. */
@@ -652,6 +687,7 @@ internal class CpToLpRelaxation(
                 colVarId.add(boolVar)
                 colIsBool.add(1)
                 colRealId.add(-1)
+                colRealSign.add(1)
                 colReq.add(null)
                 colPresentUpper.add(0L)
             }
@@ -785,6 +821,7 @@ internal class CpToLpRelaxation(
                 colPresentUpper = presentUpper,
                 hullFactorIds = hullFactorIds.toIntArray(),
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
+                colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
             )
         }
 
@@ -913,7 +950,24 @@ internal class CpToLpRelaxation(
 
         override fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double) {
             val rel = relationOf(op) ?: return
-            builder.addRealRow(columns, coeffs, rel, rhs)
+            if (realNegOf.isEmpty() || columns.none { realNegOf.containsKey(it) }) {
+                builder.addRealRow(columns, coeffs, rel, rhs)
+                return
+            }
+            // Mirror each split column's negative part with the negated coefficient.
+            val extra = columns.count { realNegOf.containsKey(it) }
+            val cols = IntArray(columns.size + extra)
+            val vals = DoubleArray(columns.size + extra)
+            var w = columns.size
+            for (k in columns.indices) {
+                cols[k] = columns[k]
+                vals[k] = coeffs[k]
+                val neg = realNegOf[columns[k]] ?: continue
+                cols[w] = neg
+                vals[w] = -coeffs[k]
+                w++
+            }
+            builder.addRealRow(cols, vals, rel, rhs)
         }
 
         override fun bigMRow(
