@@ -310,6 +310,15 @@ data class BacktrackParams(
      * integer variables (order-literal atoms carry no PB reason).
      */
     val pbLearning: Boolean? = null,
+    /**
+     * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
+     * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a
+     * permanent constraint, so branch-and-bound prunes against it and cutting-planes conflict analysis can
+     * refute it to prove optimality — the standard bound-enforcement a weighted-Boolean objective
+     * otherwise lacks (it has no objective variable to tighten). On by default; ignored when the objective
+     * is a single integer variable (that path tightens the variable directly).
+     */
+    val pbObjectiveCutoff: Boolean = true,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))
