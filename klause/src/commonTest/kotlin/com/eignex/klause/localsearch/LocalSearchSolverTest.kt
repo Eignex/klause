@@ -1,10 +1,13 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -51,5 +54,25 @@ class LocalSearchSolverTest {
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(30).toList()
         assertEquals(3, samples.toSet().size, "ExactlyOne over 3 vars has exactly 3 distinct solutions")
         for (s in samples) assertEquals(1, s.bools.count { it })
+    }
+
+    private class ThreeDistinct : VariableSchema() {
+        val a by intVar(min = 1, max = 3)
+        val b by intVar(min = 1, max = 3)
+        val c by intVar(min = 1, max = 3)
+        val unique by constraint { allDifferent(a, b, c) }
+    }
+
+    @Test
+    fun `constructor accepts a compiled problem`() {
+        val compiled = ThreeDistinct().compile()
+        val result = LocalSearchSolver(compiled).solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 0))
+        assertTrue(result is SolveResult.Sat)
+    }
+
+    @Test
+    fun `constructor accepts a schema and compiles it`() {
+        val result = LocalSearchSolver(ThreeDistinct()).solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 0))
+        assertTrue(result is SolveResult.Sat)
     }
 }

@@ -1,5 +1,7 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.compile.CompiledProblem
+import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
@@ -10,6 +12,7 @@ import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.ProbSat
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -77,6 +80,12 @@ class LocalSearchSolver(
     val seedImplicitOnRestart: Boolean = false,
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
+
+    /** Solve a [CompiledProblem]'s problem with the default local-search configuration. */
+    constructor(compiled: CompiledProblem) : this(compiled.problem)
+
+    /** Compile [schema] with the default config and solve the resulting problem. */
+    constructor(schema: VariableSchema) : this(schema.compile().problem)
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each

@@ -1,210 +1,110 @@
 <p align="center">
   <a href="https://eignex.com/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner-white.svg">
-      <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg">
-      <img alt="Eignex" src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg" style="max-width: 100%; width: 22em;">
+      <source media="(prefers-color-scheme: dark)"
+        srcset="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner-white.svg">
+      <source media="(prefers-color-scheme: light)"
+        srcset="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg">
+      <img alt="Eignex"
+        src="https://raw.githubusercontent.com/Eignex/.github/refs/heads/main/profile/banner.svg"
+        style="max-width: 100%; width: 22em;">
     </picture>
   </a>
 </p>
 
 # Klause
 
-Klause is a Kotlin constraint programming library and CLI tool. It can optimize arbitrary problems that can be expressed in the MiniZinc language. Klause can also be used independently of MiniZinc embedded in JVM or native targets through KMP.
+[![License](https://img.shields.io/github/license/eignex/klause)](https://github.com/eignex/klause/blob/main/LICENSE)
 
-The engine supports boolean the and bounded int variables natively. There are wrappers to encode floats and sets of either ints and nominal universes too. Any variable can be declared optional, with constraints lowered to reified or aggregation-aware forms automatically.
+Klause is a hybrid solver for booleans, finite domain integers and linear
+reals.
 
-Two native engines, both implementing Solver and Optimizer:
+It features a modular CDCL backtrack solver with:
+ - Constraint programming propagators (alldifferent, circuit, and the usual
+   suspects).
+ - A boolean-only fast path for SAT and pseudo-Boolean problems.
+ - A linear programming solver for relaxations and continuous variables.
 
-- A complete CSP backtrack engine (the default) with propagation,
-  configurable variable and value heuristics, branch-and-bound minimize,
-  and model-blocking enumeration. Used for proofs of unsat, optimal
-  bounds, and without-replacement enumeration.
-- A local-search engine (default strategy: adaptive probSAT; also
-  WalkSat, DDFW, simulated annealing, CCA variants). Used for stochastic
-  sampling and large-domain problems where complete search doesn't
-  finish in budget.
+Klause can read and solve problems in a wide range of input formats:
+MiniZinc, XCSP3, SMT-LIB (QF_LIRA), MPS, OPB, and DIMACS. The CLI is
+available both as a native binary and on JVM through KMP (kotlin
+multi-platform).
 
-For benchmarking, external reference solvers (Choco, Gecode, Yuck) are run
-end-to-end via `minizinc --solver` — see `klause-bench`. Side doors, not the core.
+You can also use it as a kotlin/java library with a nice DSL. There are
+wrappers to encode non-linear floats and sets over ints or nominal labels
+too. Any variable can be declared optional, with constraints lowered to
+reified or aggregation-aware forms automatically.
 
-Sampling is first-class. Drawing samples with replacement and enumerating
-without replacement are core operations. Most CP libraries solve once and
-stop; klause is built for repeated, diverse, and incremental queries
-against the same model.
+## Installation
 
-Klause is not a MILP solver (objectives are linear over integers, not
-reals), not a full SMT solver (no bitvectors, arrays, strings, or
-quantifiers), and not a verification framework. For those, reach for a
-MILP solver, Z3 or CVC5, or a proof assistant.
+TODO
+
+## Engines
+
+Besides backtrack there's also a highly customizable local search and large
+neighbourhood search engine. The local search engine generalizes
+meta-heuristics like ProbSAT, CBLS, feasibility jump, DDFW, simulated
+annealing etc.
+
+All engines are combined and selected automatically in the portfolio based
+on whether there is an optimization target or just satisfiability and what
+types of variables and constraints the problem contain.
+
+## Theories
+
+Linear reals are handled by the LP: continuous variables exist only as LP
+columns and are never branched on. The LP runs in double precision but
+every bound and infeasibility verdict is certified exactly, so floating
+point never decides an answer. Non-linear float constraints are instead
+discretized into integer buckets at a configurable resolution.
+
+The SMT-LIB frontend decides QF_LIRA, quantifier-free linear integer and
+real arithmetic, optionally with a minimize or maximize objective.
 
 ## Use cases
 
 Klause targets problems where the constraint system is the model and the
 question is "give me some valid configurations" rather than "prove this
-assertion holds".
+assertion holds". It is built both for high performance one-shot solving
+and for long-running services that re-solve and re-sample the same model.
 
-- Constraint-aware test or fuzz input generation. Produce inputs that
-  satisfy structural invariants so the test exercises behaviour instead
-  of rejecting on input validation.
-- Diverse input sets for differential testing. Draw many valid samples
-  spread across the feasible region, not clustered in one corner.
-- Configuration synthesis. Find a system configuration (feature flags,
-  resource caps, routing weights) that satisfies the rules, optionally
-  ranked by a weighted objective.
+- Test and fuzz input generation. Draw diverse valid inputs spread across
+  the feasible region instead of getting rejected on validation.
+- Configuration synthesis. Find feature flags, resource caps or routing
+  weights that satisfy the rules, optionally ranked by an objective.
+- Parameter optimization under constraints.
+  [Combo](https://github.com/Eignex/combo) runs bandit and Bayesian
+  optimization on top of klause.
 - Scheduling and assignment. Tasks to machines, students to rooms,
-  campaigns to budgets. Add a linear objective for cost-minimal solutions.
-- Plan verification. Check that a proposed assignment satisfies all
-  declared constraints, and report why it fails when it doesn't.
+  campaigns to budgets.
 
-## Schema
+Sampling and counting are first-class and run natively over the compiled
+problem, without translation to CNF:
+
+- Drawing samples with replacement.
+- Enumerating solutions without replacement.
+- Exact and approximate model counting.
+- Near-uniform sampling.
+
+Klause is not a full SMT solver (no bitvectors, arrays, strings, or
+quantifiers) and not a verification framework. For those, use Z3, CVC5 or a
+proof assistant.
+
+## Example
+
+Declare a schema, compile it, and enumerate solutions:
 
 ```kotlin
-class CampaignSchema : VariableSchema() {
-    val type    by nominal("a", "b", "c")
-    val budget  by intVar(min = 1000, max = 4000)
-    val bonus   by intVar(min = 0, max = 500)
-    val rate    by floatVar(min = 0.0, max = 1.0)
-
-    init {
-        constraint((type eq "a") implies (budget + bonus le 2000))
-        constraint(2 * bonus le budget)
-        constraint((rate ge 0.5) implies (budget ge 2000))
-    }
+class Order : VariableSchema() {
+    val a by intVar(min = 1, max = 3)
+    val b by intVar(min = 1, max = 3)
+    val c by intVar(min = 1, max = 3)
+    val unique by constraint { allDifferent(a, b, c) }
 }
-```
 
-### Variables
-
-- `intVar`: bounded integer with a contiguous starting domain.
-  Propagation can excise interior values during solving; storage switches
-  to a bitset for narrow spans and a sorted hole list for wide ones.
-- `floatVar`: continuous-looking variable bucketed into a
-  precision-controlled grid of integer buckets at compile time.
-- `boolVar`: declares a free Boolean variable. Comparisons and Boolean
-  operators on other variable kinds also produce Boolean-typed expressions
-  implicitly, so most code never names a BoolVar directly.
-- `nominal`: picks one label from a fixed list, lowered internally to
-  one-hot indicator bools with the standard exactly-one constraint.
-- `multiple` and `setVar`: set variables over a nominal universe or an int
-  range respectively. Both lower to per-element indicator bools, with set
-  operations dispatching through bulk bitset propagators.
-- Optional: optIntVar, optBoolVar, and the opt forms of nominal and
-  set vars return a (present, value) pair. The DSL routes constraints
-  involving opt vars through reified or opt-aware lowerings so user code
-  does not need to write the presence guards explicitly. By default an
-  absent opt var is pinned to a canonical in-domain value (0 for ints,
-  false for bools, the first label for nominals), collapsing the dead-value
-  symmetry that would otherwise multiply equivalent solutions during
-  enumeration and model counting; disable it via `KlauseConfig` when absent
-  values are unconstrained by spec.
-
-### Constraints
-
-- Boolean: connectives (and, or, implies, iff, not, xor) over Boolean
-  expressions, freely composable and reified into clauses behind the scenes.
-- Nominal: equality and inequality (eq, ne) against label literals or
-  other nominals.
-- Set: membership (inSet), structural relations (subsetOf, disjointFrom),
-  and algebra (union, intersect, card). Mixed concrete-set and set-var
-  operands work uniformly.
-- Optional: constraints on optional variables follow relational semantics:
-  an undefined value in a Boolean context is false. Aggregating constraints
-  filter to the present subset, so most user code does not need to mention
-  presence explicitly.
-- Integer arithmetic: +, -, *, /, % over integer expressions and constants.
-  Division and modulo are truncated toward zero (matching MiniZinc and Java/Kotlin
-  `%`), so the remainder takes the sign of the dividend. Multiplication works
-  variable-by-variable, not only by constants.
-- Comparisons: le, lt, ge, gt, eq, ne between arbitrary integer expressions,
-  returning a Boolean expression usable in any reified context.
-- Counting: atMost and atLeast bound the number of true bools; cardinality
-  and pseudoBoolean are the weighted versions. gcc enforces a global
-  cardinality vector. count counts occurrences of a single value. among
-  counts membership in a value set. nValue counts the number of distinct
-  values taken.
-- Permutations and ordering: allDifferent enforces pairwise distinctness via
-  Regin's GAC matching, allDifferentExcept excepts a designated value set,
-  and allEqual, inverse, sort, argSort cover the standard array invariants.
-  lexLeq and lexLt enforce lexicographic ordering between two arrays;
-  valuePrecede is a structural symmetry-breaking primitive.
-- Scheduling: cumulative keeps every time point's resource usage under the
-  capacity; the propagator combines time-tabling with a Vilim Theta-tree
-  edge-finder. disjunctive is the unary special case. Opt-aware variants
-  accept a presents array so that absent tasks contribute no resource use.
-- Routing: circuit constrains a successor array to form a single Hamiltonian
-  cycle, subcircuit allows nodes to sit outside the cycle as fixed points,
-  and path and tree enforce directed-path and rooted-spanning-tree shapes.
-- Packing: binPacking assigns items to bins under a per-bin capacity,
-  knapsack is the classical 0-1 knapsack, and geost enforces N-dimensional
-  non-overlap via a sweep-line propagator.
-- Network flow: networkFlow enforces nodal flow conservation, and
-  networkFlowCost adds per-unit-flow costs that aggregate into a cost
-  variable suitable as an objective.
-- Tabular: table allows only tuples listed in the table and notTable forbids
-  them. regular accepts only the words a deterministic finite automaton
-  recognises; costRegular adds per-edge costs that sum into a cost variable.
-  mdd and costMdd are the multi-valued decision diagram analogues, supporting
-  much richer structure than a flat table at lower memory cost.
-- Integer expressions: min, max, and abs give pointwise extrema and absolute
-  value. element indexes an array by a variable. member exposes set
-  membership as a Boolean. argMin and argMax return the index of the smallest
-  or largest entry. ifThenElse is an integer-valued conditional.
-- Linking: channel enforces that exactly one bool is true and the
-  corresponding int is its index, the standard bridge between one-hot and
-  indexed representations.
-
-## Solving
-
-```kotlin
-val schema = CampaignSchema()
+val schema = Order()
 val compiled = schema.compile()
-val solver = BacktrackSolver(compiled.problem)
-
-solver.enumerate(BacktrackParams()).take(20).forEach { s ->
-    println("type=${compiled.decode(schema.type, s)} budget=${compiled.decode(schema.budget, s)}")
+for (sample in BacktrackSolver(compiled).enumerate().take(5)) {
+    println(compiled.decode(schema.a, sample))
 }
-
-val weights = LinearObjective(boolWeights = doubleArrayOf(/* ... */))
-val best = solver.minimize(weights, BacktrackParams())
-
-// Or point at one schema variable, MiniZinc-style:
-val cheapest = solver.minimize(compiled.minimize(schema.budget), BacktrackParams())
 ```
-
-The backtrack engine is the default — it provides completeness, branch-and-bound
-optimality proofs, and without-replacement enumeration. Swap in `LocalSearchSolver`
-with `LocalSearchParams(maxFlips = ...)` when complete search is too slow on a
-large-domain problem or you want stochastic sampling with replacement.
-
-When an objective is defined by a cone of constraints rather than a single
-variable (as in a decomposed MiniZinc objective), local search evaluates it
-through a functional objective that recomputes the objective value from the
-decision variables, so a move yields the true change in the objective and
-the search gets a real gradient to descend instead of plateauing once the
-constraints are merely satisfied.
-
-Compilation and solving knobs (opt-var pinning, default bounds for unbounded
-integers) are consolidated in `KlauseConfig` — set `KlauseConfig.current` once
-at startup, or pass a config straight to `schema.compile(config)`.
-
-## Model counting and sampling
-
-Counting and sampling run natively over the compiled problem — no translation
-to CNF. `count` returns an interval `[lower, upper]`: an anytime exact counter
-walks the projection and tightens the bounds until they meet, falling back to
-ApproxMC when the exact count is too large to finish. `approximateCount` runs
-ApproxMC directly for a `(1 ± ε)` estimate at confidence `1 − δ`, and `samples`
-with `ACCURATE` quality draws near-uniformly via UniGen2.
-
-Both add random XOR (parity) constraints, propagated jointly by Gauss-Jordan
-elimination, which is what keeps a hashed cell tractable to enumerate. A
-projection that includes integer variables channels them to Boolean bits (a
-binary encoding kept native, so every original constraint keeps its own
-propagator) and the hashes range over those bits, so counting is over distinct
-integer values.
-
-DIMACS CNF and WCNF instances can be parsed into a problem (`Dimacs.parse`,
-`Dimacs.parseWcnf`) to run external SAT/MaxSAT benchmarks through the native
-engine.
-

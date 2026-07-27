@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Vsids
+import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -9,6 +10,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -571,5 +574,33 @@ class BacktrackSolverTest {
         assertIs<SolveResult.Unknown>(fired)
         // With no deadline the same problem is solved.
         assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    private class ThreeDistinct : VariableSchema() {
+        val a by intVar(min = 1, max = 3)
+        val b by intVar(min = 1, max = 3)
+        val c by intVar(min = 1, max = 3)
+        val unique by constraint { allDifferent(a, b, c) }
+    }
+
+    @Test
+    fun `constructor accepts a compiled problem`() {
+        val compiled = ThreeDistinct().compile()
+        assertIs<SolveResult.Sat>(BacktrackSolver(compiled).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `constructor accepts a schema and compiles it`() {
+        assertIs<SolveResult.Sat>(BacktrackSolver(ThreeDistinct()).solve(BacktrackParams(randomSeed = 0L)))
+    }
+
+    @Test
+    fun `enumerate with default params yields every distinct model`() {
+        val schema = ThreeDistinct()
+        val compiled = schema.compile()
+        val decoded = BacktrackSolver(compiled).enumerate()
+            .map { Triple(compiled.decode(schema.a, it), compiled.decode(schema.b, it), compiled.decode(schema.c, it)) }
+            .toSet()
+        assertEquals(6, decoded.size)
     }
 }
