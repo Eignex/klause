@@ -91,6 +91,23 @@ class LinearSubSumAggregationTest {
     }
 
     @Test
+    fun `a zero-coefficient partner does not divide by zero`() {
+        // `s + 0·x − w = 0` keeps its zero term (coalescing preserves it). The old matchMultiplier did
+        // `c % 0` on that term and crashed; a zero coefficient is now treated as no partner, leaving a
+        // single-partner "definition" that is no sub-sum — so the pass declines cleanly rather than throwing.
+        val p = Problem(
+            0,
+            4,
+            Array(4) { IntDomain(0, 8) },
+            listOf(
+                Linear(intArrayOf(1, 0, -1), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 5),
+            ),
+        )
+        assertTrue(Presolve.aggregateSubSums(p).isEmpty, "a zero-coefficient term is not a sub-sum partner")
+    }
+
+    @Test
     fun `the fold preserves the feasible set`() {
         // Per-variable ranges chosen so the sub-sum and the multiplier are genuinely exercised.
         val mins = longArrayOf(0, 0, 0, 0)
