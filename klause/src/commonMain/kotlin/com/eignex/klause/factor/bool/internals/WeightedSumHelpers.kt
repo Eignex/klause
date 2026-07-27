@@ -278,30 +278,20 @@ internal fun pbFalseFormAntecedents(
     excludeVar: Int,
     extraLit: Int, // 0 == no extra literal
 ): IntArray? {
-    var n = 0
-    if (extraLit != 0) n++
-    val seen = IntHashSet()
-    for (lit in literals) {
-        val v = Lit.variable(lit)
-        if (v == excludeVar) continue
-        if (extraLit != 0 && v == Lit.variable(extraLit)) continue
-        if (!seen.add(v)) continue
-        if (state.boolValues[v] != null) n++
-    }
-    if (n == 0) return null
-    val out = IntArray(n)
-    var w = 0
-    if (extraLit != 0) out[w++] = extraLit
+    val seen = state.pbAntecedentSeen
+    val buf = state.pbAntecedentBuf
     seen.clear()
+    buf.clear()
+    if (extraLit != 0) buf.add(extraLit)
+    val extraVar = if (extraLit != 0) Lit.variable(extraLit) else -1
     for (lit in literals) {
         val v = Lit.variable(lit)
-        if (v == excludeVar) continue
-        if (extraLit != 0 && v == Lit.variable(extraLit)) continue
+        if (v == excludeVar || v == extraVar) continue
         if (!seen.add(v)) continue
         val b = state.boolValues[v] ?: continue
-        out[w++] = Lit.make(v, !b)
+        buf.add(Lit.make(v, !b))
     }
-    return out
+    return if (buf.isEmpty()) null else buf.toIntArray()
 }
 
 /** Per-literal contribution ranges for a weighted-Boolean sum: [litLo]/[litHi] are each literal's
