@@ -64,14 +64,14 @@ class LpContinuousColumnTest {
     }
 
     @Test
-    fun `declines to certify when a coefficient is not rationalizable in budget`() {
-        // 1/3 fits neither the dyadic nor the decimal ladder; infeasible in reals (x/3 >= 2, x <= 5 =>
-        // x >= 6) but the rationalization declines, so the verdict is INDETERMINATE — sound, never a
-        // wrong INFEASIBLE.
+    fun `certifies a coefficient outside every scaling ladder via the rational fallback`() {
+        // 1/3 fits neither the dyadic nor the decimal ladder, so the scaled-integer certifiers
+        // decline; the exact rational simplex reads the double as the rational it is and refutes
+        // the system outright (x/3 >= 2, x <= 5 => x >= 6).
         val b = LpBuilder()
         val x = b.addRealVar(0.0, 5.0, cost = 1.0)
         b.addRealRow(intArrayOf(x), doubleArrayOf(1.0 / 3.0), Relation.GE, 2.0)
-        assertEquals(LpVerdict.INDETERMINATE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
+        assertEquals(LpVerdict.INFEASIBLE, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
     }
 
     @Test
