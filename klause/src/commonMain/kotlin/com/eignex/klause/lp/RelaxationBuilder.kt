@@ -61,7 +61,7 @@ interface RelaxationBuilder {
      * declines while it is present (its infeasibility is still certified via the rationalized 128-bit
      * Farkas). The default is a no-op; the search relaxation driver overrides it.
      */
-    fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double) {}
+    fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, strict: Boolean = false) {}
 
     /**
      * An auxiliary LP column in `[lo, hi]` with no backing CP variable (e.g. a one-hot selector or a

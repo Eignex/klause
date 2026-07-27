@@ -10,12 +10,13 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.BigInt
 
 // Real-arithmetic lowering for the SMT-LIB front-end (LRA / the real half of LIRA): real variables
-// become LP-only continuous columns and top-level non-strict linear real constraints become real
-// Linear rows — no discretisation. Coefficients are folded as exact rationals (BigFraction), and
-// each emitted row is multiplied through by the least common denominator so the row's doubles are
-// exact integers: the LP-side certifiers then reason about precisely the asserted constraint.
-// Fragment: conjunctive real atoms plus real OMT objectives; distinct and real atoms under boolean
-// structure reject with a clear message until the real-atom reification lands.
+// become LP-only continuous columns and top-level linear real constraints become real Linear rows —
+// no discretisation. Coefficients are folded as exact rationals (BigFraction), and each emitted row
+// is multiplied through by the least common denominator so the row's doubles are exact integers:
+// the LP-side certifiers then reason about precisely the asserted constraint. Fragment: conjunctive
+// real atoms, strict or not (strictness rides the delta-rational exact deciders), plus real OMT
+// objectives; distinct and real atoms under boolean structure reject with a clear message until the
+// real-atom reification lands.
 
 /** The integer combination this real term embeds, or null when any coefficient is fractional or
  *  a real column appears — the inverse of [toRealComb], for `to_int` over an integral real term. */
@@ -89,34 +90,42 @@ internal fun parseRealLiteral(s: String): BigFraction? {
 internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
     val op = node.atomAt(0, "relation operator")
     requireBinaryRelation(node, op)
-    val linOp = when (op) {
-        "<=" -> LinearOp.LE
-        ">=" -> LinearOp.GE
-        "=" -> LinearOp.EQ
-        "<", ">" -> smtUnsupported("strict real relation '$op' (not yet supported over reals)")
+    val (linOp, strict) = when (op) {
+        "<=" -> LinearOp.LE to false
+        ">=" -> LinearOp.GE to false
+        "<" -> LinearOp.LE to true
+        ">" -> LinearOp.GE to true
+        "=" -> LinearOp.EQ to false
         else -> smtUnsupported("real relation '$op'")
     }
     val a = realTerm(node.items[1])
     val b = realTerm(node.items[2])
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
     if (d.isConstant) {
-        val holds = when (linOp) {
-            LinearOp.LE -> d.constant.signum() <= 0
-            LinearOp.GE -> d.constant.signum() >= 0
-            else -> d.constant.isZero
+        val sign = d.constant.signum()
+        val holds = when {
+            linOp == LinearOp.LE -> if (strict) sign < 0 else sign <= 0
+            linOp == LinearOp.GE -> if (strict) sign > 0 else sign >= 0
+            else -> sign == 0
         }
         if (!holds) forceTrue(Lit.negate(trueLit()))
         return
     }
     if (d.realCoeffs.isEmpty()) {
         // Integer variables compared against a rational (e.g. `x <= 1.5`): multiplying through by the
-        // least common denominator gives an exact all-integer row — no real column is involved.
+        // least common denominator gives an exact all-integer row — no real column is involved, and
+        // strictness folds into the integer bound.
         val scaled = integerRow(d) ?: smtUnsupported("rational comparison exceeds the 64-bit range")
         val (vars, coeffs, bound) = scaled
-        assertLinearRow(coeffs, vars, linOp, bound)
+        val adjusted = when {
+            !strict -> bound
+            linOp == LinearOp.LE -> bound - 1
+            else -> bound + 1
+        }
+        assertLinearRow(coeffs, vars, linOp, adjusted)
         return
     }
-    factors.add(realRow(d, linOp))
+    factors.add(realRow(d, linOp, strict))
 }
 
 /** Scale an all-integer-variable `d ⟨op⟩ 0` by the least common denominator into an exact Long row
@@ -138,7 +147,7 @@ internal fun SmtLib.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray,
 }
 
 /** Scale `d ⟨op⟩ 0` by the least common denominator and emit the exact-integer double row. */
-internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp): Linear {
+internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean = false): Linear {
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
     for (c in d.realCoeffs.values) lcm = lcmOf(lcm, c.den)
@@ -168,7 +177,7 @@ internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp): Linear {
         i++
     }
     val bound = exact(d.constant.negated())
-    return Linear(intVars, intCoeffs, realVars, realCoeffs, op, bound)
+    return Linear(intVars, intCoeffs, realVars, realCoeffs, op, bound, strict)
 }
 
 private fun lcmOf(a: BigInt, b: BigInt): BigInt {

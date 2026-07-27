@@ -39,6 +39,7 @@ class Linear private constructor(
     // consumers keep well-formed. Empty / 0 for the integer core.
     intCoeffsRealIn: DoubleArray = EmptyDoubleArray,
     realBoundIn: Double = 0.0,
+    strictRealIn: Boolean = false,
 ) : Factor,
     LinearRow {
 
@@ -79,10 +80,16 @@ class Linear private constructor(
     /** Whether this row carries a continuous (real) term, making it an LP-only row (see [realVars]). */
     val hasReals: Boolean get() = realVars.isNotEmpty()
 
+    /** Strict inequality over reals (`Σ … < bound` after the ≤ canonicalisation). Only meaningful on an
+     *  LP-only row: the float relaxation treats it as non-strict (a sound relaxation), and the exact
+     *  deciders enforce the strictness (delta-rational feasibility, boundary-rejecting point checks). */
+    val strictReal: Boolean = strictRealIn
+
     init {
         require(coeffs.isNotEmpty() || realVars.isNotEmpty()) { "linear sum must have at least one term" }
         require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
         require(!hasReals || realIntCoeffs.size == vars.size) { "real int-coeff/var length mismatch" }
+        require(!strictReal || (hasReals && op == LinearOp.LE)) { "strictness needs an LP-only inequality row" }
     }
 
     override val intVars: IntArray = vars
@@ -136,6 +143,7 @@ class Linear private constructor(
         realCoeffs: DoubleArray,
         op: LinearOp,
         bound: Double,
+        strict: Boolean = false,
     ) : this(
         CoalescedTerms(intVars.copyOf(), LongArray(intCoeffs.size) { intCoeffs[it].roundToLong() }),
         op,
@@ -144,6 +152,7 @@ class Linear private constructor(
         realCoeffs.copyOf(),
         intCoeffs.copyOf(),
         bound,
+        strict,
     )
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LINEAR, ::buildKey)
@@ -160,6 +169,7 @@ class Linear private constructor(
         // A continuous row keys on its exact double bound / integer coefficients (the [Long] forms are
         // rounded placeholders); an integer row keys on the [Long] bound and coalesced integer terms.
         if (hasReals) {
+            sink.long(if (strictReal) 1L else 0L)
             sink.long(realBound.toRawBits())
             for (i in vars.indices) {
                 sink.long(vars[i].toLong())
@@ -179,7 +189,7 @@ class Linear private constructor(
         // Real var ids live in a separate namespace and are not remapped by [intMap]; the row was
         // already canonicalised (any `>=` negated) at construction, so re-emit as-is (op is LE/EQ/NE,
         // never GE) via the double form to preserve the exact continuous-row coefficients and bound.
-        Linear(vars.remapVars(intMap), realIntCoeffs, realVars, realCoeffs, op, realBound)
+        Linear(vars.remapVars(intMap), realIntCoeffs, realVars, realCoeffs, op, realBound, strictReal)
     } else {
         Linear(coeffs, vars.remapVars(intMap), op, bound)
     }
@@ -243,7 +253,7 @@ class Linear private constructor(
             cols[vars.size + j] = builder.realColumn(realVars[j])
             dcoeffs[vars.size + j] = realCoeffs[j]
         }
-        builder.realRow(cols, dcoeffs, op, realBound)
+        builder.realRow(cols, dcoeffs, op, realBound, strictReal)
     }
 }
 
