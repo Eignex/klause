@@ -134,7 +134,8 @@ internal val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "lp-objective-cone", "lp-auto-off-reprobe",
-    "lp-knapsack-lagrangian", "pb-learning", "pb-objective-cutoff", "var-selector", "val-selector",
+    "lp-knapsack-lagrangian", "pb-learning", "pb-objective-cutoff", "objective-guided-values",
+    "var-selector", "val-selector",
 )
 
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
@@ -167,12 +168,13 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val lpBranching = p.bool("lp-branching")
     val pbLearning = p.bool("pb-learning")
     val pbObjectiveCutoff = p.bool("pb-objective-cutoff")
+    val objectiveGuidedValues = p.bool("objective-guided-values")
     val varKind = if (allowSelectors) p.varSelectorKind("var-selector") else null
     val valKind = if (allowSelectors) p.valSelectorKind("val-selector") else null
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
-        lpCone, lpAutoOff, lpKnapsack, lpBranching, pbLearning, pbObjectiveCutoff,
+        lpCone, lpAutoOff, lpKnapsack, lpBranching, pbLearning, pbObjectiveCutoff, objectiveGuidedValues,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -198,6 +200,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }
+        objectiveGuidedValues?.let { out = out.copy(objectiveGuidedValues = it) }
         varKind?.let { out = out.copy(variableSelector = it.selector(out.randomSeed)) }
         valKind?.let { out = out.copy(valueSelector = it.selector()) }
         out

@@ -319,6 +319,18 @@ data class BacktrackParams(
      * is a single integer variable (that path tightens the variable directly).
      */
     val pbObjectiveCutoff: Boolean = true,
+    /**
+     * Objective-guided value selection on the minimisation path: try each decision variable's
+     * objective-improving polarity first (for `min Σ w·x`, `x=0` when `w ≥ 0`, `x=1` when `w < 0`; the
+     * cost-minimising domain end for any integer coefficient). Dives toward cheap solutions so the
+     * incumbent improves fast — the standard cost-based value ordering of a branch-and-bound optimiser,
+     * and general to any linear objective (not just pseudo-Boolean). A no-op for a pure-satisfaction
+     * problem (every coefficient is zero). **Off by default and enabled per arm**: as a uniform default it
+     * collapses the portfolio's value-order diversity, so it ships as one objective-guided diversity arm
+     * rather than a blanket override. When on, replaces the value selector on the optimize path, kept
+     * incumbent-guided by the phase heuristic on top.
+     */
+    val objectiveGuidedValues: Boolean = false,
 ) : SolverParams {
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
         if (assumptions.isEmpty) this else copy(assumptions = merge(this.assumptions, assumptions))

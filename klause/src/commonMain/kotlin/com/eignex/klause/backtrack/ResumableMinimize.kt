@@ -5,6 +5,8 @@ import com.eignex.klause.backtrack.lp.lbTreeSearch
 import com.eignex.klause.backtrack.lp.lpBranchPick
 import com.eignex.klause.backtrack.lp.lpFeasibilityPump
 import com.eignex.klause.backtrack.lp.lpRoundingProbe
+import com.eignex.klause.backtrack.selector.IndomainBest
+import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.LpVerdict
@@ -16,10 +18,10 @@ import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -80,6 +82,19 @@ internal class ResumableMinimize(
     private val baseCancellation: Cancellation = params0.cancellation
     private val params: BacktrackParams = params0
         .copy(cancellation = Cancellation { sliceCancelled() }, minHammingDistance = 0, recentWindow = 0)
+        .let { p ->
+            // Objective-guided value selection: dive toward the cost-minimising polarity first. Applied on
+            // the minimisation path when the objective is non-trivial, kept incumbent-guided on top; a no-op
+            // for a pure-satisfaction objective (all coefficients zero → IndomainBest is IndomainMin).
+            if (p.objectiveGuidedValues && objectiveHasWeight()) {
+                p.copy(valueSelector = SolutionGuided(IndomainBest(objective)))
+            } else {
+                p
+            }
+        }
+
+    private fun objectiveHasWeight(): Boolean =
+        objective.boolWeights.any { it != 0L } || objective.intCoefficients.any { it != 0L }
 
     // --- Slice control (no coroutine): a re-armable deadline + the current global token. ---
     private var globalToken: Cancellation = Cancellation.Never
