@@ -137,6 +137,31 @@ class MpsLoweringTest {
     }
 
     @Test
+    fun `feasibility-based propagation closes a chain of open variables to a fixpoint`() {
+        // x, y, z open above from 0; x <= 3, y - x <= 2, z - y <= 1. Interval propagation must iterate:
+        // x <= 3 then y <= 5 then z <= 6 — each pass closes the next, no LP solve needed.
+        val capX = MpsConstraint("X", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 3.0)
+        val yx = MpsConstraint("YX", intArrayOf(1, 0), doubleArrayOf(1.0, -1.0), lower = null, upper = 2.0)
+        val zy = MpsConstraint("ZY", intArrayOf(2, 1), doubleArrayOf(1.0, -1.0), lower = null, upper = 1.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(
+                MpsVar("x", integer = true, lower = 0.0, upper = null),
+                MpsVar("y", integer = true, lower = 0.0, upper = null),
+                MpsVar("z", integer = true, lower = 0.0, upper = null),
+            ),
+            listOf(capX, yx, zy),
+        )
+        val compiled = m.toProblem(searchBound = 1_000_000L)
+        assertFalse(compiled.clamped)
+        assertEquals(3L, compiled.problem.intDomains[0].max)
+        assertEquals(5L, compiled.problem.intDomains[1].max)
+        assertEquals(6L, compiled.problem.intDomains[2].max)
+    }
+
+    @Test
     fun `drops a term-free constraint row instead of emitting an empty sum`() {
         val emptyRow = MpsConstraint("ZBESTROW", IntArray(0), DoubleArray(0), lower = null, upper = 0.0)
         val realRow = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
