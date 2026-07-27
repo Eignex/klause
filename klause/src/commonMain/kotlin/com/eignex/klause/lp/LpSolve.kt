@@ -79,7 +79,7 @@ internal fun solveAndCertify(
                 )
             } else {
                 CertifiedLpResult(
-                    LpVerdict.INDETERMINATE,
+                    rationalFallbackVerdict(model, cancellation),
                     float = null,
                     certificate = null,
                     farkasRay = null,
@@ -100,6 +100,11 @@ internal fun solveAndCertify(
             (exactBasisFeasible(model, result.basis) == true || exactPointFeasible(model, result.primal)) ->
             LpVerdict.OPTIMAL
 
+        // Last resort: decide feasibility outright in exact rational arithmetic. The float point was
+        // not certifiable, but the model may still be exactly decidable — FEASIBLE stands in for the
+        // basis/point certificates (a definitive SAT), INFEASIBLE is an exact refutation.
+        model.hasContinuous -> rationalFallbackVerdict(model, cancellation)
+
         else -> LpVerdict.INDETERMINATE
     }
     return CertifiedLpResult(
@@ -110,3 +115,12 @@ internal fun solveAndCertify(
         model = model,
     )
 }
+
+/** Decide an uncertified model exactly with the rational feasibility simplex (which reads the
+ *  double view as exact rationals); UNKNOWN (pivot cap, cancellation) stays INDETERMINATE. */
+private fun rationalFallbackVerdict(model: LpModel, cancellation: Cancellation): LpVerdict =
+    when (rationalFeasible(model, cancellation)) {
+        RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
+        RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
+        RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
+    }
