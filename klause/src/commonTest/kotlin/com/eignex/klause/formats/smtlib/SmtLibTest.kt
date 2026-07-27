@@ -8,6 +8,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -286,13 +287,69 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a real atom under boolean structure is rejected with a clear message`() {
-        val ex = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse(
-                "(declare-const x Real) (assert (or (<= x 1.0) (>= x 2.0))) (check-sat)",
-            )
-        }
-        assertTrue(ex.message!!.contains("boolean structure"), ex.message!!)
+    fun `a real disjunction solves through reified atoms`() {
+        val parsed = SmtLib.parse(
+            "(declare-const x Real) (assert (or (<= x 1.0) (>= x 3.0))) (assert (>= x 2.0)) (check-sat)",
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        assertTrue(r.assignment.reals[0] >= 3.0 - 1e-9, "x=${r.assignment.reals[0]} must take the >= 3 branch")
+    }
+
+    @Test
+    fun `a real disjunction with contradictory branches is unsat`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real)
+            (assert (or (< x 1.0) (> x 3.0)))
+            (assert (>= x 1.5)) (assert (<= x 2.5))
+            (check-sat)
+            """.trimIndent(),
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
+    }
+
+    @Test
+    fun `a real ite selects the branch chosen by its condition`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real) (declare-const c Bool)
+            (assert c) (assert (= x (ite c 2.5 7.5)))
+            (check-sat)
+            """.trimIndent(),
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        assertTrue(abs(r.assignment.reals[0] - 2.5) < 1e-9, "x=${r.assignment.reals[0]}")
+    }
+
+    @Test
+    fun `to_int of a fractional real floors it`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const r Real) (declare-const n Int)
+            (assert (= r 2.5)) (assert (= n (to_int r)))
+            (check-sat)
+            """.trimIndent(),
+        )
+        val res = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(res is SolveResult.Sat, "expected SAT, got $res")
+        assertEquals(2L, res.assignment.ints[parsed.intVarNames.getValue("n")])
+    }
+
+    @Test
+    fun `distinct over pinned reals is unsat`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real) (declare-const y Real)
+            (assert (distinct x y))
+            (assert (= x 2.0)) (assert (= y 2.0))
+            (check-sat)
+            """.trimIndent(),
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
     @Test

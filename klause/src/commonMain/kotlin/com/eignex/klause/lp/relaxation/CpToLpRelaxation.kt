@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -349,7 +350,8 @@ internal class CpToLpRelaxation(
     private val structurallyPersistent: Boolean =
         !objectiveCone && !cumulative && !diffn &&
             problem.factors.none {
-                it is ReifiedLinear || it is ReifiedPseudoBoolean || it is ReifiedCardinality
+                it is ReifiedLinear || it is ReifiedPseudoBoolean || it is ReifiedCardinality ||
+                    it is ReifiedRealLinear
             }
 
     /**
@@ -941,6 +943,8 @@ internal class CpToLpRelaxation(
 
         override fun liveDomain(intVar: Int): IntDomain = domains.intDomain(intVar)
 
+        override fun liveBool(boolVar: Int): Boolean? = domains.boolValue(boolVar)
+
         override fun declaredDomain(intVar: Int): IntDomain = problem.intDomains[intVar]
 
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) {
@@ -949,10 +953,17 @@ internal class CpToLpRelaxation(
             builder.addRow(columns, coeffs, rel, rhs)
         }
 
-        override fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, strict: Boolean) {
+        override fun realRow(
+            columns: IntArray,
+            coeffs: DoubleArray,
+            op: LinearOp,
+            rhs: Double,
+            strict: Boolean,
+            premiseLits: IntArray,
+        ) {
             val rel = relationOf(op) ?: return
             if (realNegOf.isEmpty() || columns.none { realNegOf.containsKey(it) }) {
-                builder.addRealRow(columns, coeffs, rel, rhs, strict)
+                builder.addRealRow(columns, coeffs, rel, rhs, strict, premiseLits)
                 return
             }
             // Mirror each split column's negative part with the negated coefficient.
@@ -968,7 +979,7 @@ internal class CpToLpRelaxation(
                 vals[w] = -coeffs[k]
                 w++
             }
-            builder.addRealRow(cols, vals, rel, rhs, strict)
+            builder.addRealRow(cols, vals, rel, rhs, strict, premiseLits)
         }
 
         override fun bigMRow(

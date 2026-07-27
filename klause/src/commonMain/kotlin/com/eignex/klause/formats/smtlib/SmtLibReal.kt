@@ -2,8 +2,11 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
+import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.lp.BigFraction
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
@@ -183,6 +186,95 @@ internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean =
 private fun lcmOf(a: BigInt, b: BigInt): BigInt {
     val g = a.gcd(b)
     return (a * b).divRem(g).first.abs()
+}
+
+/**
+ * Reify a real relation `(op a b)` as a Boolean literal: an inequality atom becomes one
+ * [ReifiedRealLinear]; an equality is the conjunction of its two inequality atoms (its complement is
+ * a disjunction no single row expresses). Pure-integer sides fall back to the integer reification.
+ */
+internal fun SmtLib.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): Int {
+    val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
+    if (op == "=") {
+        return tseitinAnd(
+            listOf(reifyRealAtom(d, LinearOp.LE, strict = false), reifyRealAtom(d, LinearOp.GE, strict = false)),
+        )
+    }
+    val (linOp, strict) = when (op) {
+        "<=" -> LinearOp.LE to false
+        ">=" -> LinearOp.GE to false
+        "<" -> LinearOp.LE to true
+        ">" -> LinearOp.GE to true
+        else -> throw UnsupportedSmtException("real relation '$op'")
+    }
+    return reifyRealAtom(d, linOp, strict)
+}
+
+private fun SmtLib.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: Boolean): Int {
+    if (d.isConstant) {
+        val sign = d.constant.signum()
+        val holds = when {
+            linOp == LinearOp.LE -> if (strict) sign < 0 else sign <= 0
+            linOp == LinearOp.GE -> if (strict) sign > 0 else sign >= 0
+            else -> sign == 0
+        }
+        return if (holds) trueLit() else Lit.negate(trueLit())
+    }
+    if (d.realCoeffs.isEmpty()) {
+        val scaled = integerRow(d) ?: throw UnsupportedSmtException("rational comparison exceeds the 64-bit range")
+        val (vars, coeffs, bound) = scaled
+        val adjusted = when {
+            !strict -> bound
+            linOp == LinearOp.LE -> bound - 1
+            else -> bound + 1
+        }
+        return reifyLinear(coeffs, vars, linOp, adjusted)
+    }
+    val row = realRow(d, linOp, strict)
+    val w = newBool()
+    factors.add(
+        ReifiedRealLinear(
+            aux = w,
+            vars = row.vars,
+            intCoeffs = row.realIntCoeffs,
+            realVars = row.realVars,
+            realCoeffs = row.realCoeffs,
+            op = if (row.op == LinearOp.EQ) LinearOp.LE else row.op,
+            bound = row.realBound,
+            strict = row.strictReal,
+        ),
+    )
+    return Lit.make(w, true)
+}
+
+/**
+ * A real `ite`: a fresh real variable pinned to each branch by the condition through conditional
+ * equality atoms (`c ⇒ v = a`, `¬c ⇒ v = b`), each equality being its two reified inequality atoms.
+ */
+internal fun SmtLib.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb {
+    val v = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
+    val negCond = Lit.negate(cond)
+    val dA = v.plus(a.scaled(BigFraction.MINUS_ONE))
+    val dB = v.plus(b.scaled(BigFraction.MINUS_ONE))
+    forceClause(negCond, reifyRealAtom(dA, LinearOp.LE, strict = false))
+    forceClause(negCond, reifyRealAtom(dA, LinearOp.GE, strict = false))
+    forceClause(cond, reifyRealAtom(dB, LinearOp.LE, strict = false))
+    forceClause(cond, reifyRealAtom(dB, LinearOp.GE, strict = false))
+    return v
+}
+
+/**
+ * `to_int` of a fractional real term: a fresh unbounded integer `n` with the floor definition
+ * `n ≤ r < n + 1` — the upper half strict, riding the delta-rational deciders.
+ */
+internal fun SmtLib.Builder.realFloor(r: RealComb): LinComb {
+    val n = newInt(null, null)
+    val nReal = LinComb(mapOf(n to 1), 0).toRealComb()
+    factors.add(realRow(nReal.plus(r.scaled(BigFraction.MINUS_ONE)), LinearOp.LE))
+    val fracGap = r.plus(nReal.scaled(BigFraction.MINUS_ONE))
+        .plus(RealComb(emptyMap(), emptyMap(), BigFraction.MINUS_ONE))
+    factors.add(realRow(fracGap, LinearOp.LE, strict = true))
+    return LinComb(mapOf(n to 1), 0)
 }
 
 /** Fold [t] to a real combination (iteratively, via [evalTerm]). */

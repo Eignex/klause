@@ -2,6 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * The sink a factor's [com.eignex.klause.solver.Factor.linearize] emits its LP relaxation into. A factor
@@ -61,7 +62,19 @@ interface RelaxationBuilder {
      * declines while it is present (its infeasibility is still certified via the rationalized 128-bit
      * Farkas). The default is a no-op; the search relaxation driver overrides it.
      */
-    fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, strict: Boolean = false) {}
+    fun realRow(
+        columns: IntArray,
+        coeffs: DoubleArray,
+        op: LinearOp,
+        rhs: Double,
+        strict: Boolean = false,
+        premiseLits: IntArray = EmptyIntArray,
+    ) {}
+
+    /** The live pin of Boolean variable [boolVar] in this build's domains, or null when unpinned (or
+     *  the builder has no Boolean backing). Lets a conditionally-active factor emit only the rows its
+     *  activation literal currently justifies. */
+    fun liveBool(boolVar: Int): Boolean? = null
 
     /**
      * An auxiliary LP column in `[lo, hi]` with no backing CP variable (e.g. a one-hot selector or a
