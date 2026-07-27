@@ -225,11 +225,15 @@ internal object SolverInvocation {
 
     /** Which output stream a subprocess emits, so the read loop parses the right markers. References
      *  always speak MiniZinc; klause-cli speaks the front-end bound to the *input* format — MiniZinc
-     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml` and MPS. */
-    private enum class Dialect { MINIZINC, XCSP3 }
+     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS and OPB. */
+    private enum class Dialect { MINIZINC, PB_COMPETITION }
 
     private fun dialectFor(solverId: String, format: Format): Dialect =
-        if (solverId == KLAUSE && (format == Format.XCSP3 || format == Format.MPS)) Dialect.XCSP3 else Dialect.MINIZINC
+        if (solverId == KLAUSE && (format == Format.XCSP3 || format == Format.MPS || format == Format.OPB)) {
+            Dialect.PB_COMPETITION
+        } else {
+            Dialect.MINIZINC
+        }
 
     private fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
@@ -300,7 +304,7 @@ internal object SolverInvocation {
                     }
                 }
 
-                Dialect.XCSP3 -> when {
+                Dialect.PB_COMPETITION -> when {
                     line == XCSP_SATISFIABLE -> markFeasible()
 
                     line == XCSP_OPTIMUM -> {
