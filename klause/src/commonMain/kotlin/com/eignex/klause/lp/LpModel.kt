@@ -90,6 +90,9 @@ internal class LpModel(
      * row their dual certificate leans on is globally valid; this array is what they check.
      */
     val rowGlobal: BooleanArray = BooleanArray(m) { true },
+    /** Per row, whether the inequality is strict over the reals (`<` rather than `≤`). The float
+     *  simplex ignores it (a sound relaxation); the exact deciders enforce it. */
+    val rowStrict: BooleanArray = BooleanArray(m),
     /**
      * Per-row citation fallback for non-global rows: the live bounds whose atoms make row `i`
      * valid ([LpRowPremises]), or null when the row's validity is not expressible as bound atoms
@@ -296,6 +299,7 @@ internal class LpBuilder {
         val premises: LpRowPremises?,
         val valsD: DoubleArray? = null,
         val rhsD: Double? = null,
+        val strict: Boolean = false,
     )
 
     private val rows = ArrayList<RawRow>()
@@ -360,7 +364,7 @@ internal class LpBuilder {
 
     /** Add a real-coefficient constraint `Σ vals(k)·x_{cols(k)} rel rhs`; like [addRow] but with double
      *  data. Forces the model onto the double view (and declines integer certification). */
-    fun addRealRow(cols: IntArray, vals: DoubleArray, rel: Relation, rhs: Double) {
+    fun addRealRow(cols: IntArray, vals: DoubleArray, rel: Relation, rhs: Double, strict: Boolean = false) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
         anyRealRow = true
         rows.add(
@@ -373,6 +377,7 @@ internal class LpBuilder {
                 premises = null,
                 valsD = vals.copyOf(),
                 rhsD = rhs,
+                strict = strict,
             ),
         )
     }
@@ -471,6 +476,7 @@ internal class LpBuilder {
             upper = upper, hasUpper = hasUpper, loShift = loShift,
             objConstant = objConstant, sense = sense, tag = IntArray(n) { tags[it] },
             rowGlobal = BooleanArray(m) { rows[it].global },
+            rowStrict = BooleanArray(m) { rows[it].strict },
             rowPremises = Array(m) { rows[it].premises },
             flippedRhs = flippedRhs,
             probeClampedLo = BooleanArray(n) { it in clampedLoCols },

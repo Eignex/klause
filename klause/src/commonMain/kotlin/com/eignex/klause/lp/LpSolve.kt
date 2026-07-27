@@ -31,6 +31,10 @@ internal class CertifiedLpResult internal constructor(
     /** The exact integer Farkas ray proving infeasibility on an [LpVerdict.INFEASIBLE] verdict; null otherwise. */
     val farkasRay: LongArray?,
     private val model: LpModel?,
+    /** Exact structural-column witness from the rational decider (delta-instantiated for strict rows);
+     *  preferred over the float primal by consumers that report the point. Null when the float
+     *  certificates decided. */
+    val exactPrimal: DoubleArray? = null,
 ) {
     /** The exact 128-bit integer lower bound `⌈optimum⌉` on the true objective, or null when the LP was
      *  not certified or the bound does not fit a `Long`. */
@@ -69,23 +73,28 @@ internal fun solveAndCertify(
             // Farkas certificate. Any other failure (non-convergence / singular) is indeterminate.
             val floatRay = solver.infeasibleRay
             val ray = if (floatRay != null) integerFarkasRay(model, floatRay) else null
-            return if (ray != null) {
-                CertifiedLpResult(
+            if (ray != null) {
+                return CertifiedLpResult(
                     LpVerdict.INFEASIBLE,
                     float = null,
                     certificate = null,
                     farkasRay = ray,
                     model = null,
                 )
-            } else {
-                CertifiedLpResult(
-                    rationalFallbackVerdict(model, cancellation),
-                    float = null,
-                    certificate = null,
-                    farkasRay = null,
-                    model = null,
-                )
             }
+            val outcome = rationalOutcome(model, cancellation)
+            return CertifiedLpResult(
+                when (outcome.feasibility) {
+                    RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
+                    RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
+                    RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
+                },
+                float = null,
+                certificate = null,
+                farkasRay = null,
+                model = null,
+                exactPrimal = outcome.witness,
+            )
         }
     // A float optimum that cannot be certified exactly (a 128-bit overflow, or a real coefficient the
     // integer certifier declines) is INDETERMINATE — the float point is not a proof. An integer model is
@@ -93,17 +102,31 @@ internal fun solveAndCertify(
     // so its feasibility is certified by reconstructing the reported basis's point exactly
     // ([exactBasisFeasible]) — enough for a definitive SAT verdict at a leaf.
     val certificate = integerCertify(model, result.duals)
+    // Strict rows are relaxed to non-strict in the float model, so the basis/point certificates would
+    // bless a boundary point a strict row forbids; those models go straight to the delta-aware
+    // rational decider.
+    val anyStrict = model.rowStrict.any { it }
+    var exactPrimal: DoubleArray? = null
     val verdict = when {
         certificate != null -> LpVerdict.OPTIMAL
 
-        model.hasContinuous &&
+        model.hasContinuous && !anyStrict &&
             (exactBasisFeasible(model, result.basis) == true || exactPointFeasible(model, result.primal)) ->
             LpVerdict.OPTIMAL
 
         // Last resort: decide feasibility outright in exact rational arithmetic. The float point was
         // not certifiable, but the model may still be exactly decidable — FEASIBLE stands in for the
-        // basis/point certificates (a definitive SAT), INFEASIBLE is an exact refutation.
-        model.hasContinuous -> rationalFallbackVerdict(model, cancellation)
+        // basis/point certificates (a definitive SAT, with the exact witness carried out), INFEASIBLE
+        // is an exact refutation.
+        model.hasContinuous -> {
+            val outcome = rationalOutcome(model, cancellation)
+            exactPrimal = outcome.witness
+            when (outcome.feasibility) {
+                RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
+                RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
+                RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
+            }
+        }
 
         else -> LpVerdict.INDETERMINATE
     }
@@ -113,14 +136,6 @@ internal fun solveAndCertify(
         certificate = certificate,
         farkasRay = null,
         model = model,
+        exactPrimal = exactPrimal,
     )
 }
-
-/** Decide an uncertified model exactly with the rational feasibility simplex (which reads the
- *  double view as exact rationals); UNKNOWN (pivot cap, cancellation) stays INDETERMINATE. */
-private fun rationalFallbackVerdict(model: LpModel, cancellation: Cancellation): LpVerdict =
-    when (rationalFeasible(model, cancellation)) {
-        RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
-        RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
-        RationalFeasibility.UNKNOWN -> LpVerdict.INDETERMINATE
-    }

@@ -211,7 +211,8 @@ internal fun leafRealFeasibility(
     // INDETERMINATE, degrading the leaf to `unknown` — never an unsound SAT/UNSAT.
     val certified = solveAndCertify(relaxation.model, cancellation = cancellation)
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
-    val primal = certified.float?.primal ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+    val primal = certified.exactPrimal ?: certified.float?.primal
+        ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
     // Read each continuous column's solved value back onto its real variable (see [LpRelaxation.colRealId]);
     // a split (lower-unbounded) variable accumulates x⁺ − x⁻ across its two columns.
     val reals = DoubleArray(problem.numRealVars)
@@ -948,10 +949,10 @@ internal class CpToLpRelaxation(
             builder.addRow(columns, coeffs, rel, rhs)
         }
 
-        override fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double) {
+        override fun realRow(columns: IntArray, coeffs: DoubleArray, op: LinearOp, rhs: Double, strict: Boolean) {
             val rel = relationOf(op) ?: return
             if (realNegOf.isEmpty() || columns.none { realNegOf.containsKey(it) }) {
-                builder.addRealRow(columns, coeffs, rel, rhs)
+                builder.addRealRow(columns, coeffs, rel, rhs, strict)
                 return
             }
             // Mirror each split column's negative part with the negated coefficient.
@@ -967,7 +968,7 @@ internal class CpToLpRelaxation(
                 vals[w] = -coeffs[k]
                 w++
             }
-            builder.addRealRow(cols, vals, rel, rhs)
+            builder.addRealRow(cols, vals, rel, rhs, strict)
         }
 
         override fun bigMRow(

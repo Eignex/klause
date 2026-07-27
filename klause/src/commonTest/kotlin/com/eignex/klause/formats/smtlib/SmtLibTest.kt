@@ -266,11 +266,23 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a strict real relation is rejected with a clear message`() {
-        val ex = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(declare-const x Real) (assert (< x 2.5)) (check-sat)")
-        }
-        assertTrue(ex.message!!.contains("strict real"), ex.message!!)
+    fun `a strict real interval solves to a point strictly inside`() {
+        val parsed = SmtLib.parse(
+            "(declare-const x Real) (assert (< x 2.5)) (assert (> x 2.4)) (check-sat)",
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        val x = r.assignment.reals[0]
+        assertTrue(x > 2.4 && x < 2.5, "x=$x must sit strictly inside (2.4, 2.5)")
+    }
+
+    @Test
+    fun `a strict boundary conflict over reals is unsat`() {
+        val parsed = SmtLib.parse(
+            "(declare-const x Real) (assert (< x 2.0)) (assert (>= x 2.0)) (check-sat)",
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
     @Test
