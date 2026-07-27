@@ -3,6 +3,10 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.EmptyDoubleArray
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * A variable's integer bounds for [tightenOpenIntBounds]: a `null` side is genuinely ±∞ (open), a `Long`
@@ -17,8 +21,9 @@ internal class OpenIntBounds(val lo: Long?, val hi: Long?)
  * takes its minimum. A side the LP leaves unbounded (its optimum only reaches the free-column frontier)
  * stays open (`null`) for the caller to clamp.
  *
- * The tightening is sound over genuine ±∞ because an open side enters the LP as a real free column
- * ([LpBuilder.addFreeVar]): a derived bound holds over the true unbounded region, not a pre-clamped box.
+ * The tightening is sound over genuine ±∞ because an open side enters the LP genuinely open — open
+ * above as a probe-flagged free upper ([LpBuilder.addFreeVar]), open below as the zero-shift split
+ * `x = x⁺ − x⁻` — so a derived bound holds over the true unbounded region, not a pre-clamped box.
  * This is why it must run before a [com.eignex.klause.solver.Problem]'s finite
  * [com.eignex.klause.solver.IntDomain]s are committed — once a side is clamped the "genuinely infinite"
  * information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ] constraints enter; any other
@@ -42,25 +47,53 @@ internal class OpenIntBounds(val lo: Long?, val hi: Long?)
  *   the caller excludes it).
  * @param cancellation polled between variables so a long presolve can bail early — also threaded into each
  *   solve, so a single overlong LP re-solve is cut off too.
+ * @param realConstraints mixed integer/real rows joined through LP-only continuous columns, so a
+ *   variable defined only through a real row (a floor definition, a `to_real` bridge) is still
+ *   boundable; strict rows enter non-strict (a relaxation — every derived bound stays sound).
+ * @param realLower per-real-variable declared lower bounds (`-inf` for open); indexed by real id.
+ * @param realUpper per-real-variable declared upper bounds (`+inf` for open); indexed by real id.
  * @return a fresh bounds array with every provable open side closed.
  */
 internal fun tightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
     cancellation: Cancellation = Cancellation.Never,
+    realConstraints: List<Linear> = emptyList(),
+    realLower: DoubleArray = EmptyDoubleArray,
+    realUpper: DoubleArray = EmptyDoubleArray,
 ): Array<OpenIntBounds> {
     val n = bounds.size
+    // Working real-variable bounds the prefilter tightens alongside the integers (outward-rounded, so
+    // always sound); the LP pass then starts from the tighter real boxes too.
+    var maxReal = realLower.size
+    for (f in realConstraints) for (rv in f.realVars) if (rv + 1 > maxReal) maxReal = rv + 1
+    val rLo = DoubleArray(maxReal) { realLower.getOrNull(it) ?: Double.NEGATIVE_INFINITY }
+    val rUp = DoubleArray(maxReal) { realUpper.getOrNull(it) ?: Double.POSITIVE_INFINITY }
     // Cheap feasibility-based prefilter first: interval propagation closes every side a single row already
     // implies, so those cost no LP solve; the LP-solving pass below only handles what survives.
-    val work = fbbtTightenOpenIntBounds(bounds, constraints, cancellation)
+    val work = fbbtTightenOpenIntBounds(bounds, constraints, cancellation, realConstraints, rLo, rUp)
     if (work.none { it.lo == null || it.hi == null }) return work // nothing open left for the LP pass
 
-    // Column j is variable j (added in id order); a genuine open side is a free column. Objective is zero
-    // — each solve swaps in its own single-column cost.
+    // A variable open below enters split, x = x⁺ − x⁻ with both parts ≥ 0, never as a −2⁶¹ probe lower
+    // bound: the double view folds each column's lower bound into the row rhs in doubles, and at the
+    // probe's magnitude (ULP 512) that fold absorbs the true rhs — every row would degenerate and every
+    // derived bound void at the frontier. Splitting keeps the fold at zero. The open direction is then
+    // x⁻ riding to *its* probe upper, which the caller flags to the bound extraction explicitly.
     val builder = LpBuilder()
+    val posCol = IntArray(n)
+    val negCol = IntArray(n) { -1 }
     for (v in 0 until n) {
         val b = work[v]
-        if (b.lo != null && b.hi != null) builder.addVar(b.lo, b.hi) else builder.addFreeVar(b.lo, b.hi)
+        if (b.lo != null) {
+            posCol[v] = if (b.hi != null) builder.addVar(b.lo, b.hi) else builder.addFreeVar(b.lo, null)
+        } else {
+            posCol[v] = if (b.hi != null && b.hi >= 0L) builder.addVar(0L, b.hi) else builder.addFreeVar(0L, null)
+            negCol[v] = builder.addFreeVar(0L, null)
+            if (b.hi != null && b.hi < 0L) {
+                // x⁺ is pinned to 0 above; the finite negative upper bound survives as a row on the pair.
+                builder.addRow(intArrayOf(posCol[v], negCol[v]), longArrayOf(1L, -1L), Relation.LE, b.hi)
+            }
+        }
     }
     for (f in constraints) {
         val rel = when (f.op) {
@@ -69,7 +102,73 @@ internal fun tightenOpenIntBounds(
             LinearOp.EQ -> Relation.EQ
             else -> continue
         }
-        builder.addRow(IntArray(f.vars.size) { f.vars[it] }, f.coeffs.copyOf(), rel, f.bound)
+        var extra = 0
+        for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
+        val cols = IntArray(f.vars.size + extra)
+        val vals = LongArray(cols.size)
+        var w = 0
+        for (k in f.vars.indices) {
+            val v = f.vars[k]
+            cols[w] = posCol[v]
+            vals[w] = f.coeffs[k]
+            w++
+            if (negCol[v] >= 0) {
+                cols[w] = negCol[v]
+                vals[w] = -f.coeffs[k]
+                w++
+            }
+        }
+        builder.addRow(cols, vals, rel, f.bound)
+    }
+    // Mixed integer/real rows join through LP-only continuous columns, so a variable whose only
+    // definition rides a real row (a floor definition, a to_real bridge) is still boundable. A strict
+    // row enters non-strict — a relaxation, so every derived bound stays sound. Real columns open
+    // below split exactly like the integer ones, for the same rhs-absorption reason.
+    if (realConstraints.isNotEmpty()) {
+        val realPos = HashMap<Int, Int>()
+        val realNeg = HashMap<Int, Int>()
+        for (f in realConstraints) {
+            val rel = when (f.op) {
+                LinearOp.LE -> Relation.LE
+                LinearOp.GE -> Relation.GE
+                LinearOp.EQ -> Relation.EQ
+                else -> continue
+            }
+            var extra = 0
+            for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
+            for (j in f.realVars.indices) {
+                val rv = f.realVars[j]
+                if (rv !in realPos) addRealColumns(builder, rv, rLo, rUp, realPos, realNeg)
+                if (realNeg.containsKey(rv)) extra++
+            }
+            val cols = IntArray(f.vars.size + f.realVars.size + extra)
+            val vals = DoubleArray(cols.size)
+            var w = 0
+            for (k in f.vars.indices) {
+                val v = f.vars[k]
+                cols[w] = posCol[v]
+                vals[w] = f.realIntCoeffs[k]
+                w++
+                if (negCol[v] >= 0) {
+                    cols[w] = negCol[v]
+                    vals[w] = -f.realIntCoeffs[k]
+                    w++
+                }
+            }
+            for (j in f.realVars.indices) {
+                val rv = f.realVars[j]
+                cols[w] = realPos.getValue(rv)
+                vals[w] = f.realCoeffs[j]
+                w++
+                val neg = realNeg[rv]
+                if (neg != null) {
+                    cols[w] = neg
+                    vals[w] = -f.realCoeffs[j]
+                    w++
+                }
+            }
+            builder.addRealRow(cols, vals, rel, f.realBound)
+        }
     }
     val base = try {
         builder.build(Sense.MINIMIZE)
@@ -78,7 +177,8 @@ internal fun tightenOpenIntBounds(
     }
 
     var warm: Basis? = null
-    var prevCol = -1
+    var prevPos = -1
+    var prevNeg = -1
     for (v in 0 until n) {
         if (cancellation()) break
         val cur = work[v]
@@ -88,8 +188,15 @@ internal fun tightenOpenIntBounds(
         // maximize x_v bounds the open upper side; minimize bounds the open lower side.
         for (maximize in booleanArrayOf(true, false)) {
             if (if (maximize) cur.hi != null else cur.lo != null) continue
-            val model = base.withSingleColumnObjective(v, if (maximize) -1L else 1L, prevCol)
-            prevCol = v
+            val model = base.withSingleColumnObjective(
+                posCol[v],
+                if (maximize) -1L else 1L,
+                prevPos,
+                negCol = negCol[v],
+                prevNegCol = prevNeg,
+            )
+            prevPos = posCol[v]
+            prevNeg = negCol[v]
             val result = try {
                 newLpSolver(model, cancellation).solvePrimal(warm)
             } catch (_: LpOverflowException) {
@@ -97,13 +204,41 @@ internal fun tightenOpenIntBounds(
             }
             if (result != null) {
                 warm = result.basis
-                val bound = model.tightVariableBound(result, v, maximize)
+                // The open direction's probe: the upper probe of x⁺ when maximizing, of x⁻ (whose growth
+                // is x's descent) when minimizing an open-below variable.
+                val probeCol = if (maximize || negCol[v] < 0) posCol[v] else negCol[v]
+                val bound = model.tightVariableBound(result, v, maximize, model.probeClampedHi[probeCol])
                 if (maximize) newHi = bound else newLo = bound
             }
         }
         work[v] = OpenIntBounds(newLo, newHi)
     }
     return work
+}
+
+/** Add the LP column(s) for real variable [rv]: a single column when bounded below, else the same
+ *  zero-shift split pair the integer columns use, recorded in [realPos]/[realNeg]. */
+private fun addRealColumns(
+    builder: LpBuilder,
+    rv: Int,
+    realLower: DoubleArray,
+    realUpper: DoubleArray,
+    realPos: HashMap<Int, Int>,
+    realNeg: HashMap<Int, Int>,
+) {
+    val lo = realLower.getOrNull(rv)?.takeIf { it.isFinite() }
+    val hi = realUpper.getOrNull(rv)?.takeIf { it.isFinite() }
+    if (lo != null) {
+        realPos[rv] = builder.addRealVar(lo, hi)
+        return
+    }
+    val pos = if (hi != null && hi >= 0.0) builder.addRealVar(0.0, hi) else builder.addRealVar(0.0, null)
+    val neg = builder.addRealVar(0.0, null)
+    realPos[rv] = pos
+    realNeg[rv] = neg
+    if (hi != null && hi < 0.0) {
+        builder.addRealRow(intArrayOf(pos, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
+    }
 }
 
 /** Upper bound on the number of full propagation passes; bounds only ever tighten, so the loop reaches a
@@ -123,11 +258,19 @@ private const val FBBT_MAX_PASSES = 16
  * Every derived bound holds at every solution (it is implied by the row), so a closed side is sound — a
  * genuine bound, never a clamp. Integer variables floor an upper / ceil a lower candidate. Any overflow
  * in the interval arithmetic skips that tightening. Iterated to a fixpoint up to [FBBT_MAX_PASSES].
+ *
+ * Mixed [realRows] propagate jointly through the same fixpoint in outward-rounded double intervals
+ * ([propagateRealRow]), tightening the working real boxes [rLo]/[rUp] in place alongside the integer
+ * bounds — so a chain like `r = 5/2, n ≤ r < n + 1` closes `n` exactly with no LP at all. Strict rows
+ * propagate non-strict (a relaxation, sound).
  */
 private fun fbbtTightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
     cancellation: Cancellation,
+    realRows: List<Linear> = emptyList(),
+    rLo: DoubleArray = EmptyDoubleArray,
+    rUp: DoubleArray = EmptyDoubleArray,
 ): Array<OpenIntBounds> {
     val n = bounds.size
     val b = MutableIntBounds(n)
@@ -137,7 +280,8 @@ private fun fbbtTightenOpenIntBounds(
     }
     // Only LE/EQ rows propagate — [Linear] canonicalises GE to LE, and NE is not an interval bound.
     val rows = constraints.filter { it.op == LinearOp.LE || it.op == LinearOp.EQ }
-    if (rows.isEmpty()) return bounds
+    val mixed = realRows.filter { it.op == LinearOp.LE || it.op == LinearOp.GE || it.op == LinearOp.EQ }
+    if (rows.isEmpty() && mixed.isEmpty()) return bounds
 
     var pass = 0
     var changed = true
@@ -149,6 +293,10 @@ private fun fbbtTightenOpenIntBounds(
             if (propagateRow(f.coeffs, f.vars, f.bound, sign = 1L, b = b)) changed = true
             // An equality also bounds from below: `Σ aⱼ·xⱼ ≥ b`, i.e. `−Σ aⱼ·xⱼ ≤ −b`.
             if (f.op == LinearOp.EQ && propagateRow(f.coeffs, f.vars, f.bound, sign = -1L, b = b)) changed = true
+        }
+        for (f in mixed) {
+            if (f.op != LinearOp.GE && propagateRealRow(f, sign = 1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
+            if (f.op != LinearOp.LE && propagateRealRow(f, sign = -1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
         }
     }
     return Array(n) { OpenIntBounds(b.loOrNull(it), b.hiOrNull(it)) }
@@ -183,59 +331,182 @@ private class MutableIntBounds(n: Int) {
 /** Propagate the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound` into [b], returning whether any bound
  *  tightened. Overflow in the exact activity arithmetic aborts this row (returns `false`). */
 @Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
-private fun propagateRow(
-    coeffs: LongArray,
-    vars: IntArray,
-    bound: Long,
-    sign: Long,
+private fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: Long, b: MutableIntBounds): Boolean =
+    try {
+        val effBound = mulExact(sign, bound)
+        // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
+        var minActivity = 0L
+        var numInf = 0
+        var infIdx = -1
+        for (idx in coeffs.indices) {
+            val a = mulExact(sign, coeffs[idx])
+            if (a == 0L) continue
+            val v = vars[idx]
+            if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) {
+                numInf++
+                infIdx = idx
+                if (numInf > 1) return false // ≥2 unbounded terms ⇒ the row implies nothing
+            } else {
+                minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+            }
+        }
+        var changed = false
+        for (idx in coeffs.indices) {
+            val a = mulExact(sign, coeffs[idx])
+            if (a == 0L) continue
+            val v = vars[idx]
+            val restMin = when {
+                numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+
+                infIdx == idx -> minActivity
+
+                // this term was the sole −∞; the rest is finite
+                else -> continue // the sole −∞ is a different term ⇒ no bound for this one
+            }
+            val num = subExact(effBound, restMin)
+            if (a > 0L) {
+                val cand = floorDivSafe(num, a) ?: continue
+                if (b.hiOpen(v) || cand < b.hiVal(v)) {
+                    b.setHi(v, cand)
+                    changed = true
+                }
+            } else {
+                val cand = ceilDivSafe(num, a) ?: continue
+                if (b.loOpen(v) || cand > b.loVal(v)) {
+                    b.setLo(v, cand)
+                    changed = true
+                }
+            }
+        }
+        changed
+    } catch (_: LpOverflowException) {
+        false
+    }
+
+/** Conservative per-term relative rounding bound for the real-row interval arithmetic; generous next to
+ *  the `2⁻⁵³` unit roundoff so it also covers the `Long`→`Double` conversion of wide integer bounds. */
+private const val REAL_EPS = 1e-15
+
+/** Magnitude cap on a derived candidate bound: beyond this a double no longer resolves integers and the
+ *  bound is worthless next to the search box anyway. */
+private const val REAL_CAND_MAX = 4.0e18
+
+/**
+ * Propagate the mixed row `sign·(Σ aₖ·xₖ + Σ cⱼ·rⱼ) ≤ sign·bound` into the integer bounds [b] and the
+ * real boxes [rLo]/[rUp], returning whether anything tightened. The double interval arithmetic rounds
+ * **outward** — every candidate is widened by a conservative relative margin ([REAL_EPS]-scaled to the
+ * accumulated magnitude) before it is committed, so a derived bound is always implied by the row: an
+ * integer upper is the floor of an overestimate, an integer lower the ceil of an underestimate, and the
+ * real boxes take the widened candidate itself. Mirrors [propagateRow]'s single-open-term rule.
+ */
+@Suppress("ReturnCount", "LoopWithTooManyJumpStatements", "CyclomaticComplexMethod", "LongMethod")
+private fun propagateRealRow(
+    f: Linear,
+    sign: Double,
     b: MutableIntBounds,
-): Boolean = try {
-    val effBound = mulExact(sign, bound)
-    // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
-    var minActivity = 0L
+    rLo: DoubleArray,
+    rUp: DoubleArray,
+): Boolean {
+    val effBound = sign * f.realBound
+    if (!effBound.isFinite()) return false
+    val terms = f.vars.size + f.realVars.size
+    // Minimum activity over the finite terms, its magnitude for the rounding margin, and the open count.
+    var act = 0.0
+    var mag = 0.0
     var numInf = 0
-    var infIdx = -1
-    for (idx in coeffs.indices) {
-        val a = mulExact(sign, coeffs[idx])
-        if (a == 0L) continue
-        val v = vars[idx]
-        if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) {
+    var infInt = -1
+    var infReal = -1
+    for (k in f.vars.indices) {
+        val a = sign * f.realIntCoeffs[k]
+        if (a == 0.0) continue
+        if (!a.isFinite()) return false
+        val v = f.vars[k]
+        val open = if (a > 0.0) b.loOpen(v) else b.hiOpen(v)
+        if (open) {
             numInf++
-            infIdx = idx
-            if (numInf > 1) return false // ≥2 unbounded terms ⇒ the row implies nothing
+            infInt = k
+            if (numInf > 1) return false
         } else {
-            minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+            val m = a * (if (a > 0.0) b.loVal(v) else b.hiVal(v)).toDouble()
+            act += m
+            mag += abs(m)
         }
     }
+    for (j in f.realVars.indices) {
+        val c = sign * f.realCoeffs[j]
+        if (c == 0.0) continue
+        if (!c.isFinite()) return false
+        val rv = f.realVars[j]
+        val m = c * (if (c > 0.0) rLo[rv] else rUp[rv])
+        if (m == Double.NEGATIVE_INFINITY || m.isNaN()) {
+            numInf++
+            infReal = j
+            if (numInf > 1) return false
+        } else {
+            act += m
+            mag += abs(m)
+        }
+    }
+    val margin = REAL_EPS * (mag + abs(effBound)) * (terms + 4)
     var changed = false
-    for (idx in coeffs.indices) {
-        val a = mulExact(sign, coeffs[idx])
-        if (a == 0L) continue
-        val v = vars[idx]
-        val restMin = when {
-            numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
-            infIdx == idx -> minActivity // this term was the sole −∞; the rest is finite
-            else -> continue // the sole −∞ is a different term ⇒ no bound for this one
+    for (k in f.vars.indices) {
+        val a = sign * f.realIntCoeffs[k]
+        if (a == 0.0) continue
+        val v = f.vars[k]
+        val own = if (numInf == 0) {
+            a * (if (a > 0.0) b.loVal(v) else b.hiVal(v)).toDouble()
+        } else {
+            if (infInt != k) continue // the sole −∞ is a different term ⇒ no bound for this one
+            0.0
         }
-        val num = subExact(effBound, restMin)
-        if (a > 0L) {
-            val cand = floorDivSafe(num, a) ?: continue
-            if (b.hiOpen(v) || cand < b.hiVal(v)) {
-                b.setHi(v, cand)
+        val cand = widen(effBound - (act - own), margin) / a
+        if (!cand.isFinite() || abs(cand) >= REAL_CAND_MAX) continue
+        if (a > 0.0) {
+            val hi = floor(cand + REAL_EPS * abs(cand)).toLong()
+            if (b.hiOpen(v) || hi < b.hiVal(v)) {
+                b.setHi(v, hi)
                 changed = true
             }
         } else {
-            val cand = ceilDivSafe(num, a) ?: continue
-            if (b.loOpen(v) || cand > b.loVal(v)) {
-                b.setLo(v, cand)
+            val lo = ceil(cand - REAL_EPS * abs(cand)).toLong()
+            if (b.loOpen(v) || lo > b.loVal(v)) {
+                b.setLo(v, lo)
                 changed = true
             }
         }
     }
-    changed
-} catch (_: LpOverflowException) {
-    false
+    for (j in f.realVars.indices) {
+        val c = sign * f.realCoeffs[j]
+        if (c == 0.0) continue
+        val rv = f.realVars[j]
+        val own = if (numInf == 0) {
+            c * (if (c > 0.0) rLo[rv] else rUp[rv])
+        } else {
+            if (infReal != j) continue
+            0.0
+        }
+        val raw = widen(effBound - (act - own), margin) / c
+        if (raw.isNaN()) continue
+        if (c > 0.0) {
+            val cand = raw + REAL_EPS * abs(raw)
+            if (cand < rUp[rv]) {
+                rUp[rv] = cand
+                changed = true
+            }
+        } else {
+            val cand = raw - REAL_EPS * abs(raw)
+            if (cand > rLo[rv]) {
+                rLo[rv] = cand
+                changed = true
+            }
+        }
+    }
+    return changed
 }
+
+/** Widen the residual upward by [margin] plus its own relative slack — the outward rounding step that
+ *  keeps every derived candidate an overestimate of the true residual. */
+private fun widen(residual: Double, margin: Double): Double = residual + margin + REAL_EPS * abs(residual)
 
 /** `⌊a / b⌋`, or null on the one non-representable case (`Long.MIN_VALUE / −1`). */
 private fun floorDivSafe(a: Long, b: Long): Long? = if (a == Long.MIN_VALUE && b == -1L) null else a.floorDiv(b)

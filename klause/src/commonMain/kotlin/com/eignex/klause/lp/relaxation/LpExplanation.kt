@@ -54,6 +54,8 @@ internal object LpExplanation {
      * which is what the no-entering-column argument was evaluated against.
      */
     fun premiseLit(relaxation: LpRelaxation, session: PropagationSession, col: Int, lowerSide: Boolean): Int {
+        // A continuous column's bounds are declared globals (or probe stand-ins), valid at every node.
+        if (col < relaxation.colRealId.size && relaxation.colRealId[col] >= 0) return PREMISE_NONE
         val varId = relaxation.colVarId[col]
         if (varId < 0) return PREMISE_AUX
         val model = relaxation.model
@@ -170,6 +172,10 @@ internal object LpExplanation {
                 }
                 if (seen.add(lit)) lits.add(lit)
             }
+            for (bl in prem.boolLits) {
+                val neg = Lit.negate(bl)
+                if (seen.add(neg)) lits.add(neg)
+            }
         }
         return true
     }
@@ -193,6 +199,10 @@ internal object LpExplanation {
                     session.boundGeLit(prem.vars[k], prem.thresholds[k], positive = false)
                 }
                 if (seen.add(lit)) lits.add(lit)
+            }
+            for (bl in prem.boolLits) {
+                val neg = Lit.negate(bl)
+                if (seen.add(neg)) lits.add(neg)
             }
         }
         return true

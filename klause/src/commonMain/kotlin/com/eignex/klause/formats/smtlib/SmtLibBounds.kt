@@ -155,7 +155,7 @@ internal fun SmtLib.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
         val n = work.removeLast()
         if (n is SExpr.SList) {
             val head = (n.items.firstOrNull() as? SExpr.Atom)?.text
-            if (head == "ite" || head == "abs" || head == "div" || head == "mod" ||
+            if (head == "ite" || head == "abs" || head == "div" || head == "mod" || head == "to_int" ||
                 (head != null && macros.containsKey(head))
             ) {
                 return true

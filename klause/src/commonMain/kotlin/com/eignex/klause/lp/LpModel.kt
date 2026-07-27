@@ -1,5 +1,7 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
@@ -17,7 +19,14 @@ internal enum class Relation { LE, GE, EQ }
  * tighter than the declared ones are recorded (a declared bound holds everywhere). Parallel
  * arrays: premise `k` is `x_{vars[k]} ≤ thresholds[k]` when `isUpper[k]`, else `≥`.
  */
-internal class LpRowPremises(val vars: IntArray, val isUpper: BooleanArray, val thresholds: LongArray)
+internal class LpRowPremises(
+    val vars: IntArray,
+    val isUpper: BooleanArray,
+    val thresholds: LongArray,
+    /** Boolean literals that must hold for the row to be valid (a reified real atom's activation);
+     *  a learned clause leaning on the row cites their negations. */
+    val boolLits: IntArray = EmptyIntArray,
+)
 
 /** Optimization sense. Branch-and-bound minimizes; [MAXIMIZE] is negated at build time. */
 internal enum class Sense { MINIMIZE, MAXIMIZE }
@@ -196,25 +205,47 @@ internal class LpModel(
     /**
      * A model identical in structure and bounds but whose objective is a single unit cost [unitCost] on
      * structural column [col] and zero elsewhere — the per-variable objective optimization-based bound
-     * tightening ([com.eignex.klause.lp.tightenOpenIntBounds]) swaps in for each open side. The [cost]
-     * array is **shared and mutated in place**: [col] is set to [unitCost] and the column of the previous
-     * call ([prevCol], `-1` on the first) is reset to `0`, so a whole sweep of single-column objectives
-     * allocates no per-solve cost vector and each model is `O(1)` to form. The objective constant tracks
-     * the one nonzero column's shift (`unitCost·loShift[col]`), matching a fresh build with that cost, so
-     * the solve and its dual bound are identical to a per-objective rebuild. Integer models only (a
-     * [doubleView] carries its own cost the [Long] mutation would not reach).
+     * tightening ([com.eignex.klause.lp.tightenOpenIntBounds]) swaps in for each open side. When the
+     * variable is represented split (`x = x⁺ − x⁻`), [negCol] names the negative part and takes
+     * `−unitCost`, so the objective is still exactly `unitCost·x`. The [cost] array is **shared and
+     * mutated in place**: [col]/[negCol] are set and the columns of the previous call
+     * ([prevCol]/[prevNegCol], `-1` on the first) are reset to `0`, so a whole sweep of single-column
+     * objectives allocates no per-solve cost vector and each model is `O(1)` to form. The objective
+     * constant tracks the nonzero columns' shifts (`unitCost·loShift`), matching a fresh build with that
+     * cost, so the solve and its dual bound are identical to a per-objective rebuild. A [doubleView]
+     * carries its own cost array and objective constant, mutated with the same in-place discipline (the
+     * continuous-column solve reads them).
      */
-    fun withSingleColumnObjective(col: Int, unitCost: Long, prevCol: Int): LpModel {
-        require(doubleView == null) { "withSingleColumnObjective is for pure-integer models" }
+    fun withSingleColumnObjective(
+        col: Int,
+        unitCost: Long,
+        prevCol: Int,
+        negCol: Int = -1,
+        prevNegCol: Int = -1,
+    ): LpModel {
         if (prevCol >= 0) cost[prevCol] = 0L
+        if (prevNegCol >= 0) cost[prevNegCol] = 0L
         cost[col] = unitCost
+        if (negCol >= 0) cost[negCol] = -unitCost
+        var constant = mulExact(unitCost, loShift[col])
+        if (negCol >= 0) constant = subExact(constant, mulExact(unitCost, loShift[negCol]))
+        val dv = doubleView
+        if (dv != null) {
+            if (prevCol >= 0) dv.cost[prevCol] = 0.0
+            if (prevNegCol >= 0) dv.cost[prevNegCol] = 0.0
+            dv.cost[col] = unitCost.toDouble()
+            if (negCol >= 0) dv.cost[negCol] = -unitCost.toDouble()
+            dv.objConstant = dv.cost[col] * dv.loShift[col] +
+                (if (negCol >= 0) dv.cost[negCol] * dv.loShift[negCol] else 0.0)
+        }
         return LpModel(
             n = n, m = m, csc = csc, rhs = rhs, cost = cost,
             upper = upper, hasUpper = hasUpper, loShift = loShift,
-            objConstant = mulExact(unitCost, loShift[col]), sense = sense, tag = tag,
+            objConstant = constant, sense = sense, tag = tag,
             rowGlobal = rowGlobal, rowPremises = rowPremises, flippedRhs = flippedRhs,
             probeClampedLo = probeClampedLo, probeClampedHi = probeClampedHi,
             colContinuous = colContinuous,
+            doubleView = dv,
         )
     }
 
@@ -254,7 +285,9 @@ internal class LpDoubleView(
     val cost: DoubleArray,
     val upper: DoubleArray,
     val hasUpper: BooleanArray,
-    val objConstant: Double,
+    /** `Σ cost·loShift` folded out by the lower-bound shift; mutable because
+     *  [LpModel.withSingleColumnObjective] rewrites [cost] in place and must keep this consistent. */
+    var objConstant: Double,
     val loShift: DoubleArray,
 )
 
@@ -364,7 +397,14 @@ internal class LpBuilder {
 
     /** Add a real-coefficient constraint `Σ vals(k)·x_{cols(k)} rel rhs`; like [addRow] but with double
      *  data. Forces the model onto the double view (and declines integer certification). */
-    fun addRealRow(cols: IntArray, vals: DoubleArray, rel: Relation, rhs: Double, strict: Boolean = false) {
+    fun addRealRow(
+        cols: IntArray,
+        vals: DoubleArray,
+        rel: Relation,
+        rhs: Double,
+        strict: Boolean = false,
+        premiseLits: IntArray = EmptyIntArray,
+    ) {
         require(cols.size == vals.size) { "cols/vals length mismatch: ${cols.size} vs ${vals.size}" }
         anyRealRow = true
         rows.add(
@@ -373,8 +413,12 @@ internal class LpBuilder {
                 LongArray(cols.size),
                 rel,
                 0L,
-                global = true,
-                premises = null,
+                global = premiseLits.isEmpty(),
+                premises = if (premiseLits.isEmpty()) {
+                    null
+                } else {
+                    LpRowPremises(EmptyIntArray, BooleanArray(0), EmptyLongArray, premiseLits.copyOf())
+                },
                 valsD = vals.copyOf(),
                 rhsD = rhs,
                 strict = strict,

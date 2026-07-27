@@ -84,14 +84,21 @@ private const val EPS = 2.4e-16
  * constant (max is set up as minimizing `−x`). Rigorous under float error via [safeObjectiveLowerBound],
  * then floored (max) / ceiled (min) to an integer. **Reject-at-cap:** an optimum that only rode the
  * column to its [LP_UNBOUNDED_PROBE] frontier — the private stand-in for `±∞` on a [LpBuilder.addFreeVar]
- * side — is reported unbounded (null), never as a spurious bound at the probe magnitude.
+ * side — is reported unbounded (null), never as a spurious bound at the probe magnitude. [clamped]
+ * overrides which probe flag guards that rejection — a variable represented split (`x = x⁺ − x⁻`)
+ * descends by `x⁻` riding *its* upper probe, which [objectiveCol]'s own flags cannot see.
  */
-internal fun LpModel.safeVariableBound(result: FloatLpResult, objectiveCol: Int, maximize: Boolean): Long? {
+internal fun LpModel.safeVariableBound(
+    result: FloatLpResult,
+    objectiveCol: Int,
+    maximize: Boolean,
+    clamped: Boolean? = null,
+): Long? {
     val objMin = safeObjectiveLowerBound(this, result.duals) ?: return null
     // cost is −1 on the column for a maximization (we minimize −x), +1 for a minimization.
     val bound = if (maximize) floor(-objMin) else ceil(objMin)
     if (!bound.isFinite() || bound < Long.MIN_VALUE.toDouble() || bound > Long.MAX_VALUE.toDouble()) return null
-    val clampedThatSide = if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
+    val clampedThatSide = clamped ?: if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
     // Reject well below the exact cap: a bound this large is "at the frontier" and means unbounded (a
     // real bound worth keeping is tiny next to the probe, which is ~Long.MAX/4).
     val frontier = (LP_UNBOUNDED_PROBE - LP_UNBOUNDED_PROBE / 4).toDouble()
@@ -106,9 +113,14 @@ internal fun LpModel.safeVariableBound(result: FloatLpResult, objectiveCol: Int,
  * ([LpBuilder.addFreeVar]) is multiplied by the ~`Long.MAX/4` probe upper and swamps the true bound; the
  * exact bound carries no such margin, so a free basic column (true reduced cost 0) contributes nothing.
  * Null on a 128-bit certification overflow (the caller falls back). Same probe-frontier rejection as
- * [safeVariableBound]: an optimum that only rode the column to its `±∞` stand-in is reported unbounded.
+ * [safeVariableBound], with the same [clamped] override for split representations.
  */
-internal fun LpModel.exactVariableBound(result: FloatLpResult, objectiveCol: Int, maximize: Boolean): Long? {
+internal fun LpModel.exactVariableBound(
+    result: FloatLpResult,
+    objectiveCol: Int,
+    maximize: Boolean,
+    clamped: Boolean? = null,
+): Long? {
     // ⌈L⌉ on the minimized objective (−x when maximizing, x when minimizing), objConstant folded in.
     val ceil = integerDualLowerBoundCeil(this, result.duals) ?: return null
     val bound = if (maximize) {
@@ -117,7 +129,7 @@ internal fun LpModel.exactVariableBound(result: FloatLpResult, objectiveCol: Int
     } else {
         ceil
     }
-    val clampedThatSide = if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
+    val clampedThatSide = clamped ?: if (maximize) probeClampedHi[objectiveCol] else probeClampedLo[objectiveCol]
     val frontier = LP_UNBOUNDED_PROBE - LP_UNBOUNDED_PROBE / 4
     if (clampedThatSide && (bound == Long.MIN_VALUE || abs(bound) >= frontier)) return null
     return bound
@@ -128,11 +140,17 @@ internal fun LpModel.exactVariableBound(result: FloatLpResult, objectiveCol: Int
  * [exactVariableBound] and the float [safeVariableBound]. Both are valid, so the tighter always wins —
  * the smaller upper bound when [maximize], the larger lower bound otherwise — which never regresses below
  * the float bound yet captures the exact bound's sharpness on free columns. Null only when neither is
- * available (both unbounded / overflow).
+ * available (both unbounded / overflow). [clamped] is the split-representation probe override of
+ * [safeVariableBound].
  */
-internal fun LpModel.tightVariableBound(result: FloatLpResult, objectiveCol: Int, maximize: Boolean): Long? {
-    val safe = safeVariableBound(result, objectiveCol, maximize)
-    val exact = exactVariableBound(result, objectiveCol, maximize)
+internal fun LpModel.tightVariableBound(
+    result: FloatLpResult,
+    objectiveCol: Int,
+    maximize: Boolean,
+    clamped: Boolean? = null,
+): Long? {
+    val safe = safeVariableBound(result, objectiveCol, maximize, clamped)
+    val exact = exactVariableBound(result, objectiveCol, maximize, clamped)
     return when {
         safe == null -> exact
         exact == null -> safe

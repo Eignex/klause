@@ -165,31 +165,22 @@ private fun SmtLib.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<
         Sort.BOOL -> when (head) {
             "not", "and", "or", "xor", "=>" -> args.map { it to Sort.BOOL }
 
-            "<=", "<", ">=", ">" -> {
-                if (isRealRelation(node)) {
-                    // Top-level real relations are intercepted by assert(); reaching one here means
-                    // it sits under boolean structure, which needs real-atom reification.
-                    smtUnsupported(
-                        "real relation under boolean structure (only top-level real constraints are supported)",
-                    )
-                }
-                args.map { it to Sort.INT }
-            }
+            "<=", "<", ">=", ">" ->
+                args.map { it to (if (isRealRelation(node)) Sort.REAL else Sort.INT) }
 
             "ite" -> args.map { it to Sort.BOOL }
 
-            "distinct" -> {
-                if (isRealRelation(node)) smtUnsupported("distinct over reals")
-                args.map { it to (if (isBoolExpr(it)) Sort.BOOL else Sort.INT) }
+            "distinct" -> args.map { arg ->
+                val argSort = when {
+                    isBoolExpr(arg) -> Sort.BOOL
+                    isRealExpr(arg) -> Sort.REAL
+                    else -> Sort.INT
+                }
+                arg to argSort
             }
 
             "=" -> if (isArithmeticRelation(node)) {
-                if (isRealRelation(node)) {
-                    smtUnsupported(
-                        "real relation under boolean structure (only top-level real constraints are supported)",
-                    )
-                }
-                args.map { it to Sort.INT }
+                args.map { it to (if (isRealRelation(node)) Sort.REAL else Sort.INT) }
             } else {
                 args.map { it to Sort.BOOL }
             }
@@ -211,7 +202,7 @@ private fun SmtLib.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<
         Sort.REAL -> when (head) {
             "+", "-", "*", "/" -> args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
             "to_real" -> args.map { it to Sort.INT }
-            "ite" -> smtUnsupported("real ite (not yet supported over reals)")
+            "ite" -> listOf(args[0] to Sort.BOOL, args[1] to Sort.REAL, args[2] to Sort.REAL)
             else -> null
         }
     }
@@ -266,6 +257,8 @@ private fun SmtLib.Builder.combineReal(head: String, args: List<Res>): Res = whe
 
     "to_real" -> Res.R(args[0].asReal())
 
+    "ite" -> Res.R(realIte(args[0].asLit(), args[1].asReal(), args[2].asReal()))
+
     else -> smtUnsupported("unsupported real op '$head'")
 }
 
@@ -283,14 +276,32 @@ private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: Li
         Res.B(lits.dropLast(1).foldRight(lits.last()) { a, acc -> tseitinOr(listOf(Lit.negate(a), acc)) })
     }
 
-    "<=", "<", ">=", ">" -> Res.B(reifyRelArgs(node, head, args))
+    "<=", "<", ">=", ">" -> if (args.any { it is Res.R }) {
+        requireBinaryRelation(node, head)
+        Res.B(reifyRealRel(head, args[0].asReal(), args[1].asReal()))
+    } else {
+        Res.B(reifyRelArgs(node, head, args))
+    }
 
-    "distinct" -> Res.B(distinctFromArgs(args))
+    "distinct" -> if (args.any { it is Res.R }) {
+        val terms = args.map { it.asReal() }
+        val neLits = ArrayList<Int>()
+        for (i in terms.indices) {
+            for (j in i + 1 until terms.size) {
+                neLits.add(Lit.negate(reifyRealRel("=", terms[i], terms[j])))
+            }
+        }
+        Res.B(tseitinAnd(neLits))
+    } else {
+        Res.B(distinctFromArgs(args))
+    }
 
     "ite" -> Res.B(tseitinIte(args[0].asLit(), args[1].asLit(), args[2].asLit()))
 
     "=" -> if (isArithmeticRelation(node)) {
-        if (args.size == 2) {
+        if (args.any { it is Res.R }) {
+            Res.B(chainEqToFirst(args.map { it.asReal() }) { a, b -> reifyRealRel("=", a, b) })
+        } else if (args.size == 2) {
             Res.B(reifyRelArgs(node, head, args))
         } else {
             Res.B(chainEqToFirst(args.map { it.asLin() }, ::reifyEq))
@@ -322,14 +333,10 @@ private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when
     "to_real" -> Res.I(args[0].asLin())
 
     // `to_int` of an integral real term folds back to its integer combination; a genuinely
-    // fractional real needs floor semantics the lowering does not carry yet.
+    // fractional real gets the floor definition (a fresh integer with `n ≤ r < n + 1`).
     "to_int" -> when (val a = args[0]) {
         is Res.I -> a
-
-        is Res.R -> Res.I(
-            a.comb.toLinCombOrNull() ?: smtUnsupported("to_int over a fractional real term"),
-        )
-
+        is Res.R -> Res.I(a.comb.toLinCombOrNull() ?: realFloor(a.comb))
         else -> smtUnsupported("to_int over a boolean term")
     }
 

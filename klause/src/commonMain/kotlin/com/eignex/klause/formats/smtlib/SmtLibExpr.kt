@@ -53,9 +53,10 @@ internal fun SmtLib.Builder.assert(top: SExpr) {
                 }
 
                 h == "distinct" -> {
-                    if (isRealRelation(node)) throw UnsupportedSmtException("distinct over reals")
-                    assertDistinct(args)
-                    continue
+                    if (!isRealRelation(node)) {
+                        assertDistinct(args)
+                        continue
+                    }
                 }
             }
         }
@@ -65,6 +66,10 @@ internal fun SmtLib.Builder.assert(top: SExpr) {
 
 internal fun SmtLib.Builder.forceTrue(lit: Int) {
     factors.add(Clause(intArrayOf(lit)))
+}
+
+internal fun SmtLib.Builder.forceClause(a: Int, b: Int) {
+    factors.add(Clause(intArrayOf(a, b)))
 }
 
 /** Fold [t] to a boolean literal (iteratively, via [evalTerm]). */

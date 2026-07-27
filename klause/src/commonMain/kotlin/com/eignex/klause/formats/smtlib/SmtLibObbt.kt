@@ -28,7 +28,14 @@ private fun SmtLib.Builder.obbtBounds() {
             is PresolveDomain.Open -> OpenIntBounds(d.lo, d.hi)
         }
     }
-    val tightened = tightenOpenIntBounds(bounds, factors.filterIsInstance<Linear>().filter { !it.hasReals })
+    val linears = factors.filterIsInstance<Linear>()
+    val tightened = tightenOpenIntBounds(
+        bounds,
+        linears.filter { !it.hasReals },
+        realConstraints = linears.filter { it.hasReals },
+        realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
+        realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
+    )
     for (v in 0 until nextInt) {
         if (intDomains[v] is PresolveDomain.Open) {
             intDomains[v] = openOrFinite(tightened[v].lo, tightened[v].hi)

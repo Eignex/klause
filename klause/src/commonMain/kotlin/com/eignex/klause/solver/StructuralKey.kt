@@ -86,6 +86,7 @@ internal enum class FactorKind {
     ARRAY_MIN_MAX,
     PRODUCT,
     REAL_PRODUCT,
+    REIFIED_REAL_LINEAR,
     GAUSSIAN_XOR,
     LEX_LESS,
     INCREASING,
