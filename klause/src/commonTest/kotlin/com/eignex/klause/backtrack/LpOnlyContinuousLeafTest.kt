@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.LpVerdict
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -83,6 +84,24 @@ class LpOnlyContinuousLeafTest {
             cancellation = Cancellation { true },
         )
         assertEquals(LpVerdict.INDETERMINATE, res.verdict)
+    }
+
+    @Test
+    fun `the continuous leaf verdict is the same with LP bounding off and on`() {
+        // LP bounding (`--lp off` vs on) is a branch-and-bound search accelerator, not the continuous
+        // feasibility decision — that lives in the leaf solve, which runs whenever there are real vars.
+        // So toggling bounding must not change the verdict: feasible stays SAT, infeasible stays UNSAT.
+        val feasible = Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
+        val infeasible = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L)
+        for (bounding in booleanArrayOf(false, true)) {
+            val params = BacktrackParams(lpPlan = LpPlan(bounding = bounding))
+            assertIs<SolveResult.Sat>(
+                BacktrackSolver(problem(1, arrayOf(IntDomain(0, 3)), 0.0, 10.0, feasible)).solve(params),
+            )
+            assertIs<SolveResult.Unsat>(
+                BacktrackSolver(problem(0, emptyArray(), 0.0, 1.0, infeasible)).solve(params),
+            )
+        }
     }
 
     @Test
