@@ -605,6 +605,69 @@ class PropagationState(
      *  first push. */
     var undoLogging: Boolean = false
 
+    // --- Incremental objective lower bound (the always-on trivial bound, kept O(1) per node). ---
+    // The trivial lower bound on a `Σ boolWeights·x` objective under the current partial assignment is
+    //   objective.constant + Σ_b contribution(b) + <integer part>, where
+    //   contribution(b) = pinned ? (value ? w : 0) : min(w, 0).
+    // Pinning a bool var raises the bound by a nonnegative penalty, so the bool part is maintained on
+    // the reversible trail instead of rescanned every node — that scan dominated CPU on large
+    // pseudo-Boolean optimization (a node visits O(numBoolVars) here otherwise). Installed lazily at the
+    // root; the integer part (usually empty for pseudo-Boolean) stays the caller's per-node scan.
+    private var objBoolWeights: LongArray? = null
+    private var objBoolBaseConst: Long = 0L
+    private var objBoolPenalty: RevLong? = null
+
+    /** Whether the incremental objective bool lower bound is live (see [objectiveBoolLowerBound]). */
+    internal val objectiveBoolBoundInstalled: Boolean get() = objBoolWeights != null
+
+    /**
+     * Install the incremental objective bool lower bound from [weights] (indexed by bool var id). A no-op
+     * unless at the root (`currentLevel == 0`) and not already installed: the baseline sums the current
+     * level-0 contributions, which are never undone, so subsequent pins/undos maintain the bound soundly
+     * on the reversible trail. Returns true once (or while) the incremental bound is live; false when it
+     * declined (not at root, or the baseline overflowed) so the caller rescans instead.
+     */
+    internal fun installObjectiveBoolBound(weights: LongArray): Boolean {
+        if (objBoolWeights != null) return true
+        if (currentLevel != 0) return false
+        var base = 0L
+        val nb = minOf(problem.numBoolVars, weights.size)
+        for (b in 0 until nb) {
+            val w = weights[b]
+            if (w == 0L) continue
+            val contribution = when {
+                boolValueBits.get(b) && boolAssigned.get(b) -> w
+                boolAssigned.get(b) -> 0L
+                w < 0L -> w
+                else -> 0L
+            }
+            val next = base + contribution
+            if (((base xor next) and (contribution xor next)) < 0L) return false // overflow ⇒ decline
+            base = next
+        }
+        objBoolBaseConst = base
+        objBoolPenalty = RevLong(this, 0L)
+        objBoolWeights = weights
+        return true
+    }
+
+    /** Fold the pin of bool [v] to [value] into the incremental objective bool lower bound. The penalty
+     *  is `contribution(pinned) − contribution(unpinned) = value ? max(w,0) : max(−w,0)`, always ≥ 0; the
+     *  reversible cell restores it on backtrack. */
+    internal fun bumpObjectiveBoolBound(v: Int, value: Boolean) {
+        val weights = objBoolWeights ?: return
+        if (v >= weights.size) return
+        val w = weights[v]
+        if (w == 0L) return
+        val penalty = if (value) (if (w > 0L) w else 0L) else (if (w < 0L) -w else 0L)
+        if (penalty != 0L) objBoolPenalty?.let { it.set(it.value + penalty) }
+    }
+
+    /** The incremental bool part of the trivial objective lower bound — `Σ_b contribution(b)` over the
+     *  current assignment, excluding the objective constant and any integer terms. Valid only when
+     *  [objectiveBoolBoundInstalled]; O(1). */
+    internal fun objectiveBoolLowerBound(): Long = objBoolBaseConst + (objBoolPenalty?.value ?: 0L)
+
     /** Current undo-log size. A [LevelMark] captures this; iterating [undoVarAt] /
      *  [undoIsBoolAt] over `[base, undoTop)` enumerates exactly the variables mutated since
      *  position `base` — used by [PropagationSession] to compute the implied-fact diff of a

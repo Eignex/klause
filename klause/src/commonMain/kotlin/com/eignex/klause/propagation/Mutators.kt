@@ -126,6 +126,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused (#201)
     boolAntecedents[v] = antecedents
     boolPinOrder.add(v)
+    bumpObjectiveBoolBound(v, value)
     // The native-SAT lane sweeps the pin trail directly and never drains dirtyBools; skipping the
     // enqueue keeps that queue from growing unbounded across a solve. The general path still uses it.
     if (nativeEngine == null) dirtyBools.addLast(v)

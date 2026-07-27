@@ -45,6 +45,28 @@ internal class RevInt(private val state: PropagationState, initial: Int) : Trail
     }
 }
 
+/** A backtrackable `Long`. Reads via [value]; mutate via [set]. */
+internal class RevLong(private val state: PropagationState, initial: Long) : Trailed {
+    var value: Long = initial
+        private set
+
+    private val prior = LongArrayList()
+
+    fun set(v: Long) {
+        if (v == value) return
+        if (state.undoLogging) {
+            prior.add(value)
+            state.logReversible(this)
+        }
+        value = v
+    }
+
+    override fun restore() {
+        value = prior.last()
+        prior.truncateTo(prior.size - 1)
+    }
+}
+
 /** A backtrackable reference cell. */
 internal class RevRef<T>(private val state: PropagationState, initial: T) : Trailed {
     var value: T = initial

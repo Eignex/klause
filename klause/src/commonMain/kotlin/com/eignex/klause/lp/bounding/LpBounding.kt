@@ -38,22 +38,8 @@ import kotlin.math.round
  * domain endpoint matching the coefficient's sign.
  */
 internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: PropagationSession): Long = try {
-    var total = obj.constant
+    var total = addExact(obj.constant, boolLowerBoundPart(obj, session))
     val sp = session.problem
-    val nb = minOf(sp.numBoolVars, obj.boolWeights.size)
-    for (b in 0 until nb) {
-        val w = obj.boolWeights[b]
-        val v = session.boolValue(b)
-        total = addExact(
-            total,
-            when {
-                v == true -> w
-                v == false -> 0L
-                w < 0L -> w
-                else -> 0L
-            },
-        )
-    }
     val ni = minOf(sp.numIntVars, obj.intCoefficients.size)
     for (i in 0 until ni) {
         val c = obj.intCoefficients[i]
@@ -66,6 +52,33 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
     // A wrapped accumulation could overshoot the incumbent and prune wrongly; no bound is the
     // sound fallback.
     Long.MIN_VALUE
+}
+
+/**
+ * The `Σ_b contribution(b)` bool part of [linearLowerBound]. Maintained incrementally on the reversible
+ * trail once installed at the root — an O(1) read instead of the O(numBoolVars) rescan that dominated
+ * CPU on large pseudo-Boolean optimization; identical value either way. Before the root install is
+ * possible (not at level 0), it rescans directly. Throws [LpOverflowException] via [addExact] on the
+ * rescan path so the caller falls back to no bound.
+ */
+private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: PropagationSession): Long {
+    if (session.installObjectiveBoolBound(obj.boolWeights)) return session.objectiveBoolLowerBound()
+    var sum = 0L
+    val nb = minOf(session.problem.numBoolVars, obj.boolWeights.size)
+    for (b in 0 until nb) {
+        val w = obj.boolWeights[b]
+        val v = session.boolValue(b)
+        sum = addExact(
+            sum,
+            when {
+                v == true -> w
+                v == false -> 0L
+                w < 0L -> w
+                else -> 0L
+            },
+        )
+    }
+    return sum
 }
 
 /** The smallest value `≥ lb` congruent to `r` modulo `g` (`g ≥ 1`, `0 ≤ r < g`). When `lb` already
