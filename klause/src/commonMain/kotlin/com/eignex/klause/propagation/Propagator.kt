@@ -97,6 +97,17 @@ interface Propagator {
     val consumesIntEventDelta: Boolean get() = false
 
     /**
+     * Whether this factor's first fire is expensive — it builds heavy per-state bookkeeping
+     * (a table's live-tuple set, a flow/matching cache, an automaton layer DP) and sweeps it.
+     * The root bake can skip firing such factors (see [PropagationState.runToFixpoint]'s
+     * `skipExpensiveBake`): their optional root tightening is deferred to the first search fire,
+     * where the state builds once on the final post-presolve factors instead of throwaway at load.
+     * Skipping only weakens the bake fixpoint (always sound); search re-derives the tightening.
+     * Default `false` — a lightweight factor (Linear, Clause, Comparison) always fires.
+     */
+    val expensiveBake: Boolean get() = false
+
+    /**
      * If this factor just returned `false` from [propagate], the clause-form explanation
      * of why — i.e. an array of literals, all currently *false* in [state], whose
      * disjunction is unsatisfied. The propagation-graph conflict analyzer seeds its

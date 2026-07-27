@@ -27,6 +27,8 @@ internal class TablePropagator(
     private val groupCache: TableGroupCache? = null,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     /** Lower/upper bound the cell at (row, col) accepts; equal for a point, `[MIN, MAX]` for a `*`. */
     private fun cellLo(row: Int, col: Int): Long = tuples[row * arity + col]
     private fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]

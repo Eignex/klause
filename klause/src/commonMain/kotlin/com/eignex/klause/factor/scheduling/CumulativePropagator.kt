@@ -32,6 +32,8 @@ internal class CumulativePropagator(
     private val constantEnergyAndCap: Boolean,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? {

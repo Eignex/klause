@@ -30,6 +30,8 @@ internal class GlobalCardinalityPropagator(
     private val definitelyAbsentGccFn: (Int, PropagationState) -> Boolean,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     // Plain (no-presence) path: subscribe to every int-domain event on the constrained variables and
     // consume the dirty-variable delta, so a fire re-blocks only the var→cover edges of the variables
     // that actually changed instead of the O(n·m) full scan. The optional-variable path keeps the

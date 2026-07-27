@@ -21,6 +21,8 @@ internal class MddPropagator(
     private val transitionIndex: MddTransitionIndex? = null,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     /** Advisor subscription (#623): the layered reachability sweep reads each sequence variable's
      *  bounds (`sym in min..max`), not interior holes, so it wakes on bound moves only — interior
      *  [IntEvent.VALUE_REMOVED] carves cannot change the reachability bitsets. Consumes the dirty-

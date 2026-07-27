@@ -307,6 +307,7 @@ class Problem(
     fun propagate(
         assumptions: Assumptions = Assumptions.None,
         cancellation: Cancellation = Cancellation.Never,
+        skipExpensiveBake: Boolean = false,
     ): PropagationResult {
         val state = PropagationState(this, assumptions)
         if (!state.seeded) {
@@ -319,7 +320,11 @@ class Problem(
                 lvls,
             )
         }
-        val conflict = state.runToFixpoint(allFactors = true, cancellation = cancellation)
+        val conflict = state.runToFixpoint(
+            allFactors = true,
+            cancellation = cancellation,
+            skipExpensiveBake = skipExpensiveBake,
+        )
         if (conflict != null) {
             return PropagationResult.Unsat(
                 state.extractConflictBools(conflict),
