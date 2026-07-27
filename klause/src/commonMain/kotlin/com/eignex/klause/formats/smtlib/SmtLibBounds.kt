@@ -7,7 +7,7 @@ import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 /** Bound inference for the SMT-LIB front-end: a fixpoint over the conjunctive linear relations tightens
  *  each integer variable's `[lo, hi]`. A bound that stays unprovable is left `null` (infinite) — infinity
  *  is structural, never a `±Long/4` sentinel — so the result is a [PresolveDomain] (finite or still-open). */
-internal fun SmtLibQfLia.Builder.inferBounds() {
+internal fun SmtLib.Builder.inferBounds() {
     if (intNames.isEmpty()) return
     // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
     val lo = arrayOfNulls<Long>(nextInt)
@@ -67,7 +67,7 @@ internal fun SmtLibQfLia.Builder.inferBounds() {
 
 // lo/hi are nullable (a null slot is ±infinity), so a primitive LongArray cannot represent them.
 @Suppress("ArrayPrimitive")
-internal fun SmtLibQfLia.Builder.applyCtBound(
+internal fun SmtLib.Builder.applyCtBound(
     lo: Array<Long?>,
     hi: Array<Long?>,
     tv: Int,
@@ -123,7 +123,7 @@ internal fun addOrNull(a: Long, b: Long): Long? {
     return if (((a xor s) and (b xor s)) < 0) null else s
 }
 
-internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
+internal fun SmtLib.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
     // Walk the `and` conjunction with an explicit worklist (not recursion), so a degenerate
     // conjunction can't overflow the stack during bound inference.
     val work = ArrayDeque<SExpr>()
@@ -148,7 +148,7 @@ internal fun SmtLibQfLia.Builder.collectConjunctiveRelations(top: SExpr, out: Ar
  *  bound-inference pass must not descend into such a relation, since evaluating it would allocate
  *  variables the fixpoint's bound arrays aren't sized for. The scan is iterative (explicit stack) so
  *  a deep term can't overflow the call stack. */
-internal fun SmtLibQfLia.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
+internal fun SmtLib.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(t)
     while (work.isNotEmpty()) {

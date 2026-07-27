@@ -14,7 +14,7 @@ import com.eignex.klause.solver.Lit
 /** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
  *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities
  *  and `distinct` are posted as hard constraints, everything else is reified and forced true. */
-internal fun SmtLibQfLia.Builder.assert(top: SExpr) {
+internal fun SmtLib.Builder.assert(top: SExpr) {
     // Worklist of pending assertion nodes; a `null` entry is a let-scope pop marker.
     val work = ArrayDeque<SExpr?>()
     work.addLast(top)
@@ -43,16 +43,17 @@ internal fun SmtLibQfLia.Builder.assert(top: SExpr) {
                 }
 
                 h == "<=" || h == "<" || h == ">=" || h == ">" -> {
-                    assertLinear(node)
+                    if (isRealRelation(node)) assertRealLinear(node) else assertLinear(node)
                     continue
                 }
 
                 h == "=" && isArithmeticRelation(node) && args.size == 2 -> {
-                    assertLinear(node)
+                    if (isRealRelation(node)) assertRealLinear(node) else assertLinear(node)
                     continue
                 }
 
                 h == "distinct" -> {
+                    if (isRealRelation(node)) throw UnsupportedSmtException("distinct over reals")
                     assertDistinct(args)
                     continue
                 }
@@ -62,29 +63,29 @@ internal fun SmtLibQfLia.Builder.assert(top: SExpr) {
     }
 }
 
-internal fun SmtLibQfLia.Builder.forceTrue(lit: Int) {
+internal fun SmtLib.Builder.forceTrue(lit: Int) {
     factors.add(Clause(intArrayOf(lit)))
 }
 
 /** Fold [t] to a boolean literal (iteratively, via [evalTerm]). */
-internal fun SmtLibQfLia.Builder.compileBool(t: SExpr): Int = (evalTerm(t, Sort.BOOL) as Res.B).lit
+internal fun SmtLib.Builder.compileBool(t: SExpr): Int = (evalTerm(t, Sort.BOOL) as Res.B).lit
 
-internal fun SmtLibQfLia.Builder.boolBinding(name: String, b: SmtLibQfLia.Builder.Binding): Int {
+internal fun SmtLib.Builder.boolBinding(name: String, b: SmtLib.Builder.Binding): Int {
     if (!b.isBool) throw UnsupportedSmtException("'$name' used as Bool but bound to an Int term")
     return b.lit ?: throw UnsupportedSmtException("'$name' has no compiled Bool value")
 }
 
 /** Reify boolean ite as `(c and x) or (!c and y)`. */
-internal fun SmtLibQfLia.Builder.tseitinIte(c: Int, x: Int, y: Int): Int =
+internal fun SmtLib.Builder.tseitinIte(c: Int, x: Int, y: Int): Int =
     tseitinOr(listOf(tseitinAnd(listOf(c, x)), tseitinAnd(listOf(Lit.negate(c), y))))
 
 /** Compile n-ary equality as pairwise equality to the first operand. */
-internal fun <T> SmtLibQfLia.Builder.chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
+internal fun <T> SmtLib.Builder.chainEqToFirst(items: List<T>, relate: (T, T) -> Int): Int =
     tseitinAnd((1 until items.size).map { relate(items[0], items[it]) })
 
 /** Syntactic bool/int classifier for a term, following `ite`/`let` to their result term without
  *  recursion so a deeply nested chain cannot overflow the stack. */
-internal fun SmtLibQfLia.Builder.isBoolExpr(t: SExpr): Boolean {
+internal fun SmtLib.Builder.isBoolExpr(t: SExpr): Boolean {
     var node = t
     while (true) {
         when (node) {
@@ -106,7 +107,7 @@ internal fun SmtLibQfLia.Builder.isBoolExpr(t: SExpr): Boolean {
     }
 }
 
-internal fun SmtLibQfLia.Builder.assertDistinct(args: List<SExpr>) {
+internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
     if (args.size < 2) return
     if (args.all { !isBoolExpr(it) }) {
         val terms = args.map { linearTerm(it) }
@@ -128,14 +129,14 @@ internal fun SmtLibQfLia.Builder.assertDistinct(args: List<SExpr>) {
 }
 
 /** Post pairwise `!=` as linear NE constraints. */
-internal fun SmtLibQfLia.Builder.assertPairwiseNe(terms: List<LinComb>) {
+internal fun SmtLib.Builder.assertPairwiseNe(terms: List<LinComb>) {
     for (i in terms.indices) {
         for (j in i + 1 until terms.size) factors.add(neLinear(terms[i], terms[j]))
     }
 }
 
 /** Channel a bool literal to a fresh 0/1 int term. */
-internal fun SmtLibQfLia.Builder.litToIntTerm(lit: Int): LinComb {
+internal fun SmtLib.Builder.litToIntTerm(lit: Int): LinComb {
     val z = newInt(0L, 1L)
     val w = newBool() // w ⇔ lit
     val wlit = Lit.make(w, true)
@@ -145,15 +146,15 @@ internal fun SmtLibQfLia.Builder.litToIntTerm(lit: Int): LinComb {
     return LinComb(mapOf(z to 1), 0)
 }
 
-internal fun SmtLibQfLia.Builder.neLinear(a: LinComb, b: LinComb): Linear {
+internal fun SmtLib.Builder.neLinear(a: LinComb, b: LinComb): Linear {
     val (vars, coeffs, bound) = diff(a, b)
     return Linear(coeffs, vars, LinearOp.NE, bound)
 }
 
-internal fun SmtLibQfLia.Builder.reifyNe(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.NE)
-internal fun SmtLibQfLia.Builder.reifyEq(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.EQ)
+internal fun SmtLib.Builder.reifyNe(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.NE)
+internal fun SmtLib.Builder.reifyEq(a: LinComb, b: LinComb): Int = reifyRelTerms(a, b, LinearOp.EQ)
 
-internal fun SmtLibQfLia.Builder.reifyRelTerms(a: LinComb, b: LinComb, op: LinearOp): Int {
+internal fun SmtLib.Builder.reifyRelTerms(a: LinComb, b: LinComb, op: LinearOp): Int {
     val (vars, coeffs, bound) = diff(a, b)
     return reifyLinear(coeffs, vars, op, bound)
 }

@@ -14,10 +14,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-class SmtLibQfLiaTest {
+class SmtLibTest {
 
     private fun solve(text: String): LongArray {
-        val r = BacktrackSolver(SmtLibQfLia.parse(text).problem).solve(BacktrackParams())
+        val r = BacktrackSolver(SmtLib.parse(text).problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints
     }
@@ -40,7 +40,7 @@ class SmtLibQfLiaTest {
     fun `an integer literal beyond 32 bits parses as a 64-bit value`() {
         // 2^31 and 2^32 exceed Int but are valid arbitrary-precision QF_LIA integers; they must parse
         // (carried as Long), not be misclassified as reals and rejected.
-        val p = SmtLibQfLia.parse(
+        val p = SmtLib.parse(
             "(declare-const x Int) (assert (<= x 2147483648)) (assert (>= x 4294967296)) (check-sat)",
             unboundedIntLo = 0L,
             unboundedIntHi = Int.MAX_VALUE.toLong(),
@@ -53,14 +53,14 @@ class SmtLibQfLiaTest {
     @Test
     fun `an integer literal beyond 64 bits is rejected as an over-range integer`() {
         val text = "(declare-const x Int) (assert (<= x 170141183460469231731687303715884105728))"
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
         assertTrue("integer literal" in e.message.orEmpty() && "64-bit" in e.message.orEmpty(), e.message.orEmpty())
     }
 
     @Test
     fun `a bitvector literal is rejected as outside the integer-only fragment`() {
         val text = "(declare-const x Int) (assert (= x #xFF))"
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
         assertTrue("bitvector literal" in e.message.orEmpty(), e.message.orEmpty())
     }
 
@@ -68,10 +68,10 @@ class SmtLibQfLiaTest {
     fun `a malformed command is rejected with a clear message not a raw cast crash`() {
         // A declare-const missing its sort must surface as an UnsupportedSmtException, not a
         // ClassCastException / IndexOutOfBounds leaking from an unchecked access.
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse("(declare-const x)") }
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(declare-const x)") }
         assertTrue("declare-const" in e.message.orEmpty(), e.message.orEmpty())
         // A declare-const whose name position is a list (not an atom) likewise fails cleanly.
-        assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse("(declare-const (a b) Int)") }
+        assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(declare-const (a b) Int)") }
     }
 
     @Test
@@ -79,10 +79,10 @@ class SmtLibQfLiaTest {
         // A non-empty argument list makes f a genuine function symbol, not a variable; it must not be
         // silently declared as an Int constant (the arg-sort list was previously ignored).
         val e = assertFailsWith<UnsupportedSmtException> {
-            SmtLibQfLia.parse("(declare-fun f (Int) Int) (assert (>= f 0)) (check-sat)")
+            SmtLib.parse("(declare-fun f (Int) Int) (assert (>= f 0)) (check-sat)")
         }
         assertTrue("declare-fun" in e.message.orEmpty(), e.message.orEmpty())
-        val p = SmtLibQfLia.parse("(declare-fun f () Int) (assert (>= f 0)) (check-sat)").problem
+        val p = SmtLib.parse("(declare-fun f () Int) (assert (>= f 0)) (check-sat)").problem
         assertEquals(1, p.numIntVars)
     }
 
@@ -96,7 +96,7 @@ class SmtLibQfLiaTest {
             (assert (or (>= x 7) (>= y 7)))
             (check-sat)
         """.trimIndent()
-        val parsed = SmtLibQfLia.parse(text)
+        val parsed = SmtLib.parse(text)
         assertEquals(2, parsed.problem.numIntVars)
         val ints = solve(text)
         val x = ints[0]
@@ -113,7 +113,7 @@ class SmtLibQfLiaTest {
             (assert (or (>= x 7) (>= y 7)))
             (minimize (+ x y))
         """.trimIndent()
-        val parsed = SmtLibQfLia.parse(text)
+        val parsed = SmtLib.parse(text)
         val obj = requireNotNull(parsed.objective)
         val r = BacktrackSolver(parsed.problem).minimize(obj, BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
@@ -161,7 +161,7 @@ class SmtLibQfLiaTest {
             (assert (distinct a b c))
             (check-sat)
         """.trimIndent()
-        assertTrue(SmtLibQfLia.parse(text).problem.factors.any { it is AllDifferent }, "expected AllDifferent")
+        assertTrue(SmtLib.parse(text).problem.factors.any { it is AllDifferent }, "expected AllDifferent")
         val ints = solve(text)
         assertEquals(setOf(1L, 2L, 3L), listOf(ints[0], ints[1], ints[2]).toSet())
     }
@@ -173,7 +173,7 @@ class SmtLibQfLiaTest {
             (assert (distinct p q))
             (check-sat)
         """.trimIndent()
-        val r = BacktrackSolver(SmtLibQfLia.parse(text).problem).solve(BacktrackParams())
+        val r = BacktrackSolver(SmtLib.parse(text).problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         assertTrue(r.assignment.bools[0] != r.assignment.bools[1], "p and q must differ")
     }
@@ -186,7 +186,7 @@ class SmtLibQfLiaTest {
             (assert (<= (+ x y) 10)) (assert (>= y 0))
             (check-sat)
         """.trimIndent()
-        val p = SmtLibQfLia.parse(text).problem
+        val p = SmtLib.parse(text).problem
         assertEquals(3, p.intDomains[0].min)
         assertEquals(7, p.intDomains[0].max)
         assertEquals(0, p.intDomains[1].min)
@@ -195,7 +195,7 @@ class SmtLibQfLiaTest {
 
     @Test
     fun `bound inference falls back to the default bound when unprovable`() {
-        val p = SmtLibQfLia.parse(
+        val p = SmtLib.parse(
             "(declare-const x Int) (assert (<= x 4))",
             unboundedIntLo = -50,
             unboundedIntHi = 50,
@@ -206,7 +206,7 @@ class SmtLibQfLiaTest {
 
     @Test
     fun `to_real and to_int are identity over ints`() {
-        val p = SmtLibQfLia.parse(
+        val p = SmtLib.parse(
             "(declare-const x Int) (assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
         ).problem
         assertEquals(5, p.intDomains[0].min)
@@ -214,11 +214,80 @@ class SmtLibQfLiaTest {
     }
 
     @Test
-    fun `real literals are rejected with a clear message`() {
+    fun `real declarations lower to lp-only columns and solve`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real) (declare-const n Int)
+            (assert (>= n 1)) (assert (<= n 3))
+            (assert (<= (to_real n) x)) (assert (<= x 2.5))
+            (check-sat)
+            """.trimIndent(),
+        )
+        assertEquals(1, parsed.problem.numRealVars)
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        val n = r.assignment.ints[0]
+        val x = r.assignment.reals[0]
+        assertTrue(n in 1..2, "n=$n must fit under x <= 2.5")
+        assertTrue(x >= n.toDouble() && x <= 2.5, "x=$x outside [n, 2.5]")
+    }
+
+    @Test
+    fun `an infeasible real system is unsat via the exact leaf verdict`() {
+        val parsed = SmtLib.parse(
+            "(declare-const x Real) (assert (>= x 6.0)) (assert (<= (* 0.1 x) 0.5)) (check-sat)",
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
+    }
+
+    @Test
+    fun `rational coefficients fold exactly through division`() {
+        val parsed = SmtLib.parse(
+            """
+            (declare-const x Real)
+            (assert (= (* 3.0 x) 1.0)) (assert (>= x 0.3)) (assert (<= x 0.4))
+            (check-sat)
+            """.trimIndent(),
+        )
+        val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        val x = r.assignment.reals[0]
+        assertTrue(x > 0.333 && x < 0.334, "x=$x should be 1/3")
+    }
+
+    @Test
+    fun `a real objective parses into real coefficients`() {
+        val parsed = SmtLib.parse(
+            "(declare-const x Real) (assert (>= x 2.5)) (minimize x) (check-sat)",
+        )
+        val obj = parsed.objective
+        assertTrue(obj != null && obj.realCoefficients.size == 1 && obj.realCoefficients[0] == 1.0)
+    }
+
+    @Test
+    fun `a strict real relation is rejected with a clear message`() {
         val ex = assertFailsWith<UnsupportedSmtException> {
-            SmtLibQfLia.parse("(declare-const x Int) (assert (<= x 1.5))")
+            SmtLib.parse("(declare-const x Real) (assert (< x 2.5)) (check-sat)")
         }
-        assertTrue(ex.message!!.contains("real literal"), ex.message!!)
+        assertTrue(ex.message!!.contains("strict real"), ex.message!!)
+    }
+
+    @Test
+    fun `a real atom under boolean structure is rejected with a clear message`() {
+        val ex = assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse(
+                "(declare-const x Real) (assert (or (<= x 1.0) (>= x 2.0))) (check-sat)",
+            )
+        }
+        assertTrue(ex.message!!.contains("boolean structure"), ex.message!!)
+    }
+
+    @Test
+    fun `a decimal comparison over an int scales to an exact integer row`() {
+        // x <= 1.5 over Int multiplies through by the denominator: 2x <= 3, so x = 1 is the witness.
+        val text = "(declare-const x Int) (assert (<= x 1.5)) (assert (>= x 1)) (check-sat)"
+        assertEquals(1L, solveFor(text, "x"))
     }
 
     @Test
@@ -243,7 +312,7 @@ class SmtLibQfLiaTest {
     @Test
     fun `strict bounds errors on an unbounded variable`() {
         val ex = assertFailsWith<UnsupportedSmtException> {
-            SmtLibQfLia.parse("(declare-const x Int) (declare-const y Int) (assert (<= x 4))", strictBounds = true)
+            SmtLib.parse("(declare-const x Int) (declare-const y Int) (assert (<= x 4))", strictBounds = true)
         }
         assertTrue(ex.message!!.contains("y") || ex.message!!.contains("bound"), ex.message!!)
     }
@@ -271,12 +340,12 @@ class SmtLibQfLiaTest {
             (assert (>= $letChain 0))
             (check-sat)
         """.trimIndent()
-        val problem = SmtLibQfLia.parse(text).problem
+        val problem = SmtLib.parse(text).problem
         assertTrue(problem.numIntVars >= 1)
     }
 
     private fun solveFor(text: String, name: String): Long {
-        val parsed = SmtLibQfLia.parse(text)
+        val parsed = SmtLib.parse(text)
         val r = BacktrackSolver(parsed.problem).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints[parsed.intVarNames.getValue(name)]
@@ -324,13 +393,13 @@ class SmtLibQfLiaTest {
     fun `a small unbounded system closes under the small-model bound without clamping`() {
         // One row with tiny coefficients: the small-model bound fits, so the finite box is
         // equisatisfiable with the unbounded model and no clamp flag is raised.
-        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
+        val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
         assertFalse(parsed.domainsClamped, "the small-model bound covers this system exactly")
     }
 
     @Test
     fun `an unbounded variable past the small-model range marks the model as clamped`() {
-        val parsed = SmtLibQfLia.parse(
+        val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (> x 3000000000000)) (check-sat)",
         )
         assertTrue(parsed.domainsClamped, "the coefficient magnitude pushes the small-model bound past 2^62")
@@ -338,7 +407,7 @@ class SmtLibQfLiaTest {
 
     @Test
     fun `a fully bounded model is not clamped`() {
-        val parsed = SmtLibQfLia.parse(
+        val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
         )
         assertFalse(parsed.domainsClamped, "both bounds are provable, so an unsat here is sound")
@@ -350,7 +419,7 @@ class SmtLibQfLiaTest {
         // so it leaves x unbounded; OBBT solves the LP to x in [5, 5], so the model is not clamped
         // (an unsat would be sound) and x solves to 5.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (= (* 2 x) 10))\n(check-sat)"
-        val parsed = SmtLibQfLia.parse(text)
+        val parsed = SmtLib.parse(text)
         assertFalse(parsed.domainsClamped, "OBBT bounded x from the LP, so the model is not clamped")
         assertEquals(5L, solveFor(text, "x"))
     }
@@ -360,7 +429,7 @@ class SmtLibQfLiaTest {
         // x > 3 leaves x unbounded above; OBBT cannot bound it. The small-model box closes it and
         // search still finds the witness x = 4.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
-        val parsed = SmtLibQfLia.parse(text)
+        val parsed = SmtLib.parse(text)
         assertFalse(parsed.domainsClamped, "the small-model box is equisatisfiable, not a clamp")
         assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the box")
     }
@@ -380,7 +449,7 @@ class SmtLibQfLiaTest {
         // is not clamped (an unsat would be sound) and x solves to 7.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ x y) 10))\n(assert (= (- x y) 4))\n(check-sat)"
-        val parsed = SmtLibQfLia.parse(text)
+        val parsed = SmtLib.parse(text)
         assertFalse(parsed.domainsClamped, "OBBT closed both variables from the linear system")
         assertEquals(7L, solveFor(text, "x"))
     }
@@ -389,19 +458,19 @@ class SmtLibQfLiaTest {
     fun `a fresh abs over an unbounded operand marks the model clamped`() {
         // abs(x) with x unbounded: the fresh |x| var must inherit x's open range and be flagged when it
         // is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
-        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)")
+        val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)")
         assertTrue(parsed.domainsClamped, "the fresh abs var inherits x's unbounded range")
     }
 
     @Test
     fun `a fresh div quotient over an unbounded dividend marks the model clamped`() {
-        val parsed = SmtLibQfLia.parse("(declare-fun x () Int) (assert (> (div x 2) 3000000000000)) (check-sat)")
+        val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> (div x 2) 3000000000000)) (check-sat)")
         assertTrue(parsed.domainsClamped, "the fresh quotient var inherits x's unbounded range")
     }
 
     @Test
     fun `a fresh ite over an unbounded branch marks the model clamped`() {
-        val parsed = SmtLibQfLia.parse(
+        val parsed = SmtLib.parse(
             "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3000000000000)) (check-sat)",
         )
         assertTrue(parsed.domainsClamped, "the fresh ite var inherits the unbounded branch's range")
@@ -412,7 +481,7 @@ class SmtLibQfLiaTest {
         // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1), and its LP relaxation is
         // feasible so OBBT derives no bound. The small-model bound fits, making the finite box
         // equisatisfiable: the resulting unsat is sound for the unbounded problem, no clamp flag.
-        val parsed = SmtLibQfLia.parse(
+        val parsed = SmtLib.parse(
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
         )
@@ -424,7 +493,7 @@ class SmtLibQfLiaTest {
         // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1). Coefficient strengthening runs
         // as the first presolve pass and reports this in O(factors) — before the (deferred) root bake
         // would narrow the wide clamped domain toward the empty domain one step per round (O(span)).
-        val problem = SmtLibQfLia.parse(
+        val problem = SmtLib.parse(
             "(declare-fun x () Int) (declare-fun y () Int)" +
                 " (assert (= (+ (* 3 x) (* 3 y)) 1)) (check-sat)",
         ).problem
@@ -439,7 +508,7 @@ class SmtLibQfLiaTest {
         // A top-level unbalanced ')' must be rejected; previously the reader returned an empty token
         // without advancing and spun forever.
         assertFailsWith<FormatException> {
-            SmtLibQfLia.parse("(declare-const x Int)\n(assert (>= x 0))\n(check-sat))")
+            SmtLib.parse("(declare-const x Int)\n(assert (>= x 0))\n(check-sat))")
         }
     }
 
@@ -448,14 +517,14 @@ class SmtLibQfLiaTest {
         // SMT integers are unbounded; folding 2^63-1 + 1 wraps to Long.MIN_VALUE if unchecked, so the
         // term must be rejected the same way an over-64-bit literal is.
         val text = "(declare-const x Int) (assert (= x (+ 9223372036854775807 1))) (check-sat)"
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
         assertTrue("overflow" in e.message.orEmpty(), e.message.orEmpty())
     }
 
     @Test
     fun `constant multiplication overflow is rejected`() {
         val text = "(declare-const x Int) (assert (= x (* 3037000500 3037000500))) (check-sat)"
-        assertFailsWith<UnsupportedSmtException> { SmtLibQfLia.parse(text) }
+        assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
     }
 
     @Test
@@ -469,7 +538,7 @@ class SmtLibQfLiaTest {
             "(assert \"unterminated",
         )
         for (text in malformed) {
-            assertFailsWith<FormatException>(text) { SmtLibQfLia.parse(text) }
+            assertFailsWith<FormatException>(text) { SmtLib.parse(text) }
         }
     }
 
@@ -483,7 +552,7 @@ class SmtLibQfLiaTest {
             "(declare-const x Int) (assert (>= (let (()) 5) 0))",
         )
         for (text in malformed) {
-            assertFailsWith<FormatException>(text) { SmtLibQfLia.parse(text) }
+            assertFailsWith<FormatException>(text) { SmtLib.parse(text) }
         }
     }
 }

@@ -181,6 +181,8 @@ internal class BigFraction private constructor(val num: BigInt, val den: BigInt)
 
     operator fun times(other: BigFraction): BigFraction = of(num * other.num, den * other.den)
 
+    fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
+
     fun reciprocal(): BigFraction {
         require(!isZero) { "reciprocal of zero" }
         return of(den, num)
@@ -197,6 +199,7 @@ internal class BigFraction private constructor(val num: BigInt, val den: BigInt)
     companion object {
         val ZERO = BigFraction(BigInt.ZERO, BigInt.ONE)
         val ONE = BigFraction(BigInt.ONE, BigInt.ONE)
+        val MINUS_ONE = BigFraction(-BigInt.ONE, BigInt.ONE)
 
         fun ofLong(v: Long): BigFraction = if (v == 0L) ZERO else BigFraction(BigInt.fromLong(v), BigInt.ONE)
 

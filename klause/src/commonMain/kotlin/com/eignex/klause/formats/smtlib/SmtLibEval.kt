@@ -11,6 +11,7 @@ import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
+import com.eignex.klause.lp.BigFraction
 import com.eignex.klause.solver.Lit
 import kotlin.math.abs
 
@@ -22,16 +23,25 @@ import kotlin.math.abs
  * inline via [Frame.MakeScope]/[Frame.PopScope] frames (never a nested [evalTerm] call), so even a
  * deeply nested chain of `let`-bound values stays off the stack.
  */
-internal enum class Sort { BOOL, INT }
+internal enum class Sort { BOOL, INT, REAL }
 
-/** A folded term result: a boolean literal ([B]) or an integer linear combination ([I]). */
+/** A folded term result: a boolean literal ([B]), an integer linear combination ([I]), or a real
+ *  rational combination ([R]). */
 internal sealed interface Res {
     class B(val lit: Int) : Res
     class I(val lin: LinComb) : Res
+    class R(val comb: RealComb) : Res
 }
 
 private fun Res.asLit(): Int = (this as Res.B).lit
 private fun Res.asLin(): LinComb = (this as Res.I).lin
+
+/** A folded operand as a real combination: real results directly, int results via the embedding. */
+private fun Res.asReal(): RealComb = when (this) {
+    is Res.R -> comb
+    is Res.I -> lin.toRealComb()
+    is Res.B -> smtUnsupported("boolean term used as Real")
+}
 
 private sealed interface Frame {
     class Eval(val node: SExpr, val sort: Sort) : Frame
@@ -41,7 +51,7 @@ private sealed interface Frame {
 }
 
 /** Fold [root] to a [Res] of the requested [sort] with no unbounded call-stack recursion. */
-internal fun SmtLibQfLia.Builder.evalTerm(root: SExpr, sort: Sort): Res {
+internal fun SmtLib.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     val work = ArrayDeque<Frame>()
     val vals = ArrayDeque<Res>()
     work.addLast(Frame.Eval(root, sort))
@@ -55,11 +65,16 @@ internal fun SmtLibQfLia.Builder.evalTerm(root: SExpr, sort: Sort): Res {
                 // Values were pushed in binding order, so the top-of-stack is the last binding.
                 val popped = ArrayList<Res>(k)
                 repeat(k) { popped.add(vals.removeLast()) }
-                val bound = ArrayList<Pair<String, SmtLibQfLia.Builder.Binding>>(k)
+                val bound = ArrayList<Pair<String, SmtLib.Builder.Binding>>(k)
                 for (i in 0 until k) {
                     val res = popped[k - 1 - i]
-                    val b = SmtLibQfLia.Builder.Binding(isBool = fr.bools[i])
-                    if (fr.bools[i]) b.lit = res.asLit() else b.lin = res.asLin()
+                    val isReal = res is Res.R
+                    val b = SmtLib.Builder.Binding(isBool = fr.bools[i], isReal = isReal)
+                    when {
+                        fr.bools[i] -> b.lit = res.asLit()
+                        isReal -> b.real = (res as Res.R).comb
+                        else -> b.lin = res.asLin()
+                    }
                     bound.add(fr.names[i] to b)
                 }
                 pushScopeBindings(bound)
@@ -109,10 +124,10 @@ internal fun SmtLibQfLia.Builder.evalTerm(root: SExpr, sort: Sort): Res {
 
 /** Push the frames for `(let (bindings) body)`: evaluate each binding value, build the scope, run the
  *  body, then pop — all in-stack, so nested lets never recurse through [evalTerm]. */
-private fun SmtLibQfLia.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
+private fun SmtLib.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
     val bindingList = node.argAt(1, "let bindings") as? SExpr.SList
-        ?: throw UnsupportedSmtException("malformed let bindings")
-    val pairs = bindingList.items.map { it as? SExpr.SList ?: throw UnsupportedSmtException("malformed let binding") }
+        ?: smtUnsupported("malformed let bindings")
+    val pairs = bindingList.items.map { it as? SExpr.SList ?: smtUnsupported("malformed let binding") }
     val names = pairs.map { it.atomAt(0, "let binding name") }
     val valueExprs = pairs.map { it.argAt(1, "let binding value") }
     val bools = BooleanArray(pairs.size) { isBoolExpr(valueExprs[it]) }
@@ -121,57 +136,140 @@ private fun SmtLibQfLia.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work:
     work.addLast(Frame.Eval(node.argAt(2, "let body"), sort))
     work.addLast(Frame.MakeScope(names, bools))
     for (i in valueExprs.indices.reversed()) {
-        work.addLast(Frame.Eval(valueExprs[i], if (bools[i]) Sort.BOOL else Sort.INT))
+        val kidSort = when {
+            bools[i] -> Sort.BOOL
+            isRealExpr(valueExprs[i]) -> Sort.REAL
+            else -> Sort.INT
+        }
+        work.addLast(Frame.Eval(valueExprs[i], kidSort))
     }
 }
 
 /** Inline a `define-fun` call `(f a…)` by binding its parameters to the arguments like a `let` and
  *  evaluating the body — non-recursive, so this expands to a bounded nest handled on the work-stack. */
-private fun SmtLibQfLia.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: Sort, work: ArrayDeque<Frame>) {
+private fun SmtLib.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: Sort, work: ArrayDeque<Frame>) {
     val m = macros.getValue(head)
     val callArgs = node.items.drop(1)
     if (callArgs.size != m.params.size) {
-        throw UnsupportedSmtException("'$head' applied to ${callArgs.size} args, expected ${m.params.size}")
+        smtUnsupported("'$head' applied to ${callArgs.size} args, expected ${m.params.size}")
     }
     val bindings = SExpr.SList(m.params.indices.map { SExpr.SList(listOf(SExpr.Atom(m.params[it]), callArgs[it])) })
     scheduleLet(SExpr.SList(listOf(SExpr.Atom("let"), bindings, m.body)), sort, work)
 }
 
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
-private fun SmtLibQfLia.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
+private fun SmtLib.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
     val head = (node.items[0] as? SExpr.Atom)?.text
     val args = node.items.drop(1)
-    val kids = if (sort == Sort.BOOL) {
-        when (head) {
+    val kids = when (sort) {
+        Sort.BOOL -> when (head) {
             "not", "and", "or", "xor", "=>" -> args.map { it to Sort.BOOL }
-            "<=", "<", ">=", ">" -> args.map { it to Sort.INT }
+
+            "<=", "<", ">=", ">" -> {
+                if (isRealRelation(node)) {
+                    // Top-level real relations are intercepted by assert(); reaching one here means
+                    // it sits under boolean structure, which needs real-atom reification.
+                    smtUnsupported(
+                        "real relation under boolean structure (only top-level real constraints are supported)",
+                    )
+                }
+                args.map { it to Sort.INT }
+            }
+
             "ite" -> args.map { it to Sort.BOOL }
-            "distinct" -> args.map { it to (if (isBoolExpr(it)) Sort.BOOL else Sort.INT) }
-            "=" -> if (isArithmeticRelation(node)) args.map { it to Sort.INT } else args.map { it to Sort.BOOL }
+
+            "distinct" -> {
+                if (isRealRelation(node)) smtUnsupported("distinct over reals")
+                args.map { it to (if (isBoolExpr(it)) Sort.BOOL else Sort.INT) }
+            }
+
+            "=" -> if (isArithmeticRelation(node)) {
+                if (isRealRelation(node)) {
+                    smtUnsupported(
+                        "real relation under boolean structure (only top-level real constraints are supported)",
+                    )
+                }
+                args.map { it to Sort.INT }
+            } else {
+                args.map { it to Sort.BOOL }
+            }
+
             else -> null
         }
-    } else {
-        when (head) {
+
+        Sort.INT -> when (head) {
             "+", "-", "*" -> args.map { it to Sort.INT }
-            "to_real", "to_int", "abs" -> args.map { it to Sort.INT }
+            "to_real" -> args.map { it to Sort.INT }
+            "to_int" -> args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
+            "abs" -> args.map { it to Sort.INT }
             "div", "mod" -> args.map { it to Sort.INT }
             "ite" -> listOf(args[0] to Sort.BOOL, args[1] to Sort.INT, args[2] to Sort.INT)
-            "/" -> throw UnsupportedSmtException("real division '/' (QF_LIA is integer-only)")
+            "/" -> smtUnsupported("real division '/' in an integer context")
+            else -> null
+        }
+
+        Sort.REAL -> when (head) {
+            "+", "-", "*", "/" -> args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
+            "to_real" -> args.map { it to Sort.INT }
+            "ite" -> smtUnsupported("real ite (not yet supported over reals)")
             else -> null
         }
     }
-    return kids ?: throw UnsupportedSmtException(
+    return kids ?: smtUnsupported(
         "unsupported ${if (sort == Sort.BOOL) "boolean" else "int"} op '$head'",
     )
 }
 
 /** Combine a list node's already-folded child results [args] into this node's [Res]. */
-private fun SmtLibQfLia.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
+private fun SmtLib.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
     val head = node.atomAt(0, "operator")
-    return if (sort == Sort.BOOL) combineBool(node, head, args) else combineInt(head, args)
+    return when (sort) {
+        Sort.BOOL -> combineBool(node, head, args)
+        Sort.INT -> combineInt(head, args)
+        Sort.REAL -> combineReal(head, args)
+    }
 }
 
-private fun SmtLibQfLia.Builder.combineBool(node: SExpr.SList, head: String, args: List<Res>): Res = when (head) {
+/** Combine a real-sorted node: exact-rational folding; `*` and `/` need a constant side. */
+private fun SmtLib.Builder.combineReal(head: String, args: List<Res>): Res = when (head) {
+    "+" -> Res.R(args.map { it.asReal() }.reduce { a, b -> a.plus(b) })
+
+    "-" -> if (args.size == 1) {
+        Res.R(args[0].asReal().scaled(BigFraction.MINUS_ONE))
+    } else {
+        Res.R(
+            args.drop(1).fold(args[0].asReal()) { acc, e ->
+                acc.plus(e.asReal().scaled(BigFraction.MINUS_ONE))
+            },
+        )
+    }
+
+    "*" -> {
+        val parts = args.map { it.asReal() }
+        val nonConst = parts.filter { !it.isConstant }
+        if (nonConst.size > 1) smtUnsupported("nonlinear multiplication")
+        val k = parts.filter { it.isConstant }.fold(BigFraction.ONE) { a, c -> a * c.constant }
+        if (nonConst.isEmpty()) {
+            Res.R(RealComb(emptyMap(), emptyMap(), k))
+        } else {
+            Res.R(nonConst[0].scaled(k))
+        }
+    }
+
+    "/" -> {
+        val den = args.drop(1).map { it.asReal() }
+        if (den.any { !it.isConstant || it.constant.isZero }) {
+            smtUnsupported("non-constant or zero divisor in real division")
+        }
+        Res.R(den.fold(args[0].asReal()) { acc, d -> acc.scaled(d.constant.reciprocal()) })
+    }
+
+    "to_real" -> Res.R(args[0].asReal())
+
+    else -> smtUnsupported("unsupported real op '$head'")
+}
+
+private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: List<Res>): Res = when (head) {
     "not" -> Res.B(Lit.negate(args[0].asLit()))
 
     "and" -> Res.B(tseitinAnd(args.map { it.asLit() }))
@@ -201,10 +299,10 @@ private fun SmtLibQfLia.Builder.combineBool(node: SExpr.SList, head: String, arg
         Res.B(chainEqToFirst(args.map { it.asLit() }, ::tseitinIff))
     }
 
-    else -> throw UnsupportedSmtException("unsupported boolean op '$head'")
+    else -> smtUnsupported("unsupported boolean op '$head'")
 }
 
-private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
+private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
     "+" -> Res.I(args.map { it.asLin() }.reduce(::add))
 
     "-" -> if (args.size == 1) {
@@ -216,12 +314,24 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
     "*" -> {
         val parts = args.map { it.asLin() }
         val nonConst = parts.filter { it.coeffs.isNotEmpty() }
-        if (nonConst.size > 1) throw UnsupportedSmtException("nonlinear multiplication")
+        if (nonConst.size > 1) smtUnsupported("nonlinear multiplication")
         val k = foldChecked { parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> mulExact(a, c.constant) } }
         if (nonConst.isEmpty()) Res.I(LinComb(emptyMap(), k)) else Res.I(scale(nonConst[0], k))
     }
 
-    "to_real", "to_int" -> Res.I(args[0].asLin())
+    "to_real" -> Res.I(args[0].asLin())
+
+    // `to_int` of an integral real term folds back to its integer combination; a genuinely
+    // fractional real needs floor semantics the lowering does not carry yet.
+    "to_int" -> when (val a = args[0]) {
+        is Res.I -> a
+
+        is Res.R -> Res.I(
+            a.comb.toLinCombOrNull() ?: smtUnsupported("to_int over a fractional real term"),
+        )
+
+        else -> smtUnsupported("to_int over a boolean term")
+    }
 
     "abs" -> Res.I(absTerm(args[0].asLin()))
 
@@ -245,19 +355,19 @@ private fun SmtLibQfLia.Builder.combineInt(head: String, args: List<Res>): Res =
         Res.I(self)
     }
 
-    else -> throw UnsupportedSmtException("unsupported int op '$head'")
+    else -> smtUnsupported("unsupported int op '$head'")
 }
 
 /** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
  *  (posting the false literal when it cannot hold) rather than an empty [Linear] row. */
-private fun SmtLibQfLia.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
+private fun SmtLib.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
     val (vars, coeffs, bound) = diff(a, b)
     assertLinearRow(coeffs, vars, op, bound)
 }
 
 /** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. The fresh
  *  var is bounded by `x`'s own range so an unbounded default never enters its defining constraints. */
-private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
+private fun SmtLib.Builder.absTerm(x: LinComb): LinComb {
     val (xLo, xHi) = linCombRange(x)
     val y = LinComb(mapOf(newInt(0L, absHi(xLo, xHi)) to 1), 0)
     val negX = x.scaled(-1L)
@@ -270,10 +380,10 @@ private fun SmtLibQfLia.Builder.absTerm(x: LinComb): LinComb {
 /** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and
  *  `0 ≤ m < |d|`. `q` is bounded by `a`'s range / `d`; when `a` is open on the driving side `q` stays
  *  open (an [PresolveDomain.Open] aux var). A non-constant divisor is genuinely non-linear, so rejected. */
-private fun SmtLibQfLia.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
-    if (b.coeffs.isNotEmpty()) throw UnsupportedSmtException("non-constant divisor in div/mod")
+private fun SmtLib.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
+    if (b.coeffs.isNotEmpty()) smtUnsupported("non-constant divisor in div/mod")
     val d = b.constant
-    if (d == 0L) throw UnsupportedSmtException("division by zero in div/mod")
+    if (d == 0L) smtUnsupported("division by zero in div/mod")
     val absd = if (d < 0) -d else d
     val (aLo, aHi) = linCombRange(a)
     // floorDiv is monotone in `a` (increasing for d>0, decreasing for d<0); pick the a-bound driving
@@ -298,7 +408,7 @@ private fun absHi(lo: Long?, hi: Long?): Long? {
 
 /** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
  *  unbounded (an open domain or an arithmetic overflow) — infinity is structural, no `±Long/4`. */
-private fun SmtLibQfLia.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
+private fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     var lo: Long? = lin.constant
     var hi: Long? = lin.constant
     for ((v, c) in lin.coeffs) {
@@ -330,14 +440,14 @@ private fun SmtLibQfLia.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
 }
 
 /** Reify a two-operand arithmetic relation from its folded operands. */
-private fun SmtLibQfLia.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
+private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
     requireBinaryRelation(node, op)
     val rel = relFromOperands(op, args[0].asLin(), args[1].asLin())
     return reifyLinear(rel.coeffs, rel.vars, rel.op, rel.bound)
 }
 
 /** Pairwise `!=` over folded distinct operands (bool operands channelled to a 0/1 int term). */
-private fun SmtLibQfLia.Builder.distinctFromArgs(args: List<Res>): Int {
+private fun SmtLib.Builder.distinctFromArgs(args: List<Res>): Int {
     if (args.size < 2) return trueLit()
     val terms = args.map { if (it is Res.B) litToIntTerm(it.lit) else it.asLin() }
     val neLits = ArrayList<Int>()
@@ -347,8 +457,10 @@ private fun SmtLibQfLia.Builder.distinctFromArgs(args: List<Res>): Int {
     return tseitinAnd(neLits)
 }
 
-/** Fold an atom to a boolean literal or integer term. */
-private fun SmtLibQfLia.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.BOOL) {
+/** Fold an atom to a boolean literal, integer term, or real term. */
+private fun SmtLib.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.REAL) {
+    evalRealAtom(node)
+} else if (sort == Sort.BOOL) {
     when (node.text) {
         "true" -> Res.B(trueLit())
 
@@ -357,7 +469,7 @@ private fun SmtLibQfLia.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if
         else -> lookup(node.text)?.let { Res.B(boolBinding(node.text, it)) }
             ?: Res.B(
                 Lit.make(
-                    boolNames[node.text] ?: throw UnsupportedSmtException("unknown bool '${node.text}'"),
+                    boolNames[node.text] ?: smtUnsupported("unknown bool '${node.text}'"),
                     true,
                 ),
             )
@@ -367,22 +479,22 @@ private fun SmtLibQfLia.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if
     when {
         n != null -> Res.I(LinComb(emptyMap(), n))
 
-        isIntegerLiteral(node.text) -> throw UnsupportedSmtException(
-            "integer literal '${node.text}' exceeds the 64-bit range of the QF_LIA lowering",
+        isIntegerLiteral(node.text) -> smtUnsupported(
+            "integer literal '${node.text}' exceeds the 64-bit range of the integer lowering",
         )
 
         isRealLiteral(node.text) ->
-            throw UnsupportedSmtException("real literal '${node.text}' (QF_LIA is integer-only)")
+            smtUnsupported("real literal '${node.text}' (integer context)")
 
         node.text.startsWith("#") ->
-            throw UnsupportedSmtException("bitvector literal '${node.text}' (QF_LIA is integer-only)")
+            smtUnsupported("bitvector literal '${node.text}' (integer context)")
 
         else -> lookup(node.text)?.let { Res.I(intBinding(node.text, it)) }
             ?: Res.I(
                 LinComb(
                     mapOf(
                         (
-                            intNames[node.text] ?: throw UnsupportedSmtException(
+                            intNames[node.text] ?: smtUnsupported(
                                 "unknown int var '${node.text}'",
                             )
                             ) to 1,
@@ -391,4 +503,27 @@ private fun SmtLibQfLia.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if
                 ),
             )
     }
+}
+
+/** Fold a real-sorted atom: numeral / decimal literals, real variables, bindings, and (via the
+ *  implicit embedding) integer variables reached from a real context through `to_real`. */
+private fun SmtLib.Builder.evalRealAtom(node: SExpr.Atom): Res {
+    val lit = parseRealLiteral(node.text)
+    if (lit != null) return Res.R(RealComb(emptyMap(), emptyMap(), lit))
+    val binding = lookup(node.text)
+    if (binding != null) {
+        return when {
+            binding.isBool -> smtUnsupported("'${node.text}' used as Real but bound to a Bool term")
+
+            binding.isReal -> Res.R(
+                binding.real ?: smtUnsupported("'${node.text}' has no compiled Real value"),
+            )
+
+            else -> Res.R(intBinding(node.text, binding).toRealComb())
+        }
+    }
+    val rv = realNames[node.text]
+    if (rv != null) return Res.R(RealComb(emptyMap(), mapOf(rv to BigFraction.ONE), BigFraction.ZERO))
+    val iv = intNames[node.text] ?: smtUnsupported("unknown real var '${node.text}'")
+    return Res.R(LinComb(mapOf(iv to 1), 0).toRealComb())
 }
