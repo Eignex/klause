@@ -135,6 +135,13 @@ object BacktrackCatalog {
         )
     }
 
+    /** The conflict-driven workhorse with objective-guided value selection (#33): dive toward each
+     *  variable's cost-minimising polarity first, so the incumbent improves fast. A no-op on a CSP (no
+     *  objective) — a COP-only diversity arm distinct from the cost-agnostic value orders above. */
+    private fun objectiveGuided() = BacktrackRecipe("objective-guided") { seed, onEvent ->
+        BacktrackPresets.conflictDriven(randomSeed = seed, onEvent = onEvent).copy(objectiveGuidedValues = true)
+    }
+
     /** Build the recipe for [arm]'s typed identity — the single place each arm's params originate.
      *  Keeps [BacktrackArm.label] and the produced recipe's [BacktrackRecipe.label] in lockstep. */
     private fun make(arm: BacktrackArm): BacktrackRecipe = when (arm) {
@@ -150,6 +157,7 @@ object BacktrackCatalog {
         BacktrackArm.FirstFail -> firstFail()
         BacktrackArm.DomWdeg -> domWdeg()
         BacktrackArm.Activity -> activity()
+        BacktrackArm.ObjectiveGuided -> objectiveGuided()
     }
 
     private val copOrder = listOf(
@@ -167,6 +175,8 @@ object BacktrackCatalog {
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
+        // Objective-guided value diving (#33): last lever, COP-only, pending its cross-seed credit pass.
+        BacktrackArm.ObjectiveGuided,
     )
     private val cspOrder = listOf(
         BacktrackArm.SatOptimized,
@@ -223,4 +233,5 @@ internal enum class BacktrackArm(val label: String) {
     DomWdeg("domwdeg"),
     FirstFail("first-fail"),
     Activity("activity"),
+    ObjectiveGuided("objective-guided"),
 }

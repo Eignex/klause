@@ -46,27 +46,36 @@ internal class BtRestartOption(
 /** A named LP-emphasis axis option; [emphasis] `OFF` leaves the recipe with no LP relaxation. */
 internal class BtLpOption(val label: String, val emphasis: LpEmphasis)
 
+/** A named objective-guided-value axis option (#33): [enabled] dives toward each variable's
+ *  cost-minimising polarity first (a no-op on a satisfaction problem). */
+internal class BtObjGuidedOption(val label: String, val enabled: Boolean)
+
 /**
  * Cross-product recipe space over the backtrack tuning axes — variable order × value order × restart
- * cadence × LP emphasis — mirroring the local-search [RecipeSpace]. A generator for a backtrack credit
- * campaign: [all] enumerates the full product, [sample] draws a deterministic distinct subset to seed a
- * bench sweep. The curated [BacktrackWorkerConfig] ranking is not yet *derived* from a campaign over
- * this space; running that campaign and folding its credit back into the ranked order is a follow-up.
+ * cadence × LP emphasis × objective-guided values — mirroring the local-search [RecipeSpace]. A generator
+ * for a backtrack credit campaign: [all] enumerates the full product, [sample] draws a deterministic
+ * distinct subset to seed a bench sweep. The curated [BacktrackWorkerConfig] ranking is not yet *derived*
+ * from a campaign over this space; running that campaign and folding its credit back into the ranked order
+ * is a follow-up.
  */
 internal class BacktrackRecipeSpace(
     val variables: List<BtVarOption> = DEFAULT_VARIABLES,
     val values: List<BtValOption> = DEFAULT_VALUES,
     val restarts: List<BtRestartOption> = DEFAULT_RESTARTS,
     val lp: List<BtLpOption> = DEFAULT_LP,
+    val objGuided: List<BtObjGuidedOption> = DEFAULT_OBJ_GUIDED,
 ) {
     init {
-        require(variables.isNotEmpty() && values.isNotEmpty() && restarts.isNotEmpty() && lp.isNotEmpty()) {
+        require(
+            variables.isNotEmpty() && values.isNotEmpty() && restarts.isNotEmpty() &&
+                lp.isNotEmpty() && objGuided.isNotEmpty(),
+        ) {
             "every recipe axis needs at least one option"
         }
     }
 
     /** Total number of recipes in the full cross-product. */
-    val size: Int get() = variables.size * values.size * restarts.size * lp.size
+    val size: Int get() = variables.size * values.size * restarts.size * lp.size * objGuided.size
 
     /** The full cross-product, in a stable nested order, each with a unique label. */
     fun all(): List<BacktrackRecipe> = buildList(size) {
@@ -74,7 +83,9 @@ internal class BacktrackRecipeSpace(
             for (va in values) {
                 for (r in restarts) {
                     for (l in lp) {
-                        add(recipe(v, va, r, l))
+                        for (og in objGuided) {
+                            add(recipe(v, va, r, l, og))
+                        }
                     }
                 }
             }
@@ -89,19 +100,25 @@ internal class BacktrackRecipeSpace(
         return if (n >= all.size) all else all.shuffled(rng).take(n)
     }
 
-    private fun recipe(v: BtVarOption, va: BtValOption, r: BtRestartOption, l: BtLpOption): BacktrackRecipe =
-        BacktrackRecipe("${v.label}+${va.label}/${r.label}/${l.label}") { seed ->
-            BacktrackParams(
-                randomSeed = seed,
-                variableSelector = v.make(),
-                valueSelector = va.make(),
-                lubyRestartBase = r.lubyBase,
-                adaptiveRestart = r.adaptive,
-                emaRestart = r.ema,
-                modeSwitchingRestart = r.modeSwitching,
-                lpConfig = if (l.emphasis == LpEmphasis.OFF) null else LpConfig(l.emphasis),
-            )
-        }
+    private fun recipe(
+        v: BtVarOption,
+        va: BtValOption,
+        r: BtRestartOption,
+        l: BtLpOption,
+        og: BtObjGuidedOption,
+    ): BacktrackRecipe = BacktrackRecipe("${v.label}+${va.label}/${r.label}/${l.label}/${og.label}") { seed ->
+        BacktrackParams(
+            randomSeed = seed,
+            variableSelector = v.make(),
+            valueSelector = va.make(),
+            lubyRestartBase = r.lubyBase,
+            adaptiveRestart = r.adaptive,
+            emaRestart = r.ema,
+            modeSwitchingRestart = r.modeSwitching,
+            lpConfig = if (l.emphasis == LpEmphasis.OFF) null else LpConfig(l.emphasis),
+            objectiveGuidedValues = og.enabled,
+        )
+    }
 
     /** Exploration-breadth defaults per axis. */
     companion object {
@@ -131,6 +148,11 @@ internal class BacktrackRecipeSpace(
             BtLpOption("no-lp", LpEmphasis.OFF),
             BtLpOption("lp-default", LpEmphasis.DEFAULT),
             BtLpOption("lp-aggressive", LpEmphasis.AGGRESSIVE),
+        )
+
+        val DEFAULT_OBJ_GUIDED: List<BtObjGuidedOption> = listOf(
+            BtObjGuidedOption("cost-agnostic", enabled = false),
+            BtObjGuidedOption("obj-guided", enabled = true),
         )
     }
 }

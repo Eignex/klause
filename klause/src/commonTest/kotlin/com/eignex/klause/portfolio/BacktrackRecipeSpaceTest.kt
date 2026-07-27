@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
 
 /**
  * Tests for the backtrack recipe cross-product generator (the backtrack analogue of [RecipeSpaceTest]):
- * `all()` enumerates `variable × value × restart × lp` with unique labels, every recipe builds fresh
- * params, and `sample()` is a deterministic distinct subset.
+ * `all()` enumerates `variable × value × restart × lp × obj-guided` with unique labels, every recipe
+ * builds fresh params, and `sample()` is a deterministic distinct subset.
  */
 class BacktrackRecipeSpaceTest {
 
@@ -20,9 +20,9 @@ class BacktrackRecipeSpaceTest {
         val space = BacktrackRecipeSpace()
         val all = space.all()
         assertEquals(
-            space.variables.size * space.values.size * space.restarts.size * space.lp.size,
+            space.variables.size * space.values.size * space.restarts.size * space.lp.size * space.objGuided.size,
             all.size,
-            "all() must be the full a×b×c×d cross-product",
+            "all() must be the full a×b×c×d×e cross-product",
         )
         assertEquals(space.size, all.size)
         assertEquals(all.size, all.map { it.label }.toSet().size, "recipe labels must be unique")
@@ -36,7 +36,7 @@ class BacktrackRecipeSpaceTest {
             assertEquals(1L, a.randomSeed, "the recipe applies the worker seed")
             assertEquals(2L, b.randomSeed, "each build re-applies the given seed")
             // The no-lp axis option leaves the relaxation off.
-            if (recipe.label.endsWith("/no-lp")) assertNull(a.lpConfig, "the no-lp option must disable LP")
+            if (recipe.label.contains("/no-lp/")) assertNull(a.lpConfig, "the no-lp option must disable LP")
         }
     }
 
@@ -53,8 +53,21 @@ class BacktrackRecipeSpaceTest {
 
     @Test
     fun `an lp-aggressive recipe carries the aggressive emphasis`() {
-        val recipe = BacktrackRecipeSpace().all().first { it.label.endsWith("/lp-aggressive") }
+        val recipe = BacktrackRecipeSpace().all().first { it.label.contains("/lp-aggressive/") }
         assertEquals(LpEmphasis.AGGRESSIVE, recipe.build(1L).lpConfig?.emphasis)
+    }
+
+    @Test
+    fun `the objective-guided axis toggles cost-based value diving`() {
+        val recipes = BacktrackRecipeSpace().all()
+        assertTrue(
+            recipes.first { it.label.endsWith("/obj-guided") }.build(1L).objectiveGuidedValues,
+            "the obj-guided option enables objective-guided value selection",
+        )
+        assertFalse(
+            recipes.first { it.label.endsWith("/cost-agnostic") }.build(1L).objectiveGuidedValues,
+            "the cost-agnostic option leaves it off",
+        )
     }
 
     @Test
