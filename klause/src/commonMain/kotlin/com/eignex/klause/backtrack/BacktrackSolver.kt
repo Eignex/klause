@@ -1,7 +1,10 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.compile.CompiledProblem
+import com.eignex.klause.compile.compile
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
@@ -14,6 +17,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import kotlin.random.Random
@@ -38,6 +42,27 @@ class BacktrackSolver(override val problem: Problem) :
     Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams> {
+
+    /** Solve a [CompiledProblem]'s problem. */
+    constructor(compiled: CompiledProblem) : this(compiled.problem)
+
+    /** Compile [schema] with the default config and solve the resulting problem. */
+    constructor(schema: VariableSchema) : this(schema.compile().problem)
+
+    /** Solve once and return a [SolveResult]. */
+    fun solve(): SolveResult = solve(BacktrackParams())
+
+    /** Draw a single diverse sample, or null if none exists. */
+    fun sample(): SampleResult = sample(BacktrackParams())
+
+    /** Lazily draw diverse samples. */
+    fun samples(): Sequence<Sample> = samples(BacktrackParams())
+
+    /** Lazily enumerate distinct models. */
+    fun enumerate(): Sequence<Sample> = enumerate(BacktrackParams())
+
+    /** Optimise against [objective] under the hard constraints. */
+    fun minimize(objective: LinearObjective): MinimizeResult = minimize(objective, BacktrackParams())
 
     /** Open an explicit-state, pausable branch-and-bound over [objective] (#381). See [ResumableSearch].
      *  The handle reuses this solver's search primitives; [params] should carry the
