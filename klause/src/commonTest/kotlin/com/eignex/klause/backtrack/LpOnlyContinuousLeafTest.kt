@@ -63,10 +63,10 @@ class LpOnlyContinuousLeafTest {
 
     @Test
     fun `uncertifiable residual real LP degrades to UNKNOWN rather than UNSAT`() {
-        // 0.1 is not dyadic within the rationalization budget: 0.1 r >= 1 is infeasible for r in [0,5] but
-        // cannot be certified, so the verdict is UNKNOWN — never an unsound UNSAT.
-        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(0.1), intArrayOf(0), LinearOp.GE, 1L)
-        val p = problem(0, emptyArray(), 0.0, 5.0, row)
+        // 1/3 fits neither the dyadic nor the decimal rationalization ladder: r/3 >= 1 is infeasible for
+        // r in [0,2] but cannot be certified, so the verdict is UNKNOWN — never an unsound UNSAT.
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0 / 3.0), intArrayOf(0), LinearOp.GE, 1L)
+        val p = problem(0, emptyArray(), 0.0, 2.0, row)
         val r = assertIs<SolveResult.Unknown>(BacktrackSolver(p).solve(BacktrackParams()))
         assertEquals(TerminationReason.Unsupported, r.reason)
     }

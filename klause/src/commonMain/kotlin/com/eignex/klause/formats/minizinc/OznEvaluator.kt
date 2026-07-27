@@ -512,4 +512,3 @@ private fun stringifyForOutput(v: OznValue): String = when (v) {
     is OznValue.ArrayV -> v.elements.joinToString("") { stringifyForOutput(it) }
     else -> stringifyForShow(v)
 }
-
