@@ -242,9 +242,9 @@ class TablePropagatorTest {
         for (a in 1..4) {
             for (b in 1..4) {
                 if (a != b) {
-            rel.add(a.toLong())
-            rel.add(b.toLong())
-        }
+                    rel.add(a.toLong())
+                    rel.add(b.toLong())
+                }
             }
         }
         val flat = rel.toLongArray()

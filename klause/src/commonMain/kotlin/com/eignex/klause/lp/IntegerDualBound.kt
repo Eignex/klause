@@ -234,12 +234,18 @@ private fun chooseScale(maxY: Double, scaleBits: Int): Int {
 
 /**
  * A scaled-integer copy of a continuous [model], or null when it cannot be rationalized within budget.
- * Multiplies the double-view coefficients (matrix, rhs, cost) by a common power of two `2ᵏ` so they
+ * Multiplies the double-view coefficients (matrix, rhs, cost) by a common positive integer scale so they
  * become exact [Long]s, keeping the (integer) variable bounds. The existing 128-bit certifiers then apply
- * unchanged: scaling by a positive `2ᵏ` leaves the feasible region intact, so an infeasibility (Farkas)
- * certificate over the scaled model proves the real model infeasible. Returns null — leaving the LP
- * `INDETERMINATE`, never mis-certified — when a bound is non-integral, a coefficient needs more than
- * [MAX_SCALE_BITS] fractional bits, or a scaled value escapes the exactly-representable range.
+ * unchanged: scaling by a positive integer leaves the feasible region intact, so an infeasibility (Farkas)
+ * certificate over the scaled model proves the real model infeasible. The scale is drawn from a dyadic
+ * ladder (`2ᵏ`, exact — a power-of-two multiply never rounds the mantissa) and then a decimal ladder
+ * (`10ᵏ` within [DEC_TOL], for the `0.1`-style coefficients real MPS files carry). The decimal rungs use
+ * the same convention as [exactPointFeasible]: the scale *reconstructs the decimals the frontend
+ * emitted* — the decimal text is the authoritative model and its double is already the approximation —
+ * so the certificate is exact for the intended model even though the stored double of `0.1` is not
+ * `1/10`. Returns null — leaving the LP `INDETERMINATE`, never mis-certified — when a bound is
+ * non-integral, no ladder scale covers every coefficient, or a scaled value escapes the
+ * exactly-representable range.
  */
 internal fun rationalizeToIntegerModel(model: LpModel): LpModel? {
     val dv = model.doubleView ?: return model
@@ -252,8 +258,7 @@ internal fun rationalizeToIntegerModel(model: LpModel): LpModel? {
         if (!u.isFinite() || u != floor(u) || abs(u) >= MAX_EXACT_INT) return null
         upper[j] = u.toLong()
     }
-    val k = commonScaleBits(dv) ?: return null
-    val s = (1L shl k).toDouble()
+    val s = commonScale(dv) ?: return null
     return LpModel(
         n = n,
         m = model.m,
@@ -273,12 +278,20 @@ internal fun rationalizeToIntegerModel(model: LpModel): LpModel? {
     )
 }
 
-/** Smallest power-of-two scale `k ≤ [MAX_SCALE_BITS]` at which every double-view coefficient becomes an
- *  exact integer within the round-trip range, or null when none does. */
-private fun commonScaleBits(dv: LpDoubleView): Int? {
+/** Smallest ladder scale covering every double-view coefficient, or null when none does. Dyadic scales
+ *  first (strictly exact, and they keep today's models on exactly today's path), then decimal
+ *  (reconstructing within [DEC_TOL]). Returned as a double: both ladders are exactly representable. */
+private fun commonScale(dv: LpDoubleView): Double? {
     for (k in 0..MAX_SCALE_BITS) {
         val s = (1L shl k).toDouble()
-        if (exactlyIntegral(dv.colVal, s) && exactlyIntegral(dv.rhs, s) && exactlyIntegral(dv.cost, s)) return k
+        if (exactlyIntegral(dv.colVal, s) && exactlyIntegral(dv.rhs, s) && exactlyIntegral(dv.cost, s)) return s
+    }
+    var s = 1.0
+    repeat(DEC_MAX_DIGITS) {
+        s *= 10.0
+        if (reconstructsDecimal(dv.colVal, s) && reconstructsDecimal(dv.rhs, s) && reconstructsDecimal(dv.cost, s)) {
+            return s
+        }
     }
     return null
 }
@@ -290,6 +303,23 @@ private fun exactlyIntegral(a: DoubleArray, scale: Double): Boolean {
     }
     return true
 }
+
+/** Whether every value in [a] reconstructs from `round(v·scale)/scale` within [DEC_TOL] and stays in
+ *  the exactly-representable range — the decimal-reconstruction test [exactPointFeasible] uses. */
+private fun reconstructsDecimal(a: DoubleArray, scale: Double): Boolean {
+    for (x in a) {
+        val v = x * scale
+        if (!v.isFinite() || abs(v) >= MAX_EXACT_INT) return false
+        if (abs(v.roundToLong() / scale - x) > DEC_TOL) return false
+    }
+    return true
+}
+
+/** Decimal-reconstruction tolerance; matches the decimal point-feasibility check in ExactBasisSolve. */
+private const val DEC_TOL = 1e-9
+
+/** Largest decimal scale exponent tried (`10⁹`); matches the decimal point-feasibility check. */
+private const val DEC_MAX_DIGITS = 9
 
 /** Requested scale: fine enough to keep rounding loss negligible, capped by [chooseScale]. */
 private const val DEFAULT_SCALE_BITS = 40

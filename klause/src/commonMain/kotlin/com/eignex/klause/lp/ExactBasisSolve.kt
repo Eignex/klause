@@ -123,7 +123,7 @@ private const val DEC_MAX_INT = 9.007199254740992E15
  * Soundness rests on exactness: a `true` is a genuine rational feasible point (basic values `x_t =
  * detₜ/det` with nonbasic columns at their bounds satisfy `A x = b` by construction of the basis and the
  * bound checks confirm the box). Continuous models are certified over their scaled-integer
- * rationalization ([rationalizeToIntegerModel]), where a positive `2ᵏ` scale preserves the feasible
+ * rationalization ([rationalizeToIntegerModel]), where a positive integer scale preserves the feasible
  * region so the proof carries back exactly.
  */
 internal fun exactBasisFeasible(model: LpModel, basis: Basis): Boolean? {
