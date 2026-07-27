@@ -24,14 +24,18 @@ internal class OpenIntBounds(val lo: Long?, val hi: Long?)
  * information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ] constraints enter; any other
  * relation is skipped (dropping a constraint only loosens the relaxation, never unsound).
  *
- * The relaxation is built **once** and every open side is a re-solve of that one model with a single ±1
- * cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and bounds never
- * change, so the previous optimal basis stays primal-feasible and the primal simplex warm-starts from it
- * ([LpSolver.solvePrimal]) in a few pivots rather than refactorizing a freshly-built model per side. Each
- * side's bound is derived over the original (un-tightened) bounds, so — unlike a sequential pass that
- * feeds each closed side into later solves — a bound is never sharpened by an earlier one; every bound is
- * still individually sound (the relaxation contains every solution), only potentially looser, which never
- * removes a feasible point.
+ * A cheap [feasibility-based prefilter][fbbtTightenOpenIntBounds] runs first: interval bound propagation
+ * closes every side a single row already implies (`O(nnz)` per pass, no LP), so those cost no LP solve
+ * and the LP-solving pass only handles the sides that genuinely need the global relaxation.
+ *
+ * That LP relaxation is built **once** and every remaining open side is a re-solve of that one model with
+ * a single ±1 cost swapped onto its column ([LpModel.withSingleColumnObjective]) — the matrix, rows and
+ * bounds never change, so the previous optimal basis stays primal-feasible and the primal simplex
+ * warm-starts from it ([LpSolver.solvePrimal]) in a few pivots rather than refactorizing a freshly-built
+ * model per side. Each side's LP bound is derived over the prefiltered (but not further-OBBT-tightened)
+ * bounds, so — unlike a sequential pass that feeds each closed side into later solves — an LP bound is
+ * never sharpened by an earlier LP bound; every bound is still individually sound (the relaxation contains
+ * every solution), only potentially looser, which never removes a feasible point.
  *
  * @param bounds current per-variable bounds, indexed by variable id.
  * @param constraints the linear constraints over those variable ids (an objective is not a constraint;
@@ -46,8 +50,10 @@ internal fun tightenOpenIntBounds(
     cancellation: Cancellation = Cancellation.Never,
 ): Array<OpenIntBounds> {
     val n = bounds.size
-    val work = Array(n) { bounds[it] }
-    if (work.none { it.lo == null || it.hi == null }) return work // nothing open to tighten
+    // Cheap feasibility-based prefilter first: interval propagation closes every side a single row already
+    // implies, so those cost no LP solve; the LP-solving pass below only handles what survives.
+    val work = fbbtTightenOpenIntBounds(bounds, constraints, cancellation)
+    if (work.none { it.lo == null || it.hi == null }) return work // nothing open left for the LP pass
 
     // Column j is variable j (added in id order); a genuine open side is a free column. Objective is zero
     // — each solve swaps in its own single-column cost.
@@ -98,4 +104,145 @@ internal fun tightenOpenIntBounds(
         work[v] = OpenIntBounds(newLo, newHi)
     }
     return work
+}
+
+/** Upper bound on the number of full propagation passes; bounds only ever tighten, so the loop reaches a
+ *  fixpoint in finite steps, but a long dependency chain could take many passes — cap it and leave any
+ *  residual to the LP pass. */
+private const val FBBT_MAX_PASSES = 16
+
+/**
+ * Feasibility-based bound tightening (FBBT): propagate [constraints] as interval bounds to a fixpoint,
+ * closing open sides a single row already implies — the cheap `O(nnz)`-per-pass prefilter for
+ * [tightenOpenIntBounds], so a side bounded by simple propagation needs no LP solve. For a row
+ * `Σ aⱼ·xⱼ ≤ b` the extreme of the other terms is isolated against each coefficient: with the row's
+ * minimum activity `A = Σ min(aⱼ·xⱼ)`, variable `k` satisfies `aₖ·xₖ ≤ b − (A − min(aₖ·xₖ))`, giving an
+ * upper bound when `aₖ > 0` and a lower bound when `aₖ < 0`; an equality also propagates its `≥ b`
+ * direction (the row negated). A term whose relevant side is open makes that side of the activity `−∞`:
+ * with two or more such terms the row implies nothing, with exactly one only that term can be bounded.
+ * Every derived bound holds at every solution (it is implied by the row), so a closed side is sound — a
+ * genuine bound, never a clamp. Integer variables floor an upper / ceil a lower candidate. Any overflow
+ * in the interval arithmetic skips that tightening. Iterated to a fixpoint up to [FBBT_MAX_PASSES].
+ */
+private fun fbbtTightenOpenIntBounds(
+    bounds: Array<OpenIntBounds>,
+    constraints: List<Linear>,
+    cancellation: Cancellation,
+): Array<OpenIntBounds> {
+    val n = bounds.size
+    val b = MutableIntBounds(n)
+    for (i in 0 until n) {
+        bounds[i].lo?.let { b.setLo(i, it) }
+        bounds[i].hi?.let { b.setHi(i, it) }
+    }
+    // Only LE/EQ rows propagate — [Linear] canonicalises GE to LE, and NE is not an interval bound.
+    val rows = constraints.filter { it.op == LinearOp.LE || it.op == LinearOp.EQ }
+    if (rows.isEmpty()) return bounds
+
+    var pass = 0
+    var changed = true
+    while (changed && pass < FBBT_MAX_PASSES) {
+        if (cancellation()) break
+        changed = false
+        pass++
+        for (f in rows) {
+            if (propagateRow(f.coeffs, f.vars, f.bound, sign = 1L, b = b)) changed = true
+            // An equality also bounds from below: `Σ aⱼ·xⱼ ≥ b`, i.e. `−Σ aⱼ·xⱼ ≤ −b`.
+            if (f.op == LinearOp.EQ && propagateRow(f.coeffs, f.vars, f.bound, sign = -1L, b = b)) changed = true
+        }
+    }
+    return Array(n) { OpenIntBounds(b.loOrNull(it), b.hiOrNull(it)) }
+}
+
+/** Working per-variable bounds for [fbbtTightenOpenIntBounds] in primitive arrays (no `Long?` boxing): a
+ *  side is open (`±∞`) when its `*Open` flag is set, else its value is in `*Val`. */
+private class MutableIntBounds(n: Int) {
+    private val loVal = LongArray(n)
+    private val hiVal = LongArray(n)
+    private val loOpen = BooleanArray(n) { true }
+    private val hiOpen = BooleanArray(n) { true }
+
+    fun loOpen(i: Int) = loOpen[i]
+    fun hiOpen(i: Int) = hiOpen[i]
+    fun loVal(i: Int) = loVal[i]
+    fun hiVal(i: Int) = hiVal[i]
+    fun loOrNull(i: Int): Long? = if (loOpen[i]) null else loVal[i]
+    fun hiOrNull(i: Int): Long? = if (hiOpen[i]) null else hiVal[i]
+
+    fun setLo(i: Int, v: Long) {
+        loVal[i] = v
+        loOpen[i] = false
+    }
+
+    fun setHi(i: Int, v: Long) {
+        hiVal[i] = v
+        hiOpen[i] = false
+    }
+}
+
+/** Propagate the row `Σ (sign·coeffs(k))·vars(k) ≤ sign·bound` into [b], returning whether any bound
+ *  tightened. Overflow in the exact activity arithmetic aborts this row (returns `false`). */
+@Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
+private fun propagateRow(
+    coeffs: LongArray,
+    vars: IntArray,
+    bound: Long,
+    sign: Long,
+    b: MutableIntBounds,
+): Boolean = try {
+    val effBound = mulExact(sign, bound)
+    // Minimum activity Σ min(aⱼ·xⱼ) over finite terms, plus how many terms are −∞ (open on the min side).
+    var minActivity = 0L
+    var numInf = 0
+    var infIdx = -1
+    for (idx in coeffs.indices) {
+        val a = mulExact(sign, coeffs[idx])
+        if (a == 0L) continue
+        val v = vars[idx]
+        if (if (a > 0L) b.loOpen(v) else b.hiOpen(v)) {
+            numInf++
+            infIdx = idx
+            if (numInf > 1) return false // ≥2 unbounded terms ⇒ the row implies nothing
+        } else {
+            minActivity = addExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+        }
+    }
+    var changed = false
+    for (idx in coeffs.indices) {
+        val a = mulExact(sign, coeffs[idx])
+        if (a == 0L) continue
+        val v = vars[idx]
+        val restMin = when {
+            numInf == 0 -> subExact(minActivity, mulExact(a, if (a > 0L) b.loVal(v) else b.hiVal(v)))
+            infIdx == idx -> minActivity // this term was the sole −∞; the rest is finite
+            else -> continue // the sole −∞ is a different term ⇒ no bound for this one
+        }
+        val num = subExact(effBound, restMin)
+        if (a > 0L) {
+            val cand = floorDivSafe(num, a) ?: continue
+            if (b.hiOpen(v) || cand < b.hiVal(v)) {
+                b.setHi(v, cand)
+                changed = true
+            }
+        } else {
+            val cand = ceilDivSafe(num, a) ?: continue
+            if (b.loOpen(v) || cand > b.loVal(v)) {
+                b.setLo(v, cand)
+                changed = true
+            }
+        }
+    }
+    changed
+} catch (_: LpOverflowException) {
+    false
+}
+
+/** `⌊a / b⌋`, or null on the one non-representable case (`Long.MIN_VALUE / −1`). */
+private fun floorDivSafe(a: Long, b: Long): Long? = if (a == Long.MIN_VALUE && b == -1L) null else a.floorDiv(b)
+
+/** `⌈a / b⌉` = `⌊a / b⌋ + (a not divisible by b ? 1 : 0)`, or null on overflow. */
+private fun ceilDivSafe(a: Long, b: Long): Long? {
+    if (a == Long.MIN_VALUE && b == -1L) return null
+    val q = a.floorDiv(b)
+    return if (a % b != 0L) (if (q == Long.MAX_VALUE) null else q + 1L) else q
 }
