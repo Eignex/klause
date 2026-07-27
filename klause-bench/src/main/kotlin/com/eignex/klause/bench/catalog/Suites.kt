@@ -78,6 +78,30 @@ internal object Suites {
                 )
             },
             DynamicSuite(
+                "smtlib-qflra",
+                "SMT-LIB QF_LRA non-incremental set (fetched, ~1.7k .smt2; cap with per-family=/max=)",
+            ) {
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfLra,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_LRA", "smt2"),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.CSP,
+                    format = Format.SMTLIB_QF_LIA,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qflira",
+                "SMT-LIB QF_LIRA non-incremental set (fetched, small mixed int/real .smt2)",
+            ) {
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfLira,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_LIRA", "smt2"),
+                    CorpusSelection.Selection.fromProps(),
+                    Category.CSP,
+                    format = Format.SMTLIB_QF_LIA,
+                )
+            },
+            DynamicSuite(
                 "miplib2017",
                 "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; cap with max=/per-family=)",
             ) {
@@ -724,6 +748,24 @@ internal object ExternalCollections {
         url = "https://zenodo.org/records/11061097/files/QF_LIA.tar.zst?download=1",
         license = "SMT-LIB (per-family licenses)",
         reason = "large benchmark set (689MB compressed, ~13k instances); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
+    )
+
+    /** SMT-LIB QF_LRA non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. */
+    val smtlibQfLra = ExternalCollection(
+        id = "smtlib-qf_lra",
+        url = "https://zenodo.org/records/11061097/files/QF_LRA.tar.zst?download=1",
+        license = "SMT-LIB (per-family licenses)",
+        reason = "real-arithmetic benchmark set (174MB compressed, ~1.7k instances); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
+    )
+
+    /** SMT-LIB QF_LIRA non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. */
+    val smtlibQfLira = ExternalCollection(
+        id = "smtlib-qf_lira",
+        url = "https://zenodo.org/records/11061097/files/QF_LIRA.tar.zst?download=1",
+        license = "SMT-LIB (per-family licenses)",
+        reason = "small mixed int/real benchmark set (0.2MB compressed); fetched rather than vendored",
         fetch = FetchMethod.TarballZst,
     )
 
