@@ -1,7 +1,7 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.util.BigInt
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
  * Exact rational feasibility of an [LpModel]: slack-form rows `A·x = rhs` over boxes `0 ≤ xⱼ ≤ uⱼ`
@@ -269,27 +269,29 @@ private fun structuralWitness(
     return out
 }
 
-private val HALF = BigFraction.of(BigInt.ONE, BigInt.fromLong(2L))
+private val HALF = BigFraction.of(BigInteger.ONE, BigInteger.TWO)
 
 /** Pivot cap: generous for the small leaf models the fallback targets, tiny relative to a search. */
 internal fun defaultRationalPivotCap(model: LpModel): Int = 200 + 20 * (model.m + model.n)
 
-/** Immutable rational number over [BigInt], always normalized (gcd 1, positive denominator). */
-internal class BigFraction private constructor(val num: BigInt, val den: BigInt) {
+/** Immutable rational number over the multiplatform big integer, always normalized (gcd 1, positive
+ *  denominator). The unbounded second level of the exact rational arithmetic — the 128-bit
+ *  fixed-width level handles the common case and escalates here on overflow. */
+internal class BigFraction private constructor(val num: BigInteger, val den: BigInteger) {
 
-    val isZero: Boolean get() = num.isZero
+    val isZero: Boolean get() = num.isZero()
 
-    fun signum(): Int = num.sign
+    fun signum(): Int = num.signum()
+
+    fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
+
+    fun toDouble(): Double = num.doubleValue(exactRequired = false) / den.doubleValue(exactRequired = false)
 
     operator fun plus(other: BigFraction): BigFraction = of(num * other.den + other.num * den, den * other.den)
 
     operator fun minus(other: BigFraction): BigFraction = of(num * other.den - other.num * den, den * other.den)
 
     operator fun times(other: BigFraction): BigFraction = of(num * other.num, den * other.den)
-
-    fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
-
-    fun toDouble(): Double = num.toDouble() / den.toDouble()
 
     fun reciprocal(): BigFraction {
         require(!isZero) { "reciprocal of zero" }
@@ -302,14 +304,24 @@ internal class BigFraction private constructor(val num: BigInt, val den: BigInt)
 
     override fun hashCode(): Int = num.hashCode() * 31 + den.hashCode()
 
-    override fun toString(): String = if (den == BigInt.ONE) "$num" else "$num/$den"
+    override fun toString(): String = if (den == BigInteger.ONE) "$num" else "$num/$den"
 
     companion object {
-        val ZERO = BigFraction(BigInt.ZERO, BigInt.ONE)
-        val ONE = BigFraction(BigInt.ONE, BigInt.ONE)
-        val MINUS_ONE = BigFraction(-BigInt.ONE, BigInt.ONE)
+        val ZERO = BigFraction(BigInteger.ZERO, BigInteger.ONE)
+        val ONE = BigFraction(BigInteger.ONE, BigInteger.ONE)
+        val MINUS_ONE = BigFraction(-BigInteger.ONE, BigInteger.ONE)
 
-        fun ofLong(v: Long): BigFraction = if (v == 0L) ZERO else BigFraction(BigInt.fromLong(v), BigInt.ONE)
+        fun ofLong(v: Long): BigFraction = if (v == 0L) ZERO else BigFraction(BigInteger.fromLong(v), BigInteger.ONE)
+
+        fun of(num: BigInteger, den: BigInteger): BigFraction {
+            require(!den.isZero()) { "zero denominator" }
+            if (num.isZero()) return ZERO
+            val negative = den.signum() < 0
+            val n = if (negative) -num else num
+            val d = if (negative) -den else den
+            val g = n.gcd(d)
+            return BigFraction(n / g, d / g)
+        }
 
         /** The exact rational value of a finite double: `v = ±m·2ᵉ` from its IEEE decomposition.
          *  Null for non-finite values. */
@@ -328,31 +340,8 @@ internal class BigFraction private constructor(val num: BigInt, val den: BigInt)
             val tz = m.countTrailingZeroBits()
             m = m shr tz
             e += tz
-            val mag = BigInt.fromLong(if (bits < 0L) -m else m)
-            return if (e >= 0) of(mag * pow2(e), BigInt.ONE) else of(mag, pow2(-e))
-        }
-
-        private fun pow2(e: Int): BigInt {
-            var r = BigInt.ONE
-            var left = e
-            while (left > 0) {
-                val step = minOf(left, 62)
-                r *= BigInt.fromLong(1L shl step)
-                left -= step
-            }
-            return r
-        }
-
-        fun of(num: BigInt, den: BigInt): BigFraction {
-            require(!den.isZero) { "zero denominator" }
-            if (num.isZero) return ZERO
-            val sign = if (den.isNegative) -BigInt.ONE else BigInt.ONE
-            val n = num * sign
-            val d = den * sign
-            val g = n.gcd(d)
-            val (nq, _) = n.divRem(g)
-            val (dq, _) = d.divRem(g)
-            return BigFraction(nq, dq)
+            val mag = BigInteger.fromLong(if (bits < 0L) -m else m)
+            return if (e >= 0) of(mag shl e, BigInteger.ONE) else of(mag, BigInteger.ONE shl -e)
         }
     }
 }

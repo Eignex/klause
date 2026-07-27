@@ -10,7 +10,7 @@ import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.lp.BigFraction
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.BigInt
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 // Real-arithmetic lowering for the SMT-LIB front-end (LRA / the real half of LIRA): real variables
 // become LP-only continuous columns and top-level linear real constraints become real Linear rows —
@@ -79,11 +79,10 @@ internal fun parseRealLiteral(s: String): BigFraction? {
     val dot = body.indexOf('.')
     val digits = if (dot < 0) body else body.substring(0, dot) + body.substring(dot + 1)
     if (digits.isEmpty() || digits.any { it !in '0'..'9' }) return null
-    var num = BigInt.ZERO
-    val ten = BigInt.fromLong(10L)
-    for (ch in digits) num = num * ten + BigInt.fromLong((ch - '0').toLong())
+    var num = BigInteger.parseString(digits, 10)
     if (negative) num = -num
-    var den = BigInt.ONE
+    var den = BigInteger.ONE
+    val ten = BigInteger.TEN
     if (dot >= 0) repeat(body.length - dot - 1) { den *= ten }
     return BigFraction.of(num, den)
 }
@@ -136,7 +135,7 @@ internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
 internal fun SmtLib.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray, Long>? {
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
-    val scale = BigFraction.of(lcm, BigInt.ONE)
+    val scale = BigFraction.of(lcm, BigInteger.ONE)
     val vars = IntArray(d.intCoeffs.size)
     val coeffs = LongArray(d.intCoeffs.size)
     var i = 0
@@ -154,11 +153,11 @@ internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean =
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
     for (c in d.realCoeffs.values) lcm = lcmOf(lcm, c.den)
-    val scale = BigFraction.of(lcm, BigInt.ONE)
+    val scale = BigFraction.of(lcm, BigInteger.ONE)
     fun exact(c: BigFraction): Double {
         val whole = (c * scale)
-        val v = whole.num.toLongOrNull()
-        if (v == null || whole.den != BigInt.ONE || v < -MAX_EXACT_ROW || v > MAX_EXACT_ROW) {
+        val v = whole.toExactLongOrNull()
+        if (v == null || v < -MAX_EXACT_ROW || v > MAX_EXACT_ROW) {
             smtUnsupported("real coefficient exceeds the exactly-representable range")
         }
         return v.toDouble()
@@ -183,10 +182,7 @@ internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean =
     return Linear(intVars, intCoeffs, realVars, realCoeffs, op, bound, strict)
 }
 
-private fun lcmOf(a: BigInt, b: BigInt): BigInt {
-    val g = a.gcd(b)
-    return (a * b).divRem(g).first.abs()
-}
+private fun lcmOf(a: BigInteger, b: BigInteger): BigInteger = ((a * b) / a.gcd(b)).abs()
 
 /**
  * Reify a real relation `(op a b)` as a Boolean literal: an inequality atom becomes one
@@ -300,12 +296,11 @@ internal fun SmtLib.Builder.realObjective(t: SExpr, negate: Boolean): LinearObje
     return LinearObjective(intCoefficients = intCoeffs, constant = const, realCoefficients = realCoeffs)
 }
 
-internal fun BigFraction.toExactLongOrNull(): Long? = if (den == BigInt.ONE) num.toLongOrNull() else null
+internal fun BigFraction.toExactLongOrNull(): Long? =
+    if (den == BigInteger.ONE && num.bitLength() <= 63) num.longValue(exactRequired = false) else null
 
 private fun BigFraction.toExactDoubleOrNull(): Double? {
-    val n = num.toLongOrNull() ?: return null
-    val d = den.toLongOrNull() ?: return null
-    val v = n.toDouble() / d.toDouble()
+    val v = toDouble()
     val back = BigFraction.ofDouble(v) ?: return null
     return if (back == this) v else null
 }

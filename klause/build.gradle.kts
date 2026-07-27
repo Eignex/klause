@@ -63,6 +63,7 @@ kotlin {
             implementation("com.eignex:koblas:0.1.0")
             implementation("com.eignex:kumulant:0.3.3")
             implementation("com.eignex:kpermute:1.1.2")
+            implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
