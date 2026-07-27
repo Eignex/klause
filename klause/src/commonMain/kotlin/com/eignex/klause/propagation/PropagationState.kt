@@ -303,6 +303,12 @@ class PropagationState(
     /** Reused dedup scratch for [collectLevelsForVars] — avoids a per-conflict HashSet alloc. */
     internal val levelScratch: IntHashSet = IntHashSet()
 
+    /** Reused scratch for [com.eignex.klause.factor.bool.internals.pbFalseFormAntecedents] — a single
+     *  wide pseudo-Boolean factor pins many literals per sweep, each rebuilding the same assigned-literal
+     *  antecedent set, so a per-call [IntHashSet] alloc and its regrowth dominated wide-WBO root bake. */
+    internal val pbAntecedentSeen: IntHashSet = IntHashSet()
+    internal val pbAntecedentBuf: IntArrayList = IntArrayList()
+
     /** Var whose pinned value was contradicted by a decision-level pin attempt (i.e.
      *  `pinBoolAsDecision` tried to set the opposite value of an existing pin). `-1` when
      *  no such conflict is active. Lets the conflict analyzer learn from a
