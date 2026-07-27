@@ -118,7 +118,19 @@ internal fun rationalFeasible(
             }
         }
         if (enter < 0) {
-            // The violated variable already sits at its extreme attainable value: exact infeasibility.
+            // The violated variable already sits at its extreme attainable value: exact infeasibility —
+            // unless the proof leans on a probe stand-in bound (a `±∞` side realized as a huge finite
+            // box). Infeasibility relative to the probe box does not refute the true unbounded model,
+            // so such a proof degrades to UNKNOWN.
+            if (basis[row] < model.n &&
+                (model.probeClampedHi[basis[row]] || model.probeClampedLo[basis[row]])
+            ) {
+                return RationalFeasibility.UNKNOWN
+            }
+            for (j in 0 until total) {
+                if (inBasisRow[j] >= 0 || t[row][j].isZero) continue
+                if (atUpper[j] && j < model.n && model.probeClampedHi[j]) return RationalFeasibility.UNKNOWN
+            }
             return RationalFeasibility.INFEASIBLE
         }
         // Pivot fully: the leaving variable lands exactly on its violated bound; solve row for `enter`.
