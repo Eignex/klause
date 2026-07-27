@@ -16,6 +16,7 @@ import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
@@ -102,6 +103,7 @@ internal class ResumableMinimize(
     private val externalShared = params.objectiveBoundSupplier != null
     private val sink = SolveStatsSink(backend = "backtrack")
     private var lastObjBoundAsserted: Long? = null
+    private var lastBoolCutoffRhs: Long? = null
 
     // --- LP-relaxation family state (built once; persists across slices = rolling warm starts).
     // Always constructed so the always-on linear lower bound runs; its internal bounds are null/empty
@@ -175,6 +177,7 @@ internal class ResumableMinimize(
         bestObj = Double.POSITIVE_INFINITY
         objVarBest = null
         lastObjBoundAsserted = null
+        lastBoolCutoffRhs = null
         done = null
     }
 
@@ -230,13 +233,56 @@ internal class ResumableMinimize(
     /** Assert the incumbent bound on the objective var at the root; true iff that empties the root
      *  (optimum proven). */
     private fun assertObjectiveBoundAtRoot(): Boolean {
-        val objectiveVar = singleObj?.varId ?: return false
+        val objectiveVar = singleObj?.varId ?: return postBoolObjectiveCutoffAtRoot()
         val b = objVarBest ?: return false
         val ascending = singleObj.ascending
         val threshold = if (ascending) b - 1 else b + 1
         if (threshold == lastObjBoundAsserted) return false
         lastObjBoundAsserted = threshold
         return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
+    }
+
+    /**
+     * For a pure-Boolean weighted objective (no single objective variable) post the incumbent cutoff
+     * `Σ boolWeights_b·x_b ≤ bestObj − constant − 1` as a permanent pseudo-Boolean constraint, so CDCL and
+     * pseudo-Boolean cutting-planes learning can *refute* it — the mechanism that proves optimality (a
+     * weighted-Boolean objective has no objective variable to bound, so tree exhaustion alone rarely
+     * closes it). Fired at the root on each restart, re-posting only when the incumbent improved. The
+     * cutoff normalizes to `Σ |w_b|·ℓ_b ≥ degree` with `ℓ_b = x_b` when `w_b < 0` else `¬x_b`,
+     * `degree = Σ_{w_b>0} w_b − (bestObj − constant − 1)`. Returns true iff it empties the root
+     * (optimum proven). Integer/mixed objectives keep the objective-variable path above.
+     */
+    private fun postBoolObjectiveCutoffAtRoot(): Boolean {
+        if (!params.pbObjectiveCutoff || problem.numIntVars > 0 || !bestObj.isFinite()) return false
+        val bestLong = bestObj.toLong()
+        if (bestLong.toDouble() != bestObj) return false // non-integral incumbent: no exact integer cutoff
+        val cutoffRhs = bestLong - objective.constant - 1 // Σ w_b·x_b must be ≤ this to beat the incumbent
+        if (cutoffRhs == lastBoolCutoffRhs) return false
+        lastBoolCutoffRhs = cutoffRhs
+        val weights = objective.boolWeights
+        val nb = minOf(problem.numBoolVars, weights.size)
+        var posSum = 0L
+        var nnz = 0
+        for (b in 0 until nb) {
+            val w = weights[b]
+            if (w == 0L) continue
+            nnz++
+            if (w > 0L) posSum += w
+        }
+        if (nnz == 0) return false
+        val degree = posSum - cutoffRhs
+        if (degree <= 0L) return false // every assignment already beats the cutoff — nothing to enforce
+        val pbWeights = LongArray(nnz)
+        val pbLits = IntArray(nnz)
+        var i = 0
+        for (b in 0 until nb) {
+            val w = weights[b]
+            if (w == 0L) continue
+            pbWeights[i] = if (w < 0L) -w else w
+            pbLits[i] = Lit.make(b, w < 0L)
+            i++
+        }
+        return session.addLearnedPb(pbWeights, pbLits, degree, lbd = 1, permanent = true) is PropagationResult.Unsat
     }
 
     /** Fold [sample] (objective [o]) into the incumbent when it strictly improves the best; fires
