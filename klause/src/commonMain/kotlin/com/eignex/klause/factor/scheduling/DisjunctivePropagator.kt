@@ -25,6 +25,8 @@ internal class DisjunctivePropagator(
     private val n: Int,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     override val initialIntEventWatches: IntArray = IntEvent.boundEventWatches(intVars)
 
     /** Snapshot effective per-task durations. Returns null if any duration var is not

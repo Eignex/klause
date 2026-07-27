@@ -902,6 +902,7 @@ class PropagationState(
         initialFactor: Int = -1,
         initialFactors: IntArray = EmptyIntArray,
         cancellation: Cancellation = Cancellation.Never,
+        skipExpensiveBake: Boolean = false,
     ): IntArray? {
         // The native-SAT lane runs its own arena-packed two-watched-literal BCP; the atom store,
         // channeling flush, factor queue, and dirty-var drains below are all inert when there are no
@@ -954,6 +955,9 @@ class PropagationState(
             val fid = propQueue.removeFirst()
             propStamp[fid] = propGen - 1 // mark dequeued (≠ propGen) so it can re-enqueue
             val f = factorAt(fid)
+            // Cheap bake: defer an expensive factor's first fire (heavy state build + sweep) to the
+            // first search fire. It re-enqueues if a cheap factor later wakes it, and is skipped again.
+            if (skipExpensiveBake && f.expensiveBake) continue
             currentLevel = effectiveLevelFor(f, fid)
             currentFactor = fid
             conflictLevels = null

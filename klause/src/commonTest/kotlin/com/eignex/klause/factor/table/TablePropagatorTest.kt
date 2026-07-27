@@ -4,6 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.TableGroupCache
+import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -36,6 +38,26 @@ class TablePropagatorTest {
             .toList()
             .toSet()
         assertEquals(setOf(listOf(0, 1), listOf(2, 3)), results)
+    }
+
+    @Test
+    fun `skipExpensiveBake defers the table's root pruning`() {
+        // Table {(0,1),(2,3)} over vars in [0..3] is GAC at the root: value 3 of var0 has no support,
+        // so a full bake tightens its max 3 -> 2. preFolded skips the construction bake so each state
+        // starts from the raw [0..3] domains.
+        fun problem() = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = Array(2) { IntDomain(0, 3) },
+            factors = arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3))),
+            preFolded = true,
+        )
+        val full = PropagationState(problem(), Assumptions.None)
+        full.runToFixpoint(allFactors = true, skipExpensiveBake = false)
+        val cheap = PropagationState(problem(), Assumptions.None)
+        cheap.runToFixpoint(allFactors = true, skipExpensiveBake = true)
+        assertEquals(2L, full.intDomains[0].max, "table fires: 3 unsupported, max 3 -> 2")
+        assertEquals(3L, cheap.intDomains[0].max, "expensive table skipped: domain intact")
     }
 
     @Test
@@ -242,9 +264,9 @@ class TablePropagatorTest {
         for (a in 1..4) {
             for (b in 1..4) {
                 if (a != b) {
-            rel.add(a.toLong())
-            rel.add(b.toLong())
-        }
+                    rel.add(a.toLong())
+                    rel.add(b.toLong())
+                }
             }
         }
         val flat = rel.toLongArray()

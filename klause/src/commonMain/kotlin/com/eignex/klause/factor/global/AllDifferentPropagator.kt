@@ -22,6 +22,8 @@ internal class AllDifferentPropagator(
     private val definitelyPresentPropFn: (Int, PropagationState) -> Boolean,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     override val initialIntEventWatches: IntArray?
         get() = if (boundsConsistent && presents.isEmpty() && exceptSet.isEmpty()) {
             val distinctVars = vars.distinct()

@@ -18,6 +18,8 @@ internal class RegularPropagator(
     private val accepting: IntArray,
 ) : Propagator {
 
+    override val expensiveBake: Boolean get() = true
+
     /** Advisor subscription (#623): GAC over interior domains, so subscribe to every kind on every
      *  (distinct) sequence variable and consume the dirty-variable delta (#624) — the incremental
      *  propagator (`RegularIncrementalState`) recomputes only the layers a changed position reaches. */
