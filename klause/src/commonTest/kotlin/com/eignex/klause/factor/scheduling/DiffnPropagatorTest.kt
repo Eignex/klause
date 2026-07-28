@@ -179,7 +179,7 @@ class DiffnPropagatorTest {
             ),
             factors = arrayOf<Factor>(factor),
         )
-        val r = problem.baked
+        val r = problem.propagate()
         val implied = assertIs<PropagationResult.Implied>(r)
         assertEquals(2, implied.intMinOrNullCompat(3), "rect 1 y.min must be pushed to 2 (above rect 0)")
     }

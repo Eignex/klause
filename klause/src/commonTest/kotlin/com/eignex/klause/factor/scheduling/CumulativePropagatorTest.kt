@@ -275,10 +275,10 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(factor),
         )
-        val baked = p.baked
+        val baked = p.propagate()
         assertTrue(
             baked is PropagationResult.Unsat,
-            "overload check should mark this as Unsat at bake time, got $baked",
+            "overload check should mark this as Unsat, got $baked",
         )
     }
 
@@ -314,7 +314,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 0), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.baked
+        val result = problem.propagate()
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
         assertEquals(4, result.ints[1], "task 1 must be pinned to t=4 after time-tabling shaves earlier starts")
     }
@@ -388,7 +388,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 10)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.baked
+        val result = problem.propagate()
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
         assertEquals(
             3,
@@ -411,7 +411,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.baked
+        val result = problem.propagate()
         assertTrue(result is PropagationResult.Implied, "expected propagation success; got $result")
         assertEquals(null, result.intMinOrNullCompat(0))
         assertEquals(null, result.intMinOrNullCompat(1))
@@ -522,7 +522,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        val result = problem.baked
+        val result = problem.propagate()
         assertTrue(result is PropagationResult.Implied, "single task is always feasible; got $result")
     }
 
@@ -542,7 +542,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        assertTrue(problem.baked is PropagationResult.Implied)
+        assertTrue(problem.propagate() is PropagationResult.Implied)
     }
 
     @Test
@@ -559,7 +559,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        assertTrue(problem.baked is PropagationResult.Unsat)
+        assertTrue(problem.propagate() is PropagationResult.Unsat)
     }
 
     // --- From CumulativeThetaTreeTest ---

@@ -239,7 +239,11 @@ class Problem(
      * replay [baked] as assumptions are unaffected.
      */
     val baked: PropagationResult by lazy(LazyThreadSafetyMode.NONE) {
-        mergeBase(propagate(Assumptions.None, cancellation), seedDeductions)
+        // The root bake skips firing expensive propagators (Table/Mdd/Regular/global/scheduling): their
+        // heavy per-state bookkeeping is not built at load and their optional root tightening is deferred
+        // to the first search fire, re-derived once on the final post-presolve factors. Only weakens the
+        // bake fixpoint (always sound) — cheap bounds/clauses still reach fixpoint at load.
+        mergeBase(propagate(Assumptions.None, cancellation, skipExpensiveBake = true), seedDeductions)
     }
 
     // Force the root bake and fold its deductions into [intDomains] eagerly — except in [preFolded]

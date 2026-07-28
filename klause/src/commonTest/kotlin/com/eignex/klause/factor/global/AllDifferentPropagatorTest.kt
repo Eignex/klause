@@ -295,10 +295,10 @@ class AllDifferentPropagatorTest {
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3), IntDomain(1, 3)),
             factors = arrayOf<Factor>(factor),
         )
-        val baked = problem.baked
+        val baked = problem.propagate()
         assertTrue(
             baked is PropagationResult.Unsat,
-            "expected bake-time Unsat from Hall pigeonhole; got $baked",
+            "expected Unsat from Hall pigeonhole; got $baked",
         )
     }
 
