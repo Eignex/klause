@@ -86,6 +86,15 @@ class Problem(
      */
     val preFolded: Boolean = false,
     /**
+     * Defer the construction-time base bake: when `true`, [intDomains] are a defensive copy of the raw
+     * declared domains (not folded), and the root [baked] fold is NOT forced at construction — the
+     * presolve pipeline runs it as its step 0 instead (so `--presolve none` stays pure parse). Unlike
+     * [preFolded] the domains are the *raw* declared ones, not an already-folded pass-view array. Off by
+     * default: a directly-constructed [Problem] bakes eagerly at construction exactly as before, so only
+     * the front-end base problem (which always flows through the pipeline) opts in.
+     */
+    val deferBake: Boolean = false,
+    /**
      * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
      * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
      * continuous column but absent from CP search — it has no [intDomains] entry, no trail, and is never
@@ -157,6 +166,7 @@ class Problem(
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         preFolded: Boolean = false,
+        deferBake: Boolean = false,
         numRealVars: Int = 0,
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
@@ -170,6 +180,7 @@ class Problem(
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         preFolded = preFolded,
+        deferBake = deferBake,
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
@@ -259,8 +270,33 @@ class Problem(
     // construction); this init access is what forces the otherwise-lazy propagators/occurrences/baked.
     init {
         val mark = TimeSource.Monotonic.markNow()
-        if (!preFolded) foldIntoDomains(baked)
+        if (!preFolded && !deferBake) foldIntoDomains(baked)
         bakeElapsed = mark.elapsedNow()
+    }
+
+    /**
+     * Run the deferred base bake: return an equivalent non-[deferBake] [Problem] over the same factors
+     * whose domains carry the root-bake fold. A no-op returning `this` when the bake already ran (not
+     * [deferBake]) — and idempotent, since re-folding already-tightened domains changes nothing. This is
+     * the presolve pipeline's step 0, replacing the construction-time bake for a front-end base problem.
+     */
+    fun bakeBase(): Problem = if (!deferBake) {
+        this
+    } else {
+        // A deferBake problem is always a fresh front-end base problem — it never carries seedDeductions
+        // (those come from a presolve rebuild, which is never deferBake), so the rebuild omits them.
+        Problem(
+            numBoolVars = numBoolVars,
+            numIntVars = numIntVars,
+            intDomains = Array(numIntVars) { intDomains[it] },
+            factors = factors,
+            cancellation = cancellation,
+            impliedFactorMask = impliedFactorMask,
+            hasSymmetryBreaking = hasSymmetryBreaking,
+            numRealVars = numRealVars,
+            realLower = realLower,
+            realUpper = realUpper,
+        )
     }
 
     /** Folds the root-level int deductions of a successful bake into [intDomains] so the

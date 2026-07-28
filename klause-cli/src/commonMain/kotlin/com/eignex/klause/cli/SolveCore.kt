@@ -242,14 +242,19 @@ internal object SolveCore {
     ) {
         val passes = stats?.passes.orEmpty()
         errPrintln("presolve dry-run:")
-        // Split the front-end load into parse vs the root bake (step 0): the bake is the eager root
-        // propagation folded into domains at construction; parse is the rest of the load.
+        // Split the load into parse, the root bake (step 0), and the presolve passes. The base bake is
+        // deferred to the pipeline (stats.bakeElapsed) for a front-end problem, or ran at construction
+        // (original.bakeElapsed) otherwise — only one is non-zero. `elapsed` is the whole presolve phase,
+        // which for a deferred problem includes the step-0 bake, so the passes get the remainder.
+        val stepZeroBake = stats?.bakeElapsed ?: Duration.ZERO
+        val bake = original.bakeElapsed + stepZeroBake
         loadElapsedMs?.let { load ->
-            val bakeMs = original.bakeElapsed.inWholeMilliseconds
-            errPrintln("  parse: ${(load - bakeMs).coerceAtLeast(0)}ms")
-            errPrintln("  bake (step 0): ${original.bakeElapsed}")
+            errPrintln("  parse: ${(load - original.bakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
+            errPrintln("  bake (step 0): $bake")
         }
-        errPrintln("  elapsed: $elapsed")
+        // Presolve passes alone (the step-0 bake is broken out above; for a deferred problem it is part
+        // of the pipeline's wall time, so subtract it to leave the passes' own cost).
+        errPrintln("  elapsed: ${elapsed - stepZeroBake}")
         errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
         errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
         errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")

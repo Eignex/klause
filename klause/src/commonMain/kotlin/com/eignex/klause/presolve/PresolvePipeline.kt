@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.PresolveStats
+import kotlin.time.TimeSource
 
 /** Round cap for the presolve↔LP-harvest fixpoint (#14): a spin guard, never the real stop. The loop
  *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
@@ -91,7 +92,12 @@ object PresolvePipeline {
             problem
         }
 
-        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(prebaked, bakeConfig)
+        // Step 0: run the deferred base bake — fold the root propagation into the domains. A no-op for a
+        // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
+        // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
+        val bakeStart = TimeSource.Monotonic.markNow()
+        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(prebaked.bakeBase(), bakeConfig)
+        val bakeElapsed = bakeStart.elapsedNow()
         var current = seeded
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
@@ -129,6 +135,7 @@ object PresolvePipeline {
             constraintsRemoved = problem.factors.size - current.factors.size,
             infeasible = infeasible || harvest.rootInfeasible,
             lpHarvest = harvest.takeUnless { it.isEmpty },
+            bakeElapsed = bakeElapsed,
         )
         return PresolveOutcome(current, reconstruct, stats, changed = true)
     }
