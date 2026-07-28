@@ -34,20 +34,19 @@ private const val EXIT_ERROR = 2
 
 /** Run the CLI and map a boundary failure to an exit code, printing its diagnostic to stderr. Split out
  *  from [main] so the error boundary is observable without terminating the process. */
-internal fun runCli(args: Array<String>): Int =
-    try {
-        run(args)
-        EXIT_OK
-    } catch (e: CliUsageException) {
-        errPrintln("klause-cli: ${e.message}")
-        EXIT_ERROR
-    } catch (e: FormatException) {
-        // A parser rejecting malformed/unsupported input is a user error, not a crash: its message
-        // already carries the `klause <format>: <message>` prefix, so surface it verbatim on stderr
-        // and exit with the CLI error code rather than leaking a stack trace.
-        errPrintln(e.message.orEmpty())
-        EXIT_ERROR
-    }
+internal fun runCli(args: Array<String>): Int = try {
+    run(args)
+    EXIT_OK
+} catch (e: CliUsageException) {
+    errPrintln("klause-cli: ${e.message}")
+    EXIT_ERROR
+} catch (e: FormatException) {
+    // A parser rejecting malformed/unsupported input is a user error, not a crash: its message
+    // already carries the `klause <format>: <message>` prefix, so surface it verbatim on stderr
+    // and exit with the CLI error code rather than leaking a stack trace.
+    errPrintln(e.message.orEmpty())
+    EXIT_ERROR
+}
 
 private fun run(args: Array<String>) {
     val common = CommonOptions()
