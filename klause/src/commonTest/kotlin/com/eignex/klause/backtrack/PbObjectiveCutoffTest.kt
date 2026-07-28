@@ -14,7 +14,8 @@ import kotlin.test.assertIs
  * A pure-Boolean pseudo-Boolean minimize has no objective variable to bound, so optimality is proven only
  * once the incumbent cutoff `Σ w_b·x_b ≤ best − 1` is posted as a refutable pseudo-Boolean constraint and
  * the cutting-planes engine refutes it. These assert a *proven* optimum (not just a best-found), covering
- * both positive and negative objective weights (the cutoff's sign normalization).
+ * both positive and negative objective weights (the cutoff's sign normalization). The cutoff is off by
+ * default (net-negative as a uniform default), so these enable it explicitly.
  */
 class PbObjectiveCutoffTest {
 
@@ -27,7 +28,7 @@ class PbObjectiveCutoffTest {
         // x0 (weight 3) stays false.
         val p = Problem(4, 0, emptyArray(), arrayOf(atLeast(4, min = 2)))
         val obj = LinearObjective(boolWeights = longArrayOf(3, 1, 1, 1))
-        val r = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val r = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, pbObjectiveCutoff = true))
         val opt = assertIs<MinimizeResult.Optimal>(r)
         assertEquals(2.0, opt.objective)
     }
@@ -37,11 +38,13 @@ class PbObjectiveCutoffTest {
         // Minimize −x0 − x1 − x2 subject to at most one true (max via a ≤1 cardinality). Turning one on
         // reaches −1; the negative weights exercise the cutoff literal-flip.
         val p = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(Cardinality(IntArray(3) { Lit.make(it, true) }, min = 0, max = 1)),
         )
         val obj = LinearObjective(boolWeights = longArrayOf(-1, -1, -1))
-        val r = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val r = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, pbObjectiveCutoff = true))
         val opt = assertIs<MinimizeResult.Optimal>(r)
         assertEquals(-1.0, opt.objective)
     }

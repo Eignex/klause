@@ -315,10 +315,16 @@ data class BacktrackParams(
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a
      * permanent constraint, so branch-and-bound prunes against it and cutting-planes conflict analysis can
      * refute it to prove optimality — the standard bound-enforcement a weighted-Boolean objective
-     * otherwise lacks (it has no objective variable to tighten). On by default; ignored when the objective
-     * is a single integer variable (that path tightens the variable directly).
+     * otherwise lacks (it has no objective variable to tighten). Ignored when the objective is a single
+     * integer variable (that path tightens the variable directly).
+     *
+     * **Off by default.** It is a proving-speed win (fewer nodes, and it proves the odd extra instance) but
+     * enforcing the bound by propagation turns free incumbent-ratcheting into a harder constrained search,
+     * so as a uniform default it costs more in anytime incumbent quality than it gains — measured
+     * net-negative on the pb07 corpus at both 20s and 60s. It belongs on a proving-focused arm rather than
+     * every search; enable it per arm (or via the CLI) where proving matters more than fast incumbents.
      */
-    val pbObjectiveCutoff: Boolean = true,
+    val pbObjectiveCutoff: Boolean = false,
     /**
      * Objective-guided value selection on the minimisation path: try each decision variable's
      * objective-improving polarity first (for `min Σ w·x`, `x=0` when `w ≥ 0`, `x=1` when `w < 0`; the
