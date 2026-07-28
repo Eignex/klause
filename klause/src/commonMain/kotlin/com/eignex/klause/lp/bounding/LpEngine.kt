@@ -33,8 +33,10 @@ import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.solveAndCertify
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
@@ -296,7 +298,37 @@ internal class LpEngine(
             val base = relaxer.build(PropagationSession(problem))
             if (base.persistentEligible) persistentRelaxation = base
         }
-        return persistentRelaxation?.rebound(session) ?: relaxer.build(session)
+        persistentRelaxation?.let { return it.rebound(session) }
+        // Residual real models rebuild only when an activating pin changed: with no integer columns
+        // every row and bound is a function of the aux-bool pin set alone, so an unchanged fingerprint
+        // means the previously built relaxation is byte-identical — the common case along a dive,
+        // where most decisions touch Booleans that activate no real row.
+        if (residualAuxVars.isNotEmpty() && problem.numIntVars == 0) {
+            val key = IntArray(residualAuxVars.size) {
+                when (session.boolValue(residualAuxVars[it])) {
+                    null -> 2
+                    true -> 1
+                    false -> 0
+                }
+            }
+            residualCache?.let { cached ->
+                if (residualCacheKey?.contentEquals(key) == true) return cached
+            }
+            val built = relaxer.build(session)
+            residualCache = built
+            residualCacheKey = key
+            return built
+        }
+        return relaxer.build(session)
+    }
+
+    // Pin-fingerprint cache for the residual real relaxation (realResidual plans, no integer columns).
+    private var residualCacheKey: IntArray? = null
+    private var residualCache: LpRelaxation? = null
+    private val residualAuxVars: IntArray = if (params0.lpPlan.realResidual) {
+        problem.factors.filterIsInstance<ReifiedRealLinear>().map { it.aux }.distinct().sorted().toIntArray()
+    } else {
+        EmptyIntArray
     }
 
     /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
