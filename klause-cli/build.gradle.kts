@@ -4,17 +4,50 @@ plugins {
     id("com.eignex.cli") version "1.2.7"
 }
 
+// Build identity, mirrored by the MiniZinc solver configuration checked below. These feed the
+// generated BuildInfo that `--version` reports.
+val cliAppName = "Klause"
+val cliAppId = "com.eignex.klause"
+val cliVersion = "0.1.0"
+
 eignexCli {
     mainClass.set("com.eignex.klause.cli.MainKt")
     entryPoint.set("com.eignex.klause.cli.main")
-    // Feeds the generated BuildInfo that `--version` reports. `version` must agree with the
-    // `version` field of the MiniZinc solver configuration at
-    // klause-mzn-lib/share/minizinc/solvers/klause.msc: MiniZinc reads the solver version from
-    // the .msc and the CLI reports it here, so the two have to match.
-    appName.set("Klause")
-    appId.set("com.eignex.klause")
-    version.set("0.1.0")
+    appName.set(cliAppName)
+    appId.set(cliAppId)
+    version.set(cliVersion)
 }
+
+// MiniZinc reports the solver id, name and version from the .msc while the CLI reports them from
+// BuildInfo, so the two can disagree with nothing failing until someone compares `--version`
+// against `minizinc --solvers`. Assert the pair here instead.
+val mznSolverConfig =
+    rootProject.layout.projectDirectory.file("klause-mzn-lib/share/minizinc/solvers/klause.msc")
+
+val checkMznSolverConfig = tasks.register("checkMznSolverConfig") {
+    group = "verification"
+    description = "Asserts the MiniZinc solver configuration agrees with the CLI build identity."
+    val msc = mznSolverConfig
+    val expected = mapOf("id" to cliAppId, "name" to cliAppName, "version" to cliVersion)
+    inputs.file(msc)
+    inputs.property("expected", expected)
+    doLast {
+        val file = msc.asFile
+        @Suppress("UNCHECKED_CAST")
+        val config = groovy.json.JsonSlurper().parse(file) as Map<String, Any?>
+        val drift = expected.mapNotNull { (field, want) ->
+            val got = config[field]
+            if (got == want) null else "  $field: .msc has \"$got\", the build declares \"$want\""
+        }
+        if (drift.isNotEmpty()) {
+            throw GradleException(
+                "${file.name} disagrees with the CLI build identity:\n" + drift.joinToString("\n"),
+            )
+        }
+    }
+}
+
+tasks.named("check") { dependsOn(checkMznSolverConfig) }
 
 kotlin {
     jvm()
