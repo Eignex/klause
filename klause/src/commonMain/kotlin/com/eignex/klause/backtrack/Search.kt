@@ -234,6 +234,13 @@ internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
 ): Sequence<SearchOutcome> = sequence {
+    // Theory lemmas from the residual real LP register at restarts; a real-column model with no
+    // restart policy would pool them forever, so give it the Luby default.
+    val params = if (this@driveSearch.problem.numRealVars > 0 && params.lubyRestartBase == null) {
+        params.copy(lubyRestartBase = SAT_REAL_LUBY_BASE)
+    } else {
+        params
+    }
     val policy = SatPolicy(params, this@driveSearch.problem)
     val engine = DfsEngine(this@driveSearch, params, sink, policy)
     while (true) {
@@ -257,3 +264,7 @@ internal fun BacktrackSolver.makeNode(varRef: VarRef, values: Sequence<Long>): T
     is VarRef.Bool -> BoolNode(varRef, values)
     is VarRef.IntVar -> IntNode(varRef, values)
 }
+
+
+/** Luby restart unit for satisfaction search over real columns (the lemma-registration cadence). */
+private const val SAT_REAL_LUBY_BASE = 256L
