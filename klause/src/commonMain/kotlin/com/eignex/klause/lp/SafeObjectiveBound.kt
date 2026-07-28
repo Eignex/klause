@@ -112,6 +112,8 @@ internal fun LpModel.safeVariableBound(
  * subtracts a conservative rounding margin from every reduced cost, which for a free column
  * ([LpBuilder.addFreeVar]) is multiplied by the ~`Long.MAX/4` probe upper and swamps the true bound; the
  * exact bound carries no such margin, so a free basic column (true reduced cost 0) contributes nothing.
+ * A continuous model certifies over its scaled-integer rationalization
+ * ([rationalizedDualLowerBoundCeil]), so mixed real models get the same sharpness.
  * Null on a 128-bit certification overflow (the caller falls back). Same probe-frontier rejection as
  * [safeVariableBound], with the same [clamped] override for split representations.
  */
@@ -122,7 +124,13 @@ internal fun LpModel.exactVariableBound(
     clamped: Boolean? = null,
 ): Long? {
     // ⌈L⌉ on the minimized objective (−x when maximizing, x when minimizing), objConstant folded in.
-    val ceil = integerDualLowerBoundCeil(this, result.duals) ?: return null
+    val ceil = (
+        if (hasContinuous) {
+            rationalizedDualLowerBoundCeil(this, result.duals)
+        } else {
+            integerDualLowerBoundCeil(this, result.duals)
+        }
+        ) ?: return null
     val bound = if (maximize) {
         if (ceil == Long.MIN_VALUE) return null // −Long.MIN_VALUE overflows
         -ceil

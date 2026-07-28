@@ -33,6 +33,31 @@ import kotlin.math.roundToLong
 internal fun integerDualLowerBoundCeil(model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): Long? =
     integerCertify(model, y, scaleBits)?.objectiveBoundCeil(0L)
 
+/**
+ * `⌈L⌉` on a **continuous** model's true minimized objective, certified over its scaled-integer
+ * rationalization: the integer certificate bounds the scaled objective `s·(cᵀz + objConstant)` exactly,
+ * and the scale divides back out through `⌈⌈N / 2ᵏ⌉ / s⌉ = ⌈N / (2ᵏ·s)⌉`, so the result is a sound
+ * integer lower bound on the real objective. The float duals need no rescaling — row-scaling by `s`
+ * leaves the optimal duals unchanged, and any multipliers are sound regardless. Null when the model
+ * does not rationalize (an exactly-scaled objective constant included) or the certification overflows.
+ */
+internal fun rationalizedDualLowerBoundCeil(
+    model: LpModel,
+    y: DoubleArray,
+    scaleBits: Int = DEFAULT_SCALE_BITS,
+): Long? {
+    val r = rationalizeToIntegerModel(model, outwardRealUppers = true) ?: return null
+    if (!r.objConstantExact) return null
+    val scaled = integerCertify(r.model, y, scaleBits)?.objectiveBoundCeil(0L) ?: return null
+    return ceilDivPositive(scaled, r.scale)
+}
+
+/** `⌈a / d⌉` for a positive [d]: truncating division adjusted upward on a positive remainder. */
+private fun ceilDivPositive(a: Long, d: Long): Long {
+    val q = a / d
+    return if (a % d > 0L) q + 1L else q
+}
+
 /** The integer duals from rounding the float duals at the chosen power-of-two scale `2ᵏ`. */
 internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongArray)
 
@@ -188,7 +213,7 @@ internal fun integerFarkasRay(model: LpModel, ray: DoubleArray, scaleBits: Int =
     if (model.hasContinuous) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
-        val integral = rationalizeToIntegerModel(model) ?: return null
+        val integral = rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
         return integerFarkasRay(integral, ray, scaleBits)
     }
     val rd = roundDuals(model, ray, scaleBits) ?: return null
@@ -232,10 +257,16 @@ private fun chooseScale(maxY: Double, scaleBits: Int): Int {
     return scaleBits.coerceAtMost(headroom).coerceIn(0, MAX_SCALE_BITS)
 }
 
+/** A continuous model's scaled-integer copy: the integral [model], the positive [scale] `s` its
+ *  coefficients were multiplied by, and whether the objective constant scaled exactly
+ *  ([objConstantExact] — Farkas and feasibility certificates never read the objective, so they
+ *  tolerate an inexact constant; an objective-bound certificate must decline). */
+internal class RationalizedLp(val model: LpModel, val scale: Long, val objConstantExact: Boolean)
+
 /**
  * A scaled-integer copy of a continuous [model], or null when it cannot be rationalized within budget.
  * Multiplies the double-view coefficients (matrix, rhs, cost) by a common positive integer scale so they
- * become exact [Long]s, keeping the (integer) variable bounds. The existing 128-bit certifiers then apply
+ * become exact [Long]s. The existing 128-bit certifiers then apply
  * unchanged: scaling by a positive integer leaves the feasible region intact, so an infeasibility (Farkas)
  * certificate over the scaled model proves the real model infeasible. The scale is drawn from a dyadic
  * ladder (`2ᵏ`, exact — a power-of-two multiply never rounds the mantissa) and then a decimal ladder
@@ -243,38 +274,55 @@ private fun chooseScale(maxY: Double, scaleBits: Int): Int {
  * the same convention as [exactPointFeasible]: the scale *reconstructs the decimals the frontend
  * emitted* — the decimal text is the authoritative model and its double is already the approximation —
  * so the certificate is exact for the intended model even though the stored double of `0.1` is not
- * `1/10`. Returns null — leaving the LP `INDETERMINATE`, never mis-certified — when a bound is
- * non-integral, no ladder scale covers every coefficient, or a scaled value escapes the
- * exactly-representable range.
+ * `1/10`. Returns null — leaving the LP `INDETERMINATE`, never mis-certified — when no ladder scale
+ * covers every coefficient or a scaled value escapes the exactly-representable range.
+ *
+ * Variable bounds are not scaled. An int-backed or slack column takes its exact bound from the
+ * [Long] core (valid even at probe magnitude, where the double view's copy has rounded). A real
+ * column's box may be fractional, so its upper rounds by certificate direction, chosen by
+ * [outwardRealUppers]: `true` rounds **up** — enlarging the box only weakens a refutation (a Farkas
+ * box max grows, a dual lower bound drops), so Farkas rays and objective bounds stay sound; `false`
+ * rounds **down** — a feasibility certificate's point must live inside the true box.
  */
-internal fun rationalizeToIntegerModel(model: LpModel): LpModel? {
-    val dv = model.doubleView ?: return model
+internal fun rationalizeToIntegerModel(model: LpModel, outwardRealUppers: Boolean): RationalizedLp? {
+    val dv = model.doubleView ?: return RationalizedLp(model, 1L, objConstantExact = true)
     val n = model.n
     val numVars = model.numVars
     val upper = LongArray(numVars)
     for (j in 0 until numVars) {
         if (!dv.hasUpper[j]) continue
-        val u = dv.upper[j]
-        if (!u.isFinite() || u != floor(u) || abs(u) >= MAX_EXACT_INT) return null
+        if (j >= n || !model.colContinuous[j]) {
+            upper[j] = model.upper[j]
+            continue
+        }
+        val u = if (outwardRealUppers) ceil(dv.upper[j]) else floor(dv.upper[j])
+        if (u.isNaN() || u < 0.0 || u >= LONG_LIMIT) return null
         upper[j] = u.toLong()
     }
     val s = commonScale(dv) ?: return null
-    return LpModel(
-        n = n,
-        m = model.m,
-        csc = Csc(
-            dv.colPtr.copyOf(),
-            dv.rowIdx.copyOf(),
-            LongArray(dv.colVal.size) { (dv.colVal[it] * s).roundToLong() },
+    val objC = dv.objConstant * s
+    val objConstantExact = objC.isFinite() && abs(objC) < MAX_EXACT_INT &&
+        abs(objC.roundToLong() / s - dv.objConstant) <= DEC_TOL
+    return RationalizedLp(
+        LpModel(
+            n = n,
+            m = model.m,
+            csc = Csc(
+                dv.colPtr.copyOf(),
+                dv.rowIdx.copyOf(),
+                LongArray(dv.colVal.size) { (dv.colVal[it] * s).roundToLong() },
+            ),
+            rhs = LongArray(model.m) { (dv.rhs[it] * s).roundToLong() },
+            cost = LongArray(numVars) { (dv.cost[it] * s).roundToLong() },
+            upper = upper,
+            hasUpper = dv.hasUpper.copyOf(),
+            loShift = LongArray(n),
+            objConstant = if (objConstantExact) objC.roundToLong() else 0L,
+            sense = model.sense,
+            tag = IntArray(n) { -1 },
         ),
-        rhs = LongArray(model.m) { (dv.rhs[it] * s).roundToLong() },
-        cost = LongArray(numVars) { (dv.cost[it] * s).roundToLong() },
-        upper = upper,
-        hasUpper = dv.hasUpper.copyOf(),
-        loShift = LongArray(n),
-        objConstant = 0L,
-        sense = model.sense,
-        tag = IntArray(n) { -1 },
+        s.toLong(),
+        objConstantExact,
     )
 }
 
@@ -332,3 +380,6 @@ private const val MULTIPLIER_BITS = 52
 
 /** Integers below this magnitude round-trip exactly through `Double` (`2⁵³`); matches the certifier. */
 private const val MAX_EXACT_INT: Double = 9.007199254740992E15
+
+/** `Long.MAX_VALUE` as a `Double` (`2⁶³`): a real column's rounded upper must stay below it to convert. */
+private const val LONG_LIMIT: Double = 9.223372036854776E18

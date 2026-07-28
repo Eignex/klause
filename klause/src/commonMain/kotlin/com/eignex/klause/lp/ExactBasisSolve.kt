@@ -127,7 +127,7 @@ private const val DEC_MAX_INT = 9.007199254740992E15
  * region so the proof carries back exactly.
  */
 internal fun exactBasisFeasible(model: LpModel, basis: Basis): Boolean? {
-    val integral = rationalizeToIntegerModel(model) ?: return null
+    val integral = rationalizeToIntegerModel(model, outwardRealUppers = false)?.model ?: return null
     val m = integral.m
     if (m == 0) return true // no rows ⇒ the box `0 ≤ x ≤ u` (all nonbasic at a valid bound) is feasible
     if (m > MAX_EXACT_BASIS) return null // beyond this the fraction-free minors cannot stay in 128 bits
