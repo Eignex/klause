@@ -257,7 +257,11 @@ internal fun LpEngine.rootInfeasible(token: Cancellation): Boolean {
 internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     val relaxer = lpRelaxer ?: return false
     if (token()) return false
-    val model = relaxer.build(RootDomains(problem)).model
+    val model = try {
+        relaxer.build(RootDomains(problem)).model
+    } catch (_: LpOverflowException) {
+        return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
+    }
     if (model.n == 0) return false
     val simplex = RevisedSimplex(model, token)
     // A non-null solve is a feasible optimum; null is infeasible or an inconclusive failure. Only a
