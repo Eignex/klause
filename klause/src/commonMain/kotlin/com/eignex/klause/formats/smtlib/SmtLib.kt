@@ -8,6 +8,7 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -57,10 +58,11 @@ object SmtLib {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
         searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
+        cancellation: Cancellation = Cancellation.Never,
     ): SmtLibProblem {
         val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
         for (cmd in SExprReader(text).readAll()) b.command(cmd)
-        return b.build()
+        return b.build(cancellation)
     }
 
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
@@ -220,10 +222,10 @@ object SmtLib {
             }
         }
 
-        fun build(): SmtLibProblem {
+        fun build(cancellation: Cancellation = Cancellation.Never): SmtLibProblem {
             inferBounds()
             for (a in asserts) assert(a)
-            boundUnboundedVars()
+            boundUnboundedVars(cancellation)
             val objective = objectiveSpec?.let { (t, neg) ->
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }

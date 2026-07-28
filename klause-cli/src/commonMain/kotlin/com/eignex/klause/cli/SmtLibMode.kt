@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 
 /**
@@ -25,11 +26,17 @@ internal object SmtLibMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
             val config = KlauseConfig.current
+            // Bound the load-time OBBT by the `-t` deadline: each open-int side is a full LP solve over
+            // the relaxation, so on a large model an unbounded pass could outlast the whole solve budget
+            // before any solver exists (mirrors the MPS front-end). A side left un-tightened when the
+            // deadline trips is clamped to the searchable box below (sound — the clamp only loosens).
+            val obbtCancel = common.deadlineAtMs?.let { d -> Cancellation { nowMillis() > d } } ?: Cancellation.Never
             val parsed = SmtLib.parse(
                 readTextFile(path),
                 config.unboundedIntLo,
                 config.unboundedIntHi,
                 searchBound = config.unboundedSearchBound,
+                cancellation = obbtCancel,
             )
             domainsClamped = parsed.domainsClamped
             cliLogger(common.verbose).v {
