@@ -331,6 +331,12 @@ internal class LpEngine(
         EmptyIntArray
     }
 
+    /** Whether the residual real model is too large for per-node / per-leaf exact work: one sparse-LU
+     *  factorization at this row count outruns any node budget and its fill explodes memory, so the
+     *  checks decline and the verdict honestly degrades to unknown instead of hanging. */
+    val residualOversized: Boolean = params0.lpPlan.realResidual &&
+        problem.factors.count { it is ReifiedRealLinear || (it is Linear && it.hasReals) } > RESIDUAL_MAX_ROWS
+
     /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
     fun lastBackjump(): Learned? = lpBackjump
 
@@ -344,6 +350,7 @@ internal class LpEngine(
      */
     fun leafCertify(session: PropagationSession): LeafRealResult {
         lpBackjump = null
+        if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
         val relaxation = nodeRelaxation(relaxer, session)
         val model = relaxation.model
@@ -479,7 +486,8 @@ internal class LpEngine(
             // The residual real check is the model's only decision procedure for its real rows — a
             // demoted LP would leave the search enumerating a space it can never refute — so the
             // adaptive shedding (breaker, ladder, depth/cadence) does not apply to it.
-            val essential = params.lpPlan.realResidual
+            val essential = params.lpPlan.realResidual && !residualOversized
+            if (params.lpPlan.realResidual && residualOversized) return false
             // Wall-clock breaker: an expensive LP the ladder can't shed in time is shut off here,
             // before the ladder, so the search runs as a bare combinatorial arm.
             if (lpWallBreaker.isTripped && !essential) return false
@@ -608,3 +616,6 @@ internal class LpEngine(
         )
     }
 }
+
+/** Row cap for per-node / per-leaf exact residual work (one LU at ~1k rows is already ~ms-scale). */
+private const val RESIDUAL_MAX_ROWS = 1000
