@@ -179,8 +179,9 @@ internal fun tightenOpenIntBounds(
     var warm: Basis? = null
     var prevPos = -1
     var prevNeg = -1
+    var solves = 0
     for (v in 0 until n) {
-        if (cancellation()) break
+        if (cancellation() || solves >= OBBT_MAX_SIDE_SOLVES) break
         val cur = work[v]
         if (cur.lo != null && cur.hi != null) continue
         var newHi = cur.hi
@@ -188,6 +189,7 @@ internal fun tightenOpenIntBounds(
         // maximize x_v bounds the open upper side; minimize bounds the open lower side.
         for (maximize in booleanArrayOf(true, false)) {
             if (if (maximize) cur.hi != null else cur.lo != null) continue
+            solves++
             val model = base.withSingleColumnObjective(
                 posCol[v],
                 if (maximize) -1L else 1L,
@@ -240,6 +242,10 @@ private fun addRealColumns(
         builder.addRealRow(intArrayOf(pos, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
     }
 }
+
+/** Cap on the LP-solving pass's per-side solves: presolve-time OBBT runs with no deadline, and each
+ *  re-solve refactorizes on a large model — sides past the cap stay open for the caller's clamp. */
+private const val OBBT_MAX_SIDE_SOLVES = 128
 
 /** Upper bound on the number of full propagation passes; bounds only ever tighten, so the loop reaches a
  *  fixpoint in finite steps, but a long dependency chain could take many passes — cap it and leave any
