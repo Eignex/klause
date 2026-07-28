@@ -17,6 +17,12 @@ class XmlElement(
         if (children.isEmpty()) directText else directText + children.joinToString("") { it.textContent }
     }
 
+    /** Whether this element's own [directText] holds a `%` placeholder. Cached: `substituteParams` runs
+     *  once per `<args>` row on a shared group template, so a large `%`-free literal (an mdd
+     *  `<transitions>` blob) would otherwise be re-scanned for `%` on every instantiation — O(text) per
+     *  row. The tree is immutable after parsing, so the scan is done once per node. */
+    private val directTextHasPercent: Boolean by lazy(LazyThreadSafetyMode.NONE) { '%' in directText }
+
     /** Attribute [name], or empty string if absent. */
     fun attr(name: String): String = attributes[name].orEmpty()
 
@@ -30,10 +36,11 @@ class XmlElement(
         tag,
         attributes,
         children.map { it.substituteParams(tokens, usedIndices) },
-        // A `%`-free text carries no placeholder, so reuse it verbatim rather than scanning it with the
-        // parameter regex once per `<args>` row — a group whose template holds a large literal (e.g. an
-        // mdd `<transitions>` blob) would otherwise re-match megabytes of text on every instantiation.
-        if ('%' !in directText) directText else expandParams(directText, tokens, usedIndices),
+        // A `%`-free text carries no placeholder, so reuse it verbatim rather than expanding it once per
+        // `<args>` row — a group whose template holds a large literal (e.g. an mdd `<transitions>` blob)
+        // would otherwise rescan megabytes of text on every instantiation. The `%` test is itself cached
+        // ([directTextHasPercent]) so the scan is paid once per node, not once per instantiation.
+        if (!directTextHasPercent) directText else expandParams(directText, tokens, usedIndices),
     )
 
     /** Parameter indices explicitly referenced (`%i` / `%i..%j`) in this element's full text —
