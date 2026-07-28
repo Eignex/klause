@@ -245,10 +245,15 @@ internal fun LpEngine.sparseSafePrune(
             val outcome = rationalOutcome(model, cancellation)
             if (outcome.feasibility == RationalFeasibility.INFEASIBLE) {
                 sink.lp.observeInfeasiblePrune()
-                // No integer ray exists for a strictness-only conflict; cite every active row's
-                // premises — a valid theory lemma over the activating literals (sharpened by the
-                // rational decider's own row set later).
-                val clause = if (learn) activePremiseClause(relaxation, session) else null
+                // No integer ray exists for a strictness-only conflict; cite the rational decider's
+                // load-bearing rows (their premises plus touched integer bound atoms), falling back to
+                // every active row's premises when the row set is unavailable.
+                val clause = if (learn) {
+                    outcome.rows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
+                        ?: activePremiseClause(relaxation, session)
+                } else {
+                    null
+                }
                 return LpNodeOutcome(true, null, clause)
             }
         }

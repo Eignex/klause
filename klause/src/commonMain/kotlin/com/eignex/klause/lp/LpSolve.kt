@@ -35,6 +35,9 @@ internal class CertifiedLpResult internal constructor(
      *  preferred over the float primal by consumers that report the point. Null when the float
      *  certificates decided. */
     val exactPrimal: DoubleArray? = null,
+    /** On a rational-decider [LpVerdict.INFEASIBLE], the load-bearing original rows (no integer ray
+     *  exists for a strictness-carried proof); null otherwise. */
+    val infeasibleRows: IntArray? = null,
 ) {
     /** The exact 128-bit integer lower bound `⌈optimum⌉` on the true objective, or null when the LP was
      *  not certified or the bound does not fit a `Long`. */
@@ -94,6 +97,7 @@ internal fun solveAndCertify(
                 farkasRay = null,
                 model = null,
                 exactPrimal = outcome.witness,
+                infeasibleRows = outcome.rows,
             )
         }
     // A float optimum that cannot be certified exactly (a 128-bit overflow, or a real coefficient the
@@ -107,6 +111,7 @@ internal fun solveAndCertify(
     // rational decider.
     val anyStrict = model.rowStrict.any { it }
     var exactPrimal: DoubleArray? = null
+    var infeasibleRows: IntArray? = null
     val verdict = when {
         certificate != null -> LpVerdict.OPTIMAL
 
@@ -121,6 +126,7 @@ internal fun solveAndCertify(
         model.hasContinuous -> {
             val outcome = rationalOutcome(model, cancellation)
             exactPrimal = outcome.witness
+            infeasibleRows = outcome.rows
             when (outcome.feasibility) {
                 RationalFeasibility.FEASIBLE -> LpVerdict.OPTIMAL
                 RationalFeasibility.INFEASIBLE -> LpVerdict.INFEASIBLE
@@ -137,5 +143,6 @@ internal fun solveAndCertify(
         farkasRay = null,
         model = model,
         exactPrimal = exactPrimal,
+        infeasibleRows = infeasibleRows,
     )
 }

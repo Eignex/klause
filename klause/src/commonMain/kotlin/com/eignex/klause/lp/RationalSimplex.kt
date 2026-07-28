@@ -30,7 +30,14 @@ internal enum class RationalFeasibility { FEASIBLE, INFEASIBLE, UNKNOWN }
 
 /** The exact verdict plus, on FEASIBLE, a concrete structural-column witness (evaluated at a small
  *  positive delta when strict rows are present). */
-internal class RationalOutcome(val feasibility: RationalFeasibility, val witness: DoubleArray? = null)
+internal class RationalOutcome(
+    val feasibility: RationalFeasibility,
+    val witness: DoubleArray? = null,
+    /** On [RationalFeasibility.INFEASIBLE], the original rows carrying nonzero Farkas weight — the
+     *  violated row's tableau slack coefficients are exactly `B⁻ᵀe_r` — so an explanation cites only
+     *  the load-bearing rows. Null otherwise. */
+    val rows: IntArray? = null,
+)
 
 /**
  * An arithmetic level for the exact simplex: a rational number type with exact operations. A
@@ -239,7 +246,13 @@ private fun <F> runSimplex(
                 if (inBasisRow[j] >= 0 || ops.isZero(t[row][j])) continue
                 if (atUpper[j] && j < model.n && model.probeClampedHi[j]) return unknownOutcome()
             }
-            return RationalOutcome(RationalFeasibility.INFEASIBLE)
+            val certRows = ArrayList<Int>()
+            if (basis[row] >= model.n) certRows.add(basis[row] - model.n)
+            for (i in 0 until model.m) {
+                if (!ops.isZero(t[row][model.n + i]) && (basis[row] - model.n) != i) certRows.add(i)
+            }
+            if (ops.overflowed()) return null
+            return RationalOutcome(RationalFeasibility.INFEASIBLE, rows = certRows.toIntArray())
         }
         // Pivot fully: the leaving variable lands exactly on its violated bound; solve row for `enter`.
         val leave = basis[row]
