@@ -279,8 +279,13 @@ class Problem(
      * whose domains carry the root-bake fold. A no-op returning `this` when the bake already ran (not
      * [deferBake]) — and idempotent, since re-folding already-tightened domains changes nothing. This is
      * the presolve pipeline's step 0, replacing the construction-time bake for a front-end base problem.
+     *
+     * [cancellation] budgets the bake: on a pathologically wide domain the cheap bound-propagation
+     * fixpoint can grind, so the presolve pipeline threads its own (budget-capped) cancellation here. A
+     * fired budget yields a sound *partial* bake (the fixpoint only ever tightens); the deferred expensive
+     * propagators and the search re-derive the rest at the root.
      */
-    fun bakeBase(): Problem = if (!deferBake) {
+    fun bakeBase(cancellation: Cancellation = this.cancellation): Problem = if (!deferBake) {
         this
     } else {
         // A deferBake problem is always a fresh front-end base problem — it never carries seedDeductions

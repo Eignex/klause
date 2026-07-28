@@ -96,7 +96,7 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(prebaked.bakeBase(), bakeConfig)
+        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(prebaked.bakeBase(cancellation), bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         var current = seeded
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
