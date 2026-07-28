@@ -154,6 +154,12 @@ internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, bas
  * it can prune feasible assignments. Values absent from the root domain are global facts and
  * need no citation.
  */
+/** Sentinel: the hole-crossing reason is too wide to express; the caller must decline the move. */
+internal val INEXPRESSIBLE_REASON = IntArray(0)
+
+/** Citation cap for a snapped bound's crossed holes; a wider block declines instead. */
+private const val MAX_HOLE_CITATIONS = 4096
+
 internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange, base: IntArray?): IntArray? {
     var out: IntArrayList? = null
     val orig = problem.intDomains[v]
@@ -165,19 +171,34 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
         o.add(Lit.make(atomVarEq(v, value), true))
     }
     // Cite the search-carved values the bound snapped past — those in [crossed] still in the root
-    // domain. Enumerate the smaller side: over a wide sparse domain [crossed] can span billions while
-    // the root holds a handful of values, so iterate the root's members rather than every integer
-    // crossed. Both visit the same values ascending, so the cited literal set is identical.
-    val crossedLen = if (crossed.isEmpty()) {
-        0L
-    } else {
-        val d = crossed.last - crossed.first
-        if (d < 0) Long.MAX_VALUE else d + 1
-    }
-    if (orig.size.toLong() <= crossedLen) {
-        orig.forEach { value -> if (value in crossed) cite(value) }
-    } else {
-        for (value in crossed) if (value in orig) cite(value)
+    // domain. Walk the root's members inside [crossed] by neighbour steps: both the crossed span and
+    // the root can be astronomically wide (a clamped Long domain), but the members visited are
+    // bounded by the search-removal events that carved them, so this never scans value-by-value.
+    if (!crossed.isEmpty()) {
+        val start = if (crossed.first in orig) {
+            crossed.first
+        } else if (crossed.first < orig.max) {
+            orig.higher(crossed.first)
+        } else {
+            crossed.last + 1 // past the range: nothing to cite
+        }
+        // Count before citing: citing materializes eq-atoms, so an over-wide block must be detected
+        // allocation-free — a block past the cap was not carved value-by-value and has no bound-atom
+        // expression either; the deduction is inexpressible and the caller declines the move (sound —
+        // a weaker tightening never removes a feasible point).
+        var count = 0
+        var probe = start
+        while (probe <= crossed.last) {
+            if (++count > MAX_HOLE_CITATIONS) return INEXPRESSIBLE_REASON
+            if (probe >= orig.max) break
+            probe = orig.higher(probe)
+        }
+        var value = start
+        while (value <= crossed.last) {
+            cite(value)
+            if (value >= orig.max) break
+            value = orig.higher(value)
+        }
     }
     return out?.toIntArray() ?: base
 }
@@ -228,7 +249,9 @@ private inline fun PropagationState.tightenBoundImpl(
         val root = problem.intDomains[v]
         val cite = (if (isMin) bound > root.min else bound < root.max) && antecedents == null
         val crossed = if (isMin) bound until newDomain.min else (newDomain.max + 1)..bound
-        appendPriorBound(priorLit, cite, antecedentsAcrossHoles(v, crossed, antecedents))
+        val across = antecedentsAcrossHoles(v, crossed, antecedents)
+        if (across === INEXPRESSIBLE_REASON) return true // decline the snap: sound, just weaker
+        appendPriorBound(priorLit, cite, across)
     } else {
         antecedents
     }
@@ -307,6 +330,7 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
         newDomain.max != d.max -> antecedentsAcrossHoles(v, (newDomain.max + 1) until value, antNear)
         else -> antecedents
     }
+    if (ant === INEXPRESSIBLE_REASON) return true // decline the carve: sound, just weaker
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     // An interior carve (no endpoint moved) records the hole-carve record — the level/reason source

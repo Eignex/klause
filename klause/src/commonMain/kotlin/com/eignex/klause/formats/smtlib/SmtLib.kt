@@ -79,6 +79,13 @@ object SmtLib {
         internal var nextBool = 0
         internal var nextInt = 0
         internal var nextReal = 0
+
+        /** Chain variables of the wide-coefficient row encoding, keyed `(varId shl 3) or (k shl 1) or isInt`:
+         *  chain k stands for `B^k · var` (see [wideRealRow]). */
+        internal val realChainVars = HashMap<Long, Int>()
+
+        /** The auxiliary real pinned to 1 that absorbs a wide row's oversized constant, or -1. */
+        internal var realOneVar = -1
         internal val intDomains = ArrayList<PresolveDomain>()
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
