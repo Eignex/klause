@@ -62,7 +62,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *  - `calibrate [filters…]` — the fair arm tester: run the pool once as a live portfolio and rank
  *    arms into a diverse palette by per-problem best-holder wins (see [calibrate]).
  *  - `reference [filters…]` — harvest per-instance reference optima/bounds with a format-native strong
- *    solver (cp-sat for MiniZinc/XCSP3, clasp for DIMACS/OPB, z3 for SMT-LIB QF_LIA) into the committed
+ *    solver (cp-sat for MiniZinc/XCSP3, clasp for DIMACS/OPB, z3 for SMT-LIB) into the committed
  *    per-solver tables (see [reference]); the gap-to-optimum reward + a soundness oracle.
  *  - `credit [--by structure|format] <a.csv> <b.csv> …` — win-share + greedy set-cover credit between
  *    per-run result CSVs, keyed by (suite, problem), sliceable by a feature column (see [credit]).
@@ -359,11 +359,11 @@ object BenchCli {
         val f = filterArgs.filter { "=" in it }.associate { it.substringBefore('=') to it.substringAfter('=') }
         // Best strong solver per format: cp-sat for MiniZinc (`minizinc --solver`) and XCSP3 (the CPMpy
         // container — OR-Tools has no XCSP3 frontend), clasp for DIMACS/OPB (the Boolean formats cp-sat
-        // can't read), z3 for SMT-LIB QF_LIA, SCIP for MPS (MIP). Other formats have no path.
+        // can't read), z3 for SMT-LIB, SCIP for MPS (MIP). Other formats have no path.
         val refs = select(f).filter {
             it.format == Format.MINIZINC || it.format == Format.XCSP3 ||
                 it.format == Format.DIMACS || it.format == Format.OPB ||
-                it.format == Format.SMTLIB_QF_LIA || it.format == Format.MPS
+                it.format == Format.SMTLIB || it.format == Format.MPS
         }
         if (refs.isEmpty()) {
             println("(no MiniZinc/XCSP3/DIMACS/OPB/SMT-LIB/MPS problems matched the selection)")
@@ -382,8 +382,8 @@ object BenchCli {
             "DIMACS/OPB reference needs the ${ClaspReference.IMAGE} image " +
                 "(build it: docker build -t ${ClaspReference.IMAGE} klause-bench/clasp)"
         }
-        require(refs.none { it.format == Format.SMTLIB_QF_LIA } || Z3Reference.available()) {
-            "SMT-LIB QF_LIA reference needs a z3 binary on PATH (`z3 --version`)"
+        require(refs.none { it.format == Format.SMTLIB } || Z3Reference.available()) {
+            "SMT-LIB reference needs a z3 binary on PATH (`z3 --version`)"
         }
         require(refs.none { it.format == Format.MPS } || ScipReference.imageAvailable()) {
             "MPS reference needs the ${ScipReference.IMAGE} image " +
@@ -454,7 +454,7 @@ object BenchCli {
         // table stays honest about which oracle each format came from. All cache and score identically.
         val clasp = ref.format == Format.DIMACS || ref.format == Format.OPB
         val xcsp3 = ref.format == Format.XCSP3
-        val smt = ref.format == Format.SMTLIB_QF_LIA
+        val smt = ref.format == Format.SMTLIB
         val mps = ref.format == Format.MPS
         val solverId = solverIdFor(ref, backend)
         val cacheTag = when {
@@ -485,7 +485,7 @@ object BenchCli {
 
             smt -> {
                 r = cached ?: Z3Reference.run(ref, budget).also { BenchCache.store(key, it) }
-                maximize = false // QF_LIA benchmarks are decision instances — no objective to orient
+                maximize = false // SMT-LIB benchmarks are decision instances — no objective to orient
             }
 
             mps -> {
@@ -546,7 +546,7 @@ object BenchCli {
      *  requested MiniZinc [backend]. One source of truth so the decisive and unknown-row paths agree. */
     private fun solverIdFor(ref: ProblemRef, backend: String): String = when (ref.format) {
         Format.DIMACS, Format.OPB -> "clasp"
-        Format.SMTLIB_QF_LIA -> "z3"
+        Format.SMTLIB -> "z3"
         Format.MPS -> "scip"
         else -> backend
     }

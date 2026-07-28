@@ -6,9 +6,9 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import java.util.concurrent.TimeUnit
 
 /**
- * The SMT-LIB QF_LIA reference. cp-sat has no SMT-LIB frontend, so quantifier-free linear-integer
+ * The SMT-LIB reference. cp-sat has no SMT-LIB frontend, so quantifier-free linear-arithmetic
  * benchmarks are decided by z3 (a complete SMT solver) run as a native binary directly on the `.smt2`
- * file — no container, since z3 ships a self-contained executable. QF_LIA benchmarks are decision
+ * file — no container, since z3 ships a self-contained executable. SMT-LIB benchmarks are decision
  * instances (no `(minimize`/`(maximize`), so a row records satisfiability (`sat` → feasible, `unsat`
  * → infeasible) and proves it whenever z3 returns a definitive verdict within budget; `unknown` or a
  * timeout is undecided. Rows are keyed by solver `z3`, coexisting with the cp-sat and clasp oracles.
@@ -35,7 +35,7 @@ internal object Z3Reference {
         p.waitFor(EXIT_WAIT_MS, TimeUnit.MILLISECONDS) && p.exitValue() == 0
     }.getOrElse { false }
 
-    /** Decide [ref] (a QF_LIA `.smt2`) with z3 under [budget]. Bounded so a whole-corpus parallel sweep
+    /** Decide [ref] (an SMT-LIB `.smt2`) with z3 under [budget]. Bounded so a whole-corpus parallel sweep
      *  is safe: `-T:<sec>` caps wall-clock (z3 then answers `unknown`), `-memory:<MB>` caps RAM, and
      *  `sat.threads=1 parallel.enable=false` keep it single-threaded (no fan-out per process). A watchdog
      *  force-kills a run that ignores its own limits, so one solve can never hang or starve the box. */
@@ -71,7 +71,7 @@ internal object Z3Reference {
     }
 
     /** z3 prints the check-sat answer as a bare `sat` / `unsat` / `unknown` line. Map the last such
-     *  line to the [SolverInvocation.Result] the reference sweep scores: QF_LIA is a decision problem,
+     *  line to the [SolverInvocation.Result] the reference sweep scores: SMT-LIB benchmarks are decision problems,
      *  so `sat`/`unsat` is a proof (no objective) and `unknown`/timeout is undecided. */
     internal fun parse(stdout: String, elapsedMs: Long, cmd: List<String>): SolverInvocation.Result {
         val verdict = stdout.lineSequence().map { it.trim() }
@@ -85,7 +85,7 @@ internal object Z3Reference {
         val timeMs = elapsedMs.takeIf { feasible == true }
         return SolverInvocation.Result(
             feasible = feasible,
-            objective = null, // QF_LIA benchmarks are decision instances — no optimisation objective
+            objective = null, // SMT-LIB benchmarks are decision instances — no optimisation objective
             timeToBestMs = timeMs,
             timeToFirstFeasibleMs = timeMs,
             proven = proven,

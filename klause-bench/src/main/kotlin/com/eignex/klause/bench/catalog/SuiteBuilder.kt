@@ -158,7 +158,7 @@ val Format.dir: String
         Format.JSON_SCHEMA -> "schema"
         Format.MINIZINC -> "minizinc"
         Format.XCSP3 -> "xcsp3"
-        Format.SMTLIB_QF_LIA -> "smtlib"
+        Format.SMTLIB -> "smtlib"
         Format.MPS -> "mps"
         Format.IN_CODE -> error("IN_CODE has no corpus directory")
     }
@@ -172,7 +172,7 @@ val Format.ext: String
         Format.JSON_SCHEMA -> "json"
         Format.MINIZINC -> "mzn"
         Format.XCSP3 -> "xml"
-        Format.SMTLIB_QF_LIA -> "smt2"
+        Format.SMTLIB -> "smt2"
         Format.MPS -> "mps"
         Format.IN_CODE -> error("IN_CODE has no extension")
     }

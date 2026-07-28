@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * A committed per-instance reference optimum/bound from a strong external solver — cp-sat (MiniZinc,
- * XCSP3), clasp (DIMACS, OPB), z3 (SMT-LIB QF_LIA), or SCIP (MPS), per the instance's format
+ * XCSP3), clasp (DIMACS, OPB), z3 (SMT-LIB), or SCIP (MPS), per the instance's format
  * ([solver]). The gap-to-optimum BO reward reads this table, and it doubles as a soundness oracle (any
  * solver beating a [proven] optimum is a bug). [objective] is in the model's orientation ([maximize]).
  */

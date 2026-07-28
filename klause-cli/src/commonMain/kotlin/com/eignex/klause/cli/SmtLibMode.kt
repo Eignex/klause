@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 
 /**
- * SMT-LIB 2 **QF_LIA** front-end (`.smt2` / `.smt`). Emits the SMT-LIB convention: a
+ * SMT-LIB 2 front-end (`.smt2` / `.smt`; QF_LIA / QF_LRA / QF_LIRA). Emits the SMT-LIB convention: a
  * `sat` / `unsat` / `unknown` status line, followed (when sat) by a `(get-model)`-style
  * `(define-fun …)` block. `-s` statistics are emitted as `;` comment lines.
  */

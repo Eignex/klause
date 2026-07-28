@@ -34,8 +34,8 @@ enum class Format {
     /** XCSP3 instance. Net-new ingest (phase 3). */
     XCSP3,
 
-    /** SMT-LIB QF_LIA script. Net-new ingest (phase 3). */
-    SMTLIB_QF_LIA,
+    /** SMT-LIB script (QF_LIA / QF_LRA / QF_LIRA). Net-new ingest (phase 3). */
+    SMTLIB,
 
     /** MPS (Mathematical Programming System) MIP instance. In-process via `Mps.parse(…).toProblem(…)`. */
     MPS,
