@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.smallModelIntBound
 import com.eignex.klause.lp.tightenOpenIntBounds
+import com.eignex.klause.solver.Cancellation
 
 /**
  * Close every still-[PresolveDomain.Open] integer variable to a finite domain before search. First
@@ -13,14 +14,14 @@ import com.eignex.klause.lp.tightenOpenIntBounds
  * marks the model clamped, so search still finds a SAT witness while an `unsat` over the box is reported
  * as `unknown` (never a false `unsat`). Infinity thus never reaches search.
  */
-internal fun SmtLib.Builder.boundUnboundedVars() {
-    obbtBounds()
+internal fun SmtLib.Builder.boundUnboundedVars(cancellation: Cancellation = Cancellation.Never) {
+    obbtBounds(cancellation)
     finalizeDomains()
 }
 
 /** LP-tighten every open domain side via the shared OBBT helper ([tightenOpenIntBounds]) over the
  *  current [Linear] constraints; only open sides are written back (a finite domain is left as inferred). */
-private fun SmtLib.Builder.obbtBounds() {
+private fun SmtLib.Builder.obbtBounds(cancellation: Cancellation) {
     if ((0 until nextInt).none { intDomains[it] is PresolveDomain.Open }) return
     val bounds = Array(nextInt) { v ->
         when (val d = intDomains[v]) {
@@ -32,6 +33,7 @@ private fun SmtLib.Builder.obbtBounds() {
     val tightened = tightenOpenIntBounds(
         bounds,
         linears.filter { !it.hasReals },
+        cancellation = cancellation,
         realConstraints = linears.filter { it.hasReals },
         realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
         realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
