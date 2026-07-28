@@ -44,6 +44,10 @@ internal class CommonOptions {
      *  ([CliMode.load]) and the solve phase ([SolveCore]) so the two phases don't each spend a
      *  fresh full budget (which would let `-t` overshoot ~2×). Null when no `-t` is given. */
     var deadlineAtMs: Long? = null
+
+    /** Wall time (ms) the front-end load took — parse + construction-time bake — set by the driver
+     *  around `session.load`, so `dry-run-presolve` can split parse from bake. */
+    var loadElapsedMs: Long? = null
     var randomSeed: Long? = null
     var verbose = false
     var statistics = false

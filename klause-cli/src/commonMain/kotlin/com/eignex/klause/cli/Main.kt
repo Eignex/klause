@@ -82,7 +82,9 @@ private fun run(args: Array<String>) {
     common.deadlineAtMs = common.timeLimitMs?.let { nowMillis() + it }
     val mode = pickMode(common, path)
     val session = sessions.getValue(mode)
+    val loadStart = nowMillis()
     val solvable = session.load(path, common)
+    common.loadElapsedMs = nowMillis() - loadStart
     SolveCore.solve(solvable, common, session.output(common))
 }
 
