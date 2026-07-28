@@ -3,7 +3,11 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.lp.LpVerdict
+import com.eignex.klause.lp.bounding.LpEngine
+import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
+import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
@@ -148,6 +152,36 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
      *  final Exhausted verdict must degrade to `unknown` rather than UNSAT. */
     var sawIndeterminate = false
         private set
+
+    // Real rows have no propagator, so on a model with continuous columns nothing between the root and a
+    // full-assignment leaf ever refutes a partial assignment that already activates an infeasible set of
+    // real rows — the search would enumerate the whole Boolean space one expensive leaf LP at a time. Run
+    // the certified LP-infeasibility prune at search nodes instead, with Farkas-clause learning: the
+    // certificate cites the reified rows' premise literals, so one refutation prunes every assignment
+    // sharing them and the engine backjumps past the dead region.
+    private val lpEngine: LpEngine? = if (problem.numRealVars > 0) {
+        LpEngine(
+            problem,
+            LinearObjective(intCoefficients = LongArray(problem.numIntVars)),
+            LpParams(
+                lpPlan = params.lpPlan.copy(bounding = true, learn = true, realResidual = true),
+                lpConfig = params.lpConfig,
+                cancellation = params.cancellation,
+                solveBudgetMillis = params.solveBudgetMillis,
+                randomSeed = params.randomSeed,
+            ),
+            SolveStatsSink(backend = "backtrack"),
+        )
+    } else {
+        null
+    }
+
+    override val pruneIf: ((PropagationSession) -> Boolean)? = lpEngine?.let { eng ->
+        // An infinite incumbent never dominates, so the LP arm prunes only on certified infeasibility.
+        { session -> eng.pruneNode(session, Double.POSITIVE_INFINITY, -1, true) }
+    }
+
+    override val pruneLearned: (() -> Learned?)? = lpEngine?.let { eng -> { eng.lastBackjump() } }
 
     override fun cancelled(): Boolean = params.cancellation()
 

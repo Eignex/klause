@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -305,6 +306,14 @@ internal class CpToLpRelaxation(
      * probe is deliberately the minimal linear+Boolean relaxation.
      */
     private val objectiveCone: Boolean = false,
+    /**
+     * Build only the **residual real sub-relaxation**: the factors that touch LP-only continuous
+     * (real) columns, and nothing else. Propagation already enforces the Boolean/integer structure at
+     * every node, so for a pure feasibility prune the clause rows add no strength — dropping them
+     * shrinks the basis from the clause count to the real-atom count (the satisfaction path's
+     * per-node check; see [com.eignex.klause.lp.bounding.LpPlan.realResidual]).
+     */
+    private val realResidual: Boolean = false,
     /** When true, build the arc-indicator relaxation of each [Circuit] / [Circuit] (degree +
      *  channelling rows over one `y_ij ∈ [0,1]` column per candidate arc). For Circuit it also records
      *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
@@ -781,6 +790,7 @@ internal class CpToLpRelaxation(
                 // #571: in cone mode emit only factors connected to the objective; this also drops
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
+                if (realResidual && !touchesReals(factor)) continue
                 currentFactorId = factorId
                 // Each factor emits its own rows; factors with no linear relaxation (hard globals,
                 // cut-only or scheduling-view factors) keep the default no-op [Factor.linearize] and
@@ -826,6 +836,14 @@ internal class CpToLpRelaxation(
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
                 colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
             )
+        }
+
+        /** Whether [factor] involves an LP-only continuous column — the [realResidual] filter. */
+        private fun touchesReals(factor: Factor): Boolean = when (factor) {
+            is Linear -> factor.hasReals
+            is ReifiedRealLinear -> true
+            is RealProduct -> true
+            else -> false
         }
 
         /**

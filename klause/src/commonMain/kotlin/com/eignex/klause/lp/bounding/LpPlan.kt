@@ -151,6 +151,14 @@ data class LpPlan(
      */
     val objectiveCone: Boolean = false,
     /**
+     * Build the per-node relaxation over only the factors that touch LP-only continuous (real)
+     * columns — the residual real-feasibility sub-relaxation the satisfaction path prunes with. The
+     * Boolean clause structure is enforced by propagation already, so dropping its rows loses no
+     * pruning power at an infinite incumbent while shrinking the basis from the clause count to the
+     * real-atom count. Requires [bounding]; off by default.
+     */
+    val realResidual: Boolean = false,
+    /**
      * Whether the adaptive LP auto-off (#614) may **re-probe** a disabled per-node LP on exponential
      * backoff to recover subtrees where the relaxation becomes useful again. `true` is the adaptive
      * default; `false` makes a disable irreversible — the static-one-shot behaviour of #562, kept as a
