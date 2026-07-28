@@ -225,15 +225,16 @@ internal object SolverInvocation {
 
     /** Which output stream a subprocess emits, so the read loop parses the right markers. References
      *  always speak MiniZinc; klause-cli speaks the front-end bound to the *input* format — MiniZinc
-     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS and OPB. */
-    private enum class Dialect { MINIZINC, PB_COMPETITION }
+     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS and
+     *  OPB, and the SMT-LIB convention (`sat`/`unsat`/`unknown` + `; key=value` comments) for `.smt2`. */
+    private enum class Dialect { MINIZINC, PB_COMPETITION, SMT_LIB }
 
-    private fun dialectFor(solverId: String, format: Format): Dialect =
-        if (solverId == KLAUSE && (format == Format.XCSP3 || format == Format.MPS || format == Format.OPB)) {
-            Dialect.PB_COMPETITION
-        } else {
-            Dialect.MINIZINC
-        }
+    private fun dialectFor(solverId: String, format: Format): Dialect = when {
+        solverId != KLAUSE -> Dialect.MINIZINC
+        format == Format.XCSP3 || format == Format.MPS || format == Format.OPB -> Dialect.PB_COMPETITION
+        format == Format.SMTLIB -> Dialect.SMT_LIB
+        else -> Dialect.MINIZINC
+    }
 
     private fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
@@ -331,6 +332,20 @@ internal object SolverInvocation {
                     // `c <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
                     line.startsWith(XCSP_COMMENT_PREFIX) -> recordStat(line.removePrefix(XCSP_COMMENT_PREFIX).trim())
                 }
+
+                Dialect.SMT_LIB -> when {
+                    line == SMT_SAT -> markFeasible()
+
+                    line == SMT_UNSAT -> {
+                        unsat = true
+                        proven = true
+                    }
+
+                    line == SMT_UNKNOWN -> Unit
+
+                    // `; <key>=<value>` statistics (same shape as `%%%mzn-stat:`, different prefix).
+                    line.startsWith(SMT_COMMENT_PREFIX) -> recordStat(line.removePrefix(SMT_COMMENT_PREFIX).trim())
+                }
             }
         }
         if (!process.waitFor(GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
@@ -389,6 +404,12 @@ internal object SolverInvocation {
     private const val XCSP_UNKNOWN = "s UNKNOWN"
     private const val XCSP_OBJECTIVE_PREFIX = "o "
     private const val XCSP_COMMENT_PREFIX = "c "
+
+    // SMT-LIB output stream (klause-cli's `.smt2` front-end).
+    private const val SMT_SAT = "sat"
+    private const val SMT_UNSAT = "unsat"
+    private const val SMT_UNKNOWN = "unknown"
+    private const val SMT_COMMENT_PREFIX = "; "
     private const val NANOS_PER_MILLI = 1_000_000L
     private const val GRACE_MILLIS = 30_000L
     private const val STDERR_CAP = 2000
