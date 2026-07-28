@@ -200,3 +200,11 @@ tasks.register("dumpSchema", JavaExec::class) {
 tasks.withType<Test> {
     maxHeapSize = "4g"
 }
+
+// The KMP modules get `allTests` from the kotlin plugin; this module is jvm-only and has just
+// `test`. Alias it so one task name runs the tests of every module.
+tasks.register("allTests") {
+    group = "verification"
+    description = "Runs the tests for all targets (jvm only in this module)."
+    dependsOn(tasks.named("test"))
+}
