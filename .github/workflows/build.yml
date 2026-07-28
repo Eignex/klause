@@ -47,10 +47,11 @@ jobs:
       # js/wasm with their browser/node runtimes) is opt-in via -Ptargets.full and builds
       # and tests on release.
 
-      # `check` runs tests without lintDocs (detekt + dokka), which the parallel `lint` job
-      # already covers. Keeping them separate avoids running lintDocs twice per push.
+      # Named tasks rather than `check`: the build conventions wire lintDocs (detekt + dokka) into
+      # `check`, and the parallel `lint` job already owns that. Anything the conventions later add
+      # to `check` must be listed here.
       - name: Run tests with coverage
-        run: ./gradlew check koverXmlReport
+        run: ./gradlew allTests koverVerify koverXmlReport
 
       - name: Upload test reports
         if: always()
