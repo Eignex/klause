@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VarRef
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
@@ -182,6 +183,19 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
     }
 
     override val pruneLearned: (() -> Learned?)? = lpEngine?.let { eng -> { eng.lastBackjump() } }
+
+    /** Non-asserting theory lemmas pool up in the engine; register them permanently at each restart —
+     *  without this the satisfaction path silently drops every lemma whose 1UIP analysis fails. A root
+     *  contradiction while registering proves the whole space empty. */
+    override fun drainLpNogoodsAtRestart(session: PropagationSession): Boolean {
+        val pool = lpEngine?.lpNogoods ?: return false
+        for (nogood in pool.drain()) {
+            val res = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)
+            if (res is PropagationResult.Unsat) return true
+            params.clauseExchange?.publishGlobal(session.asSharedClause(nogood, nogood.size))
+        }
+        return false
+    }
 
     override fun cancelled(): Boolean = params.cancellation()
 
