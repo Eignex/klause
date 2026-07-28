@@ -81,6 +81,7 @@ internal class LpEngine(
                 gccCountHull = plan.gccCount,
                 circuitArcs = plan.circuit,
                 objectiveCone = plan.objectiveCone,
+                realResidual = plan.realResidual,
                 linMaxTightFace = plan.linMaxTightFace,
                 productMcCormick = plan.productMcCormick,
                 booleanRlt = plan.booleanRlt,
@@ -382,12 +383,18 @@ internal class LpEngine(
             objectiveAscending: Boolean,
         ): Boolean {
             val lpRelaxerL = lpRelaxer ?: return false
+            // The residual real check is the model's only decision procedure for its real rows — a
+            // demoted LP would leave the search enumerating a space it can never refute — so the
+            // adaptive shedding (breaker, ladder, depth/cadence) does not apply to it.
+            val essential = params.lpPlan.realResidual
             // Wall-clock breaker: an expensive LP the ladder can't shed in time is shut off here,
             // before the ladder, so the search runs as a bare combinatorial arm.
-            if (lpWallBreaker.isTripped) return false
-            if (session.decisionLevel > params.lpPlan.boundMaxDepth ||
-                ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
-                !lpLadder.shouldRun()
+            if (lpWallBreaker.isTripped && !essential) return false
+            if (!essential && (
+                    session.decisionLevel > params.lpPlan.boundMaxDepth ||
+                        ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
+                        !lpLadder.shouldRun()
+                    )
             ) {
                 return false
             }
