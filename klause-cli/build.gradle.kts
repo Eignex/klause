@@ -1,12 +1,19 @@
 plugins {
     // kbuild CLI conventions: KMP + lint + kover, JVM dist + native executables,
     // and the `releaseAssets` packaging task.
-    id("com.eignex.cli") version "1.2.6"
+    id("com.eignex.cli") version "1.2.7"
 }
 
 eignexCli {
     mainClass.set("com.eignex.klause.cli.MainKt")
     entryPoint.set("com.eignex.klause.cli.main")
+    // Feeds the generated BuildInfo that `--version` reports. `version` must agree with the
+    // `version` field of the MiniZinc solver configuration at
+    // klause-mzn-lib/share/minizinc/solvers/klause.msc: MiniZinc reads the solver version from
+    // the .msc and the CLI reports it here, so the two have to match.
+    appName.set("Klause")
+    appId.set("com.eignex.klause")
+    version.set("0.1.0")
 }
 
 kotlin {

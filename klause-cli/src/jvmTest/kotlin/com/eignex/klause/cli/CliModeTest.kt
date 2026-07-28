@@ -200,7 +200,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `-p2 attached form drives the parallel portfolio (matches the documented spelling)`() {
+    fun `-p2 attached form drives the parallel portfolio matching the documented spelling`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
