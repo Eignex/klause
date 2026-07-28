@@ -44,8 +44,9 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
             max -> ContiguousDomain(min, max - 1)
 
             else -> {
+                // A full-Long span overflows the subtraction; a negative "span" means huge, never bitset.
                 val span = max - min + 1
-                if (span <= KlauseConfig.current.bitsetThreshold) {
+                if (span in 1..KlauseConfig.current.bitsetThreshold) {
                     val spanI = span.toInt()
                     val bits = LongArray((spanI + 63) ushr 6)
                     Bits.fillRange(bits, 0, spanI)

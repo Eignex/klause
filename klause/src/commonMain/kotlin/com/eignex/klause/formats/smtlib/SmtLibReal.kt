@@ -54,8 +54,11 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
 
             is SExpr.SList -> when ((node.items[0] as? SExpr.Atom)?.text) {
                 "to_real", "/" -> return true
+
                 "to_int" -> Unit
+
                 "+", "-", "*" -> for (i in 1 until node.items.size) work.addLast(node.items[i])
+
                 // Either branch decides the ite's sort: a real may hide in the else-branch alone.
                 "ite" -> {
                     work.addLast(node.items[2])
@@ -63,6 +66,7 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
                 }
 
                 "let" -> work.addLast(node.items[2])
+
                 else -> Unit
             }
         }

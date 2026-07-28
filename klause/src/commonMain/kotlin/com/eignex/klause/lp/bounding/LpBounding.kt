@@ -5,6 +5,7 @@ import com.eignex.klause.lp.FloatLpResult
 import com.eignex.klause.lp.IntegerCertificate
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpOverflowException
+import com.eignex.klause.lp.RationalFeasibility
 import com.eignex.klause.lp.RevisedSimplex
 import com.eignex.klause.lp.TableauCutSolver
 import com.eignex.klause.lp.VarStatus
@@ -16,7 +17,6 @@ import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.integerCertify
 import com.eignex.klause.lp.integerDualLowerBoundCeil
 import com.eignex.klause.lp.integerFarkasRay
-import com.eignex.klause.lp.RationalFeasibility
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.rationalOutcome
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
@@ -227,7 +227,7 @@ internal fun LpEngine.sparseSafePrune(
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
     val simplex = dualSimplex(model, cancellation)
     val floatResult = simplex.solve(warm)
-    strictSaved?.let { it.copyInto(dv!!.rhs) }
+    if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
     val result = floatResult ?: run {
         // Infeasibility prune (#705): a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
@@ -657,7 +657,6 @@ internal const val SEARCH_CUT_ROUNDS: Int = 4
  *  measured ≤ ~48k (evilshop 155×155, the largest gain) while the cost regressions were ≥ ~1.6M
  *  (fast-food 501×1048, diameterc-mst 1797×4066), so the gap is two orders of magnitude. */
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
-
 
 /** Inward relative rhs perturbation applied to strict rows for the float filter solve. */
 private const val STRICT_FILTER_EPS = 1e-7
