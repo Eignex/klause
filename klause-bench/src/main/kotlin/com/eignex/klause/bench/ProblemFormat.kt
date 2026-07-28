@@ -79,10 +79,10 @@ internal object Xcsp3Format : ProblemFormat {
     }
 }
 
-/** SMT-LIB QF_LIA ingest (pragmatic subset → klause Problem). Parser lives in
+/** SMT-LIB ingest (pragmatic subset → klause Problem). Parser lives in
  *  `com.eignex.klause.formats.smtlib`; this wrapper reads bench-level config knobs. */
 internal object SmtLibFormat : ProblemFormat {
-    override val format = Format.SMTLIB_QF_LIA
+    override val format = Format.SMTLIB
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toLongOrNull() ?: 100_000L

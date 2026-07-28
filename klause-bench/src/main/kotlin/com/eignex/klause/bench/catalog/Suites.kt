@@ -74,7 +74,7 @@ internal object Suites {
                     CorpusSelection.Layout.Flat("non-incremental/QF_LIA", "smt2"),
                     CorpusSelection.Selection.fromProps(),
                     Category.CSP,
-                    format = Format.SMTLIB_QF_LIA,
+                    format = Format.SMTLIB,
                 )
             },
             DynamicSuite(
@@ -86,7 +86,7 @@ internal object Suites {
                     CorpusSelection.Layout.Flat("non-incremental/QF_LRA", "smt2"),
                     CorpusSelection.Selection.fromProps(),
                     Category.CSP,
-                    format = Format.SMTLIB_QF_LIA,
+                    format = Format.SMTLIB,
                 )
             },
             DynamicSuite(
@@ -98,7 +98,7 @@ internal object Suites {
                     CorpusSelection.Layout.Flat("non-incremental/QF_LIRA", "smt2"),
                     CorpusSelection.Selection.fromProps(),
                     Category.CSP,
-                    format = Format.SMTLIB_QF_LIA,
+                    format = Format.SMTLIB,
                 )
             },
             DynamicSuite(
@@ -534,7 +534,7 @@ internal object Suites {
     }
 
     private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {
-        format = Format.SMTLIB_QF_LIA
+        format = Format.SMTLIB
         license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
         vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))

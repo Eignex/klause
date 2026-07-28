@@ -28,7 +28,7 @@ internal object ProblemKind {
                 text == null -> false
                 ref.format == Format.MINIZINC -> hasSolveObjective(text)
                 ref.format == Format.OPB -> OPB_OBJECTIVE.containsMatchIn(text)
-                ref.format == Format.SMTLIB_QF_LIA -> SMT_OBJECTIVE.containsMatchIn(text)
+                ref.format == Format.SMTLIB -> SMT_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.XCSP3 -> XCSP_OBJECTIVE.containsMatchIn(text)
                 ref.format == Format.MPS -> mpsHasObjective(text)
                 else -> false
