@@ -17,6 +17,8 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedLongArray
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
@@ -246,12 +248,19 @@ class Problem(
         mergeBase(propagate(Assumptions.None, cancellation, skipExpensiveBake = true), seedDeductions)
     }
 
+    /** Wall time the construction-time base bake took: forcing [baked] (root propagation to fixpoint)
+     *  and folding it into [intDomains]. Zero for a [preFolded] pass view (which never bakes). Lets a
+     *  front-end separate parse cost from bake cost when reporting load time. */
+    val bakeElapsed: Duration
+
     // Force the root bake and fold its deductions into [intDomains] eagerly — except in [preFolded]
     // pass-view mode, where the domains are already folded and the deferred derived structures stay
     // uncomputed. A non-preFolded [Problem] thus behaves exactly as before (baked + folded at
     // construction); this init access is what forces the otherwise-lazy propagators/occurrences/baked.
     init {
+        val mark = TimeSource.Monotonic.markNow()
         if (!preFolded) foldIntoDomains(baked)
+        bakeElapsed = mark.elapsedNow()
     }
 
     /** Folds the root-level int deductions of a successful bake into [intDomains] so the

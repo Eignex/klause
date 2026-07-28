@@ -69,7 +69,13 @@ internal object SolveCore {
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
         if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-            printPresolved(rawSolvable.problem, solvable.problem, solvable.presolve, presolveElapsed)
+            printPresolved(
+                rawSolvable.problem,
+                solvable.problem,
+                solvable.presolve,
+                presolveElapsed,
+                common.loadElapsedMs,
+            )
             return
         }
         cliLogger(common.verbose).v {
@@ -227,9 +233,22 @@ internal object SolveCore {
      *  `--presolve` config can be inspected and A/B-compared without solving. The elapsed time is the
      *  presolve phase alone, excluding JVM startup and parsing, so it is the figure to watch when tuning
      *  presolve cost. */
-    private fun printPresolved(original: Problem, presolved: Problem, stats: PresolveStats?, elapsed: Duration) {
+    private fun printPresolved(
+        original: Problem,
+        presolved: Problem,
+        stats: PresolveStats?,
+        elapsed: Duration,
+        loadElapsedMs: Long?,
+    ) {
         val passes = stats?.passes.orEmpty()
         errPrintln("presolve dry-run:")
+        // Split the front-end load into parse vs the root bake (step 0): the bake is the eager root
+        // propagation folded into domains at construction; parse is the rest of the load.
+        loadElapsedMs?.let { load ->
+            val bakeMs = original.bakeElapsed.inWholeMilliseconds
+            errPrintln("  parse: ${(load - bakeMs).coerceAtLeast(0)}ms")
+            errPrintln("  bake (step 0): ${original.bakeElapsed}")
+        }
         errPrintln("  elapsed: $elapsed")
         errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
         errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
