@@ -485,7 +485,7 @@ internal class ResumableMinimize(
         // improves the incumbent. With LP-only continuous variables a leaf is a solution only if the
         // residual real LP is feasible — the real rows carry no propagator, so CP alone has not enforced
         // them; an uncertifiable residual taints the terminal verdict to `unknown`.
-        override fun onLeaf(snap: Sample): MinimizeResult.WithSample? {
+        override fun onLeaf(snap: Sample, session: PropagationSession): MinimizeResult.WithSample? {
             if (problem.numRealVars > 0) {
                 val res = leafRealFeasibility(problem, objective, snap, Cancellation { sliceCancelled() })
                 when (res.verdict) {

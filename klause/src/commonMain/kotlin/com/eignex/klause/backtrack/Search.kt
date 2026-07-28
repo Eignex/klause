@@ -185,12 +185,14 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
 
     override fun cancelled(): Boolean = params.cancellation()
 
-    override fun onLeaf(snap: Sample): Sample? {
+    override fun onLeaf(snap: Sample, session: PropagationSession): Sample? {
         // With LP-only continuous variables, a CP-consistent leaf is a solution only if the residual real
         // LP is feasible — the real rows have no propagator, so CP alone has not enforced them. On success
-        // the LP's continuous values complete the assignment into a full solution.
+        // the LP's continuous values complete the assignment into a full solution. The engine-owned check
+        // builds from the live session, so a refuted leaf also derives its premise-cited theory lemma.
         if (problem.numRealVars == 0) return snap
-        val res = leafRealFeasibility(problem, objective = null, sample = snap, cancellation = params.cancellation)
+        val res = lpEngine?.leafCertify(session)
+            ?: leafRealFeasibility(problem, objective = null, sample = snap, cancellation = params.cancellation)
         return when (res.verdict) {
             LpVerdict.OPTIMAL -> snap.copy(reals = res.reals)
 

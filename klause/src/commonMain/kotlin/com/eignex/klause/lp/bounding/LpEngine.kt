@@ -28,6 +28,13 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.rebound
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
+import com.eignex.klause.lp.LpVerdict
+import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.solveAndCertify
+import com.eignex.klause.lp.relaxation.LpExplanation
+import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
@@ -294,6 +301,59 @@ internal class LpEngine(
 
     /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
     fun lastBackjump(): Learned? = lpBackjump
+
+    /**
+     * Exact residual verdict at a full-assignment leaf, over the relaxation built from the live
+     * [session] — the strict-aware decider ([solveAndCertify]'s delta-rational fallback) with the
+     * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
+     * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
+     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.OPTIMAL] the returned
+     * reals complete the assignment into a full solution.
+     */
+    fun leafCertify(session: PropagationSession): LeafRealResult {
+        lpBackjump = null
+        val relaxer = lpRelaxer ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        val relaxation = nodeRelaxation(relaxer, session)
+        val model = relaxation.model
+        if (model.n == 0) return LeafRealResult(LpVerdict.OPTIMAL, DoubleArray(problem.numRealVars))
+        val certified = solveAndCertify(model, cancellation = params.cancellation)
+        return when (certified.verdict) {
+            LpVerdict.OPTIMAL -> {
+                val primal = certified.exactPrimal ?: certified.float?.primal
+                    ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+                val reals = DoubleArray(problem.numRealVars)
+                for (col in relaxation.colRealId.indices) {
+                    val r = relaxation.colRealId[col]
+                    if (r >= 0 && col < primal.size) reals[r] += relaxation.colRealSign[col] * primal[col]
+                }
+                LeafRealResult(LpVerdict.OPTIMAL, reals)
+            }
+
+            LpVerdict.INFEASIBLE -> {
+                val clause = certified.farkasRay
+                    ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
+                    ?: activePremiseClause(relaxation, session)
+                if (clause != null) {
+                    val analyzed = session.analyzeConflictClause(clause) as? Learned
+                    if (analyzed != null && analyzed.asserting) lpBackjump = analyzed
+                }
+                LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
+            }
+
+            LpVerdict.INDETERMINATE -> LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)
+        }
+    }
+
+    /** The active rows' premises as one clause — the whole activating-literal set is real-infeasible.
+     *  Weaker than a ray-filtered clause but still a valid theory lemma; null when some non-global row
+     *  has no recorded premise (inexpressible) or nothing is cited. */
+    private fun activePremiseClause(relaxation: LpRelaxation, session: PropagationSession): IntArray? {
+        val lits = IntArrayList()
+        val seen = IntHashSet()
+        val rows = IntArray(relaxation.model.m) { it }
+        val ok = LpExplanation.addRowPremiseLits(lits, seen, relaxation, rows, session)
+        return if (ok && lits.size > 0) lits.toIntArray() else null
+    }
 
     /**
      * Per-node prune cascade. Returns true when this node is provably dominated by the incumbent

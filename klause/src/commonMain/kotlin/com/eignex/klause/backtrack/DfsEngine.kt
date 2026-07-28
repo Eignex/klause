@@ -67,7 +67,7 @@ internal interface SearchPolicy<L> {
      * the pending blocking nogood, and set the engine to backtrack). Return the payload to surface as
      * [EngineEvent.Solution], or null to keep searching (optimize: a non-improving leaf).
      */
-    fun onLeaf(snap: Sample): L?
+    fun onLeaf(snap: Sample, session: PropagationSession): L?
 
     /** Assert the incumbent objective bound at the root; true iff that empties the root (optimum proven). */
     fun assertObjectiveBoundAtRoot(session: PropagationSession): Boolean = false
@@ -306,7 +306,13 @@ internal class DfsEngine<L>(
             restart.onSolution()
             pendingBlock = snap
             descend = false
-            return policy.onLeaf(snap)?.let { EngineEvent.Solution(it) }
+            val payload = policy.onLeaf(snap, session)
+            if (payload != null) return EngineEvent.Solution(payload)
+            // A refuted leaf may carry a theory lemma (the residual real LP's Farkas clause over the
+            // activating literals): backjump-and-learn like any conflict instead of stepping back one
+            // decision, so the whole dead region is pruned in the sibling subtrees.
+            policy.pruneLearned?.invoke()?.let { return handleBackjump(it, alignFirst = true) }
+            return null
         }
         val values = params.valueSelector.values(session, varRef, rng)
         if (phaseManaged) phase.setManagedMode(restart.phaseMode())
