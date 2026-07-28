@@ -332,6 +332,7 @@ internal class LpEngine(
             LpVerdict.INFEASIBLE -> {
                 val clause = certified.farkasRay
                     ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
+                    ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                     ?: activePremiseClause(relaxation, session)
                 if (clause != null) {
                     val analyzed = session.analyzeConflictClause(clause) as? Learned

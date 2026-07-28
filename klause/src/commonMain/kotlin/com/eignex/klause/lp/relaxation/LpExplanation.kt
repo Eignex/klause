@@ -148,6 +148,34 @@ internal object LpExplanation {
     }
 
     /**
+     * A theory lemma from an exact rational infeasibility over the load-bearing [rows]: the rows'
+     * validity premises plus the current bound atoms of every integer-backed column those rows touch —
+     * each a live assumption the refutation leans on, so their conjunction is provably real-infeasible
+     * and the negated clause is globally valid. Null when some cited row's premise is inexpressible.
+     */
+    fun premiseClauseForRows(relaxation: LpRelaxation, rows: IntArray, session: PropagationSession): IntArray? {
+        val lits = IntArrayList()
+        val seen = IntHashSet()
+        if (!addRowPremiseLits(lits, seen, relaxation, rows, session)) return null
+        val model = relaxation.model
+        val inRows = IntHashSet()
+        for (r in rows) inRows.add(r)
+        for (col in relaxation.colVarId.indices) {
+            val v = relaxation.colVarId[col]
+            if (v < 0 || relaxation.colIsBool[col]) continue
+            var touches = false
+            model.forEachInColumnD(col) { i, _ -> if (inRows.contains(i)) touches = true }
+            if (!touches) continue
+            val d = session.intDomain(v)
+            val le = session.boundLeLit(v, d.max, positive = false)
+            if (seen.add(le)) lits.add(le)
+            val ge = session.boundGeLit(v, d.min, positive = false)
+            if (seen.add(ge)) lits.add(ge)
+        }
+        return if (lits.size > 0) lits.toIntArray() else null
+    }
+
+    /**
      * Append the negated validity premises of every non-global row in [rows]; false when some
      * non-global row has none recorded (the certificate is then inexpressible). The premise
      * thresholds were the live bounds at the relaxation's build, so each atom is true (and its
