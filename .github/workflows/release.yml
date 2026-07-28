@@ -60,14 +60,23 @@ jobs:
             klause/build/test-results/
           if-no-files-found: ignore
 
-      # Library publishing is not enabled yet; re-enable when klause publishes to Central.
-      # - name: Publish to Maven Central (Portal)
-      #   env:
-      #     ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}
-      #     ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
-      #     ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
-      #     ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-      #   run: ./gradlew --no-daemon publishToMavenCentral -PciVersion=${{ env.RELEASE_VERSION }}
+      - name: Publish to Maven Central (Portal)
+        if: ${{ !contains(env.RELEASE_VERSION, '-') }}
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew --no-daemon publishToMavenCentral -PciVersion=${{ env.RELEASE_VERSION }}
+
+      - name: Publish to Sonatype Snapshots
+        if: ${{ contains(env.RELEASE_VERSION, '-') }}
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.CENTRAL_PORTAL_USER }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew --no-daemon publishToSonatypeSnapshots -PciVersion=${{ env.RELEASE_VERSION }}
 
       # CLI release assets: stripped native executables (linux x64/arm64 — the
       # host-linkable targets), the JVM dist zip, and SHA256SUMS.
