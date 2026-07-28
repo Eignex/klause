@@ -115,6 +115,7 @@ internal class FlatZincCompiler(
             cancellation = cancellation,
             impliedFactorMask = impliedFactorMask,
             hasSymmetryBreaking = hasSymmetryBreaking,
+            deferBake = true, // base bake runs as presolve step 0
             numRealVars = realLo.size,
             realLower = realLo.toDoubleArray(),
             realUpper = realHi.toDoubleArray(),

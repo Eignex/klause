@@ -1133,6 +1133,9 @@ object Xcsp3 {
                 intDomains = domains.toTypedArray(),
                 factors = factors.toTypedArray(),
                 cancellation = bakeCancellation,
+                // The base bake is deferred to presolve step 0 ([Problem.bakeBase]); construction is
+                // pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
+                deferBake = true,
             ),
             objective,
             intVarNames = LinkedHashMap(varIds),

@@ -3,6 +3,7 @@ package com.eignex.klause.solver.result
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.kumulant.stat.summary.WeightedMeanResult
+import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource.Monotonic
 
@@ -205,4 +206,7 @@ data class PresolveStats(
     val constraintsRemoved: Int = 0,
     val infeasible: Boolean = false,
     val lpHarvest: LpHarvestReport? = null,
+    /** Wall time the deferred base bake (presolve step 0, [com.eignex.klause.solver.Problem.bakeBase])
+     *  took; zero when the bake ran at construction instead. */
+    val bakeElapsed: Duration = Duration.ZERO,
 )
