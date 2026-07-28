@@ -362,14 +362,14 @@ internal class LpEngine(
             }
 
             LpVerdict.INFEASIBLE -> {
+                // Pool the theory lemma for restart-time registration: the leaf itself just rejects
+                // (the engine backtracks chronologically), and the next restart makes the lemma a
+                // permanent clause pruning the dead region everywhere.
                 val clause = certified.farkasRay
                     ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
                     ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                     ?: activePremiseClause(relaxation, session)
-                if (clause != null) {
-                    val analyzed = session.analyzeConflictClause(clause) as? Learned
-                    if (analyzed != null && analyzed.asserting) lpBackjump = analyzed
-                }
+                if (clause != null) lpNogoods?.add(clause)
                 LeafRealResult(LpVerdict.INFEASIBLE, EmptyDoubleArray)
             }
 
