@@ -16,7 +16,9 @@ import com.eignex.klause.lp.cut.CutSeparator
 import com.eignex.klause.lp.integerCertify
 import com.eignex.klause.lp.integerDualLowerBoundCeil
 import com.eignex.klause.lp.integerFarkasRay
+import com.eignex.klause.lp.RationalFeasibility
 import com.eignex.klause.lp.mulExact
+import com.eignex.klause.lp.rationalOutcome
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -28,6 +30,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.round
 
@@ -208,20 +211,46 @@ internal fun LpEngine.sparseSafePrune(
     val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
+    val model = relaxation.model
+    // The float LP relaxes strict rows to non-strict, so a node infeasible only through strictness
+    // looks feasible here and survives to an expensive leaf. Perturb each strict row's rhs inward by a
+    // small relative epsilon for the float solve only — a heuristic filter, restored before any
+    // certification so every proof is against the asserted model. A perturbed-infeasible node that the
+    // integer Farkas certificate cannot confirm (strictness carries no non-strict certificate) is
+    // decided by the exact strict-aware rational simplex.
+    val dv = model.doubleView
+    var strictSaved: DoubleArray? = null
+    if (dv != null && model.rowStrict.any { it }) {
+        strictSaved = dv.rhs.copyOf()
+        for (i in 0 until model.m) if (model.rowStrict[i]) dv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(dv.rhs[i]))
+    }
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
-    val simplex = dualSimplex(relaxation.model, cancellation)
-    val result = simplex.solve(warm) ?: run {
+    val simplex = dualSimplex(model, cancellation)
+    val floatResult = simplex.solve(warm)
+    strictSaved?.let { it.copyInto(dv!!.rhs) }
+    val result = floatResult ?: run {
         // Infeasibility prune (#705): a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
         val floatRay = simplex.infeasibleRay
-        val ray = if (floatRay != null) integerFarkasRay(relaxation.model, floatRay) else null
+        val ray = if (floatRay != null) integerFarkasRay(model, floatRay) else null
         if (ray != null) {
             sink.lp.observeInfeasiblePrune()
             // With learning, the Farkas ray becomes a bound-atom nogood (#247) for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
             val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
             return LpNodeOutcome(true, null, clause)
+        }
+        if (strictSaved != null && !cancellation()) {
+            val outcome = rationalOutcome(model, cancellation)
+            if (outcome.feasibility == RationalFeasibility.INFEASIBLE) {
+                sink.lp.observeInfeasiblePrune()
+                // No integer ray exists for a strictness-only conflict; cite every active row's
+                // premises — a valid theory lemma over the activating literals (sharpened by the
+                // rational decider's own row set later).
+                val clause = if (learn) activePremiseClause(relaxation, session) else null
+                return LpNodeOutcome(true, null, clause)
+            }
         }
         return LpNodeOutcome(false, null)
     }
@@ -623,3 +652,17 @@ internal const val SEARCH_CUT_ROUNDS: Int = 4
  *  measured ≤ ~48k (evilshop 155×155, the largest gain) while the cost regressions were ≥ ~1.6M
  *  (fast-food 501×1048, diameterc-mst 1797×4066), so the gap is two orders of magnitude. */
 internal const val LP_HARVEST_MAX_RELAXATION_COST = 250_000L
+
+
+/** Inward relative rhs perturbation applied to strict rows for the float filter solve. */
+private const val STRICT_FILTER_EPS = 1e-7
+
+/** Every active row's premises as one clause — the activating-literal set is jointly infeasible.
+ *  Null when some non-global row has no recorded premise or nothing is cited. */
+private fun activePremiseClause(relaxation: LpRelaxation, session: PropagationSession): IntArray? {
+    val lits = IntArrayList()
+    val seen = IntHashSet()
+    val rows = IntArray(relaxation.model.m) { it }
+    val ok = LpExplanation.addRowPremiseLits(lits, seen, relaxation, rows, session)
+    return if (ok && lits.size > 0) lits.toIntArray() else null
+}
