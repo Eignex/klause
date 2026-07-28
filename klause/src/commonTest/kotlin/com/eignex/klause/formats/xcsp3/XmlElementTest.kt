@@ -78,6 +78,14 @@ class XmlElementTest {
     }
 
     @Test
+    fun `substituteParams expands placeholders and reuses percent-free text verbatim`() {
+        val template = parseXml("<t><a>%0 %1</a><b>no placeholder</b></t>")
+        val out = template.substituteParams(listOf("x", "y"))
+        assertEquals("x y", out.child("a")!!.textContent)
+        assertEquals("no placeholder", out.child("b")!!.textContent)
+    }
+
+    @Test
     fun `rejects a mismatched closing tag`() {
         val e = assertFailsWith<IllegalArgumentException> { parseXml("<a><b>1</c></a>") }
         assertTrue("mismatched closing tag" in e.message.orEmpty(), e.message.orEmpty())
