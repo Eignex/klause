@@ -144,6 +144,30 @@ internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, bas
     return out
 }
 
+/** Citation cap for a snapped bound's crossed holes; a wider block takes the decision-cut reason. */
+private const val MAX_HOLE_CITATIONS = 4096
+
+/** The coarse always-sound reason: [base] plus every decision variable's current pin / root-tightened
+ *  bound atoms, negated. See [antecedentsAcrossHoles]'s over-wide fallback. */
+private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
+    val lits = IntArrayList()
+    base?.forEach { lits.add(it) }
+    val numBools = problem.numBoolVars
+    for (i in 0 until levelToDecisionVar.size) {
+        val dv = levelToDecisionVar[i]
+        if (dv < numBools) {
+            boolValues[dv]?.let { pin -> lits.add(Lit.make(dv, !pin)) }
+        } else {
+            val iv = dv - numBools
+            val d = intDomains[iv]
+            val root = problem.intDomains[iv]
+            if (d.min > root.min) lits.add(Lit.make(atomVarGe(iv, d.min), false))
+            if (d.max < root.max) lits.add(Lit.make(atomVarLe(iv, d.max), false))
+        }
+    }
+    return lits.toIntArray()
+}
+
 /**
  * Antecedents for a bound move that snapped past interior holes. The supplied [base] reason
  * justifies the *requested* bound only; when the hole-aware domain update lands the endpoint
@@ -154,12 +178,6 @@ internal fun PropagationState.appendPriorBound(priorLit: Int, cite: Boolean, bas
  * it can prune feasible assignments. Values absent from the root domain are global facts and
  * need no citation.
  */
-/** Sentinel: the hole-crossing reason is too wide to express; the caller must decline the move. */
-internal val INEXPRESSIBLE_REASON = IntArray(0)
-
-/** Citation cap for a snapped bound's crossed holes; a wider block declines instead. */
-private const val MAX_HOLE_CITATIONS = 4096
-
 internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange, base: IntArray?): IntArray? {
     var out: IntArrayList? = null
     val orig = problem.intDomains[v]
@@ -182,14 +200,15 @@ internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange,
         } else {
             crossed.last + 1 // past the range: nothing to cite
         }
-        // Count before citing: citing materializes eq-atoms, so an over-wide block must be detected
-        // allocation-free — a block past the cap was not carved value-by-value and has no bound-atom
-        // expression either; the deduction is inexpressible and the caller declines the move (sound —
-        // a weaker tightening never removes a feasible point).
+        // Count before citing (citing materializes eq-atoms): a block past the cap gets the coarse
+        // decision-cut reason instead — every decision variable's current pins/bounds negated. Those
+        // premises are at least as strong as the decisions themselves, and everything derived at this
+        // node follows from the decisions, so the implication (and the clauses learned through it)
+        // stays sound; the reason is just less reusable than the per-value citation.
         var count = 0
         var probe = start
         while (probe <= crossed.last) {
-            if (++count > MAX_HOLE_CITATIONS) return INEXPRESSIBLE_REASON
+            if (++count > MAX_HOLE_CITATIONS) return decisionCutAntecedents(base)
             if (probe >= orig.max) break
             probe = orig.higher(probe)
         }
@@ -249,9 +268,7 @@ private inline fun PropagationState.tightenBoundImpl(
         val root = problem.intDomains[v]
         val cite = (if (isMin) bound > root.min else bound < root.max) && antecedents == null
         val crossed = if (isMin) bound until newDomain.min else (newDomain.max + 1)..bound
-        val across = antecedentsAcrossHoles(v, crossed, antecedents)
-        if (across === INEXPRESSIBLE_REASON) return true // decline the snap: sound, just weaker
-        appendPriorBound(priorLit, cite, across)
+        appendPriorBound(priorLit, cite, antecedentsAcrossHoles(v, crossed, antecedents))
     } else {
         antecedents
     }
@@ -330,7 +347,6 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
         newDomain.max != d.max -> antecedentsAcrossHoles(v, (newDomain.max + 1) until value, antNear)
         else -> antecedents
     }
-    if (ant === INEXPRESSIBLE_REASON) return true // decline the carve: sound, just weaker
     intDomains[v] = newDomain
     intLevel[v] = maxOf(intLevel[v], currentLevel)
     // An interior carve (no endpoint moved) records the hole-carve record — the level/reason source

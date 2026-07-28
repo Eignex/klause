@@ -15,6 +15,10 @@ internal class BitsetDomain(
 ) : AbstractIntDomain() {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
+        // The endpoints must be members — a violation here means a caller built the bit array wrong
+        // (the span-overflow class of bug), and catching it at construction names the culprit.
+        check(Bits.has(bitset, (min - bitsetLo).toInt())) { "min $min is not a member (lo=$bitsetLo)" }
+        check(Bits.has(bitset, (max - bitsetLo).toInt())) { "max $max is not a member (lo=$bitsetLo)" }
     }
 
     override val size: Int = run {

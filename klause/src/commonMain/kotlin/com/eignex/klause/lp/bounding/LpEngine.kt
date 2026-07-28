@@ -2,7 +2,9 @@ package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.lp.Basis
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.bound.CumulativeFlowBound
 import com.eignex.klause.lp.bound.KnapsackLagrangianBound
@@ -25,23 +27,21 @@ import com.eignex.klause.lp.cut.ImpliedBoundSeparator
 import com.eignex.klause.lp.cut.KnapsackCoverSeparator
 import com.eignex.klause.lp.cut.SharedCut
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
+import com.eignex.klause.lp.relaxation.LeafRealResult
+import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.relaxation.rebound
-import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
-import com.eignex.klause.lp.LpVerdict
-import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.solveAndCertify
-import com.eignex.klause.lp.relaxation.LpExplanation
-import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 import kotlin.time.TimeSource
 
 /**

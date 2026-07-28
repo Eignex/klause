@@ -8,12 +8,12 @@ import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
@@ -112,29 +112,32 @@ internal class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Lon
 internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Long>) : TrailNode {
     private val preferred: Long = valueSeq.firstOrNull() ?: 0L
     private var step = 0
-    private var split = 0L
+    private var splitLo = 0L
+    private var splitHi = 0L
     private var lowerFirst = true
     private var resolved = false
 
     override fun applyNext(session: PropagationSession): ApplyOutcome? {
         if (!resolved) {
             val d = session.intDomain(varRef.varId)
-            split = if (preferred >= d.max) d.max - 1 else maxOf(preferred, d.min)
-            lowerFirst = preferred <= split
+            val s = if (preferred >= d.max) d.max - 1 else maxOf(preferred, d.min)
+            splitLo = s
+            splitHi = s + 1
+            lowerFirst = preferred <= s
             resolved = true
         }
         val vid = varRef.varId
         return when (step++) {
             0 -> if (lowerFirst) {
-                ApplyOutcome(split, session.pinIntAtMost(vid, split))
+                ApplyOutcome(splitLo, session.pinIntAtMost(vid, splitLo))
             } else {
-                ApplyOutcome(split + 1, session.pinIntAtLeast(vid, split + 1))
+                ApplyOutcome(splitHi, session.pinIntAtLeast(vid, splitHi))
             }
 
             1 -> if (lowerFirst) {
-                ApplyOutcome(split + 1, session.pinIntAtLeast(vid, split + 1))
+                ApplyOutcome(splitHi, session.pinIntAtLeast(vid, splitHi))
             } else {
-                ApplyOutcome(split, session.pinIntAtMost(vid, split))
+                ApplyOutcome(splitLo, session.pinIntAtMost(vid, splitLo))
             }
 
             else -> null
@@ -236,13 +239,13 @@ internal fun BacktrackSolver.driveSearch(
 ): Sequence<SearchOutcome> = sequence {
     // Theory lemmas from the residual real LP register at restarts; a real-column model with no
     // restart policy would pool them forever, so give it the Luby default.
-    val params = if (this@driveSearch.problem.numRealVars > 0 && params.lubyRestartBase == null) {
+    val runParams = if (this@driveSearch.problem.numRealVars > 0 && params.lubyRestartBase == null) {
         params.copy(lubyRestartBase = SAT_REAL_LUBY_BASE)
     } else {
         params
     }
-    val policy = SatPolicy(params, this@driveSearch.problem)
-    val engine = DfsEngine(this@driveSearch, params, sink, policy)
+    val policy = SatPolicy(runParams, this@driveSearch.problem)
+    val engine = DfsEngine(this@driveSearch, runParams, sink, policy)
     while (true) {
         when (val e = engine.runUntilEvent()) {
             is EngineEvent.Solution -> yield(SearchOutcome.Found(e.payload))
@@ -264,7 +267,6 @@ internal fun BacktrackSolver.makeNode(varRef: VarRef, values: Sequence<Long>): T
     is VarRef.Bool -> BoolNode(varRef, values)
     is VarRef.IntVar -> IntNode(varRef, values)
 }
-
 
 /** Luby restart unit for satisfaction search over real columns (the lemma-registration cadence). */
 private const val SAT_REAL_LUBY_BASE = 256L

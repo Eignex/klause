@@ -16,9 +16,11 @@ internal fun intDomainFromSurvivors(sv: LongArray): IntDomain {
     val s = sv.size
     val newMin = sv[0]
     val newMax = sv[s - 1]
+    // A full-Long span overflows the subtraction; a negative "span" means huge, never compact.
     val span = newMax - newMin + 1
-    if (s.toLong() == span) return ContiguousDomain(newMin, newMax)
-    if (span <= KlauseConfig.current.bitsetThreshold) {
+    val spanHuge = span <= 0
+    if (!spanHuge && s.toLong() == span) return ContiguousDomain(newMin, newMax)
+    if (!spanHuge && span <= KlauseConfig.current.bitsetThreshold) {
         val spanI = span.toInt()
         val bits = LongArray((spanI + 63) ushr 6)
         for (i in 0 until s) Bits.set(bits, (sv[i] - newMin).toInt())
@@ -45,7 +47,7 @@ internal fun intDomainFromSurvivors(sv: LongArray): IntDomain {
     // survivor array: O(1) `contains` in place of a binary search, at memory parity. A wide span makes
     // `words` huge, so `2·words <= s` is false and we fall through to the survivor list (span-independent).
     val words = (span + 63) ushr 6
-    if (2 * words <= s) {
+    if (!spanHuge && 2 * words <= s) {
         val bits = LongArray(words.toInt())
         for (i in 0 until s) Bits.set(bits, (sv[i] - newMin).toInt())
         return BitsetDomain(newMin, newMax, bits, newMin)
@@ -62,15 +64,18 @@ internal fun intDomainFromRuns(runs: LongArrayList): IntDomain {
     val newMin = runs[0]
     val newMax = runs[runs.size - 1]
     if (runs.size == 2) return ContiguousDomain(newMin, newMax) // single run
+    // A full-Long span overflows the subtraction; a negative "span" means huge, never compact.
     val span = newMax - newMin + 1
+    val spanHuge = span <= 0
     val r = runs.size shr 1
     var s = 0L
     var k = 0
     while (k < runs.size) {
         s += runs[k + 1] - runs[k] + 1
+        if (s < 0) return RunsDomain(newMin, newMax, runs.toLongArray()) // member count overflows: huge
         k += 2
     }
-    if (span <= KlauseConfig.current.bitsetThreshold) {
+    if (!spanHuge && span <= KlauseConfig.current.bitsetThreshold) {
         val spanI = span.toInt()
         val bits = LongArray((spanI + 63) ushr 6)
         k = 0
@@ -85,7 +90,7 @@ internal fun intDomainFromRuns(runs: LongArrayList): IntDomain {
     // A wide span makes `words` huge so this is skipped, and a huge run makes `2·r <= s` true above, so
     // the O(s) survivor materialisation below is only reached for a genuinely small scattered set.
     val words = (span + 63) ushr 6
-    if (2 * words <= s) {
+    if (!spanHuge && 2 * words <= s) {
         val bits = LongArray(words.toInt())
         k = 0
         while (k < runs.size) {
