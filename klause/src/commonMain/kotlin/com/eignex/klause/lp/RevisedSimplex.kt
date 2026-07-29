@@ -154,7 +154,19 @@ internal class RevisedSimplex(
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
-    private fun duals(factor: EtaBasis): DoubleArray = factor.btran(DoubleArray(m) { model.costD(basicVar[it]) })
+    private fun duals(factor: EtaBasis): DoubleArray {
+        // Zero objective (the gated feasibility filter): the duals solve `Bᵀy = 0`, so the whole
+        // BTRAN — a full pass over the LU plus the eta chain, once per iteration — is a zero vector.
+        if (allZeroCost) return DoubleArray(m)
+        return factor.btran(DoubleArray(m) { model.costD(basicVar[it]) })
+    }
+
+    /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
+    private val allZeroCost: Boolean = run {
+        var zero = true
+        for (j in 0 until numVars) if (model.costD(j) != 0.0) zero = false
+        zero
+    }
 
     /** Reset the Devex reference weights to 1 (a fresh reference frame). */
     private fun resetGamma() {
@@ -188,12 +200,54 @@ internal class RevisedSimplex(
      * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
      * sound regardless of how the basis was obtained.
      */
-    override fun solve(warm: Basis?): FloatLpResult? {
-        if (warm == null || !tryWarmStart(warm)) coldStart()
+    override fun solve(warm: Basis?): FloatLpResult? = solveCore(warm, reuse = false)
+
+    /**
+     * Re-solve with per-row enforcement, keeping the basis AND its LU factorization from this
+     * instance's previous terminated solve — the persistent gated-residual filter. A row with
+     * `enforced(i) = false` does not constrain: its slack is driven into the basis (one designated
+     * pivot when nonbasic) and then never selected as violated and never re-enters, so the row's
+     * equation merely defines the free slack's value. Node-to-node only [enforced] and the rhs
+     * change, neither of which touches the basis matrix, so the kept factorization carries over and
+     * feasibility is repaired in a few dual pivots instead of a fresh factorization.
+     *
+     * Only sound for an all-zero objective (the gated filter's shape): with zero costs every basis is
+     * dual-feasible, so the designated reconciliation pivots can never break the dual simplex's
+     * invariant. When nothing usable is kept (first call, or the previous solve bailed), this is an
+     * ordinary cold start — whose all-slack basis has every unenforced slack basic already.
+     */
+    fun resolveGated(enforced: BooleanArray): FloatLpResult? = solveCore(null, reuse = true, enforced = enforced)
+
+    /** The factorization at the previous solve's termination, held for [resolveGated]; the seated
+     *  [basicVar]/[status] it factorizes are still in place. Null after a bailed solve. */
+    private var keptFactor: EtaBasis? = null
+
+    private fun solveCore(warm: Basis?, reuse: Boolean, enforced: BooleanArray? = null): FloatLpResult? {
+        // Per-solve state: the infeasibility certificate slots and counters must not leak across a
+        // persistent instance's solves.
+        infeasibleBasis = null
+        infeasibleRow = -1
+        infeasibleRay = null
+        pivots = 0
+        maxLuFill = 0.0
+        maxLuDensity = 0.0
+        val kept = if (reuse) keptFactor else null
+        keptFactor = null
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
-        var factor: EtaBasis = refactor() ?: run {
-            coldStart()
-            refactor() ?: return null
+        var factor: EtaBasis = kept ?: run {
+            if (warm == null || !tryWarmStart(warm)) coldStart()
+            refactor() ?: run {
+                coldStart()
+                refactor() ?: return null
+            }
+        }
+        if (enforced != null) {
+            // Every unenforced row's slack must be basic before the main loop. A failed reconciliation
+            // resets to the all-slack cold start, where the invariant holds trivially.
+            factor = reconcileUnenforced(enforced, factor) ?: run {
+                coldStart()
+                refactor() ?: return null
+            }
         }
         resetGamma() // fresh Devex reference frame for this solve
         val maxIter = 50 * (m + numVars) + 200
@@ -233,6 +287,8 @@ internal class RevisedSimplex(
             var belowLower = false
             for (i in 0 until m) {
                 val v = basicVar[i]
+                // An unenforced row's basic slack is free: its value is never a violation.
+                if (enforced != null && v >= n && !enforced[v - n]) continue
                 val below = -beta[i]
                 val above = if (model.hasFiniteUpper(v)) beta[i] - model.upperD(v) else Double.NEGATIVE_INFINITY
                 val isBelow = below >= above
@@ -246,7 +302,10 @@ internal class RevisedSimplex(
                     belowLower = isBelow
                 }
             }
-            if (r == -1) return optimal(beta, factor) // primal feasible ⇒ optimal
+            if (r == -1) {
+                keptFactor = factor // terminated cleanly: [resolve] may continue from here
+                return optimal(beta, factor) // primal feasible ⇒ optimal
+            }
 
             val y = duals(factor)
             // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r; entering column by dual ratio test.
@@ -257,6 +316,9 @@ internal class RevisedSimplex(
             elig.clear()
             for (j in 0 until numVars) {
                 if (status[j] == VarStatus.BASIC) continue
+                // An unenforced row's slack never enters — it is conceptually basic forever (and the
+                // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
+                if (enforced != null && j >= n && !enforced[j - n]) continue
                 val a = dotColumn(rho, j)
                 if (abs(a) < TOL) continue
                 val atLower = status[j] == VarStatus.AT_LOWER
@@ -276,6 +338,7 @@ internal class RevisedSimplex(
                 infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf())
                 infeasibleRow = r
                 infeasibleRay = rho.copyOf() // float ρ = B⁻ᵀeᵣ; integerFarkasRay rounds + certifies it
+                keptFactor = factor // the seated basis stays dual-feasible for the next [resolve]
                 return null
             }
             val q = chooseEntering(elig, ratioBuf, pivotRowEntry, worst)
@@ -298,6 +361,65 @@ internal class RevisedSimplex(
             }
         }
         return null // budget exhausted
+    }
+
+    /**
+     * Drive every unenforced row's slack into the basis with one designated pivot each, so the main
+     * loop's free-slack invariant holds: an unenforced slack that is basic never leaves (skipped as a
+     * violation) and never re-enters. Evicting another unenforced slack re-queues it, bounded by a
+     * `2m` guard; a singular spike or an exhausted guard returns null and the caller cold-starts (the
+     * all-slack basis seats every slack trivially). Only called with an all-zero objective, where any
+     * basis is dual-feasible, so the arbitrary evicted-to-lower statuses never break the dual simplex.
+     */
+    private fun reconcileUnenforced(enforced: BooleanArray, start: EtaBasis): EtaBasis? {
+        var factor = start
+        val aq = DoubleArray(m)
+        var guard = 0
+        var i = 0
+        val requeued = ArrayDeque<Int>()
+        while (true) {
+            val row = when {
+                i < m -> i++
+                requeued.isNotEmpty() -> requeued.removeFirst()
+                else -> return factor
+            }
+            val sc = n + row
+            if (enforced[row] || status[sc] == VarStatus.BASIC) continue
+            if (guard++ > 2 * m) return null
+            denseColumn(sc, aq)
+            val alpha = factor.ftran(aq)
+            // Pivot the slack in where its spike is largest, preferring not to evict another
+            // unenforced slack (which would only re-queue it).
+            var r = -1
+            var best = TOL
+            var rAny = -1
+            var bestAny = TOL
+            for (t in 0 until m) {
+                val mag = abs(alpha[t])
+                if (mag > bestAny) {
+                    bestAny = mag
+                    rAny = t
+                }
+                val v = basicVar[t]
+                if (!(v >= n && !enforced[v - n]) && mag > best) {
+                    best = mag
+                    r = t
+                }
+            }
+            if (r == -1) r = rAny
+            if (r == -1) return null // singular spike: no pivotable row
+            val evicted = basicVar[r]
+            if (evicted >= n && !enforced[evicted - n]) requeued.add(evicted - n)
+            status[evicted] = VarStatus.AT_LOWER
+            basicVar[r] = sc
+            status[sc] = VarStatus.BASIC
+            pivots++
+            factor = if (factor.etaCount + 1 >= refactorEtaLimit) {
+                refactor() ?: return null
+            } else {
+                factor.also { it.update(r, alpha) }
+            }
+        }
     }
 
     /**
