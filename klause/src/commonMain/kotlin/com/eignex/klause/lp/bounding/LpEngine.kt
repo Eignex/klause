@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.lp.Basis
 import com.eignex.klause.lp.LpVerdict
+import com.eignex.klause.lp.RevisedSimplex
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.bound.CumulativeFlowBound
 import com.eignex.klause.lp.bound.KnapsackLagrangianBound
@@ -30,6 +31,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
+import com.eignex.klause.lp.relaxation.gatedEnforcement
 import com.eignex.klause.lp.relaxation.rebound
 import com.eignex.klause.lp.solveAndCertify
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
@@ -43,6 +45,16 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import kotlin.time.TimeSource
+
+/** The persistent gated-residual float filter: the node-invariant [relaxation], the ONE [simplex]
+ *  instance re-solving it with its kept factorization, and the reusable per-row [enforced] buffer
+ *  [LpEngine.gatedResidual] refreshes to the live pins each node. [lastEnforced]/[lastFeasible] memo
+ *  the previous solved node: the model is a pure function of the enforcement, so an unchanged
+ *  fingerprint after a feasible solve (a decision that flips no real atom) needs no solve at all. */
+internal class GatedResidual(val relaxation: LpRelaxation, val simplex: RevisedSimplex, val enforced: BooleanArray) {
+    val lastEnforced: BooleanArray = BooleanArray(enforced.size)
+    var lastFeasible: Boolean = false
+}
 
 /**
  * Per-node relaxation-bounding runtime for branch-and-bound. Owns the whole LP-relaxation family
@@ -325,6 +337,37 @@ internal class LpEngine(
     // Pin-fingerprint cache for the residual real relaxation (realResidual plans, no integer columns).
     private var residualCacheKey: IntArray? = null
     private var residualCache: LpRelaxation? = null
+
+    // Gated residual float filter (pure-real models): a structurally node-invariant relaxation whose
+    // rows toggle by per-row enforcement alone, plus ONE simplex instance that re-solves it with its
+    // kept LU factorization — the per-node build+factorize that dominated the satisfaction path
+    // collapses to a few dual pivots. Exact certificates never read this model; they run on the
+    // per-node pin-consulting build as before.
+    private var gatedResolved = false
+    private var gatedFilter: GatedResidual? = null
+
+    /** The gated residual filter with its enforcement refreshed to [session]'s pins, or null when the
+     *  model does not qualify (not pure-real, oversized, or no gated rows). */
+    internal fun gatedResidual(session: PropagationSession): GatedResidual? {
+        if (!params.lpPlan.realResidual || residualOversized) return null
+        if (!gatedResolved) {
+            gatedResolved = true
+            val built = lpRelaxer?.buildGatedResidual()
+            if (built != null && built.gatedRows.isNotEmpty() && built.model.n > 0) {
+                gatedFilter = GatedResidual(
+                    built,
+                    // A long eta chain: the persistent instance's pivots accumulate ACROSS nodes
+                    // (reconciliation + dual repair after each pin flip), so the default limit would
+                    // refactorize the full basis every few nodes — the exact cost this filter removes.
+                    RevisedSimplex(built.model, params.cancellation, refactorEtaLimit = GATED_ETA_LIMIT),
+                    BooleanArray(built.model.m),
+                )
+            }
+        }
+        val filter = gatedFilter ?: return null
+        filter.relaxation.gatedEnforcement(session, filter.enforced)
+        return filter
+    }
     private val residualAuxVars: IntArray = if (params0.lpPlan.realResidual) {
         problem.factors.filterIsInstance<ReifiedRealLinear>().map { it.aux }.distinct().sorted().toIntArray()
     } else {
@@ -619,3 +662,8 @@ internal class LpEngine(
 
 /** Row cap for per-node / per-leaf exact residual work (one LU at ~1k rows is already ~ms-scale). */
 private const val RESIDUAL_MAX_ROWS = 1000
+
+/** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots
+ *  accumulate across nodes, so the chain must span many node re-solves for the kept factorization to
+ *  pay; each eta costs one extra sparse pass per FTRAN/BTRAN, bounding the drift. */
+private const val GATED_ETA_LIMIT = 400

@@ -208,6 +208,63 @@ internal fun LpEngine.sparseSafePrune(
     warm: Basis? = null,
     cutsAllowed: Boolean = false,
 ): LpNodeOutcome {
+    // Gated residual fast path (pure-real satisfaction models): re-solve the persistent, structurally
+    // node-invariant gated model with its kept LU factorization — a feasible node (the common case
+    // along a dive) costs a few dual pivots instead of a fresh build + factorization. Any other
+    // outcome (candidate infeasibility, cancellation, a bailed solve) falls through to the per-node
+    // pin-consulting build below, whose certificates and magnitudes are unchanged. Sound as a filter:
+    // the gated rows' inactive forms are implied by the box, so the gated and active models have the
+    // same feasible set, and a feasible verdict deduces nothing the sat path needs beyond "keep" —
+    // which is why the path is taken only when there is no incumbent to prune against and no
+    // objective to propagate (the satisfaction check).
+    val satisfactionOnly = !bound.isFinite() && !(objectiveVar >= 0 && objectiveAscending)
+    if (satisfactionOnly) {
+        gatedResidual(session)?.let { filter ->
+            // Unchanged enforcement after a feasible solve: the gated model is a pure function of the
+            // enforcement, so this node's verdict is the memoized one — no solve at all.
+            if (filter.lastFeasible && filter.enforced.contentEquals(filter.lastEnforced)) {
+                return LpNodeOutcome(false, null)
+            }
+            filter.lastFeasible = false
+            val gatedModel = filter.relaxation.model
+            sink.lp.observeSolve()
+            val gatedDv = gatedModel.doubleView
+            var gatedStrictSaved: DoubleArray? = null
+            if (gatedDv != null && gatedModel.rowStrict.any { it }) {
+                gatedStrictSaved = gatedDv.rhs.copyOf()
+                for (i in 0 until gatedModel.m) {
+                    if (gatedModel.rowStrict[i]) gatedDv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(gatedDv.rhs[i]))
+                }
+            }
+            val gatedResult = filter.simplex.resolveGated(filter.enforced)
+            if (gatedStrictSaved != null && gatedDv != null) gatedStrictSaved.copyInto(gatedDv.rhs)
+            if (gatedResult != null) {
+                sink.lp.observePivots(gatedResult.pivots)
+                filter.enforced.copyInto(filter.lastEnforced)
+                filter.lastFeasible = true
+                return LpNodeOutcome(false, null)
+            }
+            // Certify the candidate infeasibility on the gated model directly: restricted to the enforced
+            // rows (zeroing the rest just picks another candidate ray — the certificate is checked
+            // exactly), a Farkas proof here IS one over the active submodel, so the common refutation
+            // prunes without ever building the per-node model. Strictness-only conflicts (no non-strict
+            // certificate exists) still fall through to the exact rational path below.
+            val gatedRay = filter.simplex.infeasibleRay
+            if (gatedRay != null) {
+                for (i in 0 until gatedModel.m) if (!filter.enforced[i]) gatedRay[i] = 0.0
+                val ray = integerFarkasRay(gatedModel, gatedRay)
+                if (ray != null) {
+                    sink.lp.observeInfeasiblePrune()
+                    val clause = if (learn) {
+                        LpExplanation.infeasibilityClause(filter.relaxation, ray, session)
+                    } else {
+                        null
+                    }
+                    return LpNodeOutcome(true, null, clause)
+                }
+            }
+        }
+    }
     val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()

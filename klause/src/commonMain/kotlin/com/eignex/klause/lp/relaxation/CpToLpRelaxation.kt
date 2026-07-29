@@ -96,7 +96,29 @@ internal class LpRelaxation(
      *  lower-unbounded real variable is split `x = x⁺ − x⁻` (two columns, both lower-bounded at 0, so
      *  no huge lower-shift ever reaches the rhs doubles), and the negative part carries -1. */
     val colRealSign: IntArray = IntArray(model.n) { 1 },
+    /** Gated residual rows (pure-real models only): row index per gated entry. Each reified real atom
+     *  contributes its atom row AND its complement row unconditionally — with their true rhs — so the
+     *  model's structure and coefficients never change across nodes and a persistent simplex's LU
+     *  factorization survives; a node merely tells the solver which rows are enforced
+     *  ([gatedEnforcement]), and an unenforced row's slack rides free. */
+    val gatedRows: IntArray = EmptyIntArray,
+    /** The aux Boolean whose pin activates gated entry k. */
+    val gatedAux: IntArray = EmptyIntArray,
+    /** The pin value activating gated entry k (`true` = the atom row, `false` = its complement). */
+    val gatedWhenTrue: BooleanArray = BooleanArray(0),
 )
+
+/**
+ * Fill [out] (length `model.m`) with per-row enforcement at [session]'s pins: every non-gated row is
+ * enforced, a gated row only while its activating pin holds — at most one of an atom/complement pair.
+ * The persistent simplex treats an unenforced row's slack as free, so the row never constrains.
+ */
+internal fun LpRelaxation.gatedEnforcement(session: PropagationSession, out: BooleanArray) {
+    out.fill(true)
+    for (k in gatedRows.indices) {
+        if (session.boolValue(gatedAux[k]) != gatedWhenTrue[k]) out[gatedRows[k]] = false
+    }
+}
 
 /**
  * The same relaxation re-bound to [session]'s live column bounds, reusing the fixed matrix and column
@@ -448,6 +470,19 @@ internal class CpToLpRelaxation(
     fun build(domains: RelaxationDomains, extraCuts: List<Cut> = emptyList()): LpRelaxation =
         Assembler(domains).assemble(extraCuts)
 
+    /**
+     * The **gated** residual relaxation ([LpRelaxation.gatedRows]), or null when the model does not
+     * qualify: only a pure-real [realResidual] build is node-invariant enough (an integer column's
+     * live lower bound would fold a changing constant into the double rhs, breaking the rhs-only
+     * rebind). Built from the declared domains — every reified row is emitted regardless of pins, so
+     * the result is independent of any session. This is the float filter's persistent model; exact
+     * certificates keep running on the per-node pin-consulting [build], whose magnitudes rationalize.
+     */
+    fun buildGatedResidual(): LpRelaxation? {
+        if (!realResidual || problem.numIntVars > 0) return null
+        return Assembler(RootDomains(problem), gated = true).assemble(emptyList())
+    }
+
     private fun intCost(i: Int): Long = objective?.intCoefficients?.getOrElse(i) { 0L } ?: 0L
 
     private fun boolCost(b: Int): Long = objective?.boolWeights?.getOrElse(b) { 0L } ?: 0L
@@ -456,7 +491,8 @@ internal class CpToLpRelaxation(
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
      *  [RelaxationBuilder] so a factor's [com.eignex.klause.solver.Factor.linearize] can emit into it. */
-    private inner class Assembler(private val domains: RelaxationDomains) : RelaxationBuilder {
+    private inner class Assembler(private val domains: RelaxationDomains, private val gated: Boolean = false) :
+        RelaxationBuilder {
         private val builder = LpBuilder()
         private val intCol = IntArray(problem.numIntVars) { -1 }
         private val boolCol = IntArray(problem.numBoolVars) { -1 }
@@ -792,6 +828,10 @@ internal class CpToLpRelaxation(
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
                 if (realResidual && !touchesReals(factor)) continue
                 currentFactorId = factorId
+                if (gated && factor is ReifiedRealLinear) {
+                    emitGatedReified(factor)
+                    continue
+                }
                 // Each factor emits its own rows; factors with no linear relaxation (hard globals,
                 // cut-only or scheduling-view factors) keep the default no-op [Factor.linearize] and
                 // contribute nothing here — they are handled by the separators and the blocks above.
@@ -835,6 +875,9 @@ internal class CpToLpRelaxation(
                 hullFactorIds = hullFactorIds.toIntArray(),
                 colRealId = IntArray(colRealId.size) { colRealId[it] },
                 colRealSign = IntArray(colRealSign.size) { colRealSign[it] },
+                gatedRows = gatedRowList.toIntArray(),
+                gatedAux = gatedAuxList.toIntArray(),
+                gatedWhenTrue = BooleanArray(gatedWhenTrueList.size) { gatedWhenTrueList[it] == 1 },
             )
         }
 
@@ -844,6 +887,45 @@ internal class CpToLpRelaxation(
             is ReifiedRealLinear -> true
             is RealProduct -> true
             else -> false
+        }
+
+        // Gated residual bookkeeping: parallel (row, aux, whenTrue) entries recorded as the rows are
+        // emitted, surfaced on the relaxation with the active/vacuous rhs pair computed post-build.
+        private val gatedRowList = IntArrayList()
+        private val gatedAuxList = IntArrayList()
+        private val gatedWhenTrueList = IntArrayList()
+
+        /**
+         * Emit [f]'s atom row AND its exact complement row unconditionally (contrast
+         * [ReifiedRealLinear.linearize], which consults the live pin and emits at most one): the model's
+         * row set is then pin-independent, and a node merely re-points each row's rhs at its pin state
+         * ([gatedEnforcement]) — at most one of the pair is ever active. Premises stay the activating
+         * literal, so certificates cite exactly as on the per-node build.
+         */
+        private fun emitGatedReified(f: ReifiedRealLinear) {
+            val cols = IntArray(f.vars.size + f.realVars.size)
+            val coeffs = DoubleArray(cols.size)
+            for (i in f.vars.indices) {
+                cols[i] = intColumn(f.vars[i])
+                coeffs[i] = f.intCoeffs[i]
+            }
+            for (j in f.realVars.indices) {
+                val c = realColumn(f.realVars[j])
+                if (c < 0) return // builder has no real-column backing (e.g. a presolve fake)
+                cols[f.vars.size + j] = c
+                coeffs[f.vars.size + j] = f.realCoeffs[j]
+            }
+            // Columns (and any lazy split-pair rows) exist now, so each realRow below lands as exactly
+            // the row index recorded before it.
+            gatedRowList.add(builder.rowCount)
+            gatedAuxList.add(f.aux)
+            gatedWhenTrueList.add(1)
+            realRow(cols, coeffs, f.op, f.bound, f.strict, intArrayOf(Lit.make(f.aux, true)))
+            gatedRowList.add(builder.rowCount)
+            gatedAuxList.add(f.aux)
+            gatedWhenTrueList.add(0)
+            val flipped = if (f.op == LinearOp.LE) LinearOp.GE else LinearOp.LE
+            realRow(cols, coeffs, flipped, f.bound, !f.strict, intArrayOf(Lit.make(f.aux, false)))
         }
 
         /**
