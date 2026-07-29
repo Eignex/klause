@@ -64,7 +64,12 @@ internal object SolveCore {
         // each phase restart the clock and blow the limit cumulatively.
         val (deadline, cancel) = deadlineCancellation(common)
         val presolveStart = TimeSource.Monotonic.markNow()
-        val solvable = rawSolvable.presolved(config, solutionSetSensitive, presolveCancellation(cancel, deadline))
+        val solvable = rawSolvable.presolved(
+            config,
+            solutionSetSensitive,
+            presolveCancellation(cancel, deadline),
+            boundingCancellation = cancel,
+        )
         val presolveElapsed = presolveStart.elapsedNow()
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).

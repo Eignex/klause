@@ -8,7 +8,6 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -37,10 +36,11 @@ data class SmtLibProblem(
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    /** True when some integer variable's true (infinite or wider) domain was narrowed to the finite
-     *  solver range because no tight bound was provable. An `unsat` over such a clamped model is only
-     *  `unsat` within the finite range — the honest verdict for the original problem is `unknown`. */
-    val domainsClamped: Boolean = false,
+    /** Deferred integer-domain bounding (OBBT), or `null` when every domain is already finite (nothing to
+     *  close). Parsing closes each open side to a cheap fallback box; the LP tightening runs in the presolve
+     *  phase ([DeferredIntBounds.run]), which also decides whether a side fell back to a lossy clamp — the
+     *  honest-`unknown` signal, known only after that runs. */
+    val deferredBounds: DeferredIntBounds?,
 )
 
 /** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
@@ -58,11 +58,10 @@ object SmtLib {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
         searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
-        cancellation: Cancellation = Cancellation.Never,
     ): SmtLibProblem {
         val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
         for (cmd in SExprReader(text).readAll()) b.command(cmd)
-        return b.build(cancellation)
+        return b.build()
     }
 
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
@@ -91,10 +90,6 @@ object SmtLib {
         internal val asserts = ArrayList<SExpr>()
         internal var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
         override var trueLitCache: Int = -1
-
-        /** Set once bound inference has to clamp an integer variable to the finite solver range; makes
-         *  an eventual `unsat` verdict `unknown` (see [SmtLibProblem.domainsClamped]). */
-        internal var domainsClamped = false
 
         /** Non-recursive `define-fun` macros: name to (parameter names, body term, Bool-return flag).
          *  A call `(f a…)` is inlined by binding the parameters to the arguments like a `let`. */
@@ -229,16 +224,17 @@ object SmtLib {
             }
         }
 
-        fun build(cancellation: Cancellation = Cancellation.Never): SmtLibProblem {
+        fun build(): SmtLibProblem {
             inferBounds()
             for (a in asserts) assert(a)
-            boundUnboundedVars(cancellation)
+            val deferred = prepareDeferredBounds()
             val objective = objectiveSpec?.let { (t, neg) ->
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
-            // The single search seam: every domain must be Finite by now (boundUnboundedVars closes
-            // every Open one). An Open here would be a bug, but the sealed type kept it from flowing
-            // anywhere a searchable IntDomain was expected, so this cast is the only place it can surface.
+            // The single search seam: every domain must be Finite by now (prepareDeferredBounds closes
+            // every Open one to the fallback box). An Open here would be a bug, but the sealed type kept
+            // it from flowing anywhere a searchable IntDomain was expected, so this cast is the only place
+            // it can surface.
             val domains = Array(intDomains.size) { i ->
                 (intDomains[i] as? PresolveDomain.Finite)?.domain ?: error("open domain reached search")
             }
@@ -262,7 +258,7 @@ object SmtLib {
                 boolVarNames = LinkedHashMap(boolNames),
                 realVarNames = LinkedHashMap(realNames),
                 sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
-                domainsClamped = domainsClamped,
+                deferredBounds = deferred,
             )
         }
     }
