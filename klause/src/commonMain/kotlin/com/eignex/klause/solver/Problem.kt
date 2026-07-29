@@ -187,6 +187,29 @@ class Problem(
     )
 
     /**
+     * A copy with the integer domains replaced — used when a front-end's deferred bounding tightens the
+     * open sides after parsing (the domains are a finished, already-folded view, so it stays [preFolded]).
+     * Every other structure (factors, real bounds, implied/symmetry flags) is shared. Requires
+     * [preFolded]: a directly-constructed problem carries construction-time bake deductions this copy
+     * would not reproduce.
+     */
+    fun withIntDomains(newDomains: Array<IntDomain>): Problem {
+        require(preFolded) { "withIntDomains is for preFolded (front-end) problems only" }
+        return Problem(
+            numBoolVars = numBoolVars,
+            numIntVars = numIntVars,
+            intDomains = newDomains,
+            factors = factors.asList(),
+            impliedFactorMask = impliedFactorMask,
+            hasSymmetryBreaking = hasSymmetryBreaking,
+            preFolded = true,
+            numRealVars = numRealVars,
+            realLower = realLower,
+            realUpper = realUpper,
+        )
+    }
+
+    /**
      * Variable → factor occurrence lists, split by engine (CP vs local search) and wakeup mode. The
      * LS-side lists force [invariants] lazily, so a presolve/CP-only problem never builds them. The
      * individual lists below delegate here; access them by name or through this index directly.

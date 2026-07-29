@@ -6,6 +6,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.Presolver
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
@@ -22,6 +23,10 @@ class SmtLibTest {
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints
     }
+
+    // OBBT is deferred to the presolve phase, so the clamp verdict is decided by running the deferred
+    // bounding (not at parse). Run it eagerly here to assert the same behaviour.
+    private fun SmtLibProblem.clamped(): Boolean = deferredBounds?.run(Cancellation.Never)?.clamped ?: false
 
     @Test
     fun `integer equality over an ite operand is an arithmetic relation`() {
@@ -463,7 +468,7 @@ class SmtLibTest {
         // One row with tiny coefficients: the small-model bound fits, so the finite box is
         // equisatisfiable with the unbounded model and no clamp flag is raised.
         val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
-        assertFalse(parsed.domainsClamped, "the small-model bound covers this system exactly")
+        assertFalse(parsed.clamped(), "the small-model bound covers this system exactly")
     }
 
     @Test
@@ -471,7 +476,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (> x 3000000000000)) (check-sat)",
         )
-        assertTrue(parsed.domainsClamped, "the coefficient magnitude pushes the small-model bound past 2^62")
+        assertTrue(parsed.clamped(), "the coefficient magnitude pushes the small-model bound past 2^62")
     }
 
     @Test
@@ -479,7 +484,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
         )
-        assertFalse(parsed.domainsClamped, "both bounds are provable, so an unsat here is sound")
+        assertFalse(parsed.clamped(), "both bounds are provable, so an unsat here is sound")
     }
 
     @Test
@@ -489,7 +494,7 @@ class SmtLibTest {
         // (an unsat would be sound) and x solves to 5.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (= (* 2 x) 10))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertFalse(parsed.domainsClamped, "OBBT bounded x from the LP, so the model is not clamped")
+        assertFalse(parsed.clamped(), "OBBT bounded x from the LP, so the model is not clamped")
         assertEquals(5L, solveFor(text, "x"))
     }
 
@@ -499,7 +504,7 @@ class SmtLibTest {
         // search still finds the witness x = 4.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertFalse(parsed.domainsClamped, "the small-model box is equisatisfiable, not a clamp")
+        assertFalse(parsed.clamped(), "the small-model box is equisatisfiable, not a clamp")
         assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the box")
     }
 
@@ -519,7 +524,7 @@ class SmtLibTest {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ x y) 10))\n(assert (= (- x y) 4))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertFalse(parsed.domainsClamped, "OBBT closed both variables from the linear system")
+        assertFalse(parsed.clamped(), "OBBT closed both variables from the linear system")
         assertEquals(7L, solveFor(text, "x"))
     }
 
@@ -528,13 +533,13 @@ class SmtLibTest {
         // abs(x) with x unbounded: the fresh |x| var must inherit x's open range and be flagged when it
         // is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
         val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)")
-        assertTrue(parsed.domainsClamped, "the fresh abs var inherits x's unbounded range")
+        assertTrue(parsed.clamped(), "the fresh abs var inherits x's unbounded range")
     }
 
     @Test
     fun `a fresh div quotient over an unbounded dividend marks the model clamped`() {
         val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> (div x 2) 3000000000000)) (check-sat)")
-        assertTrue(parsed.domainsClamped, "the fresh quotient var inherits x's unbounded range")
+        assertTrue(parsed.clamped(), "the fresh quotient var inherits x's unbounded range")
     }
 
     @Test
@@ -542,7 +547,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3000000000000)) (check-sat)",
         )
-        assertTrue(parsed.domainsClamped, "the fresh ite var inherits the unbounded branch's range")
+        assertTrue(parsed.clamped(), "the fresh ite var inherits the unbounded branch's range")
     }
 
     @Test
@@ -554,7 +559,7 @@ class SmtLibTest {
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
         )
-        assertFalse(parsed.domainsClamped, "the small-model box decides divisibility unsat exactly")
+        assertFalse(parsed.clamped(), "the small-model box decides divisibility unsat exactly")
     }
 
     @Test
