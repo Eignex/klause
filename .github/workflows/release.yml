@@ -76,7 +76,7 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew --no-daemon publishToSonatypeSnapshots -PciVersion=${{ env.RELEASE_VERSION }}
+        run: ./gradlew --no-daemon publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion=${{ env.RELEASE_VERSION }}
 
       # CLI release assets: stripped native executables (linux x64/arm64 — the
       # host-linkable targets), the JVM dist zip, and SHA256SUMS.
