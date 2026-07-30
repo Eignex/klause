@@ -19,7 +19,6 @@ import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -105,24 +104,18 @@ internal fun splitCondition(text: String): Pair<String, String> {
 
 /** Parser/compiler for the supported XCSP3 integer subset. */
 object Xcsp3 {
-    /** Parse XCSP3 [text] into an [Xcsp3Problem]. [bakeCancellation] bounds the construction-time root
-     *  bake (the propagation fixpoint folded into the problem's domains) — a wall-clock ceiling that only
-     *  clips instances whose root bake would otherwise run for seconds, leaving the residual propagation
-     *  to the solver; a fast bake completes fully and is unaffected. */
+    /** Parse XCSP3 [text] into an [Xcsp3Problem]. Parsing only reads: the base bake is deferred to
+     *  presolve step 0, bounded there by the presolve deadline. */
     // The scanners report malformed input via `require` and the throw is re-typed, not swallowed: the
     // original message is carried into the format exception verbatim.
     @Suppress("SwallowedException")
-    fun parse(
-        text: String,
-        negTableCap: Long = 1_000_000L,
-        bakeCancellation: Cancellation = Cancellation.Never,
-    ): Xcsp3Problem = try {
+    fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = try {
         Builder(negTableCap).run {
             val root = parseXml(text)
             root.child("variables")?.let { vs -> vs.children.forEach { declareVar(it) } }
             root.child("constraints")?.let { cs -> cs.children.forEach { constraint(it) } }
             root.child("objectives")?.let { objs -> objs.children.firstOrNull()?.let { objective(it) } }
-            build(bakeCancellation)
+            build()
         }
     } catch (e: IllegalArgumentException) {
         // The XML / FExpr / tuple scanners report malformed input with `require`, and a few numeric
@@ -1126,13 +1119,12 @@ object Xcsp3 {
             return op to (k + delta)
         }
 
-        fun build(bakeCancellation: Cancellation = Cancellation.Never): Xcsp3Problem = Xcsp3Problem(
+        fun build(): Xcsp3Problem = Xcsp3Problem(
             Problem(
                 numBoolVars = nextBool,
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),
                 factors = factors.toTypedArray(),
-                cancellation = bakeCancellation,
                 // The base bake is deferred to presolve step 0 ([Problem.bakeBase]); construction is
                 // pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
                 deferBake = true,
