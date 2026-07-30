@@ -29,20 +29,4 @@ internal object CliKnobs {
      *  as a runaway backstop — the long-running passes (affine, symmetry) still bail promptly via
      *  cooperative cancellation once it trips. */
     const val DEFAULT_PRESOLVE_BUDGET_MS = 5000L
-
-    /** Wall-clock ceiling (milliseconds) for the construction-time root bake when loading a model:
-     *  `klause.bake.budget.ms` / `KLAUSE_BAKE_BUDGET_MS`. The eager root-propagation fixpoint folded into
-     *  the problem's domains is bounded so loading an instance stays fast; a bake that finishes under the
-     *  ceiling completes fully (unaffected), and one that would run for seconds is clipped, leaving the
-     *  residual propagation to the solver (sound — the partial bake only ever tightens). `0` or negative
-     *  disables the cap. Defaults to [DEFAULT_BAKE_BUDGET_MS]. */
-    val bakeBudgetMs by propertyKnob()
-
-    /** Default load-time root-bake ceiling: `0` = **disabled** (bake to completion). Off by default
-     *  because it is a load-latency-vs-solve-quality trade: a small ceiling bounds cold load (a 600ms cap
-     *  takes the XCSP3 competition corpus from 79.8% to 89.5% loading <1s against the ~120ms JVM+parse
-     *  floor) but clips the root propagation some searches rely on — a `bench solve` A/B at 600ms lost an
-     *  instance klause solves with the full bake (Accordion-11-01). So it stays opt-in via
-     *  `KLAUSE_BAKE_BUDGET_MS`; a caller that values bounded load over that headroom sets it explicitly. */
-    const val DEFAULT_BAKE_BUDGET_MS = 0L
 }

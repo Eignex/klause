@@ -7,7 +7,6 @@ import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FloatBucketing
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -33,8 +32,6 @@ internal class FlatZincCompiler(
     /** Default domain for unbounded `var int` declarations. */
     internal val unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     internal val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-    /** Cooperative cancellation token. */
-    internal val cancellation: Cancellation = Cancellation.Never,
 ) : CnfLowering {
     internal val params = HashMap<String, ParamValue>()
     internal val boolVars = HashMap<String, Int>()
@@ -112,7 +109,6 @@ internal class FlatZincCompiler(
             numIntVars = intDomains.size,
             intDomains = intDomains.toTypedArray(),
             factors = factors.toTypedArray(),
-            cancellation = cancellation,
             impliedFactorMask = impliedFactorMask,
             hasSymmetryBreaking = hasSymmetryBreaking,
             deferBake = true, // base bake runs as presolve step 0
@@ -663,7 +659,6 @@ fun parseFlatZinc(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-    cancellation: Cancellation = Cancellation.Never,
 ): FlatZincProgram {
     val tokens = FlatZincLexer(source).tokenize()
     val model = FlatZincParser(tokens).parse()
@@ -674,6 +669,5 @@ fun parseFlatZinc(
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
-        cancellation = cancellation,
     ).compile()
 }
