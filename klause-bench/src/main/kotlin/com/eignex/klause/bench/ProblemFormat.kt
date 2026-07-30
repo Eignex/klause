@@ -88,7 +88,13 @@ internal object SmtLibFormat : ProblemFormat {
         val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toLongOrNull() ?: 100_000L
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
         val parsed = SmtLib.parse(file.readText(), -intBound, intBound, strict)
-        return Ingested(parsed.problem, parsed.objective)
+        // OBBT is deferred out of parsing; the bench solves in-process without the CLI presolve phase, so
+        // run the deferred bounding here under an ingest budget (a side left un-tightened is clamped, sound).
+        val budgetMs = System.getProperty("klause.bench.smtlib.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
+        val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
+        val problem = parsed.deferredBounds?.run(cancel)?.let { parsed.problem.withIntDomains(it.domains) }
+            ?: parsed.problem
+        return Ingested(problem, parsed.objective)
     }
 }
 
@@ -100,14 +106,17 @@ internal object MpsFormat : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val searchBound = System.getProperty("klause.bench.mps.searchBound")?.toLongOrNull() ?: 1_000_000L
-        // Bound load-time OBBT: on a large MPS it solves an LP per open-integer variable and can run for
-        // many minutes, wedging a sweep before the instance is ever solved. A side left un-tightened when
-        // the budget trips is clamped to searchBound (sound — the clamp only loosens).
+        // OBBT is deferred out of parsing (it solves an LP per open-integer variable and can run for many
+        // minutes on a large MPS). The bench solves in-process without the CLI presolve phase, so run the
+        // deferred bounding here under an ingest budget; a side left un-tightened when the budget trips is
+        // clamped to searchBound (sound — the clamp only loosens).
         val budgetMs = System.getProperty("klause.bench.mps.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
         val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
-        val compiled = Mps.parse(file.readText()).toProblem(searchBound, cancellation = cancel)
+        val compiled = Mps.parse(file.readText()).toProblem(searchBound)
+        val problem = compiled.deferredBounds?.run(cancel)?.let { compiled.problem.withIntDomains(it.domains) }
+            ?: compiled.problem
         val objective = if (compiled.maximize) compiled.objective?.negated() else compiled.objective
-        return Ingested(compiled.problem, objective)
+        return Ingested(problem, objective)
     }
 
     /** Minimise-canonical view of a raw MPS maximise objective (the bench always minimises). */

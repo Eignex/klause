@@ -5,10 +5,9 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.smallModelIntBound
-import com.eignex.klause.lp.tightenOpenIntBounds
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -42,9 +41,11 @@ data class MpsCompiled(
     /** Fixed-point factor the objective was multiplied by (1 when it is already integral); divide the
      *  reported objective by it for the true value. */
     val objectiveScale: Long,
-    /** True when an integer variable unbounded on some side was clamped to the finite search range, so an
-     *  `unsat`/optimum is only valid within that range. */
-    val clamped: Boolean,
+    /** Deferred integer-domain bounding (OBBT), or `null` when every integer column is already finite.
+     *  Compiling closes each open side to a cheap fallback box; the LP tightening runs in the presolve
+     *  phase ([DeferredIntBounds.run]), which also decides whether a side fell back to a lossy clamp — the
+     *  honest-`unknown`/optimum-only-valid signal, known only after that runs. */
+    val deferredBounds: DeferredIntBounds?,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
 )
@@ -55,8 +56,9 @@ private const val MPS_INFINITY = 1e20
 /**
  * Lower an [MpsModel] to a klause [Problem] for the hybrid MIP/CP engine (issue #1232):
  *  - **integer columns** become integer (CP search) variables; a side left unbounded (or at the `1e30`
- *    marker) is tightened by OBBT ([tightenOpenIntBounds]) over the constraint relaxation, and only a
- *    side OBBT cannot bound is clamped to `±[searchBound]` (flagged by [MpsCompiled.clamped]).
+ *    marker) is closed to the cheap fallback box now, and the OBBT tightening over the constraint
+ *    relaxation is deferred to the presolve phase ([MpsCompiled.deferredBounds]); a side OBBT cannot bound
+ *    stays clamped to `±[searchBound]`.
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
  *    search; the simplex resolves them at nodes and leaves. Their real bounds carry through directly, so
  *    an unbounded float is no longer rejected (its open side is `±∞`).
@@ -67,7 +69,6 @@ fun MpsModel.toProblem(
     searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     @Suppress("UNUSED_PARAMETER") floatBuckets: Int = 0,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
-    cancellation: Cancellation = Cancellation.Never,
 ): MpsCompiled {
     val isFloat = BooleanArray(variables.size) { !variables[it].integer }
     val intVarOf = IntArray(variables.size) { -1 }
@@ -109,21 +110,26 @@ fun MpsModel.toProblem(
     // OBBT over the purely-integer rows only (a real-bearing Linear carries placeholder integer data).
     val intLinears = factors.filterIsInstance<Linear>().filter { !it.hasReals }
 
-    // Bound OBBT by the load deadline: on a large model each open-int side is a full LP solve over the
-    // relaxation, so an unbounded pass could outlast the whole solve budget. A side left un-tightened when
-    // the deadline trips is clamped below (sound — the clamp only ever loosens).
-    @Suppress("UNCHECKED_CAST")
-    val tightened = tightenOpenIntBounds(obbtInput as Array<OpenIntBounds>, intLinears, cancellation)
-    // A pure-integer feasibility model whose small-model bound ([smallModelIntBound]) fits keeps
-    // exact verdicts: the finite box is equisatisfiable with the unbounded model, so no clamp flag.
-    // Never under an objective (the box could truncate an unbounded optimum into a spurious finite
-    // one); mixed models and oversized bounds fall back to the lossy searchable window.
+    // A pure-integer feasibility model whose small-model bound ([smallModelIntBound]) fits keeps exact
+    // verdicts: the finite box is equisatisfiable with the unbounded model, so no clamp flag. Never under
+    // an objective (the box could truncate an unbounded optimum into a spurious finite one); mixed models
+    // and oversized bounds fall back to the lossy searchable window.
     val small = if (numReal == 0 && objective.indices.isEmpty()) smallModelIntBound(numInt, factors) else null
     val box = small ?: searchBound
-    var clamped = false
+
+    // Defer OBBT to the presolve phase (compiling only reads): close each open integer side to the cheap
+    // fallback box now, and capture the OBBT inputs so the deferred run can tighten under the solve
+    // deadline. A side the LP cannot bound stays at the fallback, clamped when that box is lossy.
+    @Suppress("UNCHECKED_CAST")
+    val openBounds = obbtInput as Array<OpenIntBounds>
+    val deferredBounds = if (openBounds.any { it.lo == null || it.hi == null }) {
+        DeferredIntBounds(openBounds, intLinears, emptyList(), 0, -box, box, small == null)
+    } else {
+        null
+    }
     val domains = Array(numInt) { j ->
-        val lo = tightened[j].lo ?: (-box).also { if (small == null) clamped = true }
-        val hi = tightened[j].hi ?: box.also { if (small == null) clamped = true }
+        val lo = openBounds[j].lo ?: -box
+        val hi = openBounds[j].hi ?: box
         if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
     }
 
@@ -147,7 +153,7 @@ fun MpsModel.toProblem(
     val columns = variables.mapIndexed { i, v ->
         MpsColumn(v.name, isFloat[i], if (isFloat[i]) realVarOf[i] else intVarOf[i])
     }
-    return MpsCompiled(problem, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, clamped, numReal)
+    return MpsCompiled(problem, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, deferredBounds, numReal)
 }
 
 /** Emit a purely-integer row over integer-variable ids, scaling by [floatScale] when a coefficient or
