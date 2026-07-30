@@ -180,6 +180,8 @@ object Opb {
             numIntVars = 0,
             intDomains = emptyArray(),
             factors = builder.factors.toTypedArray(),
+            // Defer the base bake (root PB/unit propagation) to presolve step 0, so parsing only reads.
+            deferBake = true,
         )
         return OpbProblem(problem, objective, builder.boolFolds, numDeclaredVars)
     }
