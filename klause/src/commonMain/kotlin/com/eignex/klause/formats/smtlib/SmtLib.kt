@@ -8,6 +8,7 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective

@@ -4,7 +4,6 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.toProblem
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 
 /**
@@ -21,32 +20,36 @@ internal object MpsMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        // Set by load(): true when an unbounded variable was clamped to the finite search range, so a
-        // proven optimum/unsat is only valid within that range (see output()).
-        private var clamped = false
+        // Shared with the deferred bounding: set once the presolve-phase OBBT decides whether a side fell
+        // back to a lossy clamp, and read by output() at status-line time (after solving) — so a proven
+        // optimum/unsat over a clamped box is reported honestly.
+        private val clamp = ClampFlag()
 
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = KlauseConfig.current
-            // Honor `-t` during the load-time bake: MPS OBBT solves an LP per open-int variable, which on a
-            // large model can outlast the whole solve budget before any solver/cancellation exists (mirrors
-            // the MiniZinc/XCSP3 bake bound). A side left un-tightened when the deadline trips is clamped.
-            val bakeCancel =
-                common.deadlineAtMs?.let { d -> Cancellation { nowMillis() > d } } ?: Cancellation.Never
             val compiled = Mps.parse(readTextFile(path))
-                .toProblem(config.unboundedSearchBound, config.floatBuckets, config.floatScale, bakeCancel)
-            clamped = compiled.clamped
+                .toProblem(config.unboundedSearchBound, config.floatBuckets, config.floatScale)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.problem.numIntVars} " +
                     "factors=${compiled.problem.numFactors} float-cols=${compiled.floatColumns} " +
-                    "objScale=${compiled.objectiveScale} clamped=$clamped"
+                    "objScale=${compiled.objectiveScale}"
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
-            return linearSolvable(compiled.problem, compiled.objective, compiled.maximize, render)
+            val base = linearSolvable(compiled.problem, compiled.objective, compiled.maximize, render)
+            // Defer OBBT into the presolve phase: compiling only reads, and the LP tightening runs under the
+            // presolve budget instead of unbounded at load. The run also decides the clamp verdict. Absent
+            // when every integer column is already finite (nothing to bound, never clamped).
+            val deferred = compiled.deferredBounds ?: return base
+            return base.withDeferredBounds { cancellation ->
+                val bounded = deferred.run(cancellation)
+                clamp.clamped = bounded.clamped
+                compiled.problem.withIntDomains(bounded.domains)
+            }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(clamped)
+        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(clamp)
     }
 }
 
@@ -64,14 +67,14 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
  * search range, a proven optimum is only optimal within the clamp and an `unsat` only holds within it,
  * so both are softened (to `SATISFIABLE` / `UNKNOWN`) — the honest verdict for the unbounded problem.
  */
-internal class MpsOutput(private val clamped: Boolean) : BufferedBestOutput() {
+internal class MpsOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
-        Verdict.OPTIMAL -> if (clamped) "s SATISFIABLE" else "s OPTIMUM FOUND"
-        Verdict.UNSATISFIABLE -> if (clamped) "s UNKNOWN" else "s UNSATISFIABLE"
+        Verdict.OPTIMAL -> if (clamp.clamped) "s SATISFIABLE" else "s OPTIMUM FOUND"
+        Verdict.UNSATISFIABLE -> if (clamp.clamped) "s UNKNOWN" else "s UNSATISFIABLE"
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 

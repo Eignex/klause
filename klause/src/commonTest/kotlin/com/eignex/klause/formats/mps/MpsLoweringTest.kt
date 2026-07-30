@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.lp.BoundedIntDomains
 import com.eignex.klause.solver.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,6 +15,11 @@ class MpsLoweringTest {
 
     private fun model(vararg vars: MpsVar) =
         MpsModel("m", ObjectiveSense.MINIMIZE, noObjective, vars.toList(), emptyList())
+
+    // OBBT is deferred to the presolve phase; run it here to assert the effective bounded domains and
+    // clamp flag (a fully-finite model has no deferred bounding, so its domains stand and it never clamps).
+    private fun MpsCompiled.bounded(cancellation: Cancellation = Cancellation.Never): BoundedIntDomains =
+        deferredBounds?.run(cancellation) ?: BoundedIntDomains(problem.intDomains, false)
 
     @Test
     fun `keeps an unbounded float column as an open LP-only continuous variable`() {
@@ -47,16 +53,17 @@ class MpsLoweringTest {
         // No rows and no objective: any single value is a witness, so the small-model box is
         // equisatisfiable and the model is not flagged clamped.
         val compiled = model(MpsVar("x", integer = true, lower = null, upper = null)).toProblem(searchBound = 1000L)
-        assertFalse(compiled.clamped)
+        assertFalse(compiled.bounded().clamped)
 
         // Under an objective the box could truncate an unbounded optimum, so the lossy search
         // window applies and the model is flagged.
         val minimized = model(MpsVar("x", integer = true, lower = null, upper = null))
             .copy(objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0))
             .toProblem(searchBound = 1000L)
+            .bounded()
         assertTrue(minimized.clamped)
-        assertEquals(-1000L, minimized.problem.intDomains[0].min)
-        assertEquals(1000L, minimized.problem.intDomains[0].max)
+        assertEquals(-1000L, minimized.domains[0].min)
+        assertEquals(1000L, minimized.domains[0].max)
     }
 
     @Test
@@ -69,9 +76,9 @@ class MpsLoweringTest {
             listOf(MpsVar("x", integer = true, lower = 0.0, upper = null)),
             listOf(row),
         )
-        val d = m.toProblem(searchBound = 1_000_000L).let {
+        val d = m.toProblem(searchBound = 1_000_000L).bounded().let {
             assertFalse(it.clamped)
-            it.problem.intDomains[0]
+            it.domains[0]
         }
         // x >= 0, x <= 5: exact-certified OBBT tightens the open upper side to exactly 5, no clamp.
         assertEquals(0L, d.min)
@@ -79,7 +86,7 @@ class MpsLoweringTest {
     }
 
     @Test
-    fun `a tripped load deadline skips OBBT and clamps the open side instead of tightening`() {
+    fun `a tripped deadline skips OBBT and clamps the open side instead of tightening`() {
         // The huge bound magnitude keeps the small-model box from applying, so the lossy window shows.
         val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0e12)
         val m = MpsModel(
@@ -89,11 +96,11 @@ class MpsLoweringTest {
             listOf(MpsVar("x", integer = true, lower = 0.0, upper = null)),
             listOf(row),
         )
-        // With the load deadline already tripped, OBBT runs no LP solves, so the open upper side is clamped
-        // to the search bound rather than tightened — this is what bounds load on a large model.
-        val compiled = m.toProblem(searchBound = 1_000L, cancellation = Cancellation { true })
-        assertTrue(compiled.clamped)
-        assertEquals(1_000L, compiled.problem.intDomains[0].max)
+        // With the presolve deadline already tripped, the deferred OBBT runs no LP solves, so the open
+        // upper side is clamped to the search bound rather than tightened — this is what bounds the phase.
+        val bounded = m.toProblem(searchBound = 1_000L).bounded(Cancellation { true })
+        assertTrue(bounded.clamped)
+        assertEquals(1_000L, bounded.domains[0].max)
     }
 
     @Test
@@ -106,9 +113,9 @@ class MpsLoweringTest {
             listOf(MpsVar("x", integer = true, lower = null, upper = null)),
             listOf(row),
         )
-        val d = m.toProblem(searchBound = 1_000_000L).let {
+        val d = m.toProblem(searchBound = 1_000_000L).bounded().let {
             assertFalse(it.clamped)
-            it.problem.intDomains[0]
+            it.domains[0]
         }
         assertEquals(-4L, d.min)
         assertEquals(8L, d.max)
@@ -130,10 +137,10 @@ class MpsLoweringTest {
             ),
             listOf(cap, sum),
         )
-        val compiled = m.toProblem(searchBound = 1_000_000L)
-        assertFalse(compiled.clamped)
-        assertEquals(5L, compiled.problem.intDomains[0].max)
-        assertEquals(12L, compiled.problem.intDomains[1].max)
+        val bounded = m.toProblem(searchBound = 1_000_000L).bounded()
+        assertFalse(bounded.clamped)
+        assertEquals(5L, bounded.domains[0].max)
+        assertEquals(12L, bounded.domains[1].max)
     }
 
     @Test
@@ -154,11 +161,11 @@ class MpsLoweringTest {
             ),
             listOf(capX, yx, zy),
         )
-        val compiled = m.toProblem(searchBound = 1_000_000L)
-        assertFalse(compiled.clamped)
-        assertEquals(3L, compiled.problem.intDomains[0].max)
-        assertEquals(5L, compiled.problem.intDomains[1].max)
-        assertEquals(6L, compiled.problem.intDomains[2].max)
+        val bounded = m.toProblem(searchBound = 1_000_000L).bounded()
+        assertFalse(bounded.clamped)
+        assertEquals(3L, bounded.domains[0].max)
+        assertEquals(5L, bounded.domains[1].max)
+        assertEquals(6L, bounded.domains[2].max)
     }
 
     @Test
