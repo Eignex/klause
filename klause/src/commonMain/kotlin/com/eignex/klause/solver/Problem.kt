@@ -327,6 +327,19 @@ class Problem(
         )
     }
 
+    /**
+     * The integer domains with the root bake's deductions folded in — the finite, tightened form,
+     * independent of construction mode. For an eagerly-baked or [preFolded] problem these are [intDomains]
+     * directly (already folded); for a [deferBake] problem the raw declared domains are folded on first
+     * access (memoized). Consumers that need tightened domains should read this rather than [intDomains],
+     * which is the *raw* declared array for a deferBake problem.
+     */
+    val bakedDomains: Array<IntDomain> by lazy(LazyThreadSafetyMode.NONE) {
+        // `this.intDomains` (the folded property), not the unqualified name — inside this lazy lambda the
+        // bare `intDomains` would capture the raw constructor parameter, which the eager fold never touches.
+        if (deferBake) bakeBase().intDomains else this.intDomains
+    }
+
     /** Folds the root-level int deductions of a successful bake into [intDomains] so the
      *  tightened bounds are part of the problem itself rather than transient solver state.
      *  Bounds are applied before holes so every recorded hole is interior to the final
