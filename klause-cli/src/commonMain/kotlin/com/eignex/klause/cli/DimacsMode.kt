@@ -19,7 +19,7 @@ internal object DimacsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val problem = Dimacs.parse(readTextFile(path))
+            val problem = Dimacs.parse(openFileSource(path))
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }

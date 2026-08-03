@@ -20,7 +20,7 @@ internal object OpbMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val parsed = Opb.parse(readTextFile(path))
+            val parsed = Opb.parse(openFileSource(path))
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} factors=${parsed.problem.numFactors}"
             }

@@ -3,6 +3,9 @@ package com.eignex.klause.formats.dimacs
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
+import com.eignex.klause.io.lineSequence
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -36,7 +39,10 @@ object Dimacs {
     private const val HARD_WEIGHT_SENTINEL: Long = Long.MAX_VALUE
 
     /** Parse DIMACS CNF/WCNF [text] into a [Problem]. */
-    fun parse(text: String): Problem {
+    fun parse(text: String): Problem = parse(StringCharSource(text))
+
+    /** Parse a DIMACS CNF/WCNF [source] into a [Problem], consuming it line by line. */
+    fun parse(source: CharSource): Problem {
         var numVars = -1
         val clauses = mutableListOf<Clause>()
         // A bare `0` with no accumulated literals is the empty clause (⊥) — an unsatisfiable instance —
@@ -46,7 +52,7 @@ object Dimacs {
 
         @Suppress("DoubleMutabilityForCollection") // reset to a new list per clause
         var current: IntArrayList? = null
-        for (rawLine in text.lineSequence()) {
+        for (rawLine in source.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty()) continue
             if (line.startsWith("c")) continue
@@ -120,7 +126,10 @@ object Dimacs {
     )
 
     /** Parse `.wcnf` into hard clauses plus weighted soft clauses. */
-    fun parseWcnf(text: String): WcnfProblem {
+    fun parseWcnf(text: String): WcnfProblem = parseWcnf(StringCharSource(text))
+
+    /** Parse a `.wcnf` [source] into hard clauses plus weighted soft clauses, consuming it line by line. */
+    fun parseWcnf(source: CharSource): WcnfProblem {
         var numVars = -1
         var top: Long? = null
         var hasOldHeader = false
@@ -131,7 +140,7 @@ object Dimacs {
         var triviallyUnsat = false
         var fixedCost = 0L
 
-        for (rawLine in text.lineSequence()) {
+        for (rawLine in source.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty()) continue
             if (line.startsWith("c") || line.startsWith("%")) continue

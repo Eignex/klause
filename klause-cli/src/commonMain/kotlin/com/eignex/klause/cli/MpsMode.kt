@@ -29,7 +29,7 @@ internal object MpsMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = KlauseConfig.current
-            val compiled = Mps.parse(readTextFile(path))
+            val compiled = Mps.parse(openFileSource(path))
                 .toProblem(config.unboundedSearchBound, config.floatBuckets, config.floatScale)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.problem.numIntVars} " +
