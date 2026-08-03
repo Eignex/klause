@@ -27,7 +27,7 @@ internal object SmtLibMode : CliMode {
             // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
             val config = KlauseConfig.current
             val parsed = SmtLib.parse(
-                readTextFile(path),
+                openFileSource(path),
                 config.unboundedIntLo,
                 config.unboundedIntHi,
                 searchBound = config.unboundedSearchBound,
