@@ -1,5 +1,7 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
@@ -31,8 +33,13 @@ internal actual fun errPrintln(message: String) {
 
 internal actual fun exitCli(code: Int): Nothing = exitProcess(code)
 
+// Native reads the whole file up front (a chunked reader would have to buffer partial UTF-8 sequences
+// across chunk boundaries); the [CharSource] contract is met, and the incremental-IO win lands on the
+// JVM distribution first. A dedicated native streaming reader is a follow-up.
+internal actual fun openFileSource(path: String): CharSource = StringCharSource(readWholeFile(path))
+
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun readTextFile(path: String): String {
+private fun readWholeFile(path: String): String {
     compressionExtension(path)?.let { ext ->
         // `<decompressor> -dc '<path>'` piped through the shell; single-quote the path (escaping any
         // embedded quote) so a path with spaces is one argument.
