@@ -438,8 +438,9 @@ object Xcsp3 {
             return m
         }
 
-        internal fun intension(expr: String) {
-            val node = FExpr.parse(expr)
+        internal fun intension(expr: String) = intension(FExpr.parse(expr))
+
+        internal fun intension(node: FExpr) {
             if (node is FExpr.Call && node.fn == "eq" && node.args.size == 2) {
                 // `eq(v, mul(a,b))` with v, a, b plain variables is one Product (v = a·b), skipping the aux
                 // var and equality the generic term path emits — the bulk of an O(n²) product model.
@@ -1095,10 +1096,23 @@ object Xcsp3 {
             val template = e.children.firstOrNull { it.tag != "args" }
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
             val used = template.explicitParamIndices()
+            // An `<intension>` template over scalar `%i` placeholders is parsed once and reused: substitute
+            // the args into the expression tree per row instead of re-expanding and re-parsing the string,
+            // which otherwise dominates the parse of group-heavy models (millions of rows, one template).
+            val intensionTemplate =
+                if (template.tag == "intension" && FExpr.isScalarTemplate(template.textContent)) {
+                    FExpr.parse(template.textContent.trim())
+                } else {
+                    null
+                }
             for (args in e.children.filter { it.tag == "args" }) {
                 val tokens = args.textContent.splitWs()
                     .flatMap { expandNames(it) }
-                constraint(template.substituteParams(tokens, used))
+                if (intensionTemplate != null) {
+                    intension(FExpr.substitute(intensionTemplate, tokens))
+                } else {
+                    constraint(template.substituteParams(tokens, used))
+                }
             }
         }
 
