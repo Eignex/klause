@@ -140,12 +140,14 @@ fun MpsModel.toProblem(
         buildObjective(isFloat, intVarOf, realVarOf, numInt, numReal, objScale)
     }
 
+    // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
+    // integer-infeasible equality would grind O(span) if baked at construction; presolve's strengthen
+    // pass catches that first, at solve time, before the (now-lazy) bake runs.
     val problem = Problem(
         numBoolVars = 0,
         numIntVars = numInt,
         intDomains = domains,
         factors = factors.toTypedArray(),
-        preFolded = true,
         numRealVars = numReal,
         realLower = realLower,
         realUpper = realUpper,

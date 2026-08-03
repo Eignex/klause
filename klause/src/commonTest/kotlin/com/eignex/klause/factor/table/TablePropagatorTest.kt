@@ -43,14 +43,13 @@ class TablePropagatorTest {
     @Test
     fun `skipExpensiveBake defers the table's root pruning`() {
         // Table {(0,1),(2,3)} over vars in [0..3] is GAC at the root: value 3 of var0 has no support,
-        // so a full bake tightens its max 3 -> 2. preFolded skips the construction bake so each state
+        // so a full bake tightens its max 3 -> 2. A raw problem never bakes at construction, so each state
         // starts from the raw [0..3] domains.
         fun problem() = Problem(
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = Array(2) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3))),
-            preFolded = true,
         )
         val full = PropagationState(problem(), Assumptions.None)
         full.runToFixpoint(allFactors = true, skipExpensiveBake = false)

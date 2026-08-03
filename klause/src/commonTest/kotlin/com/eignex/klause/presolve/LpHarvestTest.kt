@@ -309,10 +309,9 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
                 Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1),
             ),
-            // preFolded, exactly as the SMT frontend builds a wide model: the declared domains reach the
+            // Raw, exactly as the SMT frontend builds a wide model: the declared domains reach the
             // probe as-is, with no O(span) base bake at construction — so this asserts the probe alone
             // certifies infeasibility in one LP solve, fast regardless of the span.
-            preFolded = true,
         )
         assertTrue(
             lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
@@ -327,7 +326,6 @@ class LpHarvestTest {
             2,
             arrayOf(IntDomain(0, 1_000_000_000), IntDomain(0, 1_000_000_000)),
             arrayOf<Factor>(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1)),
-            preFolded = true, // declared wide domains reach the probe with no O(span) base bake
         )
         assertFalse(
             lpRootInfeasible(problem, LinearObjective(), LpPlan(bounding = true)),
@@ -348,7 +346,6 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10), // x + y <= 10
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0), // x - y <= 0  (x <= y)
             ),
-            preFolded = true, // declared wide domains reach the OBBT with no base bake
         )
         val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
         assertTrue(tightened !== problem, "OBBT must tighten a domain the LP bounds below propagation")

@@ -12,11 +12,11 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/** Root-level deductions from the bake are folded into [Problem.intDomains], so every
- *  consumer sees the tightened domains rather than the loosely-declared input. */
+/** Root-level deductions from the bake are folded into [BakedProblem.intDomains] by [Problem.bake], so
+ *  every solver sees the tightened domains rather than the loosely-declared input. */
 class ProblemDomainTighteningTest {
     @Test
-    fun `bound tightenings become the problem's domains`() {
+    fun `bound tightenings become the baked problem's domains`() {
         val p =
             Problem(
                 0,
@@ -26,7 +26,7 @@ class ProblemDomainTighteningTest {
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
                 ),
-            )
+            ).bake()
         assertEquals(0, p.intDomains[0].min)
         assertEquals(1, p.intDomains[0].max)
     }
@@ -39,7 +39,7 @@ class ProblemDomainTighteningTest {
                 1,
                 arrayOf(IntDomain(-1_000_000, 1_000_000)),
                 listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)),
-            )
+            ).bake()
         assertEquals(7, p.intDomains[0].min)
         assertEquals(7, p.intDomains[0].max)
     }
@@ -57,7 +57,7 @@ class ProblemDomainTighteningTest {
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                     Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
                 ),
-            )
+            ).bake()
         for (v in 0..1) {
             assertEquals(0, p.intDomains[v].min, "var $v min")
             assertEquals(1, p.intDomains[v].max, "var $v max")
@@ -72,7 +72,7 @@ class ProblemDomainTighteningTest {
                 1,
                 arrayOf(IntDomain(0, 4)),
                 listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 2)),
-            )
+            ).bake()
         val p = RootBaker.reseed(base, BakeConfig(probeIntHoles = true))
         assertIs<PropagationResult.Implied>(p.baked)
         assertFalse(2 in p.intDomains[0])
@@ -81,11 +81,11 @@ class ProblemDomainTighteningTest {
     }
 
     @Test
-    fun `cross-constraint bound propagation reaches a multi-hop fixpoint at construction`() {
+    fun `cross-constraint bound propagation reaches a multi-hop fixpoint in the bake`() {
         // A three-link chain x0 >= x1 >= x2 >= x3 with only x0 <= 5 declared: the upper bound has to
         // hop x0 -> x1 -> x2 -> x3 across separate constraints, which only a propagation *fixpoint*
         // (re-queue a factor when a neighbour's bound moves), not a one-shot per-constraint sweep,
-        // can reach. The construction bake folds that fixpoint into the problem's domains.
+        // can reach. The bake folds that fixpoint into the problem's domains.
         val wide = { IntDomain(0, 1_000_000) }
         val p =
             Problem(
@@ -98,20 +98,20 @@ class ProblemDomainTighteningTest {
                     Linear(intArrayOf(1, -1), intArrayOf(2, 1), LinearOp.LE, 0), // x2 - x1 <= 0
                     Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.LE, 0), // x3 - x2 <= 0
                 ),
-            )
+            ).bake()
         for (v in 0..3) assertEquals(5, p.intDomains[v].max, "var $v max should propagate to 5")
     }
 
     @Test
-    fun `caller-supplied domain array is not mutated`() {
+    fun `caller-supplied domain array is not mutated by the bake`() {
         val input = arrayOf(IntDomain(-1_000_000, 1_000_000))
-        Problem(0, 1, input, listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)))
+        Problem(0, 1, input, listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7))).bake()
         assertEquals(-1_000_000, input[0].min)
         assertEquals(1_000_000, input[0].max)
     }
 
     @Test
-    fun `a fired cancellation makes the construction-time bake a sound no-op`() {
+    fun `a fired cancellation makes the bake a sound no-op`() {
         // The same x + y = 1, x,y >= 0 model that tightens both vars to [0..1] when baked to
         // completion. With an already-fired cancellation the all-factors fixpoint bails before
         // firing any factor: domains stay as declared and the bake is sound (Implied, not Unsat).
@@ -123,14 +123,14 @@ class ProblemDomainTighteningTest {
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
             )
         val cancelled =
-            Problem(0, 2, arrayOf(wide(), wide()), factors, cancellation = { true })
+            Problem(0, 2, arrayOf(wide(), wide()), factors, cancellation = { true }).bake()
         assertIs<PropagationResult.Implied>(cancelled.baked)
         for (v in 0..1) {
             assertEquals(-1_000_000, cancelled.intDomains[v].min, "var $v min unchanged")
             assertEquals(1_000_000, cancelled.intDomains[v].max, "var $v max unchanged")
         }
         // Same model with the default never-cancel token bakes to completion and tightens.
-        val baked = Problem(0, 2, arrayOf(wide(), wide()), factors)
+        val baked = Problem(0, 2, arrayOf(wide(), wide()), factors).bake()
         for (v in 0..1) {
             assertEquals(0, baked.intDomains[v].min, "var $v min baked")
             assertEquals(1, baked.intDomains[v].max, "var $v max baked")
@@ -148,7 +148,7 @@ class ProblemDomainTighteningTest {
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
                 ),
-            )
+            ).bake()
         assertIs<PropagationResult.Unsat>(p.baked)
         assertEquals(0, p.intDomains[0].min)
         assertEquals(10, p.intDomains[0].max)

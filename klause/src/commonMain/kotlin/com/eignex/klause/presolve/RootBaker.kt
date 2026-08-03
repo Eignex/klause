@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -28,17 +29,17 @@ object RootBaker {
 
     /**
      * Re-seed a base-baked [problem] with the [config]-enabled probing tiers: run [bake] and, when it
-     * found extra deductions, return a fresh eager [Problem] over the same factors / domains whose
+     * found extra deductions, return a fresh folded [BakedProblem] over the same factors / domains whose
      * [Problem.baked] carries them. Returns [problem] unchanged when no tier is enabled, the problem is
-     * a [Problem.preFolded] pass view (which never bakes), or the base bake is already `Unsat`. This is
+     * an already-folded pass view (which never bakes), or the base bake is already `Unsat`. This is
      * the central re-probe point for the presolve fresh path and the LP harvest — the kernel never
      * initiates it, so no `solver → presolve` cycle.
      */
     fun reseed(problem: Problem, config: BakeConfig): Problem {
-        if (!config.anyEnabled || problem.preFolded) return problem
+        if (!config.anyEnabled || problem.sharedDomains) return problem
         val extra = bake(problem, config)
         if (extra === problem.baked) return problem
-        return Problem(
+        return BakedProblem(
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = Array(problem.numIntVars) { problem.intDomains[it] },

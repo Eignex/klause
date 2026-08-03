@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -174,14 +175,14 @@ internal object PresolveShared {
         intDomains: Array<IntDomain> = problem.intDomains.copyOf(),
         bakeConfig: BakeConfig = BakeConfig.NONE,
     ): Problem {
-        // Inherit the pass-view mode: a pass fed a cheap preFolded input returns a cheap preFolded
+        // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
         // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
-        val base = Problem(
+        val base = BakedProblem(
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = intDomains,
             factors = factors,
-            preFolded = problem.preFolded,
+            alreadyFolded = problem.sharedDomains,
             // The LP-only continuous columns are a separate namespace presolve never touches (real-bearing
             // rows are guarded out of every pass, and int renumbering leaves real ids alone), so carry it
             // through unchanged — else the solve loses the reals and the leaf verdict silently no-ops.
@@ -189,7 +190,7 @@ internal object PresolveShared {
             realLower = problem.realLower,
             realUpper = problem.realUpper,
         )
-        // A preFolded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
+        // An already-folded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs
         // [RootBaker] against the base-baked problem and returns a fresh eager [Problem] whose
         // [Problem.baked] carries the failed-literal / SAC deductions — the kernel's former self-bake, now

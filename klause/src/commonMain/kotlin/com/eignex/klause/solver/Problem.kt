@@ -76,24 +76,14 @@ open class Problem(
      */
     val hasSymmetryBreaking: Boolean = false,
     /**
-     * Presolve pass-view mode. When `true`, this [Problem] is a cheap carrier of `(factors, intDomains)`
-     * for a presolve pass that reads only those two: the eager derived structures — [propagators],
-     * the occurrence lists, and the root [baked] fold — are deferred to first access and NOT forced at
-     * construction, and [intDomains] are taken to be *already folded* (the incremental
-     * [com.eignex.klause.presolve.PresolveSession] supplies its re-propagated domains). Off by
-     * default: every solver/LS/LP consumer builds a normal [Problem] whose [baked] is forced eagerly at
-     * construction exactly as before, so nothing outside presolve sees a behavioural change.
+     * Skip the defensive copy of [intDomains]: when `true`, the passed array is shared as-is rather than
+     * copied. Internal to [BakedProblem]'s already-folded construction (the incremental
+     * [com.eignex.klause.presolve.PresolveSession] and the SMT/MPS front-ends supply a re-propagated array
+     * read — never mutated — within one firing and rebuilt on the next change, so sharing saves an
+     * O([numIntVars]) copy per firing). A raw [Problem] leaves this off and copies, so nothing it is
+     * constructed from can alias its domains.
      */
-    val preFolded: Boolean = false,
-    /**
-     * Defer the construction-time base bake: when `true`, [intDomains] are a defensive copy of the raw
-     * declared domains (not folded), and the root [baked] fold is NOT forced at construction — the
-     * presolve pipeline runs it as its step 0 instead (so `--presolve none` stays pure parse). Unlike
-     * [preFolded] the domains are the *raw* declared ones, not an already-folded pass-view array. Off by
-     * default: a directly-constructed [Problem] bakes eagerly at construction exactly as before, so only
-     * the front-end base problem (which always flows through the pipeline) opts in.
-     */
-    val deferBake: Boolean = false,
+    val sharedDomains: Boolean = false,
     /**
      * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
      * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
@@ -108,20 +98,16 @@ open class Problem(
     val realUpper: DoubleArray = EmptyDoubleArray,
 ) {
     /**
-     * Domain (bounds) of each integer variable, indexed by int var id. A defensive copy of
-     * the constructor input, strengthened at construction by folding in the root-level
-     * deductions from [baked]: bound tightenings, interior holes and pins derived by one
-     * propagation fixpoint over the factors become the problem's own domains. Loosely
-     * declared variables (e.g. unbounded ints flattened to machine-int spans) thus present
-     * finite domains to every consumer — search engines start from a stronger root and
-     * reference backends can represent constraints whose raw reachable ranges would
-     * overflow their variable limits.
+     * Domain (bounds) of each integer variable, indexed by int var id. On a raw [Problem] these are the
+     * declared domains verbatim (a defensive copy of the constructor input); [BakedProblem] strengthens
+     * them by folding in the root-level deductions from [baked] — bound tightenings, interior holes and
+     * pins derived by one propagation fixpoint over the factors — so search/export consumers of a baked
+     * problem start from a stronger, finite root even when the declared domains were loosely bounded.
      *
-     * A [preFolded] pass view skips the defensive copy: its domains are already the incremental
-     * session's re-propagated array, read (never mutated) by a pass within a single firing and
-     * rebuilt by the session on the next change, so sharing it saves an O(numIntVars) copy per firing.
+     * A [sharedDomains] construction skips the defensive copy: the caller supplies an array that is safe
+     * to share (read, never mutated, within one presolve firing), saving an O([numIntVars]) copy.
      */
-    val intDomains: Array<IntDomain> = if (preFolded) intDomains else intDomains.copyOf()
+    val intDomains: Array<IntDomain> = if (sharedDomains) intDomains else intDomains.copyOf()
 
     /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
      *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
@@ -165,8 +151,6 @@ open class Problem(
         cancellation: Cancellation = Cancellation.Never,
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
-        preFolded: Boolean = false,
-        deferBake: Boolean = false,
         numRealVars: Int = 0,
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
@@ -179,8 +163,6 @@ open class Problem(
         cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
-        preFolded = preFolded,
-        deferBake = deferBake,
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
@@ -188,13 +170,12 @@ open class Problem(
 
     /**
      * A copy with the integer domains replaced — used when a front-end's deferred bounding tightens the
-     * open sides after parsing (the domains are a finished, already-folded view, so it stays [preFolded]).
-     * Every other structure (factors, real bounds, implied/symmetry flags) is shared. Requires
-     * [preFolded]: a directly-constructed problem carries construction-time bake deductions this copy
-     * would not reproduce.
+     * open sides after parsing, before the problem flows into presolve. Every other structure (factors,
+     * real bounds, implied/symmetry flags) is shared. The result is a raw [Problem] whose root bake is
+     * still deferred; must not be called on a [BakedProblem], whose fold this copy would not reproduce.
      */
     fun withIntDomains(newDomains: Array<IntDomain>): Problem {
-        require(preFolded) { "withIntDomains is for preFolded (front-end) problems only" }
+        require(this !is BakedProblem) { "withIntDomains is for raw (front-end) problems only" }
         return Problem(
             numBoolVars = numBoolVars,
             numIntVars = numIntVars,
@@ -202,7 +183,6 @@ open class Problem(
             factors = factors.asList(),
             impliedFactorMask = impliedFactorMask,
             hasSymmetryBreaking = hasSymmetryBreaking,
-            preFolded = true,
             numRealVars = numRealVars,
             realLower = realLower,
             realUpper = realUpper,
@@ -282,38 +262,27 @@ open class Problem(
         mergeBase(propagate(Assumptions.None, cancellation, skipExpensiveBake = true), seedDeductions)
     }
 
-    /** Wall time the construction-time base bake took: forcing [baked] (root propagation to fixpoint)
-     *  and folding it into [intDomains]. Zero for a [preFolded] pass view (which never bakes). Lets a
-     *  front-end separate parse cost from bake cost when reporting load time. */
-    val bakeElapsed: Duration
-
-    // Force the root bake and fold its deductions into [intDomains] eagerly — except in [preFolded]
-    // pass-view mode, where the domains are already folded and the deferred derived structures stay
-    // uncomputed. A non-preFolded [Problem] thus behaves exactly as before (baked + folded at
-    // construction); this init access is what forces the otherwise-lazy propagators/occurrences/baked.
-    init {
-        val mark = TimeSource.Monotonic.markNow()
-        if (!preFolded && !deferBake) foldIntoDomains(baked)
-        bakeElapsed = mark.elapsedNow()
-    }
+    /** Wall time the root bake took on a [BakedProblem]: forcing [baked] (root propagation to fixpoint)
+     *  and folding it into [intDomains]. Zero on a raw [Problem] (which never bakes) and on a
+     *  [sharedDomains] baked problem (whose domains arrive already folded). Lets a front-end separate parse
+     *  cost from bake cost when reporting load time. Set once by [BakedProblem]'s construction. */
+    var bakeElapsed: Duration = Duration.ZERO
+        protected set
 
     /**
-     * Run the deferred base bake: return an equivalent non-[deferBake] [Problem] over the same factors
-     * whose domains carry the root-bake fold. A no-op returning `this` when the bake already ran (not
-     * [deferBake]) — and idempotent, since re-folding already-tightened domains changes nothing. This is
-     * the presolve pipeline's step 0, replacing the construction-time bake for a front-end base problem.
-     *
-     * [cancellation] budgets the bake: on a pathologically wide domain the cheap bound-propagation
-     * fixpoint can grind, so the presolve pipeline threads its own (budget-capped) cancellation here. A
-     * fired budget yields a sound *partial* bake (the fixpoint only ever tightens); the deferred expensive
-     * propagators and the search re-derive the rest at the root.
+     * Force the root bake and return the solve-ready [BakedProblem] — the only problem type the solvers,
+     * the model counter, sampling and the LP engine accept. Idempotent: returns `this` when already a
+     * [BakedProblem]. Otherwise constructs a [BakedProblem] over the same factors, folding the root-bake
+     * deductions into its domains. [cancellation] budgets the fold: on a pathologically wide domain the
+     * cheap bound-propagation fixpoint can grind, so the presolve pipeline threads its own (budget-capped)
+     * cancellation here. A fired budget yields a sound *partial* bake (the fixpoint only ever tightens);
+     * the deferred expensive propagators and the search re-derive the rest at the root.
      */
-    fun bakeBase(cancellation: Cancellation = this.cancellation): Problem = if (!deferBake) {
-        this
-    } else {
-        // A deferBake problem is always a fresh front-end base problem — it never carries seedDeductions
-        // (those come from a presolve rebuild, which is never deferBake), so the rebuild omits them.
-        Problem(
+    fun bake(cancellation: Cancellation = this.cancellation): BakedProblem {
+        if (this is BakedProblem) return this
+        // A raw front-end/builder problem carries no seedDeductions (those come from a presolve rebuild,
+        // which constructs its BakedProblem directly), so the bake is the plain base propagation.
+        return BakedProblem(
             numBoolVars = numBoolVars,
             numIntVars = numIntVars,
             intDomains = Array(numIntVars) { intDomains[it] },
@@ -327,48 +296,11 @@ open class Problem(
         )
     }
 
-    /**
-     * The integer domains with the root bake's deductions folded in — the finite, tightened form,
-     * independent of construction mode. For an eagerly-baked or [preFolded] problem these are [intDomains]
-     * directly (already folded); for a [deferBake] problem the raw declared domains are folded on first
-     * access (memoized). Consumers that need tightened domains should read this rather than [intDomains],
-     * which is the *raw* declared array for a deferBake problem.
-     */
-    val bakedDomains: Array<IntDomain> by lazy(LazyThreadSafetyMode.NONE) {
-        // `this.intDomains` (the folded property), not the unqualified name — inside this lazy lambda the
-        // bare `intDomains` would capture the raw constructor parameter, which the eager fold never touches.
-        if (deferBake) bakeBase().intDomains else this.intDomains
-    }
-
-    /**
-     * Force the root bake and return the solve-ready [BakedProblem] — the only problem type the solvers,
-     * the model counter, sampling and the LP engine accept. Idempotent: returns `this`
-     * when already a [BakedProblem]. Otherwise runs [bakeBase] (folding a [deferBake] model, or reusing an
-     * already-folded one) and wraps its folded domains, so the returned problem carries the root-propagation
-     * fold that construction used to force eagerly. [cancellation] budgets the fold exactly as [bakeBase].
-     */
-    fun bake(cancellation: Cancellation = this.cancellation): BakedProblem {
-        if (this is BakedProblem) return this
-        val folded = bakeBase(cancellation)
-        return BakedProblem(
-            numBoolVars = folded.numBoolVars,
-            numIntVars = folded.numIntVars,
-            intDomains = folded.intDomains,
-            factors = folded.factors,
-            impliedFactorMask = folded.impliedFactorMask,
-            hasSymmetryBreaking = folded.hasSymmetryBreaking,
-            numRealVars = folded.numRealVars,
-            realLower = folded.realLower,
-            realUpper = folded.realUpper,
-            cancellation = folded.cancellation,
-        )
-    }
-
     /** Folds the root-level int deductions of a successful bake into [intDomains] so the
      *  tightened bounds are part of the problem itself rather than transient solver state.
      *  Bounds are applied before holes so every recorded hole is interior to the final
      *  bounds; pins collapse the domain to a singleton via the same hole-aware paths. */
-    private fun foldIntoDomains(result: PropagationResult) {
+    protected fun foldIntoDomains(result: PropagationResult) {
         if (result !is PropagationResult.Implied) return
         result.forEachInt { v, value ->
             intDomains[v] = intDomains[v].withMinAtLeast(value).withMaxAtMost(value)
@@ -562,22 +494,68 @@ class BakedProblem internal constructor(
     numIntVars: Int,
     intDomains: Array<IntDomain>,
     factors: Array<Factor>,
+    seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
     impliedFactorMask: BooleanArray? = null,
     hasSymmetryBreaking: Boolean = false,
     numRealVars: Int = 0,
     realLower: DoubleArray = EmptyDoubleArray,
     realUpper: DoubleArray = EmptyDoubleArray,
     cancellation: Cancellation = Cancellation.Never,
+    /**
+     * When `true`, [intDomains] already carry the root-bake fold (an incremental presolve pass view or a
+     * presolve rebuild supplies its re-propagated array): share the array and skip the fold. When `false`
+     * (the [Problem.bake] path), [intDomains] are the raw declared domains and this constructor folds the
+     * base bake into them, exactly as construction used to.
+     */
+    alreadyFolded: Boolean = false,
 ) : Problem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     intDomains = intDomains,
     factors = factors,
+    seedDeductions = seedDeductions,
     cancellation = cancellation,
     impliedFactorMask = impliedFactorMask,
     hasSymmetryBreaking = hasSymmetryBreaking,
-    preFolded = true,
+    sharedDomains = alreadyFolded,
     numRealVars = numRealVars,
     realLower = realLower,
     realUpper = realUpper,
-)
+) {
+    init {
+        if (!alreadyFolded) {
+            val mark = TimeSource.Monotonic.markNow()
+            foldIntoDomains(baked)
+            bakeElapsed = mark.elapsedNow()
+        }
+    }
+
+    /** Convenience overload taking factors as a [List] (stored as an [Array]); mirrors [Problem]'s. */
+    internal constructor(
+        numBoolVars: Int,
+        numIntVars: Int,
+        intDomains: Array<IntDomain>,
+        factors: List<Factor>,
+        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
+        impliedFactorMask: BooleanArray? = null,
+        hasSymmetryBreaking: Boolean = false,
+        numRealVars: Int = 0,
+        realLower: DoubleArray = EmptyDoubleArray,
+        realUpper: DoubleArray = EmptyDoubleArray,
+        cancellation: Cancellation = Cancellation.Never,
+        alreadyFolded: Boolean = false,
+    ) : this(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intDomains = intDomains,
+        factors = Array(factors.size) { factors[it] },
+        seedDeductions = seedDeductions,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        cancellation = cancellation,
+        alreadyFolded = alreadyFolded,
+    )
+}

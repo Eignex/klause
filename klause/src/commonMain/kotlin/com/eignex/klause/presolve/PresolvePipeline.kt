@@ -96,7 +96,8 @@ object PresolvePipeline {
         // directly-constructed (already-baked) problem, so this is where a front-end's deferred base bake
         // actually happens, after the O(one-LP) pre-bake infeasibility/OBBT that must precede it.
         val bakeStart = TimeSource.Monotonic.markNow()
-        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(prebaked.bakeBase(cancellation), bakeConfig)
+        val baked = if (preBakeInfeasible) problem else prebaked.bake(cancellation)
+        val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
         var current = seeded
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
@@ -123,7 +124,13 @@ object PresolvePipeline {
             if (harvested === pre.problem) break
         }
         val reconstruct: (Sample) -> Sample = { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
-        if (current === problem && !infeasible) {
+        // The base bake (declared → root-propagated domains) is not a presolve reduction: the solve boundary
+        // re-runs it. So when no pass fired ([current] === [seeded]) and neither the OBBT pre-bake ([prebaked]
+        // === [problem]) nor the probing reseed ([seeded] === [baked]) tightened anything beyond that base
+        // fold, report no change and let the caller keep its raw problem — preserving object identity for a
+        // genuine no-op presolve, exactly as an already-baked input did before the bake became a fresh type.
+        val onlyBaseBake = current === seeded && prebaked === problem && seeded === baked
+        if ((current === problem || onlyBaseBake) && !infeasible) {
             return PresolveOutcome(problem, reconstruct, PresolveStats(), changed = false)
         }
 

@@ -1125,9 +1125,8 @@ object Xcsp3 {
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),
                 factors = factors.toTypedArray(),
-                // The base bake is deferred to presolve step 0 ([Problem.bakeBase]); construction is
-                // pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
-                deferBake = true,
+                // A raw problem: the base bake is deferred to presolve step 0 ([Problem.bake]); construction
+                // is pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
             ),
             objective,
             intVarNames = LinkedHashMap(varIds),
