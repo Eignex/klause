@@ -352,6 +352,12 @@ internal fun propagatePbBounds(
         PbOp.GE -> if (sumHi < bound) return false
         PbOp.EQ -> if (sumLo > bound || sumHi < bound) return false
     }
+    // Every pin implied below is forced by the same pre-loop assignment: the feasibility tests all read
+    // the frozen pre-loop ranges [r], and each pinned var is free pre-loop so appears in no antecedent.
+    // So all pins in this fire share one false-form antecedent — build it lazily once rather than
+    // rescanning the literals per pin, which turned a wide-WBO fixpoint fire into O(pins × literals).
+    var ant: IntArray? = null
+    var antReady = false
     for (i in 0 until literals.size) {
         val w = weights[i]
         if (w == 0L) continue
@@ -362,12 +368,13 @@ internal fun propagatePbBounds(
         val trueOk = pbFeasible(op, otherLo + w, otherHi + w, bound)
         val falseOk = pbFeasible(op, otherLo, otherHi, bound)
         if (!trueOk && !falseOk) return false
-        if (!trueOk) {
-            val ant = pbFalseFormAntecedents(state, literals, excludeVar = v, extraLit = extraLit)
-            if (!state.pinBool(v, !Lit.isPositive(literals[i]), ant)) return false
-        } else if (!falseOk) {
-            val ant = pbFalseFormAntecedents(state, literals, excludeVar = v, extraLit = extraLit)
-            if (!state.pinBool(v, Lit.isPositive(literals[i]), ant)) return false
+        if (!trueOk || !falseOk) {
+            if (!antReady) {
+                ant = pbFalseFormAntecedents(state, literals, excludeVar = -1, extraLit = extraLit)
+                antReady = true
+            }
+            val value = if (!trueOk) !Lit.isPositive(literals[i]) else Lit.isPositive(literals[i])
+            if (!state.pinBool(v, value, ant)) return false
         }
     }
     return true
