@@ -10,7 +10,7 @@ import com.eignex.klause.solver.Problem
  * keeping [LinearObjective] a pure data class while the "point at one variable" idiom
  * sits at the layer that knows about variables.
  *
- * For schema-level callers, see the `CompiledProblem.minimize(handle)` overloads which
+ * For schema-level callers, see the `CompiledSchema.minimize(handle)` overloads which
  * delegate here after resolving handle names to ids and folding float-bucket scaling
  * into real-valued coefficients.
  */

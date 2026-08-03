@@ -76,7 +76,7 @@ import com.eignex.skema.SchemaDef
 import kotlin.math.roundToInt
 
 internal class Compiler(private val config: KlauseConfig = KlauseConfig.current) {
-    fun compile(def: SchemaDef<SchemaEntry>): CompiledProblem = Lowering(config).run(def)
+    fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(config).run(def)
 }
 
 internal class Lowering(val config: KlauseConfig) : CnfLowering {
@@ -414,12 +414,12 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     internal fun falseLit(): Int = Lit.negate(trueLit())
 }
 
-/** Compile this schema's [VariableSchema.definition] into a solver-ready [CompiledProblem],
+/** Compile this schema's [VariableSchema.definition] into a solver-ready [CompiledSchema],
  *  using [config] (defaults to the ambient [KlauseConfig.current]). */
-fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledProblem =
+fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): CompiledSchema =
     Compiler(config).compile(this.definition())
 
-// Schema-entry driver: turns a SchemaDef into a CompiledProblem by declaring variables,
+// Schema-entry driver: turns a SchemaDef into a CompiledSchema by declaring variables,
 // asserting constraints, and packaging the engine state. Kept off the Lowering class so the
 // engine itself stays free of any SchemaDef / schema-shape dependency.
 
@@ -448,7 +448,7 @@ private fun schemaFloatsAreLpOnly(def: SchemaDef<SchemaEntry>): Boolean {
     return true
 }
 
-private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
+private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     schemaFloatsLpOnly = schemaFloatsAreLpOnly(def)
     for ((name, entry) in def.entries) {
         when (entry) {
@@ -526,7 +526,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledProblem {
     // The compiler builds a plain base-baked [Problem]; the SAC / failed-literal probing tiers, resolved
     // from the presolve config, now run in the presolve lane via [RootBaker] (kernel → presolve would
     // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
-    return CompiledProblem(
+    return CompiledSchema(
         problem = Problem(
             numBoolVars = numBoolVars,
             numIntVars = numIntVars,

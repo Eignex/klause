@@ -70,7 +70,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
      * Optional float variable: declares a presence Boolean named `<prop>__present` alongside the
      * bucketised-float value variable. Compare via [OptFloatHandle]'s opt-aware operators to get
      * MiniZinc's "undefined → false" semantics; decode with
-     * [com.eignex.klause.compile.CompiledProblem.decode] to read `null` when absent.
+     * [com.eignex.klause.compile.CompiledSchema.decode] to read `null` when absent.
      */
     protected fun optFloatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
         optVar(FloatSpec(min, max, buckets)) { name, present ->

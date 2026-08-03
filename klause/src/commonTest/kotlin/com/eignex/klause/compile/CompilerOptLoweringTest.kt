@@ -62,7 +62,7 @@ class CompilerOptLoweringTest {
         }
     }
 
-    private fun firstFeasible(compiled: CompiledProblem): Sample {
+    private fun firstFeasible(compiled: CompiledSchema): Sample {
         val solver = LocalSearchSolver(compiled.problem)
         val s = solver.samples(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).firstOrNull()
         assertTrue(s != null, "solver found no feasible sample")

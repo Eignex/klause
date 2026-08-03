@@ -30,7 +30,7 @@ import com.eignex.klause.solver.objective.minimizeInt
  * to int-array ids in `intVarIdByName`. Float vars round-trip through their bucket index
  * using the [FloatSpec] in `floatDecoders`.
  */
-class CompiledProblem internal constructor(
+class CompiledSchema internal constructor(
     /** The compiled solver problem. */
     val problem: Problem,
     /** Boolean variable id by schema name. */
