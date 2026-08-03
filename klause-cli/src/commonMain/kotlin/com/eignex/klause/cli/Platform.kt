@@ -1,6 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.readText
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
 import kotlin.time.TimeSource
@@ -22,7 +24,14 @@ internal expect fun errPrintln(message: String)
 
 internal expect fun exitCli(code: Int): Nothing
 
-internal expect fun readTextFile(path: String): String
+/** Open [path] as a streamed [CharSource]: an uncompressed file read incrementally, or a compressed one
+ *  piped through the matching [DECOMPRESSORS] command (see [compressionExtension]). Front-ends consume
+ *  the source instead of the whole-file [String], so a huge instance is never fully resident. */
+internal expect fun openFileSource(path: String): CharSource
+
+/** Read [path] fully into a [String] — the bridge for a front-end that still parses a materialized
+ *  [String]. A thin adapter over [openFileSource]; a converted front-end takes the source directly. */
+internal fun readTextFile(path: String): String = openFileSource(path).readText()
 
 /** Build the parallel [PortfolioExecutor] (the multi-threaded `Portfolio`), which lives in klause's
  *  jvm+native source set — `commonMain` has no threads (js/wasm are single-threaded). The CLI targets
