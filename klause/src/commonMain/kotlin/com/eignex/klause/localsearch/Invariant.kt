@@ -80,7 +80,7 @@ interface Invariant {
         for (b in state.problem.factors[factorId].boolVars) sink.addBoolFlip(b)
         for (i in state.problem.factors[factorId].intVars) {
             val cur = state.assignment.intValue(i)
-            val d = state.problem.intDomains[i]
+            val d = state.rootDomains[i]
             if (cur < d.max) sink.addChannelingIntSet(state, i, cur + 1L)
             if (cur > d.min) sink.addChannelingIntSet(state, i, cur - 1L)
         }

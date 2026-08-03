@@ -110,7 +110,7 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
         if (pick < nInt) {
             val v = scope.intVars[pick]
             if (state.assumptions.isFrozenInt(v)) return null
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             if (d.size <= 1) return null
             val nv = d.valueAt(state.rng.nextInt(d.size)) // sparse-aware: never lands on a hole
             if (nv == state.assignment.intValue(v)) return null

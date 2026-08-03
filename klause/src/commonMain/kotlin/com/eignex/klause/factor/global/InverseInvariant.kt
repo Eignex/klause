@@ -61,7 +61,7 @@ internal class InverseInvariant(
             val j = state.assignment.intValue(f[i])
             val gIdx = fValueToGIndex(j)
             if (gIdx !in g.indices) {
-                val d = state.problem.intDomains[f[i]]
+                val d = state.rootDomains[f[i]]
                 val mid = ((d.min + d.max) / 2)
                 if (mid in d && mid != j) sink.addChannelingIntSet(state, f[i], mid)
                 return
@@ -69,15 +69,15 @@ internal class InverseInvariant(
             val gVal = state.assignment.intValue(g[gIdx.toInt()])
             val fBack = (i + fOffset).toLong()
             if (gVal != fBack) {
-                val gd = state.problem.intDomains[g[gIdx.toInt()]]
+                val gd = state.rootDomains[g[gIdx.toInt()]]
                 if (fBack in gd && fBack != gVal) sink.addChannelingIntSet(state, g[gIdx.toInt()], fBack)
                 val gFwd = gVal - fOffset
                 if (gFwd in 0 until g.size) {
                     val targetFwd = gFwd + gOffset
-                    val fd = state.problem.intDomains[f[i]]
+                    val fd = state.rootDomains[f[i]]
                     if (targetFwd in fd && targetFwd != j) sink.addChannelingIntSet(state, f[i], targetFwd)
                 }
-                val fd = state.problem.intDomains[f[i]]
+                val fd = state.rootDomains[f[i]]
                 for (jPrime in g.indices) {
                     if (state.assignment.intValue(g[jPrime]) == fBack) {
                         val tgt = (jPrime + gOffset).toLong()
@@ -116,10 +116,10 @@ internal class InverseInvariant(
             val gB = g[gIdxB.toInt()]
             val newGA = (i2 + fOffset).toLong()
             val newGB = (i1 + fOffset).toLong()
-            if (b !in state.problem.intDomains[f[i1]]) continue
-            if (a !in state.problem.intDomains[f[i2]]) continue
-            if (newGA !in state.problem.intDomains[gA]) continue
-            if (newGB !in state.problem.intDomains[gB]) continue
+            if (b !in state.rootDomains[f[i1]]) continue
+            if (a !in state.rootDomains[f[i2]]) continue
+            if (newGA !in state.rootDomains[gA]) continue
+            if (newGB !in state.rootDomains[gB]) continue
             sink.addCompound(
                 listOf(
                     Move.IntSet(f[i1], b),
@@ -174,7 +174,7 @@ internal class InverseInvariant(
         for (k in indices.indices) {
             val v = f[indices[k]]
             val value = (targets[k] + gOffset).toLong()
-            if (value !in state.problem.intDomains[v]) return false
+            if (value !in state.rootDomains[v]) return false
             parts.add(Move.IntSet(v, value))
         }
         sink.addCompound(parts)
@@ -191,7 +191,7 @@ internal class InverseInvariant(
         for (i in 0 until n) {
             val fv = (i + gOffset).toLong()
             val gv = (i + fOffset).toLong()
-            if (fv !in state.problem.intDomains[f[i]] || gv !in state.problem.intDomains[g[i]]) return false
+            if (fv !in state.rootDomains[f[i]] || gv !in state.rootDomains[g[i]]) return false
             if (state.assumptions.isFrozenInt(f[i]) && state.assignment.intValue(f[i]) != fv) return false
             if (state.assumptions.isFrozenInt(g[i]) && state.assignment.intValue(g[i]) != gv) return false
         }
@@ -225,10 +225,10 @@ internal class InverseInvariant(
         for (v in g) if (fVars.contains(v)) return false
         val valuesPerVar = Array(n) { i ->
             val allowed = IntArrayList()
-            val fd = state.problem.intDomains[f[i]]
+            val fd = state.rootDomains[f[i]]
             for (vid in 0 until n) {
                 if ((vid + gOffset).toLong() !in fd) continue
-                if ((i + fOffset).toLong() !in state.problem.intDomains[g[vid]]) continue
+                if ((i + fOffset).toLong() !in state.rootDomains[g[vid]]) continue
                 allowed.add(vid)
             }
             IntArray(allowed.size) { allowed[it] }

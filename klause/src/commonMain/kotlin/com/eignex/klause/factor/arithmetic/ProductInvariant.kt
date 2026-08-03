@@ -59,19 +59,19 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val rv = state.assignment.intValue(result)
         if (av * bv == rv) return
         val rTarget = av * bv
-        val rDomain = state.problem.intDomains[result]
+        val rDomain = state.rootDomains[result]
         val rClamped = rDomain.clamp(rTarget)
         if (rClamped == rTarget && rClamped != rv) sink.addChannelingIntSet(state, result, rClamped)
         if (bv != 0L && rv % bv == 0L) {
             val aTarget = rv / bv
-            val aClamped = state.problem.intDomains[a].clamp(aTarget)
+            val aClamped = state.rootDomains[a].clamp(aTarget)
             if (aClamped == aTarget && aClamped != av) sink.addChannelingIntSet(state, a, aClamped)
         } else if (bv != 0L) {
             proposeClosestOperand(state, operandVar = a, otherValue = bv, currentValue = av, sink)
         }
         if (av != 0L && rv % av == 0L) {
             val bTarget = rv / av
-            val bClamped = state.problem.intDomains[b].clamp(bTarget)
+            val bClamped = state.rootDomains[b].clamp(bTarget)
             if (bClamped == bTarget && bClamped != bv) sink.addChannelingIntSet(state, b, bClamped)
         } else if (av != 0L) {
             proposeClosestOperand(state, operandVar = b, otherValue = av, currentValue = bv, sink)
@@ -80,7 +80,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         val curResidual = abs(av * bv - rvL)
         for (v in intArrayOf(a, b, result)) {
             val cur = state.assignment.intValue(v)
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             for (cand in longArrayOf(cur + 1, cur - 1)) {
                 if (cand !in d) continue
                 val res = when (v) {
@@ -103,7 +103,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         if (otherValue == 0L) return
         val rv = state.assignment.intValue(result)
         val center = rv / otherValue
-        val domain = state.problem.intDomains[operandVar]
+        val domain = state.rootDomains[operandVar]
         var bestCandidate = currentValue
         var bestError = abs(currentValue * otherValue - rv)
         for (delta in -2..2) {

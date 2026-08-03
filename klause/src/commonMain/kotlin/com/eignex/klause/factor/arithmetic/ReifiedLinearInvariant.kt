@@ -86,7 +86,7 @@ internal class ReifiedLinearInvariant(
             // Same-aux snap: shift body so the predicate matches the current aux.
             val targetSame = snapLinearTarget(op, bound, c, sumWithout, aux)
             if (targetSame != null) {
-                val clamped = state.problem.intDomains[v].clamp(targetSame)
+                val clamped = state.rootDomains[v].clamp(targetSame)
                 if (clamped != cur && aux == linearHolds(sumWithout + c * clamped, op, bound)) {
                     sink.addChannelingIntSet(state, v, clamped)
                 }
@@ -95,7 +95,7 @@ internal class ReifiedLinearInvariant(
             // predicate matches the flipped aux.
             val targetOpp = snapLinearTarget(op, bound, c, sumWithout, !aux)
             if (targetOpp != null) {
-                val clamped = state.problem.intDomains[v].clamp(targetOpp)
+                val clamped = state.rootDomains[v].clamp(targetOpp)
                 if (clamped != cur && !aux == linearHolds(sumWithout + c * clamped, op, bound)) {
                     sink.addCompound(listOf(auxFlipMove, IntSet(v, clamped)))
                 }

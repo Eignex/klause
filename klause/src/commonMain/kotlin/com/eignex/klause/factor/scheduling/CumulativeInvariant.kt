@@ -268,7 +268,7 @@ internal class CumulativeInvariant(
             val cur = state.assignment.intValue(v)
             val d = curDur(state, i)
             val r = curRes(state, i)
-            val dom = state.problem.intDomains[v]
+            val dom = state.rootDomains[v]
             val runsAtPeak = (peakT >= 0 && r > 0 && d > 0 && cur <= absT && absT < cur + d)
             if (runsAtPeak) {
                 val afterPeak = absT + 1
@@ -309,7 +309,7 @@ internal class CumulativeInvariant(
             if (swapsAdded >= CUMULATIVE_MAX_SWAPS) break
             val iV = starts[i]
             val iCur = state.assignment.intValue(iV)
-            val iDom = state.problem.intDomains[iV]
+            val iDom = state.rootDomains[iV]
             for (j in 0 until n) {
                 if (swapsAdded >= CUMULATIVE_MAX_SWAPS) break
                 if (j == i) continue
@@ -319,7 +319,7 @@ internal class CumulativeInvariant(
                 if (!OptPresence.isPresentInAssignment(presents, j, state)) continue
                 val jV = starts[j]
                 val jCur = state.assignment.intValue(jV)
-                if (jCur !in iDom || iCur !in state.problem.intDomains[jV]) continue
+                if (jCur !in iDom || iCur !in state.rootDomains[jV]) continue
                 if (jCur == iCur) continue
                 val di = simulateCumulativeStartDelta(ls, iCur, jCur, curDur(state, i), curRes(state, i))
                 val dj = simulateCumulativeStartDelta(ls, jCur, iCur, dj0, rj0)
@@ -360,7 +360,7 @@ internal class CumulativeInvariant(
             val si = state.assignment.intValue(starts[i])
             val sj = state.assignment.intValue(starts[j])
             if (si == sj) continue
-            if (sj !in state.problem.intDomains[starts[i]] || si !in state.problem.intDomains[starts[j]]) continue
+            if (sj !in state.rootDomains[starts[i]] || si !in state.rootDomains[starts[j]]) continue
             sink.addCompound(listOf(IntSet(starts[i], sj), IntSet(starts[j], si)))
             emitted++
         }
@@ -370,7 +370,7 @@ internal class CumulativeInvariant(
         if (starts.isEmpty()) return false
         val cap = curCap(state)
         val order = argsortBy(starts.size) { a, b ->
-            state.problem.intDomains[starts[a]].min.compareTo(state.problem.intDomains[starts[b]].min)
+            state.rootDomains[starts[a]].min.compareTo(state.rootDomains[starts[b]].min)
         }
         var prevEnd = Long.MIN_VALUE
         for (oi in order.indices) {
@@ -384,7 +384,7 @@ internal class CumulativeInvariant(
                 if (s < prevEnd) return false
                 prevEnd = s + dur
             } else {
-                val d = state.problem.intDomains[v]
+                val d = state.rootDomains[v]
                 val cand = max(d.min, prevEnd)
                 val s = firstInDomainAtLeast(d, cand) ?: return false
                 state.assignment.setInt(v, s)
@@ -397,7 +397,7 @@ internal class CumulativeInvariant(
     private fun computeTLow(state: LocalSearchState): Long {
         var lo = Long.MAX_VALUE
         for (i in 0 until n) {
-            lo = min(lo, min(state.problem.intDomains[starts[i]].min, state.assignment.intValue(starts[i])))
+            lo = min(lo, min(state.rootDomains[starts[i]].min, state.assignment.intValue(starts[i])))
         }
         return if (lo == Long.MAX_VALUE) 0L else lo
     }
@@ -408,9 +408,9 @@ internal class CumulativeInvariant(
             val dUb = if (durationVars.isEmpty()) {
                 durations[i]
             } else {
-                max(durations[i], state.problem.intDomains[durationVars[i]].max)
+                max(durations[i], state.rootDomains[durationVars[i]].max)
             }
-            val cand = max(state.problem.intDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
+            val cand = max(state.rootDomains[starts[i]].max, state.assignment.intValue(starts[i])) + dUb
             hi = max(hi, cand)
         }
         return if (hi == Long.MIN_VALUE) 0L else hi

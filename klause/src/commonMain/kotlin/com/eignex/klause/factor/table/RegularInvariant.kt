@@ -115,7 +115,7 @@ internal class RegularInvariant(
             val s = state.assignment.intValue(seq[i])
             val next = regularDelta(transitions, numStates, alphabetSize, path[i], s)
             if (next == 0) {
-                val d = state.problem.intDomains[seq[i]]
+                val d = state.rootDomains[seq[i]]
                 d.forEach { sym ->
                     if (sym != s && regularDelta(transitions, numStates, alphabetSize, path[i], sym) != 0) {
                         sink.addChannelingIntSet(state, seq[i], sym)
@@ -128,7 +128,7 @@ internal class RegularInvariant(
         if (path[seq.size] !in acceptingSet) {
             val last = seq.size - 1
             val curLast = state.assignment.intValue(seq[last])
-            val d = state.problem.intDomains[seq[last]]
+            val d = state.rootDomains[seq[last]]
             d.forEach { sym ->
                 val target = regularDelta(transitions, numStates, alphabetSize, path[last], sym)
                 if (sym != curLast && target in acceptingSet) sink.addChannelingIntSet(state, seq[last], sym)
@@ -169,7 +169,7 @@ internal class RegularInvariant(
             val cur = state.assignment.intValue(seq[i])
             val q = path[i]
             val nq = path[i + 1]
-            val d = state.problem.intDomains[seq[i]]
+            val d = state.rootDomains[seq[i]]
             var pick = -1
             var seen = 0
             for (s in 1..alphabetSize) {
@@ -275,7 +275,7 @@ internal fun regularSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int
     return if (state.assumptions.isFrozenInt(v)) {
         state.assignment.intValue(v) == s.toLong()
     } else {
-        s.toLong() in state.problem.intDomains[v]
+        s.toLong() in state.rootDomains[v]
     }
 }
 

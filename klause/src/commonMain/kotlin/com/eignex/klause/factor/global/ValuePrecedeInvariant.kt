@@ -40,7 +40,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
         }
         if (firstBadT < 0 || firstBadT > firstS) return
         val badVar = xs[firstBadT]
-        val badDom = state.problem.intDomains[badVar]
+        val badDom = state.rootDomains[badVar]
         for (cand in longArrayOf(badDom.min, badDom.max)) {
             if (cand != t && cand in badDom) {
                 sink.addChannelingIntSet(state, badVar, cand)
@@ -49,7 +49,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
         }
         for (i in 0..firstBadT) {
             val v = xs[i]
-            if (s in state.problem.intDomains[v] && state.assignment.intValue(v) != s) {
+            if (s in state.rootDomains[v] && state.assignment.intValue(v) != s) {
                 sink.addChannelingIntSet(state, v, s)
                 break
             }
@@ -64,7 +64,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
             attempts++
             val i = state.rng.nextInt(xs.size)
             val v = state.assignment.intValue(xs[i])
-            val d = state.problem.intDomains[xs[i]]
+            val d = state.rootDomains[xs[i]]
             var pick = -1L
             var seen = 0
             d.forEach { w ->
@@ -86,7 +86,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
                 if (state.assignment.intValue(v) == t) return false
                 continue
             }
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             var pick = -1L
             d.forEach { if (pick < 0 && it != t) pick = it }
             if (pick < 0) return false

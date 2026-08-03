@@ -61,7 +61,7 @@ internal class TableInvariant(
                     tableCellLo(tuples, arity, row, col),
                     tableCellHi(tuples, hi, arity, row, col),
                 )
-                if (target != cur && target in state.problem.intDomains[xs[col]]) {
+                if (target != cur && target in state.rootDomains[xs[col]]) {
                     sink.addChannelingIntSet(state, xs[col], target)
                 }
             }
@@ -100,7 +100,7 @@ internal class TableInvariant(
                 }
                 val v = xs[col]
                 val target = tuples[base + col]
-                if (target !in state.problem.intDomains[v]) {
+                if (target !in state.rootDomains[v]) {
                     usable = false
                     break
                 }
@@ -218,7 +218,7 @@ internal fun tableBuildTupleMove(
         if (!tableCellIsPoint(tuples, hi, arity, row, col)) return null
         val v = xs[col]
         val target = tuples[base + col]
-        if (target !in state.problem.intDomains[v]) return null
+        if (target !in state.rootDomains[v]) return null
         for (prev in 0 until col) {
             if (tableCellIsFree(tuples, hi, arity, row, prev)) continue
             if (xs[prev] == v && tuples[base + prev] != target) return null

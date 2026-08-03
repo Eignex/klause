@@ -143,7 +143,7 @@ internal class MddInvariant(
                 p += recordStride
             }
             if (matchedDst < 0) {
-                val d = state.problem.intDomains[seq[i]]
+                val d = state.rootDomains[seq[i]]
                 var q = start
                 while (q < end) {
                     if (transitions[q].toInt() == path[i]) {
@@ -161,7 +161,7 @@ internal class MddInvariant(
         val last = seq.size - 1
         val qPrev = path[last]
         val curLast = state.assignment.intValue(seq[last])
-        val d = state.problem.intDomains[seq[last]]
+        val d = state.rootDomains[seq[last]]
         val start = layerStarts[last]
         val end = layerStarts[last + 1]
         var p = start
@@ -219,7 +219,7 @@ internal class MddInvariant(
             val from = path[i]
             val to = path[i + 1]
             val curWeight = mddRecordWeight(layerStarts, transitions, recordStride, from, cur, i)
-            val d = state.problem.intDomains[seq[i]]
+            val d = state.rootDomains[seq[i]]
             var pick = -1L
             var seen = 0
             var p = layerStarts[i]
@@ -299,7 +299,7 @@ internal class MddInvariant(
             if (state.assumptions.isFrozenInt(cost)) {
                 if (state.assignment.intValue(cost) != totalWeight) return false
             } else {
-                if (totalWeight !in state.problem.intDomains[cost]) return false
+                if (totalWeight !in state.rootDomains[cost]) return false
             }
         }
         for (i in 0 until n) {
@@ -389,7 +389,7 @@ internal fun mddSymbolAllowed(state: LocalSearchState, seq: IntArray, i: Int, s:
     return if (state.assumptions.isFrozenInt(v)) {
         state.assignment.intValue(v) == s
     } else {
-        s in state.problem.intDomains[v]
+        s in state.rootDomains[v]
     }
 }
 
@@ -454,7 +454,7 @@ internal fun mddRepairPath(
     for (i in 0 until n) {
         val cur = state.assignment.intValue(seq[i])
         val frozen = state.assumptions.isFrozenInt(seq[i])
-        val d = state.problem.intDomains[seq[i]]
+        val d = state.rootDomains[seq[i]]
         var p = layerStarts[i]
         val end = layerStarts[i + 1]
         while (p < end) {

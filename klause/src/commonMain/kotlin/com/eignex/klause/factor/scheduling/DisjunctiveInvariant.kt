@@ -60,7 +60,7 @@ internal class DisjunctiveInvariant(
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (presents.isNotEmpty() || starts.isEmpty()) return false
         val order = argsortBy(starts.size) { a, b ->
-            state.problem.intDomains[starts[a]].min.compareTo(state.problem.intDomains[starts[b]].min)
+            state.rootDomains[starts[a]].min.compareTo(state.rootDomains[starts[b]].min)
         }
         var prevEnd = Long.MIN_VALUE
         for (oi in order.indices) {
@@ -72,8 +72,8 @@ internal class DisjunctiveInvariant(
                 if (s < prevEnd) return false
                 prevEnd = s + dur
             } else {
-                val cand = max(state.problem.intDomains[v].min, prevEnd)
-                val s = firstInDomainAtLeast(state.problem.intDomains[v], cand) ?: return false
+                val cand = max(state.rootDomains[v].min, prevEnd)
+                val s = firstInDomainAtLeast(state.rootDomains[v], cand) ?: return false
                 state.assignment.setInt(v, s)
                 prevEnd = s + dur
             }

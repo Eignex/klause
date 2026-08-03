@@ -81,12 +81,12 @@ internal class ArrayMinMaxInvariant(private val result: Int, private val xs: Int
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as ArrayMinMaxState
         val best = s.bestValue
-        val rDom = state.problem.intDomains[result]
+        val rDom = state.rootDomains[result]
         if (best in rDom) sink.addChannelingIntSet(state, result, best)
         val rv = state.assignment.intValue(result)
         if ((max && rv > best) || (!max && rv < best)) {
             for (v in xs) {
-                if (rv in state.problem.intDomains[v] && rv != state.assignment.intValue(v)) {
+                if (rv in state.rootDomains[v] && rv != state.assignment.intValue(v)) {
                     sink.addChannelingIntSet(state, v, rv)
                     break
                 }

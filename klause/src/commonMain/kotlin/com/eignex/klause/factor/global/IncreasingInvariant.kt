@@ -78,7 +78,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
 
     /** Snap [v] to [target] if reachable; otherwise to the nearest domain bound in that direction. */
     private fun snap(state: LocalSearchState, sink: MoveSink, v: Int, target: Long, lowering: Boolean) {
-        val d = state.problem.intDomains[v]
+        val d = state.rootDomains[v]
         val cur = state.assignment.intValue(v)
         val pick = when {
             target in d -> target
@@ -101,7 +101,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         val indices = if (raise) 0 until n else n - 1 downTo 0
         var first = true
         for (i in indices) {
-            val d = state.problem.intDomains[xs[i]]
+            val d = state.rootDomains[xs[i]]
             val cur = state.assignment.intValue(xs[i])
             if (first) {
                 target[i] = cur
@@ -127,7 +127,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         val n = xs.size
         for (i in 0 until n) {
             val cur = state.assignment.intValue(xs[i])
-            val d = state.problem.intDomains[xs[i]]
+            val d = state.rootDomains[xs[i]]
             val lo = if (i == 0) d.min else maxOf(d.min, state.assignment.intValue(xs[i - 1]) + gap)
             val hi = if (i == n - 1) d.max else minOf(d.max, state.assignment.intValue(xs[i + 1]) - gap)
             if (cur - 1 >= lo) sink.addChannelingIntSet(state, xs[i], cur - 1)
@@ -139,7 +139,7 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         var floor = Long.MIN_VALUE // minimal value the current variable may take
         for (i in xs.indices) {
             val v = xs[i]
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             if (state.assumptions.isFrozenInt(v)) {
                 val fv = state.assignment.intValue(v)
                 if (fv < floor) return false // a frozen value already breaks the chain

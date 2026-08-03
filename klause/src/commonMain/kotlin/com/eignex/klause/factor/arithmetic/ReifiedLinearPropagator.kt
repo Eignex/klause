@@ -125,7 +125,7 @@ internal class ReifiedLinearPropagator(
         if (k < Int.MIN_VALUE.toLong() || k > Int.MAX_VALUE.toLong()) return null
         val v = vars[0]
         val d = state.intDomains[v]
-        val orig = state.problem.intDomains[v]
+        val orig = state.rootDomains[v]
         return when {
             k < orig.min || k > orig.max -> null
             k < d.min -> intArrayOf(Lit.make(state.atomVarGe(v, d.min), false))

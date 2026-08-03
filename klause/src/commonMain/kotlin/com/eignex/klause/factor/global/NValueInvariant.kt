@@ -135,7 +135,7 @@ internal class NValueInvariant(
         if (!isViolated(state, factorId)) return
         val s = state.refPayload[factorId] as NValueState
         val nv = state.assignment.intValue(n)
-        val nDom = state.problem.intDomains[n]
+        val nDom = state.rootDomains[n]
         if (s.distinctCount.toLong() in nDom) sink.addChannelingIntSet(state, n, s.distinctCount.toLong())
         val needIncrease = when (mode) {
             NValue.Mode.Eq -> nv > s.distinctCount
@@ -153,7 +153,7 @@ internal class NValueInvariant(
                 if (!presentNvInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
                 if (s.counts.getOrDefault(cur, 0) <= 1) continue
-                val d = state.problem.intDomains[xs[i]]
+                val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
                 d.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
                 val p = pick
@@ -165,7 +165,7 @@ internal class NValueInvariant(
                 if (!presentNvInvFn(state, i)) continue
                 val cur = state.assignment.intValue(xs[i])
                 if (s.counts.getOrDefault(cur, 0) > 1) continue
-                val d = state.problem.intDomains[xs[i]]
+                val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
                 d.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
                 val p = pick
@@ -187,7 +187,7 @@ internal class NValueInvariant(
             for (j in xs.indices) if (xs[j] == xs[i] && presentNvInvFn(state, j)) occ++
             val cv = s.counts.getOrDefault(v, 0)
             val vDies = cv - occ == 0
-            val d = state.problem.intDomains[xs[i]]
+            val d = state.rootDomains[xs[i]]
             var pick = -1L
             var seen = 0
             d.forEach { w ->
@@ -209,12 +209,12 @@ internal class NValueInvariant(
         for (i in xs.indices) {
             if (!presentNvInvFn(state, i)) continue
             if (state.assumptions.isFrozenInt(xs[i])) continue
-            state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
+            state.assignment.setInt(xs[i], state.rootDomains[xs[i]].min)
         }
         val seen = LongHashSet()
         for (i in xs.indices) if (presentNvInvFn(state, i)) seen.add(state.assignment.intValue(xs[i]))
         val distinct = seen.size
-        val nDom = state.problem.intDomains[n]
+        val nDom = state.rootDomains[n]
         val target = when (mode) {
             NValue.Mode.Eq -> distinct.toLong()
             NValue.Mode.AtLeast -> largestInDomainAtMost(nDom, distinct) ?: return false

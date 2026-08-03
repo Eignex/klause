@@ -34,7 +34,7 @@ class ObjectiveSeed : MoveSource {
                 for (v in obj.intCoefficients.indices) {
                     if (obj.intCoefficients[v] == 0L) continue
                     val cur = state.assignment.intValue(v)
-                    val d = state.problem.intDomains[v]
+                    val d = state.rootDomains[v]
                     // Step toward smaller objective; channeling-aware so int-move + indicator
                     // updates stay atomic.
                     if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, d.lower(cur))
@@ -48,7 +48,7 @@ class ObjectiveSeed : MoveSource {
                 // a wide-domain coordinate objective far too slowly.
                 for (v in obj.leafVars) {
                     val cur = state.assignment.intValue(v)
-                    val d = state.problem.intDomains[v]
+                    val d = state.rootDomains[v]
                     var step = 1
                     while (step <= OBJ_SEED_MAX_STEP) {
                         val up = cur + step

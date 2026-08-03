@@ -65,7 +65,7 @@ internal class ElementInvariant(
         val len = arr.size
         val idxVal = state.assignment.intValue(idx)
         val pos = idxVal - indexOffset
-        val idxDom = state.problem.intDomains[idx]
+        val idxDom = state.rootDomains[idx]
         val resultVal = state.assignment.intValue(result)
         val inRange = pos >= 0 && pos < len
         val ev = if (inRange) {
@@ -77,10 +77,10 @@ internal class ElementInvariant(
         if (inRange && resultVal == ev) return
 
         if (inRange) {
-            if (ev in state.problem.intDomains[result]) sink.addChannelingIntSet(state, result, ev)
+            if (ev in state.rootDomains[result]) sink.addChannelingIntSet(state, result, ev)
             if (arrIsVars) {
                 val sel = arr[pos.toInt()].toInt()
-                if (resultVal in state.problem.intDomains[sel]) sink.addChannelingIntSet(state, sel, resultVal)
+                if (resultVal in state.rootDomains[sel]) sink.addChannelingIntSet(state, sel, resultVal)
             }
         } else {
             val target = idxDom.clamp(

@@ -57,7 +57,7 @@ class ArgminJump(
 
     private fun emitBestIntJump(state: LocalSearchState, weights: DoubleArray, v: Int, sink: MoveSink) {
         val cur = state.assignment.intValue(v)
-        val d = state.problem.intDomains[v]
+        val d = state.rootDomains[v]
         var bestVal = cur
         // Staying put is the baseline candidate (Δ = 0); a jump is taken only if it strictly beats it.
         var bestDelta = 0.0

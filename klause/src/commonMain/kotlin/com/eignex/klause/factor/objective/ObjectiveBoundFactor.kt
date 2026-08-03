@@ -214,7 +214,7 @@ private class ObjectiveBoundInvariant(
         for (i in intVars.indices) {
             val v = intVars[i]
             val cur = state.assignment.intValue(v)
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             if (intCoeffs[i] > 0L && cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
             if (intCoeffs[i] < 0L && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
         }

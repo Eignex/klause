@@ -59,7 +59,7 @@ internal fun collectHoleAndBoundAntecedents(
     for (v in vars) {
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val d = state.intDomains[v]
-        val orig = state.problem.intDomains[v]
+        val orig = state.rootDomains[v]
         if (d.min > orig.min) {
             val lit = Lit.make(state.atomVarGe(v, d.min), false)
             if (seen.add(lit)) out.add(lit)
@@ -139,7 +139,7 @@ internal fun collectLinearDirAntecedents(
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val citeMin = if (useLo) c > 0 else c < 0
         val d = state.intDomains[v]
-        val orig = state.problem.intDomains[v]
+        val orig = state.rootDomains[v]
         if (citeMin) {
             if (d.min > orig.min) {
                 val lit = Lit.make(state.atomVarGe(v, d.min), false)
@@ -182,7 +182,7 @@ internal fun collectLinearTightenAntecedents(
         val v = vars[j]
         if (anyAboveRoot && state.intLevel[v] <= 0) continue
         val d = state.intDomains[v]
-        val orig = state.problem.intDomains[v]
+        val orig = state.rootDomains[v]
         if (d.min > orig.min) {
             val lit = Lit.make(state.atomVarGe(v, d.min), false)
             if (seen.add(lit)) out.add(lit)
@@ -222,10 +222,10 @@ internal fun collectLinearStartBoundAntecedents(
         val startMax = if (c > 0) rHi[j] / c else rLo[j] / c
         val citeMin = if (useLo) c > 0 else c < 0
         if (citeMin) {
-            if (startMin <= state.problem.intDomains[v].min) continue
+            if (startMin <= state.rootDomains[v].min) continue
             out.add(Lit.make(state.atomVarGe(v, startMin), false))
         } else {
-            if (startMax >= state.problem.intDomains[v].max) continue
+            if (startMax >= state.rootDomains[v].max) continue
             out.add(Lit.make(state.atomVarLe(v, startMax), false))
         }
     }
