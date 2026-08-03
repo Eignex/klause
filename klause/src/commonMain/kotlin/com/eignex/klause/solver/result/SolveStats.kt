@@ -206,7 +206,6 @@ data class PresolveStats(
     val constraintsRemoved: Int = 0,
     val infeasible: Boolean = false,
     val lpHarvest: LpHarvestReport? = null,
-    /** Wall time the deferred base bake (presolve step 0, [com.eignex.klause.solver.Problem.bakeBase])
-     *  took; zero when the bake ran at construction instead. */
+    /** Wall time the base bake (presolve step 0, [com.eignex.klause.solver.Problem.bake]) took. */
     val bakeElapsed: Duration = Duration.ZERO,
 )

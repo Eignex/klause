@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -271,8 +272,8 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     }
 
     /**
-     * A cheap [Problem] for a pass to read: the live factors and the state's current folded domains,
-     * built in [Problem.preFolded] mode so it never bakes or inverts occurrences. The passes read only
+     * A cheap [BakedProblem] for a pass to read: the live factors and the state's current folded domains,
+     * built already-folded so it never bakes or inverts occurrences. The passes read only
      * `factors` and `intDomains`, so nothing deferred is ever forced — construction is O(live factors).
      * Records [liveIds] parallel to the returned factor list so the next [applyDelta] maps the delta's
      * factor indices back to stable ids.
@@ -288,17 +289,17 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             }
         }
         liveIds = ids.toIntArray()
-        val input = Problem(
+        val input = BakedProblem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             // Once infeasible, expose the clean pre-conflict domains — not the partially-tightened live ones
             // a conflicted re-propagation left — so a later pass sees what the fresh path (fold skipped on an
             // Unsat bake) would and fires identically. While feasible, share the state's live domain array
-            // directly: the [Problem.preFolded] view never copies it, and a pass only reads it within one
+            // directly: an alreadyFolded view never copies it, and a pass only reads it within one
             // firing (the next delta rebuilds this view), so the per-firing O(numIntVars) copy is avoided.
             intDomains = if (infeasible) lastFeasibleDomains else state.intDomains,
             factors = live,
-            preFolded = true,
+            alreadyFolded = true,
             numRealVars = base.numRealVars,
             realLower = base.realLower,
             realUpper = base.realUpper,
@@ -429,22 +430,22 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      *  folding an Unsat bake); otherwise the state's fully-folded domains.
      *
      *  With no root-bake probing enabled (the common incremental case) the state domains are already the
-     *  greatest fixpoint, so the result is [Problem.preFolded]: its `baked` stays lazy and is computed by
-     *  the solver at solve time, not inside the presolve window — the session's own [infeasible] flag
-     *  surfaces the infeasibility to the caller without forcing that bake. When probing *is* enabled it
-     *  must be re-derived over the final factor set (a [RootBaker.reseed] the preFolded view would skip),
+     *  greatest fixpoint, so the result is an already-folded [BakedProblem]: its `baked` stays lazy and is
+     *  computed by the solver at solve time, not inside the presolve window — the session's own [infeasible]
+     *  flag surfaces the infeasibility to the caller without forcing that bake. When probing *is* enabled it
+     *  must be re-derived over the final factor set (a [RootBaker.reseed] the already-folded view would skip),
      *  so the eager rebuild path is taken, exactly as before. */
     fun materialize(): Problem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
         if (bakeConfig.anyEnabled) {
             return PresolveShared.rebuildProblem(stateProblem, liveFactors(), domains, bakeConfig)
         }
-        return Problem(
+        return BakedProblem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
             intDomains = domains,
             factors = liveFactors(),
-            preFolded = true,
+            alreadyFolded = true,
             numRealVars = base.numRealVars,
             realLower = base.realLower,
             realUpper = base.realUpper,

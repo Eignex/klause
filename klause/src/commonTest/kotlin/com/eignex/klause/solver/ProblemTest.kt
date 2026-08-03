@@ -11,27 +11,24 @@ class ProblemTest {
     private fun tighteningFactors(): List<Factor> = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3))
 
     @Test
-    fun `bakedDomains folds the root bake for a deferBake problem while intDomains stays raw`() {
+    fun `a raw problem keeps its declared domains unbaked`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 10)),
             factors = tighteningFactors(),
-            deferBake = true,
         )
-        assertEquals(10, problem.intDomains[0].max, "deferBake leaves the declared domain raw")
-        assertEquals(3, problem.bakedDomains[0].max, "bakedDomains carries the x <= 3 tightening")
+        assertEquals(10, problem.intDomains[0].max, "a raw problem never folds the root bake")
     }
 
     @Test
-    fun `bakedDomains is the folded view for an eagerly baked problem too`() {
+    fun `bake folds the root deductions into the domains`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
             intDomains = arrayOf(IntDomain(0, 10)),
             factors = tighteningFactors(),
         )
-        assertEquals(3, problem.intDomains[0].max, "eager construction folds in place")
-        assertEquals(3, problem.bakedDomains[0].max, "bakedDomains carries the folded upper bound")
+        assertEquals(3, problem.bake().intDomains[0].max, "bake carries the x <= 3 tightening")
     }
 }

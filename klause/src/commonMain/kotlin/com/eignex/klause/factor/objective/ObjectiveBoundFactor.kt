@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
@@ -33,10 +34,10 @@ internal fun objectiveBoundOverlay(
 
 /** A copy of this problem with [extra] appended to its factors, reusing the base's bake rather than
  *  paying a fresh one. The appended factor is [NoPropagator], so it changes nothing the bake would
- *  derive; the base's domains are already folded, so `preFolded` skips the redundant construction-time
+ *  derive; the base's domains are already folded, so `alreadyFolded` skips the redundant construction-time
  *  fold and `seedDeductions` carries the base's proven deductions (a no-op on already-tightened domains)
  *  so the deferred bake stays exact. An implied-factor mask grows by one non-implied slot. */
-private fun Problem.withAppendedFactor(extra: Factor): Problem = Problem(
+private fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
     intDomains = intDomains,
@@ -45,7 +46,7 @@ private fun Problem.withAppendedFactor(extra: Factor): Problem = Problem(
     cancellation = cancellation,
     impliedFactorMask = impliedFactorMask?.let { it + false },
     hasSymmetryBreaking = hasSymmetryBreaking,
-    preFolded = true,
+    alreadyFolded = true,
 )
 
 /**

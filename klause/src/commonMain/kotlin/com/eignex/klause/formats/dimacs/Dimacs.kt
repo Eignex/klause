@@ -106,7 +106,6 @@ object Dimacs {
             intDomains = emptyArray(),
             factors = factors.toTypedArray(),
             // Defer the base bake (root unit propagation) to presolve step 0, so parsing only reads.
-            deferBake = true,
         )
     }
 
@@ -235,7 +234,6 @@ object Dimacs {
             intDomains = emptyArray(),
             factors = factors.toTypedArray(),
             // Defer the base bake (root unit propagation) to presolve step 0, so parsing only reads.
-            deferBake = true,
         )
         return WcnfProblem(problem, LinearObjective(boolWeights = weights, constant = fixedCost), numOriginal)
     }
