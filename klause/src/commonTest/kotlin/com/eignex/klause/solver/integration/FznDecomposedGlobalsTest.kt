@@ -23,7 +23,7 @@ class FznDecomposedGlobalsTest {
     private fun enumerate(src: String, vars: List<String>): Set<List<Int>> {
         val program = parseFlatZinc(src)
         val ids = vars.map { program.intVarsByName.getValue(it) }
-        return BacktrackSolver(program.problem).enumerate(BacktrackParams(randomSeed = 0L))
+        return BacktrackSolver(program.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { s -> ids.map { s.ints[it].toInt() } }
             .toHashSet()
     }

@@ -33,7 +33,7 @@ class TablePropagatorTest {
                 ),
             ),
         )
-        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val results = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.map { v -> v.toInt() } }
             .toList()
             .toSet()
@@ -74,7 +74,7 @@ class TablePropagatorTest {
                 Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, b, b, 0)),
             ),
         )
-        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val results = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.toList() }
             .toList()
             .toSet()
@@ -97,7 +97,7 @@ class TablePropagatorTest {
                 ),
             ),
         )
-        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val results = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
         assertEquals(
             setOf(listOf(0, 0), listOf(0, 1), listOf(0, 2), listOf(0, 3), listOf(2, 3)),
@@ -120,7 +120,7 @@ class TablePropagatorTest {
                 ),
             ),
         )
-        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val results = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
         assertEquals(setOf(listOf(0, 1), listOf(0, 2), listOf(3, 3)), results)
     }
@@ -136,7 +136,7 @@ class TablePropagatorTest {
                 Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 2), hi = longArrayOf(0, 5)),
             ),
         )
-        val results = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val results = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.map { v -> v.toInt() } }.toList().toSet()
         assertEquals(setOf(listOf(0, 2), listOf(0, 3)), results)
     }
@@ -155,7 +155,7 @@ class TablePropagatorTest {
                 ),
             ),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test
@@ -173,7 +173,7 @@ class TablePropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val ints = sat.assignment.ints.map { it.toInt() }
         assertTrue(
@@ -209,7 +209,7 @@ class TablePropagatorTest {
                 intDomains = Array(inst.arity) { IntDomain(inst.lo.toLong(), inst.hi.toLong()) },
                 factors = arrayOf<Factor>(Table(xs = varsOf, tuples = flat)),
             )
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "table instance #$idx: enumerated solutions must equal in-domain tuples")
         }
@@ -245,7 +245,7 @@ class TablePropagatorTest {
                 intDomains = Array(arity) { IntDomain(cdom[it].first.toLong(), cdom[it].second.toLong()) },
                 factors = arrayOf<Factor>(Table(xs = IntArray(arity) { it }, tuples = flat)),
             )
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = (trial + 1).toLong()))
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = (trial + 1).toLong()))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (arity=$arity hi=$hi rows=$numRows): must equal in-domain tuples")
         }
@@ -295,7 +295,7 @@ class TablePropagatorTest {
                 intDomains = Array(6) { if (it == 0) IntDomain(1, h0.toLong()) else IntDomain(1, 4) },
                 factors = arrayOf<Factor>(mk(0, 1), mk(2, 3), mk(4, 5)),
             )
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L))
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "shared-cache table #$idx (var0 hi=$h0): must equal brute force")
         }

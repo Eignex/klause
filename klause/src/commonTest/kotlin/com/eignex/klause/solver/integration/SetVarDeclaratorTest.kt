@@ -61,7 +61,7 @@ class SetMembershipTest {
     fun `top-level x inSet s forces x to a present element`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(50).toList()
         assertTrue(samples.isNotEmpty(), "expected at least one solution")
         for (sample in samples) {
@@ -83,7 +83,7 @@ class SetSubsetTest {
     fun `a subsetOf b holds in every solution`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
         // 2^3 * 2^3 = 64 raw assignments; sub-set pairs: |{A: A⊆B}| over each B is 2^|B|;
         // total = Σ_B 2^|B| = (1+1)^3 * ... actually total subsets-of-b summed = 3^3 = 27.
@@ -107,7 +107,7 @@ class SetDisjointTest {
     fun `disjoint sets share no elements`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
         // For each pair: a[i] ∈ {0,1}, b[i] ∈ {0,1}, but not both → 3 options per element
         // → 3^3 = 27 disjoint pairs.
@@ -132,7 +132,7 @@ class SetUnionIntersectTest {
     fun `union is computed correctly`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(200).toList()
         assertTrue(samples.isNotEmpty())
         for (sample in samples) {
@@ -154,7 +154,7 @@ class SetUnionIntersectTest {
     fun `intersect is computed correctly`() {
         val schema = IntersectS()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(200).toList()
         assertTrue(samples.isNotEmpty())
         for (sample in samples) {
@@ -176,7 +176,7 @@ class SetCardTest {
     fun `card constraint forces exactly two members`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(20).toList()
         // C(4,2) = 6 subsets of size 2.
         assertEquals(6, samples.size)
@@ -201,7 +201,7 @@ class SetReifiedTest {
     fun `reified set membership tracks flag`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
         assertTrue(samples.isNotEmpty())
         for (sample in samples) {
@@ -228,7 +228,7 @@ class NominalSetTest {
     fun `nominal-set membership pins the indicator`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(20).toList()
         // "red" must be present; the other two are free. 2^2 = 4 solutions.
         assertEquals(4, samples.size)
@@ -249,7 +249,7 @@ class SetEqLiteralTest {
     fun `set equals literal pins all indicators`() {
         val schema = Sch()
         val compiled = schema.compile()
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(5).toList()
         assertEquals(1, samples.size)
         assertEquals(setOf(1, 2), compiled.decode(schema.s, samples[0]))

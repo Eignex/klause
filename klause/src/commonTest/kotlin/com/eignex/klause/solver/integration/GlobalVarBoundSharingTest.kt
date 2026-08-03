@@ -46,7 +46,7 @@ class GlobalVarBoundSharingTest {
     @Test
     fun `a beyond-bake shaving tightening reaches the sink`() {
         val published = HashMap<Int, Pair<Long, Long>>()
-        val res = BacktrackSolver(triangleCover()).minimize(
+        val res = BacktrackSolver(triangleCover().bake()).minimize(
             LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)), // minimize cost (var 3)
             BacktrackParams(
                 randomSeed = 1L,
@@ -60,7 +60,7 @@ class GlobalVarBoundSharingTest {
 
     @Test
     fun `importing a shared bound preserves the optimum`() {
-        val res = BacktrackSolver(problem()).minimize(
+        val res = BacktrackSolver(problem().bake()).minimize(
             LinearObjective(intCoefficients = longArrayOf(1)),
             BacktrackParams(
                 randomSeed = 1L,

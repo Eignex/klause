@@ -35,7 +35,7 @@ internal object InProcessEval {
     /** Evaluate an LS config (decoded [recipe] from [LocalSearchConfigSpace]) on [entry] for [budgetMs] at [seed]. */
     fun evalLs(entry: ResolvedProblem, recipe: LocalSearchRecipe, budgetMs: Long, seed: Long): EvalResult {
         val solver = LocalSearchSolver(
-            entry.problem,
+            entry.problem.bake(),
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
             restartPolicy = recipe.strategy.schedule.restart ?: FixedCadenceRestart(),
@@ -56,7 +56,7 @@ internal object InProcessEval {
     /** Evaluate a backtrack config ([params] from [BacktrackConfigSpace]) on [entry] for [budgetMs] at [seed]. */
     fun evalBt(entry: ResolvedProblem, params: BacktrackParams, budgetMs: Long, seed: Long): EvalResult {
         val wired = params.copy(randomSeed = seed, cancellation = deadline(budgetMs))
-        val solver = BacktrackSolver(entry.problem)
+        val solver = BacktrackSolver(entry.problem.bake())
         val objective = entry.objective
         return if (objective != null) solver.minimize(objective, wired).toEval() else satisfy { solver.solve(wired) }
     }

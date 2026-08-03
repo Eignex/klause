@@ -121,7 +121,7 @@ class ConflictAnalyzerTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = InputOrder))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = InputOrder))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -139,7 +139,7 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams())
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams())
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -160,7 +160,7 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 variableSelector = InputOrder,
                 randomSeed = 0L,
@@ -194,7 +194,7 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 42L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 42L))
         val sat = assertIs<SolveResult.Sat>(r)
         val s = sat.assignment.bools
         val clauses = listOf(
@@ -248,7 +248,7 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
                 // with a tight Luby restart base, the forgetting pass triggers reliably.
@@ -393,7 +393,7 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(4, true))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 11L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 11L))
         val sat = assertIs<SolveResult.Sat>(r)
         val s = sat.assignment.bools
         val clauses = listOf(
@@ -430,7 +430,7 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(0, true))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         for (v in 0 until 5) {
             assertTrue(sat.assignment.bools[v], "v$v should be true; got ${sat.assignment.bools.toList()}")

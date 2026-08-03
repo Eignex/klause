@@ -26,7 +26,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val layout = program.setVarsByName.getValue("s")
         val twoIdx = layout.elements.indexOf(2)
@@ -46,7 +46,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -64,7 +64,7 @@ class SetPredicateTest {
         val cons = (0 until 6).joinToString("\n") { "constraint set_in(a$it,1..31);" }
         val src = "$decls\n$cons\nsolve satisfy;"
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         for (i in 0 until 6) {
             val v = program.intVarsByName.getValue("a$i")
@@ -82,7 +82,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val rId = program.boolVarsByName.getValue("r")
         assertTrue(sat.assignment.bools[rId])
@@ -102,7 +102,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val sLayout = program.setVarsByName.getValue("s")
         val tLayout = program.setVarsByName.getValue("t")
@@ -125,7 +125,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val layout = program.setVarsByName.getValue("s")
         val card = layout.indicatorBoolIds.count { sat.assignment.bools[it] }
@@ -142,7 +142,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 1L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 1L))
         val sat = assertIs<SolveResult.Sat>(r)
         val layout = program.setVarsByName.getValue("s")
         val card = layout.indicatorBoolIds.count { sat.assignment.bools[it] }
@@ -159,7 +159,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val sLayout = program.setVarsByName.getValue("s")
         val tLayout = program.setVarsByName.getValue("t")
@@ -188,7 +188,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val uLayout = program.setVarsByName.getValue("u")
         fun inSet(name: String, elem: Int): Boolean {
@@ -216,7 +216,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         fun inSet(name: String, elem: Int): Boolean {
             val l = program.setVarsByName.getValue(name)
@@ -240,7 +240,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val xId = program.intVarsByName.getValue("x")
         assertEquals(2, sat.assignment.ints[xId])
@@ -263,7 +263,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val res = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(res)
         assertTrue(sat.assignment.bools[program.boolVarsByName.getValue("r")])
     }
@@ -282,7 +282,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val res = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(res)
         assertTrue(!sat.assignment.bools[program.boolVarsByName.getValue("r")])
     }
@@ -304,7 +304,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             sat.assignment.bools[program.boolVarsByName.getValue("r")],
@@ -329,7 +329,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 1L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 1L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             !sat.assignment.bools[program.boolVarsByName.getValue("r")],
@@ -353,7 +353,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 2L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 2L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(sat.assignment.bools[program.boolVarsByName.getValue("r")])
     }
@@ -372,7 +372,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(!sat.assignment.bools[program.boolVarsByName.getValue("r")])
     }
@@ -389,7 +389,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val sLayout = program.setVarsByName.getValue("s")
         val tLayout = program.setVarsByName.getValue("t")
@@ -410,7 +410,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val sets = (1..3).map { i -> program.setVarsByName.getValue("a[$i]") }
         val membersOf: (SetVarLayout) -> Set<Int> = { layout ->
@@ -438,7 +438,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 3L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 3L))
         val sat = assertIs<SolveResult.Sat>(r)
         val sets = (1..2).map { i -> program.setVarsByName.getValue("a[$i]") }
         val u = program.setVarsByName.getValue("u")
@@ -462,7 +462,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val output = writeFlatZincSolution(program, sat.assignment)
         assertTrue(output.contains("s = {1, 3};"), "expected s = {1, 3} in output: $output")
@@ -481,7 +481,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         fun inSet(name: String, elem: Int): Boolean {
             val l = program.setVarsByName.getValue(name)
@@ -500,7 +500,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val layout = program.setVarsByName.getValue("s")
         for ((i, e) in layout.elements.withIndex()) {
@@ -520,7 +520,7 @@ class SetPredicateTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val layout = program.setVarsByName.getValue("s")
         for ((i, e) in layout.elements.withIndex()) {

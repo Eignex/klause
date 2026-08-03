@@ -39,7 +39,7 @@ class LocalSearchPoolFlowTest {
     fun `each improving incumbent is published to the sink`() {
         val published = mutableListOf<Pair<Sample, Double>>()
         val objective = LinearObjective(boolWeights = weights)
-        val result = LocalSearchSolver(problem()).minimize(
+        val result = LocalSearchSolver(problem().bake()).minimize(
             objective,
             LocalSearchParams(
                 maxFlips = 3_000L,
@@ -57,7 +57,7 @@ class LocalSearchPoolFlowTest {
         var polls = 0
         val optimal = optimalSample()
         val objective = LinearObjective(boolWeights = weights)
-        val result = LocalSearchSolver(problem()).minimize(
+        val result = LocalSearchSolver(problem().bake()).minimize(
             objective,
             LocalSearchParams(
                 maxFlips = 3_000L,

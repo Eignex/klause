@@ -166,7 +166,7 @@ class CumulativePropagatorTest {
         assertEquals(2, reason.size, "pointwise reason cites only the two tasks covering the overload")
     }
 
-    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
+    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
         .map { it.ints.map { v -> v.toInt() } }
@@ -351,7 +351,7 @@ class CumulativePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(factor),
         )
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
         val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample, "BacktrackSolver should find a feasible schedule")
         val starts = sample.ints
@@ -502,7 +502,7 @@ class CumulativePropagatorTest {
             // CDCL so conflict analysis + clause learning (hence the window reasons) actually run;
             // no restarts so enumeration completeness is simple to reason about.
             val params = BacktrackParams(randomSeed = 1, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: cumulative backtrack solution set must equal brute force")
         }
@@ -862,7 +862,7 @@ class CumulativePropagatorTest {
                     }
                 }
             }
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: disjunctive + interior holes must match brute force")

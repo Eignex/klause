@@ -285,7 +285,7 @@ class PresolverTest {
         )
         val pre = Presolver.run(problem, PresolveConfig.DEFAULT)
         assertTrue(pre.problem !== problem, "expected the pipeline to transform the problem")
-        val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
+        val result = BacktrackSolver(pre.problem.bake()).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
         val full = pre.reconstruct(result.assignment)
         assertEquals(2 * full.ints[1] + 1, full.ints[0], "affine var not reconstructed: x should be 2y+1")
@@ -362,7 +362,7 @@ class PresolverTest {
         val pre = Presolver.run(problem, PresolveConfig.parse("value-precede"))
         assertTrue(pre.problem !== problem, "value precedence should add precedence factors")
         assertEquals(problem.numIntVars, pre.problem.numIntVars, "no auxiliary variables are added")
-        val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
+        val result = BacktrackSolver(pre.problem.bake()).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
         val full = pre.reconstruct(result.assignment)
         assertEquals(listOf(0L, 1L, 2L), full.ints.toList(), "the single canonical permutation")
@@ -397,7 +397,7 @@ class PresolverTest {
         val pre = Presolver.run(problem, PresolveConfig.DEFAULT)
         assertEquals(1, pre.problem.factors.count { it is AllDifferent }, "the vacuous all-different is dropped")
         assertTrue(pre.problem.factors.none { 0 in it.intVars }, "x0 is eliminated — present in no factor")
-        val result = BacktrackSolver(pre.problem).solve(BacktrackParams())
+        val result = BacktrackSolver(pre.problem.bake()).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "presolved problem should be SAT, got $result")
         val full = pre.reconstruct(result.assignment)
         assertEquals(full.ints[1] + 1, full.ints[0], "x0 reconstructed as x1 + 1")
@@ -439,10 +439,10 @@ class PresolverTest {
 
         fun count(config: PresolveConfig, sensitive: Boolean): Int {
             val pre = Presolver.run(problem, config, PresolveContext(solutionSetSensitive = sensitive))
-            return BacktrackSolver(pre.problem).enumerate(BacktrackParams(randomSeed = 0L)).count()
+            return BacktrackSolver(pre.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).count()
         }
 
-        val unpresolved = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).count()
+        val unpresolved = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).count()
         assertEquals(6, unpresolved, "circuit(4) has exactly 6 Hamiltonian cycles")
         // Sensitive query (enumeration / counting): the affine gate keeps the count exact.
         assertEquals(6, count(PresolveConfig.AUTO, sensitive = true), "presolve must not inflate the count under -a")

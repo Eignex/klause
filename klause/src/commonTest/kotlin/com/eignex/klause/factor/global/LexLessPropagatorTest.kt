@@ -42,7 +42,7 @@ class LexLessPropagatorTest {
             intDomains = Array(4) { IntDomain(0, 2) },
             factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
         )
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             val xs = listOf(sample.ints[0], sample.ints[1])
             val ys = listOf(sample.ints[2], sample.ints[3])
             assertTrue(lexLess(xs, ys, strict = true), "lex_less violated: xs=$xs ys=$ys")
@@ -57,7 +57,7 @@ class LexLessPropagatorTest {
             intDomains = Array(4) { IntDomain(0, 1) },
             factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = false)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val xs = listOf(sat.assignment.ints[0], sat.assignment.ints[1])
         val ys = listOf(sat.assignment.ints[2], sat.assignment.ints[3])
@@ -73,7 +73,7 @@ class LexLessPropagatorTest {
             intDomains = Array(4) { IntDomain(1, 1) },
             factors = arrayOf<Factor>(LexLess(intArrayOf(0, 1), intArrayOf(2, 3), strict = true)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test

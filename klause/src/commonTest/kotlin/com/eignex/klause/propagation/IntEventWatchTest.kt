@@ -80,7 +80,7 @@ class IntEventWatchTest {
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     @Test

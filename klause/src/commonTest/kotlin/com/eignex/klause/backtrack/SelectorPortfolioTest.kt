@@ -37,7 +37,7 @@ class SelectorPortfolioTest {
                 SelectorPortfolio.Arm("smallest+random", SmallestDomain, IndomainRandom),
             ),
         )
-        val r = BacktrackSolver(simpleAllDifferent(5)).solve(
+        val r = BacktrackSolver(simpleAllDifferent(5).bake()).solve(
             BacktrackParams(
                 variableSelector = portfolio.variableSelector,
                 valueSelector = portfolio.valueSelector,

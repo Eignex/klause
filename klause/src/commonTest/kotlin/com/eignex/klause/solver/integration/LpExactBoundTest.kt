@@ -42,7 +42,7 @@ class LpExactBoundTest {
             val obj = LinearObjective(intCoefficients = cost)
             val params = BacktrackParams(randomSeed = 5L, lpPlan = LpPlan(bounding = true))
 
-            when (val res = BacktrackSolver(problem).minimize(obj, params)) {
+            when (val res = BacktrackSolver(problem.bake()).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {
                     val opt = brute ?: error("solver Optimal but brute infeasible")
                     assertEquals(opt.toDouble(), res.objective, 1e-9, "wrong optimum")

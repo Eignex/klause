@@ -5,7 +5,7 @@ import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -29,7 +29,7 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
      *  sharing). LS-only knobs ([lsLambda], [lsObjective], [definitionalSweep]) are ignored. The label
      *  is `backtrack#<index>`. */
     override fun materialize(
-        problem: Problem,
+        problem: BakedProblem,
         index: Int,
         armId: Int,
         seed: Long,

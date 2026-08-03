@@ -35,7 +35,7 @@ class ObjectiveBoundFactorTest {
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1, 1, 1))
         val (overlay, bound) = assertIs<Pair<Problem, MutableObjectiveBound>>(objectiveBoundOverlay(problem, objective))
-        val solver = LocalSearchSolver(overlay, strategy = ProbSat()).apply { objectiveBound = bound }
+        val solver = LocalSearchSolver(overlay.bake(), strategy = ProbSat()).apply { objectiveBound = bound }
 
         val result = solver.minimize(objective, LocalSearchParams(maxFlips = 50_000, randomSeed = 7))
 

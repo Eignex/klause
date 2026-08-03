@@ -90,7 +90,7 @@ class ArithmeticPropagatorReifiedTest {
 
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
         val found = BacktrackSolver(
-            p,
+            p.bake(),
         ).enumerate(params).take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "backtrack enumeration must equal the brute-force feasible set")
     }
@@ -415,7 +415,7 @@ class ArithmeticPropagatorReifiedTest {
                 maxDecisions = 200_000,
             )
             val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-            val result = BacktrackSolver(p).minimize(objective, params)
+            val result = BacktrackSolver(p.bake()).minimize(objective, params)
             val best = bruteBest
             when (result) {
                 is MinimizeResult.Optimal ->
@@ -473,7 +473,7 @@ class ArithmeticPropagatorReifiedTest {
         )
     }
 
-    private fun enumerateBoolInt(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
+    private fun enumerateBoolInt(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
         .map { it.bools.map { b -> if (b) 1 else 0 } + it.ints.map { v -> v.toInt() } }
@@ -592,7 +592,7 @@ class ArithmeticPropagatorReifiedTest {
                 intDomains = doms.toTypedArray(),
                 factors = factors.toTypedArray(),
             )
-            val projected = BacktrackSolver(problem).enumerate(
+            val projected = BacktrackSolver(problem.bake()).enumerate(
                 BacktrackParams(
                     maxDecisions = 50_000_000L,
                     randomSeed = seed,
@@ -636,7 +636,7 @@ class ArithmeticPropagatorReifiedTest {
             brute.add(values.map { it == x } to x)
         }
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-        val found = BacktrackSolver(p).enumerate(params).take(100_000)
+        val found = BacktrackSolver(p.bake()).enumerate(params).take(100_000)
             .map { it.bools.toList() to it.ints[0].toInt() }.toHashSet()
         assertEquals(brute, found, "reified eq over a hole domain must match brute enumeration")
     }
@@ -667,7 +667,7 @@ class ArithmeticPropagatorReifiedTest {
             factors.add(Cardinality(IntArray(perVar) { Lit.make(chans[it], true) }, min = 1, max = perVar))
         }
         val p = Problem(nVars * perVar, nVars, doms, factors.toTypedArray())
-        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 1L)))
+        assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L)))
     }
 
     @Test
@@ -735,6 +735,6 @@ class ArithmeticPropagatorReifiedTest {
         }
         factors.add(Cardinality(IntArray(values.size) { Lit.make(it, true) }, min = 1, max = values.size))
         val p = Problem(values.size, 1, arrayOf(dom), factors.toTypedArray())
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 1L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L)))
     }
 }

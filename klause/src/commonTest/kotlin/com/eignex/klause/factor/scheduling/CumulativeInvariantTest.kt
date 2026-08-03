@@ -101,7 +101,7 @@ class CumulativeInvariantTest {
     fun `LS finds a feasible schedule for the 3-task unary problem`() {
         val problem = threeTasksUnary()
         val solver = LocalSearchSolver(
-            problem,
+            problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 11L)).assignment

@@ -56,7 +56,7 @@ class CutSearchSeparationTest {
                 val problem = Problem(0, n, domains, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = cost)
 
-                when (val res = BacktrackSolver(problem).minimize(obj, searchCutParams(7L))) {
+                when (val res = BacktrackSolver(problem.bake()).minimize(obj, searchCutParams(7L))) {
                     is MinimizeResult.Optimal -> {
                         assertEquals(
                             (brute ?: error("solver Optimal but brute infeasible")).toDouble(),
@@ -108,8 +108,8 @@ class CutSearchSeparationTest {
                 randomSeed = 1L,
                 lpPlan = LpPlan(bounding = true, cuts = true, cutSearchMaxDepth = 64),
             )
-            val a = BacktrackSolver(problem).minimize(obj, rootOnly)
-            val b = BacktrackSolver(problem).minimize(obj, withSearch)
+            val a = BacktrackSolver(problem.bake()).minimize(obj, rootOnly)
+            val b = BacktrackSolver(problem.bake()).minimize(obj, withSearch)
             assertTrue(a is MinimizeResult.Optimal && b is MinimizeResult.Optimal)
             assertEquals(a.objective, b.objective, 1e-9, "search separation changed the optimum")
             val rootSolves = a.stats.lp.solves.sum
@@ -147,7 +147,7 @@ class CutSearchSeparationTest {
                 val problem = Problem(0, n, Array(n) { IntDomain(0, ub.toLong()) }, factors.toTypedArray())
                 val obj = LinearObjective(intCoefficients = cost)
 
-                when (val res = BacktrackSolver(problem).minimize(obj, searchCutParams(60L))) {
+                when (val res = BacktrackSolver(problem.bake()).minimize(obj, searchCutParams(60L))) {
                     is MinimizeResult.Optimal -> {
                         assertEquals(
                             (brute ?: error("solver Optimal but brute infeasible")).toDouble(),

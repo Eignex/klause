@@ -25,7 +25,7 @@ class BranchAndBoundTest {
             factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 2L, 3L, 4L))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         for (i in 0 until 4) assertEquals(false, sample.bools[i])
     }
@@ -39,7 +39,7 @@ class BranchAndBoundTest {
             factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[0])
     }
@@ -53,7 +53,7 @@ class BranchAndBoundTest {
             factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(7, sample.ints[0])
     }
@@ -74,7 +74,7 @@ class BranchAndBoundTest {
             factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
-        val sample = BacktrackSolver(problem).minimize(
+        val sample = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(
                 randomSeed = 0L,
@@ -111,7 +111,7 @@ class BranchAndBoundTest {
             factors = arrayOf<Factor>(factor),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-        val sample = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val sum = sample.ints[0] + sample.ints[1] + sample.ints[2]
         assertEquals(6, sum, "optimal disjunctive schedule sums to 0+2+4=6; got ${sample.ints.toList()}")

@@ -23,7 +23,7 @@ class RepairSearchTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val handle = BacktrackSolver(problem).openRepair(objective, BacktrackParams())
+        val handle = BacktrackSolver(problem.bake()).openRepair(objective, BacktrackParams())
 
         // Pin 2,3 false → exactly-one over {0,1}; the cheaper choice is var 1 (weight 5).
         val a = handle.repair(Assumptions(mapOf(2 to false, 3 to false), emptyMap()), 2_000L, Double.POSITIVE_INFINITY)

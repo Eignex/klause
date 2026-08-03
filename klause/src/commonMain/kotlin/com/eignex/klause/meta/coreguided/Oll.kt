@@ -42,7 +42,7 @@ internal object Oll {
         onSat: (Sample) -> R,
         onUnsat: () -> R,
         onUnknown: (TerminationReason) -> R,
-    ): R = when (val r = BacktrackSolver(base).solve(params)) {
+    ): R = when (val r = BacktrackSolver(base.bake()).solve(params)) {
         is SolveResult.Sat -> onSat(r.assignment)
         is SolveResult.Unsat -> onUnsat()
         is SolveResult.Unknown -> onUnknown(r.reason)
@@ -117,6 +117,6 @@ internal object Oll {
             intDomains = base.intDomains,
             factors = factors,
         )
-        return (BacktrackSolver(problem).solve(params) as? SolveResult.Sat)?.assignment ?: sample
+        return (BacktrackSolver(problem.bake()).solve(params) as? SolveResult.Sat)?.assignment ?: sample
     }
 }

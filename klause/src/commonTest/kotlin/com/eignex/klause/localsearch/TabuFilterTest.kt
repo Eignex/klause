@@ -164,7 +164,7 @@ class TabuFilterTest {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val solver = LocalSearchSolver(
-            problem,
+            problem.bake(),
             strategy = WalkSat(
                 noise = 0.2,
                 tabu = TabuFilter(tenure = 5, aspiration = AspirationCriterion.OrImproving),

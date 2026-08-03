@@ -31,7 +31,7 @@ class LocalSearchImprovementsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val seq = LocalSearchSolver(problem).improvements(
+        val seq = LocalSearchSolver(problem.bake()).improvements(
             obj,
             LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L),
         ).toList()
@@ -65,7 +65,7 @@ class LocalSearchImprovementsTest {
         val problem = Problem(n, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = LongArray(n) { 1L })
         val optimum = Sample(BooleanArray(n) { false }, longArrayOf())
-        val first = LocalSearchSolver(problem).improvements(
+        val first = LocalSearchSolver(problem.bake()).improvements(
             obj,
             LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L, initialAssignment = optimum),
         ).first()
@@ -85,7 +85,7 @@ class LocalSearchImprovementsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val params = LocalSearchParams(maxFlips = 2_000L, randomSeed = 0L)
         val viaMinimize = solver.minimize(obj, params)
         val viaImprovementsLast = solver.improvements(obj, params).last()
@@ -100,7 +100,9 @@ class LocalSearchImprovementsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val result = LocalSearchSolver(problem).minimize(obj, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L))
+        val result = LocalSearchSolver(
+            problem.bake(),
+        ).minimize(obj, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L))
         val best = assertIs<MinimizeResult.BestFound>(result)
         val stats = best.stats
         assertEquals("ls", stats.run.backend)
@@ -116,7 +118,7 @@ class LocalSearchImprovementsTest {
             intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true), Lit.make(3, true)),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val result = LocalSearchSolver(problem).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
+        val result = LocalSearchSolver(problem.bake()).solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
         val sat = assertIs<SolveResult.Sat>(result)
         assertEquals("ls", sat.stats.run.backend)
         assertEquals(0.0, sat.stats.ls.incumbentViolation, "a satisfied instance has zero violation")
@@ -136,7 +138,7 @@ class LocalSearchImprovementsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L, 1L))
         // With an unbounded budget, only the lazy Sequence path can yield the first improvement and stop.
-        val first = LocalSearchSolver(problem).improvements(
+        val first = LocalSearchSolver(problem.bake()).improvements(
             obj,
             LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = 2L),
         ).first()

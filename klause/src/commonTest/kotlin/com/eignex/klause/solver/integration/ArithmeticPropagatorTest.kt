@@ -37,7 +37,7 @@ class ArithmeticPropagatorTest {
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
             factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(3, sat.assignment.ints[3])
     }
@@ -50,7 +50,7 @@ class ArithmeticPropagatorTest {
             intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
             factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = false)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(1, sat.assignment.ints[3])
     }
@@ -64,7 +64,7 @@ class ArithmeticPropagatorTest {
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 10)),
             factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         // Result must equal max(xs); since xs.max ≤ 5, so does result.
         val resVal = sat.assignment.ints[3]
@@ -132,7 +132,7 @@ class ArithmeticPropagatorTest {
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     @Test
@@ -254,7 +254,7 @@ class ArithmeticPropagatorTest {
                 factors = factors,
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(200_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(200_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
@@ -301,7 +301,7 @@ class ArithmeticPropagatorTest {
                 factors = arrayOf<Factor>(Linear(coeffs = con.coeffs, vars = varsOf, op = con.op, bound = con.bound)),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(200_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(200_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "wide instance #$idx (op=${con.op}): solution set must equal brute force")
         }
@@ -338,7 +338,7 @@ class ArithmeticPropagatorTest {
     }
 
     private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     private fun assertBoundOnly(watches: IntArray?, vars: IntArray) {

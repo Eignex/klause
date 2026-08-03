@@ -67,7 +67,7 @@ class OperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(8).toList()
@@ -97,7 +97,7 @@ class OperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 19)).take(20).toList()
@@ -113,7 +113,7 @@ class OperatorsTest {
         val s = CircuitReifiedSchema()
         val compiled = s.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         // Exercise the lowering and confirm it produces a model the solver can iterate against

@@ -84,7 +84,7 @@ class LastConflictTest {
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(3, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 variableSelector = LastConflict(Vsids()),
                 randomSeed = 0L,

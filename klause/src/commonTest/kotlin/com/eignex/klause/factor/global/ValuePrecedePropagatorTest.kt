@@ -51,7 +51,7 @@ class ValuePrecedePropagatorTest {
             intDomains = Array(domains.size) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
             factors = listOf(ValuePrecede(s.toLong(), t.toLong(), IntArray(domains.size) { it })),
         )
-        return BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L))
+        return BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { sample -> sample.ints.map { it.toInt() } }.toSet()
     }
 
@@ -84,7 +84,7 @@ class ValuePrecedePropagatorTest {
         )
         assertEquals(
             setOf(listOf(0, 1)),
-            BacktrackSolver(problem).enumerate(BacktrackParams()).map { s -> s.ints.map { it.toInt() } }.toSet(),
+            BacktrackSolver(problem.bake()).enumerate(BacktrackParams()).map { s -> s.ints.map { it.toInt() } }.toSet(),
         )
     }
 

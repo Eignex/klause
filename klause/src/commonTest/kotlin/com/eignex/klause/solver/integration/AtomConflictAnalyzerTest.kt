@@ -192,7 +192,7 @@ class AtomConflictAnalyzerTest {
                 Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, -1), // z - x <= -1  (z < x)
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = InputOrder, randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = InputOrder, randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -211,7 +211,7 @@ class AtomConflictAnalyzerTest {
                 Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, -1), // c < d
             ),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 lubyRestartBase = 4,
                 maxLearnedClauses = 0,
@@ -270,8 +270,8 @@ class AtomConflictAnalyzerTest {
         )
         for ((idx, inst) in instances.withIndex()) {
             val (problem, objective, seed) = inst
-            val truth = BruteForceSolver(problem).minimize(objective, BruteForceParams())
-            val got = BacktrackSolver(problem).minimize(objective, BacktrackParams(randomSeed = seed))
+            val truth = BruteForceSolver(problem.bake()).minimize(objective, BruteForceParams())
+            val got = BacktrackSolver(problem.bake()).minimize(objective, BacktrackParams(randomSeed = seed))
             when (truth) {
                 is MinimizeResult.Optimal -> {
                     val gotOpt = assertIs<MinimizeResult.WithSample>(got)

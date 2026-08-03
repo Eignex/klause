@@ -34,7 +34,7 @@ class AffineEliminationTest {
     }
 
     private fun verdictSat(problem: Problem): Boolean =
-        BacktrackSolver(problem).solve(BacktrackParams()) is SolveResult.Sat
+        BacktrackSolver(problem.bake()).solve(BacktrackParams()) is SolveResult.Sat
 
     private fun checkRoundTrip(name: String, original: Problem, expectEliminated: Boolean, expectSat: Boolean) {
         val delta = Presolve.eliminateAffineSingletons(original)
@@ -44,7 +44,7 @@ class AffineEliminationTest {
         assertEquals(expectSat, verdictSat(original), "$name: original verdict unexpected")
         assertEquals(verdictSat(original), verdictSat(reduced), "$name: verdict changed by elimination")
         if (verdictSat(reduced)) {
-            val solved = BacktrackSolver(reduced).solve(BacktrackParams())
+            val solved = BacktrackSolver(reduced.bake()).solve(BacktrackParams())
             check(solved is SolveResult.Sat)
             val full = reconstruct(solved.assignment)
             assertTrue(isFeasible(original, full), "$name: reconstructed sample infeasible in original")

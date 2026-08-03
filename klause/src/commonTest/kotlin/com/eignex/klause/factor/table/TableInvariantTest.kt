@@ -86,7 +86,7 @@ class TableInvariantTest {
                 Table(xs = intArrayOf(0, 1, 2), tuples = longArrayOf(1, 2, 3, 4, 5, 6)),
             ),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 1)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         val allowed = setOf(listOf(1, 2, 3), listOf(4, 5, 6))

@@ -52,7 +52,7 @@ class DisjunctiveInvariantTest {
     fun `LS finds a feasible disjunctive schedule`() {
         val problem = threeUnitTasks()
         val solver = LocalSearchSolver(
-            problem,
+            problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 17L)).assignment

@@ -39,7 +39,7 @@ class BacktrackPresetsTest {
 
     @Test
     fun `sat-optimized preset proves a conflict-heavy unsat instance`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4))
+        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4).bake())
             .solve(BacktrackPresets.satOptimized(randomSeed = 1L))
         assertIs<SolveResult.Unsat>(verdict)
     }
@@ -48,14 +48,14 @@ class BacktrackPresetsTest {
     fun `sat-optimized preset finds a valid witness on a satisfiable problem`() {
         val problem = satisfiableChain()
         val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(problem).solve(BacktrackPresets.satOptimized(randomSeed = 2L)),
+            BacktrackSolver(problem.bake()).solve(BacktrackPresets.satOptimized(randomSeed = 2L)),
         )
         assertChainWitness(sat)
     }
 
     @Test
     fun `conflict-driven preset proves a conflict-heavy unsat instance`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4))
+        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4).bake())
             .solve(BacktrackPresets.conflictDriven(randomSeed = 1L))
         assertIs<SolveResult.Unsat>(verdict)
     }
@@ -63,7 +63,7 @@ class BacktrackPresetsTest {
     @Test
     fun `conflict-driven preset finds a valid witness on a satisfiable problem`() {
         val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(satisfiableChain()).solve(BacktrackPresets.conflictDriven(randomSeed = 2L)),
+            BacktrackSolver(satisfiableChain().bake()).solve(BacktrackPresets.conflictDriven(randomSeed = 2L)),
         )
         assertChainWitness(sat)
     }

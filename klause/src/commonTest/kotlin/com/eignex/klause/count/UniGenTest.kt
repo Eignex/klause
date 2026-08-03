@@ -27,7 +27,7 @@ class UniGenTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        val samples = BacktrackSolver(p)
+        val samples = BacktrackSolver(p.bake())
             .samples(SamplingConfig(quality = SampleQuality.CHEAP, seed = 1L), BacktrackParams(randomSeed = 1L))
             .take(20).toList()
         assertTrue(samples.isNotEmpty())
@@ -46,7 +46,7 @@ class UniGenTest {
         )
         val draws = 2400
         val counts = HashMap<List<Boolean>, Int>()
-        val samples = BacktrackSolver(p)
+        val samples = BacktrackSolver(p.bake())
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 7L), BacktrackParams())
             .take(draws).toList()
 
@@ -72,7 +72,7 @@ class UniGenTest {
         // hashing kicks in at the cheapest enumeration cost. The internal count estimate only
         // seeds the hash depth, so the coarsest ε/δ suffice.
         val p = unconstrained(7)
-        val samples = BacktrackSolver(p)
+        val samples = BacktrackSolver(p.bake())
             .samples(
                 SamplingConfig(quality = SampleQuality.ACCURATE, seed = 3L, countEpsilon = 2.0, countDelta = 0.99),
                 BacktrackParams(),
@@ -95,7 +95,7 @@ class UniGenTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val samples = BacktrackSolver(p)
+        val samples = BacktrackSolver(p.bake())
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0L), BacktrackParams())
             .take(5).toList()
         assertTrue(samples.isEmpty(), "UNSAT instance should yield no accurate samples")

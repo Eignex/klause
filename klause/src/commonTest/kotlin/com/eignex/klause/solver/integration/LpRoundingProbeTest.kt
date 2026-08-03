@@ -37,9 +37,9 @@ class LpRoundingProbeTest {
         // feasible incumbent (objective 3) before search. The proven optimum must be unchanged.
         val problem = triangle()
         val off = BacktrackSolver(
-            problem,
+            problem.bake(),
         ).minimize(sumObjective, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
-        val on = BacktrackSolver(problem).minimize(
+        val on = BacktrackSolver(problem.bake()).minimize(
             sumObjective,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, probe = true)),
         )
@@ -60,7 +60,7 @@ class LpRoundingProbeTest {
             factors = arrayOf<Factor>(Linear(intArrayOf(5), intArrayOf(0), LinearOp.LE, 8)),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L))
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, probe = true)),
         )
@@ -84,7 +84,7 @@ class LpRoundingProbeTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(-1L, -1L, -1L))
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, probe = true)),
         )

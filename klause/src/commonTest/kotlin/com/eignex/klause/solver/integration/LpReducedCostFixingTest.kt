@@ -32,9 +32,9 @@ class LpReducedCostFixingTest {
     @Test
     fun `reduced-cost fixing preserves the optimum`() {
         val problem = weighted()
-        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val off = BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 1L))
         val on = BacktrackSolver(
-            problem,
+            problem.bake(),
         ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
 
         assertEquals(off.objectiveValue, on.objectiveValue, "fixing must not change the optimum")
@@ -46,7 +46,7 @@ class LpReducedCostFixingTest {
         // A generous external incumbent of 6 makes the gap known from the first node, so the LP's
         // reduced cost on x1 (= 9) immediately bounds x1 in. The optimum is still 5.
         val problem = weighted()
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, objectiveBoundSupplier = { 6.0 }, lpPlan = LpPlan(bounding = true)),
         )
@@ -69,7 +69,7 @@ class LpReducedCostFixingTest {
         )
         val triObj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
         val result = BacktrackSolver(
-            problem,
+            problem.bake(),
         ).minimize(triObj, BacktrackParams(randomSeed = 4L, lpPlan = LpPlan(bounding = true)))
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)

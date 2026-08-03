@@ -28,7 +28,7 @@ class FlatZincParseTest {
         val program = parseFlatZinc(src)
         assertEquals(2, program.problem.numBoolVars)
         assertEquals(SolveDirective.Satisfy, program.solve)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(sat.assignment.bools[0] || sat.assignment.bools[1])
     }
@@ -43,7 +43,7 @@ class FlatZincParseTest {
         """.trimIndent()
         val program = parseFlatZinc(src)
         assertEquals(2, program.problem.numIntVars)
-        val sample = LocalSearchSolver(program.problem)
+        val sample = LocalSearchSolver(program.problem.bake())
             .sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertTrue(sample.ints[0] + sample.ints[1] <= 5)
@@ -85,7 +85,7 @@ class FlatZincParseTest {
         val program = parseFlatZinc(src)
         // The alias shares its target's var id — no fresh var allocated for `obj`.
         assertEquals(program.intVarsByName["m"], program.intVarsByName["obj"])
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment!!
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment!!
         val obj = sample.ints[program.intVarsByName.getValue("obj")]
         assertEquals(40, obj, "aliased obj must equal max(30,40)=40, got $obj")
         assertTrue(writeFlatZincSolution(program, sample).contains("obj=40 m=40"))
@@ -102,7 +102,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment!!
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment!!
         val v = sample.ints[program.intVarsByName.getValue("x")]
         assertTrue(v in 3..5, "x must be in 3..5 (alias y:0..5 ∧ x>=3), got $v")
     }
@@ -115,7 +115,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment!!
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment!!
         val rendered = writeFlatZincSolution(program, sample)
         assertTrue(rendered.contains("x = true"), "got: $rendered")
         assertTrue(rendered.contains("----------"))
@@ -131,7 +131,7 @@ class FlatZincParseTest {
             output ["a=", show(a), " b=", show(b), "\n"];
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment!!
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment!!
         val rendered = writeFlatZincSolution(program, sample)
         // Result should look like "a=N b=M\n----------\n"
         assertTrue(rendered.startsWith("a="), "got: $rendered")
@@ -151,7 +151,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = LocalSearchSolver(program.problem)
+        val sample = LocalSearchSolver(program.problem.bake())
             .sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertTrue(2 * sample.ints[0] + 3 * sample.ints[1] + sample.ints[2] <= 10)
@@ -168,7 +168,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[program.intVarsByName.getValue("n")])
     }
@@ -181,7 +181,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val seen = setOf(sample.ints[0], sample.ints[1], sample.ints[2])
         assertEquals(3, seen.size)
@@ -196,7 +196,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(3, setOf(sample.ints[0], sample.ints[1], sample.ints[2]).size)
     }
@@ -210,7 +210,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         // Decode the cycle in 1-indexed space.
         val visited = BooleanArray(4)
@@ -234,7 +234,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val occ = IntArray(8)
         for (i in 0 until 3) {
@@ -253,7 +253,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val samples = BacktrackSolver(program.problem).enumerate(BacktrackParams(randomSeed = 0L)).toList()
+        val samples = BacktrackSolver(program.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).toList()
         assertEquals(6, samples.size, "expected 3! disjunctive schedules; got ${samples.size}")
     }
 
@@ -269,7 +269,9 @@ class FlatZincParseTest {
         assertEquals(2, program.floatVarsByName.size)
         // A purely-linear float model lowers to LP-only continuous columns (issue #1232), solved exactly.
         assertEquals(2, program.problem.numRealVars)
-        val r = assertIs<SolveResult.Sat>(BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 3L)))
+        val r = assertIs<SolveResult.Sat>(
+            BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 3L)),
+        )
         val xVal = r.assignment.reals[program.floatVarsByName.getValue("x").varId]
         val yVal = r.assignment.reals[program.floatVarsByName.getValue("y").varId]
         assertTrue(xVal + yVal <= 5.0 + 1e-6, "x+y = ${xVal + yVal}")
@@ -311,7 +313,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(sat.assignment.bools[0])
     }
@@ -370,7 +372,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(3, sample.ints[0])
     }
@@ -387,7 +389,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val x = sample.ints[program.intVarsByName.getValue("x")]
         val y = sample.ints[program.intVarsByName.getValue("y")]
@@ -408,7 +410,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         assertEquals(10, sample.ints[program.intVarsByName.getValue("x")])
         assertEquals(0, sample.ints[program.intVarsByName.getValue("y")])
@@ -425,7 +427,7 @@ class FlatZincParseTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val sample = BacktrackSolver(program.problem).sample(BacktrackParams(randomSeed = 0L)).assignment
+        val sample = BacktrackSolver(program.problem.bake()).sample(BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(sample)
         val a = sample.ints[program.intVarsByName.getValue("a")]
         val b = sample.ints[program.intVarsByName.getValue("b")]

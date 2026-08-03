@@ -52,7 +52,7 @@ class VariableObjectiveTest {
         val schema = S()
         val compiled = schema.compile()
         val objective = compiled.minimize(schema.cost)
-        val sample = LocalSearchSolver(compiled.problem)
+        val sample = LocalSearchSolver(compiled.problem.bake())
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
         assertEquals(3, compiled.decode(schema.cost, sample))
     }
@@ -66,7 +66,7 @@ class VariableObjectiveTest {
         val schema = S()
         val compiled = schema.compile()
         val objective = compiled.maximize(schema.cost)
-        val sample = LocalSearchSolver(compiled.problem)
+        val sample = LocalSearchSolver(compiled.problem.bake())
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
         assertEquals(7, compiled.decode(schema.cost, sample))
     }
@@ -84,7 +84,7 @@ class VariableObjectiveTest {
         // Picking `a` as the objective handle means `a=false` is preferred, so `a` should
         // not be set if either b or c can carry the at-least-one.
         val objective = compiled.minimize(schema.a)
-        val sample = LocalSearchSolver(compiled.problem)
+        val sample = LocalSearchSolver(compiled.problem.bake())
             .minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 0L)).assignment!!
         assertEquals(false, compiled.decode(schema.a, sample))
     }
@@ -121,7 +121,7 @@ class VariableObjectiveTest {
         // The float is an LP-only continuous column (issue #1232), so the objective is a real objective the
         // simplex resolves; backtrack minimises it to the real minimum ≈ -10.
         val objective = compiled.minimize(schema.temp)
-        val r = BacktrackSolver(compiled.problem).minimize(objective, BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(compiled.problem.bake()).minimize(objective, BacktrackParams(randomSeed = 0L))
         val sample = assertIs<MinimizeResult.WithSample>(r).sample
         val decoded = compiled.decode(schema.temp, sample)
         assertTrue(decoded < -9.5, "expected minimum near -10, got $decoded")
@@ -136,7 +136,7 @@ class VariableObjectiveTest {
         val compiled = schema.compile()
         // Maximise negates the bucket-index objective; the optimum decodes to the max ≈ 30.
         val objective = compiled.maximize(schema.temp)
-        val r = BacktrackSolver(compiled.problem).minimize(objective, BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(compiled.problem.bake()).minimize(objective, BacktrackParams(randomSeed = 0L))
         val sample = assertIs<MinimizeResult.WithSample>(r).sample
         val decoded = compiled.decode(schema.temp, sample)
         assertTrue(decoded > 29.5, "expected maximum near 30, got $decoded")

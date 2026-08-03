@@ -33,7 +33,7 @@ class LagrangianAllDiffExceptTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         // Lagrangian on (the AllDifferent bound) + the LP bounding stack — the soundness trigger.
-        val r = BacktrackSolver(p).minimize(
+        val r = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, lagrangian = true)),
         )

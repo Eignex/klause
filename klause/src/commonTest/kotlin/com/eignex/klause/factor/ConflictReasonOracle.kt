@@ -23,7 +23,7 @@ object ConflictReasonOracle {
 
     fun assertEntailed(problem: Problem, state: PropagationState, factorId: Int, label: String = "reason") {
         val reason = problem.propagators[factorId].conflictReason(state, factorId) ?: return
-        val solutions = BruteForceSolver(problem).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        val solutions = BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
         for (s in solutions) {
             val satisfied = reason.any { lit -> litTrueUnder(problem, state, lit, s) }
             assertTrue(

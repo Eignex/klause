@@ -86,7 +86,7 @@ class OptComparisonSemanticsTest {
         val s = S()
         val compiled = s.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(50).toList()
@@ -128,7 +128,7 @@ class OptAllDifferentTest {
         val s = S()
         val compiled = s.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 13)).take(80).toList()
@@ -171,7 +171,7 @@ class OptNValueTest {
         val compiled = s.compile()
         assertNotNull(compiled.problem.factors.filterIsInstance<NValue>().singleOrNull())
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 8_000, randomSeed = 19)).take(40).toList()
@@ -214,7 +214,7 @@ class OptGccTest {
         val compiled = s.compile()
         assertNotNull(compiled.problem.factors.filterIsInstance<GlobalCardinality>().singleOrNull())
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 8_000, randomSeed = 23)).take(40).toList()
@@ -254,7 +254,7 @@ class OptDisjunctiveTest {
         val compiled = s.compile()
         assertNotNull(compiled.problem.factors.filterIsInstance<Cumulative>().singleOrNull { it.unary })
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 8_000, randomSeed = 29)).take(40).toList()
@@ -300,7 +300,7 @@ class OptCumulativeTest {
         val compiled = s.compile()
         assertNotNull(compiled.problem.factors.filterIsInstance<Cumulative>().singleOrNull())
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 31)).take(40).toList()

@@ -136,7 +136,7 @@ object FactorPropagationOracle {
         require(BruteForceSolver.fits(problem, cap = 1L shl 18)) {
             "Problem too large to brute-enumerate (cap 262 144 assignments). Shrink domains or vars."
         }
-        return BruteForceSolver(problem).enumerate(BruteForceParams(randomSeed = 0L)).toList()
+        return BruteForceSolver(problem.bake()).enumerate(BruteForceParams(randomSeed = 0L)).toList()
     }
 
     private fun fail(msg: String): Nothing = throw AssertionError(msg)

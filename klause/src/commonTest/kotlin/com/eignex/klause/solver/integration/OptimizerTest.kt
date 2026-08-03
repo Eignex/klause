@@ -28,7 +28,7 @@ class OptimizerTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 3_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
@@ -48,7 +48,7 @@ class OptimizerTest {
             ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
-        val sample = LocalSearchSolver(problem)
+        val sample = LocalSearchSolver(problem.bake())
             .minimize(objective, LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L)).assignment
         assertNotNull(sample)
         assertEquals(2, sample.ints[0])
@@ -63,7 +63,7 @@ class OptimizerTest {
             factors = arrayOf<Factor>(AllDifferent(vars = intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L))
-        val sample = LocalSearchSolver(problem)
+        val sample = LocalSearchSolver(problem.bake())
             .minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 13L)).assignment
         assertNotNull(sample)
 
@@ -95,7 +95,7 @@ class OptimizerTest {
             ),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1L))
-        val sample = LocalSearchSolver(problem)
+        val sample = LocalSearchSolver(problem.bake())
             .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
         assertEquals(null, sample)
     }

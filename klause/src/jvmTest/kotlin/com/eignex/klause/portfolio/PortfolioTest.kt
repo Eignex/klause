@@ -146,7 +146,12 @@ class PortfolioTest {
     fun `portfolio solve on satisfiable problem returns sat`() {
         val problem = exactlyOneOver(4)
         val workers = List(4) { i ->
-            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem).session(), BacktrackParams(randomSeed = i.toLong()))
+            PortfolioWorker.of(
+                "bt#$i",
+                i,
+                BacktrackSolver(problem.bake()).session(),
+                BacktrackParams(randomSeed = i.toLong()),
+            )
         }
         Portfolio(workers).use { p ->
             val r = p.solve()
@@ -167,7 +172,7 @@ class PortfolioTest {
             ),
         )
         val workers = List(2) { i ->
-            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
+            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem.bake()).session(), BacktrackParams(randomSeed = 0L))
         }
         Portfolio(workers).use { p ->
             val r = p.solve()
@@ -183,7 +188,7 @@ class PortfolioTest {
             PortfolioWorker.of(
                 "ls#$i",
                 i,
-                LocalSearchSolver(problem).session(),
+                LocalSearchSolver(problem.bake()).session(),
                 LocalSearchParams(maxFlips = Long.MAX_VALUE, randomSeed = i.toLong()),
             )
         }
@@ -210,7 +215,7 @@ class PortfolioTest {
         val solo = PortfolioWorker.of(
             "ls",
             0,
-            LocalSearchSolver(problem).session(),
+            LocalSearchSolver(problem.bake()).session(),
             LocalSearchParams(maxFlips = 5_000, randomSeed = 0L),
         )
         Portfolio(listOf(solo)).use { p ->
@@ -247,7 +252,7 @@ class PortfolioTest {
             PortfolioWorker.of(
                 "bt#$i",
                 i,
-                BacktrackSolver(problem).session(),
+                BacktrackSolver(problem.bake()).session(),
                 BacktrackParams(randomSeed = 0L),
                 objective = obj,
             ) { params, supplier ->
@@ -279,7 +284,7 @@ class PortfolioTest {
             PortfolioWorker.of(
                 "bt#$i",
                 i,
-                BacktrackSolver(problem).session(),
+                BacktrackSolver(problem.bake()).session(),
                 // Worker 0 walks down from 1000, worker 1 from the domain middle, so both hold real
                 // incumbents when the tiny decision cap lands — but neither can bisect all the way
                 // to (and prove) the optimum at 0 in so few decisions (which, with real-thread
@@ -325,7 +330,7 @@ class PortfolioTest {
             PortfolioWorker.of(
                 "bt#$i",
                 i,
-                BacktrackSolver(problem).session(),
+                BacktrackSolver(problem.bake()).session(),
                 BacktrackParams(randomSeed = i.toLong()),
                 objective = obj,
             ) { params, supplier ->
@@ -366,7 +371,7 @@ class PortfolioTest {
         val sawOptimum = AtomicBoolean(false)
         Portfolio(
             PortfolioBuilder.build(
-                problem,
+                problem.bake(),
                 PortfolioScenario.parallel(cores = 4, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
                 objective = obj,
                 onEvent = { _, e ->
@@ -400,7 +405,7 @@ class PortfolioTest {
         val events = AtomicReference<List<Pair<String, SearchEvent>>>(emptyList())
         Portfolio(
             PortfolioBuilder.build(
-                problem,
+                problem.bake(),
                 PortfolioScenario.parallel(cores = 2, kind = Kind.COP, engine = EngineMix.MIXED, seed = 1L),
                 objective = obj,
                 onEvent = { worker, e ->
@@ -427,7 +432,7 @@ class PortfolioTest {
     fun `exhaustive strategy runs every worker to budget`() {
         val problem = exactlyOneOver(3)
         val workers = List(2) { i ->
-            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem).session(), BacktrackParams(randomSeed = 0L))
+            PortfolioWorker.of("bt#$i", i, BacktrackSolver(problem.bake()).session(), BacktrackParams(randomSeed = 0L))
         }
         Portfolio(workers, strategy = PortfolioStrategy.Exhaustive).use { p ->
             val r = p.solve()
@@ -440,7 +445,7 @@ class PortfolioTest {
         val problem = exactlyOneOver(4)
         Portfolio(
             PortfolioBuilder.build(
-                problem,
+                problem.bake(),
                 PortfolioScenario.parallel(cores = 4, kind = Kind.CSP, engine = EngineMix.MIXED, seed = 1L),
             ),
         ).use { p ->
@@ -455,14 +460,19 @@ class PortfolioTest {
         // built pool both surfaces that worker and solves a conflict-heavy UNSAT instance.
         val problem = pigeonhole(pigeons = 4, holes = 3)
         Portfolio(
-            PortfolioBuilder.buildExplicit(problem, emptyList(), backtrackWorkers = 1, kind = Kind.CSP),
+            PortfolioBuilder.buildExplicit(problem.bake(), emptyList(), backtrackWorkers = 1, kind = Kind.CSP),
         ).use { p ->
             assertTrue(p.workers.any { it.label == "backtrack#0" }, "expected a backtrack worker")
             assertIs<SolveResult.Unsat>(p.solve())
         }
         // With three backtrack workers the pool cycles through all three complete configs.
         Portfolio(
-            PortfolioBuilder.buildExplicit(exactlyOneOver(5), emptyList(), backtrackWorkers = 3, kind = Kind.CSP),
+            PortfolioBuilder.buildExplicit(
+                exactlyOneOver(5).bake(),
+                emptyList(),
+                backtrackWorkers = 3,
+                kind = Kind.CSP,
+            ),
         ).use { p ->
             assertEquals(3, p.workers.count { it.label.startsWith("backtrack#") })
             assertIs<SolveResult.Sat>(p.solve())
@@ -475,7 +485,7 @@ class PortfolioTest {
         // 6 lanes as seed-diversified replicas. LS worker labels are ls/<recipe> (no index), so the
         // replication is visible as a period-2 cycle of the two composed labels.
         val workers = PortfolioBuilder.build(
-            exactlyOneOver(5),
+            exactlyOneOver(5).bake(),
             PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
         )
         assertEquals(6, workers.size, "arms<cores must still fill every core lane")
@@ -491,7 +501,7 @@ class PortfolioTest {
         // arms=2, cores=6: the 6 lanes cycle the 2 composed arms, so their arm ids cycle 0,1,0,1,0,1
         // — every replica of a config shares one identity while distinct configs stay distinct.
         val workers = PortfolioBuilder.build(
-            exactlyOneOver(5),
+            exactlyOneOver(5).bake(),
             PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
         )
         assertEquals(listOf(0, 1, 0, 1, 0, 1), workers.map { it.armId }, "replicas of each arm share its id")
@@ -500,7 +510,7 @@ class PortfolioTest {
     @Test
     fun `a parallel scenario with arms equal to cores builds one worker per arm`() {
         val workers = PortfolioBuilder.build(
-            exactlyOneOver(5),
+            exactlyOneOver(5).bake(),
             PortfolioScenario.parallel(cores = 4, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
         )
         assertEquals(4, workers.size, "arms==cores is one distinct worker per lane")
@@ -510,7 +520,7 @@ class PortfolioTest {
     @Test
     fun `a sequential scenario builds one worker per arm`() {
         val workers = PortfolioBuilder.build(
-            exactlyOneOver(5),
+            exactlyOneOver(5).bake(),
             PortfolioScenario.sequential(kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH, arms = 5),
         )
         assertEquals(5, workers.size, "the single-core sequential track keeps its full arm pool")
@@ -532,7 +542,7 @@ class PortfolioTest {
             PortfolioWorker.of(
                 "bt#$i",
                 i,
-                BacktrackSolver(problem).session(),
+                BacktrackSolver(problem.bake()).session(),
                 BacktrackParams(randomSeed = 0L),
                 objective = obj,
             ) { params, supplier ->

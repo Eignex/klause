@@ -132,7 +132,7 @@ class DisjunctivePropagatorTest {
                     }
                 }
             }
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: disjunctive const-duration enumeration must match brute force")
@@ -175,7 +175,7 @@ class DisjunctivePropagatorTest {
                     }
                 }
             }
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: disjunctive var-duration enumeration must match brute force")
@@ -269,7 +269,7 @@ class DisjunctivePropagatorTest {
             intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
             factors = arrayOf<Factor>(factor),
         )
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
         val samples = solver.enumerate(BacktrackParams()).toList()
         assertEquals(6, samples.size, "expected 6 disjunctive schedules, got ${samples.size}")
         for (s in samples) {

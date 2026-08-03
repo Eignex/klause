@@ -78,7 +78,7 @@ class SortPropagatorTest {
             ),
             factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(1, sat.assignment.ints[3])
         assertEquals(2, sat.assignment.ints[4])
@@ -101,7 +101,7 @@ class SortPropagatorTest {
             ),
             factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(listOf(1L, 1L, 2L), listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]))
     }

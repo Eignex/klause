@@ -17,7 +17,7 @@ class BacktrackSamplesDiversityTest {
         // them in trail order; samples should give us a varied subset.
         val factor = Cardinality.exactlyOne((0..7).map { Lit.make(it, true) }.toIntArray())
         val problem = Problem(8, 0, emptyArray(), listOf(factor))
-        val results = BacktrackSolver(problem)
+        val results = BacktrackSolver(problem.bake())
             .samples(BacktrackParams(randomSeed = 42L))
             .take(20).toList()
         assertEquals(20, results.size)
@@ -41,7 +41,7 @@ class BacktrackSamplesDiversityTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val models = BacktrackSolver(problem)
+        val models = BacktrackSolver(problem.bake())
             .enumerate(BacktrackParams(minHammingDistance = 0))
             .toList()
         assertEquals(4, models.size)

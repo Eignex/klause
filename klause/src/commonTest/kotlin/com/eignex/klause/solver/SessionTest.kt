@@ -16,7 +16,7 @@ class SessionTest {
     @Test
     fun `empty session forwards to solver unchanged`() {
         val problem = exactlyOneOver(3)
-        val session = BacktrackSolver(problem).session()
+        val session = BacktrackSolver(problem.bake()).session()
         assertEquals(0, session.depth)
         val r = session.solve(BacktrackParams(randomSeed = 0L))
         assertTrue(r is SolveResult.Sat)
@@ -25,7 +25,7 @@ class SessionTest {
     @Test
     fun `push pins a variable and pop reverts`() {
         val problem = exactlyOneOver(3)
-        val session = BacktrackSolver(problem).session()
+        val session = BacktrackSolver(problem.bake()).session()
 
         session.push(Assumptions(bools = mapOf(1 to true)))
         assertEquals(1, session.depth)
@@ -40,7 +40,7 @@ class SessionTest {
     @Test
     fun `nested pushes merge with last-write semantics`() {
         val problem = exactlyOneOver(3)
-        val session = BacktrackSolver(problem).session()
+        val session = BacktrackSolver(problem.bake()).session()
 
         session.push(Assumptions(bools = mapOf(0 to true, 1 to false, 2 to false)))
         session.push(Assumptions(bools = mapOf(1 to true))) // overrides 1 = false
@@ -55,14 +55,14 @@ class SessionTest {
 
     @Test
     fun `pop on empty stack throws`() {
-        val session = BacktrackSolver(exactlyOneOver(2)).session()
+        val session = BacktrackSolver(exactlyOneOver(2).bake()).session()
         assertFails { session.pop() }
     }
 
     @Test
     fun `local search session honors pushed assumptions`() {
         val problem = exactlyOneOver(4)
-        val session = LocalSearchSolver(problem).session()
+        val session = LocalSearchSolver(problem.bake()).session()
 
         session.push(Assumptions(bools = mapOf(2 to true)))
         val samples = session.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 0L))

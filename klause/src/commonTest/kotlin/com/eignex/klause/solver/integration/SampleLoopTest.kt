@@ -13,7 +13,7 @@ class SampleLoopTest {
     @Test
     fun `same seed yields identical sequence`() {
         val problem = exactlyOneOver4()
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val a = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 42)).take(10).toList()
         val b = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 42)).take(10).toList()
         assertEquals(a, b, "Same Solver, same seed, same params → identical sequence")
@@ -22,7 +22,7 @@ class SampleLoopTest {
     @Test
     fun `different seeds explore different sequences`() {
         val problem = exactlyOneOver4()
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val a = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 1)).take(8).toList()
         val b = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 9)).take(8).toList()
         assertTrue(a != b, "Different seeds should produce different sample sequences")

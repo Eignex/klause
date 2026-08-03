@@ -27,7 +27,7 @@ class AllDifferentInvariantTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(factor),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -90,7 +90,7 @@ class AllDifferentInvariantTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(factor),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -176,7 +176,7 @@ class AllDifferentInvariantTest {
 
         assertFails {
             LocalSearchSolver(
-                problem,
+                problem.bake(),
                 restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 50),
             ).enumerate(LocalSearchParams(maxFlips = 100, randomSeed = 1)).take(1).toList()
         }

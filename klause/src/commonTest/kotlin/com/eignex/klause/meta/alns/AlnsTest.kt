@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.portfolio.PoolClauseExchange
 import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Optimizer
@@ -105,7 +106,7 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val alns = Alns(
             inner = inner,
             minDestroyFraction = 0.5,
@@ -127,9 +128,9 @@ class AlnsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             repairOperators = BacktrackRepair.Defaults,
-            backtrack = BacktrackSolver(problem),
+            backtrack = BacktrackSolver(problem.bake()),
             backtrackParams = BacktrackParams(),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
@@ -150,7 +151,7 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val published = mutableListOf<Pair<Sample, Double>>()
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
             maxIterations = 8,
@@ -173,7 +174,7 @@ class AlnsTest {
         var polls = 0
         val optimal = Sample(booleanArrayOf(false, false, false, true), LongArray(0))
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
             maxIterations = 8,
@@ -201,9 +202,9 @@ class AlnsTest {
         // must not prune away the optimum.
         val pool = SharedClausePool()
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             repairOperators = BacktrackRepair.Defaults,
-            backtrack = BacktrackSolver(problem),
+            backtrack = BacktrackSolver(problem.bake()),
             backtrackParams = BacktrackParams(
                 clauseExchange = PoolClauseExchange(pool, skipPermanent = true, shareGlobalNogoods = false),
             ),
@@ -229,7 +230,7 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val alns = Alns(
             inner = inner,
             repairOperators = listOf(InnerLsRepair("quick", 200L), InnerLsRepair("deep", 1_000L)),
@@ -262,7 +263,7 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val incumbent = Sample(booleanArrayOf(false, false, false, false), LongArray(0))
         val context = RepairContext(
             inner = inner,
@@ -293,7 +294,7 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val pinAssumptions = Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
         val context = RepairContext(
             inner = inner,
@@ -317,7 +318,7 @@ class AlnsTest {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 5L))
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val repair = InnerLsRepair(label = "test", flipsOverride = 100L)
         val context = RepairContext(
             inner = inner,
@@ -348,7 +349,7 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val session = solver.session()
 
         val alns = Alns(
@@ -382,7 +383,7 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val alns = Alns(
             inner = inner,
             destroyOperators = DestroyOperator.Defaults,
@@ -418,7 +419,7 @@ class AlnsTest {
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1L))
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
-        val inner = LocalSearchSolver(problem)
+        val inner = LocalSearchSolver(problem.bake())
         val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 5, flipsPerIteration = 100L)
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
         assertNotNull(sample, "ALNS should still return the initial solve's incumbent")
@@ -434,7 +435,7 @@ class AlnsTest {
         )
         val objective = LinearObjective(boolWeights = LongArray(20) { (it + 1).toLong() })
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.1,
             maxDestroyFraction = 0.6,
             maxIterations = 20,
@@ -453,7 +454,7 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         var seenInitial = Double.NaN
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
             maxIterations = 12,
@@ -474,7 +475,7 @@ class AlnsTest {
     }
 
     /** A local-search stub that never reaches feasibility — its minimize always returns [MinimizeResult.Unknown]. */
-    private class NoFeasibleLs(override val problem: Problem) : Optimizer<LocalSearchParams> {
+    private class NoFeasibleLs(override val problem: BakedProblem) : Optimizer<LocalSearchParams> {
         override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
             MinimizeResult.Unknown(TerminationReason.BudgetExhausted)
 
@@ -493,9 +494,9 @@ class AlnsTest {
         // The inner LS never finds feasible; the complete backtrack bootstrap must supply the incumbent so
         // ALNS optimises instead of returning empty (the dominant issue the bench sweep mined).
         val alns = Alns(
-            inner = NoFeasibleLs(problem),
+            inner = NoFeasibleLs(problem.bake()),
             repairOperators = BacktrackRepair.Defaults,
-            backtrack = BacktrackSolver(problem),
+            backtrack = BacktrackSolver(problem.bake()),
             backtrackParams = BacktrackParams(),
             maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
@@ -513,7 +514,7 @@ class AlnsTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
         val alns = Alns(
-            inner = LocalSearchSolver(problem),
+            inner = LocalSearchSolver(problem.bake()),
             repairOperators = listOf(GreedyConstructionRepair(noise = 0.5)),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,

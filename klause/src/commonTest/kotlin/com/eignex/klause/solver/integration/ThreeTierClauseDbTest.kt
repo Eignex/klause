@@ -41,7 +41,7 @@ class ThreeTierClauseDbTest {
 
     @Test
     fun `tiered db proves unsat under an aggressive cap`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4)).solve(
+        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4).bake()).solve(
             BacktrackParams(
                 randomSeed = 1L,
                 variableSelector = Vsids(),
@@ -69,7 +69,7 @@ class ThreeTierClauseDbTest {
     @Test
     fun `tiered db enumerates exactly the same models as the binary glue policy`() {
         fun models(params: BacktrackParams): Set<List<Boolean>> =
-            BacktrackSolver(clauseProblem()).enumerate(params).map { it.bools.toList() }.toSet()
+            BacktrackSolver(clauseProblem().bake()).enumerate(params).map { it.bools.toList() }.toSet()
 
         val binary = models(
             BacktrackParams(randomSeed = 7L, variableSelector = Vsids(), lubyRestartBase = 8L, maxLearnedClauses = 4),

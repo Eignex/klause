@@ -120,7 +120,7 @@ class GlobalCardinalityPropagatorTest {
                 ),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
@@ -177,7 +177,7 @@ class GlobalCardinalityPropagatorTest {
             ),
         )
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-        val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
             .map { s -> s.ints.map { it.toInt() } }.toHashSet()
         assertEquals(brute, found, "count-vars backtrack solution set must equal brute force")
     }
@@ -198,7 +198,7 @@ class GlobalCardinalityPropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val xs = (0..4).map { sat.assignment.ints[it] }
         for (k in 0..2) {
@@ -224,7 +224,7 @@ class GlobalCardinalityPropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val xs = (0..5).map { sat.assignment.ints[it] }
         for (k in 0..2) {
@@ -250,7 +250,7 @@ class GlobalCardinalityPropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         for (i in 0..2) {
             assertTrue(
@@ -348,7 +348,7 @@ class GlobalCardinalityPropagatorTest {
                 ),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "GCC+Linear (bound=$bound): solution set must equal brute force")
         }

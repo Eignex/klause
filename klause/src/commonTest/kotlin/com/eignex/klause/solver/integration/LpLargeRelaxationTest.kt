@@ -83,7 +83,7 @@ class LpLargeRelaxationTest {
                 )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
-                when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
+                when (val res = BacktrackSolver(problem.bake()).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
                         val o = brute ?: error("solver Optimal but brute infeasible")
                         assertEquals(o.toDouble(), res.objective, 1e-9, "wrong optimum")
@@ -139,7 +139,7 @@ class LpLargeRelaxationTest {
                 )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
-                when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
+                when (val res = BacktrackSolver(problem.bake()).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
                         val o = brute ?: error("solver Optimal but brute infeasible")
                         assertEquals(o.toDouble(), res.objective, 1e-9, "wrong optimum")
@@ -178,7 +178,9 @@ class LpLargeRelaxationTest {
             assertTrue(resolved.lpPlan.bounding, "LP bounding must activate")
             assertTrue(resolved.lpPlan.table, "the Table hull must be wired onto the LP path")
             // And the solve is sound: minimise x0 over the table {(0,5),(2,2),(4,0)} ⇒ 0.
-            val res = BacktrackSolver(p).minimize(LinearObjective(intCoefficients = longArrayOf(1L, 0L)), resolved)
+            val res = BacktrackSolver(
+                p.bake(),
+            ).minimize(LinearObjective(intCoefficients = longArrayOf(1L, 0L)), resolved)
             assertTrue(res is MinimizeResult.Optimal && res.objective == 0.0, "expected optimum x0=0, got $res")
         } finally {
             KlauseConfig.current = saved
@@ -215,7 +217,7 @@ class LpLargeRelaxationTest {
                 )
                 assertTrue(resolved.lpPlan.bounding, "LP bounding must activate for this model")
 
-                when (val res = BacktrackSolver(problem).minimize(obj, resolved)) {
+                when (val res = BacktrackSolver(problem.bake()).minimize(obj, resolved)) {
                     is MinimizeResult.Optimal -> {
                         val o = brute ?: error("solver Optimal but brute infeasible")
                         assertEquals(o.toDouble(), res.objective, 1e-9, "wrong optimum")
@@ -270,7 +272,7 @@ class LpLargeRelaxationTest {
 
                 // rootBudgetMillis = 0 ⇒ Cancellation.after(0) is already passed ⇒ every root step bails.
                 val starved = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetMillis = 0L))
-                when (val res = BacktrackSolver(problem).minimize(obj, starved)) {
+                when (val res = BacktrackSolver(problem.bake()).minimize(obj, starved)) {
                     is MinimizeResult.Optimal ->
                         assertEquals(
                             (brute ?: error("solver Optimal but brute infeasible")).toDouble(),
@@ -305,7 +307,7 @@ class LpLargeRelaxationTest {
             val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
             val resolved = BacktrackParams(lpPlan = LpAutoConfig.resolve(problem, LpConfig.AGGRESSIVE), randomSeed = 2L)
             val unbudgeted = resolved.copy(lpPlan = resolved.lpPlan.copy(rootBudgetFraction = 0.0))
-            val res = BacktrackSolver(problem).minimize(obj, unbudgeted)
+            val res = BacktrackSolver(problem.bake()).minimize(obj, unbudgeted)
             assertTrue(res is MinimizeResult.Optimal && res.objective == 5.0, "expected optimum 5, got $res")
             assertTrue(res.stats.lp.rootBound.isFinite(), "the unbudgeted root LP must capture a finite root bound")
         } finally {

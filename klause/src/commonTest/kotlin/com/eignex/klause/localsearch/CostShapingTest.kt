@@ -186,7 +186,7 @@ class CostShapingTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val sample = solver.minimize(
             objective,
             LocalSearchParams(

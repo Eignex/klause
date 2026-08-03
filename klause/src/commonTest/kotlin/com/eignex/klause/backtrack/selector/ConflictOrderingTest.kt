@@ -93,7 +93,7 @@ class ConflictOrderingTest {
             intDomains = Array(5) { IntDomain(0, 4) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4), domainMin = 0, domainSize = 5)),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 variableSelector = ConflictOrdering(DomWdeg()),
                 valueSelector = IndomainMin,

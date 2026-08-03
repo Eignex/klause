@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.PooledSolutionImporter
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -117,7 +118,7 @@ internal class Alns(
         }
     }
 
-    override val problem: Problem get() = inner.problem
+    override val problem: BakedProblem get() = inner.problem
     override fun solve(params: LocalSearchParams) = inner.solve(params)
     override fun samples(params: LocalSearchParams) = inner.samples(params)
     override fun enumerate(params: LocalSearchParams) = inner.enumerate(params)

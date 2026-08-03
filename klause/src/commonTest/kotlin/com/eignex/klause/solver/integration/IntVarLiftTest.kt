@@ -31,7 +31,7 @@ class IntVarLiftTest {
     fun `exact count over a few integer variables`() {
         // 4^3 = 64 value combinations, below the hashing threshold.
         val p = intVars(3, 0, 3)
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 0L))
+        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
         assertTrue(r.exact, "small integer projection should count exactly")
         assertEquals(64L, r.estimate)
     }
@@ -43,7 +43,7 @@ class IntVarLiftTest {
         // plumbing, seed pinned for determinism.
         val p = intVars(3, 0, 4)
         val eps = 2.0
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 7L))
+        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 7L))
         assertTrue(!r.exact, "125 combinations should require hashing")
         val lo = 125 / (1.0 + eps)
         val hi = 125 * (1.0 + eps)
@@ -59,7 +59,7 @@ class IntVarLiftTest {
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(),
         )
-        val r = BacktrackSolver(p).approximateCount(
+        val r = BacktrackSolver(p.bake()).approximateCount(
             ApproxCountConfig(samplingSet = intArrayOf(0, 1), intSamplingSet = intArrayOf(0, 1), seed = 1L),
         )
         assertTrue(r.exact)
@@ -71,7 +71,7 @@ class IntVarLiftTest {
         // 2 int vars over 0..3 → 16 value combos, sampled exactly-uniformly (no hashing needed).
         val p = intVars(2, 0, 3)
         val draws = 3200
-        val samples = BacktrackSolver(p)
+        val samples = BacktrackSolver(p.bake())
             .samples(SamplingConfig(quality = SampleQuality.ACCURATE, seed = 5L), BacktrackParams())
             .take(draws).toList()
         assertEquals(draws, samples.size)
@@ -94,9 +94,9 @@ class IntVarLiftTest {
     @Test
     fun `exact count agrees with full enumeration on a constrained integer problem`() {
         val p = intVars(3, 0, 3)
-        val exact = BacktrackSolver(p).enumerate(BacktrackParams())
+        val exact = BacktrackSolver(p.bake()).enumerate(BacktrackParams())
             .map(::intKey).toHashSet().size.toLong()
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 3L))
+        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 3L))
         assertEquals(exact, r.estimate)
     }
 
@@ -112,7 +112,7 @@ class IntVarLiftTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4)),
         )
-        val solver = BacktrackSolver(p)
+        val solver = BacktrackSolver(p.bake())
         var bruteForce = 0
         for (a in 0..4) {
             for (b in 0..4) {
@@ -124,7 +124,7 @@ class IntVarLiftTest {
         }
         assertEquals(15, bruteForce, "sanity: combinations with x0 + x1 <= 4")
 
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 11L))
+        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 11L))
         assertTrue(r.exact, "15 combinations is below the hashing threshold")
         assertEquals(bruteForce.toLong(), r.estimate)
     }

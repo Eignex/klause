@@ -264,7 +264,7 @@ class CumulativeTimeIndexedTest {
                     cumulativeFlow = true,
                 ),
             )
-            when (val res = BacktrackSolver(p).minimize(obj, params)) {
+            when (val res = BacktrackSolver(p.bake()).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {
                     optimal++
                     assertTrue(optimum != null, "solver Optimal on a brute-infeasible instance #$iter")

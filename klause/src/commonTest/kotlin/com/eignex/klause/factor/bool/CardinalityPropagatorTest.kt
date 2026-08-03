@@ -69,7 +69,7 @@ class CardinalityPropagatorTest {
                 .filter { mask -> (0..3).count { (mask shr it) and 1 == 1 } >= 2 }
                 .map { mask -> (0..3).map { (mask shr it) and 1 == 1 } }
                 .toHashSet()
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100).map { it.bools.toList() }.toHashSet()
             assertEquals(brute, found, "seed=$seed: at-least-2-of-4 must match brute force")
@@ -89,7 +89,7 @@ class CardinalityPropagatorTest {
                 .filter { mask -> (0..2).count { (mask shr it) and 1 == 1 } == 1 }
                 .map { mask -> (0..2).map { (mask shr it) and 1 == 1 } }
                 .toHashSet()
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100).map { it.bools.toList() }.toHashSet()
             assertEquals(brute, found, "seed=$seed: exactly-1-of-3 must match brute force")

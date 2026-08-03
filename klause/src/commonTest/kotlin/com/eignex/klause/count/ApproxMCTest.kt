@@ -15,12 +15,12 @@ class ApproxMCTest {
     private fun unconstrained(n: Int) =
         Problem(numBoolVars = n, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
 
-    private fun exactCount(p: Problem): Long = BacktrackSolver(p).enumerate(BacktrackParams()).count().toLong()
+    private fun exactCount(p: Problem): Long = BacktrackSolver(p.bake()).enumerate(BacktrackParams()).count().toLong()
 
     @Test
     fun `small problem is counted exactly without hashing`() {
         val p = unconstrained(3) // 8 models, below the hashing threshold
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 0L))
+        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
         assertTrue(r.exact, "small instance should short-circuit to an exact count")
         assertEquals(8L, r.estimate)
     }
@@ -33,7 +33,7 @@ class ApproxMCTest {
         val p = unconstrained(7)
         val exact = exactCount(p)
         val eps = 2.0
-        val r = BacktrackSolver(p).approximateCount(
+        val r = BacktrackSolver(p.bake()).approximateCount(
             ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 12345L),
         )
         assertTrue(!r.exact, "instance should require hashing")
@@ -53,7 +53,7 @@ class ApproxMCTest {
         )
         val exact = exactCount(p)
         val eps = 2.0
-        val r = BacktrackSolver(p).approximateCount(
+        val r = BacktrackSolver(p.bake()).approximateCount(
             ApproxCountConfig(epsilon = eps, delta = 0.99, seed = 999L),
         )
         assertWithinBand(exact, r.estimate, eps)
@@ -64,7 +64,7 @@ class ApproxMCTest {
         // Project 6 vars onto the first 4: 2^4 = 16 reachable projections, below the cell
         // threshold so the projection short-circuits to an exact enumeration.
         val p = unconstrained(6)
-        val r = BacktrackSolver(p).approximateCount(
+        val r = BacktrackSolver(p.bake()).approximateCount(
             ApproxCountConfig(epsilon = 0.8, delta = 0.35, samplingSet = intArrayOf(0, 1, 2, 3), seed = 5L),
         )
         assertWithinBand(16L, r.estimate, 0.8)
@@ -81,7 +81,7 @@ class ApproxMCTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val r = BacktrackSolver(p).approximateCount(ApproxCountConfig(seed = 0L))
+        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 0L))
         assertEquals(0L, r.estimate)
         assertTrue(r.exact)
     }

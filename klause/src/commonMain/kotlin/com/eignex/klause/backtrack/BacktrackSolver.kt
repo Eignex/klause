@@ -6,6 +6,7 @@ import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -38,16 +39,16 @@ import kotlin.random.Random
  *  Complete enumeration on `n` unpinned bools walks up to `2^n` branches. Use
  *  [BacktrackParams.maxDecisions] to cap exploration on large problems.
  */
-class BacktrackSolver(override val problem: Problem) :
+class BacktrackSolver(override val problem: BakedProblem) :
     Solver<BacktrackParams>,
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams> {
 
     /** Solve a [CompiledSchema]'s problem. */
-    constructor(compiled: CompiledSchema) : this(compiled.problem)
+    constructor(compiled: CompiledSchema) : this(compiled.problem.bake())
 
     /** Compile [schema] with the default config and solve the resulting problem. */
-    constructor(schema: VariableSchema) : this(schema.compile().problem)
+    constructor(schema: VariableSchema) : this(schema.compile().problem.bake())
 
     /** Solve once and return a [SolveResult]. */
     fun solve(): SolveResult = solve(BacktrackParams())

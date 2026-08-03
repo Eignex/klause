@@ -32,7 +32,9 @@ class LpAutoOffTest {
         factors.add(Linear(IntArray(n) { 1 }, IntArray(n) { it }, LinearOp.GE, 0))
         val p = Problem(0, n, Array(n) { IntDomain(0, (n - 2).toLong()) }, factors.toTypedArray()) // n vars, n-1 values
         val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
-        val res = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
+        val res = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
 
         assertTrue(res is MinimizeResult.Infeasible, "pigeonhole is infeasible, got $res")
         val lpSolves = res.stats.lp.solves.sum

@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
 class Xcsp3Test {
 
     private fun sat(xml: String): IntArray {
-        val r = BacktrackSolver(Xcsp3.parse(xml).problem).solve(BacktrackParams())
+        val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return IntArray(r.assignment.ints.size) { r.assignment.ints[it].toInt() }
     }
@@ -57,7 +57,7 @@ class Xcsp3Test {
                 }
             }
         }
-        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
             .map { it.ints.toList() }.toHashSet()
         assertEquals(brute, found, "parse+lowering+propagation must enumerate exactly the allowed tuples")
     }
@@ -81,7 +81,7 @@ class Xcsp3Test {
                 if (a >= 3 || b <= 0) brute.add(listOf(a.toLong(), b.toLong()))
             }
         }
-        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
             .map { it.ints.toList() }.toHashSet()
         assertEquals(brute, found)
     }
@@ -133,7 +133,7 @@ class Xcsp3Test {
         val decl = """<instance type="CSP"><variables><array id="x" size="[3][3]"> 1..3 </array></variables>"""
         val cons = "<allDifferent><matrix> x[0..1][0..1] </matrix></allDifferent>" +
             "<instantiation><list> x[0][0] x[0][1] </list><values> 1 1 </values></instantiation>"
-        val r = BacktrackSolver(Xcsp3.parse("$decl<constraints>$cons</constraints></instance>").problem)
+        val r = BacktrackSolver(Xcsp3.parse("$decl<constraints>$cons</constraints></instance>").problem.bake())
             .solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "same-row cells in the sub-range block must be all-different, got $r")
     }
@@ -189,7 +189,7 @@ class Xcsp3Test {
         """.trimIndent()
         val parsed = Xcsp3.parse(xml)
         val obj = requireNotNull(parsed.objective)
-        val r = BacktrackSolver(parsed.problem).minimize(obj, BacktrackParams())
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj, BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(-10.0, r.objective)
     }
@@ -204,7 +204,7 @@ class Xcsp3Test {
         val bad = "$decl<constraints>$cons" +
             "<instantiation><list> a b </list><values> 1 1 </values></instantiation></constraints></instance>"
         assertTrue(
-            BacktrackSolver(Xcsp3.parse(bad).problem).solve(BacktrackParams()) is SolveResult.Unsat,
+            BacktrackSolver(Xcsp3.parse(bad).problem.bake()).solve(BacktrackParams()) is SolveResult.Unsat,
             "the forbidden tuple (1,1) must be unsatisfiable",
         )
     }
@@ -269,7 +269,7 @@ class Xcsp3Test {
             }
             val xml = "<instance type=\"CSP\"><variables>$varsDecl</variables>" +
                 "<constraints>$cons</constraints></instance>"
-            val found = BacktrackSolver(Xcsp3.parse(xml).problem)
+            val found = BacktrackSolver(Xcsp3.parse(xml).problem.bake())
                 .enumerate(BacktrackParams(randomSeed = trial.toLong()))
                 .map { s -> (0 until arity).map { s.ints[it].toInt() } }.toHashSet()
             var all = listOf(emptyList<Int>())
@@ -338,7 +338,7 @@ class Xcsp3Test {
     fun `a domain with an interior hole excludes the gap value`() {
         val decl = """<instance type="CSP"><variables><var id="x"> 1..3 5 </var></variables>"""
         fun solve(c: String): SolveResult = BacktrackSolver(
-            Xcsp3.parse("$decl<constraints>$c</constraints></instance>").problem,
+            Xcsp3.parse("$decl<constraints>$c</constraints></instance>").problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(solve("<intension> eq(x,4) </intension>") is SolveResult.Unsat, "4 is a hole, not in the domain")
         assertTrue(solve("<intension> eq(x,5) </intension>") is SolveResult.Sat, "5 is in the domain")
@@ -489,7 +489,7 @@ class Xcsp3Test {
             </constraints></instance>
             """.trimIndent()
         assertTrue(
-            BacktrackSolver(Xcsp3.parse(bad).problem).solve(BacktrackParams()) is SolveResult.Unsat,
+            BacktrackSolver(Xcsp3.parse(bad).problem.bake()).solve(BacktrackParams()) is SolveResult.Unsat,
             "eq(x,y,z) with ne(z,x) must be UNSAT",
         )
     }
@@ -578,7 +578,7 @@ class Xcsp3Test {
                 <constraints><mdd><list> x[] </list><transitions> (root,5,t)(root,6,t) </transitions></mdd>
                 <intension> eq(x[0],3) </intension></constraints></instance>
                 """.trimIndent(),
-            ).problem,
+            ).problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "3 is not on an MDD path: $r")
     }
@@ -681,7 +681,7 @@ class Xcsp3Test {
             <objectives><minimize type="nValues"><list> x[] </list></minimize></objectives></instance>
             """.trimIndent(),
         )
-        val r = BacktrackSolver(parsed.problem).minimize(requireNotNull(parsed.objective), BacktrackParams())
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(requireNotNull(parsed.objective), BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(1.0, r.objective)
     }
@@ -756,7 +756,7 @@ class Xcsp3Test {
                   <noOverlap><origins> (x0,y0)(x1,y1) </origins><lengths> (2,2)(2,2) </lengths></noOverlap>
                 </constraints></instance>
                 """.trimIndent(),
-            ).problem,
+            ).problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "overlapping boxes must be rejected: $r")
     }
@@ -975,7 +975,7 @@ class Xcsp3Test {
                 <constraints><cardinality><list> x </list>
                   <values closed="true"> 0 1 </values><occurs> 0..1 0..1 </occurs></cardinality></constraints></instance>
                 """.trimIndent(),
-            ).problem,
+            ).problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "closed cover forbids x=2: $r")
     }
@@ -1069,7 +1069,7 @@ class Xcsp3Test {
         val bad = "$decl<constraints>$lexCons" +
             "<instantiation><list> x[][] </list><values> 1 0 0 0 </values></instantiation></constraints></instance>"
         assertTrue(
-            BacktrackSolver(Xcsp3.parse(bad).problem).solve(BacktrackParams()) is SolveResult.Unsat,
+            BacktrackSolver(Xcsp3.parse(bad).problem.bake()).solve(BacktrackParams()) is SolveResult.Unsat,
             "a row-descending matrix must be rejected",
         )
     }
@@ -1089,7 +1089,7 @@ class Xcsp3Test {
         """.trimIndent()
         val problem = Xcsp3.parse(xml).problem
         for (seed in 0L until 200L) {
-            val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = seed))
+            val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = seed))
             assertTrue(r is SolveResult.Sat, "seed=$seed expected SAT, got $r")
             val v = r.assignment.ints
             assertTrue(v[0] == v[2] && v[1] < v[3], "seed=$seed bad model a=${v[0]},${v[1]} b=${v[2]},${v[3]}")
@@ -1188,7 +1188,7 @@ class Xcsp3Test {
         """.trimIndent()
         val parsed = Xcsp3.parse(xml)
         val obj = requireNotNull(parsed.objective)
-        val r = BacktrackSolver(parsed.problem).minimize(obj, BacktrackParams())
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj, BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(2.0, r.objective)
     }
@@ -1254,7 +1254,7 @@ class Xcsp3Test {
               </constraints>
             </instance>
         """.trimIndent()
-        val r = BacktrackSolver(Xcsp3.parse(xml).problem).solve(BacktrackParams())
+        val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
@@ -1266,7 +1266,7 @@ class Xcsp3Test {
               <constraints><extension><list> a b </list><supports></supports></extension></constraints>
             </instance>
         """.trimIndent()
-        val r = BacktrackSolver(Xcsp3.parse(xml).problem).solve(BacktrackParams())
+        val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
@@ -1375,7 +1375,7 @@ class Xcsp3Test {
             Xcsp3.parse(
                 "$decl<constraints>$cons<instantiation><list> x[] </list>" +
                     "<values> $vals </values></instantiation></constraints></instance>",
-            ).problem,
+            ).problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(solve("0 0 1") is SolveResult.Sat, "two exempt 0s may repeat")
         assertTrue(solve("1 1 2") is SolveResult.Unsat, "non-exempt 1s may not repeat")
@@ -1389,7 +1389,7 @@ class Xcsp3Test {
             Xcsp3.parse(
                 "$decl<constraints>$cons<instantiation><list> s[] </list>" +
                     "<values> $vals </values></instantiation></constraints></instance>",
-            ).problem,
+            ).problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(solve("0 3 8") is SolveResult.Sat, "gaps 3 and 5 satisfied")
         assertTrue(solve("0 3 7") is SolveResult.Unsat, "s[1] + 5 <= s[2] violated at 7")
@@ -1403,7 +1403,7 @@ class Xcsp3Test {
             Xcsp3.parse(
                 "$decl<constraints><instantiation><list> e[] </list>" +
                     "<values> $vals </values></instantiation></constraints></instance>",
-            ).problem,
+            ).problem.bake(),
         ).solve(BacktrackParams())
         assertTrue(solve("5 9") is SolveResult.Sat, "e reuses d's 5..9 domain")
         assertTrue(solve("5 10") is SolveResult.Unsat, "a value outside the aliased domain is rejected")

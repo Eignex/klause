@@ -42,7 +42,7 @@ class ObjectiveBoundPropagationTest {
         // maximise z → minimise -z.
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, -1L))
         val params = BacktrackParams(randomSeed = 1L, maxDecisions = 200_000L)
-        val terminal = BacktrackSolver(problem).minimize(obj, params)
+        val terminal = BacktrackSolver(problem.bake()).minimize(obj, params)
         val optimal = assertIs<MinimizeResult.Optimal>(terminal)
         // Brute-force max of x*y under x+y<=6 is 3*3 = 9, so the minimised -z is -9.
         assertEquals(-9.0, optimal.objective, "must prove the product-defined optimum")
@@ -67,7 +67,7 @@ class ObjectiveBoundPropagationTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 1L))
         val params = BacktrackParams(randomSeed = 1L, maxDecisions = 200_000L)
-        val terminal = BacktrackSolver(problem).minimize(obj, params)
+        val terminal = BacktrackSolver(problem.bake()).minimize(obj, params)
         val optimal = assertIs<MinimizeResult.Optimal>(terminal)
         // min 2a+3b with a>=1,b>=1 is 2*1 + 3*1 = 5.
         assertEquals(5.0, optimal.objective, "must prove the linear-defined optimum")

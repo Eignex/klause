@@ -83,7 +83,7 @@ class ClausePropagatorTest {
             val brute = (1 until 8)
                 .map { mask -> (0..2).map { (mask shr it) and 1 == 1 } }
                 .toHashSet()
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100).map { it.bools.toList() }.toHashSet()
             assertEquals(brute, found, "seed=$seed: 3-literal clause must match brute force")

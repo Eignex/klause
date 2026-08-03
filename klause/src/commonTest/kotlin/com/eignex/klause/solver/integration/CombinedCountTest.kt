@@ -29,7 +29,7 @@ class CombinedCountTest {
     @Test
     fun `exact phase converges on a small integer problem`() {
         val p = ints(3, 0, 3) // 64 combos, below the exact budget
-        val r = BacktrackSolver(p).count(CountConfig(seed = 0L))
+        val r = BacktrackSolver(p.bake()).count(CountConfig(seed = 0L))
         assertTrue(r.exact, "small projection should be proved exactly by the anytime phase")
         assertEquals(64L, r.estimate)
         assertEquals(r.lower, r.upper)
@@ -39,7 +39,7 @@ class CombinedCountTest {
     fun `exact phase converges on a constrained integer problem`() {
         // x0 + x1 <= 4 over 0..4: 15 feasible combos, proved exactly.
         val p = ints(2, 0, 4, Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 4))
-        val r = BacktrackSolver(p).count(CountConfig(seed = 1L))
+        val r = BacktrackSolver(p.bake()).count(CountConfig(seed = 1L))
         assertTrue(r.exact)
         assertEquals(15L, r.estimate)
     }
@@ -48,7 +48,7 @@ class CombinedCountTest {
     fun `approx phase takes over when the exact budget is exhausted`() {
         // 5^3 = 125 combos, above the hashing threshold; a tiny exact budget forces the fallback.
         val p = ints(3, 0, 4)
-        val r = BacktrackSolver(p).count(CountConfig(exactBudget = 4L, epsilon = 2.0, delta = 0.99, seed = 7L))
+        val r = BacktrackSolver(p.bake()).count(CountConfig(exactBudget = 4L, epsilon = 2.0, delta = 0.99, seed = 7L))
         assertTrue(!r.exact, "the exact phase cannot converge within 4 checks")
         // The hard lower bound from the partial exact phase still holds, and the clamped estimate
         // stays inside the merged interval.

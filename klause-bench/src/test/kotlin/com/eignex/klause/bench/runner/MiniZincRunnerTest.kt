@@ -38,7 +38,7 @@ class MiniZincRunnerTest {
                 randomSeed = 0L,
                 cancellation = Cancellation { System.currentTimeMillis() > deadline },
             )
-            val r = BacktrackSolver(resolved.problem).solve(params)
+            val r = BacktrackSolver(resolved.problem.bake()).solve(params)
             if (ref.expected == Expected.Sat) {
                 assertTrue(r is SolveResult.Sat, "${ref.name}: klause failed to find expected solution ($r)")
                 assertTrue(satisfies(resolved.problem, r), "${ref.name}: solution violates klause constraints")

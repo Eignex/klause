@@ -32,7 +32,7 @@ class ArrayBoolElementTest {
             program.problem.factors.any { it is Element },
             "expected a native Element factor in the compiled program",
         )
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val rId = program.boolVarsByName.getValue("r")
         assertEquals(false, sat.assignment.bools[rId], "arr[2] = false")
@@ -57,7 +57,7 @@ class ArrayBoolElementTest {
             program.problem.factors.any { it is Element },
             "expected a native Element factor in the compiled program",
         )
-        val res = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val res = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(res)
         val cId = program.boolVarsByName.getValue("c")
         assertEquals(true, sat.assignment.bools[cId], "arr[3] = c must be true")

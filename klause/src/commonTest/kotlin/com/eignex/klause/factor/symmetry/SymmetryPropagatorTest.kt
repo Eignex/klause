@@ -40,9 +40,9 @@ class SymmetryPropagatorTest {
     private fun assertSoundUnderSearch(name: String, problem: Problem) {
         val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
         val original = BruteForceSolver(
-            problem,
+            problem.bake(),
         ).enumerate(BruteForceParams(randomSeed = 0L)).map { key(it) }.toHashSet()
-        val survivors = BacktrackSolver(broken).enumerate(BacktrackParams(randomSeed = 1L))
+        val survivors = BacktrackSolver(broken.bake()).enumerate(BacktrackParams(randomSeed = 1L))
             .take(100_000).map { key(it) }.toList()
         for (s in survivors) {
             assertTrue(s in original, "$name: search produced a non-solution of the original — unsound learned clause")
@@ -121,8 +121,8 @@ class SymmetryPropagatorTest {
             }
             val problem = Problem(0, n, Array(n) { IntDomain(0, d.toLong()) }, factors)
             val broken = problem.withPassDelta(Presolve.breakSymmetries(problem), BakeConfig.NONE)
-            val origSat = BruteForceSolver(problem).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
-            val brokenSat = BacktrackSolver(broken).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat
+            val origSat = BruteForceSolver(problem.bake()).solve(BruteForceParams(randomSeed = 0L)) is SolveResult.Sat
+            val brokenSat = BacktrackSolver(broken.bake()).solve(BacktrackParams(randomSeed = 1L)) is SolveResult.Sat
             assertEquals(origSat, brokenSat, "random#$iter(n=$n,d=$d): breaking changed satisfiability")
         }
     }

@@ -42,7 +42,7 @@ class ImplicationGraphTest {
 
     /** Solve the reduced problem, reconstruct via the [delta], and assert the lifted sample is feasible. */
     private fun assertRoundTrip(original: Problem, delta: PassDelta) {
-        val solved = BacktrackSolver(original.withPassDelta(delta, BakeConfig.NONE)).solve(BacktrackParams())
+        val solved = BacktrackSolver(original.withPassDelta(delta, BakeConfig.NONE).bake()).solve(BacktrackParams())
         check(solved is SolveResult.Sat) { "reduced problem should be satisfiable" }
         val full = (delta.reconstruct ?: { it })(solved.assignment)
         assertTrue(isFeasible(original, full), "reconstructed sample infeasible in the original")

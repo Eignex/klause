@@ -34,14 +34,14 @@ class MpsSolveTest {
         assertEquals(1, compiled.problem.numIntVars)
 
         // The satisfaction path returns a feasible completion; its continuous part rides on reals.
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams()))
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams()))
         assertTrue(sat.assignment.reals.isNotEmpty(), "continuous value missing from the solution")
         val x = sat.assignment.reals[0]
         val y = sat.assignment.ints[0]
         assertTrue(x in 0.0..10.0 && x + y <= 5.0 + 1e-6, "infeasible continuous completion: x=$x y=$y")
 
         // The optimize path drives the objective (min x) to its true optimum 0, resolved by the leaf LP.
-        val opt = BacktrackSolver(compiled.problem).minimize(compiled.objective!!, BacktrackParams())
+        val opt = BacktrackSolver(compiled.problem.bake()).minimize(compiled.objective!!, BacktrackParams())
         val best = assertIs<MinimizeResult.Optimal>(opt)
         assertEquals(0.0, best.sample.reals[0], 1e-6)
         assertEquals(0.0, best.objective, 1e-6)
@@ -57,6 +57,6 @@ class MpsSolveTest {
             variables = listOf(MpsVar("x", integer = false, lower = 0.0, upper = 1.0)),
             constraints = listOf(MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = 5.0, upper = null)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(m.toProblem().problem).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(m.toProblem().problem.bake()).solve(BacktrackParams()))
     }
 }

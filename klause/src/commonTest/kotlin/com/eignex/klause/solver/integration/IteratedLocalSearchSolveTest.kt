@@ -46,7 +46,7 @@ class IteratedLocalSearchSolveTest {
             emptyArray(),
             listOf(Cardinality.atLeastOne(IntArray(8) { Lit.make(it, true) })),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = policy)
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = policy)
         val result = solver.solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
         assertTrue(result is SolveResult.Sat, "solve completes without indexing a stale incumbent")
     }
@@ -77,7 +77,7 @@ class IteratedLocalSearchSolveTest {
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
-        val sample = LocalSearchSolver(problem, restartPolicy = policy)
+        val sample = LocalSearchSolver(problem.bake(), restartPolicy = policy)
             .minimize(objective, LocalSearchParams(maxFlips = 6_000L, randomSeed = 1L)).assignment
         assertNotNull(sample, "minimize completes without anchoring a stale incumbent")
     }
@@ -94,7 +94,10 @@ class IteratedLocalSearchSolveTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val solver = LocalSearchSolver(problem, restartPolicy = IteratedLocalSearchRestart(maxFlipsBeforeRestart = 50))
+        val solver = LocalSearchSolver(
+            problem.bake(),
+            restartPolicy = IteratedLocalSearchRestart(maxFlipsBeforeRestart = 50),
+        )
         val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))

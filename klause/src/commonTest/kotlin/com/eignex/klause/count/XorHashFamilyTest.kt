@@ -17,7 +17,7 @@ class XorHashFamilyTest {
         val p = Problem(numBoolVars = 9, numIntVars = 0, intDomains = emptyArray(), factors = arrayOf<Factor>())
         val hashes = XorHashFamily(IntArray(9) { it }, seed = 11L).draw(4)
         val augmented = p.withHashes(hashes)
-        val count = BacktrackSolver(augmented).enumerate(BacktrackParams()).count()
+        val count = BacktrackSolver(augmented.bake()).enumerate(BacktrackParams()).count()
         assertTrue(count in 1..200, "hashed cell size $count is implausible (expected ~32)")
     }
 

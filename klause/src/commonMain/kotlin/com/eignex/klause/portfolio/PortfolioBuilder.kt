@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -34,7 +34,7 @@ object PortfolioBuilder {
      * concurrently under a parallel `Portfolio`, so the listener must be thread-safe and cheap.
      */
     fun build(
-        problem: Problem,
+        problem: BakedProblem,
         scenario: PortfolioScenario,
         objective: LinearObjective? = null,
         lsObjective: IncrementalObjective? = null,
@@ -75,7 +75,7 @@ object PortfolioBuilder {
      * credit to an arbitrary composition. All other wiring matches [build].
      */
     fun buildExplicit(
-        problem: Problem,
+        problem: BakedProblem,
         lsLabels: List<String>,
         backtrackWorkers: Int,
         kind: Kind,
@@ -110,7 +110,7 @@ object PortfolioBuilder {
      *  attribution metadata; [pools], when non-null, is shared by every backtrack arm for clause and
      *  cut exchange. */
     private fun materialize(
-        problem: Problem,
+        problem: BakedProblem,
         arms: List<WorkerConfig>,
         armIds: List<Int>,
         seed: Long,
@@ -138,7 +138,7 @@ object PortfolioBuilder {
      * platform mutex under the parallel `Portfolio`'s concurrent writers. The clause pool is always
      * present; the cut pool only when [PortfolioScenario.shareCuts] opts in (#809).
      */
-    private fun poolsFor(scenario: PortfolioScenario, problem: Problem): SharedPools? {
+    private fun poolsFor(scenario: PortfolioScenario, problem: BakedProblem): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null
         val concurrency = if (scenario.cores == 1) Concurrency.None else Concurrency.Strict
         val cuts = if (scenario.shareCuts) SharedCutPool(concurrency.lock()) else null
