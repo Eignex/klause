@@ -76,7 +76,7 @@ class RegularPropagatorTest {
                 ),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
@@ -104,7 +104,7 @@ class RegularPropagatorTest {
             ),
         )
         // Every accepted string must end in 2.
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(20).forEach { sample ->
             assertEquals(2L, sample.ints[3], "regular violated: ints=${sample.ints.toList()}")
         }
     }
@@ -127,7 +127,7 @@ class RegularPropagatorTest {
                 ),
             ),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test
@@ -179,7 +179,7 @@ class RegularPropagatorTest {
                 ),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "Regular+Linear (bound=$bound): solution set must equal brute force")
         }
@@ -261,7 +261,7 @@ class RegularPropagatorTest {
                 maxLearnedClauses = 500,
             )
             val found = BacktrackSolver(
-                problem,
+                problem.bake(),
             ).enumerate(params).take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (Q=$numStates |Σ|=$alphabet n=$n q0=$q0): must equal brute force")
         }

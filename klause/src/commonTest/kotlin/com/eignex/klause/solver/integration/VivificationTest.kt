@@ -41,7 +41,7 @@ class VivificationTest {
 
     @Test
     fun `vivification still proves a hard unsat instance`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4)).solve(
+        val verdict = BacktrackSolver(pigeonhole(pigeons = 5, holes = 4).bake()).solve(
             BacktrackParams(
                 randomSeed = 1L,
                 variableSelector = Vsids(),
@@ -59,7 +59,7 @@ class VivificationTest {
         val holes = 4
         val pigeons = 4
         val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(pigeonhole(pigeons, holes)).solve(
+            BacktrackSolver(pigeonhole(pigeons, holes).bake()).solve(
                 BacktrackParams(
                     randomSeed = 3L,
                     variableSelector = Vsids(),
@@ -99,7 +99,7 @@ class VivificationTest {
 
     @Test
     fun `vivification preserves the feasible set`() {
-        fun models(vivify: Boolean): Set<List<Boolean>> = BacktrackSolver(clauseProblem())
+        fun models(vivify: Boolean): Set<List<Boolean>> = BacktrackSolver(clauseProblem().bake())
             .enumerate(
                 BacktrackParams(
                     randomSeed = 5L,

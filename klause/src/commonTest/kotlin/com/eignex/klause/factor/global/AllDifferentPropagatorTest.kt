@@ -133,7 +133,7 @@ class AllDifferentPropagatorTest {
                 val d = m / (base * base * base)
                 if (a != b && a != c && b != c && a != d && b != d) brute.add(listOf(a, b, c, d))
             }
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(
@@ -192,7 +192,7 @@ class AllDifferentPropagatorTest {
             }
             rec(0, IntArray(k))
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(allDiffExcept(ranges, except)).enumerate(params)
+            val found = BacktrackSolver(allDiffExcept(ranges, except).bake()).enumerate(params)
                 .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx (except=${except.toList()}): solver set must equal brute")
         }
@@ -202,7 +202,7 @@ class AllDifferentPropagatorTest {
     fun `non-except values must be pairwise distinct`() {
         // 3 vars over {1,2} with except={5}: {1,2} can't host 3 distinct ⟹ UNSAT.
         val problem = allDiffExcept(listOf(1 to 2, 1 to 2, 1 to 2), intArrayOf(5))
-        assertTrue(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)) is SolveResult.Unsat)
+        assertTrue(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)) is SolveResult.Unsat)
     }
 
     // ── AllDifferentTest (CP tests) ──────────────────────────────────────────
@@ -252,7 +252,7 @@ class AllDifferentPropagatorTest {
                 variableSelector = Vsids(),
                 maxLearnedClauses = 1_000,
             )
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
@@ -742,7 +742,7 @@ class AllDifferentPropagatorTest {
                 factors = arrayOf(alldiff()),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "alldifferent instance #$idx: backtrack solution set must equal brute force")
         }
@@ -775,7 +775,7 @@ class AllDifferentPropagatorTest {
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 1, domainSize = 6)),
         )
         val params = BacktrackParams(randomSeed = 7L, variableSelector = Vsids(), maxLearnedClauses = 2_000)
-        val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
             .map { s -> s.ints.map { it.toInt() } }.toHashSet()
         assertEquals(brute, found, "large alldifferent: backtrack solution set must equal brute force")
     }
@@ -870,7 +870,7 @@ class AllDifferentPropagatorTest {
     }
 
     private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
 
     private fun assertBoundOnly(watches: IntArray?, vars: IntArray) {

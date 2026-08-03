@@ -31,7 +31,7 @@ class IteratedLocalSearchBanditTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val solver = LocalSearchSolver(
-            problem,
+            problem.bake(),
             restartPolicy = IteratedLocalSearchRestart(
                 populationSize = 3,
                 acceptanceBandit = IteratedLocalSearchRestart.acceptanceBandit(seed = 1L),

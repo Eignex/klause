@@ -62,7 +62,7 @@ class PbLearningTest {
             PseudoBoolean(longArrayOf(1, 1), intArrayOf(Lit.make(1, true), Lit.make(2, true)), PbOp.LE, 1),
         )
         val problem = Problem(3, 0, emptyArray(), factors.toTypedArray())
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(pbParams(0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(pbParams(0L)))
     }
 
     @Test
@@ -77,7 +77,7 @@ class PbLearningTest {
             PseudoBoolean(longArrayOf(1, 1), intArrayOf(Lit.make(1, false), Lit.make(2, false)), PbOp.GE, 1),
         )
         val problem = Problem(3, 0, emptyArray(), factors.toTypedArray())
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(pbParams(0L)))
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem.bake()).solve(pbParams(0L)))
         assertTrue(satisfies(factors, sat.assignment.bools), "witness ${sat.assignment.bools.toList()} must satisfy")
     }
 
@@ -110,8 +110,8 @@ class PbLearningTest {
                 maxLearnedClauses = 3,
                 lubyRestartBase = 8L,
             )
-            val pb = BacktrackSolver(problem()).solve(forget)
-            val cl = BacktrackSolver(problem()).solve(forget.copy(pbLearning = false))
+            val pb = BacktrackSolver(problem().bake()).solve(forget)
+            val cl = BacktrackSolver(problem().bake()).solve(forget.copy(pbLearning = false))
             assertEquals(cl is SolveResult.Sat, pb is SolveResult.Sat, "disagree under forgetting on $iter")
             if (pb is SolveResult.Sat) {
                 checked++
@@ -143,8 +143,8 @@ class PbLearningTest {
                 }
             }
             val problem = { Problem(numVars, 0, emptyArray(), factors.toTypedArray()) }
-            val pb = BacktrackSolver(problem()).solve(pbParams(3L))
-            val cl = BacktrackSolver(problem()).solve(clauseParams(3L))
+            val pb = BacktrackSolver(problem().bake()).solve(pbParams(3L))
+            val cl = BacktrackSolver(problem().bake()).solve(clauseParams(3L))
             assertEquals(
                 cl is SolveResult.Sat,
                 pb is SolveResult.Sat,

@@ -48,7 +48,7 @@ class SolveStatsTest {
     fun `backtrack populates stats with non-zero nodes and depth`() {
         val schema = Queens6()
         val compiled = schema.compile()
-        val result = BacktrackSolver(compiled.problem).solve(BacktrackParams())
+        val result = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams())
         assertTrue(result is SolveResult.Sat, "expected SAT for 6-row alldiff")
         val stats = result.stats
         assertEquals("backtrack", stats.run.backend)
@@ -64,7 +64,9 @@ class SolveStatsTest {
     fun `local-search populates backend tag and wall time`() {
         val schema = Queens6()
         val compiled = schema.compile()
-        val result = LocalSearchSolver(compiled.problem).solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 7))
+        val result = LocalSearchSolver(
+            compiled.problem.bake(),
+        ).solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 7))
         // Either SAT or Unknown — both should carry the ls backend tag.
         val stats = result.stats
         assertEquals("ls", stats.run.backend)
@@ -97,7 +99,7 @@ class SolveStatsTest {
     fun `backtrack counts failures while proving UNSAT`() {
         // 4 pigeons, 3 holes: infeasible, but only the weak binary != constraints — so the
         // proof requires branching and backtracking on conflicts, not a root wipeout.
-        val result = BacktrackSolver(pigeonhole(4)).solve(BacktrackParams(randomSeed = 0L))
+        val result = BacktrackSolver(pigeonhole(4).bake()).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(result, "4-into-3 pigeonhole is infeasible")
         assertTrue(
             result.stats.search.fails.sum > 0.0,
@@ -123,7 +125,7 @@ class SolveStatsTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMax),
         )
@@ -151,7 +153,7 @@ class SolveStatsTest {
             factors = emptyArray(),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 0L, variableSelector = InputOrder, valueSelector = IndomainMin),
         )
@@ -188,7 +190,7 @@ class SolveStatsTest {
             }
         }
         val compiled = S().compile()
-        val r = BacktrackSolver(compiled.problem).solve(BacktrackParams())
+        val r = BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
         assertEquals("backtrack", r.stats.run.backend)
         assertEquals(false, r.stats.run.timedOut)

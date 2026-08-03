@@ -33,7 +33,7 @@ class SequentialPortfolioTest {
             PortfolioWorker.of(
                 "bt#$i",
                 i,
-                BacktrackSolver(problem).session(),
+                BacktrackSolver(problem.bake()).session(),
                 BacktrackParams(randomSeed = i.toLong()),
                 objective = objective,
                 withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },

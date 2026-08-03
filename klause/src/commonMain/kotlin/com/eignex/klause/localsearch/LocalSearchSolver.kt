@@ -14,6 +14,7 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -42,7 +43,7 @@ import kotlin.random.Random
  *    true without-replacement enumeration is required.
  */
 class LocalSearchSolver(
-    override val problem: Problem,
+    override val problem: BakedProblem,
     /** SourceDrivenStrategy for the satisfy phase (and, when [optimizeStrategy] is null, the minimize
      *  phase too, via its [SourceDrivenStrategy.feasibleDescent]). Default is [Cbls] — its
      *  [FeasibleDescent.SelfOwned] descent (greedy over its objective / structured / pair-swap sources)
@@ -82,10 +83,10 @@ class LocalSearchSolver(
     Optimizer<LocalSearchParams> {
 
     /** Solve a [CompiledSchema]'s problem with the default local-search configuration. */
-    constructor(compiled: CompiledSchema) : this(compiled.problem)
+    constructor(compiled: CompiledSchema) : this(compiled.problem.bake())
 
     /** Compile [schema] with the default config and solve the resulting problem. */
-    constructor(schema: VariableSchema) : this(schema.compile().problem)
+    constructor(schema: VariableSchema) : this(schema.compile().problem.bake())
 
     /** Objective-as-constraint ratchet handle (opt-in). Set non-null only for an arm whose [problem]
      *  carries an [com.eignex.klause.factor.objective.ObjectiveBoundFactor] sharing this bound: on each

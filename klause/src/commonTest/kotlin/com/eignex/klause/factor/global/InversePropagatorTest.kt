@@ -75,7 +75,7 @@ class InversePropagatorTest {
                 factors = arrayOf<Factor>(Inverse(f = IntArray(n) { it }, g = IntArray(n) { n + it })),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "instance #$idx: backtrack solution set must equal brute force")
         }
@@ -89,7 +89,7 @@ class InversePropagatorTest {
             intDomains = Array(6) { IntDomain(0, 2) },
             factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2]).map { it.toInt() }
         val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]).map { it.toInt() }
@@ -113,7 +113,7 @@ class InversePropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2]).map { it.toInt() }
         val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]).map { it.toInt() }
@@ -137,7 +137,7 @@ class InversePropagatorTest {
             ),
             factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(0, sat.assignment.ints[5], "g[2] (= var 5) must equal 0")
     }
@@ -230,7 +230,7 @@ class InversePropagatorTest {
                 variableSelector = Vsids(),
                 maxLearnedClauses = 500,
             )
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "trial #$trial (n=$n off=$off): must equal brute force")
         }

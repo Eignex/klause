@@ -22,7 +22,7 @@ class FznSlidingSumIngestTest {
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val x = listOf("x1", "x2", "x3", "x4", "x5").map { sat.assignment.ints[program.intVarsByName.getValue(it)] }
         for (i in 0..x.size - 3) {

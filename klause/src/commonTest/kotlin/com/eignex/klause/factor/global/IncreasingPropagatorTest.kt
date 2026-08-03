@@ -40,7 +40,7 @@ class IncreasingPropagatorTest {
     @Test
     fun `every enumerated solution is non-decreasing`() {
         val problem = chain(strict = false)
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(50).forEach { s ->
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(50).forEach { s ->
             assertTrue((0 until 2).all { s.ints[it] <= s.ints[it + 1] }, "not non-decreasing: ${s.ints.toList()}")
         }
     }
@@ -53,7 +53,7 @@ class IncreasingPropagatorTest {
             intDomains = Array(2) { IntDomain(1, 1) },
             factors = arrayOf<Factor>(Increasing(intArrayOf(0, 1), strict = true)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test

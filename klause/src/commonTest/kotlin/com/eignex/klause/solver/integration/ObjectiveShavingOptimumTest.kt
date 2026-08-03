@@ -38,8 +38,10 @@ class ObjectiveShavingOptimumTest {
     fun `shaving preserves the optimum end to end`() {
         val p = triangleCover()
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
-        val on = BacktrackSolver(p).minimize(
+        val off = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
+        val on = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveShaving = true)),
         )
@@ -55,7 +57,7 @@ class ObjectiveShavingOptimumTest {
         val p = triangleCover()
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         val published = ArrayList<Double>()
-        val result = BacktrackSolver(p).minimize(
+        val result = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(
                 randomSeed = 1L,

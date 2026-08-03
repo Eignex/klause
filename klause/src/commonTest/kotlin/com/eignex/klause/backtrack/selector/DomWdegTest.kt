@@ -33,7 +33,7 @@ class DomWdegTest {
                 ),
             ),
         )
-        val r1 = BacktrackSolver(satProblem).solve(
+        val r1 = BacktrackSolver(satProblem.bake()).solve(
             BacktrackParams(
                 variableSelector = DomWdeg(),
                 randomSeed = 0L,
@@ -51,7 +51,7 @@ class DomWdegTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val r2 = BacktrackSolver(unsatProblem).solve(
+        val r2 = BacktrackSolver(unsatProblem.bake()).solve(
             BacktrackParams(
                 variableSelector = DomWdeg(),
             ),

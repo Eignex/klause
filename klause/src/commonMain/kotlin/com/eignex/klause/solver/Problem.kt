@@ -32,7 +32,7 @@ import kotlin.time.TimeSource
  * Float variables, when the schema or front-end uses them, are bucketed to integer
  * variables in the factor system (so [factors] stays pure int+bool).
  */
-class Problem(
+open class Problem(
     /** Number of Boolean variables; ids occupy `[0, numBoolVars)`. */
     val numBoolVars: Int,
     /** Number of integer variables; ids occupy `[0, numIntVars)`. */
@@ -340,6 +340,30 @@ class Problem(
         if (deferBake) bakeBase().intDomains else this.intDomains
     }
 
+    /**
+     * Force the root bake and return the solve-ready [BakedProblem] — the only problem type the solvers,
+     * the model counter, sampling and the LP engine accept. Idempotent: returns `this`
+     * when already a [BakedProblem]. Otherwise runs [bakeBase] (folding a [deferBake] model, or reusing an
+     * already-folded one) and wraps its folded domains, so the returned problem carries the root-propagation
+     * fold that construction used to force eagerly. [cancellation] budgets the fold exactly as [bakeBase].
+     */
+    fun bake(cancellation: Cancellation = this.cancellation): BakedProblem {
+        if (this is BakedProblem) return this
+        val folded = bakeBase(cancellation)
+        return BakedProblem(
+            numBoolVars = folded.numBoolVars,
+            numIntVars = folded.numIntVars,
+            intDomains = folded.intDomains,
+            factors = folded.factors,
+            impliedFactorMask = folded.impliedFactorMask,
+            hasSymmetryBreaking = folded.hasSymmetryBreaking,
+            numRealVars = folded.numRealVars,
+            realLower = folded.realLower,
+            realUpper = folded.realUpper,
+            cancellation = folded.cancellation,
+        )
+    }
+
     /** Folds the root-level int deductions of a successful bake into [intDomains] so the
      *  tightened bounds are part of the problem itself rather than transient solver state.
      *  Bounds are applied before holes so every recorded hole is interior to the final
@@ -525,3 +549,35 @@ class Problem(
         )
     }
 }
+
+/**
+ * A [Problem] whose root bake is guaranteed to have run: its [Problem.intDomains] carry the
+ * root-propagation fold, and it is the only problem type the solvers, the model counter,
+ * sampling and the LP engine accept. Produced only by [Problem.bake] (or the presolve pipeline). A raw
+ * [Problem] is the supertype, so handing an un-baked model to a solver is a compile error — the caller
+ * must [Problem.bake] it first, which is where the parse-vs-solve boundary is enforced by the type system.
+ */
+class BakedProblem internal constructor(
+    numBoolVars: Int,
+    numIntVars: Int,
+    intDomains: Array<IntDomain>,
+    factors: Array<Factor>,
+    impliedFactorMask: BooleanArray? = null,
+    hasSymmetryBreaking: Boolean = false,
+    numRealVars: Int = 0,
+    realLower: DoubleArray = EmptyDoubleArray,
+    realUpper: DoubleArray = EmptyDoubleArray,
+    cancellation: Cancellation = Cancellation.Never,
+) : Problem(
+    numBoolVars = numBoolVars,
+    numIntVars = numIntVars,
+    intDomains = intDomains,
+    factors = factors,
+    cancellation = cancellation,
+    impliedFactorMask = impliedFactorMask,
+    hasSymmetryBreaking = hasSymmetryBreaking,
+    preFolded = true,
+    numRealVars = numRealVars,
+    realLower = realLower,
+    realUpper = realUpper,
+)

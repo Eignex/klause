@@ -348,18 +348,20 @@ class LpAutoConfigTest {
             Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val auto = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
+        val auto = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpConfig = LpConfig.AGGRESSIVE))
         assertTrue(auto is MinimizeResult.Optimal)
         assertEquals(3.0, auto.objectiveValue)
         assertTrue(auto.stats.lp.solves.sum > 0.0, "an LP emphasis must engage the node LP")
 
-        val plain = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val plain = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 1L))
         assertTrue(plain is MinimizeResult.Optimal)
         assertEquals(3.0, plain.objectiveValue)
         assertEquals(0.0, plain.stats.lp.solves.sum, "a null lpConfig leaves the LP family off")
 
         // The CONSERVATIVE emphasis (FAST tier only) keeps the per-node simplex off — no solves.
-        val conservative = BacktrackSolver(p).minimize(
+        val conservative = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpConfig = LpConfig(LpEmphasis.CONSERVATIVE)),
         )
@@ -448,7 +450,7 @@ class LpAutoConfigTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val auto = BacktrackParams(lpPlan = LpAutoConfig.recommend(p), randomSeed = 1L)
         assertTrue(auto.lpPlan.bounding)
-        val result = BacktrackSolver(p).minimize(obj, auto)
+        val result = BacktrackSolver(p.bake()).minimize(obj, auto)
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)
     }

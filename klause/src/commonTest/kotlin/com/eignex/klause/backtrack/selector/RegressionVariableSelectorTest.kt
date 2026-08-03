@@ -28,7 +28,7 @@ class RegressionVariableSelectorTest {
             intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(variableSelector = RegressionVariableSelector.linUcb(seed = 1L), randomSeed = 0L),
         )
         val sat = assertIs<SolveResult.Sat>(r)
@@ -46,7 +46,7 @@ class RegressionVariableSelectorTest {
             intDomains = Array(2) { IntDomain(0, 1) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(2) { it }, domainMin = 0, domainSize = 2)),
         )
-        BacktrackSolver(small).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+        BacktrackSolver(small.bake()).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
 
         val n = 8
         val large = Problem(
@@ -55,7 +55,7 @@ class RegressionVariableSelectorTest {
             intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(n) { it }, domainMin = 0, domainSize = n)),
         )
-        val r = BacktrackSolver(large).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+        val r = BacktrackSolver(large.bake()).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals((0L until n.toLong()).toSet(), sat.assignment.ints.toSet(), "not a permutation")
     }
@@ -71,7 +71,7 @@ class RegressionVariableSelectorTest {
             intDomains = Array(2) { IntDomain(0, 1) },
             factors = arrayOf<Factor>(AllDifferent(IntArray(2) { it }, domainMin = 0, domainSize = 2)),
         )
-        BacktrackSolver(small).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
+        BacktrackSolver(small.bake()).solve(BacktrackParams(variableSelector = selector, randomSeed = 0L))
 
         val n = 6
         val large = Problem(
@@ -82,7 +82,7 @@ class RegressionVariableSelectorTest {
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
         val params = BacktrackParams(variableSelector = selector, randomSeed = 0L)
-        val r = BacktrackSolver(large).minimize(objective, params)
+        val r = BacktrackSolver(large.bake()).minimize(objective, params)
         assertIs<MinimizeResult.Optimal>(r)
     }
 
@@ -98,7 +98,7 @@ class RegressionVariableSelectorTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val r = BacktrackSolver(problem).minimize(
+        val r = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(variableSelector = RegressionVariableSelector.linUcb(seed = 2L), randomSeed = 0L),
         )

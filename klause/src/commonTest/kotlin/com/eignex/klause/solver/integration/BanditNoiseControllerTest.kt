@@ -25,7 +25,7 @@ class BanditNoiseControllerTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Cardinality.exactlyOne(IntArray(n) { Lit.make(it, true) })),
         )
-        val solver = LocalSearchSolver(problem, strategy = ProbSat.bandit(seed = 1L))
+        val solver = LocalSearchSolver(problem.bake(), strategy = ProbSat.bandit(seed = 1L))
         val sat = assertIs<SolveResult.Sat>(solver.solve(LocalSearchParams(maxFlips = 50_000L, randomSeed = 0L)))
         assertEquals(1, sat.assignment.bools.count { it }, "exactly-one violated")
     }

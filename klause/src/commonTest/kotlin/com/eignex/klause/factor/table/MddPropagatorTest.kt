@@ -91,7 +91,7 @@ class MddPropagatorTest {
                 factors = arrayOf(mddFactor()),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "mdd instance #$idx: backtrack solution set must equal brute force")
         }
@@ -137,7 +137,7 @@ class MddPropagatorTest {
                 factors = arrayOf(costMdd()),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "cost MDD (cost∈$costRange): solution set must equal brute force")
         }
@@ -192,7 +192,7 @@ class MddPropagatorTest {
                 factors = arrayOf<Factor>(mdd(0, 1), mdd(2, 3)),
             )
             val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "shared-index MDD #$idx: solution set must equal brute force")
         }

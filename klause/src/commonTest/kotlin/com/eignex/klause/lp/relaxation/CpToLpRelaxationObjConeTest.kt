@@ -89,8 +89,8 @@ class CpToLpRelaxationObjConeTest {
     @Test
     fun `cone-mode LP keeps the optimum correct end to end`() {
         val p = problem()
-        val baseline = BacktrackSolver(p).minimize(objective, BacktrackParams(randomSeed = 1L))
-        val cone = BacktrackSolver(p).minimize(
+        val baseline = BacktrackSolver(p.bake()).minimize(objective, BacktrackParams(randomSeed = 1L))
+        val cone = BacktrackSolver(p.bake()).minimize(
             objective,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, objectiveCone = true)),
         )

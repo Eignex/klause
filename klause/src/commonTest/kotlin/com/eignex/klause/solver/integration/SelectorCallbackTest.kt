@@ -74,7 +74,7 @@ class SelectorCallbackTest {
             factors = emptyArray(),
         )
         val h = CountingSelectors()
-        val samples = BacktrackSolver(problem).enumerate(
+        val samples = BacktrackSolver(problem.bake()).enumerate(
             BacktrackParams(
                 randomSeed = 0L,
                 variableSelector = h,
@@ -104,7 +104,7 @@ class SelectorCallbackTest {
             ),
         )
         val h = CountingSelectors()
-        BacktrackSolver(problem).solve(
+        BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 randomSeed = 0L,
                 variableSelector = h,
@@ -131,7 +131,7 @@ class SelectorCallbackTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val h = CountingSelectors()
-        BacktrackSolver(problem).solve(
+        BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 randomSeed = 0L,
                 variableSelector = h,
@@ -151,6 +151,6 @@ class SelectorCallbackTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).toList()
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).toList()
     }
 }

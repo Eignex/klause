@@ -23,7 +23,7 @@ class SymmetricAllDifferentPropagatorTest {
             intDomains = Array(4) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
         )
-        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).take(40).forEach { sample ->
+        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).take(40).forEach { sample ->
             for (i in 0..3) {
                 val v = sample.ints[i].toInt()
                 assertTrue(sample.ints[v] == i.toLong(), "self-inverse violated at $i: ints=${sample.ints.toList()}")
@@ -40,7 +40,7 @@ class SymmetricAllDifferentPropagatorTest {
             intDomains = arrayOf(IntDomain(2, 2), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(SymmetricAllDifferent(intArrayOf(0, 1, 2, 3))),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(0, sat.assignment.ints[2])
     }

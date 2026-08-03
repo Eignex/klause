@@ -221,7 +221,7 @@ class CumulativeRelaxationTest {
             val optimum = bruteOptimum(n, starts, durations, resources, capacity)
             val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
             val params = BacktrackParams(randomSeed = 7L, lubyRestartBase = 8L, lpConfig = LpConfig.AGGRESSIVE)
-            when (val res = BacktrackSolver(p).minimize(obj, params)) {
+            when (val res = BacktrackSolver(p.bake()).minimize(obj, params)) {
                 is MinimizeResult.Optimal -> {
                     optimal++
                     assertTrue(optimum != null, "solver Optimal on a brute-infeasible instance #$iter")

@@ -20,7 +20,7 @@ class FlatZincFloatConstraintsTest {
 
     // Five buckets over an exact grid so declared constants land on bucket boundaries.
     private fun solve(src: String, buckets: Int = 5): SolveResult =
-        BacktrackSolver(parseFlatZinc(src, floatBuckets = buckets).problem)
+        BacktrackSolver(parseFlatZinc(src, floatBuckets = buckets).problem.bake())
             .solve(BacktrackParams(randomSeed = 0L))
 
     @Test
@@ -101,7 +101,9 @@ class FlatZincFloatConstraintsTest {
         // No nonlinear/strict/reified float constraint ⇒ the float is an LP-only real column, not a bucket.
         assertEquals(1, program.problem.numRealVars)
         assertEquals(0, program.problem.numIntVars)
-        val r = assertIs<SolveResult.Sat>(BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L)))
+        val r = assertIs<SolveResult.Sat>(
+            BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L)),
+        )
         val x = r.assignment.reals[0]
         assertTrue(2.0 * x <= 6.0 + 1e-6 && x in 0.0..10.0, "infeasible continuous value x=$x")
     }
@@ -186,7 +188,7 @@ class FlatZincFloatConstraintsTest {
         // only n stays an integer search variable. The product w = n·y with y = 3, w = 9 forces n = 3.
         assertEquals(3, program.problem.numRealVars)
         assertEquals(1, program.problem.numIntVars)
-        assertIs<SolveResult.Sat>(BacktrackSolver(program.problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Sat>(BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test

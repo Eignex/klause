@@ -74,7 +74,7 @@ class AdaptiveRestartTest {
 
     @Test
     fun `adaptive restarts prove a clause-dense unsat instance`() {
-        val verdict = BacktrackSolver(pigeonhole(pigeons = 4, holes = 3)).solve(
+        val verdict = BacktrackSolver(pigeonhole(pigeons = 4, holes = 3).bake()).solve(
             BacktrackParams(
                 randomSeed = 1L,
                 variableSelector = Vsids(),
@@ -100,7 +100,7 @@ class AdaptiveRestartTest {
     @Test
     fun `adaptive restarts enumerate exactly the same models as no restarts`() {
         fun models(params: BacktrackParams): Set<List<Boolean>> =
-            BacktrackSolver(clauseProblem()).enumerate(params).map { it.bools.toList() }.toSet()
+            BacktrackSolver(clauseProblem().bake()).enumerate(params).map { it.bools.toList() }.toSet()
 
         val plain = models(BacktrackParams(randomSeed = 5L, variableSelector = Vsids()))
         val adaptive = models(

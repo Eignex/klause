@@ -119,7 +119,7 @@ class NValuePropagatorTest {
             ),
             factors = arrayOf<Factor>(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.Eq)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(3, sat.assignment.ints[4], "distinct = {1, 2, 3} = 3")
     }
@@ -139,7 +139,7 @@ class NValuePropagatorTest {
             ),
             factors = arrayOf<Factor>(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.AtLeast)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         // Distinct count must be ≥ 4 → all-different.
         val vs = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2], sat.assignment.ints[3])
@@ -161,7 +161,7 @@ class NValuePropagatorTest {
             ),
             factors = arrayOf<Factor>(NValue(n = 4, xs = intArrayOf(0, 1, 2, 3), mode = NValue.Mode.AtMost)),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         val vs = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2], sat.assignment.ints[3])
         assertTrue(vs.distinct().size <= 2, "atmost_nvalues 2 violated: got $vs")
@@ -182,7 +182,7 @@ class NValuePropagatorTest {
             ),
             factors = arrayOf<Factor>(NValue(n = 3, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.AtMost)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test
@@ -200,7 +200,7 @@ class NValuePropagatorTest {
             ),
             factors = arrayOf<Factor>(NValue(n = 3, xs = intArrayOf(0, 1, 2), mode = NValue.Mode.AtMost)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test
@@ -243,7 +243,7 @@ class NValuePropagatorTest {
                 intDomains = doms,
                 factors = arrayOf<Factor>(NValue(n = xsCount, xs = IntArray(xsCount) { it }, mode = mode)),
             )
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "mode=$mode: enumerated (xs, n) set must equal brute force")
         }

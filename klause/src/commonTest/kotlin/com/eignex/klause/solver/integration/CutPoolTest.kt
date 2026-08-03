@@ -34,7 +34,7 @@ class CutPoolTest {
         // is unchanged. (Node count is not asserted: valid cuts shift the LP vertex, hence reduced-cost
         // fixings and branching, either way — the same non-monotonicity warm-starting has.)
         val p = problem()
-        val pool = BacktrackSolver(p).minimize(
+        val pool = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)),
         )

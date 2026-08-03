@@ -41,8 +41,8 @@ class LpBoundingTest {
     @Test
     fun `lp bounding preserves the optimum`() {
         val problem = triangle()
-        val off = BacktrackSolver(problem).minimize(sumObjective, BacktrackParams(randomSeed = 1L))
-        val on = BacktrackSolver(problem).minimize(
+        val off = BacktrackSolver(problem.bake()).minimize(sumObjective, BacktrackParams(randomSeed = 1L))
+        val on = BacktrackSolver(problem.bake()).minimize(
             sumObjective,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)),
         )
@@ -58,8 +58,8 @@ class LpBoundingTest {
         val problem = triangle()
         // Keep this regression independent of evolving global defaults.
         val base = BacktrackParams(randomSeed = 1L, variableSelector = RandomVariable)
-        val off = BacktrackSolver(problem).minimize(sumObjective, base)
-        val on = BacktrackSolver(problem).minimize(
+        val off = BacktrackSolver(problem.bake()).minimize(sumObjective, base)
+        val on = BacktrackSolver(problem.bake()).minimize(
             sumObjective,
             base.copy(lpPlan = base.lpPlan.copy(bounding = true)),
         )
@@ -76,7 +76,7 @@ class LpBoundingTest {
     fun `root cut harvest preserves the optimum`() {
         // The root cut harvest (global pool reused at every node) must keep the proven optimum.
         val problem = triangle()
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             sumObjective,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)),
         )
@@ -88,7 +88,7 @@ class LpBoundingTest {
     fun `frequency policy still preserves the optimum`() {
         // Solving the LP only every 3rd checked node must not change the proven optimum.
         val problem = triangle()
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             sumObjective,
             BacktrackParams(randomSeed = 7L, lpPlan = LpPlan(bounding = true, boundEvery = 3)),
         )
@@ -102,7 +102,7 @@ class LpBoundingTest {
         // unsound — the optimum is still the objective's floor.
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 4)), arrayOf<Factor>())
         val obj = LinearObjective(intCoefficients = longArrayOf(1L))
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)),
         )
@@ -127,8 +127,8 @@ class LpBoundingTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L, 0L))
-        val off = BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 1L))
-        val on = BacktrackSolver(problem).minimize(
+        val off = BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val on = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)),
         )

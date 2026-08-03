@@ -140,7 +140,7 @@ class FznDefinitionalSweepTest {
         // Threw ArrayIndexOutOfBoundsException before the fix (the literal's var id == numIntVars).
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         assertTrue(net.isDefinedInt(program.intVarsByName.getValue("e")), "e is definitionally determined")
-        val solver = LocalSearchSolver(program.problem, definitionalSweep = sweep)
+        val solver = LocalSearchSolver(program.problem.bake(), definitionalSweep = sweep)
         val r = solver.solve(LocalSearchParams(maxFlips = 20_000, randomSeed = 1L))
         assertTrue(r is SolveResult.Sat, "the element model solves under the sweep; got $r")
     }
@@ -159,7 +159,7 @@ class FznDefinitionalSweepTest {
     @Test
     fun `local search with the sweep solves the decomposed model`() {
         val program = parseFlatZinc(src)
-        val solver = LocalSearchSolver(program.problem, definitionalSweep = program.definitionalSweep)
+        val solver = LocalSearchSolver(program.problem.bake(), definitionalSweep = program.definitionalSweep)
         val r = solver.solve(LocalSearchParams(maxFlips = 50_000, randomSeed = 3L))
         assertTrue(r is SolveResult.Sat, "decomposed model must be satisfiable under the sweep; got $r")
     }

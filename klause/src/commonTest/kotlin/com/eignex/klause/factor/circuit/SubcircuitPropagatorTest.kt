@@ -72,7 +72,7 @@ class SubcircuitPropagatorTest {
                 intDomains = Array(n) { IntDomain(los[it].toLong(), his[it].toLong()) },
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
             )
-            val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
+            val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L))
             if (brute > 0) {
                 assertTrue(result is SolveResult.Sat, "false UNSAT: los=${los.toList()} his=${his.toList()}")
             } else {
@@ -144,7 +144,7 @@ class SubcircuitPropagatorTest {
         // n=2: valid assignments are {0→0, 1→1} and {0→1, 1→0}.
         val brute = setOf(listOf(0, 1), listOf(1, 0))
         val problem = problem(2)
-        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L))
+        val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L))
             .take(10_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
         assertEquals(brute, found, "n=2 subcircuit must enumerate exactly 2 valid assignments")
     }

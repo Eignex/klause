@@ -111,7 +111,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 17)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -131,7 +131,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 3)).take(5).toList()
         for (s in samples) {
             val xv = compiled.decode(schema.x, s)
@@ -160,7 +160,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 19)).take(15).toList()
@@ -183,7 +183,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 27)).take(15).toList()
@@ -207,7 +207,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 41)).take(15).toList()
@@ -230,7 +230,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 61)).take(10).toList()
@@ -255,7 +255,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 71)).take(10).toList()
@@ -283,7 +283,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 47)).take(5).toList()
@@ -306,7 +306,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(40).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -326,7 +326,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(40).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -359,7 +359,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -379,7 +379,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 53)).take(15).toList()
@@ -401,7 +401,7 @@ class IntOperatorsTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 4)).take(8).toList()
@@ -422,7 +422,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 1)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 1)),
+        )
         val rate = compiled.decode(schema.rate, sat.assignment)
         assertTrue(rate <= 0.5 + 1e-9, "rate=$rate violated rate + 0.1 <= 0.6")
     }
@@ -436,7 +438,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 2)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 2)),
+        )
         val rate = compiled.decode(schema.rate, sat.assignment)
         assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2 * rate >= 0.6")
     }
@@ -452,7 +456,7 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
+        val solver = LocalSearchSolver(compiled.problem.bake())
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -470,7 +474,7 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
+        val solver = LocalSearchSolver(compiled.problem.bake())
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 12)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -490,7 +494,7 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem)
+        val solver = LocalSearchSolver(compiled.problem.bake())
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(50).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -512,7 +516,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 3)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 3)),
+        )
         val rate = compiled.decode(schema.rate, sat.assignment)
         assertTrue(rate >= 0.4 - 1e-9, "rate=$rate violated -rate <= -0.4")
     }
@@ -526,7 +532,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 4)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 4)),
+        )
         val rate = compiled.decode(schema.rate, sat.assignment)
         assertTrue(rate >= 0.3 - 1e-9, "rate=$rate violated 2*rate >= rate+0.3")
     }
@@ -541,7 +549,7 @@ class IntOperatorsTest {
             val c by constraint { rate ge 5.0 }
         }
         val compiled = S().compile()
-        val solver = LocalSearchSolver(compiled.problem)
+        val solver = LocalSearchSolver(compiled.problem.bake())
         val samples = solver.samples(LocalSearchParams(maxFlips = 1_000, randomSeed = 1)).take(1).toList()
         assertTrue(samples.isEmpty(), "rate ge 5.0 on rate in [0,1] should yield no samples")
     }
@@ -559,7 +567,7 @@ class IntOperatorsTest {
         // One FloatLinear (rate <= 5.0) - always true.
         assertEquals(1, compiled.problem.factors.size)
         assertIs<SolveResult.Sat>(
-            BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 1)),
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 1)),
         )
     }
 
@@ -572,7 +580,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 5)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 5)),
+        )
         val av = compiled.decode(schema.a, sat.assignment)
         val bv = compiled.decode(schema.b, sat.assignment)
         assertTrue(av + bv <= 1.0 + 1e-9, "a=$av b=$bv violated a+b <= 1.0")
@@ -587,7 +597,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 6)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 6)),
+        )
         val av = compiled.decode(schema.a, sat.assignment)
         val bv = compiled.decode(schema.b, sat.assignment)
         assertTrue(av - bv >= 0.5 - 1e-9, "a=$av b=$bv violated a-b >= 0.5")
@@ -603,7 +615,9 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 7)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 7)),
+        )
         val av = compiled.decode(schema.a, sat.assignment)
         val bv = compiled.decode(schema.b, sat.assignment)
         assertTrue(

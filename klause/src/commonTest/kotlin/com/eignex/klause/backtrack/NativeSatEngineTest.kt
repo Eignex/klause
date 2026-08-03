@@ -37,7 +37,7 @@ class NativeSatEngineTest {
             intArrayOf(Lit.make(0, true), Lit.make(1, true)),
             intArrayOf(Lit.make(1, false), Lit.make(2, true)),
         )
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(cnf(3, clauses)).solve(nativeParams(0L)))
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(cnf(3, clauses).bake()).solve(nativeParams(0L)))
         assertTrue(satisfies(clauses, sat.assignment.bools), "witness ${sat.assignment.bools.toList()} must satisfy")
     }
 
@@ -49,7 +49,9 @@ class NativeSatEngineTest {
             intArrayOf(Lit.make(0, true), Lit.make(1, false)),
             intArrayOf(Lit.make(0, false), Lit.make(2, true)),
         )
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(cnf(3, clauses)).solve(BacktrackParams(randomSeed = 0L)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(cnf(3, clauses).bake()).solve(BacktrackParams(randomSeed = 0L)),
+        )
         assertTrue(satisfies(clauses, sat.assignment.bools), "auto-dispatched witness must satisfy")
     }
 
@@ -59,7 +61,7 @@ class NativeSatEngineTest {
             intArrayOf(Lit.make(0, true)),
             intArrayOf(Lit.make(0, false)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(cnf(1, clauses)).solve(nativeParams(0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(cnf(1, clauses).bake()).solve(nativeParams(0L)))
     }
 
     @Test
@@ -71,7 +73,7 @@ class NativeSatEngineTest {
             intArrayOf(Lit.make(1, false), Lit.make(2, true)),
             intArrayOf(Lit.make(2, false)),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(cnf(3, clauses)).solve(nativeParams(0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(cnf(3, clauses).bake()).solve(nativeParams(0L)))
     }
 
     @Test
@@ -90,8 +92,8 @@ class NativeSatEngineTest {
                 }
             }
             val problem = cnf(numVars, clauses)
-            val native = BacktrackSolver(problem).solve(nativeParams(1L))
-            val general = BacktrackSolver(cnf(numVars, clauses)).solve(generalParams(1L))
+            val native = BacktrackSolver(problem.bake()).solve(nativeParams(1L))
+            val general = BacktrackSolver(cnf(numVars, clauses).bake()).solve(generalParams(1L))
             assertEquals(
                 general is SolveResult.Sat,
                 native is SolveResult.Sat,
@@ -130,8 +132,8 @@ class NativeSatEngineTest {
                 tieredLearnedDb = true,
                 lubyRestartBase = 8L,
             )
-            val native = BacktrackSolver(cnf(numVars, clauses)).solve(forget)
-            val general = BacktrackSolver(cnf(numVars, clauses)).solve(forget.copy(nativeSat = false))
+            val native = BacktrackSolver(cnf(numVars, clauses).bake()).solve(forget)
+            val general = BacktrackSolver(cnf(numVars, clauses).bake()).solve(forget.copy(nativeSat = false))
             assertEquals(
                 general is SolveResult.Sat,
                 native is SolveResult.Sat,
@@ -156,8 +158,8 @@ class NativeSatEngineTest {
             intArrayOf(Lit.make(0, false), Lit.make(1, false)),
             intArrayOf(Lit.make(1, true), Lit.make(3, false)),
         )
-        val nativeCount = BacktrackSolver(cnf(4, clauses)).enumerate(nativeParams(7L)).count()
-        val generalCount = BacktrackSolver(cnf(4, clauses)).enumerate(generalParams(7L)).count()
+        val nativeCount = BacktrackSolver(cnf(4, clauses).bake()).enumerate(nativeParams(7L)).count()
+        val generalCount = BacktrackSolver(cnf(4, clauses).bake()).enumerate(generalParams(7L)).count()
         assertEquals(generalCount, nativeCount, "native and general must enumerate the same number of models")
     }
 }

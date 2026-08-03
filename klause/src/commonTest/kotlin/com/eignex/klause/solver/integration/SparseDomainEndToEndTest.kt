@@ -34,7 +34,7 @@ class SparseDomainEndToEndTest {
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5),
             ),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 variableSelector = InputOrder,
                 randomSeed = 0L,
@@ -61,7 +61,7 @@ class SparseDomainEndToEndTest {
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5),
             ),
         )
-        val models = BacktrackSolver(problem).enumerate(
+        val models = BacktrackSolver(problem.bake()).enumerate(
             BacktrackParams(
                 variableSelector = InputOrder,
                 randomSeed = 0L,
@@ -93,7 +93,7 @@ class SparseDomainEndToEndTest {
             ),
         )
         // Enumerate all models, verify none has x = 3.
-        val models = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 0L)).toList()
+        val models = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).toList()
         assertEquals(4, models.size, "expected 4 models (x ∈ {1, 2, 4, 5}); got ${models.map { it.ints.toList() }}")
         for (m in models) {
             assertTrue(
@@ -114,7 +114,7 @@ class SparseDomainEndToEndTest {
                 AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 5),
             ),
         )
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val r = solver.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 7L))
         val sat = assertIs<SolveResult.Sat>(r)
         // Verify legal assignment: all-different, and (v1, v2) at their singletons.
@@ -144,7 +144,7 @@ class SparseDomainEndToEndTest {
                 AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 1, domainSize = 10),
             ),
         )
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val r = solver.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 42L))
         val sat = assertIs<SolveResult.Sat>(r)
         // v0 must not be 3, 5, or 7.

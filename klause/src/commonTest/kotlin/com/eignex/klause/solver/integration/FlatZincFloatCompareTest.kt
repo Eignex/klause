@@ -19,11 +19,13 @@ class FlatZincFloatCompareTest {
     private fun program(src: String) = parseFlatZinc(src, floatBuckets = 5)
 
     private fun solve(src: String): SolveResult =
-        BacktrackSolver(program(src).problem).solve(BacktrackParams(randomSeed = 0L))
+        BacktrackSolver(program(src).problem.bake()).solve(BacktrackParams(randomSeed = 0L))
 
     private fun pinnedValue(src: String, varName: String): Double {
         val prog = program(src)
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(prog.problem).solve(BacktrackParams(randomSeed = 0L)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(prog.problem.bake()).solve(BacktrackParams(randomSeed = 0L)),
+        )
         val bk = prog.floatVarsByName.getValue(varName)
         return if (bk.lpOnly) sat.assignment.reals[bk.varId] else bk.valueOf(sat.assignment.ints[bk.varId].toInt())
     }

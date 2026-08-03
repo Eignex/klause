@@ -32,7 +32,7 @@ class ForgetStaleFidTest {
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3, 4, 5), domainMin = 0, domainSize = 5)),
         )
         val obj = LinearObjective(intCoefficients = LongArray(6) { 1L })
-        val r = BacktrackSolver(problem).minimize(
+        val r = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(
                 randomSeed = 1L,

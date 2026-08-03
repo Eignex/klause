@@ -88,7 +88,7 @@ class SolutionGuidedTest {
             intDomains = Array(4) { IntDomain(0, 3) },
             factors = arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 4)),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 variableSelector = SmallestDomain,
                 valueSelector = SolutionGuided(IndomainMin),
@@ -117,7 +117,7 @@ class SolutionGuidedTest {
             intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
             factors = emptyArray(),
         )
-        BacktrackSolver(problem).enumerate(
+        BacktrackSolver(problem.bake()).enumerate(
             BacktrackParams(
                 valueSelector = spy,
                 randomSeed = 0L,

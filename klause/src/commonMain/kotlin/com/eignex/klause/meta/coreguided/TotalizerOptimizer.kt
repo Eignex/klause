@@ -108,7 +108,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
             intDomains = baseProblem.intDomains,
             factors = factors,
         )
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
         val costSofts = softs.map { Oll.Soft(it.lit) }
 
         var lb = 0L
@@ -234,7 +234,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
                         numIntVars = baseProblem.numIntVars,
                         intDomains = baseProblem.intDomains,
                         factors = factors,
-                    ),
+                    ).bake(),
                 ).also { solver = it }
             }
             val assumptions = buildWeightedAssumptions(selectors, activeSofts, thresholdVar)

@@ -36,7 +36,7 @@ class LubyRestartTest {
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
         )
-        val r = BacktrackSolver(problem).solve(params)
+        val r = BacktrackSolver(problem.bake()).solve(params)
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(1, sat.assignment.bools.count { it })
     }
@@ -52,7 +52,7 @@ class LubyRestartTest {
             factors = emptyArray(),
         )
         val obj = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
-        val result = BacktrackSolver(problem).minimize(
+        val result = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(
                 randomSeed = 7L,
@@ -89,7 +89,7 @@ class LubyRestartTest {
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
         )
-        val samples = BacktrackSolver(problem).enumerate(params).take(2).toList()
+        val samples = BacktrackSolver(problem.bake()).enumerate(params).take(2).toList()
         assertEquals(2, samples.size)
         // First leaf with IndomainMin = all false.
         assertEquals(listOf(false, false, false), samples[0].bools.toList())
@@ -118,7 +118,7 @@ class LubyRestartTest {
             variableSelector = InputOrder,
             valueSelector = IndomainMin,
         )
-        val r = BacktrackSolver(problem).solve(params)
+        val r = BacktrackSolver(problem.bake()).solve(params)
         assertIs<SolveResult.Sat>(r)
     }
 
@@ -135,7 +135,7 @@ class LubyRestartTest {
             ),
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val samples = BacktrackSolver(problem).enumerate(
+        val samples = BacktrackSolver(problem.bake()).enumerate(
             BacktrackParams(
                 randomSeed = 0L,
                 phaseSaving = true,

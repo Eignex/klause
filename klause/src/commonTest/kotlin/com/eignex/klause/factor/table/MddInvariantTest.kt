@@ -167,7 +167,7 @@ class MddInvariantTest {
             intDomains = arrayOf(IntDomain(1, 2), IntDomain(1, 2)),
             factors = arrayOf(mddFactor()),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 2_000, randomSeed = 0)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

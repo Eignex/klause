@@ -35,11 +35,11 @@ class LpWarmStartTest {
         for (n in 4..6) {
             val p = clique(n, 4)
             val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
-            val cold = BacktrackSolver(p).minimize(
+            val cold = BacktrackSolver(p.bake()).minimize(
                 obj,
                 BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, warmStart = false)),
             )
-            val warm = BacktrackSolver(p).minimize(
+            val warm = BacktrackSolver(p.bake()).minimize(
                 obj,
                 BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, warmStart = true)),
             )
@@ -52,7 +52,7 @@ class LpWarmStartTest {
     fun `warm start exercises the simplex and records pivots`() {
         val p = clique(6, 3)
         val obj = LinearObjective(intCoefficients = LongArray(6) { 1L })
-        val result = BacktrackSolver(p).minimize(
+        val result = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, warmStart = true)),
         )
@@ -67,7 +67,7 @@ class LpWarmStartTest {
         // across structurally identical but differently-bounded nodes.
         val p = clique(3, 5)
         val obj = LinearObjective(intCoefficients = LongArray(3) { 1L })
-        val result = BacktrackSolver(p).minimize(
+        val result = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 2L, lpPlan = LpPlan(bounding = true, warmStart = true)),
         )

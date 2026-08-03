@@ -130,7 +130,7 @@ class DiffnPropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         // Two 2x2 rectangles with positions in [0,1] always overlap (every placement pair
         // shares at least the [1,2)x[1,2) cell), so there is no non-overlapping packing.
         assertIs<SolveResult.Unsat>(r)
@@ -152,7 +152,7 @@ class DiffnPropagatorTest {
                 ),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Sat>(r)
     }
 
@@ -200,6 +200,6 @@ class DiffnPropagatorTest {
                 ),
             ),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 }

@@ -155,7 +155,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
             }
             val problem = buildProblem(baseProblem, workings, exactly1Lits, nextBoolId)
             val assumptions = buildAssumptions(workings, activeIdx)
-            val solver = BacktrackSolver(problem)
+            val solver = BacktrackSolver(problem.bake())
             when (val r = solver.satisfyUnderAssumptions(assumptions, params)) {
                 is SatisfyResult.Sat -> {
                     if (strata.isEmpty()) return optimal(r.sample, costSofts, lb, cores, params)
@@ -290,7 +290,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
         cores: Int,
     ): Result {
         val problem = buildProblem(base, workings, exactly1s, totalBoolVars)
-        return when (val r = BacktrackSolver(problem).solve(params)) {
+        return when (val r = BacktrackSolver(problem.bake()).solve(params)) {
             is SolveResult.Sat -> optimal(r.assignment, costSofts, lb, cores, params)
             is SolveResult.Unsat -> Result.Infeasible(cores)
             is SolveResult.Unknown -> Result.Unknown(r.reason, cores, lb)

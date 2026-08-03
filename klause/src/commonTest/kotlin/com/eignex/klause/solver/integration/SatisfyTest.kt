@@ -20,7 +20,7 @@ class SatisfyTest {
     fun `satisfy returns Sat when assumptions are consistent`() {
         // Two free bools, no constraints. Pin b0=true; expect Sat with b0=true.
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
             Assumptions(bools = mapOf(0 to true)),
             BacktrackParams(),
         )
@@ -39,7 +39,7 @@ class SatisfyTest {
             intDomains = emptyArray(),
             factors = arrayOf(Clause(intArrayOf(Lit.make(0, positive = true)))),
         )
-        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
             Assumptions(bools = mapOf(0 to false, 2 to true)),
             BacktrackParams(),
         )
@@ -63,7 +63,7 @@ class SatisfyTest {
                 Clause(intArrayOf(Lit.make(0, positive = false))),
             ),
         )
-        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
             Assumptions.None,
             BacktrackParams(),
         )
@@ -79,7 +79,7 @@ class SatisfyTest {
             intDomains = emptyArray(),
             factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
         )
-        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
             Assumptions(bools = mapOf(0 to true, 1 to true, 2 to true)),
             BacktrackParams(),
             minimizeCore = true,
@@ -103,7 +103,7 @@ class SatisfyTest {
             intDomains = emptyArray(),
             factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = mapOf(0 to true, 1 to true, 2 to true)),
             ),
@@ -119,7 +119,7 @@ class SatisfyTest {
     @Test
     fun `minimizeCore on satisfiable input still returns Sat`() {
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
             Assumptions(bools = mapOf(0 to true)),
             BacktrackParams(),
             minimizeCore = true,
@@ -139,7 +139,7 @@ class SatisfyTest {
                 Clause(intArrayOf(Lit.make(0, positive = true), Lit.make(1, positive = true))),
             ),
         )
-        val r = BacktrackSolver(problem).satisfyUnderAssumptions(
+        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
             Assumptions(bools = mapOf(0 to true, 1 to true)),
             BacktrackParams(),
         )

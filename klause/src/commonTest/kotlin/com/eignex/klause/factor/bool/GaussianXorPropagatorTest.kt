@@ -54,7 +54,7 @@ class GaussianXorPropagatorTest {
             factors = arrayOf<Factor>(GaussianXor(xors.map { (lits, parity) -> Xor(lits, parity) })),
         )
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-        val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
             .map { it.bools.toList() }.toHashSet()
         assertEquals(brute, found, "GaussianXor enumeration must equal the brute-force XOR solution set")
     }
@@ -97,7 +97,7 @@ class GaussianXorPropagatorTest {
                 factors = arrayOf<Factor>(GaussianXor(rows.map { (lits, parity) -> Xor(lits, parity) })),
             )
             val params = BacktrackParams(randomSeed = seed, variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val found = BacktrackSolver(problem).enumerate(params).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(params).take(100_000)
                 .map { it.bools.toList() }.toHashSet()
             assertEquals(brute, found, "seed $seed: incremental GaussianXor enumeration must equal brute force")
         }

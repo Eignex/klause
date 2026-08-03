@@ -28,7 +28,7 @@ class PbObjectiveCutoffTest {
         // x0 (weight 3) stays false.
         val p = Problem(4, 0, emptyArray(), arrayOf(atLeast(4, min = 2)))
         val obj = LinearObjective(boolWeights = longArrayOf(3, 1, 1, 1))
-        val r = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, pbObjectiveCutoff = true))
+        val r = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 1L, pbObjectiveCutoff = true))
         val opt = assertIs<MinimizeResult.Optimal>(r)
         assertEquals(2.0, opt.objective)
     }
@@ -44,7 +44,7 @@ class PbObjectiveCutoffTest {
             arrayOf(Cardinality(IntArray(3) { Lit.make(it, true) }, min = 0, max = 1)),
         )
         val obj = LinearObjective(boolWeights = longArrayOf(-1, -1, -1))
-        val r = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, pbObjectiveCutoff = true))
+        val r = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 1L, pbObjectiveCutoff = true))
         val opt = assertIs<MinimizeResult.Optimal>(r)
         assertEquals(-1.0, opt.objective)
     }

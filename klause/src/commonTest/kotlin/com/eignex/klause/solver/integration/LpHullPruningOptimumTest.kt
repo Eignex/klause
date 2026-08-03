@@ -28,7 +28,7 @@ class LpHullPruningOptimumTest {
         val p = unrelatedProductProblem()
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         fun optimum(prune: Boolean): Double {
-            val res = BacktrackSolver(p).minimize(
+            val res = BacktrackSolver(p.bake()).minimize(
                 obj,
                 BacktrackParams(
                     randomSeed = 1L,

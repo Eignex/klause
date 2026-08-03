@@ -47,7 +47,7 @@ class PooledSolutionPhasingTest {
             },
             onEvent = { if (it is SearchEvent.Restart) restarts++ },
         )
-        BacktrackSolver(problem()).minimize(LinearObjective(boolWeights = weights), params)
+        BacktrackSolver(problem().bake()).minimize(LinearObjective(boolWeights = weights), params)
         assertTrue(restarts > 0, "the search must restart for the poll to fire")
         assertEquals(restarts, polls, "the pool is consulted exactly once per restart")
     }
@@ -61,7 +61,7 @@ class PooledSolutionPhasingTest {
             randomSeed = 1L,
             pooledSolutionSupplier = { pooledHint },
         )
-        val result = BacktrackSolver(problem()).minimize(objective, params)
+        val result = BacktrackSolver(problem().bake()).minimize(objective, params)
         val sample = assertNotNull(result.assignment)
         assertEquals(optimum, objective.evaluate(sample), "phase hints reorder trials, they never cut solutions")
     }

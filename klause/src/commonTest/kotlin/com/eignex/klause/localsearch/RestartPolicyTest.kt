@@ -86,8 +86,8 @@ class RestartPolicyTest {
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L))
 
-        val fixed = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart())
-        val adaptive = LocalSearchSolver(problem, restartPolicy = AdaptivePerturbationRestart())
+        val fixed = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart())
+        val adaptive = LocalSearchSolver(problem.bake(), restartPolicy = AdaptivePerturbationRestart())
 
         val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 1L)).assignment
         val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 1L)).assignment
@@ -131,7 +131,7 @@ class RestartPolicyTest {
             Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
         )
         val problem = Problem(3, 0, emptyArray(), clauses)
-        val solver = LocalSearchSolver(problem, restartPolicy = LubyRestart(unit = 50))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = LubyRestart(unit = 50))
         val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = 9L)).assignment
         assertNotNull(sample)
     }
@@ -201,7 +201,7 @@ class RestartPolicyTest {
             schedule = ScheduleBundle(restart = spy),
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
-        LocalSearchSolver(problem, strategy = strategy, restartPolicy = FixedCadenceRestart(1_000_000))
+        LocalSearchSolver(problem.bake(), strategy = strategy, restartPolicy = FixedCadenceRestart(1_000_000))
             .solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 4L))
         assertTrue(spy.queried > 0, "the engine must use the restart policy from the strategy's schedule bundle")
     }
@@ -230,7 +230,7 @@ class RestartPolicyTest {
                 Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
             ),
         )
-        LocalSearchSolver(problem, restartPolicy = spy)
+        LocalSearchSolver(problem.bake(), restartPolicy = spy)
             .solve(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))
         assertTrue(spy.observed > 0, "the engine must feed RoundLogs to an adaptive restart policy")
     }

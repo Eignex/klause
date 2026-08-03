@@ -54,7 +54,7 @@ class ResumableSearchTest {
         objective: LinearObjective,
         onIncumbent: (Double) -> Unit = {},
     ): Pair<MinimizeResult, Int> {
-        val handle = BacktrackSolver(problem).resumable(objective, BacktrackParams(randomSeed = 0L))
+        val handle = BacktrackSolver(problem.bake()).resumable(objective, BacktrackParams(randomSeed = 0L))
         var slices = 0
         var terminal: MinimizeResult? = null
         while (terminal == null && slices < 1_000_000) {
@@ -75,7 +75,9 @@ class ResumableSearchTest {
         val obj = LinearObjective(boolWeights = LongArray(problem.numBoolVars) { if (it == 0) 1L else 0L })
 
         // One-shot reference.
-        assertIs<MinimizeResult.Infeasible>(BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)))
+        assertIs<MinimizeResult.Infeasible>(
+            BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)),
+        )
 
         // Sliced: the proof spans multiple slices, so the engine genuinely paused and resumed mid-tree
         // (a cold restart each slice would re-derive everything and never converge here).
@@ -103,7 +105,7 @@ class ResumableSearchTest {
         val obj = LinearObjective(intCoefficients = LongArray(n) { -values[it].toLong() })
 
         val oneShot = assertIs<MinimizeResult.Optimal>(
-            BacktrackSolver(problem).minimize(obj, BacktrackParams(randomSeed = 0L)),
+            BacktrackSolver(problem.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)),
         )
 
         val seen = ArrayList<Double>()
@@ -125,7 +127,7 @@ class ResumableSearchTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val handle = BacktrackSolver(problem).resumable(obj, BacktrackParams(randomSeed = 0L))
+        val handle = BacktrackSolver(problem.bake()).resumable(obj, BacktrackParams(randomSeed = 0L))
         val first = handle.runSlice(Cancellation.Never, sliceMillis = 60_000) {}
         assertIs<MinimizeResult.Optimal>(first)
         assertEquals(3.0, first.objectiveValue)

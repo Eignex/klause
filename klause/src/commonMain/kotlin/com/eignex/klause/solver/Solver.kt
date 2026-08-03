@@ -105,8 +105,8 @@ sealed interface SolveResult {
  *    an alias for [samples] and may yield duplicates.
  */
 interface Solver<P : SolverParams> {
-    /** The problem this solver operates on. */
-    val problem: Problem
+    /** The problem this solver operates on — always a baked, solve-ready one. */
+    val problem: BakedProblem
 
     /** Solve the problem once and return a [SolveResult]. */
     fun solve(params: P): SolveResult

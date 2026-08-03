@@ -23,7 +23,7 @@ class ArithmeticInvariantTest {
             intDomains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 16)),
             factors = arrayOf<Factor>(factor),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 17)).take(20).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

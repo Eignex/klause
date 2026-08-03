@@ -29,8 +29,10 @@ class LagrangianBnbTest {
             arrayOf<Factor>(AllDifferent(intArrayOf(0, 1, 2, 3), domainMin = 0, domainSize = 6)),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L))
-        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(lagrangian = true)))
+        val off = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 1L))
+        val on = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(lagrangian = true)))
 
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(10.0, off.objectiveValue)
@@ -59,8 +61,10 @@ class LagrangianBnbTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 3L))
-        val on = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 3L, lpPlan = LpPlan(lagrangian = true)))
+        val off = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 3L))
+        val on = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 3L, lpPlan = LpPlan(lagrangian = true)))
 
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(off.objectiveValue, on.objectiveValue, "Lagrangian changed the optimum")
@@ -77,7 +81,7 @@ class LagrangianBnbTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1, 1))
         val result = BacktrackSolver(
-            p,
+            p.bake(),
         ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(lagrangian = true)))
         assertTrue(result is MinimizeResult.Optimal)
         assertEquals(3.0, result.objectiveValue)

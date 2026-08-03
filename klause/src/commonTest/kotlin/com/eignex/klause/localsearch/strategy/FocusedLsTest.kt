@@ -55,7 +55,7 @@ class FocusedLsTest {
 
     private fun assertSolvesSat3(label: String, strategy: SourceDrivenStrategy, seed: Long) {
         val problem = Problem(3, 0, emptyArray(), sat3)
-        val solver = LocalSearchSolver(problem, strategy = strategy)
+        val solver = LocalSearchSolver(problem.bake(), strategy = strategy)
         val sample = solver.sample(LocalSearchParams(maxFlips = 20_000L, randomSeed = seed)).assignment
         assertNotNull(sample, "$label should find a satisfying assignment within budget")
         for (clause in sat3) {
@@ -99,7 +99,7 @@ class FocusedLsTest {
             listOf(Cardinality.atLeastOne(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))),
         )
         val solver = LocalSearchSolver(
-            problem,
+            problem.bake(),
             strategy = SimulatedAnnealing.optimizer(Geometric()),
             optimizeStrategy = SimulatedAnnealing.optimizer(Geometric()),
         )

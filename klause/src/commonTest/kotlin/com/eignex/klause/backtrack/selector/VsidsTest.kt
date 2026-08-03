@@ -49,7 +49,7 @@ class VsidsTest {
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(5, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 variableSelector = Vsids(),
                 randomSeed = 0L,
@@ -82,7 +82,7 @@ class VsidsTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = Vsids()))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = Vsids()))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -100,7 +100,7 @@ class VsidsTest {
         // Empty Unsat record so only v3 (the failing decision) gets the bump.
         val emptyUnsat = Unsat()
         repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
-        val r = BacktrackSolver(problem).solve(BacktrackParams(variableSelector = vsids))
+        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r)
     }
 
@@ -115,7 +115,7 @@ class VsidsTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
         )
-        val r1 = BacktrackSolver(p1).solve(BacktrackParams(variableSelector = vsids))
+        val r1 = BacktrackSolver(p1.bake()).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r1)
 
         val p2 = Problem(
@@ -124,7 +124,7 @@ class VsidsTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(6, true)))),
         )
-        val r2 = BacktrackSolver(p2).solve(BacktrackParams(variableSelector = vsids))
+        val r2 = BacktrackSolver(p2.bake()).solve(BacktrackParams(variableSelector = vsids))
         assertIs<SolveResult.Sat>(r2)
         assertEquals(true, r2.assignment.bools[6])
     }

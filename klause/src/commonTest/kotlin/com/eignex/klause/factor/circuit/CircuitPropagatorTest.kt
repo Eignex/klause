@@ -154,7 +154,7 @@ class CircuitPropagatorTest {
                 intDomains = Array(n) { v -> IntDomain(los[v].toLong(), his[v].toLong()) },
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { v -> v })),
             )
-            val result = BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L))
+            val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L))
             checked++
 
             if (brute > 0) {
@@ -201,7 +201,7 @@ class CircuitPropagatorTest {
         }
     }
 
-    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
+    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
         .map { s -> s.ints.map { it.toInt() } }
@@ -292,7 +292,7 @@ class CircuitPropagatorTest {
         // Circuit distinguishes direction and starting point, so the count is
         // (N-1)! = 6 cyclic permutations, not (N-1)!/2 undirected cycles.
         val problem = fourNodeProblem()
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
         val params = BacktrackParams()
         val samples = solver.enumerate(params).toList()
         assertEquals(6, samples.size, "expected 6 Hamiltonian cycles on N=4, got ${samples.size}: $samples")
@@ -482,7 +482,7 @@ class CircuitPropagatorTest {
                 intDomains = Array(n) { IntDomain(0, (n - 1).toLong()) },
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { it }, subcircuit = true)),
             )
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(brute, found, "subcircuit n=$n: enumerated set must equal brute force")
         }

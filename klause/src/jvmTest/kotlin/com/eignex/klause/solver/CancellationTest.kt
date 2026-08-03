@@ -27,7 +27,7 @@ class CancellationTest {
      *  doesn't break the fast path. */
     @Test
     fun `cancellation never set lets backtrack finish normally`() {
-        val r = BacktrackSolver(unsatThreeBools()).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(unsatThreeBools().bake()).solve(BacktrackParams(randomSeed = 0L))
         assertIs<SolveResult.Unsat>(r)
     }
 
@@ -42,7 +42,7 @@ class CancellationTest {
             randomSeed = 1L,
             cancellation = { cancel.get() },
         )
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
 
         val flagger = thread(start = true) {
             Thread.sleep(50)
@@ -72,7 +72,7 @@ class CancellationTest {
             randomSeed = 1L,
             cancellation = { cancel.get() },
         )
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
 
         val flagger = thread(start = true) {
             Thread.sleep(20)

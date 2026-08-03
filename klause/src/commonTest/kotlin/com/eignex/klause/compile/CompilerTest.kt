@@ -60,7 +60,7 @@ class CompilerTest {
         val schema = TinyCampaign()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(40).toList()
@@ -103,7 +103,7 @@ class CompilerTest {
         val schema = IntCampaign()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
@@ -132,7 +132,9 @@ class CompilerTest {
         // `rate` appears only in a non-strict linear constraint, so it lowers to an LP-only continuous
         // column (issue #1232) the simplex resolves; its value rides on the solution's reals.
         assertEquals(1, compiled.problem.numRealVars)
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(compiled.problem).solve(BacktrackParams(randomSeed = 99)))
+        val sat = assertIs<SolveResult.Sat>(
+            BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams(randomSeed = 99)),
+        )
         val rate = compiled.decode(schema.rate, sat.assignment)
         assertTrue(rate >= 0.5 - 1e-9, "rate=$rate violated ge 0.5")
         assertTrue(rate in -1e-9..(1.0 + 1e-9), "rate=$rate out of [0,1]")

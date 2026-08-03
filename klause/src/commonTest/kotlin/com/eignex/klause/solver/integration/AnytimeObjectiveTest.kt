@@ -30,7 +30,7 @@ class AnytimeObjectiveTest {
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 1L, 100L, 50L))
         val sample = LocalSearchSolver(
-            problem,
+            problem.bake(),
         ).minimize(obj, LocalSearchParams(maxFlips = 50, randomSeed = 1L)).assignment
         assertNotNull(sample, "minimize must return a feasible when one was reached during the budget")
         assertTrue(sample.bools.count { it } == 1, "must be a feasible exactly-one assignment")
@@ -52,7 +52,7 @@ class AnytimeObjectiveTest {
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 1L, 100L, 50L, 25L))
         // Logical-clock cancel: maxFlips is unbounded, so only the poll-count token ends the run.
         var polls = 0
-        val sample = LocalSearchSolver(problem).minimize(
+        val sample = LocalSearchSolver(problem.bake()).minimize(
             obj,
             LocalSearchParams(
                 maxFlips = Long.MAX_VALUE,

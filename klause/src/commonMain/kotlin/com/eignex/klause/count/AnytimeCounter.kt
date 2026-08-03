@@ -47,7 +47,7 @@ internal object AnytimeCounter {
             suffix[d] = sizeAtD * suffix[d + 1]
         }
 
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
         var checks = 0L
         var lower = 0L
         var openMass = 0.0 // Σ suffix[node.depth] over feasible-but-unexpanded nodes

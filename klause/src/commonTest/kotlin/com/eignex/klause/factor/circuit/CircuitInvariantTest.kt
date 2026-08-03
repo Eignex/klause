@@ -77,7 +77,7 @@ class CircuitInvariantTest {
             intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
             factors = arrayOf<Factor>(factor),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 100))
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 1L)).assignment
         if (sample != null) {
             val visited = BooleanArray(3)
@@ -133,7 +133,7 @@ class CircuitInvariantTest {
     @Test
     fun `LS solver finds Hamiltonian cycle on N=4`() {
         val problem = fourNodeProblem()
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 7L)).assignment
         assertTrue(sample != null, "LS should find a Hamiltonian cycle on N=4 within budget")
         val visited = BooleanArray(4)
@@ -265,7 +265,7 @@ class CircuitInvariantTest {
     @Test
     fun `LS solver finds a valid subcircuit`() {
         val problem = fourNodeSubcircuitProblem()
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val sample = solver.sample(LocalSearchParams(maxFlips = 10_000L, randomSeed = 13L)).assignment
         assertTrue(sample != null, "LS should find a valid Subcircuit configuration")
     }

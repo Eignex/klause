@@ -195,7 +195,7 @@ internal object SolveCore {
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
-        val solver = BacktrackSolver(solvable.problem)
+        val solver = BacktrackSolver(solvable.problem.bake())
         if (dryRunSolver) {
             errPrintln("solver dry-run:")
             errPrintln(solver.describe(params))
@@ -225,7 +225,7 @@ internal object SolveCore {
     private fun printBtPool(problem: Problem, pool: List<() -> BacktrackRecipe>?, kind: Kind) {
         val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
         errPrintln("solver dry-run: ${recipes.size} backtrack arm(s)")
-        val solver = BacktrackSolver(problem)
+        val solver = BacktrackSolver(problem.bake())
         for (r in recipes) {
             errPrintln("  ${r.label}:")
             for (line in solver.describe(r.build(0L, null)).lines()) errPrintln("    $line")
@@ -360,7 +360,7 @@ internal object SolveCore {
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
         val workers = PortfolioBuilder.build(
-            solvable.problem,
+            solvable.problem.bake(),
             scenario,
             objective = solvable.linearObjective,
             lsObjective = solvable.lsObjective,

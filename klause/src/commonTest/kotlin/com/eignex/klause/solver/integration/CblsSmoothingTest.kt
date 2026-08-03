@@ -28,7 +28,7 @@ class CblsSmoothingTest {
         val schema = CardinalityS()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             strategy = Cbls(smoothProb = 0.4, smoothFactor = 0.8),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )

@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 class SmtLibTest {
 
     private fun solve(text: String): LongArray {
-        val r = BacktrackSolver(SmtLib.parse(text).bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints
     }
@@ -127,7 +127,7 @@ class SmtLibTest {
         """.trimIndent()
         val parsed = SmtLib.parse(text)
         val obj = requireNotNull(parsed.objective)
-        val r = BacktrackSolver(parsed.bounded()).minimize(obj, BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).minimize(obj, BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(7.0, r.objective)
     }
@@ -185,7 +185,7 @@ class SmtLibTest {
             (assert (distinct p q))
             (check-sat)
         """.trimIndent()
-        val r = BacktrackSolver(SmtLib.parse(text).bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         assertTrue(r.assignment.bools[0] != r.assignment.bools[1], "p and q must differ")
     }
@@ -236,7 +236,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
         assertEquals(1, parsed.problem.numRealVars)
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         val n = r.assignment.ints[0]
         val x = r.assignment.reals[0]
@@ -249,7 +249,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-const x Real) (assert (>= x 6.0)) (assert (<= (* 0.1 x) 0.5)) (check-sat)",
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
@@ -262,7 +262,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         val x = r.assignment.reals[0]
         assertTrue(x > 0.333 && x < 0.334, "x=$x should be 1/3")
@@ -282,7 +282,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-const x Real) (assert (< x 2.5)) (assert (> x 2.4)) (check-sat)",
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         val x = r.assignment.reals[0]
         assertTrue(x > 2.4 && x < 2.5, "x=$x must sit strictly inside (2.4, 2.5)")
@@ -293,7 +293,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-const x Real) (assert (< x 2.0)) (assert (>= x 2.0)) (check-sat)",
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
@@ -302,7 +302,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-const x Real) (assert (or (<= x 1.0) (>= x 3.0))) (assert (>= x 2.0)) (check-sat)",
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         assertTrue(r.assignment.reals[0] >= 3.0 - 1e-9, "x=${r.assignment.reals[0]} must take the >= 3 branch")
     }
@@ -317,7 +317,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
@@ -330,7 +330,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         assertTrue(abs(r.assignment.reals[0] - 2.5) < 1e-9, "x=${r.assignment.reals[0]}")
     }
@@ -344,7 +344,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        val res = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val res = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(res is SolveResult.Sat, "expected SAT, got $res")
         assertEquals(2L, res.assignment.ints[parsed.intVarNames.getValue("n")])
     }
@@ -359,7 +359,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
     }
 
@@ -426,7 +426,7 @@ class SmtLibTest {
 
     private fun solveFor(text: String, name: String): Long {
         val parsed = SmtLib.parse(text)
-        val r = BacktrackSolver(parsed.bounded()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints[parsed.intVarNames.getValue(name)]
     }

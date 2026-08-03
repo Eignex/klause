@@ -35,7 +35,7 @@ class TargetPhasingTest {
     @Test
     fun `target phasing finds a valid witness on a satisfiable problem`() {
         val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(clauseProblem()).solve(
+            BacktrackSolver(clauseProblem().bake()).solve(
                 BacktrackParams(randomSeed = 7L, targetPhasing = true, rephaseInterval = 2L),
             ),
         )
@@ -58,13 +58,15 @@ class TargetPhasingTest {
             ),
         )
         assertIs<SolveResult.Unsat>(
-            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, targetPhasing = true)),
+            BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L, targetPhasing = true)),
         )
     }
 
     @Test
     fun `target phasing enumerates exactly the same models as plain phase saving`() {
-        fun enumerate(params: BacktrackParams): Set<List<Boolean>> = BacktrackSolver(clauseProblem()).enumerate(params)
+        fun enumerate(params: BacktrackParams): Set<List<Boolean>> = BacktrackSolver(
+            clauseProblem().bake(),
+        ).enumerate(params)
             .map { it.bools.toList() }
             .toSet()
 

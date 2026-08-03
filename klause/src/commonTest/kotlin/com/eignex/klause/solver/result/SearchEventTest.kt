@@ -40,7 +40,7 @@ class SearchEventTest {
         // proving UNSAT here can take unbounded time. Restart events fire either way. The
         // budget is a single decision per first run — the UNSAT proof needs more than one
         // decision, so at least one restart always fires before it completes.
-        BacktrackSolver(pigeonhole()).solve(
+        BacktrackSolver(pigeonhole().bake()).solve(
             BacktrackParams(
                 randomSeed = 1L,
                 lubyRestartBase = 1L,
@@ -63,7 +63,7 @@ class SearchEventTest {
         val problem = Problem(n, 0, emptyArray(), emptyList())
         val events = mutableListOf<SearchEvent>()
         val objective = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
-        val improvements = BacktrackSolver(problem).improvements(
+        val improvements = BacktrackSolver(problem.bake()).improvements(
             objective,
             BacktrackParams(
                 randomSeed = 1L,
@@ -86,7 +86,7 @@ class SearchEventTest {
         val problem = Problem(n, 0, emptyArray(), emptyList())
         val events = mutableListOf<SearchEvent>()
         val objective = LinearObjective(boolWeights = LongArray(n) { (it + 1).toLong() })
-        LocalSearchSolver(problem).minimize(
+        LocalSearchSolver(problem.bake()).minimize(
             objective,
             LocalSearchParams(
                 randomSeed = 1L,

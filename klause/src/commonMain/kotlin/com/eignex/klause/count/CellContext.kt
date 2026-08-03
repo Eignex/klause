@@ -59,7 +59,7 @@ internal class CellContext private constructor(
      */
     fun countCell(hashes: List<Xor>, cap: Int): CellResult {
         val params = BacktrackPresets.satOptimized().copy(maxDecisions = CELL_DECISION_BUDGET)
-        val enumeration = BacktrackSolver(problem.withHashes(hashes)).enumerate(params)
+        val enumeration = BacktrackSolver(problem.withHashes(hashes).bake()).enumerate(params)
         // For hashed cells, cap+1 models decide ">cap" while staying out of the exhaustion tail; the
         // un-hashed base has no parity slices and must be enumerated fully for an exact projected count.
         val models = if (hashes.isEmpty()) enumeration else enumeration.take(cap + 1)

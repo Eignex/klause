@@ -36,7 +36,7 @@ class SharedBoundsPortfolioTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(3L, 2L, 1L))
 
         val scenario = PortfolioScenario(cores = 1, arms = 3, kind = Kind.COP, engine = EngineMix.BACKTRACK)
-        val workers = PortfolioBuilder.build(problem, scenario, objective = obj)
+        val workers = PortfolioBuilder.build(problem.bake(), scenario, objective = obj)
         val result = SequentialPortfolio.exp3(workers).use { it.minimize() }
         assertIs<MinimizeResult.Optimal>(result)
         assertEquals(4.0, result.objectiveValue, "bound sharing must not change the optimum")

@@ -1,6 +1,7 @@
 package com.eignex.klause.brute
 
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -63,7 +64,7 @@ data class BruteForceParams(
  * one with the lowest objective". Trivially correct and useful as a ground-truth oracle
  * for stochastic optimisation backends on small problems.
  */
-class BruteForceSolver(override val problem: Problem) :
+class BruteForceSolver(override val problem: BakedProblem) :
     Solver<BruteForceParams>,
     Optimizer<BruteForceParams> {
 

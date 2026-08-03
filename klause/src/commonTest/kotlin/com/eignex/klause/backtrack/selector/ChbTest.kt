@@ -51,7 +51,7 @@ class ChbTest {
             ),
         )
         val sat = assertIs<SolveResult.Sat>(
-            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
+            BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
         )
         val b = sat.assignment.bools
         assertTrue(b[0] || b[1])
@@ -71,7 +71,7 @@ class ChbTest {
             ),
         )
         assertIs<SolveResult.Unsat>(
-            BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
+            BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L, variableSelector = Chb())),
         )
     }
 }

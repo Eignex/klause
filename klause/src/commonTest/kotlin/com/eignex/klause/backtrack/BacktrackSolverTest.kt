@@ -37,7 +37,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        val r = BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L))
+        val r = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L))
         val sat = assertIs<SolveResult.Sat>(r)
         assertTrue(
             sat.assignment.bools[0] || sat.assignment.bools[1],
@@ -56,7 +56,7 @@ class BacktrackSolverTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test
@@ -81,7 +81,7 @@ class BacktrackSolverTest {
             intDomains = Array(n) { IntDomain(0, 10) },
             factors = arrayOf<Factor>(factor),
         )
-        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+        val sat = assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))
         val starts = sat.assignment.ints
         for (i in 0 until n) {
             for (j in i + 1 until n) {
@@ -105,7 +105,7 @@ class BacktrackSolverTest {
                 Clause(intArrayOf(Lit.make(0, false))),
             ),
         )
-        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
         val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
         assertEquals(
             setOf(0, 1),
@@ -131,7 +131,7 @@ class BacktrackSolverTest {
                 Clause(intArrayOf(Lit.make(2, false))),
             ),
         )
-        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
         val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
         assertEquals(
             setOf(0, 1, 2, 3),
@@ -197,7 +197,7 @@ class BacktrackSolverTest {
         )
         val pins = mutableMapOf<Int, Boolean>()
         for (v in 0 until 6) pins[v] = false
-        val result = BacktrackSolver(problem).solve(
+        val result = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = pins),
             ),
@@ -225,7 +225,7 @@ class BacktrackSolverTest {
             ),
         )
         val pins = mutableMapOf<Int, Boolean>(0 to true, 1 to true)
-        val result = BacktrackSolver(problem).solve(
+        val result = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = pins),
             ),
@@ -251,7 +251,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Cardinality.exactlyOne(IntArray(4) { Lit.make(it, true) })),
         )
-        val r = BacktrackSolver(problem).solve(
+        val r = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = mapOf(0 to true, 1 to true)),
             ),
@@ -275,7 +275,7 @@ class BacktrackSolverTest {
         )
         val pins = mutableMapOf<Int, Boolean>()
         for (v in 0 until 49) pins[v] = false
-        val result = BacktrackSolver(problem).solve(
+        val result = BacktrackSolver(problem.bake()).solve(
             BacktrackParams(
                 assumptions = Assumptions(bools = pins),
             ),
@@ -306,7 +306,7 @@ class BacktrackSolverTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
             ),
         )
-        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
         val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
         assertEquals(
             setOf(0, 1),
@@ -326,7 +326,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val tight = BacktrackSolver(p).solve(
+        val tight = BacktrackSolver(p.bake()).solve(
             BacktrackParams(
                 maxDecisions = Long.MAX_VALUE,
                 maxInstructions = 2L,
@@ -334,7 +334,7 @@ class BacktrackSolverTest {
             ),
         )
         assertIs<SolveResult.Unknown>(tight)
-        val loose = BacktrackSolver(p).solve(
+        val loose = BacktrackSolver(p.bake()).solve(
             BacktrackParams(
                 maxDecisions = Long.MAX_VALUE,
                 maxInstructions = 1_000_000L,
@@ -352,7 +352,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        val r = BacktrackSolver(p).solve(BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false))))
+        val r = BacktrackSolver(p.bake()).solve(BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false))))
         val sat = assertIs<SolveResult.Sat>(r)
         assertEquals(false, sat.assignment.bools[0])
         assertEquals(true, sat.assignment.bools[1])
@@ -375,7 +375,7 @@ class BacktrackSolverTest {
                 ),
             ),
         )
-        val models = BacktrackSolver(p).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
+        val models = BacktrackSolver(p.bake()).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
         assertEquals(4, models.size)
         assertEquals(4, models.toSet().size, "models must be distinct")
         for (m in models) {
@@ -391,7 +391,7 @@ class BacktrackSolverTest {
             intDomains = arrayOf(IntDomain(0, 2)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
         )
-        val models = BacktrackSolver(p).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
+        val models = BacktrackSolver(p.bake()).enumerate(BacktrackParams(minHammingDistance = 0)).toList()
         assertEquals(setOf(1L, 2L), models.map { it.ints[0] }.toSet())
     }
 
@@ -405,7 +405,7 @@ class BacktrackSolverTest {
                 Cardinality.exactlyOne((0..9).map { Lit.make(it, true) }.toIntArray()),
             ),
         )
-        val r = BacktrackSolver(p).solve(BacktrackParams(maxDecisions = 1))
+        val r = BacktrackSolver(p.bake()).solve(BacktrackParams(maxDecisions = 1))
         // Could legitimately be Unknown or Sat depending on whether the first branch hits.
         assertTrue(
             r is SolveResult.Sat || r is SolveResult.Unknown,
@@ -431,7 +431,7 @@ class BacktrackSolverTest {
             ),
         )
         val obj = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val best = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
+        val best = BacktrackSolver(p.bake()).minimize(obj, BacktrackParams(randomSeed = 0L)).assignment
         assertNotNull(best)
         assertEquals(3.0, obj.evaluate(best))
         assertEquals(true, best.bools[3])
@@ -453,7 +453,7 @@ class BacktrackSolverTest {
                 ),
             ),
         )
-        val models = BacktrackSolver(p).enumerate(
+        val models = BacktrackSolver(p.bake()).enumerate(
             BacktrackParams(minHammingDistance = 2, recentWindow = 16),
         ).toList()
         for (i in 0 until models.size - 1) {
@@ -471,7 +471,7 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val models = BacktrackSolver(p).samples(BacktrackParams(randomSeed = 0L)).take(80).toList()
+        val models = BacktrackSolver(p.bake()).samples(BacktrackParams(randomSeed = 0L)).take(80).toList()
         assertEquals(80, models.size, "samples is infinite for feasible problems; take(80) drains exactly 80")
         assertEquals(4, models.toSet().size, "All 4 distinct models should be sampled with replacement")
     }
@@ -550,7 +550,7 @@ class BacktrackSolverTest {
 
             val params =
                 BacktrackParams(randomSeed = seed.toLong(), variableSelector = Vsids(), maxLearnedClauses = 1_000)
-            val raw = BacktrackSolver(p).enumerate(params).take(brute.size + 10)
+            val raw = BacktrackSolver(p.bake()).enumerate(params).take(brute.size + 10)
                 .map { s -> s.bools.map { if (it) 1 else 0 } + s.ints.map { it.toInt() } }.toList()
             assertEquals(raw.size, raw.toHashSet().size, "seed $seed: a solution was yielded more than once")
             assertEquals(brute, raw.toHashSet(), "seed $seed: enumeration must equal the brute-force feasible set")
@@ -568,12 +568,12 @@ class BacktrackSolverTest {
             intDomains = emptyArray(),
             factors = arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))),
         )
-        val fired = BacktrackSolver(p).solve(
+        val fired = BacktrackSolver(p.bake()).solve(
             BacktrackParams(randomSeed = 0L, cancellation = Cancellation { true }, propagationCancelFloor = 0),
         )
         assertIs<SolveResult.Unknown>(fired)
         // With no deadline the same problem is solved.
-        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams(randomSeed = 0L)))
+        assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     private class ThreeDistinct : VariableSchema() {

@@ -61,7 +61,7 @@ class ElementPropagatorTest {
         }
     }
 
-    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem)
+    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
         .map { it.ints.map { v -> v.toInt() } }
@@ -228,7 +228,7 @@ class ElementPropagatorTest {
                     }
                 }
             }
-            val found = BacktrackSolver(problem)
+            val found = BacktrackSolver(problem.bake())
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "seed=$seed: delta-gated element + interior holes must match brute")
@@ -296,7 +296,7 @@ class ElementPropagatorTest {
                     if (pos in arr.indices && res == arr[pos].toInt()) brute.add(listOf(res, idxV))
                 }
             }
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "const-array Element: enumerated set must equal brute force")
         }
@@ -322,7 +322,7 @@ class ElementPropagatorTest {
                     }
                 }
             }
-            val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
+            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "var-array Element: enumerated set must equal brute force")
         }
@@ -347,7 +347,7 @@ class ElementPropagatorTest {
                 if (res == arr[idxV - 1].toInt()) brute.add(listOf(res, idxV))
             }
         }
-        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 3L)).take(100_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 3L)).take(100_000)
             .map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "duplicate-constant const Element: enumerated set must equal brute force")
     }
@@ -376,7 +376,7 @@ class ElementPropagatorTest {
                 }
             }
         }
-        val found = BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = 5L)).take(100_000)
+        val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 5L)).take(100_000)
             .map { it.ints.map { v -> v.toInt() } }.toHashSet()
         assertEquals(brute, found, "coupled const Elements: enumerated set must equal brute force")
     }

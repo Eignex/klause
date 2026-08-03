@@ -152,7 +152,7 @@ class RegularInvariantTest {
             intDomains = Array(4) { IntDomain(1, 2) },
             factors = arrayOf<Factor>(endsWith2Factor(4)),
         )
-        val solver = LocalSearchSolver(problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
+        val solver = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 3_000, randomSeed = 7)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {

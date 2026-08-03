@@ -24,7 +24,7 @@ class ComparisonClauseFoldTest {
         Problem(numBool, domains.size, domains, factors.toTypedArray())
 
     /** Enumerate a problem's solutions projected onto its integer variables. */
-    private fun intSolutions(problem: Problem): HashSet<List<Long>> = BacktrackSolver(problem)
+    private fun intSolutions(problem: Problem): HashSet<List<Long>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = 1L)).take(10_000).map { it.ints.toList() }.toHashSet()
 
     @Test

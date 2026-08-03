@@ -41,7 +41,7 @@ class LpOnlyContinuousLeafTest {
         // certifies the continuous point, so the leaf is a genuine solution.
         val row = Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
         val p = problem(1, arrayOf(IntDomain(0, 3)), 0.0, 10.0, row)
-        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
@@ -50,7 +50,7 @@ class LpOnlyContinuousLeafTest {
         // the fraction-free basis solve certifies it feasible (0 <= 3/2 <= 10).
         val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
         val p = problem(0, emptyArray(), 0.0, 10.0, row)
-        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
@@ -68,7 +68,7 @@ class LpOnlyContinuousLeafTest {
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
@@ -83,7 +83,7 @@ class LpOnlyContinuousLeafTest {
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
-        val r = assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+        val r = assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
         assertEquals(true, r.assignment.reals[0] <= -6.0 + 1e-9)
     }
 
@@ -99,7 +99,7 @@ class LpOnlyContinuousLeafTest {
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(5.0),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
@@ -107,7 +107,7 @@ class LpOnlyContinuousLeafTest {
         // No discrete variables; r in [0,1] with r >= 5 has no feasible point — exact Farkas certifies it.
         val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L)
         val p = problem(0, emptyArray(), 0.0, 1.0, row)
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
@@ -117,7 +117,7 @@ class LpOnlyContinuousLeafTest {
         // refutes r/3 >= 1 over r in [0,2] outright.
         val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0 / 3.0), intArrayOf(0), LinearOp.GE, 1L)
         val p = problem(0, emptyArray(), 0.0, 2.0, row)
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
@@ -145,10 +145,10 @@ class LpOnlyContinuousLeafTest {
         for (bounding in booleanArrayOf(false, true)) {
             val params = BacktrackParams(lpPlan = LpPlan(bounding = bounding))
             assertIs<SolveResult.Sat>(
-                BacktrackSolver(problem(1, arrayOf(IntDomain(0, 3)), 0.0, 10.0, feasible)).solve(params),
+                BacktrackSolver(problem(1, arrayOf(IntDomain(0, 3)), 0.0, 10.0, feasible).bake()).solve(params),
             )
             assertIs<SolveResult.Unsat>(
-                BacktrackSolver(problem(0, emptyArray(), 0.0, 1.0, infeasible)).solve(params),
+                BacktrackSolver(problem(0, emptyArray(), 0.0, 1.0, infeasible).bake()).solve(params),
             )
         }
     }
@@ -157,7 +157,7 @@ class LpOnlyContinuousLeafTest {
     fun `local search declines a model with LP-only continuous variables`() {
         val row = Linear(longArrayOf(1L), intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
         val p = problem(1, arrayOf(IntDomain(0, 3)), 0.0, 10.0, row)
-        val r = assertIs<SolveResult.Unknown>(LocalSearchSolver(p).solve())
+        val r = assertIs<SolveResult.Unknown>(LocalSearchSolver(p.bake()).solve())
         assertEquals(TerminationReason.Unsupported, r.reason)
     }
 }

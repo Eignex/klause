@@ -15,7 +15,7 @@ class AssumptionsTest {
     fun `sample should fix bool assumption to requested value`() {
         // Two bools, no constraints. Without assumptions both can be either value.
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         repeat(20) { seed ->
             val sample = solver.sample(
                 LocalSearchParams(randomSeed = seed.toLong(), assumptions = Assumptions(bools = mapOf(0 to true))),
@@ -33,7 +33,7 @@ class AssumptionsTest {
             intDomains = arrayOf(IntDomain(min = 0, max = 100)),
             factors = emptyArray(),
         )
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         repeat(20) { seed ->
             val sample = solver.sample(
                 LocalSearchParams(randomSeed = seed.toLong(), assumptions = Assumptions(ints = mapOf(0 to 42))),
@@ -47,7 +47,7 @@ class AssumptionsTest {
     fun `minimize should respect bool assumption`() {
         // 4 bools, objective rewards every true; without assumptions optimal is "all true".
         val problem = Problem(numBoolVars = 4, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val obj = LinearObjective(boolWeights = longArrayOf(-1L, -1L, -1L, -1L))
         val sample = solver.minimize(
             obj,
@@ -67,7 +67,7 @@ class AssumptionsTest {
     @Test
     fun `samples should honour assumptions across the stream`() {
         val problem = Problem(numBoolVars = 3, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val draws = solver.samples(
             LocalSearchParams(
                 randomSeed = 5L,
@@ -85,7 +85,7 @@ class AssumptionsTest {
         // Clause: bool0 OR bool1. Assume bool0 = false → bool1 must be true.
         val clauses = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))))
         val problem = Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = clauses)
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         val sample = solver.sample(
             LocalSearchParams(
                 randomSeed = 9L,

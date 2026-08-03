@@ -35,7 +35,7 @@ class RegretSelectorSolveTest {
             ),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
-        val r = BacktrackSolver(problem).minimize(
+        val r = BacktrackSolver(problem.bake()).minimize(
             obj,
             BacktrackParams(
                 variableSelector = MaxRegret(obj),

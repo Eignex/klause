@@ -8,7 +8,7 @@ import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.FeasibleDescent
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
@@ -27,7 +27,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
      *  warm-start seam so a [SequentialPortfolio] can resume a segment from the shared incumbent. The
      *  restart cadence rides on the recipe's `strategy.schedule.restart`. Label is `ls/<label>`. */
     override fun materialize(
-        problem: Problem,
+        problem: BakedProblem,
         index: Int,
         armId: Int,
         seed: Long,
@@ -50,7 +50,7 @@ internal class LocalSearchWorkerConfig(val recipe: LocalSearchRecipe) : WorkerCo
             problem to null
         }
         val session = LocalSearchSolver(
-            effectiveProblem,
+            effectiveProblem.bake(),
             strategy = recipe.strategy,
             optimizeStrategy = recipe.optimizeStrategy,
             definitionalSweep = definitionalSweep,

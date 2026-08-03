@@ -31,7 +31,7 @@ class ComparisonClauseTest {
         LinearOp.NE -> x != c
     }
 
-    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Long>> = BacktrackSolver(problem)
+    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Long>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
         .map { it.ints.toList() }
@@ -121,7 +121,7 @@ class ComparisonClauseTest {
             intDomains = arrayOf(IntDomain(0, 3)),
             factors = arrayOf<Factor>(clauseOf(listOf(le(0, -1)))),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L)))
     }
 
     @Test
@@ -134,6 +134,6 @@ class ComparisonClauseTest {
             intDomains = arrayOf(IntDomain(1, 3), IntDomain(0, 4)),
             factors = arrayOf<Factor>(clauseOf(listOf(le(0, 0), ge(1, 5)))),
         )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(problem).solve(BacktrackParams(randomSeed = 1L)))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L)))
     }
 }

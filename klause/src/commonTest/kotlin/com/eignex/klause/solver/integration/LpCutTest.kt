@@ -31,9 +31,11 @@ class LpCutTest {
     fun `cuts preserve the optimum`() {
         val p = allDiff(4, 6)
         val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
+        val off = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
         val on = BacktrackSolver(
-            p,
+            p.bake(),
         ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
 
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
@@ -46,7 +48,7 @@ class LpCutTest {
         val p = allDiff(4, 6)
         val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val on = BacktrackSolver(
-            p,
+            p.bake(),
         ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
         assertTrue(on is MinimizeResult.Optimal)
         assertEquals(6.0, on.objectiveValue)
@@ -67,8 +69,10 @@ class LpCutTest {
         val p = Problem(0, n, Array(n) { IntDomain(0, 3) }, rows.toTypedArray())
         val obj = LinearObjective(intCoefficients = LongArray(n) { 1L })
 
-        val off = BacktrackSolver(p).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
-        val on = BacktrackSolver(p).minimize(
+        val off = BacktrackSolver(
+            p.bake(),
+        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true)))
+        val on = BacktrackSolver(p.bake()).minimize(
             obj,
             BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true, gomory = true)),
         )

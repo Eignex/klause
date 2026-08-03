@@ -27,7 +27,7 @@ class MinimizeTerminationTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         // All-zero weights: every assignment evaluates to 0; greedy descent never improves.
         val degenerate = LinearObjective(boolWeights = LongArray(4))
         val sample = solver.minimize(
@@ -52,7 +52,7 @@ class MinimizeTerminationTest {
             intDomains = emptyArray(),
             factors = emptyArray(),
         )
-        val solver = LocalSearchSolver(problem)
+        val solver = LocalSearchSolver(problem.bake())
         var deltaCalls = 0
         // Incremental linear objective that counts per-move probes, so we observe how far the descent
         // scanned before bailing.

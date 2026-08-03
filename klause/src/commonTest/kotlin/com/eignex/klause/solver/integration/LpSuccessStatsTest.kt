@@ -33,7 +33,7 @@ class LpSuccessStatsTest {
         val p = makespanProblem(n, longArrayOf(3, 2, 4, 2, 3), longArrayOf(1, 2, 1, 2, 1), capacity = 2L, hi = 8)
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == n) 1L else 0L })
         val params = BacktrackParams(randomSeed = 7L, lpConfig = LpConfig.AGGRESSIVE)
-        val res = BacktrackSolver(p).minimize(obj, params)
+        val res = BacktrackSolver(p.bake()).minimize(obj, params)
         assertTrue(res is MinimizeResult.Optimal, "expected an optimum, got $res")
         val s = res.stats
 

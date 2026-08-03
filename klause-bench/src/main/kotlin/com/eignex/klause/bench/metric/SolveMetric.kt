@@ -351,14 +351,14 @@ internal object SolveMetric {
      *  on the model's annotated search; `cp` → conflict-driven backtrack. */
     private fun solveInProcess(entry: ResolvedProblem, search: KlauseSearch, cancel: Cancellation) {
         when (search.engine) {
-            "ls" -> LocalSearchSolver(entry.problem).solve(
+            "ls" -> LocalSearchSolver(entry.problem.bake()).solve(
                 LocalSearchParams(randomSeed = SOLVE_SEED, cancellation = cancel, lsObjective = entry.lsObjective),
             )
 
             else -> {
                 val params = (entry.searchParams?.takeIf { search.engine == "fixed" })?.copy(cancellation = cancel)
                     ?: BacktrackPresets.conflictDriven(randomSeed = SOLVE_SEED, cancellation = cancel)
-                val solver = BacktrackSolver(entry.problem)
+                val solver = BacktrackSolver(entry.problem.bake())
                 entry.objective?.let { solver.minimize(it, params) } ?: solver.solve(params)
             }
         }

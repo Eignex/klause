@@ -62,7 +62,7 @@ class CdclOptimizationTest {
             maxLearnedClauses = 1_000,
             maxDecisions = 200_000L,
         )
-        val terminal = BacktrackSolver(problem).minimize(obj, params)
+        val terminal = BacktrackSolver(problem.bake()).minimize(obj, params)
         val optimal = assertIs<MinimizeResult.Optimal>(terminal)
         assertEquals(-bestValue.toDouble(), optimal.objective, "must prove the true knapsack optimum")
     }

@@ -38,27 +38,27 @@ class RealProductLeafTest {
     fun `fixed integer operand yields an exact product certified SAT`() {
         // x = 2, operand r in [0,5], result w = 2·r; forcing w = 6 needs r = 3, feasible.
         val p = problem(arrayOf(IntDomain(2, 2)), 0.0, 5.0, RealProduct(0, 0, 1, 0.0, 5.0), resultEquals(6))
-        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
     fun `exact product with no feasible real completion is UNSAT`() {
         // x = 2, w = 2·r; forcing w = 12 needs r = 6, outside r in [0,5] — exact Farkas certifies UNSAT.
         val p = problem(arrayOf(IntDomain(2, 2)), 0.0, 5.0, RealProduct(0, 0, 1, 0.0, 5.0), resultEquals(12))
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
     fun `integer operand is enumerated and every leaf product is checked`() {
         // x in [1,3], operand pinned to r = 2, so w = 2·x at each leaf; w = 5 has no integer x — UNSAT.
         val p = problem(arrayOf(IntDomain(1, 3)), 2.0, 2.0, RealProduct(0, 0, 1, 2.0, 2.0), resultEquals(5))
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 
     @Test
     fun `feasible bilinear product across a branch is SAT`() {
         // x in [1,3], r in [0,5], w = x·r; forcing w = 9 is met at the x = 3 leaf with r = 3 (exact).
         val p = problem(arrayOf(IntDomain(1, 3)), 0.0, 5.0, RealProduct(0, 0, 1, 0.0, 5.0), resultEquals(9))
-        assertIs<SolveResult.Sat>(BacktrackSolver(p).solve(BacktrackParams()))
+        assertIs<SolveResult.Sat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
     }
 }

@@ -35,7 +35,7 @@ class BuildersTest {
 
         assertTrue(compiled.problem.factors.any { it is AllDifferent })
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 4)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -110,7 +110,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 11)).take(10).toList()
@@ -136,7 +136,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
@@ -163,7 +163,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 14)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -188,7 +188,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 33)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -209,7 +209,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 5)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -234,7 +234,7 @@ class BuildersTest {
         }
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Circuit })
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample)
         // Verify it's a Hamiltonian cycle of length 4.
@@ -260,7 +260,7 @@ class BuildersTest {
         }
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Circuit })
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample)
         // The user-facing values are 1..4 (1-indexed). Verify Hamiltonian cycle in that space.
@@ -292,7 +292,7 @@ class BuildersTest {
         }
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Cumulative })
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val sample = solver.sample(BacktrackParams()).assignment
         assertNotNull(sample)
         // Verify non-overlapping schedule under capacity 1.
@@ -316,7 +316,7 @@ class BuildersTest {
         }
         val compiled = S().compile()
         assertTrue(compiled.problem.factors.any { it is Cumulative && it.unary })
-        val solver = BacktrackSolver(compiled.problem)
+        val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).toList()
         assertEquals(6, samples.size, "expected 3! disjunctive schedules; got $samples")
     }
@@ -334,7 +334,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 21)).take(10).toList()
@@ -360,7 +360,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 8)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -383,7 +383,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 12)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -405,7 +405,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 5)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -425,7 +425,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 9)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -445,7 +445,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).take(15).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -478,7 +478,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(10).toList()
@@ -500,7 +500,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 19)).take(10).toList()
@@ -536,7 +536,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(15).toList()
@@ -562,7 +562,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 13)).take(15).toList()
@@ -587,7 +587,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 41)).take(10).toList()
@@ -623,7 +623,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 11)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -644,7 +644,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 7)).take(8).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -664,7 +664,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver =
-            LocalSearchSolver(compiled.problem, restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
+            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 23)).take(10).toList()
         assertTrue(samples.isNotEmpty())
         for (s in samples) {
@@ -684,7 +684,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 42)).take(10).toList()
@@ -710,7 +710,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val solver = LocalSearchSolver(
-            compiled.problem,
+            compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
         )
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 99)).take(10).toList()
@@ -735,7 +735,7 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem)
+        val sample = BacktrackSolver(compiled.problem.bake())
             .enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "sort: solver found no sample")
         fun v(n: String) = sample.ints[compiled.intVarIdByName.getValue(n)]
@@ -758,7 +758,7 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem)
+        val sample = BacktrackSolver(compiled.problem.bake())
             .enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "diffn: solver found no sample")
         fun v(n: String) = sample.ints[compiled.intVarIdByName.getValue(n)]
@@ -795,7 +795,7 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem)
+        val sample = BacktrackSolver(compiled.problem.bake())
             .enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "regular: solver found no sample")
         fun v(n: String) = sample.ints[compiled.intVarIdByName.getValue(n)]
@@ -827,7 +827,9 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
+        val sample = BacktrackSolver(
+            compiled.problem.bake(),
+        ).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "mdd: solver found no sample")
     }
 
@@ -862,7 +864,9 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
+        val sample = BacktrackSolver(
+            compiled.problem.bake(),
+        ).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "cost_regular: solver found no sample")
     }
 
@@ -894,7 +898,9 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        val sample = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
+        val sample = BacktrackSolver(
+            compiled.problem.bake(),
+        ).enumerate(BacktrackParams(maxDecisions = 500_000L)).firstOrNull()
         assertTrue(sample != null, "cost_mdd: solver found no sample")
     }
 
@@ -909,7 +915,7 @@ class BuildersTest {
         val schema = S()
         val compiled = schema.compile()
         val handles = listOf(schema.x0, schema.x1, schema.x2)
-        val sols = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val sols = BacktrackSolver(compiled.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { s -> handles.map { compiled.decode(it, s) } }.toList()
         // Every solution is a self-inverse permutation of {0,1,2}.
         for (p in sols) {
@@ -935,7 +941,7 @@ class BuildersTest {
         val compiled = schema.compile()
         val fh = listOf(schema.f0, schema.f1, schema.f2)
         val gh = listOf(schema.g0, schema.g1, schema.g2)
-        val sols = BacktrackSolver(compiled.problem).enumerate(BacktrackParams(randomSeed = 0L))
+        val sols = BacktrackSolver(compiled.problem.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { s -> fh.map { compiled.decode(it, s) } to gh.map { compiled.decode(it, s) } }.toList()
         for ((f, g) in sols) {
             assertTrue(f.toSet().size == f.size, "f not a permutation: $f")

@@ -54,8 +54,10 @@ class CpToLpRelaxationSubcircuitArcTest {
     fun `arc relaxation keeps the optimum correct end to end`() {
         val p = problem()
         val base = BacktrackParams(randomSeed = 1L)
-        val noLp = BacktrackSolver(p).minimize(objective, base)
-        val lp = BacktrackSolver(p).minimize(objective, base.copy(lpPlan = LpPlan(bounding = true, circuit = true)))
+        val noLp = BacktrackSolver(p.bake()).minimize(objective, base)
+        val lp = BacktrackSolver(
+            p.bake(),
+        ).minimize(objective, base.copy(lpPlan = LpPlan(bounding = true, circuit = true)))
         assertTrue(noLp is MinimizeResult.Optimal, "baseline should solve, got $noLp")
         assertTrue(lp is MinimizeResult.Optimal, "subcircuit-LP solve should be optimal, got $lp")
         // succ[0] >= 1 forces node 0 included; the cheapest is succ[0] = 1 (e.g. the 2-cycle 0->1->0).

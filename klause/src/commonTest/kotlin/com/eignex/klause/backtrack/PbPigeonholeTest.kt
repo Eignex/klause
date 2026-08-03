@@ -39,7 +39,9 @@ class PbPigeonholeTest {
         // measured) yet comfortably above the cutting-planes count (~0.4k measured), so it captures the
         // exponential/polynomial separation without being brittle.
         val result = assertIs<SolveResult.Unsat>(
-            BacktrackSolver(php(pigeons = 9, holes = 8)).solve(BacktrackParams(randomSeed = 1L, pbLearning = true)),
+            BacktrackSolver(
+                php(pigeons = 9, holes = 8).bake(),
+            ).solve(BacktrackParams(randomSeed = 1L, pbLearning = true)),
         )
         assertTrue(
             nodes(result) < 3000,
@@ -52,10 +54,10 @@ class PbPigeonholeTest {
         // Small enough that the clause path is still cheap, so the separation can be asserted directly.
         val p = { php(pigeons = 8, holes = 7) }
         val pb = assertIs<SolveResult.Unsat>(
-            BacktrackSolver(p()).solve(BacktrackParams(randomSeed = 1L, pbLearning = true)),
+            BacktrackSolver(p().bake()).solve(BacktrackParams(randomSeed = 1L, pbLearning = true)),
         )
         val clause = assertIs<SolveResult.Unsat>(
-            BacktrackSolver(p()).solve(BacktrackParams(randomSeed = 1L, pbLearning = false)),
+            BacktrackSolver(p().bake()).solve(BacktrackParams(randomSeed = 1L, pbLearning = false)),
         )
         assertTrue(
             nodes(pb) * 3 < nodes(clause),

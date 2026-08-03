@@ -30,7 +30,7 @@ class MddStructuralReduceTest {
         val problem = Problem(numBoolVars = 0, numIntVars = 2, intDomains = arrayOf(d0, d1), factors = arrayOf(mdd))
         val params = BacktrackParams(randomSeed = 1L, variableSelector = Vsids(), maxLearnedClauses = 1_000)
         return BacktrackSolver(
-            problem,
+            problem.bake(),
         ).enumerate(params).take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
     }
 
