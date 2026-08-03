@@ -8,6 +8,8 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
@@ -59,9 +61,20 @@ object SmtLib {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
         searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
+    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
+
+    /** Parse SMT-LIB linear-arithmetic from a streamed [source], pulling one top-level command at a time
+     *  so the whole script is never materialized. Semantically identical to the [String] overload. */
+    fun parse(
+        source: CharSource,
+        unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+        unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+        strictBounds: Boolean = false,
+        searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     ): SmtLibProblem {
         val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
-        for (cmd in SExprReader(text).readAll()) b.command(cmd)
+        val reader = SExprReader(source)
+        while (true) b.command(reader.readCommandOrNull() ?: break)
         return b.build()
     }
 

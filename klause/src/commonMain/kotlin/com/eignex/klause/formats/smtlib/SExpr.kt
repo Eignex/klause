@@ -1,5 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.io.CharReader
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
+
 /** Minimal S-expression model for SMT-LIB scripts. */
 sealed interface SExpr {
     /** Atom token. */
@@ -15,19 +19,27 @@ sealed interface SExpr {
     ) : SExpr
 }
 
-/** Streaming parser for S-expressions. */
-class SExprReader(private val src: String) {
-    private var pos = 0
+/** Streaming parser for S-expressions. Pulls characters from a [CharReader], so the whole script is
+ *  never materialized; commands are read one at a time via [readCommandOrNull]. */
+class SExprReader(private val reader: CharReader) {
+    /** Parse a [String] in one shot — the in-memory path for tests and the DSL. */
+    constructor(src: String) : this(CharReader(StringCharSource(src)))
 
-    /** Parse all top-level forms. */
+    /** Wrap a streamed [source] directly. */
+    constructor(source: CharSource) : this(CharReader(source))
+
+    /** The next top-level form, or `null` at end of input (inter-command whitespace skipped). Streaming
+     *  the commands one at a time keeps a large script from ever being held whole. */
+    fun readCommandOrNull(): SExpr? {
+        skipWs()
+        if (reader.eof()) return null
+        return readExpr()
+    }
+
+    /** Parse all top-level forms. Kept for the in-memory callers; it just drains [readCommandOrNull]. */
     fun readAll(): List<SExpr> {
         val out = ArrayList<SExpr>()
-        while (true) {
-            skipWs()
-            if (pos >= src.length) break
-            out.add(readExpr())
-        }
-        return out
+        while (true) out.add(readCommandOrNull() ?: return out)
     }
 
     // Structural parse failures surface through the catchable FormatException supertype (shared by
@@ -37,25 +49,25 @@ class SExprReader(private val src: String) {
 
     private fun readExpr(): SExpr {
         skipWs()
-        if (pos >= src.length) parseError("unexpected end of input")
+        if (reader.eof()) parseError("unexpected end of input")
         // A `)` where an expression is expected is unbalanced: [readToken] would return an empty
         // token without advancing, spinning [readAll] forever, so reject it here.
-        if (src[pos] == ')') parseError("unexpected ')'")
-        if (src[pos] != '(') return SExpr.Atom(readToken())
+        if (reader.peek() == ')'.code) parseError("unexpected ')'")
+        if (reader.peek() != '('.code) return SExpr.Atom(readToken())
         // Iterative nesting via an explicit stack: SMT-LIB formulas nest thousands of lists deep,
         // which overflows a recursive-descent reader.
         val stack = ArrayDeque<ArrayList<SExpr>>()
         while (true) {
             skipWs()
-            if (pos >= src.length) parseError("unterminated list")
-            when (src[pos]) {
-                '(' -> {
-                    pos++
+            if (reader.eof()) parseError("unterminated list")
+            when (reader.peek()) {
+                '('.code -> {
+                    reader.advance()
                     stack.addLast(ArrayList())
                 }
 
-                ')' -> {
-                    pos++
+                ')'.code -> {
+                    reader.advance()
                     val list = SExpr.SList(stack.removeLast())
                     if (stack.isEmpty()) return list
                     stack.last().add(list)
@@ -67,47 +79,68 @@ class SExprReader(private val src: String) {
     }
 
     private fun readToken(): String {
-        val start = pos
-        when (src[pos]) {
+        val sb = StringBuilder()
+        when (reader.peek()) {
             // Quoted symbol |...| — may contain whitespace and parentheses; runs to the next '|'.
-            '|' -> {
-                pos++
-                while (pos < src.length && src[pos] != '|') pos++
-                if (pos >= src.length) parseError("unterminated |quoted symbol|")
-                pos++
+            '|'.code -> {
+                sb.append('|')
+                reader.advance()
+                while (!reader.eof() && reader.peek() != '|'.code) sb.appendCurrent()
+                if (reader.eof()) parseError("unterminated |quoted symbol|")
+                sb.append('|')
+                reader.advance()
             }
 
             // String literal "..." with "" as an embedded-quote escape.
-            '"' -> {
-                pos++
-                while (pos < src.length) {
-                    if (src[pos] == '"') {
-                        if (pos + 1 < src.length && src[pos + 1] == '"') pos += 2 else break
+            '"'.code -> {
+                sb.append('"')
+                reader.advance()
+                while (!reader.eof()) {
+                    if (reader.peek() == '"'.code) {
+                        if (reader.peek(1) == '"'.code) {
+                            sb.append("\"\"")
+                            reader.advance()
+                            reader.advance()
+                        } else {
+                            break
+                        }
                     } else {
-                        pos++
+                        sb.appendCurrent()
                     }
                 }
-                if (pos >= src.length) parseError("unterminated string literal")
-                pos++
+                if (reader.eof()) parseError("unterminated string literal")
+                sb.append('"')
+                reader.advance()
             }
 
-            else -> while (pos < src.length && !src[pos].isWhitespace() && src[pos] != '(' && src[pos] != ')') pos++
+            else -> while (!reader.eof() && !reader.peek().toChar().isWhitespace() &&
+                reader.peek() != '('.code && reader.peek() != ')'.code
+                ) {
+                    sb.appendCurrent()
+                }
         }
-        return src.substring(start, pos)
+        return sb.toString()
     }
 
     private fun skipWs() {
-        while (pos < src.length) {
-            val c = src[pos]
+        while (!reader.eof()) {
+            val c = reader.peek()
             when {
-                c.isWhitespace() -> pos++
+                c.toChar().isWhitespace() -> reader.advance()
 
-                c == ';' -> {
-                    while (pos < src.length && src[pos] != '\n') pos++
+                c == ';'.code -> {
+                    while (!reader.eof() && reader.peek() != '\n'.code) reader.advance()
                 }
 
                 else -> return
             }
         }
+    }
+
+    // Append the character under the cursor and consume it — the streaming analogue of the old
+    // `src.substring(start, pos)` token capture.
+    private fun StringBuilder.appendCurrent() {
+        append(reader.peek().toChar())
+        reader.advance()
     }
 }
