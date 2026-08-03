@@ -20,7 +20,7 @@ internal object WcnfMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val parsed = Dimacs.parseWcnf(readTextFile(path))
+            val parsed = Dimacs.parseWcnf(openFileSource(path))
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
                     "soft=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"

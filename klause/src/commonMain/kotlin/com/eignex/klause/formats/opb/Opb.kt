@@ -6,6 +6,9 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
+import com.eignex.klause.io.lineSequence
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
@@ -89,9 +92,12 @@ object Opb {
     }
 
     /** Parse OPB [text] into an [OpbProblem]. */
-    fun parse(text: String): OpbProblem {
+    fun parse(text: String): OpbProblem = parse(StringCharSource(text))
+
+    /** Parse an OPB [source] into an [OpbProblem], consuming it line by line. */
+    fun parse(source: CharSource): OpbProblem {
         val tokens = mutableListOf<String>()
-        for (rawLine in text.lineSequence()) {
+        for (rawLine in source.lineSequence()) {
             val line = rawLine.trim()
             if (line.isEmpty() || line.startsWith("*")) continue
             // `;` terminates a statement and need not be whitespace-separated (e.g. `... >= 1;`), so

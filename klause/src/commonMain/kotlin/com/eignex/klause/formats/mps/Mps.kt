@@ -3,6 +3,9 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.splitWhitespace
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
+import com.eignex.klause.io.lineSequence
 
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)
@@ -102,7 +105,10 @@ object Mps {
     }
 
     /** Parse MPS [text] into an [MpsModel]. */
-    fun parse(text: String): MpsModel {
+    fun parse(text: String): MpsModel = parse(StringCharSource(text))
+
+    /** Parse an MPS [source] into an [MpsModel], consuming it line by line. */
+    fun parse(source: CharSource): MpsModel {
         val rows = ArrayList<Row>()
         val rowByName = HashMap<String, Row>()
         val vars = ArrayList<Var>()
@@ -113,7 +119,7 @@ object Mps {
         var section = Section.NONE
         var inIntegerMarker = false
 
-        for (rawLine in text.lineSequence()) {
+        for (rawLine in source.lineSequence()) {
             // Comments start with `*`; blank lines are skipped. A line with no leading whitespace and a
             // recognised keyword opens a new section, otherwise it is a data line for the current one.
             if (rawLine.isBlank() || rawLine.startsWith("*")) continue
