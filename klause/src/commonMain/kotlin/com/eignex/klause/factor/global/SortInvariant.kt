@@ -34,7 +34,7 @@ internal class SortInvariant(private val xs: IntArray, private val ys: IntArray)
         val sortedXs = xsVals.copyOf().also { it.sort() }
         for (i in ys.indices) {
             val target = sortedXs[i]
-            if (target != ysVals[i] && target in state.problem.intDomains[ys[i]]) {
+            if (target != ysVals[i] && target in state.rootDomains[ys[i]]) {
                 sink.addChannelingIntSet(state, ys[i], target)
             }
         }
@@ -49,7 +49,7 @@ internal class SortInvariant(private val xs: IntArray, private val ys: IntArray)
             for (ui in 0 until under.size) {
                 val vPrime = under[ui]
                 for (k in xs.indices) {
-                    if (xsVals[k] == v && vPrime in state.problem.intDomains[xs[k]]) {
+                    if (xsVals[k] == v && vPrime in state.rootDomains[xs[k]]) {
                         sink.addChannelingIntSet(state, xs[k], vPrime)
                         break
                     }
@@ -65,7 +65,7 @@ internal class SortInvariant(private val xs: IntArray, private val ys: IntArray)
         val sortedXs = LongArray(xs.size) { state.assignment.intValue(xs[it]) }.also { it.sort() }
         for (i in ys.indices) {
             val target = sortedXs[i]
-            if (target !in state.problem.intDomains[ys[i]]) return false
+            if (target !in state.rootDomains[ys[i]]) return false
             if (state.assumptions.isFrozenInt(ys[i]) && state.assignment.intValue(ys[i]) != target) return false
         }
         for (i in ys.indices) {

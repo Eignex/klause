@@ -104,13 +104,13 @@ internal class CumulativePropagator(
             // instead of leaving the generalised thresholds as extra same-var leaves that a single
             // bound decision crossed, which left these nogoods non-asserting (#744). Mirrors how every
             // other global constraint reasons ([PropagationState.composeIntVarAtomAntecedents]).
-            val orig = state.problem.intDomains[starts[k]]
+            val orig = state.rootDomains[starts[k]]
             if (dom.max < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], dom.max), false))
             if (dom.min > orig.min) out.add(Lit.make(state.atomVarGe(starts[k], dom.min), false))
             citeEnergyBounds(out, state, k, eff)
         }
         if (capacityVar >= 0) {
-            val orig = state.problem.intDomains[capacityVar]
+            val orig = state.rootDomains[capacityVar]
             if (eff.cap < orig.max) out.add(Lit.make(state.atomVarLe(capacityVar, eff.cap), false))
         }
         if (out.size == 0) return null
@@ -120,13 +120,13 @@ internal class CumulativePropagator(
     private fun citeEnergyBounds(out: IntArrayList, state: PropagationState, k: Int, eff: CumulativeEff) {
         if (durationVars.isNotEmpty()) {
             val dv = durationVars[k]
-            if (eff.dur[k] > state.problem.intDomains[dv].min) {
+            if (eff.dur[k] > state.rootDomains[dv].min) {
                 out.add(Lit.make(state.atomVarGe(dv, eff.dur[k]), false))
             }
         }
         if (resourceVars.isNotEmpty()) {
             val rv = resourceVars[k]
-            if (eff.res[k] > state.problem.intDomains[rv].min) {
+            if (eff.res[k] > state.rootDomains[rv].min) {
                 out.add(Lit.make(state.atomVarGe(rv, eff.res[k]), false))
             }
         }
@@ -140,7 +140,7 @@ internal class CumulativePropagator(
         newMin: Long,
         eff: CumulativeEff,
     ): IntArray? {
-        val orig = state.problem.intDomains[starts[i]]
+        val orig = state.rootDomains[starts[i]]
         val extra = if (oldMin > orig.min) Lit.make(state.atomVarGe(starts[i], oldMin), false) else 0
         if (newMin - oldMin > d) {
             return windowOverloadReason(state, i, oldMin, newMin - 1 + d, eff, extra)
@@ -156,7 +156,7 @@ internal class CumulativePropagator(
         newMax: Long,
         eff: CumulativeEff,
     ): IntArray? {
-        val orig = state.problem.intDomains[starts[i]]
+        val orig = state.rootDomains[starts[i]]
         val extra = if (oldMax < orig.max) Lit.make(state.atomVarLe(starts[i], oldMax), false) else 0
         if (oldMax - newMax > d) {
             return windowOverloadReason(state, i, newMax + 1, oldMax + d, eff, extra)
@@ -185,13 +185,13 @@ internal class CumulativePropagator(
             val ect = dom.min + dk
             if (lst >= ect) continue
             if (ect <= winLo || lst >= winHi) continue
-            val orig = state.problem.intDomains[starts[k]]
+            val orig = state.rootDomains[starts[k]]
             if (dom.min > orig.min) out.add(Lit.make(state.atomVarGe(starts[k], dom.min), false))
             if (dom.max < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], dom.max), false))
             citeEnergyBounds(out, state, k, eff)
         }
         if (capacityVar >= 0) {
-            val orig = state.problem.intDomains[capacityVar]
+            val orig = state.rootDomains[capacityVar]
             if (eff.cap < orig.max) out.add(Lit.make(state.atomVarLe(capacityVar, eff.cap), false))
         }
         if (out.size == 0) return null

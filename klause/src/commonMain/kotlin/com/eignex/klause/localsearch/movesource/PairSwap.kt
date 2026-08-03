@@ -111,8 +111,8 @@ class PairSwap(
                 val owners = state.seeding.ownerInt
                 if (owners != null && (owners[u] >= 0 || owners[w] >= 0)) return null
             }
-            val du = state.problem.intDomains[u]
-            val dw = state.problem.intDomains[w]
+            val du = state.rootDomains[u]
+            val dw = state.rootDomains[w]
             // Same-shaped domains only (swaps target permutation/assignment structure over one value
             // range); cross-domain swaps (decision var vs derived load/count var) are meaningless.
             if (sameShape && (du.min != dw.min || du.max != dw.max)) return null

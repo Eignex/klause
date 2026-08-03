@@ -58,7 +58,7 @@ internal class LinearInvariant(
                 val c = coeffs[i]
                 if (c == 0L) continue
                 val cur = state.assignment.intValue(v)
-                val d = state.problem.intDomains[v]
+                val d = state.rootDomains[v]
                 if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                 if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
             }
@@ -71,7 +71,7 @@ internal class LinearInvariant(
             val cur = state.assignment.intValue(v)
             val sumWithout = sum - c * cur
             val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true) ?: continue
-            val clamped = state.problem.intDomains[v].clamp(target)
+            val clamped = state.rootDomains[v].clamp(target)
             if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
         }
     }
@@ -113,7 +113,7 @@ internal class LinearInvariant(
         val curU = state.assignment.intValue(u)
         val newU = curU + uShift
         if (newU == curU) return
-        val dom = state.problem.intDomains[u]
+        val dom = state.rootDomains[u]
         if (newU < dom.min || newU > dom.max) return
         sink.add(IntSet(u, newU))
         sink.pin(u)
@@ -163,8 +163,8 @@ internal class LinearInvariant(
                     val newA = va + delta
                     val newB = vb + deltaB
                     if (newA == va && newB == vb) continue
-                    val domA = state.problem.intDomains[vars[a]]
-                    val domB = state.problem.intDomains[vars[b]]
+                    val domA = state.rootDomains[vars[a]]
+                    val domB = state.rootDomains[vars[b]]
                     if (newA !in domA || newB !in domB) continue
                     sink.addCompound(
                         listOf(
@@ -211,7 +211,7 @@ internal class LinearInvariant(
             val absC = if (c < 0) -c else c
             val maxStep = slack / absC
             if (maxStep <= 0L) continue
-            val dom = state.problem.intDomains[v]
+            val dom = state.rootDomains[v]
             // For LE: positive c → decrease v (frees more slack), negative c → increase v.
             // For GE: opposite. Either way, the move stays feasible because |Δ·c| ≤ slack.
             val direction = when (op) {

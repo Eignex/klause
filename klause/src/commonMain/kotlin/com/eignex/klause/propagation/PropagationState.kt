@@ -112,8 +112,13 @@ class PropagationState(
     /** Read/write view over the current Boolean assignment. */
     val boolValues: BoolView = BoolView()
 
-    /** Per-int current domain (copy of [Problem.intDomains], narrowed as propagation proceeds). */
-    val intDomains: Array<IntDomain> = Array(problem.numIntVars) { problem.intDomains[it] }
+    /** The stable root domains this state was seeded from — the search root, read by propagators for a
+     *  variable's original bounds. Decoupled from [problem] so the bake can seed from raw declared domains
+     *  and search from baked ones without the machinery caring which. */
+    val rootDomains: Array<IntDomain> = problem.intDomains
+
+    /** Per-int current domain (copy of [rootDomains], narrowed as propagation proceeds). */
+    val intDomains: Array<IntDomain> = Array(problem.numIntVars) { rootDomains[it] }
 
     /** Vars whose pin/domain changed since the driver last drained them. Primitive int
      *  ring buffers to avoid the autoboxing tax `ArrayDeque<Int>` pays on every push/poll. */
@@ -229,7 +234,7 @@ class PropagationState(
         val out = IntArrayList()
         for (v in vars) {
             val d = intDomains[v]
-            val orig = problem.intDomains[v]
+            val orig = rootDomains[v]
             if (d.min > orig.min) {
                 // Dedup on the atom's virtual-var id: it is a unique identity per (v, GE, d.min),
                 // so the threshold value need not be packed into the key (it may exceed 32 bits).

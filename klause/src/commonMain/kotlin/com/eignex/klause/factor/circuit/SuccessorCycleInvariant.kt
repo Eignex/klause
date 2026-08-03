@@ -86,7 +86,7 @@ internal open class SuccessorCycleInvariant(
     private fun appendEdge(state: LocalSearchState, from: Int, to: Int, parts: ArrayList<Move>): Boolean {
         val v = succ[from]
         if (state.assumptions.isFrozenInt(v)) return false
-        if (to.toLong() !in state.problem.intDomains[v]) return false
+        if (to.toLong() !in state.rootDomains[v]) return false
         parts.add(Move.IntSet(v, to.toLong()))
         return true
     }

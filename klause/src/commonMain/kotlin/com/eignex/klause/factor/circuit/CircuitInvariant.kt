@@ -15,7 +15,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
         for (i in succ.indices) {
             val v = succ[i]
             val cur = state.assignment.intValue(v)
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             val span = d.size
             if (span <= MAX_TARGETS) {
                 d.forEach { target ->
@@ -53,9 +53,9 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
             if (a == v || a == p) continue
             val b = nextOf[a]
             if (b == v) continue
-            if (nv.toLong() !in state.problem.intDomains[succ[p]]) continue
-            if (v.toLong() !in state.problem.intDomains[succ[a]]) continue
-            if (b.toLong() !in state.problem.intDomains[succ[v]]) continue
+            if (nv.toLong() !in state.rootDomains[succ[p]]) continue
+            if (v.toLong() !in state.rootDomains[succ[a]]) continue
+            if (b.toLong() !in state.rootDomains[succ[v]]) continue
             sink.addCompound(
                 listOf(
                     Move.IntSet(succ[p], nv.toLong()),
@@ -100,7 +100,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         for (i in 0 until n) {
             val target = (i + 1) % n
-            if (target.toLong() !in state.problem.intDomains[succ[i]]) return false
+            if (target.toLong() !in state.rootDomains[succ[i]]) return false
             if (state.assumptions.isFrozenInt(
                     succ[i],
                 ) && state.assignment.intValue(succ[i]) != target.toLong()
@@ -151,8 +151,8 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
                 val si = effective[i]
                 val sj = effective[j]
                 if (si < 0 || sj < 0) continue
-                val di = state.problem.intDomains[succ[i]]
-                val dj = state.problem.intDomains[succ[j]]
+                val di = state.rootDomains[succ[i]]
+                val dj = state.rootDomains[succ[j]]
                 if (sj.toLong() !in di.min..di.max || si.toLong() !in dj.min..dj.max) continue
                 sink.addCompound(listOf(Move.IntSet(succ[i], sj.toLong()), Move.IntSet(succ[j], si.toLong())))
                 swapsAdded++

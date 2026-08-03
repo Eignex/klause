@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -36,6 +37,11 @@ class LocalSearchState(
     /** Variables pinned for this search. */
     var assumptions: Assumptions = Assumptions.None,
 ) {
+    /** The stable root domains this search was seeded from — read by invariants for a variable's
+     *  original bounds. Decoupled from [problem] so the seed source (declared vs baked) can vary without
+     *  the invariants caring which. */
+    val rootDomains: Array<IntDomain> = problem.intDomains
+
     /** The current variable assignment. */
     val assignment: Assignment = Assignment(
         numBoolVars = problem.numBoolVars,
@@ -152,7 +158,7 @@ class LocalSearchState(
 
     /** Reset to a fresh random assignment and reinitialise all factors. */
     fun restart() {
-        assignment.randomize(rng, problem.intDomains)
+        assignment.randomize(rng, rootDomains)
         // Overwrite the assumed slots so the assignment starts consistent with the caller's pins.
         assumptions.forEachBool { id, value ->
             if (assignment.boolValue(id) != value) assignment.flipBool(id)
@@ -239,7 +245,7 @@ class LocalSearchState(
         val affected = net.affectedNodes(ints.toIntArray(), bools.toIntArray())
         for (idx in affected) {
             val n = net.node(idx)
-            val v = n.eval(assignment, problem.intDomains)
+            val v = n.eval(assignment, rootDomains)
             if (v == DefinitionalSweep.SweepNode.NO_WRITE) continue
             if (n.outIsBool) {
                 if (assignment.boolValue(n.out) != (v != 0L)) applyBoolFlip(n.out)

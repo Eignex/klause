@@ -65,8 +65,8 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         if (a < b) return
         val xV = xs[k]
         val yV = ys[k]
-        val dx = state.problem.intDomains[xV]
-        val dy = state.problem.intDomains[yV]
+        val dx = state.rootDomains[xV]
+        val dy = state.rootDomains[yV]
         val needXLE = if (strict) b - 1 else b
         val needYGE = if (strict) a + 1 else a
         if (needXLE in dx) {
@@ -110,7 +110,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
             val vId = arr[k + 1 + state.rng.nextInt(arr.size - (k + 1))]
             if (prefix.contains(vId)) continue
             val cur = state.assignment.intValue(vId)
-            val d = state.problem.intDomains[vId]
+            val d = state.rootDomains[vId]
             var pick = -1L
             var seen = 0
             d.forEach { w ->
@@ -134,24 +134,24 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         val xv = if (state.assumptions.isFrozenInt(x0)) {
             state.assignment.intValue(x0)
         } else {
-            state.problem.intDomains[x0].min
+            state.rootDomains[x0].min
         }
         val yv = if (state.assumptions.isFrozenInt(y0)) {
             state.assignment.intValue(y0)
         } else {
-            state.problem.intDomains[y0].max
+            state.rootDomains[y0].max
         }
         if (xv >= yv) return false
         if (!state.assumptions.isFrozenInt(x0)) state.assignment.setInt(x0, xv)
         if (!state.assumptions.isFrozenInt(y0)) state.assignment.setInt(y0, yv)
         for (i in 1 until xs.size) {
             if (!state.assumptions.isFrozenInt(xs[i])) {
-                state.assignment.setInt(xs[i], state.problem.intDomains[xs[i]].min)
+                state.assignment.setInt(xs[i], state.rootDomains[xs[i]].min)
             }
         }
         for (i in 1 until ys.size) {
             if (!state.assumptions.isFrozenInt(ys[i])) {
-                state.assignment.setInt(ys[i], state.problem.intDomains[ys[i]].min)
+                state.assignment.setInt(ys[i], state.rootDomains[ys[i]].min)
             }
         }
         return true
@@ -197,8 +197,8 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
         for (i in startK until len) {
             val a = state.assignment.intValue(xs[i])
             val b = state.assignment.intValue(ys[i])
-            val dx = state.problem.intDomains[xs[i]]
-            val dy = state.problem.intDomains[ys[i]]
+            val dx = state.rootDomains[xs[i]]
+            val dy = state.rootDomains[ys[i]]
             var added = false
             if (a > dx.min) {
                 sink.addChannelingIntSet(state, xs[i], a - 1)

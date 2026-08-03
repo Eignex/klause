@@ -29,7 +29,7 @@ internal class AllDifferentInvariant(
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         for (v in vars) {
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             require(d.min >= domainMin && d.max < domainMin + domainSize) {
                 "AllDifferent var $v has domain $d outside declared union " +
                     "[$domainMin..${domainMin + domainSize - 1}]"
@@ -154,7 +154,7 @@ internal class AllDifferentInvariant(
             if (!presentInvFn(state, i)) continue
             val v = vars[i]
             if (state.assumptions.isFrozenInt(v)) continue
-            val d = state.problem.intDomains[v]
+            val d = state.rootDomains[v]
             var chosen = Long.MIN_VALUE
             d.forEach { cand ->
                 if (chosen == Long.MIN_VALUE && (cand in exceptValues || !used.contains(cand))) chosen = cand
@@ -197,7 +197,7 @@ internal class AllDifferentInvariant(
         }
         val m = freeVars.size
         val valuesPerVar = Array(m) { k ->
-            val d = state.problem.intDomains[freeVars[k]]
+            val d = state.rootDomains[freeVars[k]]
             val allowed = IntArrayList()
             d.forEach { cand ->
                 val idx = cand - domainMin
@@ -222,7 +222,7 @@ internal class AllDifferentInvariant(
                 continue
             }
             var chosen = Long.MIN_VALUE
-            state.problem.intDomains[v].forEach { cand ->
+            state.rootDomains[v].forEach { cand ->
                 if (chosen == Long.MIN_VALUE && cand in exceptValues) {
                     chosen = cand
                 }
@@ -258,7 +258,7 @@ internal class AllDifferentInvariant(
             if (state.rng.nextInt(seenOccupants) == 0) occupant = v
         }
         if (occupant == -1) return
-        val d = state.problem.intDomains[occupant]
+        val d = state.rootDomains[occupant]
         val targets = LongArray(MAX_REPAIR_TARGETS) { Long.MIN_VALUE }
         var filled = 0
         var seenTargets = 0
@@ -291,7 +291,7 @@ internal class AllDifferentInvariant(
                 }
             }
             if (holder == -1 || holder == occupant) continue
-            val hd = state.problem.intDomains[holder]
+            val hd = state.rootDomains[holder]
             if (value !in hd) continue
             sink.addCompound(listOf(Move.IntSet(occupant, wLong), Move.IntSet(holder, value)))
             swapsAdded++

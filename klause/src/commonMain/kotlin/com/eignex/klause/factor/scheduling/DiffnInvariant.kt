@@ -181,10 +181,10 @@ internal class DiffnInvariant(
                 val wj = rw(state, j, -1, 0L)
                 val hj = rh(state, j, -1, 0L)
                 if (!overlaps(xi, yi, wi, hi, xj, yj, wj, hj)) continue
-                val dxsI = state.problem.intDomains[xs[i]]
-                val dysI = state.problem.intDomains[ys[i]]
-                val dxsJ = state.problem.intDomains[xs[j]]
-                val dysJ = state.problem.intDomains[ys[j]]
+                val dxsI = state.rootDomains[xs[i]]
+                val dysI = state.rootDomains[ys[i]]
+                val dxsJ = state.rootDomains[xs[j]]
+                val dysJ = state.rootDomains[ys[j]]
                 val leftI = xj - wi
                 val rightI = xj + wj
                 val downI = yj - hi
@@ -254,8 +254,8 @@ internal class DiffnInvariant(
             val xj = state.assignment.intValue(xs[j])
             val yj = state.assignment.intValue(ys[j])
             if (xi == xj && yi == yj) continue
-            if (xj !in state.problem.intDomains[xs[i]] || yj !in state.problem.intDomains[ys[i]]) continue
-            if (xi !in state.problem.intDomains[xs[j]] || yi !in state.problem.intDomains[ys[j]]) continue
+            if (xj !in state.rootDomains[xs[i]] || yj !in state.rootDomains[ys[i]]) continue
+            if (xi !in state.rootDomains[xs[j]] || yi !in state.rootDomains[ys[j]]) continue
             val parts = ArrayList<Move>(4)
             if (xj != xi) parts.add(IntSet(xs[i], xj))
             if (yj != yi) parts.add(IntSet(ys[i], yj))
@@ -273,12 +273,12 @@ internal class DiffnInvariant(
     override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
         if (n == 0) return false
         var prevRight = Long.MIN_VALUE
-        val order = (0 until n).sortedBy { state.problem.intDomains[xs[it]].min }
+        val order = (0 until n).sortedBy { state.rootDomains[xs[it]].min }
         for (i in order) {
             val xv = xs[i]
             val w = rw(state, i, -1, 0L)
             if (!state.assumptions.isFrozenInt(xv)) {
-                val d = state.problem.intDomains[xv]
+                val d = state.rootDomains[xv]
                 val cand = if (prevRight > d.min) prevRight else d.min
                 if (cand > d.max) return false
                 var s = Long.MIN_VALUE
@@ -298,7 +298,7 @@ internal class DiffnInvariant(
                 prevRight = s + w
             }
             val yv = ys[i]
-            if (!state.assumptions.isFrozenInt(yv)) state.assignment.setInt(yv, state.problem.intDomains[yv].min)
+            if (!state.assumptions.isFrozenInt(yv)) state.assignment.setInt(yv, state.rootDomains[yv].min)
         }
         return true
     }

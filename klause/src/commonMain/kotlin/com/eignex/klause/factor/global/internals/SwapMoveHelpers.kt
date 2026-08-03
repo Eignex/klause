@@ -28,7 +28,7 @@ internal inline fun proposeRandomSwaps(
         val va = state.assignment.intValue(a)
         val vb = state.assignment.intValue(b)
         if (va == vb) continue
-        if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) continue
+        if (vb !in state.rootDomains[a] || va !in state.rootDomains[b]) continue
         sink.addCompound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
         emitted++
     }
@@ -65,8 +65,8 @@ internal inline fun proposeRandomRotations(
         val vb = state.assignment.intValue(b)
         val vc = state.assignment.intValue(c)
         if (va == vb || vb == vc || va == vc) continue
-        if (vc !in state.problem.intDomains[a] || va !in state.problem.intDomains[b] ||
-            vb !in state.problem.intDomains[c]
+        if (vc !in state.rootDomains[a] || va !in state.rootDomains[b] ||
+            vb !in state.rootDomains[c]
         ) {
             continue
         }
