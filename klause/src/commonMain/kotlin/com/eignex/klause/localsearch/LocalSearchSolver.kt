@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.compile.CompiledProblem
+import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.Move
@@ -81,8 +81,8 @@ class LocalSearchSolver(
 ) : Solver<LocalSearchParams>,
     Optimizer<LocalSearchParams> {
 
-    /** Solve a [CompiledProblem]'s problem with the default local-search configuration. */
-    constructor(compiled: CompiledProblem) : this(compiled.problem)
+    /** Solve a [CompiledSchema]'s problem with the default local-search configuration. */
+    constructor(compiled: CompiledSchema) : this(compiled.problem)
 
     /** Compile [schema] with the default config and solve the resulting problem. */
     constructor(schema: VariableSchema) : this(schema.compile().problem)

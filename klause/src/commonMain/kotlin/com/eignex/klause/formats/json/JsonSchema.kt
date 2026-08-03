@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.json
 
-import com.eignex.klause.compile.CompiledProblem
+import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.Compiler
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.model.SchemaEntry
@@ -23,8 +23,8 @@ object JsonSchema {
     /** Parse and compile, returning only the [Problem]. */
     fun parseProblem(text: String): Problem = parseCompiled(text).problem
 
-    /** Parse and compile, returning the full [CompiledProblem]. */
-    fun parseCompiled(text: String): CompiledProblem = Compiler().compile(decode(text))
+    /** Parse and compile, returning the full [CompiledSchema]. */
+    fun parseCompiled(text: String): CompiledSchema = Compiler().compile(decode(text))
 
     private fun decode(text: String): SchemaDef<SchemaEntry> = try {
         json.decodeFromString(SchemaDef.serializer(SchemaEntry.serializer()), text)

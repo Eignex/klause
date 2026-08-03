@@ -1,6 +1,6 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.compile.CompiledProblem
+import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.propagation.PropagationSession
@@ -43,8 +43,8 @@ class BacktrackSolver(override val problem: Problem) :
     Optimizer<BacktrackParams>,
     ResumableOptimizer<BacktrackParams> {
 
-    /** Solve a [CompiledProblem]'s problem. */
-    constructor(compiled: CompiledProblem) : this(compiled.problem)
+    /** Solve a [CompiledSchema]'s problem. */
+    constructor(compiled: CompiledSchema) : this(compiled.problem)
 
     /** Compile [schema] with the default config and solve the resulting problem. */
     constructor(schema: VariableSchema) : this(schema.compile().problem)
