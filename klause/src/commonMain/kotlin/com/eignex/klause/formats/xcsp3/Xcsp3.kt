@@ -19,6 +19,8 @@ import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -108,13 +110,41 @@ object Xcsp3 {
      *  presolve step 0, bounded there by the presolve deadline. */
     // The scanners report malformed input via `require` and the throw is re-typed, not swallowed: the
     // original message is carried into the format exception verbatim.
+    fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = parse(StringCharSource(text), negTableCap)
+
+    /** Parse XCSP3 from a streamed [source], driving a pull cursor over the document so the container
+     *  elements and — crucially — a `<group>`'s `<args>` rows are consumed one at a time and never held
+     *  whole. Semantically identical to the [String] overload: the same per-element [Builder] logic
+     *  receives the same bounded subtrees, just fed incrementally rather than from a resident DOM. */
     @Suppress("SwallowedException")
-    fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = try {
+    fun parse(source: CharSource, negTableCap: Long = 1_000_000L): Xcsp3Problem = try {
         Builder(negTableCap).run {
-            val root = parseXml(text)
-            root.child("variables")?.let { vs -> vs.children.forEach { declareVar(it) } }
-            root.child("constraints")?.let { cs -> cs.children.forEach { constraint(it) } }
-            root.child("objectives")?.let { objs -> objs.children.firstOrNull()?.let { objective(it) } }
+            val reader = XmlReader(source)
+            reader.openRoot()
+            // Single forward pass over `<instance>`'s children, dispatching by tag. A separate scan per
+            // container would over-consume when one (e.g. a pure-COP with no `<constraints>`) is absent,
+            // since the scan cannot rewind; the ordered walk both keeps memory bounded and tolerates gaps.
+            while (true) {
+                when (reader.nextChildTag() ?: break) {
+                    "variables" -> if (reader.enterPeeked()) {
+                        while (reader.nextChildTag() != null) declareVar(reader.materializeChild())
+                    }
+
+                    "constraints" -> if (reader.enterPeeked()) streamConstraints(reader)
+
+                    // Only the first objective is taken (as the DOM `firstOrNull` did); the rest of the
+                    // block is still drained so its closing tag is consumed and the outer walk stays aligned.
+                    "objectives" -> if (reader.enterPeeked()) {
+                        var first = true
+                        while (reader.nextChildTag() != null) {
+                            if (first) objective(reader.materializeChild()) else reader.materializeChild()
+                            first = false
+                        }
+                    }
+
+                    else -> reader.materializeChild() // annotations and any other sibling: skip its subtree
+                }
+            }
             build()
         }
     } catch (e: IllegalArgumentException) {
@@ -1091,28 +1121,73 @@ object Xcsp3 {
             }
         }
 
-        /** Instantiate a `<group>` template for each `<args>` row. */
+        /** Instantiate a `<group>` template for each `<args>` row of a fully materialized `<group>`. The
+         *  streaming path ([streamGroup]) shares the same per-row emit; this overload stays for a `<group>`
+         *  that reaches [constraint] already materialized (e.g. one nested as a template). */
         internal fun group(e: XmlElement) {
             val template = e.children.firstOrNull { it.tag != "args" }
                 ?: throw UnsupportedXcsp3Exception("group without a template constraint")
             val used = template.explicitParamIndices()
-            // An `<intension>` template over scalar `%i` placeholders is parsed once and reused: substitute
-            // the args into the expression tree per row instead of re-expanding and re-parsing the string,
-            // which otherwise dominates the parse of group-heavy models (millions of rows, one template).
-            val intensionTemplate =
-                if (template.tag == "intension" && FExpr.isScalarTemplate(template.textContent)) {
-                    FExpr.parse(template.textContent.trim())
-                } else {
-                    null
-                }
+            val intensionTemplate = intensionTemplateOf(template)
             for (args in e.children.filter { it.tag == "args" }) {
-                val tokens = args.textContent.splitWs()
-                    .flatMap { expandNames(it) }
-                if (intensionTemplate != null) {
-                    intension(FExpr.substitute(intensionTemplate, tokens))
-                } else {
-                    constraint(template.substituteParams(tokens, used))
+                applyGroupRow(template, used, intensionTemplate, argsTokens(args))
+            }
+        }
+
+        /** Drive the streaming cursor over a `<constraints>` (or `<block>`) body: dispatch each child
+         *  constraint as it arrives, recursing into `<block>` and streaming a `<group>`'s `<args>` rows one
+         *  at a time so neither the container nor a group's rows are ever all resident. */
+        internal fun streamConstraints(reader: XmlReader) {
+            while (true) {
+                val tag = reader.nextChildTag() ?: return
+                when (tag) {
+                    "group" -> streamGroup(reader)
+                    "block" -> if (reader.enterPeeked()) streamConstraints(reader)
+                    else -> constraint(reader.materializeChild())
                 }
+            }
+        }
+
+        /** Stream a `<group>`: materialize the (first, bounded) template, then instantiate one `<args>` row
+         *  at a time — the memory win, since a group over millions of rows never holds them all at once. */
+        private fun streamGroup(reader: XmlReader) {
+            require(reader.enterPeeked()) { "group without a template constraint" }
+            val firstTag = reader.nextChildTag()
+                ?: throw UnsupportedXcsp3Exception("group without a template constraint")
+            require(firstTag != "args") { "group template must precede its <args> rows" }
+            val template = reader.materializeChild()
+            val used = template.explicitParamIndices()
+            val intensionTemplate = intensionTemplateOf(template)
+            while (true) {
+                val tag = reader.nextChildTag() ?: break
+                require(tag == "args") { "group: expected <args>, found <$tag>" }
+                applyGroupRow(template, used, intensionTemplate, argsTokens(reader.materializeChild()))
+            }
+        }
+
+        // An `<intension>` template over scalar `%i` placeholders is parsed once and reused: substitute the
+        // args into the expression tree per row instead of re-expanding and re-parsing the string, which
+        // otherwise dominates the parse of group-heavy models (millions of rows, one template).
+        private fun intensionTemplateOf(template: XmlElement): FExpr? =
+            if (template.tag == "intension" && FExpr.isScalarTemplate(template.textContent)) {
+                FExpr.parse(template.textContent.trim())
+            } else {
+                null
+            }
+
+        private fun argsTokens(args: XmlElement): List<String> = args.textContent.splitWs().flatMap { expandNames(it) }
+
+        // One `<group>` row: substitute into the pre-parsed intension tree, else expand the template's params.
+        private fun applyGroupRow(
+            template: XmlElement,
+            used: Set<Int>,
+            intensionTemplate: FExpr?,
+            tokens: List<String>,
+        ) {
+            if (intensionTemplate != null) {
+                intension(FExpr.substitute(intensionTemplate, tokens))
+            } else {
+                constraint(template.substituteParams(tokens, used))
             }
         }
 
