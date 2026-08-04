@@ -49,10 +49,11 @@ internal object MiniZincMode : CliMode {
             // The ambient config was installed once in `main`. Unbounded `var int` resolution:
             // CLI flag → KlauseConfig → built-in default (matches Gecode/Chuffed).
             val config = KlauseConfig.current
-            val source = readTextFile(path)
-            // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
+            // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
+            // whole source is never held as one String. Parsing only reads; the base bake runs as
+            // presolve step 0, bounded by the presolve deadline.
             val program = parseFlatZinc(
-                source = source,
+                source = openFileSource(path),
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,
                 unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo,
