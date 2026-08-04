@@ -20,7 +20,8 @@ internal object Xcsp3Mode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             // Parsing only reads: the base bake runs as presolve step 0, bounded by the presolve deadline.
-            val parsed = Xcsp3.parse(readTextFile(path))
+            // The file is streamed into the parser so a huge instance is never fully resident.
+            val parsed = Xcsp3.parse(openFileSource(path))
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
                     "factors=${parsed.problem.numFactors}"

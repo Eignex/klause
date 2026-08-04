@@ -1,5 +1,9 @@
 package com.eignex.klause.formats.xcsp3
 
+import com.eignex.klause.io.CharReader
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
+
 /** Minimal XML element tree for XCSP3 parsing. */
 class XmlElement(
     /** Element tag name. */
@@ -139,36 +143,103 @@ private fun collectExplicitParams(text: String, into: MutableSet<Int>) {
 /** Parse a single XML document, returning its root element. */
 fun parseXml(src: String): XmlElement = XmlReader(src).parseDocument()
 
-private class XmlReader(private val s: String) {
-    private var pos = 0
+/**
+ * Recursive-descent XML reader over a forward-only [CharReader]. It scans the same grammar as before but
+ * pulls characters through the reader (`peek`/`advance`/`eof`) instead of indexing a resident [String],
+ * so a huge document is never held whole. [parseElement] still materializes exactly one bounded subtree
+ * (a var decl, one constraint, a group template, a single `<args>` row); the streaming cursor
+ * ([openRoot], [nextChildTag], [enterPeeked], [materializeChild]) walks the top level element by element
+ * so the containers themselves are never materialized.
+ */
+internal class XmlReader(private val reader: CharReader) {
+    /** Parse an in-memory [String] — the path for tests, the DSL, and an already-decompressed blob. */
+    constructor(src: String) : this(CharReader(StringCharSource(src)))
+
+    /** Wrap a streamed [source] directly. */
+    constructor(source: CharSource) : this(CharReader(source))
 
     fun parseDocument(): XmlElement {
         skipMisc()
-        require(pos < s.length && s[pos] == '<') { "expected root element at $pos" }
+        require(!reader.eof() && reader.peek() == '<'.code) { "expected root element" }
         return parseElement()
+    }
+
+    /** Skip the prolog/comments/doctype and read the root element's start tag, leaving the cursor inside
+     *  it. The root's own tag and attributes are irrelevant to the top-level walk, so they are discarded. */
+    fun openRoot() {
+        skipMisc()
+        require(!reader.eof() && reader.peek() == '<'.code) { "expected root element" }
+        enterPeeked()
+    }
+
+    /** Advance to the next child of the currently open element: its tag name (cursor left at the child's
+     *  `<`, nothing past it consumed) if a child starts, or `null` — having consumed the closing tag — if
+     *  the current element ends. Whitespace, comments and CDATA between children are skipped. */
+    fun nextChildTag(): String? {
+        while (true) {
+            skipWs()
+            require(!reader.eof()) { "unterminated element (expected a child or closing tag)" }
+            if (reader.peek() != '<'.code) {
+                reader.advance() // stray inter-element text: only whitespace occurs here, so skip it
+                continue
+            }
+            when {
+                matches("<!--") -> skipUntilAfter("-->")
+
+                matches("<![CDATA[") -> skipUntilAfter("]]>")
+
+                matches("</") -> {
+                    reader.advance()
+                    reader.advance()
+                    readName()
+                    skipWs()
+                    expect('>')
+                    return null
+                }
+
+                else -> return peekTagName()
+            }
+        }
+    }
+
+    /** Materialize the child [nextChildTag] just peeked (cursor at its `<`) into a bounded subtree. */
+    fun materializeChild(): XmlElement = parseElement()
+
+    /** Consume the start tag of the child [nextChildTag] just peeked (cursor at its `<`), leaving the
+     *  cursor inside it; the tag name and attributes are discarded. Returns false for a self-closing
+     *  (empty) element — already fully consumed — and true for one with a body. */
+    fun enterPeeked(): Boolean {
+        expect('<')
+        readName()
+        while (true) {
+            skipWs()
+            require(!reader.eof()) { "unterminated start tag" }
+            val c = reader.peek()
+            if (c == '/'.code && reader.peek(1) == '>'.code) {
+                reader.advance()
+                reader.advance()
+                return false
+            }
+            if (c == '>'.code) {
+                reader.advance()
+                return true
+            }
+            readName()
+            skipWs()
+            expect('=')
+            skipWs()
+            readAttrValue()
+        }
     }
 
     /** Skip prolog, comments, doctype, and whitespace. */
     private fun skipMisc() {
-        while (pos < s.length) {
+        while (!reader.eof()) {
             when {
-                s[pos].isWhitespace() -> pos++
-
-                s.startsWith(
-                    "<?",
-                    pos,
-                ) -> pos = s.indexOf("?>", pos).also { require(it >= 0) { "unterminated <? ?>" } } + 2
-
-                s.startsWith(
-                    "<!--",
-                    pos,
-                ) -> pos = s.indexOf("-->", pos).also { require(it >= 0) { "unterminated comment" } } + 3
-
-                s.startsWith(
-                    "<!",
-                    pos,
-                ) -> pos = s.indexOf('>', pos).also { require(it >= 0) { "unterminated <! >" } } + 1
-
+                reader.peek().toChar().isWhitespace() -> reader.advance()
+                matches("<?") -> skipUntilAfter("?>")
+                matches("<!--") -> skipUntilAfter("-->")
+                matches("<!") -> skipUntilAfter(">")
                 else -> return
             }
         }
@@ -180,14 +251,15 @@ private class XmlReader(private val s: String) {
         val attrs = LinkedHashMap<String, String>()
         while (true) {
             skipWs()
-            require(pos < s.length) { "unterminated start tag <$tag" }
-            val c = s[pos]
-            if (c == '/' && pos + 1 < s.length && s[pos + 1] == '>') {
-                pos += 2
+            require(!reader.eof()) { "unterminated start tag <$tag" }
+            val c = reader.peek()
+            if (c == '/'.code && reader.peek(1) == '>'.code) {
+                reader.advance()
+                reader.advance()
                 return XmlElement(tag, attrs, emptyList(), "")
             }
-            if (c == '>') {
-                pos++
+            if (c == '>'.code) {
+                reader.advance()
                 break
             }
             val an = readName()
@@ -199,20 +271,21 @@ private class XmlReader(private val s: String) {
         val text = StringBuilder()
         val children = ArrayList<XmlElement>()
         while (true) {
-            require(pos < s.length) { "unterminated element <$tag>" }
-            if (s[pos] == '<') {
+            require(!reader.eof()) { "unterminated element <$tag>" }
+            if (reader.peek() == '<'.code) {
                 when {
-                    s.startsWith("<!--", pos) -> pos = s.indexOf("-->", pos).also { require(it >= 0) } + 3
+                    matches("<!--") -> skipUntilAfter("-->")
 
-                    s.startsWith("<![CDATA[", pos) -> {
-                        val end = s.indexOf("]]>", pos)
-                        require(end >= 0) { "unterminated CDATA" }
-                        text.append(s, pos + 9, end)
-                        pos = end + 3
+                    matches("<![CDATA[") -> {
+                        repeat(CDATA_OPEN.length) { reader.advance() }
+                        while (!reader.eof() && !matches("]]>")) appendCurrent(text)
+                        require(!reader.eof()) { "unterminated CDATA" }
+                        repeat(3) { reader.advance() }
                     }
 
-                    s.startsWith("</", pos) -> {
-                        pos += 2
+                    matches("</") -> {
+                        reader.advance()
+                        reader.advance()
                         val closeName = readName()
                         require(closeName == tag) { "mismatched closing tag </$closeName> for <$tag>" }
                         skipWs()
@@ -223,9 +296,9 @@ private class XmlReader(private val s: String) {
                     else -> children.add(parseElement())
                 }
             } else {
-                val start = pos
-                while (pos < s.length && s[pos] != '<') pos++
-                text.append(decodeEntities(s.substring(start, pos)))
+                val raw = StringBuilder()
+                while (!reader.eof() && reader.peek() != '<'.code) appendCurrent(raw)
+                text.append(decodeEntities(raw.toString()))
             }
         }
         return XmlElement(tag, attrs, children, text.toString())
@@ -233,35 +306,86 @@ private class XmlReader(private val s: String) {
 
     private fun readName(): String {
         skipWs()
-        val start = pos
-        while (pos < s.length && !s[pos].isWhitespace() && s[pos] !in "=/><") pos++
-        require(pos > start) { "expected a name at $pos" }
-        return s.substring(start, pos)
+        val sb = StringBuilder()
+        while (!reader.eof()) {
+            val ch = reader.peek().toChar()
+            if (ch.isWhitespace() || ch in NAME_STOP) break
+            sb.append(ch)
+            reader.advance()
+        }
+        require(sb.isNotEmpty()) { "expected a name" }
+        return sb.toString()
+    }
+
+    // The tag name of the child at the cursor (which sits on `<`), read via lookahead without consuming —
+    // so the subsequent [materializeChild]/[enterPeeked] still starts cleanly from the `<`.
+    private fun peekTagName(): String {
+        val sb = StringBuilder()
+        var i = 1
+        while (true) {
+            val c = reader.peek(i)
+            if (c < 0) break
+            val ch = c.toChar()
+            if (ch.isWhitespace() || ch in NAME_STOP) break
+            sb.append(ch)
+            i++
+        }
+        require(sb.isNotEmpty()) { "expected a tag name" }
+        return sb.toString()
     }
 
     private fun readAttrValue(): String {
-        val q = s[pos]
-        require(q == '"' || q == '\'') { "expected quoted attribute value at $pos" }
-        pos++
-        val start = pos
-        while (pos < s.length && s[pos] != q) pos++
-        require(pos < s.length) { "unterminated attribute value" }
-        val raw = s.substring(start, pos)
-        pos++
-        return decodeEntities(raw)
+        val q = reader.peek()
+        require(q == '"'.code || q == '\''.code) { "expected quoted attribute value" }
+        reader.advance()
+        val sb = StringBuilder()
+        while (!reader.eof() && reader.peek() != q) appendCurrent(sb)
+        require(!reader.eof()) { "unterminated attribute value" }
+        reader.advance()
+        return decodeEntities(sb.toString())
     }
 
     private fun expect(c: Char) {
-        require(pos < s.length && s[pos] == c) { "expected '$c' at $pos" }
-        pos++
+        require(!reader.eof() && reader.peek() == c.code) { "expected '$c'" }
+        reader.advance()
     }
+
     private fun skipWs() {
-        while (pos < s.length && s[pos].isWhitespace()) pos++
+        while (!reader.eof() && reader.peek().toChar().isWhitespace()) reader.advance()
+    }
+
+    // True if the next characters spell [lit] (lookahead only, cursor unmoved).
+    private fun matches(lit: String): Boolean {
+        for (i in lit.indices) if (reader.peek(i) != lit[i].code) return false
+        return true
+    }
+
+    // Advance until the cursor spells [lit], then consume it; used to skip over comments/PIs/doctype.
+    private fun skipUntilAfter(lit: String) {
+        while (!reader.eof()) {
+            if (matches(lit)) {
+                repeat(lit.length) { reader.advance() }
+                return
+            }
+            reader.advance()
+        }
+        throw IllegalArgumentException("unterminated '$lit'")
+    }
+
+    // Append the character under the cursor and consume it — the streaming analogue of a substring capture.
+    private fun appendCurrent(sb: StringBuilder) {
+        sb.append(reader.peek().toChar())
+        reader.advance()
     }
 
     private fun decodeEntities(t: String): String {
         if ('&' !in t) return t
         return t.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
             .replace("&apos;", "'").replace("&amp;", "&")
+    }
+
+    private companion object {
+        private const val CDATA_OPEN = "<![CDATA["
+        private const val NAME_STOP = "=/><"
     }
 }
