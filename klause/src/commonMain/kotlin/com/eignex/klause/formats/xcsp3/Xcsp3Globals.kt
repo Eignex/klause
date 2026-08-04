@@ -145,9 +145,6 @@ internal fun Xcsp3.Builder.constMatrixRows(text: String): List<IntArray>? {
 internal fun Xcsp3.Builder.elementVarMatrix(rows: List<IntArray>, i: Int, j: Int, v: Int, rowOff: Int, colOff: Int) {
     val nCols = rows[0].size
     require(rows.all { it.size == nCols }) { "element: ragged <matrix>" }
-    if (rows.size.toLong() * nCols > negTableCap) {
-        throw UnsupportedXcsp3Exception("element: matrix decomposition exceeds cap")
-    }
     // The index must select a real cell (Element semantics require a valid index).
     factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.GE, rowOff))
     factors.add(Linear(intArrayOf(1), intArrayOf(i), LinearOp.LE, rowOff + rows.size - 1))
@@ -191,9 +188,6 @@ internal fun Xcsp3.Builder.channel(e: XmlElement) {
  *  `∀i,j: x[i]=j ⟹ y[j]=i`. The reverse does NOT hold — entries `y[j]` for `j` never taken
  *  by any `x[i]` are unconstrained — so unlike the equal-length case this is not a bijection. */
 internal fun Xcsp3.Builder.channelPartial(x: IntArray, y: IntArray) {
-    if (x.size.toLong() * y.size > negTableCap) {
-        throw UnsupportedXcsp3Exception("channel: ${x.size}x${y.size} decomposition exceeds cap")
-    }
     for (i in x.indices) {
         for (j in y.indices) {
             val xij = reifyLinear(intArrayOf(1), intArrayOf(x[i]), LinearOp.EQ, j) // x[i] = j
@@ -874,9 +868,6 @@ internal fun Xcsp3.Builder.binPacking(e: XmlElement) {
             // Load entries may be plain variables or expressions (e.g. `sub(y,37)`).
             val loadVars = loadsEl.textContent.splitWs()
                 .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
-            if (loadVars.size.toLong() * items.size > negTableCap) {
-                throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
-            }
             for (b in loadVars.indices) {
                 val ind = IntArray(items.size) { i -> eqValue01(items[i], (b + offset).toLong()) }
                 factors.add(Linear(sizes + -1, ind + loadVars[b], LinearOp.EQ, 0))
@@ -887,9 +878,6 @@ internal fun Xcsp3.Builder.binPacking(e: XmlElement) {
         e.child("limits") != null -> {
             val limits = parseInts(e.child("limits")?.textContent)
                 ?: throw UnsupportedXcsp3Exception("binPacking: non-constant <limits>")
-            if (limits.size.toLong() * items.size > negTableCap) {
-                throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
-            }
             for (b in limits.indices) {
                 val ind = IntArray(items.size) { i -> eqValue01(items[i], (b + offset).toLong()) }
                 factors.add(Linear(sizes.copyOf(), ind, LinearOp.LE, limits[b]))
@@ -909,9 +897,6 @@ internal fun Xcsp3.Builder.binPacking(e: XmlElement) {
             }
             val loBin = items.minOf { domains[it].min }
             val hiBin = items.maxOf { domains[it].max }
-            if ((hiBin - loBin + 1) * items.size > negTableCap) {
-                throw UnsupportedXcsp3Exception("binPacking: decomposition exceeds cap")
-            }
             for (b in loBin..hiBin) {
                 val ind = IntArray(items.size) { i -> eqValue01(items[i], b) }
                 postCondition(sizes.copyOf(), ind, condText)
@@ -962,9 +947,6 @@ internal fun Xcsp3.Builder.nValues(e: XmlElement) {
 internal fun Xcsp3.Builder.distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
     val loV = vars.minOf { domains[it].min }
     val hiV = vars.maxOf { domains[it].max }
-    if ((hiV - loV + 1) * vars.size > negTableCap) {
-        throw UnsupportedXcsp3Exception("nValues: value range too large to decompose")
-    }
     val used = ArrayList<Int>()
     for (v in loV..hiV) {
         val vi = v.toInt()
@@ -992,9 +974,6 @@ internal fun Xcsp3.Builder.precedence(e: XmlElement) {
     val values = parseInts(e.child("values")?.textContent)
         ?: vars.flatMap { domainValues(it) }.distinct().sorted().toIntArray()
     if (values.size < 2) return
-    if (values.size.toLong() * vars.size * vars.size > negTableCap) {
-        throw UnsupportedXcsp3Exception("precedence: too large to decompose")
-    }
     val eqLits = MutableLongIntMap()
     fun eqLit(j: Int, v: Int): Int {
         val key = j.toLong() shl 32 or (v.toLong() and 0xffffffffL)
@@ -1055,9 +1034,6 @@ internal fun Xcsp3.Builder.noOverlapMulti(e: XmlElement, originsText: String) {
     val nDim = origins[0].size
     require(origins.all { it.size == nDim } && lengths.all { it.size == nDim }) {
         "noOverlap: inconsistent box dimensionality"
-    }
-    if (origins.size.toLong() * origins.size * nDim > negTableCap) {
-        throw UnsupportedXcsp3Exception("noOverlap: decomposition exceeds cap")
     }
     for (i in origins.indices) {
         for (j in i + 1 until origins.size) {
@@ -1143,9 +1119,6 @@ internal fun Xcsp3.Builder.postAllDifferent(vars: IntArray) {
  *  value. Decomposed as `x[i] = x[j] ⟹ x[i] ∈ except` per pair — two equal variables share a value,
  *  so it suffices to require that common value be exempt (one membership guard, symmetric). */
 internal fun Xcsp3.Builder.allDifferentExcept(vars: IntArray, except: IntArray) {
-    if (vars.size.toLong() * vars.size * except.size > negTableCap) {
-        throw UnsupportedXcsp3Exception("allDifferent: except decomposition exceeds cap")
-    }
     // x[i] ∈ except, reused across every pair sharing i.
     val inExcept = IntArray(vars.size) { i ->
         tseitinOr(except.map { reifyLinear(intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, it) })

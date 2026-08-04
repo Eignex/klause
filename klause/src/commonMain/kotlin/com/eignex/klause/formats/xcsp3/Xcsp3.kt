@@ -110,15 +110,15 @@ object Xcsp3 {
      *  presolve step 0, bounded there by the presolve deadline. */
     // The scanners report malformed input via `require` and the throw is re-typed, not swallowed: the
     // original message is carried into the format exception verbatim.
-    fun parse(text: String, negTableCap: Long = 1_000_000L): Xcsp3Problem = parse(StringCharSource(text), negTableCap)
+    fun parse(text: String): Xcsp3Problem = parse(StringCharSource(text))
 
     /** Parse XCSP3 from a streamed [source], driving a pull cursor over the document so the container
      *  elements and — crucially — a `<group>`'s `<args>` rows are consumed one at a time and never held
      *  whole. Semantically identical to the [String] overload: the same per-element [Builder] logic
      *  receives the same bounded subtrees, just fed incrementally rather than from a resident DOM. */
     @Suppress("SwallowedException")
-    fun parse(source: CharSource, negTableCap: Long = 1_000_000L): Xcsp3Problem = try {
-        Builder(negTableCap).run {
+    fun parse(source: CharSource): Xcsp3Problem = try {
+        Builder().run {
             val reader = XmlReader(source)
             reader.openRoot()
             // Single forward pass over `<instance>`'s children, dispatching by tag. A separate scan per
@@ -154,7 +154,7 @@ object Xcsp3 {
         throw UnsupportedXcsp3Exception(e.message ?: "malformed XCSP3 document")
     }
 
-    internal class Builder(val negTableCap: Long) : CnfLowering {
+    internal class Builder : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
         internal val domains = ArrayList<IntDomain>()
@@ -953,11 +953,6 @@ object Xcsp3 {
             for (tok in toks) {
                 val rle = parseRle(tok)
                 if (rle != null) {
-                    // Cap the run-length expansion: an unbounded `vxn` count (e.g. `1x2000000000`) would
-                    // otherwise allocate multiple GB before any other limit applies.
-                    if (out.size.toLong() + rle.second > negTableCap) {
-                        throw UnsupportedXcsp3Exception("run-length list exceeds the $negTableCap-element cap")
-                    }
                     repeat(rle.second) { out.add(rle.first) }
                 } else {
                     out.add(tok.toIntOrNull() ?: return null)
