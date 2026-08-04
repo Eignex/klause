@@ -1,6 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.io.CharReader
+import com.eignex.klause.io.StringCharSource
 
 /** One lexical token from FlatZinc source. */
 internal sealed interface FznToken {
@@ -21,9 +23,15 @@ internal sealed interface FznToken {
 class FlatZincParseException(message: String, sourceLine: Int, sourceCol: Int) :
     FormatException("FlatZinc", "$message (at $sourceLine:$sourceCol)")
 
-/** Single-pass FlatZinc tokenizer. */
-internal class FlatZincLexer(private val src: String) {
-    private var pos: Int = 0
+/**
+ * Single-pass FlatZinc tokenizer. Pulls characters from a [CharReader], so the whole source is never
+ * held as one [String]; tokens are produced one at a time via [next] (the parser streams them), and
+ * [tokenize] just drains that pull for the in-memory callers (tests).
+ */
+internal class FlatZincLexer(private val reader: CharReader) {
+    /** Tokenize a [String] in one shot — the in-memory path for tests. */
+    constructor(src: String) : this(CharReader(StringCharSource(src)))
+
     private var line: Int = 1
     private var col: Int = 1
 
@@ -33,35 +41,44 @@ internal class FlatZincLexer(private val src: String) {
         "output", "annotation", "any",
     )
 
+    /** The next token, or a terminal [FznToken.Eof] once the input is exhausted. Calling again after
+     *  end of input keeps returning [FznToken.Eof] (with the final position), which is the sentinel the
+     *  parser's lookahead expects. */
+    fun next(): FznToken {
+        skipWhitespaceAndComments()
+        if (reader.eof()) return FznToken.Eof(line, col)
+        return nextToken()
+    }
+
     fun tokenize(): List<FznToken> {
         val out = ArrayList<FznToken>()
         while (true) {
-            skipWhitespaceAndComments()
-            if (pos >= src.length) {
-                out.add(FznToken.Eof(line, col))
-                return out
-            }
-            out.add(nextToken())
+            val t = next()
+            out.add(t)
+            if (t is FznToken.Eof) return out
         }
     }
 
     private fun nextToken(): FznToken {
         val startLine = line
         val startCol = col
-        val c = src[pos]
+        val c = reader.peek().toChar()
         return when {
             c.isLetter() || c == '_' -> readIdentOrKeyword(startLine, startCol)
 
-            c.isDigit() || (c == '-' && pos + 1 < src.length && (src[pos + 1].isDigit() || src[pos + 1] == '.')) ->
+            c.isDigit() || (
+                c == '-' && reader.peek(1) >= 0 &&
+                    (reader.peek(1).toChar().isDigit() || reader.peek(1) == '.'.code)
+                ) ->
                 readNumber(startLine, startCol)
 
-            c == '.' && pos + 1 < src.length && src[pos + 1] == '.' -> {
+            c == '.' && reader.peek(1) == '.'.code -> {
                 advance()
                 advance()
                 FznToken.Punct("..", startLine, startCol)
             }
 
-            c == ':' && pos + 1 < src.length && src[pos + 1] == ':' -> {
+            c == ':' && reader.peek(1) == ':'.code -> {
                 advance()
                 advance()
                 FznToken.Punct("::", startLine, startCol)
@@ -75,14 +92,14 @@ internal class FlatZincLexer(private val src: String) {
                 FznToken.Punct(c.toString(), startLine, startCol)
             }
 
-            else -> throw FlatZincParseException("unexpected character '${src[pos]}'", line, col)
+            else -> throw FlatZincParseException("unexpected character '$c'", line, col)
         }
     }
 
     private fun readIdentOrKeyword(startLine: Int, startCol: Int): FznToken {
         val sb = StringBuilder()
-        while (pos < src.length && (src[pos].isLetterOrDigit() || src[pos] == '_')) {
-            sb.append(src[pos])
+        while (!reader.eof() && (reader.peek().toChar().isLetterOrDigit() || reader.peek() == '_'.code)) {
+            sb.append(reader.peek().toChar())
             advance()
         }
         val name = sb.toString()
@@ -95,14 +112,14 @@ internal class FlatZincLexer(private val src: String) {
 
     private fun readNumber(startLine: Int, startCol: Int): FznToken {
         val sb = StringBuilder()
-        if (src[pos] == '-') {
+        if (reader.peek() == '-'.code) {
             sb.append('-')
             advance()
         }
         var sawDot = false
         var sawExp = false
-        while (pos < src.length) {
-            val ch = src[pos]
+        while (!reader.eof()) {
+            val ch = reader.peek().toChar()
             when {
                 ch.isDigit() -> {
                     sb.append(ch)
@@ -111,7 +128,7 @@ internal class FlatZincLexer(private val src: String) {
 
                 ch == '.' && !sawDot && !sawExp -> {
                     // FlatZinc range token `..` — don't consume the dot if the next char is also `.`
-                    if (pos + 1 < src.length && src[pos + 1] == '.') break
+                    if (reader.peek(1) == '.'.code) break
                     sawDot = true
                     sb.append(ch)
                     advance()
@@ -121,8 +138,8 @@ internal class FlatZincLexer(private val src: String) {
                     sawExp = true
                     sb.append(ch)
                     advance()
-                    if (pos < src.length && (src[pos] == '+' || src[pos] == '-')) {
-                        sb.append(src[pos])
+                    if (reader.peek() == '+'.code || reader.peek() == '-'.code) {
+                        sb.append(reader.peek().toChar())
                         advance()
                     }
                 }
@@ -145,41 +162,40 @@ internal class FlatZincLexer(private val src: String) {
     private fun readString(startLine: Int, startCol: Int): FznToken {
         advance() // opening "
         val sb = StringBuilder()
-        while (pos < src.length && src[pos] != '"') {
-            if (src[pos] == '\\' && pos + 1 < src.length) {
+        while (!reader.eof() && reader.peek() != '"'.code) {
+            if (reader.peek() == '\\'.code && reader.peek(1) >= 0) {
                 advance()
                 sb.append(
-                    when (src[pos]) {
+                    when (reader.peek().toChar()) {
                         'n' -> '\n'
                         't' -> '\t'
                         'r' -> '\r'
                         '\\' -> '\\'
                         '"' -> '"'
-                        else -> src[pos]
+                        else -> reader.peek().toChar()
                     },
                 )
                 advance()
             } else {
-                if (src[pos] == '\n') throw FlatZincParseException("unterminated string", startLine, startCol)
-                sb.append(src[pos])
+                if (reader.peek() == '\n'.code) throw FlatZincParseException("unterminated string", startLine, startCol)
+                sb.append(reader.peek().toChar())
                 advance()
             }
         }
-        if (pos >= src.length) throw FlatZincParseException("unterminated string", startLine, startCol)
+        if (reader.eof()) throw FlatZincParseException("unterminated string", startLine, startCol)
         advance() // closing "
         return FznToken.StringLit(sb.toString(), startLine, startCol)
     }
 
     private fun skipWhitespaceAndComments() {
-        while (pos < src.length) {
-            val ch = src[pos]
-            when (ch) {
+        while (!reader.eof()) {
+            when (reader.peek().toChar()) {
                 ' ', '\t', '\r' -> advance()
 
                 '\n' -> advance()
 
                 '%' -> {
-                    while (pos < src.length && src[pos] != '\n') advance()
+                    while (!reader.eof() && reader.peek() != '\n'.code) advance()
                 }
 
                 else -> return
@@ -188,12 +204,12 @@ internal class FlatZincLexer(private val src: String) {
     }
 
     private fun advance() {
-        if (src[pos] == '\n') {
+        if (reader.peek() == '\n'.code) {
             line++
             col = 1
         } else {
             col++
         }
-        pos++
+        reader.advance()
     }
 }

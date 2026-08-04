@@ -7,6 +7,9 @@ import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FloatBucketing
+import com.eignex.klause.io.CharReader
+import com.eignex.klause.io.CharSource
+import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -650,7 +653,7 @@ internal class FlatZincCompiler(
     }
 }
 
-/** Parse and compile FlatZinc source. */
+/** Parse and compile FlatZinc from an in-memory [String] — the path for tests and the DSL. */
 fun parseFlatZinc(
     source: String,
     floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
@@ -658,9 +661,27 @@ fun parseFlatZinc(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+): FlatZincProgram = parseFlatZinc(
+    StringCharSource(source),
+    floatBuckets = floatBuckets,
+    floatScale = floatScale,
+    forLocalSearch = forLocalSearch,
+    unboundedIntLo = unboundedIntLo,
+    unboundedIntHi = unboundedIntHi,
+)
+
+/** Parse and compile FlatZinc from a streamed [source], pulling one token at a time so the whole file
+ *  and its token list are never held. The compiler stays whole-model (its float classification and
+ *  `int2float` forward references need every constraint at once); only lexing/parsing are streamed. */
+fun parseFlatZinc(
+    source: CharSource,
+    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    floatScale: Long = DEFAULT_FLOAT_SCALE,
+    forLocalSearch: Boolean = false,
+    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
 ): FlatZincProgram {
-    val tokens = FlatZincLexer(source).tokenize()
-    val model = FlatZincParser(tokens).parse()
+    val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
     return FlatZincCompiler(
         model,
         floatBuckets = floatBuckets,

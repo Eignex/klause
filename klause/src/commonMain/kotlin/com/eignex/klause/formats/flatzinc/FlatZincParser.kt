@@ -2,9 +2,12 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.util.LongArrayList
 
-/** Recursive-descent parser for FlatZinc 1.6. */
-internal class FlatZincParser(private val tokens: List<FznToken>) {
-    private var pos: Int = 0
+/** Recursive-descent parser for FlatZinc 1.6. Pulls tokens one at a time from a [FlatZincLexer]
+ *  through a single-token lookahead buffer, so the full token list is never materialized. */
+internal class FlatZincParser(private val lexer: FlatZincLexer) {
+    // One-token lookahead: `null` means "not yet pulled"; refilled from the lexer on demand. The lexer
+    // yields a terminal [FznToken.Eof] indefinitely, so this never underflows past end of input.
+    private var lookahead: FznToken? = null
 
     fun parse(): FznModel {
         while (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "predicate") {
@@ -313,8 +316,8 @@ internal class FlatZincParser(private val tokens: List<FznToken>) {
         return FznExpr.IntSetLit(values.toLongArray())
     }
 
-    private fun peek(): FznToken = tokens[pos]
-    private fun advance(): FznToken = tokens[pos++]
+    private fun peek(): FznToken = lookahead ?: lexer.next().also { lookahead = it }
+    private fun advance(): FznToken = peek().also { lookahead = null }
 
     private fun matchKw(kw: String): Boolean {
         val t = peek()
