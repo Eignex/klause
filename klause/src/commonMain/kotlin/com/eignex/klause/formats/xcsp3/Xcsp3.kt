@@ -19,15 +19,15 @@ import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.StringCharSource
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
 class UnsupportedXcsp3Exception(msg: String) : FormatException("XCSP3", msg)
@@ -132,8 +132,8 @@ object Xcsp3 {
 
                     "constraints" -> if (reader.enterPeeked()) streamConstraints(reader)
 
-                    // Only the first objective is taken (as the DOM `firstOrNull` did); the rest of the
-                    // block is still drained so its closing tag is consumed and the outer walk stays aligned.
+                    // Only the first objective is taken; the rest of the block is still drained so its
+                    // closing tag is consumed and the outer walk stays aligned.
                     "objectives" -> if (reader.enterPeeked()) {
                         var first = true
                         while (reader.nextChildTag() != null) {

@@ -1,8 +1,8 @@
-package com.eignex.klause.io
+package com.eignex.klause.util
 
 /**
  * A forward-only buffered character reader over a [CharSource] — the primitive the char-scanning
- * front-ends (SMT-LIB now; FlatZinc / XCSP3 later) build on. It gives a scanner indexed-`String`-style
+ * front-ends (SMT-LIB, FlatZinc, XCSP3) build on. It gives a scanner indexed-`String`-style
  * access ([peek] / [advance] / [eof]) without ever holding the whole input: chunks are pulled from the
  * source on demand and the consumed prefix is dropped once the position grows, so memory stays bounded
  * by the live window rather than the file size.

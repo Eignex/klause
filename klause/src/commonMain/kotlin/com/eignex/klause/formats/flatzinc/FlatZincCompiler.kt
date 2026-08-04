@@ -7,15 +7,15 @@ import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FloatBucketing
-import com.eignex.klause.io.CharReader
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.CharReader
+import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.toSortedIntArray
 

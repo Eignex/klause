@@ -1,10 +1,10 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.StringCharSource
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.toKString

@@ -1,10 +1,10 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.readText
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.readText
 import kotlin.time.TimeSource
 
 // Platform seams for the CLI: the complete list of what differs between the JVM

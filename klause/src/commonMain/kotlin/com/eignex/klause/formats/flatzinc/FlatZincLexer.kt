@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.io.CharReader
-import com.eignex.klause.io.StringCharSource
+import com.eignex.klause.util.CharReader
+import com.eignex.klause.util.StringCharSource
 
 /** One lexical token from FlatZinc source. */
 internal sealed interface FznToken {

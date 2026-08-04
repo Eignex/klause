@@ -3,9 +3,9 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.splitWhitespace
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
-import com.eignex.klause.io.lineSequence
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.lineSequence
 
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)

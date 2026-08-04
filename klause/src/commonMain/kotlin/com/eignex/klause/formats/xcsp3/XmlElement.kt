@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.xcsp3
 
-import com.eignex.klause.io.CharReader
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
+import com.eignex.klause.util.CharReader
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.StringCharSource
 
 /** Minimal XML element tree for XCSP3 parsing. */
 class XmlElement(
@@ -144,10 +144,9 @@ private fun collectExplicitParams(text: String, into: MutableSet<Int>) {
 fun parseXml(src: String): XmlElement = XmlReader(src).parseDocument()
 
 /**
- * Recursive-descent XML reader over a forward-only [CharReader]. It scans the same grammar as before but
- * pulls characters through the reader (`peek`/`advance`/`eof`) instead of indexing a resident [String],
- * so a huge document is never held whole. [parseElement] still materializes exactly one bounded subtree
- * (a var decl, one constraint, a group template, a single `<args>` row); the streaming cursor
+ * Recursive-descent XML reader over a forward-only [CharReader]: it pulls characters through the reader
+ * (`peek`/`advance`/`eof`), so a huge document is never held whole. [parseElement] materializes exactly
+ * one bounded subtree (a var decl, one constraint, a group template, a single `<args>` row); the cursor
  * ([openRoot], [nextChildTag], [enterPeeked], [materializeChild]) walks the top level element by element
  * so the containers themselves are never materialized.
  */

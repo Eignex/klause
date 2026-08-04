@@ -1,18 +1,12 @@
-package com.eignex.klause.io
+package com.eignex.klause.util
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** A [CharSource] that hands out pre-split chunks, to exercise consumers across arbitrary boundaries. */
-private class ChunkedSource(chunks: List<String>) : CharSource {
-    private val it = chunks.iterator()
-    override fun next(): String? = if (it.hasNext()) it.next() else null
-}
-
 class CharSourceTest {
     @Test
     fun `readText concatenates all chunks`() {
-        assertEquals("abcdef", ChunkedSource(listOf("ab", "cd", "ef")).readText())
+        assertEquals("abcdef", ChunkedCharSource(listOf("ab", "cd", "ef")).readText())
     }
 
     @Test
@@ -22,13 +16,13 @@ class CharSourceTest {
 
     @Test
     fun `lineSequence splits lines that straddle chunk boundaries`() {
-        val src = ChunkedSource(listOf("one\ntw", "o\nthr", "ee"))
+        val src = ChunkedCharSource(listOf("one\ntw", "o\nthr", "ee"))
         assertEquals(listOf("one", "two", "three"), src.lineSequence().toList())
     }
 
     @Test
     fun `lineSequence strips carriage returns including a split crlf`() {
-        val src = ChunkedSource(listOf("a\r", "\nb\r\nc"))
+        val src = ChunkedCharSource(listOf("a\r", "\nb\r\nc"))
         assertEquals(listOf("a", "b", "c"), src.lineSequence().toList())
     }
 
