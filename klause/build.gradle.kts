@@ -41,7 +41,7 @@ kotlin {
         // Solver tests are compute-heavy; Mocha's default 2s timeout is far too tight for
         // the single-threaded JS/wasm targets. Tests must also avoid multi-second busy
         // loops — ChromeHeadless kills the page.
-        js(IR) {
+        js {
             browser { testTask { useMocha { timeout = "120s" } } }
             nodejs { testTask { useMocha { timeout = "120s" } } }
         }
@@ -57,18 +57,18 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+            compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
             implementation("com.eignex:koblas:0.1.0")
             implementation("com.eignex:kumulant:0.3.3")
-            implementation("com.eignex:kpermute:1.1.2")
+            implementation("com.eignex:kpermute:1.2.0")
             implementation("com.ionspin.kotlin:bignum:0.3.10")
         }
         commonTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.10.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-protobuf:1.11.0")
         }
     }
 }
