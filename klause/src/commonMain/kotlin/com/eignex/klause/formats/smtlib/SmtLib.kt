@@ -8,12 +8,12 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.CharSource
+import com.eignex.klause.util.StringCharSource
 
 /** Raised when an SMT-LIB construct outside the supported linear-arithmetic subset is encountered. */
 class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB", msg)

@@ -6,19 +6,19 @@ import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.formats.tseitinAnd
-import com.eignex.klause.io.CharSource
-import com.eignex.klause.io.StringCharSource
-import com.eignex.klause.io.lineSequence
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.StringCharSource
+import com.eignex.klause.util.lineSequence
 
 /** Raised when an OPB/WBO document is malformed, so a caller can catch it via [FormatException] like
  *  the other input formats. */

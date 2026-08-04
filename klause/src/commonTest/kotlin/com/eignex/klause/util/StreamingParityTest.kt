@@ -1,4 +1,4 @@
-package com.eignex.klause.io
+package com.eignex.klause.util
 
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
@@ -11,13 +11,6 @@ import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** A [CharSource] that hands out its text one character at a time — the pathological chunking that
- *  exercises every cross-boundary case in a front-end's [CharReader] / [lineSequence] consumption. */
-private class OneCharSource(private val text: String) : CharSource {
-    private var i = 0
-    override fun next(): String? = if (i < text.length) text[i].toString().also { i++ } else null
-}
-
 /** Each supported front-end must parse a whole-string source and a one-character-per-chunk source to the
  *  same model — i.e. its incremental consumption is agnostic to where the input is split. Guards the
  *  streaming refactor: a future scanner change that peeks past a chunk or mishandles a split token/line
@@ -28,7 +21,7 @@ class StreamingParityTest {
     private fun assertParity(name: String, text: String, parse: (CharSource) -> Problem) {
         assertEquals(
             shape(parse(StringCharSource(text))),
-            shape(parse(OneCharSource(text))),
+            shape(parse(perCharSource(text))),
             "$name parses differently when the source is split one char at a time",
         )
     }

@@ -1,9 +1,9 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.io.CharSource
 import com.eignex.klause.portfolio.Portfolio
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.PortfolioWorker
+import com.eignex.klause.util.CharSource
 import java.io.File
 import java.io.Reader
 import kotlin.system.exitProcess

@@ -1,10 +1,10 @@
-package com.eignex.klause.io
+package com.eignex.klause.util
 
 /**
  * A forward-only source of text for a front-end parser. Backed either by an in-memory [String]
  * ([StringCharSource]) or by a streamed file / decompressor pipe (the CLI's `openFileSource`), so a
- * front-end can consume its input incrementally — never holding the whole file, nor an intermediate
- * DOM/AST over it — instead of parsing one materialized [String].
+ * front-end can consume its input incrementally, never holding the whole file nor an intermediate
+ * DOM/AST over it.
  *
  * The contract is deliberately small: [next] yields the next slice of characters, or `null` at end of
  * input. Chunk boundaries are arbitrary (a token or line may straddle two chunks), so scanners built on
