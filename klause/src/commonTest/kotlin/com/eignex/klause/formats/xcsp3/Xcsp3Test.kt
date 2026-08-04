@@ -139,20 +139,6 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `an over-cap run-length coeffs list is rejected rather than allocating unbounded memory`() {
-        // `1x10` expands to ten 1s; with a cap of 4 the expansion must fail fast instead of allocating.
-        val xml = """
-            <instance format="XCSP3" type="CSP">
-              <variables><var id="a"> 0..2 </var></variables>
-              <constraints>
-                <sum><list> a </list><coeffs> 1x10 </coeffs><condition> (le,4) </condition></sum>
-              </constraints>
-            </instance>
-        """.trimIndent()
-        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml, negTableCap = 4) }
-    }
-
-    @Test
     fun `an arithmetic expression overflowing 64 bits is rejected as a format exception`() {
         // A product of three near-max Int constants exceeds Long; folding it must reject the term rather
         // than silently wrapping.
@@ -242,11 +228,13 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `a conflict table whose complement exceeds the cap stays clauses`() {
-        val xml = "<instance type=\"CSP\"><variables><var id=\"a\"> 0..2 </var><var id=\"b\"> 0..2 </var></variables>" +
-            "<constraints><extension><list> a b </list><conflicts> (1,1) </conflicts></extension></constraints></instance>"
-        // The 3x3 domain product exceeds a cap of 4, so it lowers to nogood clauses instead of a Table.
-        assertTrue(Xcsp3.parse(xml, negTableCap = 4).problem.factors.none { it is Table }, "over-cap ⇒ clauses")
+    fun `a conflict table whose complement is astronomically large stays clauses`() {
+        // Three 0..200 vars: the ~8.1M-tuple domain product is far past the materialize ceiling, so the
+        // negative table lowers to nogood clauses rather than materializing a positive Table complement.
+        val xml = "<instance type=\"CSP\"><variables>" +
+            "<var id=\"a\"> 0..200 </var><var id=\"b\"> 0..200 </var><var id=\"c\"> 0..200 </var></variables>" +
+            "<constraints><extension><list> a b c </list><conflicts> (1,1,1) </conflicts></extension></constraints></instance>"
+        assertTrue(Xcsp3.parse(xml).problem.factors.none { it is Table }, "huge complement ⇒ clauses")
     }
 
     @Test
@@ -345,13 +333,13 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `an extension table exceeding the row cap is rejected cleanly instead of exhausting the heap`() {
-        // Six rows against a cap of 3 must throw a clean UnsupportedXcsp3Exception, not build the arrays.
+    fun `an extension table builds rather than being refused by a row cap`() {
+        // The former row cap is gone: a support table builds its factor instead of throwing.
         val xml = """
             <instance type="CSP"><variables><var id="a"> 0..9 </var></variables>
             <constraints><extension><list> a </list><supports> 0 1 2 3 4 5 </supports></extension></constraints></instance>
         """.trimIndent()
-        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml, negTableCap = 3) }
+        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Table }, "the support table lowers to a Table")
     }
 
     @Test

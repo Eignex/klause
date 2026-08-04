@@ -39,16 +39,22 @@ internal fun Xcsp3.Builder.extension(e: XmlElement) {
     }
 }
 
-/** Post a negative `<conflicts>` table. When the variables' domain Cartesian product is small enough,
- *  complement it to a positive [Table] — STR2 propagates that at GAC strength, which matters for dense
- *  binary negatives (e.g. FRB) where forward checking is far too weak. Otherwise lower to nogood clauses
- *  (forward-checking strength) to avoid materializing a large complement. */
+/** The domain-product ceiling below which a negative table is complemented to a positive [Table] rather
+ *  than lowered to nogood clauses. Not a size limit on the constraint — both paths are sound and always
+ *  posted; this only selects the *representation*: a small complement materializes for GAC-strength STR2
+ *  propagation, a large one degrades to forward-checking clauses so no astronomical complement is built. */
+private const val COMPLEMENT_MATERIALIZE_CEILING = 1_000_000L
+
+/** Post a negative `<conflicts>` table. When the variables' domain Cartesian product is small enough
+ *  ([COMPLEMENT_MATERIALIZE_CEILING]), complement it to a positive [Table] — STR2 propagates that at GAC
+ *  strength, which matters for dense binary negatives (e.g. FRB) where forward checking is far too weak.
+ *  Otherwise lower to nogood clauses (forward-checking strength) to avoid materializing a large complement. */
 internal fun Xcsp3.Builder.postConflicts(vars: IntArray, text: String) {
     val rows = parseShortRows(text, vars.size)
     var product = 1L
     for (v in vars) {
         product *= domainValues(v).size
-        if (product > negTableCap) return postConflictClauses(vars, rows)
+        if (product > COMPLEMENT_MATERIALIZE_CEILING) return postConflictClauses(vars, rows)
     }
     postConflictComplement(vars, rows)
 }
@@ -61,7 +67,7 @@ internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRow
     val nRows = rows.lo.size / arity
 
     // A tuple of per-column domain indices encodes to a single mixed-radix [Long] in `[0, product)`,
-    // where the domain product is bounded (this path is only taken when it fits [negTableCap]). So the
+    // where the domain product is bounded (this path is only taken below [COMPLEMENT_MATERIALIZE_CEILING]). So the
     // ground forbidden rows live in a primitive [LongHashSet] and the enumeration probes it by a code
     // maintained incrementally down the recursion — no boxed tuple per row nor per enumerated point.
     val stride = LongArray(arity)
@@ -265,13 +271,6 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
         }
     }
 
-    // Bound the row count so a pathologically large table (millions of tuples) fails cleanly here
-    // rather than exhausting the heap while building the row arrays. Interval/`*` cells do not expand,
-    // so this counts written tuples directly.
-    fun capRows() {
-        if (lo.size / arity > negTableCap) throw UnsupportedXcsp3Exception("table exceeds cap ($negTableCap rows)")
-    }
-
     val n = text.length
     if (arity == 1 && '(' !in text) {
         var i = 0
@@ -281,7 +280,6 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
             val start = i
             while (i < n && !text[i].isWhitespace()) i++
             addCell(start, i)
-            capRows()
         }
     } else {
         var i = 0
@@ -303,7 +301,6 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
             cells++
             if (cells != arity) throw UnsupportedXcsp3Exception("tuple arity $cells != $arity")
             if (i < n) i++ // past ')'
-            capRows()
         }
     }
     return ShortRows(lo.toLongArray(), hi.toLongArray())
