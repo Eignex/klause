@@ -73,8 +73,7 @@ internal object Xcsp3Format : ProblemFormat {
     override val format = Format.XCSP3
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val negTableCap = System.getProperty("klause.bench.xcsp3.negTableCap")?.toLongOrNull() ?: 1_000_000L
-        val parsed = Xcsp3.parse(file.readText(), negTableCap)
+        val parsed = Xcsp3.parse(file.readText())
         return Ingested(parsed.problem, parsed.objective)
     }
 }
