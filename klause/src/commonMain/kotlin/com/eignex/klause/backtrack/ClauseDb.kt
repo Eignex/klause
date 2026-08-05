@@ -277,11 +277,12 @@ internal fun BacktrackSolver.forgetTiered(
  * it in cannot lose models — checked by the learned-clause / witness validation tests.
  */
 internal fun BacktrackSolver.vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
-    // Vivification is inprocessing (#1119 Phase 2); it reads the general learned database, which the
-    // native-SAT lane bypasses. Skip it there until the inprocessing loop is taught the arena store.
-    if (session.usesNativeSat) return 0
     val count = session.learnedClauseCount
     if (count == 0) return 0
+    // Native-lane learned clauses live in the arena's growable side buffer, where strengthening is the
+    // same drop-then-re-add the general database uses; base arena text is never touched. Its clauses
+    // are pure-Boolean by construction, so the per-clause literal check is general-lane only.
+    val native = session.usesNativeSat
     val numBool = session.problem.numBoolVars
     val batch = params.vivifyBatch.coerceAtLeast(1)
     val replacements = ArrayList<IntArray>()
@@ -294,10 +295,10 @@ internal fun BacktrackSolver.vivify(session: PropagationSession, params: Backtra
         examined++
         if (session.learnedClausePermanent(idx)) continue
         if (!session.isLearnedClause(idx)) continue // pseudo-Boolean nogoods aren't vivified (#1119)
-        val clause = session.learnedClauseAt(idx)
-        val lits = clause.literals
-        // Pure-Boolean only; nothing to shorten below 3 literals (we never emit units).
-        if (lits.size < 3 || !clause.allLiteralsBool(numBool)) continue
+        if (!native && !session.learnedClauseAt(idx).allLiteralsBool(numBool)) continue
+        val lits = session.learnedClauseLiterals(idx)
+        // Nothing to shorten below 3 literals (we never emit units).
+        if (lits.size < 3) continue
         val strengthened = vivifyClause(session, lits) ?: continue
         if (strengthened.size in 2 until lits.size) {
             dropIdx.add(idx)
