@@ -43,7 +43,7 @@ internal object LinearSubSumAggregation {
         val rowsByVar = MutableIntObjectMap<IntArrayList>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f is Linear && !f.hasReals) for (v in f.vars) rowsByVar.getOrPut(v) { IntArrayList() }.add(i)
+            if (f is Linear && f.isIntegerCore) for (v in f.vars) rowsByVar.getOrPut(v) { IntArrayList() }.add(i)
         }
 
         val dropped = IntArrayList()
@@ -73,7 +73,7 @@ internal object LinearSubSumAggregation {
         val out = ArrayList<Definition>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f !is Linear || f.hasReals || f.op != LinearOp.EQ || f.vars.size < 3) continue
+            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size < 3) continue
             val p = unitPivotIndex(f) ?: continue
             val sign = f.coeffs[p] // ±1
             val form = HashMap<Int, Long>(f.vars.size)

@@ -97,7 +97,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             val lr = LongArrayList()
             val ls = IntArrayList()
             for (f in problem.factors) {
-                if (f !is Linear || f.hasReals) continue
+                if (f !is Linear || !f.isIntegerCore) continue
                 val sign = when (f.op) {
                     LinearOp.LE -> 1
                     LinearOp.GE -> -1

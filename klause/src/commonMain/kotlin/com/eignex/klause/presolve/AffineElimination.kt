@@ -228,7 +228,7 @@ internal object AffineSingletons {
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
         val f = ws.factorAt(di) ?: return null
-        if (f !is Linear || f.hasReals || f.op != LinearOp.EQ || f.vars.size != 2) return null
+        if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size != 2) return null
         val fBound = f.bound
         for (xi in 0..1) {
             val x = f.vars[xi]
@@ -353,7 +353,7 @@ internal object AffineSingletons {
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         val f = ws.factorAt(di) ?: return null
-        if (f !is Linear || f.hasReals || f.op != LinearOp.EQ || f.vars.size < 2) return null
+        if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size < 2) return null
         for (xi in f.vars.indices) {
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
             // overflow check, so poll the deadline between them (and inside the check below).
@@ -509,7 +509,8 @@ internal object AffineSingletons {
     }
 
     /** Whether [f] could head an affine or residue pivot: a [Linear] equality of arity >= 2. */
-    private fun isEqCand(f: Factor?): Boolean = f is Linear && !f.hasReals && f.op == LinearOp.EQ && f.vars.size >= 2
+    private fun isEqCand(f: Factor?): Boolean =
+        f is Linear && f.isIntegerCore && f.op == LinearOp.EQ && f.vars.size >= 2
 
     /** Stable ids (ascending) of the pristine [factors] that could ever head an affine/residue pivot. */
     private fun eqPivotIds(factors: Array<Factor>): IntArray {
@@ -563,7 +564,7 @@ internal object AffineSingletons {
                 val f = factors[id]
                 // A continuous (real-bearing) Linear folds through the real double view, not the integer
                 // path this pass rewrites, so it is not "plain linear" for elimination purposes.
-                if (id != defIdx && (f !is Linear || f.hasReals)) return false
+                if (id != defIdx && (f !is Linear || !f.isIntegerCore)) return false
             }
             return true
         }
@@ -583,7 +584,7 @@ internal object AffineSingletons {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ.flat[k]
                 val f = factors[id]
-                if (id != defIdx && f is Linear && !f.hasReals && foldRowOverflowsLong(
+                if (id != defIdx && f is Linear && f.isIntegerCore && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -611,7 +612,7 @@ internal object AffineSingletons {
                 // A real-bearing Linear cannot be folded on the integer path and does not override
                 // substituteAffine, so it is treated like any non-Linear factor — the var is eliminated
                 // only if every such occurrence can absorb the affine substitution exactly.
-                if ((f !is Linear || f.hasReals) && !f.canSubstituteAffine(x, scale, offset, replacement)) {
+                if ((f !is Linear || !f.isIntegerCore) && !f.canSubstituteAffine(x, scale, offset, replacement)) {
                     return false
                 }
             }
@@ -736,7 +737,7 @@ internal object AffineSingletons {
             for (k in 0 until occ.size) {
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && (f !is Linear || f.hasReals)) return false
+                if (id != defIdx && (f !is Linear || !f.isIntegerCore)) return false
             }
             return true
         }
@@ -757,7 +758,7 @@ internal object AffineSingletons {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && f is Linear && !f.hasReals && foldRowOverflowsLong(
+                if (id != defIdx && f is Linear && f.isIntegerCore && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -786,7 +787,7 @@ internal object AffineSingletons {
                 val id = occ[k]
                 if (id == defIdx) continue
                 val f = slots[id] ?: continue
-                if ((f !is Linear || f.hasReals) && !f.canSubstituteAffine(x, scale, offset, replacement)) {
+                if ((f !is Linear || !f.isIntegerCore) && !f.canSubstituteAffine(x, scale, offset, replacement)) {
                     return false
                 }
             }
@@ -799,7 +800,7 @@ internal object AffineSingletons {
                 val id = occ[k]
                 if (id == defIdx) continue
                 val f = slots[id] ?: continue
-                if (f is Linear && !f.hasReals && absorbed[id] >= FOLD_ABSORB_CAP) return true
+                if (f is Linear && f.isIntegerCore && absorbed[id] >= FOLD_ABSORB_CAP) return true
             }
             return false
         }
@@ -821,7 +822,7 @@ internal object AffineSingletons {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
                 val next = when {
-                    f is Linear && !f.hasReals && c.x in f.vars -> foldAffineIntoLinear(f, c)
+                    f is Linear && f.isIntegerCore && c.x in f.vars -> foldAffineIntoLinear(f, c)
 
                     // Single-partner affine into a global the gate accepted (non-null substitute). The
                     // gate only admits this path for an Int-range scale/offset, so the narrowing is safe.

@@ -50,7 +50,7 @@ internal object CoefficientStrengthening {
                 continue
             }
             val rewritten = when {
-                factor is Linear && !factor.hasReals -> strengthenLinear(factor, problem.intDomains)
+                factor is Linear && factor.isIntegerCore -> strengthenLinear(factor, problem.intDomains)
                 factor is PseudoBoolean -> strengthenPb(factor)
                 else -> factor
             }
@@ -75,7 +75,7 @@ internal object CoefficientStrengthening {
      *  regardless of which constraint witnesses the conflict. */
     private fun equalityContradiction(factor: Factor, domains: Array<IntDomain>): List<Factor>? = when (factor) {
         is Linear ->
-            if (!factor.hasReals && factor.op == LinearOp.EQ && indivisible(factor.coeffs, factor.bound)) {
+            if (factor.isIntegerCore && factor.op == LinearOp.EQ && indivisible(factor.coeffs, factor.bound)) {
                 intContradiction(factor.vars[0], domains)
             } else {
                 null
