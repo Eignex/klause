@@ -55,6 +55,7 @@ internal object BacktrackConfigSpace : ConfigSpace(PARAMS) {
             lbdGlueThreshold = a.int("lbd-glue"),
             midLbdThreshold = a.int("mid-lbd"),
             vivifyBatch = a.int("vivify-batch"),
+            inprocessingCadence = a.int("inprocessing-cadence"),
         )
         val maxLearned = a.str("max-learned").let { if (it == "off") null else it.toInt() }
         p = p.copy(maxLearnedClauses = maxLearned, tieredLearnedDb = a.str("tiered-db") == "true")
@@ -144,6 +145,7 @@ private val PARAMS: List<ConfigParam> = listOf(
     IntParam("lbd-glue", 1, 5),
     IntParam("mid-lbd", 3, 12),
     IntParam("vivify-batch", 64, 1024),
+    IntParam("inprocessing-cadence", 1, 16),
     CategoricalParam("lp.emphasis", listOf("off", "conservative", "default", "aggressive")),
     // LP-plan dials only matter when LP is on (conditional child params, gated exactly like lp.lbtree).
     CategoricalParam("lp.lbtree", listOf("false", "true"), lpOn()),

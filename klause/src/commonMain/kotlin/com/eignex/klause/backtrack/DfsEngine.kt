@@ -158,8 +158,7 @@ internal class DfsEngine<L>(
     // Only schedules that couple the phase regime to their mode report a non-UNMANAGED phase; capture
     // it once so the common path pays nothing and its phasing stays byte-identical.
     private val phaseManaged = restart.phaseMode() != PhaseMode.UNMANAGED
-    private val vivifyEnabled = params.vivification && params.assumptions.isEmpty
-    private var vivifyCursor = 0
+    private val inprocessing = Inprocessing.from(solver, params)
     private val poller = DeadlinePoller()
 
     private val trail: MutableList<TrailNode> = ArrayList()
@@ -225,7 +224,7 @@ internal class DfsEngine<L>(
         started = false
         restartCount = 0
         decisionsLeft = decisionBudget
-        vivifyCursor = 0
+        inprocessing?.reset()
         rootExhausted = null
         numSeed = assumptions.boolKeys.size + assumptions.intKeys.size
         touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
@@ -424,7 +423,7 @@ internal class DfsEngine<L>(
         params.variableSelector.onRestart()
         params.valueSelector.onRestart()
         solver.forgetIfOverCap(session, params)
-        if (vivifyEnabled) vivifyCursor = solver.vivify(session, params, vivifyCursor)
+        inprocessing?.onRestart(session, params)
         restart.onRestart()
         importPooledSolution()
         val restartIndex = ++restartCount
