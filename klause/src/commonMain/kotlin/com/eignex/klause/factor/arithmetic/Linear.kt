@@ -336,7 +336,7 @@ internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_
 
 /** Sum the exact coefficients of any repeated variable and drop zero-sum terms, preserving first-seen
  *  order — the wide analogue of [coalesceLinearTerms], so a wide row always has one term per variable. */
-private fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntArray, Array<BigInteger>> {
+internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntArray, Array<BigInteger>> {
     val order = ArrayList<Int>(vars.size)
     val sum = HashMap<Int, BigInteger>(vars.size)
     for (i in vars.indices) {
@@ -363,7 +363,7 @@ private fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntArr
 
 /** [Long] clamp of a [BigInteger] to the signed 64-bit range — the saturated placeholder a wide row keeps
  *  in its Long `coeffs`/`bound`, never read as authoritative (the exact value lives in [Linear.wideCoeffs]). */
-private fun BigInteger.saturatedLong(): Long = when {
+internal fun BigInteger.saturatedLong(): Long = when {
     this > BigInteger.fromLong(Long.MAX_VALUE) -> Long.MAX_VALUE
     this < BigInteger.fromLong(Long.MIN_VALUE) -> Long.MIN_VALUE
     else -> longValue(exactRequired = false)
