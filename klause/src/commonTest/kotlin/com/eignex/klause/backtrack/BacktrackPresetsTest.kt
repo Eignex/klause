@@ -6,6 +6,8 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -51,6 +53,17 @@ class BacktrackPresetsTest {
             BacktrackSolver(problem.bake()).solve(BacktrackPresets.satOptimized(randomSeed = 2L)),
         )
         assertChainWitness(sat)
+    }
+
+    @Test
+    fun `sat-optimized preset should schedule inprocessing at an amortizing cadence`() {
+        val p = BacktrackPresets.satOptimized()
+        assertTrue(p.vivification)
+        assertTrue(p.subsumption)
+        assertEquals(4, p.inprocessingCadence)
+        val optedOut = BacktrackPresets.satOptimized(inprocess = false)
+        assertFalse(optedOut.vivification)
+        assertFalse(optedOut.subsumption)
     }
 
     @Test
