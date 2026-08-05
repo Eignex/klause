@@ -38,7 +38,7 @@ internal fun SmtLib.Builder.prepareDeferredBounds(): DeferredIntBounds? {
     }
     return DeferredIntBounds(
         openBounds,
-        linears.filter { !it.hasReals },
+        linears.filter { it.isIntegerCore },
         linears.filter { it.hasReals },
         nextReal,
         fallbackLo,

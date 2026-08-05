@@ -108,7 +108,7 @@ fun MpsModel.toProblem(
     }
 
     // OBBT over the purely-integer rows only (a real-bearing Linear carries placeholder integer data).
-    val intLinears = factors.filterIsInstance<Linear>().filter { !it.hasReals }
+    val intLinears = factors.filterIsInstance<Linear>().filter { it.isIntegerCore }
 
     // A pure-integer feasibility model whose small-model bound ([smallModelIntBound]) fits keeps exact
     // verdicts: the finite box is equisatisfiable with the unbounded model, so no clamp flag. Never under

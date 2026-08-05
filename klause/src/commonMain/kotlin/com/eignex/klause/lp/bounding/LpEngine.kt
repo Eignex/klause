@@ -211,7 +211,7 @@ internal class LpEngine(
         val v = objective.singleIntObjective()?.varId ?: return null
         var best: Triple<Int, Long, Long>? = null
         for (f in problem.factors) {
-            if (f !is Linear || f.hasReals || f.op != LinearOp.EQ) continue
+            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ) continue
             val vi = f.vars.indexOf(v)
             if (vi < 0) continue
             val a = f.coeffs[vi]

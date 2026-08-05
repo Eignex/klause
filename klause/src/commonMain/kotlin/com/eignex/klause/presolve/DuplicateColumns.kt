@@ -124,7 +124,7 @@ internal object DuplicateColumns {
      *  in that row). A row mentioning no dropped variable, and every non-[Linear] factor (none mention
      *  a dropped variable — they were ineligible), is returned unchanged. */
     private fun aggregateColumns(factor: Factor, keepOf: IntArray): Factor {
-        if (factor !is Linear || factor.hasReals) return factor
+        if (factor !is Linear || !factor.isIntegerCore) return factor
         if (factor.vars.none { keepOf[it] != it }) return factor
         val keptVars = IntArrayList(factor.vars.size)
         val keptCoeffs = LongArrayList(factor.vars.size)
@@ -156,7 +156,7 @@ internal object DuplicateColumns {
             var onlyLinear = true
             for (k in start until end) {
                 val g = problem.factors[occ.flat[k]]
-                if (g !is Linear || g.hasReals) {
+                if (g !is Linear || !g.isIntegerCore) {
                     onlyLinear = false
                     break
                 }
@@ -182,7 +182,7 @@ internal object DuplicateColumns {
         for (f in factors) {
             // Only integer [Linear] columns are aggregatable; a variable in any other factor — including a
             // continuous (real-bearing) Linear, whose reals the integer rewrite would drop — is ineligible.
-            if (f is Linear && !f.hasReals) continue
+            if (f is Linear && f.isIntegerCore) continue
             for (v in f.intVars) eligible[v] = false
         }
         return eligible
@@ -195,7 +195,7 @@ internal object DuplicateColumns {
     private fun columnSignatures(factors: Array<Factor>, numIntVars: Int, eligible: BooleanArray): Array<List<Long>?> {
         val entries = Array(numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
         factors.forEachIndexed { fid, f ->
-            if (f !is Linear || f.hasReals) return@forEachIndexed
+            if (f !is Linear || !f.isIntegerCore) return@forEachIndexed
             val coeffByVar = MutableIntLongMap(f.vars.size)
             for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i])
             for (v in f.intVars) {

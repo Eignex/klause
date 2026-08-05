@@ -102,7 +102,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
     for (i in problem.factors.indices) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
         val f = problem.factors[i]
-        if (f !is Linear || f.hasReals || f.op == LinearOp.NE) continue
+        if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.NE) continue
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && idx !in removed }
         val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
@@ -143,7 +143,7 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
     var probes = 0
     for (f in problem.factors) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
-        if (f !is Linear || f.hasReals || f.op == LinearOp.EQ || f.vars.size != 2) continue
+        if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.EQ || f.vars.size != 2) continue
         val c0 = f.coeffs[0]
         val c1 = f.coeffs[1]
         if (!((c0 == 1L && c1 == -1L) || (c0 == -1L && c1 == 1L))) continue // a unit difference ±(v0 − v1)
