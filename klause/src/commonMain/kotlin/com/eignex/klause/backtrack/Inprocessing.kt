@@ -39,6 +39,22 @@ internal class VivificationPass(private val solver: BacktrackSolver) : Inprocess
     }
 }
 
+/** Clause subsumption + self-subsuming resolution (#1252) behind the inprocessing seam: a
+ *  round-robin cursor over the learned database, one [BacktrackParams.subsumeBatch]-sized slice per
+ *  scheduled run. */
+internal class SubsumptionPass(private val solver: BacktrackSolver) : InprocessingPass {
+    override val preservesVariables: Boolean get() = true
+    private var cursor = 0
+
+    override fun run(session: PropagationSession, params: BacktrackParams) {
+        cursor = solver.subsume(session, params, cursor)
+    }
+
+    override fun reset() {
+        cursor = 0
+    }
+}
+
 /**
  * The scheduled per-arm inprocessing loop (#1252): runs its passes in order at every
  * [BacktrackParams.inprocessingCadence]-th restart. The cadence exists because the passes' probing
@@ -77,6 +93,9 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
         fun from(solver: BacktrackSolver, params: BacktrackParams): Inprocessing? {
             if (!params.assumptions.isEmpty) return null
             val passes = buildList {
+                // Subsumption first: it only shrinks the database, so vivification's probing works
+                // the surviving clauses instead of ones about to be dropped.
+                if (params.subsumption) add(SubsumptionPass(solver))
                 if (params.vivification) add(VivificationPass(solver))
             }
             if (passes.isEmpty()) return null
