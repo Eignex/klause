@@ -91,7 +91,7 @@ class SharedClausePoolTest {
         pool.publish(listOf(a, b))
         val first = pool.drainSince(0)
         assertEquals(2, first.clauses.size)
-        assertEquals(2, first.cursor)
+        assertEquals(2L, first.cursor)
 
         pool.publish(listOf(aDup, c)) // aDup deduped, only c lands
         val second = pool.drainSince(first.cursor)
@@ -167,5 +167,84 @@ class SharedClausePoolTest {
     private class PortfolioExchangeFixture(problem: Problem, pool: SharedClausePool) {
         val session = PropagationSession(problem)
         val exchange = PoolClauseExchange(pool)
+    }
+
+    private fun boolClause(id: Int, lbd: Int, len: Int = 2): SharedClause =
+        SharedClause(IntArray(len) { (id + it) * 2 }, LongArray(0), lbd = lbd)
+
+    @Test
+    fun `a publish over the cap compacts instead of refusing new clauses`() {
+        val pool = SharedClausePool(cap = 4)
+        pool.publish((0 until 4).map { boolClause(it * 10, lbd = it + 1) })
+        pool.publish(listOf(boolClause(100, lbd = 1)))
+        val all = pool.drainSince(0).clauses
+        assertTrue(all.size <= 4)
+        assertTrue(all.any { it.key == boolClause(100, lbd = 1).key }, "the pool keeps accepting after the cap")
+    }
+
+    @Test
+    fun `compaction keeps low-LBD clauses over high-LBD ones`() {
+        val pool = SharedClausePool(cap = 4)
+        val keep = boolClause(0, lbd = 1)
+        val drop = boolClause(10, lbd = 9)
+        pool.publish(listOf(keep, drop, boolClause(20, lbd = 8), boolClause(30, lbd = 7)))
+        pool.publish(listOf(boolClause(100, lbd = 2))) // overflow → compact to 2 best
+        val kept = pool.drainSince(0).clauses.map { it.key }.toSet()
+        assertTrue(keep.key in kept, "the glue clause survives compaction")
+        assertTrue(drop.key !in kept, "the worst clause is evicted")
+    }
+
+    @Test
+    fun `compaction retains a global nogood ahead of better-LBD glue`() {
+        val pool = SharedClausePool(cap = 4)
+        val global = boolClause(0, lbd = 9, len = 6)
+        pool.publish(listOf(global), isGlobal = true)
+        pool.publish((1..3).map { boolClause(it * 10, lbd = 1) })
+        pool.publish(listOf(boolClause(100, lbd = 1))) // overflow → compact
+        val kept = pool.drainSince(0).clauses.map { it.key }.toSet()
+        assertTrue(global.key in kept, "a globally-published nogood outranks filtered glue")
+    }
+
+    @Test
+    fun `a stale cursor re-drains the compacted pool and the exchange stays duplicate-free`() {
+        // The fixture clauses use boolean literals, so the session's problem needs the variables.
+        val problem = Problem(
+            numBoolVars = 200,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = emptyList(),
+        )
+        val pool = SharedClausePool(cap = 4)
+        val exchange = PoolClauseExchange(pool)
+        val session = PropagationSession(problem)
+
+        // The arm imports the pre-compaction pool, then a flood of publishes forces a compaction.
+        pool.publish(listOf(boolClause(0, lbd = 1)))
+        exchange.onRestart(session)
+        val imported = session.learnedClauseCount
+        pool.publish((1..8).map { boolClause(it * 10, lbd = it) })
+
+        // The arm's cursor generation is stale: the drain restarts at 0 and `seen` filters the repeat.
+        exchange.onRestart(session)
+        val repeat = pool.drainSince(0).clauses.count { it.key == boolClause(0, lbd = 1).key }
+        assertEquals(
+            imported + pool.drainSince(0).clauses.size - repeat,
+            session.learnedClauseCount,
+            "the surviving new clauses import once; the already-seen clause does not re-import",
+        )
+    }
+
+    @Test
+    fun `an evicted key can re-enter the pool`() {
+        val pool = SharedClausePool(cap = 4)
+        val evictee = boolClause(0, lbd = 9)
+        pool.publish(listOf(evictee))
+        pool.publish((1..3).map { boolClause(it * 10, lbd = 1) })
+        pool.publish(listOf(boolClause(100, lbd = 1))) // overflow → compact, evicting the LBD-9 clause
+        var kept = pool.drainSince(0).clauses.map { it.key }.toSet()
+        assertTrue(evictee.key !in kept)
+        pool.publish(listOf(evictee))
+        kept = pool.drainSince(0).clauses.map { it.key }.toSet()
+        assertTrue(evictee.key in kept, "eviction releases the key for re-publication")
     }
 }
