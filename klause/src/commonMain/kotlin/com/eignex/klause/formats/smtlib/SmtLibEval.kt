@@ -5,14 +5,13 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.LinComb
-import com.eignex.klause.formats.mulExact
-import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.lp.BigFraction
 import com.eignex.klause.solver.Lit
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 
 /**
@@ -29,17 +28,26 @@ internal enum class Sort { BOOL, INT, REAL }
  *  rational combination ([R]). */
 internal sealed interface Res {
     class B(val lit: Int) : Res
-    class I(val lin: LinComb) : Res
+    class I(val term: IntComb) : Res
     class R(val comb: RealComb) : Res
 }
 
 private fun Res.asLit(): Int = (this as Res.B).lit
-private fun Res.asLin(): LinComb = (this as Res.I).lin
+private fun Res.asIntComb(): IntComb = (this as Res.I).term
+
+/** The 64-bit integer combination of an int result, rejecting a wide value — for the narrow-only ops
+ *  (`div`/`mod`/`abs`/`ite`/`to_real`/real embedding) that have no arbitrary-precision path. */
+private fun Res.asLin(): LinComb = when (val t = (this as Res.I).term) {
+    is IntComb.Narrow -> t.lin
+    is IntComb.Wide -> smtUnsupported("integer beyond the 64-bit range in a context that requires 64-bit")
+}
+
+private fun narrowRes(lin: LinComb): Res.I = Res.I(IntComb.Narrow(lin))
 
 /** A folded operand as a real combination: real results directly, int results via the embedding. */
 private fun Res.asReal(): RealComb = when (this) {
     is Res.R -> comb
-    is Res.I -> lin.toRealComb()
+    is Res.I -> asLin().toRealComb()
     is Res.B -> smtUnsupported("boolean term used as Real")
 }
 
@@ -72,8 +80,8 @@ internal fun SmtLib.Builder.evalTerm(root: SExpr, sort: Sort): Res {
                     val b = SmtLib.Builder.Binding(isBool = fr.bools[i], isReal = isReal)
                     when {
                         fr.bools[i] -> b.lit = res.asLit()
-                        isReal -> b.real = (res as Res.R).comb
-                        else -> b.lin = res.asLin()
+                        isReal -> b.real = res.comb
+                        else -> b.lin = res.asIntComb()
                     }
                     bound.add(fr.names[i] to b)
                 }
@@ -314,37 +322,38 @@ private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: Li
 }
 
 private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
-    "+" -> Res.I(args.map { it.asLin() }.reduce(::add))
+    "+" -> Res.I(args.map { it.asIntComb() }.reduce(::addIntComb))
 
     "-" -> if (args.size == 1) {
-        Res.I(scale(args[0].asLin(), -1L))
+        Res.I(scaleIntComb(args[0].asIntComb(), -1L))
     } else {
-        Res.I(args.drop(1).fold(args[0].asLin()) { acc, e -> add(acc, scale(e.asLin(), -1L)) })
+        val first = args[0].asIntComb()
+        Res.I(args.drop(1).fold(first) { acc, e -> addIntComb(acc, scaleIntComb(e.asIntComb(), -1L)) })
     }
 
     "*" -> {
-        val parts = args.map { it.asLin() }
-        val nonConst = parts.filter { it.coeffs.isNotEmpty() }
+        val parts = args.map { it.asIntComb() }
+        val nonConst = parts.filterNot { it.isConstant() }
         if (nonConst.size > 1) smtUnsupported("nonlinear multiplication")
-        val k = foldChecked { parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> mulExact(a, c.constant) } }
-        if (nonConst.isEmpty()) Res.I(LinComb(emptyMap(), k)) else Res.I(scale(nonConst[0], k))
+        val k = constProduct(parts.filter { it.isConstant() })
+        if (nonConst.isEmpty()) Res.I(k) else Res.I(scaleByConst(nonConst[0], k))
     }
 
-    "to_real" -> Res.I(args[0].asLin())
+    "to_real" -> Res.I(args[0].asIntComb())
 
     // `to_int` of an integral real term folds back to its integer combination; a genuinely
     // fractional real gets the floor definition (a fresh integer with `n ≤ r < n + 1`).
     "to_int" -> when (val a = args[0]) {
         is Res.I -> a
-        is Res.R -> Res.I(a.comb.toLinCombOrNull() ?: realFloor(a.comb))
+        is Res.R -> narrowRes(a.comb.toLinCombOrNull() ?: realFloor(a.comb))
         else -> smtUnsupported("to_int over a boolean term")
     }
 
-    "abs" -> Res.I(absTerm(args[0].asLin()))
+    "abs" -> narrowRes(absTerm(args[0].asLin()))
 
-    "div" -> Res.I(divModTerm(args[0].asLin(), args[1].asLin(), quotient = true))
+    "div" -> narrowRes(divModTerm(args[0].asLin(), args[1].asLin(), quotient = true))
 
-    "mod" -> Res.I(divModTerm(args[0].asLin(), args[1].asLin(), quotient = false))
+    "mod" -> narrowRes(divModTerm(args[0].asLin(), args[1].asLin(), quotient = false))
 
     "ite" -> {
         // v = if cond then a else b: a fresh int pinned to each branch by the condition. Its domain is
@@ -359,7 +368,7 @@ private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
         factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
         factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
-        Res.I(self)
+        narrowRes(self)
     }
 
     else -> smtUnsupported("unsupported int op '$head'")
@@ -446,11 +455,10 @@ private fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     return lo to hi
 }
 
-/** Reify a two-operand arithmetic relation from its folded operands. */
+/** Reify a two-operand arithmetic relation from its folded operands (wide when a value exceeds 64 bits). */
 private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
     requireBinaryRelation(node, op)
-    val rel = relFromOperands(op, args[0].asLin(), args[1].asLin())
-    return reifyLinear(rel.coeffs, rel.vars, rel.op, rel.bound)
+    return reifyRelation(op, args[0].asIntComb(), args[1].asIntComb())
 }
 
 /** Pairwise `!=` over folded distinct operands (bool operands channelled to a 0/1 int term). */
@@ -484,11 +492,10 @@ private fun SmtLib.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sor
 } else {
     val n = node.text.toLongOrNull()
     when {
-        n != null -> Res.I(LinComb(emptyMap(), n))
+        n != null -> narrowRes(LinComb(emptyMap(), n))
 
-        isIntegerLiteral(node.text) -> smtUnsupported(
-            "integer literal '${node.text}' exceeds the 64-bit range of the integer lowering",
-        )
+        // An integer literal beyond Long is carried as a wide combination and lowered to a wide factor.
+        isIntegerLiteral(node.text) -> Res.I(IntComb.Wide(WideLinComb(emptyMap(), BigInteger.parseString(node.text))))
 
         isRealLiteral(node.text) ->
             smtUnsupported("real literal '${node.text}' (integer context)")
@@ -497,7 +504,7 @@ private fun SmtLib.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sor
             smtUnsupported("bitvector literal '${node.text}' (integer context)")
 
         else -> lookup(node.text)?.let { Res.I(intBinding(node.text, it)) }
-            ?: Res.I(
+            ?: narrowRes(
                 LinComb(
                     mapOf(
                         (
@@ -526,7 +533,10 @@ private fun SmtLib.Builder.evalRealAtom(node: SExpr.Atom): Res {
                 binding.real ?: smtUnsupported("'${node.text}' has no compiled Real value"),
             )
 
-            else -> Res.R(intBinding(node.text, binding).toRealComb())
+            else -> when (val ic = intBinding(node.text, binding)) {
+                is IntComb.Narrow -> Res.R(ic.lin.toRealComb())
+                is IntComb.Wide -> smtUnsupported("'${node.text}' beyond the 64-bit range used as Real")
+            }
         }
     }
     val rv = realNames[node.text]

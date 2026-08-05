@@ -6,7 +6,6 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Factor
@@ -110,7 +109,7 @@ object SmtLib {
         internal val macros = HashMap<String, Macro>()
 
         internal class Binding(val isBool: Boolean, val isReal: Boolean = false) {
-            var lin: LinComb? = null
+            var lin: IntComb? = null
             var lit: Int? = null
             var real: RealComb? = null
         }

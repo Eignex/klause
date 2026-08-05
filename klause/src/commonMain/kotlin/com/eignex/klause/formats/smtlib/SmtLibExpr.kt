@@ -115,7 +115,7 @@ internal fun SmtLib.Builder.isBoolExpr(t: SExpr): Boolean {
 internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
     if (args.size < 2) return
     if (args.all { !isBoolExpr(it) }) {
-        val terms = args.map { linearTerm(it) }
+        val terms = args.map { linearTermNarrow(it) }
         val simpleVars = terms.mapNotNull { it.asSimpleVar() }
         val allFinite = simpleVars.none { intDomains[it] is PresolveDomain.Open }
         if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size && allFinite) {
@@ -129,7 +129,7 @@ internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
             assertPairwiseNe(terms)
         }
     } else {
-        assertPairwiseNe(args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTerm(it) })
+        assertPairwiseNe(args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTermNarrow(it) })
     }
 }
 

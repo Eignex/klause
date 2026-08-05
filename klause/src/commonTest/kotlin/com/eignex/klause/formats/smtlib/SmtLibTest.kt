@@ -10,6 +10,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -63,10 +64,49 @@ class SmtLibTest {
     }
 
     @Test
-    fun `an integer literal beyond 64 bits is rejected as an over-range integer`() {
-        val text = "(declare-const x Int) (assert (<= x 170141183460469231731687303715884105728))"
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
-        assertTrue("integer literal" in e.message.orEmpty() && "64-bit" in e.message.orEmpty(), e.message.orEmpty())
+    fun `an over-Int64 coefficient solves to a witness satisfying it exactly`() {
+        // 2^64·x + y = 2^64 + 1 with x, y in [0, 3] forces x = 1, y = 1 (y is too small to carry a 2^64
+        // unit). The 2^64 coefficient can only live in a wide row, so this exercises the wide lowering.
+        val w = BigInteger.parseString("18446744073709551616") // 2^64
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const y Int)
+            (assert (>= x 0)) (assert (<= x 3)) (assert (>= y 0)) (assert (<= y 3))
+            (assert (= (+ (* 18446744073709551616 x) y) 18446744073709551617))
+            (check-sat)
+        """.trimIndent()
+        val ints = solve(text)
+        val lhs = w * BigInteger.fromLong(ints[0]) + BigInteger.fromLong(ints[1])
+        assertEquals(w + BigInteger.ONE, lhs, "witness (x=${ints[0]}, y=${ints[1]}) must satisfy the wide row")
+    }
+
+    @Test
+    fun `an over-Int64 coefficient with no integer solution is unsat`() {
+        // 2^64·x = 2^64 + 1 has no integer x (remainder 1), so the wide row makes the problem unsat.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int)
+            (assert (>= x 0)) (assert (<= x 3))
+            (assert (= (* 18446744073709551616 x) 18446744073709551617))
+            (check-sat)
+        """.trimIndent()
+        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
+    }
+
+    @Test
+    fun `a reified over-Int64 relation solves correctly`() {
+        // b ↔ (2^64·x ≤ 2^64) ⟺ x ≤ 1; asserting b and x ≥ 1 pins x = 1. The nested relation reifies, so
+        // this exercises the wide reified lowering (a wide ReifiedLinear).
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const b Bool)
+            (assert (>= x 0)) (assert (<= x 3))
+            (assert (= b (<= (* 18446744073709551616 x) 18446744073709551616)))
+            (assert b) (assert (>= x 1))
+            (check-sat)
+        """.trimIndent()
+        assertEquals(1L, solve(text)[0], "b ∧ x ≥ 1 with b ⟺ x ≤ 1 pins x = 1")
     }
 
     @Test
@@ -593,18 +633,21 @@ class SmtLibTest {
     }
 
     @Test
-    fun `constant folding overflow is rejected rather than silently wrapping`() {
-        // SMT integers are unbounded; folding 2^63-1 + 1 wraps to Long.MIN_VALUE if unchecked, so the
-        // term must be rejected the same way an over-64-bit literal is.
+    fun `constant folding overflow promotes to a wide value instead of wrapping`() {
+        // SMT integers are unbounded; 2^63-1 + 1 = 2^63 overflows Long, so it is carried as a wide value
+        // (never silently wrapped to Long.MIN). x = 2^63 exceeds any Long domain, so the problem is unsat.
         val text = "(declare-const x Int) (assert (= x (+ 9223372036854775807 1))) (check-sat)"
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
-        assertTrue("overflow" in e.message.orEmpty(), e.message.orEmpty())
+        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "x = 2^63 is out of the Long range, so unsat, got $r")
     }
 
     @Test
-    fun `constant multiplication overflow is rejected`() {
+    fun `constant multiplication overflow promotes to a wide value`() {
+        // 3037000500^2 = 9223372037000250000 overflows Long; it is carried wide (not rejected or wrapped),
+        // and x = it exceeds the Long range, so the problem is unsat.
         val text = "(declare-const x Int) (assert (= x (* 3037000500 3037000500))) (check-sat)"
-        assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
+        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "x = 9.22e18 (> Long.MAX) is unsat, got $r")
     }
 
     @Test
