@@ -27,25 +27,29 @@ object BacktrackPresets {
      * satisfaction and the complete-search side of optimization — in a portfolio the shared
      * objective bound keeps a SAT-tuned worker useful on COP by racing to feasible incumbents.
      *
-     * **Vivification is intentionally left off here** ([vivify] defaults to false). On the SAT
-     * search-effort benchmark its per-restart probing — amplified by the frequent adaptive
-     * restarts this preset enables — cut conflict *throughput* enough to time out instances the
-     * leaner config solves (e.g. php8), while the conflict-quality win it was meant to provide
-     * already comes from the three-tier DB + binary minimization + LBD restarts (the preset is
-     * ~0.73-0.77× the baseline's conflicts either way). It stays available via [vivify] for
-     * hard-UNSAT campaigns that restart infrequently, where the probing pays for itself.
+     * **Inprocessing runs every 4th restart** ([inprocess], [inprocessingCadence]): clause
+     * subsumption/self-subsumption then vivification over the learned database. Running the
+     * passes at every restart loses on conflict throughput under this preset's frequent adaptive
+     * restarts (the original vivification measurement that kept it off), but the cadence
+     * amortizes the probing: on the classic-DIMACS benchmark cadence-4 inprocessing beats both
+     * off (Borda 118 vs 87 of 215 at 10s) and every-restart (115 vs 90) with equal-or-better
+     * decided counts, and the pseudo-Boolean decision suite gains alongside. Optimization
+     * incumbents can lag with the passes on, so the loop stays a per-arm choice rather than a
+     * [BacktrackParams] default.
      *
      *  - [randomSeed] optionally seeds the engine RNG; null uses a fresh seed per call.
      *  - [maxLearnedClauses] caps the learned database (the three-tier reduction runs at each
      *    restart once over the cap).
-     *  - [vivify] opts the periodic clause-vivification inprocessing pass back in.
+     *  - [inprocess] opts the scheduled inprocessing loop out; [inprocessingCadence] tunes how
+     *    many restarts each scheduled run amortizes over.
      *  - [cancellation] / [onEvent] thread the usual cooperative-cancellation and observation
      *    seams through unchanged.
      */
     fun satOptimized(
         randomSeed: Long? = null,
         maxLearnedClauses: Int = 20_000,
-        vivify: Boolean = false,
+        inprocess: Boolean = true,
+        inprocessingCadence: Int = 4,
         cancellation: Cancellation = Cancellation.Never,
         onEvent: ((SearchEvent) -> Unit)? = null,
     ): BacktrackParams = BacktrackParams(
@@ -58,7 +62,9 @@ object BacktrackPresets {
         adaptiveRestart = true,
         maxLearnedClauses = maxLearnedClauses,
         tieredLearnedDb = true,
-        vivification = vivify,
+        vivification = inprocess,
+        subsumption = inprocess,
+        inprocessingCadence = inprocessingCadence,
     )
 
     /**
