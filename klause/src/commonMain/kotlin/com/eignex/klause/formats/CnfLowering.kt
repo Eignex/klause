@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Shared CNF-lowering hooks for format front-ends. */
 internal interface CnfLowering {
@@ -72,6 +73,23 @@ internal fun CnfLowering.reifyLinear(coeffs: LongArray, vars: IntArray, op: Line
     if (vars.isEmpty()) return if (constRelationHolds(op, bound)) trueLit() else Lit.negate(trueLit())
     val aux = newBool()
     factors.add(ReifiedLinear(auxBoolVar = aux, coeffs = coeffs, vars = vars, op = op, bound = bound))
+    return Lit.make(aux, true)
+}
+
+/** [reifyLinear] over arbitrary-precision coefficients/bound — a reified relation from the SMT-LIB
+ *  front-end whose coefficients or bound exceed the 64-bit range, enforced by a wide [ReifiedLinear]. */
+internal fun CnfLowering.reifyLinear(coeffs: Array<BigInteger>, vars: IntArray, op: LinearOp, bound: BigInteger): Int {
+    if (vars.isEmpty()) {
+        val holds = when (op) {
+            LinearOp.LE -> BigInteger.ZERO <= bound
+            LinearOp.GE -> BigInteger.ZERO >= bound
+            LinearOp.EQ -> bound == BigInteger.ZERO
+            LinearOp.NE -> bound != BigInteger.ZERO
+        }
+        return if (holds) trueLit() else Lit.negate(trueLit())
+    }
+    val aux = newBool()
+    factors.add(ReifiedLinear(auxBoolVar = aux, vars = vars, wideCoeffs = coeffs, op = op, wideBound = bound))
     return Lit.make(aux, true)
 }
 

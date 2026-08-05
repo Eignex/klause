@@ -136,7 +136,7 @@ internal fun SmtLib.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayLi
 
             "<=", "<", ">=", ">", "=" -> if (t.items.size == 3 && isArithmeticRelation(t) && !hasSideEffectingTerm(t)) {
                 try {
-                    out.add(relationToLinear(t))
+                    relationToLinear(t)?.let { out.add(it) }
                 } catch (_: UnsupportedSmtException) { }
             }
         }

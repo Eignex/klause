@@ -6,6 +6,7 @@ import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.addExact
 import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.linCombDiff
+import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
@@ -22,8 +23,9 @@ internal fun SmtLib.Builder.isArithmeticRelation(t: SExpr.SList): Boolean {
 /** Assert a linear relation; when all terms cancel to a constant it is trivially true (post
  *  nothing) or false (post the false literal ⇒ unsat) rather than an empty [Linear]. */
 internal fun SmtLib.Builder.assertLinear(t: SExpr.SList) {
-    val rel = relationToLinear(t)
-    assertLinearRow(rel.coeffs, rel.vars, rel.op, rel.bound)
+    val op = t.atomAt(0, "relation operator")
+    requireBinaryRelation(t, op)
+    assertRelation(op, linearTerm(t.items[1]), linearTerm(t.items[2]))
 }
 
 /** Post a linear row, or resolve a variable-free relation to trivially-true (post nothing) or
@@ -37,6 +39,36 @@ internal fun SmtLib.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray, o
     }
 }
 
+/** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]
+ *  when a coefficient or the bound exceeds the 64-bit range. */
+internal fun SmtLib.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
+    val linOp = relLinearOp(op)
+    when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
+        is LinRelation.LongRel -> assertLinearRow(rel.coeffs, rel.vars, linOp, rel.bound)
+
+        is LinRelation.WideRel -> if (rel.vars.isEmpty()) {
+            if (!wideConstHolds(linOp, rel.bound)) forceTrue(Lit.negate(trueLit()))
+        } else {
+            factors.add(Linear(rel.vars, rel.coeffs, linOp, rel.bound))
+        }
+    }
+}
+
+/** Reify `a ⟨op⟩ b` onto a fresh literal, using a wide [com.eignex.klause.factor.arithmetic.ReifiedLinear]
+ *  when a coefficient or the bound exceeds the 64-bit range. */
+internal fun SmtLib.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
+    val linOp = relLinearOp(op)
+    return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
+        is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound)
+
+        is LinRelation.WideRel -> if (rel.vars.isEmpty()) {
+            if (wideConstHolds(linOp, rel.bound)) trueLit() else Lit.negate(trueLit())
+        } else {
+            reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound)
+        }
+    }
+}
+
 /** Require a relation node to have exactly two operands (`(op a b)`), else reject as unsupported. */
 internal fun requireBinaryRelation(node: SExpr.SList, op: String) {
     if (node.items.size != 3) {
@@ -46,11 +78,14 @@ internal fun requireBinaryRelation(node: SExpr.SList, op: String) {
     }
 }
 
-/** Lower `(op lhs rhs)` to one linear relation. */
-internal fun SmtLib.Builder.relationToLinear(t: SExpr.SList): Rel {
+/** Lower `(op lhs rhs)` to one 64-bit linear relation for OBBT bound inference, or `null` when either
+ *  operand is wide (a wide relation is enforced by its factor, not used to tighten bounds). */
+internal fun SmtLib.Builder.relationToLinear(t: SExpr.SList): Rel? {
     val op = t.atomAt(0, "relation operator")
     requireBinaryRelation(t, op)
-    return relFromOperands(op, linearTerm(t.items[1]), linearTerm(t.items[2]))
+    val a = linearTerm(t.items[1])
+    val b = linearTerm(t.items[2])
+    return if (a is IntComb.Narrow && b is IntComb.Narrow) relFromOperands(op, a.lin, b.lin) else null
 }
 
 /** Build a linear relation `a op b` (as `Σ coeffs·vars ⟨op⟩ bound`) from two folded operands. */
@@ -76,10 +111,18 @@ internal inline fun <T> foldChecked(block: () -> T): T = try {
     throw UnsupportedSmtException("integer overflow while folding a linear term")
 }
 
-/** Fold [t] to an integer linear combination (iteratively, via [evalTerm]). */
-internal fun SmtLib.Builder.linearTerm(t: SExpr): LinComb = (evalTerm(t, Sort.INT) as Res.I).lin
+/** Fold [t] to an integer linear combination (iteratively, via [evalTerm]); [IntComb.Wide] when a value
+ *  exceeds the 64-bit range. */
+internal fun SmtLib.Builder.linearTerm(t: SExpr): IntComb = (evalTerm(t, Sort.INT) as Res.I).term
 
-internal fun SmtLib.Builder.intBinding(name: String, b: SmtLib.Builder.Binding): LinComb {
+/** Fold [t] to a 64-bit integer combination, rejecting a wide value — for the narrow-only consumers
+ *  (the objective and `distinct`/`AllDifferent`) that have no arbitrary-precision path. */
+internal fun SmtLib.Builder.linearTermNarrow(t: SExpr): LinComb = when (val ic = linearTerm(t)) {
+    is IntComb.Narrow -> ic.lin
+    is IntComb.Wide -> throw UnsupportedSmtException("integer beyond the 64-bit range in this context")
+}
+
+internal fun SmtLib.Builder.intBinding(name: String, b: SmtLib.Builder.Binding): IntComb {
     if (b.isBool) throw UnsupportedSmtException("'$name' used as Int but bound to a Bool term")
     return b.lin ?: throw UnsupportedSmtException("'$name' has no compiled Int value")
 }
@@ -98,16 +141,12 @@ internal fun SmtLib.Builder.isIntegerLiteral(s: String): Boolean {
 /** A real literal — a decimal with a fractional point (e.g. `2.6`), which QF_LIA does not permit. */
 internal fun SmtLib.Builder.isRealLiteral(s: String): Boolean = '.' in s && s.toDoubleOrNull() != null
 
-internal fun SmtLib.Builder.add(a: LinComb, b: LinComb): LinComb = foldChecked { a.plus(b) }
-
-internal fun SmtLib.Builder.scale(a: LinComb, k: Long): LinComb = foldChecked { a.scaled(k) }
-
 /** Build linear coefficients for `a - b op 0`. */
 internal fun SmtLib.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, LongArray, Long> =
     foldChecked { linCombDiff(a, b) }
 
 internal fun SmtLib.Builder.linearObjective(t: SExpr, negate: Boolean): LinearObjective {
-    val lt = linearTerm(t)
+    val lt = linearTermNarrow(t)
     val coeffs = LongArray(nextInt)
     for ((v, c) in lt.coeffs) coeffs[v] = if (negate) -c else c
     return LinearObjective(
