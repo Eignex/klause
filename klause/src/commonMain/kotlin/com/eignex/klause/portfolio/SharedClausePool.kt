@@ -20,38 +20,88 @@ import com.eignex.kumulant.stream.lock
  * [Concurrency] via [com.eignex.kumulant.stream.lock]: a no-op under `Concurrency.None` (the single
  * core pays nothing), a platform mutex under the parallel executor's concurrent writers.
  *
- * De-dup is by [SharedClause.key]; a bounded [cap] stops growth (the pool simply stops accepting
- * new clauses when full — it never evicts, so per-arm cursors stay valid).
+ * De-dup is by [SharedClause.key]. A bounded [cap] stops growth: a publish that would overflow first
+ * compacts the pool to half, keeping globally-published nogoods (soundness-motivated shares that
+ * bypassed the glue filter) ahead of the best glue by (LBD, length), so publishing keeps working for
+ * the whole solve instead of silently stopping at the cap. Compaction bumps a generation stamp that
+ * rides in the high bits of every cursor: a cursor from an older generation re-drains the whole pool,
+ * and the arm-side `seen` key-set makes that re-drain duplicate-free — so eviction costs a stale arm
+ * one full (deduped) import, never a missed or double-registered clause. Evicted keys leave the
+ * de-dup set, so a re-derived clause can re-enter.
  */
 internal class SharedClausePool(
     private val lock: Mutex = Concurrency.None.lock(),
     private val cap: Int = DEFAULT_CAP,
 ) {
     private val clauses = ArrayList<SharedClause>()
+    private val global = ArrayList<Boolean>()
     private val keys = HashSet<Long>()
+    private var generation = 0
 
-    /** Append the unseen clauses of [batch] (by key), up to [cap]. */
-    fun publish(batch: List<SharedClause>) {
+    /** Append the unseen clauses of [batch] (by key), compacting on overflow. [isGlobal] marks a
+     *  globally-published nogood for retention priority over filtered glue. */
+    fun publish(batch: List<SharedClause>, isGlobal: Boolean = false) {
         if (batch.isEmpty()) return
         lock.withLock {
             for (c in batch) {
+                if (clauses.size >= cap) compact()
                 if (clauses.size >= cap) break
-                if (keys.add(c.key)) clauses.add(c)
+                if (keys.add(c.key)) {
+                    clauses.add(c)
+                    global.add(isGlobal)
+                }
             }
         }
     }
 
-    /** The clauses appended at index ≥ [cursor], paired with the new cursor (the current size). */
-    fun drainSince(cursor: Int): Drained = lock.withLock {
+    /** The clauses appended at index ≥ [cursor] of the cursor's generation, paired with the advanced
+     *  cursor. A cursor from an older generation restarts at index 0 (see the class doc). */
+    fun drainSince(cursor: Long): Drained = lock.withLock {
+        val from = if (generationOf(cursor) == generation) indexOf(cursor) else 0
         val size = clauses.size
-        if (cursor >= size) Drained(emptyList(), size) else Drained(ArrayList(clauses.subList(cursor, size)), size)
+        val advanced = cursorOf(generation, size)
+        if (from >= size) {
+            Drained(emptyList(), advanced)
+        } else {
+            Drained(ArrayList(clauses.subList(from, size)), advanced)
+        }
+    }
+
+    /** Keep the best half — globals first, then by (LBD, length), stable within ties — and start a
+     *  new generation. Callers hold [lock]. */
+    private fun compact() {
+        val target = cap / 2
+        val order = clauses.indices.sortedWith(
+            compareByDescending<Int> { global[it] }.thenBy { clauses[it].lbd }.thenBy { lengthOf(clauses[it]) },
+        )
+        val keep = BooleanArray(clauses.size)
+        for (k in 0 until minOf(target, order.size)) keep[order[k]] = true
+        val keptClauses = ArrayList<SharedClause>(target)
+        val keptGlobal = ArrayList<Boolean>(target)
+        keys.clear()
+        for (i in clauses.indices) {
+            if (!keep[i]) continue
+            keptClauses.add(clauses[i])
+            keptGlobal.add(global[i])
+            keys.add(clauses[i].key)
+        }
+        clauses.clear()
+        clauses.addAll(keptClauses)
+        global.clear()
+        global.addAll(keptGlobal)
+        generation++
     }
 
     /** A drained batch + the advanced cursor. */
-    internal class Drained(val clauses: List<SharedClause>, val cursor: Int)
+    internal class Drained(val clauses: List<SharedClause>, val cursor: Long)
 
     internal companion object {
         const val DEFAULT_CAP = 50_000
+
+        private fun cursorOf(generation: Int, index: Int): Long = (generation.toLong() shl 32) or index.toLong()
+        private fun generationOf(cursor: Long): Int = (cursor ushr 32).toInt()
+        private fun indexOf(cursor: Long): Int = cursor.toInt()
+        private fun lengthOf(c: SharedClause): Int = c.boolLits.size + c.atomQuads.size / SharedClause.QUAD
     }
 }
 
@@ -73,7 +123,7 @@ internal class PoolClauseExchange(
      *  certificates under its pins, so they are not globally valid there — it disables this. */
     private val shareGlobalNogoods: Boolean = true,
 ) : ClauseExchange {
-    private var cursor = 0
+    private var cursor = 0L
     private val seen = HashSet<Long>()
 
     override fun onRestart(session: PropagationSession) {
@@ -90,7 +140,7 @@ internal class PoolClauseExchange(
         // learned DB is empty, so re-import the whole pool — including this arm's own clauses from
         // earlier segments, which the persistent-session `seen`/`cursor` would otherwise suppress.
         // Resetting both makes the import unconditional; the pool de-dups any re-export by key (#381).
-        cursor = 0
+        cursor = 0L
         seen.clear()
         onRestart(session)
     }
@@ -101,7 +151,7 @@ internal class PoolClauseExchange(
      *  `seen` set so this arm neither double-publishes it nor re-imports its own. */
     override fun publishGlobal(clause: SharedClause) {
         if (!shareGlobalNogoods) return
-        if (seen.add(clause.key)) pool.publish(listOf(clause))
+        if (seen.add(clause.key)) pool.publish(listOf(clause), isGlobal = true)
     }
 
     /** Publish this arm's not-yet-seen glue clauses; safe at any decision level (read-only on the
