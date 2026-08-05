@@ -133,7 +133,7 @@ internal class EngineParams(pairs: List<String>) {
 internal val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
-    "mid-lbd", "vivification", "vivify-batch", "lp-objective-cone", "lp-auto-off-reprobe",
+    "mid-lbd", "vivification", "vivify-batch", "inprocessing-cadence", "lp-objective-cone", "lp-auto-off-reprobe",
     "lp-knapsack-lagrangian", "pb-learning", "pb-objective-cutoff", "objective-guided-values",
     "var-selector", "val-selector",
 )
@@ -162,6 +162,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val midLbd = p.int("mid-lbd")
     val vivification = p.bool("vivification")
     val vivifyBatch = p.int("vivify-batch")
+    val inprocessingCadence = p.int("inprocessing-cadence")
     val lpCone = p.bool("lp-objective-cone")
     val lpAutoOff = p.bool("lp-auto-off-reprobe")
     val lpKnapsack = p.bool("lp-knapsack-lagrangian")
@@ -174,6 +175,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val scalars = listOf(
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
+        inprocessingCadence,
         lpCone, lpAutoOff, lpKnapsack, lpBranching, pbLearning, pbObjectiveCutoff, objectiveGuidedValues,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
@@ -194,6 +196,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         midLbd?.let { out = out.copy(midLbdThreshold = it) }
         vivification?.let { out = out.copy(vivification = it) }
         vivifyBatch?.let { out = out.copy(vivifyBatch = it) }
+        inprocessingCadence?.let { out = out.copy(inprocessingCadence = it) }
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }

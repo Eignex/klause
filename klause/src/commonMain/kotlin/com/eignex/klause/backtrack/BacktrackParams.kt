@@ -180,6 +180,13 @@ data class BacktrackParams(
      */
     val vivifyBatch: Int = 256,
     /**
+     * Run the scheduled inprocessing loop every Nth restart (#1252). The passes' root probing
+     * competes with conflict throughput, and restart-heavy configurations hit the boundary often —
+     * a cadence above 1 buys the simplification at a fraction of the per-restart cost. Only
+     * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
+     */
+    val inprocessingCadence: Int = 1,
+    /**
      * Externally-supplied objective upper bound for branch-and-bound minimisation. When
      * non-null, the [com.eignex.klause.solver.Optimizer.improvements] / `minimize`
      * engines read it at each leaf-attempt and prune the subtree whenever the
