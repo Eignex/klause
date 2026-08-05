@@ -180,6 +180,19 @@ data class BacktrackParams(
      */
     val vivifyBatch: Int = 256,
     /**
+     * Clause subsumption and self-subsuming resolution (#1252) as an inprocessing pass. When true
+     * the engine periodically — at restart boundaries, alongside [vivification] — walks a bounded
+     * slice of the learned-clause database, drops each clause another learned clause subsumes, and
+     * strengthens each clause a self-subsuming resolution shortens. Pure-Boolean; atom-literal
+     * clauses are skipped. Disabled by default. Only honoured when [assumptions] is empty.
+     */
+    val subsumption: Boolean = false,
+    /**
+     * Maximum number of learned clauses checked for subsumption per scheduled run when
+     * [subsumption] is on; the round-robin cursor mirrors [vivifyBatch]. Must be positive.
+     */
+    val subsumeBatch: Int = 1024,
+    /**
      * Run the scheduled inprocessing loop every Nth restart (#1252). The passes' root probing
      * competes with conflict throughput, and restart-heavy configurations hit the boundary often —
      * a cadence above 1 buys the simplification at a fraction of the per-restart cost. Only

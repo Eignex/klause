@@ -43,6 +43,8 @@ class BacktrackConfigSpaceTest {
             "lbd-glue" to 3,
             "mid-lbd" to 8,
             "vivify-batch" to 128,
+            "subsumption" to "true",
+            "subsume-batch" to 512,
             "inprocessing-cadence" to 4,
             "lp.emphasis" to "off",
         )
@@ -57,6 +59,8 @@ class BacktrackConfigSpaceTest {
         assertEquals(3, p.lbdGlueThreshold)
         assertEquals(8, p.midLbdThreshold)
         assertEquals(128, p.vivifyBatch)
+        assertTrue(p.subsumption)
+        assertEquals(512, p.subsumeBatch)
         assertEquals(4, p.inprocessingCadence)
         assertEquals(null, p.lpConfig, "emphasis=off -> no LP")
     }
@@ -133,6 +137,8 @@ class BacktrackConfigSpaceTest {
         put("lbd-glue", 2)
         put("mid-lbd", 6)
         put("vivify-batch", 256)
+        put("subsumption", "false")
+        put("subsume-batch", 1024)
         put("inprocessing-cadence", 1)
         put("lp.emphasis", "off")
         put("lp.lbtree", "false")
