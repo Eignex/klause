@@ -68,6 +68,23 @@ class SharedClausePoolTest {
     }
 
     @Test
+    fun `a widened pool-carried filter lets the default exchange export past the glue bounds`() {
+        // The scenario's clause-share knobs land on the pool; every default-constructed exchange
+        // follows them, so one --param widens the filter for the whole portfolio.
+        val problem = twoIntVars()
+        val pool = SharedClausePool(shareMaxLbd = 9, shareMaxLen = 10)
+        val producer = PoolClauseExchange(pool)
+        val consumer = PoolClauseExchange(pool)
+
+        val src = PropagationSession(problem)
+        src.addLearnedClause(Clause(intArrayOf(src.boundGeLit(0, 3, true), src.boundLeLit(1, 2, true))), lbd = 9)
+        producer.onRestart(src)
+        val dst = PropagationSession(problem)
+        consumer.onRestart(dst)
+        assertEquals(1, dst.learnedClauseCount, "the LBD-9 clause clears the widened filter")
+    }
+
+    @Test
     fun `publishGlobal does not re-import the publishing arm's own nogood`() {
         val problem = twoIntVars()
         val pool = SharedClausePool()

@@ -51,6 +51,7 @@ internal fun BacktrackSolver.subsume(session: PropagationSession, params: Backtr
     }
     val dropIdx = IntHashSet()
     val replacements = ArrayList<IntArray>()
+    val replacementLbds = IntArrayList()
     val batch = params.subsumeBatch.coerceAtLeast(1)
     var cursor = if (startCursor in 0 until count) startCursor else 0
     var examined = 0
@@ -84,11 +85,14 @@ internal fun BacktrackSolver.subsume(session: PropagationSession, params: Backtr
         if (idx !in dropIdx && strengthened != null) {
             dropIdx.add(idx)
             replacements.add(strengthened)
+            // The resolvent is at least as strong as the clause it replaces: inherit the parent's LBD
+            // (capped by the new size) so the derived clause keeps its tier and glue-export standing.
+            replacementLbds.add(minOf(session.learnedClauseLbd(idx), strengthened.size))
         }
     }
     if (dropIdx.isEmpty()) return cursor
     session.forgetLearnedClauses { i, _ -> i !in dropIdx }
-    for (newLits in replacements) session.addLearnedClause(Clause(newLits), lbd = newLits.size)
+    for (r in replacements.indices) session.addLearnedClause(Clause(replacements[r]), lbd = replacementLbds[r])
     // The forget renumbered the database, so resume the round-robin from the start.
     return 0
 }

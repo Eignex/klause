@@ -55,6 +55,16 @@ class EngineParamsPortfolioScenarioTest {
     }
 
     @Test
+    fun `clause-share params override the exchange filter and default to the tuned bounds`() {
+        val default = scenario(cores = 2)
+        assertEquals(4, default.clauseShareMaxLbd)
+        assertEquals(8, default.clauseShareMaxLen)
+        val tuned = scenario(cores = 2, params = listOf("clause-share-lbd=6", "clause-share-len=12"))
+        assertEquals(6, tuned.clauseShareMaxLbd)
+        assertEquals(12, tuned.clauseShareMaxLen)
+    }
+
+    @Test
     fun `ls and bt set both the engine mix and the arm count`() {
         val bt = scenario(cores = 1, params = listOf("ls=0", "bt=3"))
         assertEquals(EngineMix.BACKTRACK, bt.engine)

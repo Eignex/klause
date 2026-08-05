@@ -286,6 +286,7 @@ internal fun BacktrackSolver.vivify(session: PropagationSession, params: Backtra
     val numBool = session.problem.numBoolVars
     val batch = params.vivifyBatch.coerceAtLeast(1)
     val replacements = ArrayList<IntArray>()
+    val replacementLbds = IntArrayList()
     val dropIdx = IntHashSet()
     var cursor = if (startCursor in 0 until count) startCursor else 0
     var examined = 0
@@ -303,11 +304,14 @@ internal fun BacktrackSolver.vivify(session: PropagationSession, params: Backtra
         if (strengthened.size in 2 until lits.size) {
             dropIdx.add(idx)
             replacements.add(strengthened)
+            // A subclause is at least as strong as its parent: inheriting the parent's LBD (capped by
+            // the new size) keeps the derived clause eligible for the same tier and glue export.
+            replacementLbds.add(minOf(session.learnedClauseLbd(idx), strengthened.size))
         }
     }
     if (replacements.isEmpty()) return cursor
     session.forgetLearnedClauses { i, _ -> i !in dropIdx }
-    for (newLits in replacements) session.addLearnedClause(Clause(newLits), lbd = newLits.size)
+    for (r in replacements.indices) session.addLearnedClause(Clause(replacements[r]), lbd = replacementLbds[r])
     // The forget renumbered the database, so resume the round-robin from the start.
     return 0
 }

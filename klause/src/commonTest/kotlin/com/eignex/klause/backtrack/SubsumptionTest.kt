@@ -83,4 +83,16 @@ class SubsumptionTest {
         val session = subsumed(nativeSat = false, a, b)
         assertEquals(setOf(a.toSet(), b.toSet()), learnedSets(session))
     }
+
+    @Test
+    fun `a self-subsumed resolvent should inherit its parent's LBD`() {
+        val baked = problem(6).bake()
+        val session = PropagationSession(baked)
+        session.addLearnedClause(Clause(lits(0 to true, 1 to false)), lbd = 2)
+        session.addLearnedClause(Clause(lits(0 to true, 1 to true, 2 to true)), lbd = 1)
+        BacktrackSolver(baked).subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0)
+        val resolvent = (0 until session.learnedClauseCount)
+            .single { session.learnedClauseLiterals(it).toSet() == lits(0 to true, 2 to true).toSet() }
+        assertEquals(1, session.learnedClauseLbd(resolvent), "the resolvent keeps the parent's glue standing")
+    }
 }

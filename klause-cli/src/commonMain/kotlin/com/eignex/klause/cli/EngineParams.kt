@@ -532,7 +532,9 @@ internal fun buildPortfolioScenario(
     val armsParam = p.int("arms")
     val ls = p.int("ls")
     val bt = p.int("bt")
-    p.finish("portfolio", "arms, ls, bt, seed, lambda")
+    val clauseShareLbd = p.int("clause-share-lbd")
+    val clauseShareLen = p.int("clause-share-len")
+    p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len")
     if (armsParam != null && (ls != null || bt != null)) {
         usageError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
@@ -550,7 +552,7 @@ internal fun buildPortfolioScenario(
         defaultEngine to (armsParam ?: defaultArms)
     }
     require(arms >= 1) { "portfolio needs arms ≥ 1 (got $arms)" }
-    return PortfolioScenario(
+    var scenario = PortfolioScenario(
         cores = cores,
         arms = maxOf(arms, cores),
         kind = kind,
@@ -562,6 +564,9 @@ internal fun buildPortfolioScenario(
         btPool = btPool,
         annotationArm = annotationArm,
     )
+    clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
+    clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
+    return scenario
 }
 
 /**
