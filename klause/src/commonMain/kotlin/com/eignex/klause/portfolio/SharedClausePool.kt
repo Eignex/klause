@@ -32,6 +32,12 @@ import com.eignex.kumulant.stream.lock
 internal class SharedClausePool(
     private val lock: Mutex = Concurrency.None.lock(),
     private val cap: Int = DEFAULT_CAP,
+    /** Default LBD bound for the arms' glue export ([PoolClauseExchange]); the pool carries it so
+     *  every arm of one portfolio shares a single tunable filter (`--param clause-share-lbd`). */
+    val shareMaxLbd: Int = PoolClauseExchange.DEFAULT_MAX_LBD,
+    /** Default length bound for the arms' glue export, the length half of the shared filter
+     *  (`--param clause-share-len`). */
+    val shareMaxLen: Int = PoolClauseExchange.DEFAULT_MAX_LEN,
 ) {
     private val clauses = ArrayList<SharedClause>()
     private val global = ArrayList<Boolean>()
@@ -113,8 +119,8 @@ internal class SharedClausePool(
  */
 internal class PoolClauseExchange(
     private val pool: SharedClausePool,
-    private val maxLbd: Int = DEFAULT_MAX_LBD,
-    private val maxLen: Int = DEFAULT_MAX_LEN,
+    private val maxLbd: Int = pool.shareMaxLbd,
+    private val maxLen: Int = pool.shareMaxLen,
     /** Skip permanent (search-conditioned) clauses on export — the incumbent objective bound and
      *  blocking nogoods. Required for an arm learning under assumptions/an incumbent (LNS repair): those
      *  clauses hold only under its pins, so sharing them globally is unsound. */

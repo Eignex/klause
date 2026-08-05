@@ -145,7 +145,11 @@ object PortfolioBuilder {
         // The bound managers are the dual of the shared incumbent: harmless for a CSP pool (no arm
         // publishes), so they are always present and only an optimising arm feeds them.
         return SharedPools(
-            SharedClausePool(concurrency.lock()),
+            SharedClausePool(
+                concurrency.lock(),
+                shareMaxLbd = scenario.clauseShareMaxLbd,
+                shareMaxLen = scenario.clauseShareMaxLen,
+            ),
             cuts,
             SharedObjectiveBound(concurrency.lock()),
             SharedVarBounds(problem.numIntVars, concurrency.lock()),
