@@ -225,13 +225,15 @@ internal object SolverInvocation {
 
     /** Which output stream a subprocess emits, so the read loop parses the right markers. References
      *  always speak MiniZinc; klause-cli speaks the front-end bound to the *input* format — MiniZinc
-     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS and
-     *  OPB, and the SMT-LIB convention (`sat`/`unsat`/`unknown` + `; key=value` comments) for `.smt2`. */
+     *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS,
+     *  OPB, DIMACS CNF and WCNF (the DIMACS/MaxSAT conventions are the same `s`/`o`/`v`/`c` shape),
+     *  and the SMT-LIB convention (`sat`/`unsat`/`unknown` + `; key=value` comments) for `.smt2`. */
     private enum class Dialect { MINIZINC, PB_COMPETITION, SMT_LIB }
 
     private fun dialectFor(solverId: String, format: Format): Dialect = when {
         solverId != KLAUSE -> Dialect.MINIZINC
         format == Format.XCSP3 || format == Format.MPS || format == Format.OPB -> Dialect.PB_COMPETITION
+        format == Format.DIMACS || format == Format.WCNF -> Dialect.PB_COMPETITION
         format == Format.SMTLIB -> Dialect.SMT_LIB
         else -> Dialect.MINIZINC
     }
