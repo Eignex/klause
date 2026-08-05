@@ -2,6 +2,8 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.compile.CompiledSchema
 import com.eignex.klause.compile.compile
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
@@ -160,12 +162,13 @@ class LocalSearchSolver(
     internal fun solveInternal(params: LocalSearchParams, warm: WarmState?): SolveResult {
         val sink = SolveStatsSink(backend = "ls")
         sink.start()
-        if (problem.numRealVars > 0 || hasWideIntValues(problem)) {
+        if (problem.numRealVars > 0 || hasWideIntValues(problem) || hasWideFactor(problem)) {
             // LP-only continuous variables are resolved by the LP relaxation, which local search does not
             // run; their linear rows carry no invariant, so LS would ignore them and could report a
             // solution that violates them. Domain values past the 32-bit range make the incremental
-            // violation/objective sums wrap, so a reported "solution" may violate factors too.
-            // Decline rather than return an unsound verdict.
+            // violation/objective sums wrap, so a reported "solution" may violate factors too. A wide
+            // (over-64-bit-coefficient) factor carries only a saturated Long payload, so its invariant is
+            // inert and LS would ignore it — the same unsoundness. Decline rather than return an unsound verdict.
             sink.stop()
             return SolveResult.Unknown(TerminationReason.Unsupported, sink.snapshot())
         }
@@ -185,9 +188,10 @@ class LocalSearchSolver(
     }
 
     internal fun samplesInternal(params: LocalSearchParams, warm: WarmState?): Sequence<Sample> {
-        // LP-only continuous variables and wide int values are not soundly evaluated by local search
-        // (see [solveInternal]); stream nothing rather than assignments that may violate factors.
-        if (problem.numRealVars > 0 || hasWideIntValues(problem)) return emptySequence()
+        // LP-only continuous variables, wide int domains, and wide-coefficient factors are not soundly
+        // evaluated by local search (see [solveInternal]); stream nothing rather than assignments that
+        // may violate factors.
+        if (problem.numRealVars > 0 || hasWideIntValues(problem) || hasWideFactor(problem)) return emptySequence()
         val eff = effectiveAssumptions(params.assumptions) ?: return emptySequence()
         return streamImpl(params, eff, warm)
     }
@@ -842,3 +846,9 @@ private fun hasWideIntValues(problem: Problem): Boolean {
     }
     return false
 }
+
+// A factor whose coefficients or bound exceed the 64-bit range is enforced only by its exact propagator;
+// its local-search invariant is inert (the Long payload is a saturated placeholder), so LS would ignore
+// the constraint. Bail rather than report an assignment that could violate it.
+private fun hasWideFactor(problem: Problem): Boolean =
+    problem.factors.any { (it is Linear && it.wide) || (it is ReifiedLinear && it.wide) }
