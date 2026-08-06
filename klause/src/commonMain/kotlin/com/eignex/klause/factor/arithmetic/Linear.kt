@@ -62,48 +62,68 @@ class Linear private constructor(
         if (rawOp == LinearOp.GE) LongArray(terms.coeffs.size) { -terms.coeffs[it] } else terms.coeffs
 
     /**
-     * LP-only continuous (real) variable terms, additional to the integer terms: real var ids in
-     * [realVars] paired with double coefficients in [realCoeffs]. Empty for the integer/Boolean core.
-     * When present the row `Σ coeffs(i)·vars(i) + Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound` reasons over a
-     * continuous variable, so it is absent from CP propagation ([asPropagator] is [NoPropagator]) and its
-     * feasibility is enforced by the LP relaxation and the search leaf. A `>=` row negates these
-     * coefficients alongside the integer ones.
+     * The LP-only payload — real (continuous) terms and/or over-64-bit wide coefficients — held off to the
+     * side. It is `null` for a plain integer row (the common case), so an integer [Linear] carries a single
+     * null reference here instead of the seven empty/zero/false fields the payload would otherwise occupy on
+     * every row. The GE→LE canonicalisation (negating real/wide coefficients and bounds) happens here so the
+     * accessors below can expose the payload without re-deriving it.
      */
-    val realVars: IntArray = realVarsIn
+    private val lpExtra: LinearLpExtra? =
+        if (realVarsIn.isNotEmpty() || wideCoeffsIn != null) {
+            val negate = rawOp == LinearOp.GE
+            LinearLpExtra(
+                realVars = realVarsIn,
+                realCoeffs = if (negate) DoubleArray(realCoeffsIn.size) { -realCoeffsIn[it] } else realCoeffsIn,
+                realIntCoeffs =
+                if (negate) DoubleArray(intCoeffsRealIn.size) { -intCoeffsRealIn[it] } else intCoeffsRealIn,
+                realBound = if (negate) -realBoundIn else realBoundIn,
+                strictReal = strictRealIn,
+                wideCoeffs = when {
+                    wideCoeffsIn == null -> null
+                    negate -> Array(wideCoeffsIn.size) { -wideCoeffsIn[it] }
+                    else -> wideCoeffsIn
+                },
+                wideBound = if (wideBoundIn != null && negate) -wideBoundIn else wideBoundIn,
+            )
+        } else {
+            null
+        }
+
+    /**
+     * LP-only continuous (real) variable terms, additional to the integer terms: real var ids paired with
+     * double coefficients in [realCoeffs]. Empty for the integer/Boolean core. When present the row
+     * `Σ coeffs(i)·vars(i) + Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound` reasons over a continuous variable, so
+     * it is absent from CP propagation ([asPropagator] is [NoPropagator]) and its feasibility is enforced by
+     * the LP relaxation and the search leaf. A `>=` row negates these coefficients alongside the integer ones.
+     */
+    val realVars: IntArray get() = lpExtra?.realVars ?: EmptyIntArray
 
     /** Double coefficient of each [realVars] term, index-aligned; a `>=` row negates them with the
      *  integer coefficients (see [realVars]). */
-    val realCoeffs: DoubleArray =
-        if (rawOp == LinearOp.GE) DoubleArray(realCoeffsIn.size) { -realCoeffsIn[it] } else realCoeffsIn
+    val realCoeffs: DoubleArray get() = lpExtra?.realCoeffs ?: EmptyDoubleArray
 
     /** Double coefficient of each integer term [vars] on an LP-only row (index-aligned with [vars]); the
      *  authoritative value the relaxation reads, since [coeffs] is only a rounded placeholder here. Empty
      *  for the integer core. A `>=` row negates these with the rest. */
-    val realIntCoeffs: DoubleArray =
-        if (rawOp == LinearOp.GE) DoubleArray(intCoeffsRealIn.size) { -intCoeffsRealIn[it] } else intCoeffsRealIn
+    val realIntCoeffs: DoubleArray get() = lpExtra?.realIntCoeffs ?: EmptyDoubleArray
 
     /** Double right-hand side of an LP-only row ([bound] is only a rounded placeholder here); `>=` negates. */
-    val realBound: Double = if (rawOp == LinearOp.GE) -realBoundIn else realBoundIn
+    val realBound: Double get() = lpExtra?.realBound ?: 0.0
 
     /** Whether this row carries a continuous (real) term, making it an LP-only row (see [realVars]). */
-    val hasReals: Boolean get() = realVars.isNotEmpty()
+    val hasReals: Boolean get() = lpExtra?.realVars?.isNotEmpty() == true
 
     /** Wide (>64-bit) integer coefficients, index-aligned with [vars]; null unless [wide]. A `>=` row
      *  negates them (with [wideBound]); [WideLinearPropagator] reads these exact values, not [coeffs]. */
-    val wideCoeffs: Array<BigInteger>? = when {
-        wideCoeffsIn == null -> null
-        rawOp == LinearOp.GE -> Array(wideCoeffsIn.size) { -wideCoeffsIn[it] }
-        else -> wideCoeffsIn
-    }
+    val wideCoeffs: Array<BigInteger>? get() = lpExtra?.wideCoeffs
 
     /** Wide (>64-bit) right-hand side; null unless [wide]. `>=` negates it (with [wideCoeffs]). */
-    val wideBound: BigInteger? =
-        if (wideBoundIn != null && rawOp == LinearOp.GE) -wideBoundIn else wideBoundIn
+    val wideBound: BigInteger? get() = lpExtra?.wideBound
 
     /** True when a coefficient or the bound exceeds the 64-bit range: the row propagates via
      *  [WideLinearPropagator] (exact arbitrary precision), is excluded from the LP relaxation, and its
      *  Long [coeffs]/[bound] are saturated placeholders never read as authoritative. */
-    val wide: Boolean get() = wideCoeffs != null
+    val wide: Boolean get() = lpExtra?.wideCoeffs != null
 
     /** A plain 64-bit integer CP row — neither LP-only real ([hasReals]) nor [wide]. The only shape whose
      *  Long [coeffs]/[bound] the integer-reasoning passes (presolve, cuts, LP, LS) may read directly. */
@@ -112,14 +132,15 @@ class Linear private constructor(
     /** Strict inequality over reals (`Σ … < bound` after the ≤ canonicalisation). Only meaningful on an
      *  LP-only row: the float relaxation treats it as non-strict (a sound relaxation), and the exact
      *  deciders enforce the strictness (delta-rational feasibility, boundary-rejecting point checks). */
-    val strictReal: Boolean = strictRealIn
+    val strictReal: Boolean get() = lpExtra?.strictReal == true
 
     init {
         require(coeffs.isNotEmpty() || realVars.isNotEmpty()) { "linear sum must have at least one term" }
         require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
         require(!hasReals || realIntCoeffs.size == vars.size) { "real int-coeff/var length mismatch" }
         require(!strictReal || (hasReals && op == LinearOp.LE)) { "strictness needs an LP-only inequality row" }
-        require(wideCoeffs == null || wideCoeffs.size == vars.size) { "wide coeff/var length mismatch" }
+        val wc = wideCoeffs
+        require(wc == null || wc.size == vars.size) { "wide coeff/var length mismatch" }
         require(!(wide && hasReals)) { "a row cannot be both wide and real" }
     }
 
@@ -374,6 +395,20 @@ class Linear private constructor(
         builder.realRow(cols, dcoeffs, if (ge) LinearOp.GE else LinearOp.LE, rhs, strict = false)
     }
 }
+
+/** The LP-only payload of a [Linear] row — real (continuous) terms and/or over-64-bit wide coefficients —
+ *  held off to the side so a plain integer row (which has none of these) carries a single null reference
+ *  rather than the seven fields these values would otherwise occupy on every [Linear]. Values are already
+ *  GE→LE-canonicalised by the [Linear] constructor. */
+private class LinearLpExtra(
+    val realVars: IntArray,
+    val realCoeffs: DoubleArray,
+    val realIntCoeffs: DoubleArray,
+    val realBound: Double,
+    val strictReal: Boolean,
+    val wideCoeffs: Array<BigInteger>?,
+    val wideBound: BigInteger?,
+)
 
 /** The largest `Double` that is `≤ x`. `doubleValue` rounds to nearest; step one ULP down when that
  *  landed above `x` so the result is a sound lower bound for outward relaxation. */
