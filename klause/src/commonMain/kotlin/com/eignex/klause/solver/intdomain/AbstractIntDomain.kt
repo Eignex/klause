@@ -15,6 +15,17 @@ internal abstract class AbstractIntDomain : IntDomain {
 
     override fun excludeValues(values: LongArray): IntDomain? {
         if (values.isEmpty()) return this
+        // A non-enumerable (wide-span) domain must never be walked value-by-value: [forEach] below is
+        // O(span), so a survivor pass over a > 2^31-value domain grows an unbounded list (its backing
+        // array size wraps past Int and crashes). Fold the excluded values in one at a time instead — each
+        // is a span-independent run split — so the cost scales with the excluded-value count, not the span.
+        // A finite exclusion set cannot empty such a domain (> 2^31 values remain), so the result is never
+        // null; identity is preserved when nothing was actually present to exclude.
+        if (!enumerable) {
+            var d: IntDomain = this
+            for (v in values) d = d.excludeValue(v)
+            return if (d === this) this else d
+        }
         // Grow from a small default rather than preallocating [size]: when a wide domain is carved to a
         // sparse survivor set the result is tiny, and [size] can be huge (or saturated) — a `size`-capacity
         // LongArray would waste (or exhaust) memory.

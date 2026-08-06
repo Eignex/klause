@@ -35,6 +35,24 @@ class IntDomainTest {
     }
 
     @Test
+    fun `excludeValues on a non-enumerable wide domain never walks the span`() {
+        // Span > 2^31, so the domain is not enumerable. The old survivor-materialising path walked
+        // min..max one value at a time and grew a LongArrayList past Int.MAX (NegativeArraySizeException);
+        // the fix folds each excluded value as a span-independent run split.
+        val wide = IntDomain(0, 3_000_000_000L)
+        assertFalse(wide.enumerable)
+        val holes = longArrayOf(5L, 1_000_000_000L, 2_999_999_999L)
+        val d = wide.excludeValues(holes)!!
+        assertEquals(0L, d.min)
+        assertEquals(3_000_000_000L, d.max)
+        for (h in holes) assertFalse(h in d, "hole $h excluded")
+        assertTrue(4L in d && 6L in d && 1_500_000_000L in d, "values around the holes stay present")
+        var folded: IntDomain = wide
+        for (h in holes) folded = folded.excludeValue(h)
+        assertEquals(folded, d, "bulk exclusion matches folding excludeValue")
+    }
+
+    @Test
     fun `excludeValues matches folding excludeValue across reps`() {
         val rng = Random(0xE7C1)
         repeat(400) { _ ->
