@@ -398,7 +398,11 @@ internal class LpEngine(
         val relaxation = nodeRelaxation(relaxer, session)
         val model = relaxation.model
         if (model.n == 0) return LeafRealResult(LpVerdict.OPTIMAL, DoubleArray(problem.numRealVars))
-        val certified = solveAndCertify(model, cancellation = params.cancellation)
+        val certified = solveAndCertify(
+            model,
+            cancellation = params.cancellation,
+            componentSplit = params.lpPlan.componentSplit,
+        )
         return when (certified.verdict) {
             LpVerdict.OPTIMAL -> {
                 val primal = certified.exactPrimal ?: certified.float?.primal

@@ -135,7 +135,7 @@ internal val BACKTRACK_OVERRIDE_KEYS = listOf(
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "lp-objective-cone", "lp-auto-off-reprobe",
-    "lp-knapsack-lagrangian", "pb-learning", "pb-objective-cutoff", "objective-guided-values",
+    "lp-knapsack-lagrangian", "lp-component-split", "pb-learning", "pb-objective-cutoff", "objective-guided-values",
     "var-selector", "val-selector",
 )
 
@@ -169,6 +169,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
     val lpCone = p.bool("lp-objective-cone")
     val lpAutoOff = p.bool("lp-auto-off-reprobe")
     val lpKnapsack = p.bool("lp-knapsack-lagrangian")
+    val lpComponentSplit = p.bool("lp-component-split")
     val lpBranching = p.bool("lp-branching")
     val pbLearning = p.bool("pb-learning")
     val pbObjectiveCutoff = p.bool("pb-objective-cutoff")
@@ -179,7 +180,8 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence,
-        lpCone, lpAutoOff, lpKnapsack, lpBranching, pbLearning, pbObjectiveCutoff, objectiveGuidedValues,
+        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBranching, pbLearning, pbObjectiveCutoff,
+        objectiveGuidedValues,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
     return { base ->
@@ -205,6 +207,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
         lpCone?.let { out = out.copy(lpPlan = out.lpPlan.copy(objectiveCone = it)) }
         lpAutoOff?.let { out = out.copy(lpPlan = out.lpPlan.copy(autoOffReprobe = it)) }
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
+        lpComponentSplit?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentSplit = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }

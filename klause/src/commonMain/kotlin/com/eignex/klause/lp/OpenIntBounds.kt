@@ -251,8 +251,8 @@ private fun tightenByNeighborhoodProbes(
         if (cur.lo != null && cur.hi != null) continue
         val seeds = if (negCol[v] >= 0) intArrayOf(posCol[v], negCol[v]) else intArrayOf(posCol[v])
         val nb = base.columnNeighborhood(seeds, OBBT_NEIGHBORHOOD_ROWS, rowIndex)
-        val p = nb.colMap[posCol[v]]
-        val q = if (negCol[v] >= 0) nb.colMap[negCol[v]] else -1
+        val p = nb.colOf(posCol[v])
+        val q = if (negCol[v] >= 0) nb.colOf(negCol[v]) else -1
         var newHi = cur.hi
         var newLo = cur.lo
         for (maximize in booleanArrayOf(true, false)) {

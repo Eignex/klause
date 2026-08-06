@@ -25,9 +25,9 @@ class LpNeighborhoodTest {
         val capped = base.columnNeighborhood(intArrayOf(x[0]), maxRows = 1, rowIndex = idx)
         assertEquals(1, capped.model.m, "one row within the cap")
         assertEquals(2, capped.model.n, "the accepted row keeps its whole support")
-        assertTrue(capped.colMap[x[0]] >= 0)
-        assertTrue(capped.colMap[x[1]] >= 0)
-        assertEquals(-1, capped.colMap[x[2]], "a column beyond the cap stays outside")
+        assertTrue(capped.colOf(x[0]) >= 0)
+        assertTrue(capped.colOf(x[1]) >= 0)
+        assertEquals(-1, capped.colOf(x[2]), "a column beyond the cap stays outside")
     }
 
     @Test
@@ -46,7 +46,7 @@ class LpNeighborhoodTest {
         b.addRow(intArrayOf(x0, y), longArrayOf(1L, 1L), Relation.EQ, 5L)
         val base = b.build(Sense.MINIMIZE)
         val nb = base.columnNeighborhood(intArrayOf(x0), maxRows = 4, rowIndex = base.rowIndex())
-        val c = nb.colMap[x0]
+        val c = nb.colOf(x0)
         assertEquals(base.upper[x0], nb.model.upper[c], "shifted column range carries over")
         assertEquals(base.loShift[x0], nb.model.loShift[c])
         assertTrue(nb.model.hasUpper[nb.model.slackCol(0)], "the equality row keeps its fixed slack")
@@ -62,6 +62,6 @@ class LpNeighborhoodTest {
         val base = b.build(Sense.MINIMIZE)
         val nb = base.columnNeighborhood(intArrayOf(x), maxRows = 16, rowIndex = base.rowIndex())
         assertEquals(1, nb.model.m)
-        assertEquals(-1, nb.colMap[z])
+        assertEquals(-1, nb.colOf(z))
     }
 }

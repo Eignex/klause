@@ -68,8 +68,9 @@ internal fun solveAndCertify(
     model: LpModel,
     warm: Basis? = null,
     cancellation: Cancellation = Cancellation.Never,
+    componentSplit: Boolean = true,
 ): CertifiedLpResult {
-    val solver = newLpSolver(model, cancellation)
+    val solver = newLpSolver(model, cancellation, componentSplit)
     val result = solver.solve(warm)
         ?: run {
             // A dual-unbounded termination is only a *candidate* infeasibility — confirm it with an exact

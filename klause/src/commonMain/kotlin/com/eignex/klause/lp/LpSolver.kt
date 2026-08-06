@@ -51,12 +51,27 @@ internal interface TableauCutSolver : LpSolver {
  * Construct the LP engine for the general solve/certify path — the swap point for an alternative engine
  * (or, later, a first-order primal–dual GPU solver); callers depend only on [LpSolver].
  *
- * A **dense** model whose constraint matrix has filled in picks the [DenseSimplex] (koblas dense LU),
- * where the sparse [RevisedSimplex]'s `O(nnz)` bookkeeping buys nothing; everything else stays on the
- * sparse engine. The gate is currently limited to LP-only-continuous (real) models — the integer path is
- * byte-identity-sensitive, so extending the dense engine there needs a node/propagation A/B first.
+ * A separable model first decomposes into its column components ([ComponentLpSolver]) — exact, and
+ * each block factorizes at a fraction of the monolithic cost; [componentSplit] (default on, the
+ * `lp-component-split` knob) opts out. A **dense** model whose constraint matrix has filled in picks
+ * the [DenseSimplex] (koblas dense LU), where the sparse [RevisedSimplex]'s `O(nnz)` bookkeeping buys
+ * nothing; everything else stays on the sparse engine. The dense gate is currently limited to
+ * LP-only-continuous (real) models — the integer path is byte-identity-sensitive, so extending the
+ * dense engine there needs a node/propagation A/B first.
  */
-internal fun newLpSolver(model: LpModel, cancellation: Cancellation = Cancellation.Never): LpSolver =
+internal fun newLpSolver(
+    model: LpModel,
+    cancellation: Cancellation = Cancellation.Never,
+    componentSplit: Boolean = true,
+): LpSolver {
+    if (componentSplit) {
+        componentLpSolverOrNull(model, cancellation, ::monolithicLpSolver)?.let { return it }
+    }
+    return monolithicLpSolver(model, cancellation)
+}
+
+/** The single-model engine selection [newLpSolver] and each decomposed block share. */
+private fun monolithicLpSolver(model: LpModel, cancellation: Cancellation): LpSolver =
     if (model.hasContinuous && isDense(model)) {
         DenseSimplex(model, cancellation)
     } else {
