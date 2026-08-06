@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VarRef
+import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpEngine
@@ -120,7 +121,17 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
     override fun applyNext(session: PropagationSession): ApplyOutcome? {
         if (!resolved) {
             val d = session.intDomain(varRef.varId)
-            val s = if (preferred >= d.max) d.max - 1 else maxOf(preferred, d.min)
+            // On a non-enumerable (wide-span) domain, split at the bounds midpoint regardless of the value
+            // heuristic's preferred value. An extreme preferred (min/max, e.g. indomain_min) would otherwise
+            // peel one value per level — O(span) branch depth on a > 2^31-span domain — where a dichotomic
+            // split is O(log span). [boundsMidpoint] lands in `[min, max-1]` here (min < max on a wide
+            // domain), so both children stay non-empty; the partition `x <= s` / `x >= s+1` is complete for
+            // any `s`, so this changes cost, never soundness.
+            val s = when {
+                !d.enumerable -> boundsMidpoint(d)
+                preferred >= d.max -> d.max - 1
+                else -> maxOf(preferred, d.min)
+            }
             splitLo = s
             splitHi = s + 1
             lowerFirst = preferred <= s
