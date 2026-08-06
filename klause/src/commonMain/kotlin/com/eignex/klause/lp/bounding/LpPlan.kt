@@ -253,6 +253,13 @@ data class LpPlan(
      */
     val knapsackLagrangian: Boolean = false,
     /**
+     * Decompose a separable LP into its column components at the solver seam and solve each block
+     * independently ([com.eignex.klause.lp.ComponentLpSolver]). Exact — the stitched optimum, primal
+     * point, and duals match the monolithic solve — while each block's factorization costs a fraction
+     * of the monolithic one. On by default; the `lp-component-split` param opts a run out.
+     */
+    val componentSplit: Boolean = true,
+    /**
      * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear

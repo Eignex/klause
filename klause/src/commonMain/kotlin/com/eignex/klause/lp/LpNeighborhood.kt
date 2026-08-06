@@ -14,10 +14,28 @@ import com.eignex.klause.util.IntHashSet
  * structure at a factorization cost bounded by the row cap instead of the full model's row count.
  *
  * [colMap] maps original structural columns to sub-model columns (`-1` when outside the
- * neighborhood); bounds, shifts, probe-clamp flags, tags, strictness, global validity, premises and
- * the double view all carry over per selected row/column.
+ * neighborhood) and [rows] lists the taken rows by original index (sub-model row `r` is original row
+ * `rows(r)`); bounds, shifts, probe-clamp flags, tags, strictness, global validity, premises and the
+ * double view all carry over per selected row/column.
+ *
+ * The same restriction ([LpModel.restrictTo]) also carves a **connected component** out of a
+ * separable model — there the dropped rows share no columns with the kept ones, so the sub-model is
+ * not merely a relaxation but exact, and per-component optima stitch back to the full optimum
+ * ([ComponentLpSolver]).
  */
-internal class LpNeighborhood(val model: LpModel, val colMap: IntArray)
+internal class LpNeighborhood(
+    val model: LpModel,
+    /** Old→new structural column map (`-1` outside), or null when the caller tracks columns via
+     *  [cols] alone — per-part full-length maps would cost `n × parts` on a decomposed model. */
+    val colMap: IntArray?,
+    /** Taken rows by original index: sub-model row `r` is original row `rows(r)`. */
+    val rows: IntArray,
+    /** Taken structural columns by original index: sub-model column `c` is original column `cols(c)`. */
+    val cols: IntArray,
+) {
+    /** Sub-model column of original column [j] (`-1` outside); requires the old→new map. */
+    fun colOf(j: Int): Int = checkNotNull(colMap) { "this restriction tracks columns via cols only" }[j]
+}
 
 /** Row-major adjacency of a model's structural entries (`rows -> columns`), built once in `O(nnz)`
  *  and shared across many [columnNeighborhood] walks. Covers the union of the [Long] core's and the
@@ -40,7 +58,7 @@ internal fun LpModel.rowIndex(): LpRowIndex {
 }
 
 /** Iterate the union-sparsity rows of column [j] once each, ascending. */
-private inline fun LpModel.forEachColumnRow(j: Int, action: (i: Int) -> Unit) {
+internal inline fun LpModel.forEachColumnRow(j: Int, action: (i: Int) -> Unit) {
     val view = doubleView
     if (view == null) {
         for (k in csc.colPtr[j] until csc.colPtr[j + 1]) action(csc.rowIdx[k])
@@ -74,7 +92,7 @@ private inline fun LpModel.forEachColumnRow(j: Int, action: (i: Int) -> Unit) {
 }
 
 /** Iterate every `(column, row)` of the union sparsity once, columns outer. */
-private inline fun LpModel.forEachUnionEntry(action: (j: Int, i: Int) -> Unit) {
+internal inline fun LpModel.forEachUnionEntry(action: (j: Int, i: Int) -> Unit) {
     for (j in 0 until n) forEachColumnRow(j) { i -> action(j, i) }
 }
 
@@ -115,6 +133,22 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
             }
         }
     }
+    return restrictTo(takenCols, takenRows, colMap, copyCosts = false)
+}
+
+/**
+ * Restrict this model to [takenCols] × [takenRows] (original indices; [colMap] is their prebuilt
+ * old→new column map). The caller guarantees every taken row's whole support is inside [takenCols] —
+ * the invariant both consumers establish by construction ([columnNeighborhood]'s BFS, the component
+ * labeling). With [copyCosts] the objective restricts too (costs, shift constant, double view);
+ * without it costs are zero for a probing caller to overwrite.
+ */
+internal fun LpModel.restrictTo(
+    takenCols: IntArrayList,
+    takenRows: IntArrayList,
+    colMap: IntArray?,
+    copyCosts: Boolean,
+): LpNeighborhood {
     val subN = takenCols.size
     val subM = takenRows.size
     val rowMap = IntArray(m) { -1 }
@@ -152,6 +186,7 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
     val clampLo = BooleanArray(subN)
     val clampHi = BooleanArray(subN)
     val continuous = BooleanArray(subN)
+    var subObjConstant = 0L
     for (c in 0 until subN) {
         val j = takenCols[c]
         upperOut[c] = upper[j]
@@ -161,6 +196,10 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
         clampLo[c] = probeClampedLo[j]
         clampHi[c] = probeClampedHi[j]
         continuous[c] = colContinuous[j]
+        if (copyCosts) {
+            cost[c] = this.cost[j]
+            subObjConstant = addExact(subObjConstant, mulExact(this.cost[j], loShift[j]))
+        }
     }
     val rhsOut = LongArray(subM)
     val flippedOut = LongArray(subM)
@@ -204,11 +243,17 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
         val dUpper = DoubleArray(subVars)
         val dHasUpper = BooleanArray(subVars)
         val dLoShift = DoubleArray(subN)
+        val dCost = DoubleArray(subVars)
+        var dObjConstant = 0.0
         for (c in 0 until subN) {
             val j = takenCols[c]
             dUpper[c] = view.upper[j]
             dHasUpper[c] = view.hasUpper[j]
             dLoShift[c] = view.loShift[j]
+            if (copyCosts) {
+                dCost[c] = view.cost[j]
+                dObjConstant += view.cost[j] * view.loShift[j]
+            }
         }
         val dRhs = DoubleArray(subM)
         for (r in 0 until subM) {
@@ -219,18 +264,18 @@ internal fun LpModel.columnNeighborhood(seeds: IntArray, maxRows: Int, rowIndex:
         }
         LpDoubleView(
             colPtr = dColPtr, rowIdx = dRowIdx, colVal = dColVal,
-            rhs = dRhs, cost = DoubleArray(subVars), upper = dUpper, hasUpper = dHasUpper,
-            objConstant = 0.0, loShift = dLoShift,
+            rhs = dRhs, cost = dCost, upper = dUpper, hasUpper = dHasUpper,
+            objConstant = dObjConstant, loShift = dLoShift,
         )
     }
     val model = LpModel(
         n = subN, m = subM,
         csc = Csc(colPtr, rowIdxOut, colVal),
         rhs = rhsOut, cost = cost, upper = upperOut, hasUpper = hasUpperOut,
-        loShift = loShiftOut, objConstant = 0L, sense = sense, tag = tagOut,
+        loShift = loShiftOut, objConstant = subObjConstant, sense = sense, tag = tagOut,
         rowGlobal = globalOut, rowStrict = strictOut, rowPremises = premisesOut,
         flippedRhs = flippedOut, probeClampedLo = clampLo, probeClampedHi = clampHi,
         colContinuous = continuous, doubleView = dv,
     )
-    return LpNeighborhood(model, colMap)
+    return LpNeighborhood(model, colMap, takenRows.toIntArray(), takenCols.toIntArray())
 }
