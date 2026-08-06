@@ -21,28 +21,64 @@ internal fun SmtLib.Builder.inferBounds() {
         changed = false
         for (r in relations) {
             if (r.op == LinearOp.NE) continue
+            // One O(width) activity pass per relation — Σ min / Σ max of c·x over the finite terms
+            // with the infinite terms counted — then each term isolates its own contribution in
+            // O(1). Recomputing the rest-sum per term is O(width²), which the set-covering rows of
+            // the miplib instances (tens of thousands of terms) turn into minutes (#1432). An
+            // activity overflow degrades that direction to "no finite bound" for every term but the
+            // sole infinite one, exactly like an infinite contributing bound.
+            var totLo: Long? = 0L
+            var infLo = 0
+            var infLoIdx = -1
+            var totHi: Long? = 0L
+            var infHi = 0
+            var infHiIdx = -1
+            for (oi in r.vars.indices) {
+                val c = r.coeffs[oi]
+                if (c == 0L) continue
+                val v = r.vars[oi]
+                val bLo = if (c >= 0) lo[v] else hi[v]
+                if (bLo == null) {
+                    infLo++
+                    infLoIdx = oi
+                } else {
+                    totLo = totLo?.let { mulAdd(it, c, bLo) }
+                }
+                val bHi = if (c >= 0) hi[v] else lo[v]
+                if (bHi == null) {
+                    infHi++
+                    infHiIdx = oi
+                } else {
+                    totHi = totHi?.let { mulAdd(it, c, bHi) }
+                }
+            }
+            val bnd = r.bound
             for (ti in r.vars.indices) {
                 val tv = r.vars[ti]
                 val ct = r.coeffs[ti]
                 if (ct == 0L) continue
-                // sLo/sHi accumulate the min/max of Σ_{other} c·x; null once that direction is infinite
-                // (an infinite contributing bound or an overflow — both mean "no finite bound derivable").
-                var sLo: Long? = 0L
-                var sHi: Long? = 0L
-                for (oi in r.vars.indices) {
-                    if (oi == ti) continue
-                    val c = r.coeffs[oi]
-                    val v = r.vars[oi]
-                    if (sLo != null) {
-                        val b = if (c >= 0) lo[v] else hi[v]
-                        sLo = if (b == null) null else mulAdd(sLo, c, b)
+                // Σ_{other} min: total minus this term's own contribution — finite only when every
+                // other term is finite (no infinities, or this term is the single infinite one).
+                val sLo = when {
+                    infLo == 0 -> totLo?.let { total ->
+                        val own = if (ct >= 0) lo[tv] else hi[tv]
+                        own?.let { b -> mulAdd(0L, ct, b)?.let { subOrNull(total, it) } }
                     }
-                    if (sHi != null) {
-                        val b = if (c >= 0) hi[v] else lo[v]
-                        sHi = if (b == null) null else mulAdd(sHi, c, b)
-                    }
+
+                    infLo == 1 && infLoIdx == ti -> totLo
+
+                    else -> null
                 }
-                val bnd = r.bound
+                val sHi = when {
+                    infHi == 0 -> totHi?.let { total ->
+                        val own = if (ct >= 0) hi[tv] else lo[tv]
+                        own?.let { b -> mulAdd(0L, ct, b)?.let { subOrNull(total, it) } }
+                    }
+
+                    infHi == 1 && infHiIdx == ti -> totHi
+
+                    else -> null
+                }
                 if (r.op == LinearOp.LE || r.op == LinearOp.EQ) {
                     changed = applyCtBound(lo, hi, tv, ct, sLo?.let { subOrNull(bnd, it) }, upper = true) || changed
                 }

@@ -231,16 +231,12 @@ private fun SmtLib.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res
 
 /** Combine a real-sorted node: exact-rational folding; `*` and `/` need a constant side. */
 private fun SmtLib.Builder.combineReal(head: String, args: List<Res>): Res = when (head) {
-    "+" -> Res.R(args.map { it.asReal() }.reduce { a, b -> a.plus(b) })
+    "+" -> Res.R(sumRealCombs(args.map { it.asReal() }))
 
     "-" -> if (args.size == 1) {
         Res.R(args[0].asReal().scaled(BigFraction.MINUS_ONE))
     } else {
-        Res.R(
-            args.drop(1).fold(args[0].asReal()) { acc, e ->
-                acc.plus(e.asReal().scaled(BigFraction.MINUS_ONE))
-            },
-        )
+        Res.R(sumRealCombs(args.map { it.asReal() }, negateTail = true))
     }
 
     "*" -> {
@@ -322,13 +318,12 @@ private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: Li
 }
 
 private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
-    "+" -> Res.I(args.map { it.asIntComb() }.reduce(::addIntComb))
+    "+" -> Res.I(sumIntCombs(args.map { it.asIntComb() }))
 
     "-" -> if (args.size == 1) {
         Res.I(scaleIntComb(args[0].asIntComb(), -1L))
     } else {
-        val first = args[0].asIntComb()
-        Res.I(args.drop(1).fold(first) { acc, e -> addIntComb(acc, scaleIntComb(e.asIntComb(), -1L)) })
+        Res.I(sumIntCombs(args.map { it.asIntComb() }, negateTail = true))
     }
 
     "*" -> {
