@@ -428,7 +428,7 @@ class DefinitionalSweep internal constructor(
             if (f !is ReifiedLinear) continue
             if (frozenBool(f.auxBoolVar)) continue
             var sum = 0L
-            for (k in f.vars.indices) sum += f.coeffs[k] * assignment.intValue(f.vars[k])
+            for (k in f.vars.indices) sum += f.coeff(k) * assignment.intValue(f.vars[k])
             val holds = when (f.op) {
                 LinearOp.LE -> sum <= f.bound
                 LinearOp.GE -> sum >= f.bound

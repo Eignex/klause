@@ -44,7 +44,52 @@ class ReifiedLinear private constructor(
 ) : ReifiedFactor {
 
     val vars: IntArray = terms.vars
-    val coeffs: LongArray = terms.coeffs
+
+    // Integer coefficients, index-aligned with [vars], stored compactly to cut parse/presolve memory on the
+    // Linear-dominated families (MPS, QF_LIRA): an [IntArray] (4 B/term) when every coefficient fits Int, else
+    // a [LongArray] (8 B/term). [coeff] reads the store with no allocation; [coeffs] materialises a full
+    // [LongArray] for whole-array consumers. A reified row keeps its op, so no `>=` negation here.
+    private val coeffsInt: IntArray?
+    private val coeffsLong: LongArray?
+
+    /** Largest `|coefficient|` over the integer terms (0 when there are none), cached at construction so the
+     *  small-model bound reads it instead of rescanning. A saturated placeholder on a wide row. */
+    val maxAbsCoeff: Long
+
+    init {
+        val src = terms.coeffs
+        var maxAbs = 0L
+        var fitsInt = true
+        for (c in src) {
+            val a = if (c < 0L) -c else c
+            if (a > maxAbs) maxAbs = a
+            if (c < Int.MIN_VALUE.toLong() || c > Int.MAX_VALUE.toLong()) fitsInt = false
+        }
+        maxAbsCoeff = maxAbs
+        if (fitsInt) {
+            coeffsInt = IntArray(src.size) { src[it].toInt() }
+            coeffsLong = null
+        } else {
+            coeffsInt = null
+            coeffsLong = src
+        }
+    }
+
+    /** Integer coefficient at term [k], read from the compact store with no allocation. */
+    fun coeff(k: Int): Long {
+        val ci = coeffsInt
+        return if (ci != null) ci[k].toLong() else checkNotNull(coeffsLong)[k]
+    }
+
+    /** Integer coefficients as a [LongArray], materialised on demand from the compact store; prefer [coeff]
+     *  for indexed access. */
+    val coeffs: LongArray
+        get() {
+            val cl = coeffsLong
+            if (cl != null) return cl
+            val ci = checkNotNull(coeffsInt)
+            return LongArray(ci.size) { ci[it].toLong() }
+        }
 
     /** Wide (>64-bit) integer coefficients, index-aligned with [vars]; null unless [wide].
      *  [WideReifiedLinearPropagator] reads these exact values, not [coeffs]. */
@@ -59,7 +104,7 @@ class ReifiedLinear private constructor(
     val wide: Boolean get() = wideCoeffs != null
 
     init {
-        require(coeffs.isNotEmpty()) { "linear sum must have at least one term" }
+        require(vars.isNotEmpty()) { "linear sum must have at least one term" }
         require(wideCoeffs == null || wideCoeffs.size == vars.size) { "wide coeff/var length mismatch" }
     }
 
@@ -120,7 +165,7 @@ class ReifiedLinear private constructor(
             }
         } else {
             sink.long(bound)
-            sink.pairsByVarKey(vars) { coeffs[it] }
+            sink.pairsByVarKey(vars) { coeff(it) }
         }
     }
 
@@ -185,7 +230,7 @@ class ReifiedLinear private constructor(
      */
     private fun emitExactBinaryEquality(builder: RelaxationBuilder): Boolean {
         if (op != LinearOp.EQ || vars.size != 1) return false
-        val c = coeffs[0]
+        val c = coeff(0)
         if (c == 0L) return false
         val dec = builder.declaredDomain(vars[0])
         if (dec.size != 2) return false // a size-2 domain's two values are exactly its min and max
@@ -222,7 +267,7 @@ class ReifiedLinear private constructor(
         var lMinD = 0L
         var lMaxD = 0L
         for (k in vars.indices) {
-            val c = coeffs[k]
+            val c = coeff(k)
             val dom = builder.liveDomain(vars[k])
             val dec = builder.declaredDomain(vars[k])
             if (c >= 0L) {
@@ -249,7 +294,7 @@ class ReifiedLinear private constructor(
             val vals = LongArray(vars.size + 1)
             for (k in vars.indices) {
                 cols[k] = builder.intColumn(vars[k])
-                vals[k] = coeffs[k]
+                vals[k] = coeff(k)
             }
             cols[vars.size] = a
             vals[vars.size] = auxCoeff
