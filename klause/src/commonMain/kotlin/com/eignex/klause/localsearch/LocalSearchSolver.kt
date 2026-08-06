@@ -837,12 +837,14 @@ class LocalSearchSolver(
     }
 }
 
-/** True when any int domain holds values past the 32-bit range: local search's incremental
- *  violation/objective bookkeeping accumulates coefficient-times-value products in plain `Long`
- *  arithmetic, which can wrap there — an unsound "solution" could slip through. */
+/** True when any int domain holds values past the 32-bit range, or spans more than the enumerable
+ *  range (`!enumerable`). The first would wrap local search's incremental violation/objective
+ *  bookkeeping (plain `Long` products) and slip an unsound "solution" through; the second would send the
+ *  repair-move proposers walking the domain value-by-value (O(span)) — a hang. Either way local search
+ *  cannot soundly or feasibly handle the problem, so the caller falls back to the backtrack engine. */
 private fun hasWideIntValues(problem: Problem): Boolean {
     for (d in problem.intDomains) {
-        if (d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
+        if (!d.enumerable || d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
     }
     return false
 }
