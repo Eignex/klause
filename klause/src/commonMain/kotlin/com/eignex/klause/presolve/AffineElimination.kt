@@ -233,8 +233,8 @@ internal object AffineSingletons {
         for (xi in 0..1) {
             val x = f.vars[xi]
             val y = f.vars[1 - xi]
-            val a = f.coeffs[xi]
-            val b = f.coeffs[1 - xi]
+            val a = f.coeff(xi)
+            val b = f.coeff(1 - xi)
             // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
             // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
             // `y`'s domain is restricted below, so it too must stay clear of the objective — the
@@ -359,7 +359,7 @@ internal object AffineSingletons {
             // overflow check, so poll the deadline between them (and inside the check below).
             if ((xi and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             val x = f.vars[xi]
-            val cx = f.coeffs[xi]
+            val cx = f.coeff(xi)
             if (eliminated[x] || x in objectiveIntVars) continue
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
@@ -380,7 +380,7 @@ internal object AffineSingletons {
                 if (j == xi) continue
                 if (eliminated[f.vars[j]]) partnerEliminated = true
                 termVars[w] = f.vars[j]
-                termCoeffs[w] = -f.coeffs[j] / cx
+                termCoeffs[w] = -f.coeff(j) / cx
                 w++
             }
             if (partnerEliminated) continue
@@ -461,10 +461,10 @@ internal object AffineSingletons {
      *  [f], so substituting out the pivot variable keeps all folded coefficients and the constant term
      *  integral. */
     private fun dividesAllPartnersAndBound(f: Linear, xi: Int): Boolean {
-        val cx = f.coeffs[xi]
+        val cx = f.coeff(xi)
         if (cx == 0L) return false
         if (f.bound % cx != 0L) return false
-        for (j in f.vars.indices) if (j != xi && f.coeffs[j] % cx != 0L) return false
+        for (j in f.vars.indices) if (j != xi && f.coeff(j) % cx != 0L) return false
         return true
     }
 
@@ -899,7 +899,7 @@ internal object AffineSingletons {
      *  any term var that already occurs in [l]. */
     private fun foldAffineIntoLinear(l: Linear, c: AffineCandidate): Linear {
         val ix = l.vars.indexOf(c.x)
-        val cX = l.coeffs[ix]
+        val cX = l.coeff(ix)
         val newVars = IntArray(l.vars.size - 1 + c.termVars.size)
         // Long throughout: both [l]'s coefficients and the fold candidate's are wide-capable, and the
         // candidate gate declined any pivot whose fold would overflow, so the products below are safe.
@@ -908,7 +908,7 @@ internal object AffineSingletons {
         for (j in l.vars.indices) {
             if (j == ix) continue
             newVars[w] = l.vars[j]
-            newCoeffs[w] = l.coeffs[j]
+            newCoeffs[w] = l.coeff(j)
             w++
         }
         for (k in c.termVars.indices) {
@@ -977,25 +977,18 @@ private fun foldRowOverflowsLong(
 ): Boolean {
     val xi = f.vars.indexOf(x)
     if (xi < 0) return false
-    val cX = f.coeffs[xi]
+    val cX = f.coeff(xi)
     // Fast path: if every magnitude the fold combines is below 2^31, no product `cX·c` reaches 2^62 and no
     // sum reaches 2^63, so the fold cannot overflow — skip the per-term `indexOf` + exact arithmetic below,
-    // which is O(arity · row-arity) and dominates the pass on dense wide rows (DiamondFree/SMPT). The two
-    // scans here are O(arity + row-arity); the exact path only runs when some coefficient is genuinely huge.
-    if (fitsHalfLong(cX) && fitsHalfLong(constTerm) && fitsHalfLong(f.bound)) {
+    // which is O(arity · row-arity) and dominates the pass on dense wide rows (DiamondFree/SMPT). The row's
+    // whole-row magnitude test reads its cached [Linear.maxAbsCoeff] (all `f.coeffs` fit half-Long iff the
+    // largest does), so no per-fold-candidate rescan of `f.coeffs`; the exact path runs only for huge coeffs.
+    if (fitsHalfLong(cX) && fitsHalfLong(constTerm) && fitsHalfLong(f.bound) && fitsHalfLong(f.maxAbsCoeff)) {
         var big = false
         for (c in termCoeffs) {
             if (!fitsHalfLong(c)) {
                 big = true
                 break
-            }
-        }
-        if (!big) {
-            for (c in f.coeffs) {
-                if (!fitsHalfLong(c)) {
-                    big = true
-                    break
-                }
             }
         }
         if (!big) return false
@@ -1005,7 +998,7 @@ private fun foldRowOverflowsLong(
         for (k in termVars.indices) {
             val prod = mulExact(cX, termCoeffs[k])
             val yi = f.vars.indexOf(termVars[k])
-            if (yi >= 0) addExact(f.coeffs[yi], prod)
+            if (yi >= 0) addExact(f.coeff(yi), prod)
         }
         false
     } catch (_: LpOverflowException) {

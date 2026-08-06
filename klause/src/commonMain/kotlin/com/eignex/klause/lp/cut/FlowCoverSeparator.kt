@@ -62,7 +62,7 @@ internal class FlowCoverSeparator : CutSeparator {
     /** Match `a₀·v₀ + a₁·v₁ ≤ 0` to `y − u·x ≤ 0`: the `+1` term is the flow `y`, the negative term the
      *  indicator `x` with capacity `u = −coeff`. Returns `(y, x, u)` or null when it is not that shape. */
     private fun matchVub(f: Linear): Triple<Int, Int, Long>? {
-        val (c0, c1) = f.coeffs[0] to f.coeffs[1]
+        val (c0, c1) = f.coeff(0) to f.coeff(1)
         return when {
             c0 == 1L && c1 < 0 -> Triple(f.vars[0], f.vars[1], -c1)
             c1 == 1L && c0 < 0 -> Triple(f.vars[1], f.vars[0], -c0)
@@ -90,13 +90,13 @@ internal class FlowCoverSeparator : CutSeparator {
      *  `yⱼ = wⱼ·xⱼ` over the indicator's own column, or null when [f] is not that shape. */
     private fun implicitArcs(f: Linear, problem: Problem, intColOf: IntArray): List<Arc>? {
         for (i in f.vars.indices) {
-            if (f.coeffs[i] <= 0) return null
+            if (f.coeff(i) <= 0) return null
             val d = problem.intDomains[f.vars[i]]
             if (d.min != 0L || d.max != 1L || intColOf[f.vars[i]] < 0) return null
         }
         return f.vars.indices.map { i ->
             val col = intColOf[f.vars[i]]
-            val w = f.coeffs[i]
+            val w = f.coeff(i)
             Arc(flowCol = col, flowCoeff = w, indicatorCol = col, cap = w)
         }
     }

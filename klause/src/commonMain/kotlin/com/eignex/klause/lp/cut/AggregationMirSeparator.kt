@@ -167,7 +167,7 @@ internal class AggregationMirSeparator : CutSeparator {
             for (idx in 0 until k) {
                 val col = ctx.relaxation.intColOf[factor.vars[idx]]
                 if (col < 0) return // a variable without an LP column ⇒ skip the row
-                val coeff = if (flip) -factor.coeffs[idx] else factor.coeffs[idx]
+                val coeff = if (flip) -factor.coeff(idx) else factor.coeff(idx)
                 cols[idx] = col
                 a[idx] = coeff
                 val lo = ctx.problem.intDomains[factor.vars[idx]].min

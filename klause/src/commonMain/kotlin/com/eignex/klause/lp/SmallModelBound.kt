@@ -32,7 +32,7 @@ fun smallModelIntBound(numIntVars: Int, factors: List<Factor>): Long? {
 
             is Linear -> {
                 if (!f.isIntegerCore) return null
-                for (c in f.coeffs) a = maxOf(a, abs(c.toDouble()))
+                a = maxOf(a, f.maxAbsCoeff.toDouble())
                 a = maxOf(a, abs(f.bound.toDouble()))
                 m += 2.0
             }

@@ -77,12 +77,12 @@ internal object DiophantineReduction {
             // Prefix / suffix gcd of |coeffs| so `gcd(aⱼ : j ≠ i)` is O(1) per variable.
             val pre = LongArray(n + 1)
             val suf = LongArray(n + 1)
-            for (i in 0 until n) pre[i + 1] = gcd(pre[i], f.coeffs[i])
-            for (i in n - 1 downTo 0) suf[i] = gcd(suf[i + 1], f.coeffs[i])
+            for (i in 0 until n) pre[i + 1] = gcd(pre[i], f.coeff(i))
+            for (i in n - 1 downTo 0) suf[i] = gcd(suf[i + 1], f.coeff(i))
             for (j in 0 until n) {
                 val m = gcd(pre[j], suf[j + 1])
                 if (m <= 1L) continue
-                val sol = solveCongruence(f.coeffs[j], f.bound, m) ?: return contradiction(problem, f.vars[j])
+                val sol = solveCongruence(f.coeff(j), f.bound, m) ?: return contradiction(problem, f.vars[j])
                 val (root, mod) = sol
                 if (mod <= 1L) continue
                 val v = f.vars[j]

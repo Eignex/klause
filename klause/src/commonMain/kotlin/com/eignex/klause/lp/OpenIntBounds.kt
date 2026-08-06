@@ -111,11 +111,11 @@ internal fun tightenOpenIntBounds(
         for (k in f.vars.indices) {
             val v = f.vars[k]
             cols[w] = posCol[v]
-            vals[w] = f.coeffs[k]
+            vals[w] = f.coeff(k)
             w++
             if (negCol[v] >= 0) {
                 cols[w] = negCol[v]
-                vals[w] = -f.coeffs[k]
+                vals[w] = -f.coeff(k)
                 w++
             }
         }

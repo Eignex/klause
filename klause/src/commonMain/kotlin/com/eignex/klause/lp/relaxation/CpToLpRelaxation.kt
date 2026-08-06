@@ -953,7 +953,7 @@ internal class CpToLpRelaxation(
                     val rltRow = MutableIntLongMap() // coalesces the wᵢᵢ = xᵢ term with the −b·xᵢ term
                     for (kIdx in f.vars.indices) {
                         val xk = f.vars[kIdx]
-                        val a = f.coeffs[kIdx]
+                        val a = f.coeff(kIdx)
                         val wCol = if (kIdx == iIdx) {
                             xiCol // wᵢᵢ = xᵢ²= xᵢ
                         } else {

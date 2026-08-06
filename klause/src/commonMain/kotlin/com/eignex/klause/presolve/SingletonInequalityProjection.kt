@@ -38,10 +38,10 @@ internal object SingletonInequalityProjection {
             if (!fitsHalfLong(f.bound)) return@forEachIndexed
             val j = f.vars.indices.firstOrNull { k ->
                 val x = f.vars[k]
-                occ[x] == 1 && x !in objectiveIntVars && x !in pinned && f.coeffs[k] != 0L && fitsHalfLong(f.coeffs[k])
+                occ[x] == 1 && x !in objectiveIntVars && x !in pinned && f.coeff(k) != 0L && fitsHalfLong(f.coeff(k))
             } ?: return@forEachIndexed
             val x = f.vars[j]
-            val a = f.coeffs[j]
+            val a = f.coeff(j)
             val dom = problem.intDomains[x]
             if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) return@forEachIndexed
             // The bound of x that leaves `rest` the widest feasible region.
@@ -55,7 +55,7 @@ internal object SingletonInequalityProjection {
             for (k in f.vars.indices) {
                 if (k != j) {
                     restVars[w] = f.vars[k]
-                    restCoeffs[w] = f.coeffs[k]
+                    restCoeffs[w] = f.coeff(k)
                     w++
                 }
             }

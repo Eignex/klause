@@ -116,7 +116,7 @@ class DefinitionalSweep internal constructor(
                 for (f in factors) {
                     if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ) continue
                     val j = f.vars.indices.firstOrNull {
-                        hinted[f.vars[it]] && (f.coeffs[it] == 1L || f.coeffs[it] == -1L) &&
+                        hinted[f.vars[it]] && (f.coeff(it) == 1L || f.coeff(it) == -1L) &&
                             nonProductOcc[f.vars[it]] == 1 &&
                             f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }
                     }
@@ -154,10 +154,10 @@ class DefinitionalSweep internal constructor(
                         if (k != j) {
                             visit(lin.vars[k])
                             ins.add(FunctionalObjective.Operand.v(lin.vars[k]))
-                            inc.add(lin.coeffs[k])
+                            inc.add(lin.coeff(k))
                         }
                     }
-                    node = FunctionalObjective.Lin(v, lin.coeffs[j], inc.toLongArray(), ins.toTypedArray(), lin.bound)
+                    node = FunctionalObjective.Lin(v, lin.coeff(j), inc.toLongArray(), ins.toTypedArray(), lin.bound)
                     inputs = IntArray(ins.size) { lin.vars[if (it < j) it else it + 1] }
                 }
                 if (!cyclic[v]) nodes.add(SweepNode.IntDef(node, inputs))
