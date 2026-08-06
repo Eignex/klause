@@ -71,6 +71,23 @@ class ObbtBoundsTest {
         assertEquals(4L, out[1].hi)
     }
 
+    @Test
+    fun `bounds a side on an oversized model through its neighborhood probe`() {
+        // The three real rows bound n only through the LP (interval propagation is silent, as above);
+        // 5001 padding rows on an unrelated variable push the model past the full-LP row cap, so the
+        // pass switches to neighborhood probes (#1425) — n's neighborhood is exactly the three real
+        // rows, so its bound still closes instead of falling to the clamp.
+        val lpOnly = listOf(
+            realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(-1.0, -1.0), LinearOp.EQ, 0.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0),
+            realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 7.0),
+        )
+        val padding = List(5001) { i -> Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1_000 + i) }
+        val bounds = arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, 10L))
+        val out = tightenOpenIntBounds(bounds, padding, realConstraints = lpOnly)
+        assertEquals(7L, out[0].hi, "the neighborhood probe closes the locally derivable bound")
+    }
+
     /** A row over int variable terms plus the two free reals `r1`/`r2` (ids 0 and 1). */
     private fun realRow(
         intCoeffs: LongArray,
