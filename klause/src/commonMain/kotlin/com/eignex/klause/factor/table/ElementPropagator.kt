@@ -79,10 +79,13 @@ internal class ElementPropagator(
     private fun elementPropagateVarArray(state: PropagationState): Boolean {
         val len = arr.size
         val resultDom = state.intDomains[result]
+        val idxDom = state.intDomains[idx]
+        // Walk array positions, not the index domain: only in-range indices act here, and `len` is the
+        // array length — so a wide index domain is tested by membership, never enumerated.
         var toExclude: LongArrayList? = null
-        state.intDomains[idx].forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len && !elementDomainsIntersect(state.intDomains[arr[pos.toInt()].toInt()], resultDom)) {
+        for (pos in 0 until len) {
+            val iv = indexOffset + pos.toLong()
+            if (iv in idxDom && !elementDomainsIntersect(state.intDomains[arr[pos].toInt()], resultDom)) {
                 (toExclude ?: LongArrayList().also { toExclude = it }).add(iv)
             }
         }
@@ -97,22 +100,25 @@ internal class ElementPropagator(
         }
 
         val positions = IntArrayList()
-        state.intDomains[idx].forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len) positions.add(pos.toInt())
+        for (pos in 0 until len) {
+            if (indexOffset + pos.toLong() in idxDom) positions.add(pos)
         }
         if (positions.size == 0) return false
 
         var resExclude: LongArrayList? = null
-        state.intDomains[result].forEach { rv ->
-            var supported = false
-            for (k in 0 until positions.size) {
-                if (rv in state.intDomains[arr[positions[k]].toInt()]) {
-                    supported = true
-                    break
+        // A wide result domain is never a full assignment; skip its per-value support scan (sound — the
+        // scan resumes once it narrows to enumerable, and every leaf has singleton domains).
+        if (state.intDomains[result].enumerable) {
+            state.intDomains[result].forEach { rv ->
+                var supported = false
+                for (k in 0 until positions.size) {
+                    if (rv in state.intDomains[arr[positions[k]].toInt()]) {
+                        supported = true
+                        break
+                    }
                 }
+                if (!supported) (resExclude ?: LongArrayList().also { resExclude = it }).add(rv)
             }
-            if (!supported) (resExclude ?: LongArrayList().also { resExclude = it }).add(rv)
         }
         resExclude?.let { ex ->
             val arrVars = IntArray(positions.size) { arr[positions[it]].toInt() }
@@ -127,8 +133,12 @@ internal class ElementPropagator(
                 val sel = arr[pos.toInt()].toInt()
                 val resD = state.intDomains[result]
                 var selExclude: LongArrayList? = null
-                state.intDomains[sel].forEach { v ->
-                    if (v !in resD) (selExclude ?: LongArrayList().also { selExclude = it }).add(v)
+                // A wide selected-cell domain is never a full assignment; skip its per-value scan (sound —
+                // it resumes once the cell narrows to enumerable, and leaves have singleton domains).
+                if (state.intDomains[sel].enumerable) {
+                    state.intDomains[sel].forEach { v ->
+                        if (v !in resD) (selExclude ?: LongArrayList().also { selExclude = it }).add(v)
+                    }
                 }
                 selExclude?.let { ex ->
                     val ant = collectHoleAndBoundAntecedents(state, intArrayOf(idx, result))
@@ -143,6 +153,10 @@ internal class ElementPropagator(
 /** Whether [a] and [b] share at least one live value (hole-aware). */
 internal fun elementDomainsIntersect(a: IntDomain, b: IntDomain): Boolean {
     if (a.max < b.min || b.max < a.min) return false
+    // Walking the smaller domain to find a shared value is O(span) for a wide domain. When either is
+    // non-enumerable, report an intersection whenever the bounds overlap — a sound over-approximation
+    // (it can only leave an index unpruned, never prune a supported one).
+    if (!a.enumerable || !b.enumerable) return true
     val small = if (a.size <= b.size) a else b
     val large = if (a.size <= b.size) b else a
     var found = false

@@ -220,9 +220,12 @@ class Regular(
         for (t in 0 until len) {
             val dom = domainOf(seq[t])
             reach[t].forEach { state ->
-                dom.forEach { sym ->
-                    if (sym in 1..s) {
-                        val nxt = trans[(state - 1) * s + (sym - 1).toInt()].toInt()
+                // Walk the alphabet (1..s), not the domain: only symbols in range have a transition, and
+                // s is the automaton's alphabet size (bounded), never the variable's span — so a wide
+                // sequence domain is tested by membership, never enumerated.
+                for (sym in 1..s) {
+                    if (sym.toLong() in dom) {
+                        val nxt = trans[(state - 1) * s + (sym - 1)].toInt()
                         if (nxt != 0) {
                             reach[t + 1].add(nxt)
                             arcCount++

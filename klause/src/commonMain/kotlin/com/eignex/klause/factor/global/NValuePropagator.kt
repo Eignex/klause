@@ -45,10 +45,17 @@ internal class NValuePropagator(
         // |union of domains|, which ignores that there are only `xs.size` variables. When the count is
         // pinned to that maximum, a maximum matching is mandatory, so Régin value-pruning applies.
         if (mode != NValue.Mode.AtMost) {
-            val matching = buildMatching(state)
-            if (!state.tightenIntMax(n, matching.size.toLong(), ant)) return false
-            if (state.intDomains[n].min == matching.size.toLong()) {
-                if (!atLeastGacPrune(state, matching, ant)) return false
+            // The matching build enumerates each variable's domain. On a wide (>2^31-span) domain fall
+            // back to the trivial sound upper bound (distinct values ≤ number of variables) and skip the
+            // GAC value pruning, which needs the matching.
+            if (xs.all { state.intDomains[it].enumerable }) {
+                val matching = buildMatching(state)
+                if (!state.tightenIntMax(n, matching.size.toLong(), ant)) return false
+                if (state.intDomains[n].min == matching.size.toLong()) {
+                    if (!atLeastGacPrune(state, matching, ant)) return false
+                }
+            } else if (!state.tightenIntMax(n, xs.size.toLong(), ant)) {
+                return false
             }
         }
         // atMost / eq: Beldiceanu's O(n+d) bound-consistency — the count is at least the size of a
@@ -62,6 +69,18 @@ internal class NValuePropagator(
 
     /** The original order-insensitive greedy bounds, retained for the optional-presence variant. */
     private fun propagateGreedy(state: PropagationState): Boolean {
+        // The union / disjoint-window scans below enumerate each variable's domain. On a wide
+        // (>2^31-span) domain use a bounds-only bound instead: the distinct count is at most the number
+        // of possibly-present variables (sound). No cheap sound lower bound here, so leave the minimum
+        // untightened (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
+        val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
+        if (nonAbsent.any { !state.intDomains[xs[it]].enumerable }) {
+            val boundsAnt = collectHoleAndBoundAntecedents(state, xs)
+            return when (mode) {
+                NValue.Mode.Eq, NValue.Mode.AtLeast -> state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
+                NValue.Mode.AtMost -> true
+            }
+        }
         val unionValues = LongHashSet()
         for (i in xs.indices) {
             if (definitelyAbsentNvFn(i, state)) continue

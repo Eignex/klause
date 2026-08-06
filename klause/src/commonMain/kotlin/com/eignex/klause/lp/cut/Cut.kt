@@ -267,6 +267,10 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
         val valueIndex = MutableLongIntMap()
         val values = LongArrayList()
         for (v in vars) {
+            // Abort before walking a domain that is too large to assign over — in particular a wide
+            // (>2^31-span) domain, whose `sizeLong` saturates well past the cap, so it is never
+            // enumerated value-by-value. Sound: no cut is produced, only strengthening is skipped.
+            if (session.intDomain(v).sizeLong > MAX_VALUES) return null
             session.intDomain(v).forEach { value ->
                 if (!valueIndex.containsKey(value)) {
                     valueIndex.put(value, values.size)
