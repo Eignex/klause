@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.IntIntMap
 
 internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongArray, vars: IntArray) {
     var sum = 0L
@@ -16,13 +17,19 @@ internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongA
 }
 
 /**
- * Look up the coefficient for [intVar] in [vars]/[coeffs]. Returns 0 if [intVar] is not found.
- * O(n) scan used by interface default methods — the hot path in the concrete classes uses
- * [com.eignex.klause.factor.CoeffLookup] for O(1) access.
+ * O(1) coefficient lookup over `vars`/`coeffs` for the LS linear invariants: a var→index map built
+ * once per invariant. Move scoring queries a coefficient per candidate move per containing row, so
+ * a per-query row scan turns ultra-wide rows (tens of thousands of terms) into deadline-starving
+ * move picks (#1442); the map makes each query constant work. A variable outside the row yields 0,
+ * so callers may ask about any variable.
  */
-internal fun findCoeff(coeffs: LongArray, vars: IntArray, intVar: Int): Long {
-    for (i in vars.indices) if (vars[i] == intVar) return coeffs[i]
-    return 0L
+internal class LinearCoeffIndex(private val coeffs: LongArray, vars: IntArray) {
+    private val index = IntIntMap.build(vars, IntArray(vars.size) { it }, absent = -1)
+
+    fun coeffOf(intVar: Int): Long {
+        val i = index[intVar]
+        return if (i < 0) 0L else coeffs[i]
+    }
 }
 
 /**
