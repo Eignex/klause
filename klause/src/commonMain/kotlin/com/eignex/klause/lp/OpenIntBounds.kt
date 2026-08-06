@@ -73,6 +73,7 @@ internal fun tightenOpenIntBounds(
     // implies, so those cost no LP solve; the LP-solving pass below only handles what survives.
     val work = fbbtTightenOpenIntBounds(bounds, constraints, cancellation, realConstraints, rLo, rUp)
     if (work.none { it.lo == null || it.hi == null }) return work // nothing open left for the LP pass
+    if (cancellation()) return work // the prefilter consumed the budget; don't start a factorization
 
     // A variable open below enters split, x = x⁺ − x⁻ with both parts ≥ 0, never as a −2⁶¹ probe lower
     // bound: the double view folds each column's lower bound into the row rhs in doubles, and at the
@@ -176,6 +177,15 @@ internal fun tightenOpenIntBounds(
         return work // cannot relax; leave every open side to the caller's clamp
     }
 
+    // Past the full-model row cap (#1425), each probe restricts to the row-capped neighborhood of its
+    // column pair instead: the initial factorization of the full basis is one uninterruptible call
+    // whose cost grows superlinearly with the row count, while a whole-row subset is a pure relaxation
+    // — every neighborhood bound is valid on the full model, so large instances keep their locally
+    // derivable finite bounds instead of falling to the clamp.
+    if (base.m > OBBT_MAX_LP_ROWS) {
+        return tightenByNeighborhoodProbes(base, work, posCol, negCol, cancellation)
+    }
+
     var warm: Basis? = null
     var prevPos = -1
     var prevNeg = -1
@@ -218,6 +228,53 @@ internal fun tightenOpenIntBounds(
     return work
 }
 
+/**
+ * The oversized-model LP pass: per open side, extract the [OBBT_NEIGHBORHOOD_ROWS]-capped
+ * [columnNeighborhood] of the variable's column pair from [base] and probe on that sub-model. Each
+ * probe's factorization is bounded by the neighborhood cap regardless of the full model's size, and
+ * [cancellation] is honoured between probes. Bounds transfer soundly because the neighborhood drops
+ * whole rows only (see [LpNeighborhood]); a bound the neighborhood leaves at the probe frontier stays
+ * open, exactly as on the full model.
+ */
+private fun tightenByNeighborhoodProbes(
+    base: LpModel,
+    work: Array<OpenIntBounds>,
+    posCol: IntArray,
+    negCol: IntArray,
+    cancellation: Cancellation,
+): Array<OpenIntBounds> {
+    val rowIndex = base.rowIndex()
+    var solves = 0
+    for (v in work.indices) {
+        if (cancellation() || solves >= OBBT_MAX_SIDE_SOLVES) break
+        val cur = work[v]
+        if (cur.lo != null && cur.hi != null) continue
+        val seeds = if (negCol[v] >= 0) intArrayOf(posCol[v], negCol[v]) else intArrayOf(posCol[v])
+        val nb = base.columnNeighborhood(seeds, OBBT_NEIGHBORHOOD_ROWS, rowIndex)
+        val p = nb.colMap[posCol[v]]
+        val q = if (negCol[v] >= 0) nb.colMap[negCol[v]] else -1
+        var newHi = cur.hi
+        var newLo = cur.lo
+        for (maximize in booleanArrayOf(true, false)) {
+            if (if (maximize) cur.hi != null else cur.lo != null) continue
+            solves++
+            val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, prevCol = -1, negCol = q)
+            val result = try {
+                newLpSolver(model, cancellation).solvePrimal(null)
+            } catch (_: LpOverflowException) {
+                null
+            }
+            if (result != null) {
+                val probeCol = if (maximize || q < 0) p else q
+                val bound = model.tightVariableBound(result, p, maximize, model.probeClampedHi[probeCol])
+                if (maximize) newHi = bound else newLo = bound
+            }
+        }
+        work[v] = OpenIntBounds(newLo, newHi)
+    }
+    return work
+}
+
 /** Add the LP column(s) for real variable [rv]: a single column when bounded below, else the same
  *  zero-shift split pair the integer columns use, recorded in [realPos]/[realNeg]. */
 private fun addRealColumns(
@@ -246,6 +303,16 @@ private fun addRealColumns(
 /** Cap on the LP-solving pass's per-side solves: presolve-time OBBT runs with no deadline, and each
  *  re-solve refactorizes on a large model — sides past the cap stay open for the caller's clamp. */
 private const val OBBT_MAX_SIDE_SOLVES = 128
+
+/** Row cap for the full-model LP pass (#1425): above this the initial factorization alone is an
+ *  uninterruptible multi-minute call, so the pass switches to per-probe neighborhood sub-models
+ *  ([tightenByNeighborhoodProbes]) instead of paying it. */
+private const val OBBT_MAX_LP_ROWS = 5_000
+
+/** Row cap of each neighborhood probe on the oversized path: small enough that a probe's from-scratch
+ *  factorization is effectively instant, large enough to span the local bounding structure a
+ *  variable's bound usually rides on. */
+private const val OBBT_NEIGHBORHOOD_ROWS = 512
 
 /** Upper bound on the number of full propagation passes; bounds only ever tighten, so the loop reaches a
  *  fixpoint in finite steps, but a long dependency chain could take many passes — cap it and leave any
