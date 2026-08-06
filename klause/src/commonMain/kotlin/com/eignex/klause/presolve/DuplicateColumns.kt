@@ -132,7 +132,7 @@ internal object DuplicateColumns {
             val v = factor.vars[i]
             if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's
             keptVars.add(v)
-            keptCoeffs.add(factor.coeffs[i])
+            keptCoeffs.add(factor.coeff(i))
         }
         return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), factor.op, factor.bound)
     }
@@ -197,7 +197,7 @@ internal object DuplicateColumns {
         factors.forEachIndexed { fid, f ->
             if (f !is Linear || !f.isIntegerCore) return@forEachIndexed
             val coeffByVar = MutableIntLongMap(f.vars.size)
-            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeffs[i])
+            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeff(i))
             for (v in f.intVars) {
                 entries[v]?.apply {
                     add(fid.toLong())

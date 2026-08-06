@@ -111,7 +111,7 @@ internal object LinearBoundFusion {
         } else {
             f.bound.floorDiv(g)
         }
-        val reduced = LongArray(vars.size) { f.coeffs[it] / g }
+        val reduced = LongArray(vars.size) { f.coeff(it) / g }
         val lead = leadingIndex(vars)
         val flip = reduced[lead] < 0L
         val coeffs = if (flip) LongArray(reduced.size) { -reduced[it] } else reduced

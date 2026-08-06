@@ -182,12 +182,12 @@ internal object CoefficientStrengthening {
         val bound: Long
         when (l.op) {
             LinearOp.LE -> {
-                coeffs = l.coeffs.copyOf()
+                coeffs = LongArray(l.vars.size) { l.coeff(it) }
                 bound = l.bound
             }
 
             LinearOp.GE -> {
-                coeffs = LongArray(l.coeffs.size) { -l.coeffs[it] }
+                coeffs = LongArray(l.vars.size) { -l.coeff(it) }
                 bound = -l.bound
             }
 

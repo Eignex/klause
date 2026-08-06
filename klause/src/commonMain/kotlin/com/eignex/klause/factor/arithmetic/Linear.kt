@@ -58,8 +58,50 @@ class Linear private constructor(
     val op: LinearOp = if (rawOp == LinearOp.GE) LinearOp.LE else rawOp
     override val bound: Long = if (rawOp == LinearOp.GE) -rawBound else rawBound
     val vars: IntArray = terms.vars
-    val coeffs: LongArray =
-        if (rawOp == LinearOp.GE) LongArray(terms.coeffs.size) { -terms.coeffs[it] } else terms.coeffs
+
+    // Integer coefficients, index-aligned with [vars], stored compactly to cut parse/presolve memory on the
+    // Linear-dominated families (MPS, QF_LIRA): when every coefficient fits Int (the common case) only an
+    // [IntArray] is retained (4 B/term), else a [LongArray] (8 B/term). The GE→LE canonicalisation negates
+    // the coefficients here. [coeff] reads the store with no allocation (the per-node LP path); [coeffs]
+    // materialises a full [LongArray] for whole-array sinks.
+    private val coeffsInt: IntArray?
+    private val coeffsLong: LongArray?
+
+    /** Largest `|coefficient|` over the integer terms (0 when there are none), cached at construction so the
+     *  presolve overflow gates (the affine-elimination fold, the small-model bound) need no per-row
+     *  coefficient rescan. A saturated placeholder on a wide/real row (never read as authoritative there). */
+    val maxAbsCoeff: Long
+
+    init {
+        val negate = rawOp == LinearOp.GE
+        val src = terms.coeffs
+        var maxAbs = 0L
+        var fitsInt = true
+        for (raw in src) {
+            val c = if (negate) -raw else raw
+            val a = if (c < 0L) -c else c
+            if (a > maxAbs) maxAbs = a
+            if (c < Int.MIN_VALUE.toLong() || c > Int.MAX_VALUE.toLong()) fitsInt = false
+        }
+        maxAbsCoeff = maxAbs
+        if (fitsInt) {
+            coeffsInt = IntArray(src.size) { (if (negate) -src[it] else src[it]).toInt() }
+            coeffsLong = null
+        } else {
+            coeffsInt = null
+            coeffsLong = if (negate) LongArray(src.size) { -src[it] } else src
+        }
+    }
+
+    /** Integer coefficients as a [LongArray], index-aligned with [vars], materialised on demand from the
+     *  compact store. Prefer [coeff] for indexed access; this allocates for an [coeffsInt]-backed row. */
+    val coeffs: LongArray
+        get() {
+            val cl = coeffsLong
+            if (cl != null) return cl
+            val ci = checkNotNull(coeffsInt)
+            return LongArray(ci.size) { ci[it].toLong() }
+        }
 
     /**
      * The LP-only payload — real (continuous) terms and/or over-64-bit wide coefficients — held off to the
@@ -135,7 +177,7 @@ class Linear private constructor(
     val strictReal: Boolean get() = lpExtra?.strictReal == true
 
     init {
-        require(coeffs.isNotEmpty() || realVars.isNotEmpty()) { "linear sum must have at least one term" }
+        require(vars.isNotEmpty() || realVars.isNotEmpty()) { "linear sum must have at least one term" }
         require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
         require(!hasReals || realIntCoeffs.size == vars.size) { "real int-coeff/var length mismatch" }
         require(!strictReal || (hasReals && op == LinearOp.LE)) { "strictness needs an LP-only inequality row" }
@@ -258,7 +300,7 @@ class Linear private constructor(
             }
         } else {
             sink.long(bound)
-            sink.pairsByVarKeyCoalescing(vars) { coeffs[it] }
+            sink.pairsByVarKeyCoalescing(vars) { coeff(it) }
         }
     }
 
@@ -286,7 +328,7 @@ class Linear private constructor(
      */
     private fun isBinaryValueRelation(): Boolean = isIntegerCore &&
         (op == LinearOp.EQ || op == LinearOp.NE) && bound == 0L &&
-        vars.size == 2 && coeffs[0] != 0L && coeffs[0] == -coeffs[1]
+        vars.size == 2 && coeff(0) != 0L && coeff(0) == -coeff(1)
 
     override fun isValueAnonymous(): Boolean = isBinaryValueRelation()
 
@@ -317,7 +359,10 @@ class Linear private constructor(
     // integer LinearRow (its content is not integer-valued) and emits a real row instead.
     override val size: Int get() = vars.size
     override fun ref(k: Int): Int = Term.ofIntVar(vars[k])
-    override fun coeff(k: Int): Long = coeffs[k]
+    override fun coeff(k: Int): Long {
+        val ci = coeffsInt
+        return if (ci != null) ci[k].toLong() else checkNotNull(coeffsLong)[k]
+    }
     override val relation: LinearOp get() = op
     override val isIntegerOnly: Boolean get() = isIntegerCore
     override val linearRows: List<LinearRow> get() = if (isIntegerCore) listOf(this) else emptyList()

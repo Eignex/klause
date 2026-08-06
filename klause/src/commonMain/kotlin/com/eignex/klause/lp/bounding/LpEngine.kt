@@ -214,10 +214,10 @@ internal class LpEngine(
             if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ) continue
             val vi = f.vars.indexOf(v)
             if (vi < 0) continue
-            val a = f.coeffs[vi]
+            val a = f.coeff(vi)
             if (a != 1L && a != -1L) continue
             var g = 0L
-            for (j in f.vars.indices) if (j != vi) g = gcdOfLong(g, f.coeffs[j])
+            for (j in f.vars.indices) if (j != vi) g = gcdOfLong(g, f.coeff(j))
             if (g <= 1L) continue
             // a·v ≡ b (mod g); a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
             if (best != null && g <= best.second) continue

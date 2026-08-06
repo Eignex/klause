@@ -107,7 +107,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && idx !in removed }
         val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
         val a = LongArray(problem.numIntVars)
-        for (k in f.vars.indices) a[f.vars[k]] += f.coeffs[k]
+        for (k in f.vars.indices) a[f.vars[k]] += f.coeff(k)
         val b = f.bound.toDouble()
         // `≤ b` is redundant when the others' max of a·x is already ≤ b; `≥ b` when their min is ≥ b; an
         // `=` only when both hold. Safe bounds (over-/under-estimates) keep it sound — a loose bound just
@@ -144,8 +144,8 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
     for (f in problem.factors) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
         if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.EQ || f.vars.size != 2) continue
-        val c0 = f.coeffs[0]
-        val c1 = f.coeffs[1]
+        val c0 = f.coeff(0)
+        val c1 = f.coeff(1)
         if (!((c0 == 1L && c1 == -1L) || (c0 == -1L && c1 == 1L))) continue // a unit difference ±(v0 − v1)
         val v0 = f.vars[0]
         val v1 = f.vars[1]

@@ -75,11 +75,11 @@ internal object LinearSubSumAggregation {
             val f = factors[i]
             if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size < 3) continue
             val p = unitPivotIndex(f) ?: continue
-            val sign = f.coeffs[p] // ±1
+            val sign = f.coeff(p) // ±1
             val form = HashMap<Int, Long>(f.vars.size)
             // A zero-coefficient term is vacuous (coalescing keeps it, but it names no real partner), so it
             // is not part of the sub-sum — dropping it also keeps [matchMultiplier]'s `c / A_j` well-defined.
-            for (j in f.vars.indices) if (j != p && f.coeffs[j] != 0L) form[f.vars[j]] = -sign * f.coeffs[j]
+            for (j in f.vars.indices) if (j != p && f.coeff(j) != 0L) form[f.vars[j]] = -sign * f.coeff(j)
             if (form.size < 2) continue // fewer than two real partners is no sub-sum to aggregate
             out.add(Definition(i, f.vars[p], sign * f.bound, form))
         }
@@ -91,7 +91,7 @@ internal object LinearSubSumAggregation {
     private fun unitPivotIndex(f: Linear): Int? {
         var best = -1
         for (j in f.vars.indices) {
-            if (f.coeffs[j] != 1L && f.coeffs[j] != -1L) continue
+            if (f.coeff(j) != 1L && f.coeff(j) != -1L) continue
             if (best < 0 || f.vars[j] < f.vars[best]) best = j
         }
         return if (best < 0) null else best
@@ -112,7 +112,7 @@ internal object LinearSubSumAggregation {
      *  absent, partial, or unevenly scaled (so no exact sub-sum to fold). */
     private fun matchMultiplier(row: Linear, def: Definition): Long? {
         val coeffByVar = MutableIntLongMap(row.vars.size)
-        for (j in row.vars.indices) coeffByVar.put(row.vars[j], row.coeffs[j])
+        for (j in row.vars.indices) coeffByVar.put(row.vars[j], row.coeff(j))
         var k = 0L
         for ((x, a) in def.form) {
             if (!coeffByVar.containsKey(x)) return null // partner missing → not a full sub-sum
@@ -151,7 +151,7 @@ internal object LinearSubSumAggregation {
         for (j in row.vars.indices) {
             if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
             vars.add(row.vars[j])
-            coeffs.add(row.coeffs[j])
+            coeffs.add(row.coeff(j))
         }
         vars.add(def.y)
         coeffs.add(k)

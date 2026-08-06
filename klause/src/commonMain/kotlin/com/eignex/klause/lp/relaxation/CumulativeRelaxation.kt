@@ -331,8 +331,8 @@ internal class CumulativeRelaxation(
             // Int range) matches neither pattern below and adds nothing.
             val a = f.vars[0]
             val b = f.vars[1]
-            val ca = f.coeffs[0]
-            val cb = f.coeffs[1]
+            val ca = f.coeff(0)
+            val cb = f.coeff(1)
             val bound = f.bound
             // "≥ bound" holds for GE/EQ; "≤ bound" (⇔ "≥ −bound" after negating) holds for LE/EQ.
             if (f.op == LinearOp.GE || f.op == LinearOp.EQ) addGeForm(a, ca, b, cb, bound)
