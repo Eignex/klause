@@ -578,6 +578,7 @@ internal object AffineSingletons {
             cancellation: Cancellation,
         ): Boolean {
             var polled = 0
+            val termsSmall = termsFitHalfLong(constTerm, termCoeffs)
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
                 // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
@@ -590,6 +591,7 @@ internal object AffineSingletons {
                         termVars,
                         termCoeffs,
                         constTerm,
+                        termsSmall,
                     )
                 ) {
                     return true
@@ -672,6 +674,13 @@ internal object AffineSingletons {
         // read by [anyOtherLinearAtAbsorbCap] to cap a row that has become a fold sink. Appended rows start at 0.
         private val absorbed = IntArrayList(base.size + 1).apply { repeat(base.size) { add(0) } }
 
+        // Per-variable count of at-cap cappable rows mentioning it, maintained alongside [intOcc] in [replace]
+        // and [drop]. Lets [anyOtherLinearAtAbsorbCap] answer in O(1) instead of rescanning the occurrence list
+        // of every candidate pivot. Only integer-core [Linear] rows are counted, matching that predicate.
+        private val atCapCount = IntArray(nVars)
+
+        private fun isCappable(f: Factor?): Boolean = f is Linear && f.isIntegerCore
+
         init {
             // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices
             // are the stable ids; adopt them directly instead of re-scanning every factor's [intVars].
@@ -697,6 +706,7 @@ internal object AffineSingletons {
         /** Tombstone stable id [id], removing its occurrence entries. */
         fun drop(id: Int) {
             val f = slots[id] ?: return
+            if (absorbed[id] >= FOLD_ABSORB_CAP && isCappable(f)) for (v in f.intVars) atCapCount[v]--
             for (v in f.intVars) intOcc[v].removeValue(id)
             slots[id] = null
         }
@@ -704,10 +714,13 @@ internal object AffineSingletons {
         /** Replace live stable id [id] — currently holding [prev] — with [next], moving its occurrence
          *  entries from [prev]'s variables to [next]'s and recording that it absorbed a fold. */
         private fun replace(id: Int, prev: Factor, next: Factor) {
-            absorbed[id] = absorbed[id] + 1
+            val was = absorbed[id]
+            if (was >= FOLD_ABSORB_CAP && isCappable(prev)) for (v in prev.intVars) atCapCount[v]--
+            absorbed[id] = was + 1
             for (v in prev.intVars) intOcc[v].removeValue(id)
             slots[id] = next
             for (v in next.intVars) intOcc[v].add(id)
+            if (was + 1 >= FOLD_ABSORB_CAP && isCappable(next)) for (v in next.intVars) atCapCount[v]++
             // A rewrite that turns a non-candidate row into a candidate equality promotes it into the scan;
             // record it (unless the pristine set already lists it, or it is already tracked).
             if (isEqCand(next) && !isEqCand(prev) && !inBaseEq(id) && promotedSet.add(id)) promoted.add(id)
@@ -752,6 +765,7 @@ internal object AffineSingletons {
         ): Boolean {
             val occ = intOcc[x]
             var polled = 0
+            val termsSmall = termsFitHalfLong(constTerm, termCoeffs)
             for (k in 0 until occ.size) {
                 // A high-degree pivot's overflow check walks every row it mentions; poll so one candidate's
                 // check cannot outrun the budget. Treat a bail as "would overflow" — skipping the fold is sound.
@@ -764,6 +778,7 @@ internal object AffineSingletons {
                         termVars,
                         termCoeffs,
                         constTerm,
+                        termsSmall,
                     )
                 ) {
                     return true
@@ -795,14 +810,13 @@ internal object AffineSingletons {
         }
 
         override fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean {
-            val occ = intOcc[x]
-            for (k in 0 until occ.size) {
-                val id = occ[k]
-                if (id == defIdx) continue
-                val f = slots[id] ?: continue
-                if (f is Linear && f.isIntegerCore && absorbed[id] >= FOLD_ABSORB_CAP) return true
-            }
-            return false
+            val total = atCapCount[x]
+            if (total == 0) return false
+            // `defIdx` mentions `x` (x is a pivot in it), so subtract its own contribution to the count to
+            // leave "any OTHER at-cap row". `atCapCount` counts exactly the integer-core [Linear] rows the
+            // former per-occurrence scan tested.
+            val self = if (absorbed[defIdx] >= FOLD_ABSORB_CAP && isCappable(slots[defIdx])) 1 else 0
+            return total - self > 0
         }
 
         /**
@@ -870,13 +884,25 @@ internal object AffineSingletons {
             for (id in touched) {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
+                // An alias is not a fold (absorbed is unchanged), but it renames x→y, so an at-cap row moves
+                // its at-cap count from x to y in lockstep with its [intOcc] entry (below). x is eliminated,
+                // so its count is cleared wholesale afterwards.
+                val atCap = absorbed[id] >= FOLD_ABSORB_CAP && isCappable(f)
                 val remapped = f.remap(boolMap, intMap)
                 slots[id] = remapped
                 intOcc[y].removeValue(id)
-                if (remapped.intVars.contains(y)) intOcc[y].add(id)
+                val hasY = remapped.intVars.contains(y)
+                if (hasY) intOcc[y].add(id)
+                if (atCap) {
+                    if (f.intVars.contains(y)) atCapCount[y]--
+                    if (hasY) atCapCount[y]++
+                }
             }
             intOcc[c.x].clear()
+            // drop first (it removes the x=y row's own at-cap y-contribution), then zero x wholesale — x is
+            // eliminated, so any remaining x count is dead.
             drop(c.defIdx)
+            atCapCount[c.x] = 0
             for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
             // Only the rewritten factors (`x`'s occurrences, now renamed to `y`) change content, so — as in
             // [fold] — no factor below their minimum can newly become a candidate; the scan resumes from
@@ -974,25 +1000,17 @@ private fun foldRowOverflowsLong(
     termVars: IntArray,
     termCoeffs: LongArray,
     constTerm: Long,
+    termsSmall: Boolean,
 ): Boolean {
+    // Fast path, no `indexOf`: when the pivot's own terms are all below 2^31 ([termsSmall], pivot-global so
+    // the caller hoists it) and this row's magnitudes are too, no product `cX·c` reaches 2^62 and no sum
+    // reaches 2^63 — the pivot coefficient `cX ≤ f.maxAbsCoeff`, so `fitsHalfLong(f.maxAbsCoeff)` already
+    // bounds it and `cX` is never needed. So x's position is not looked up, which is the whole
+    // small-coefficient bulk (Coprime/FAPP). The exact path below runs only when some magnitude is huge.
+    if (termsSmall && fitsHalfLong(f.bound) && fitsHalfLong(f.maxAbsCoeff)) return false
     val xi = f.vars.indexOf(x)
     if (xi < 0) return false
     val cX = f.coeff(xi)
-    // Fast path: if every magnitude the fold combines is below 2^31, no product `cX·c` reaches 2^62 and no
-    // sum reaches 2^63, so the fold cannot overflow — skip the per-term `indexOf` + exact arithmetic below,
-    // which is O(arity · row-arity) and dominates the pass on dense wide rows (DiamondFree/SMPT). The row's
-    // whole-row magnitude test reads its cached [Linear.maxAbsCoeff] (all `f.coeffs` fit half-Long iff the
-    // largest does), so no per-fold-candidate rescan of `f.coeffs`; the exact path runs only for huge coeffs.
-    if (fitsHalfLong(cX) && fitsHalfLong(constTerm) && fitsHalfLong(f.bound) && fitsHalfLong(f.maxAbsCoeff)) {
-        var big = false
-        for (c in termCoeffs) {
-            if (!fitsHalfLong(c)) {
-                big = true
-                break
-            }
-        }
-        if (!big) return false
-    }
     return try {
         subExact(f.bound, mulExact(cX, constTerm))
         for (k in termVars.indices) {
@@ -1009,3 +1027,11 @@ private fun foldRowOverflowsLong(
 /** True when `|v| < 2^31`, so a product of two such values stays below 2^62 and a sum below 2^63 — the
  *  bound the overflow fast-path in [foldRowOverflowsLong] relies on. */
 private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
+
+/** Whether the fold's constant and every partner coefficient fit half-Long — the pivot-global half of the
+ *  [foldRowOverflowsLong] fast path, computed once per pivot rather than once per rewritten row. */
+private fun termsFitHalfLong(constTerm: Long, termCoeffs: LongArray): Boolean {
+    if (!fitsHalfLong(constTerm)) return false
+    for (c in termCoeffs) if (!fitsHalfLong(c)) return false
+    return true
+}
