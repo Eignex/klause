@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.arithmetic.internals.findCoeff
+import com.eignex.klause.factor.arithmetic.internals.LinearCoeffIndex
 import com.eignex.klause.factor.arithmetic.internals.initLinearSum
 import com.eignex.klause.factor.bool.internals.linearDegree
 import com.eignex.klause.factor.bool.internals.linearHolds
@@ -19,6 +19,19 @@ internal class LinearInvariant(
     private val bound: Long,
 ) : Invariant {
 
+    // Move scoring asks for one coefficient per candidate per containing row; O(1) here keeps a
+    // wide row's move pick linear instead of quadratic (#1442).
+    private val coeffIndex = LinearCoeffIndex(coeffs, vars)
+
+    // Term indices in ascending |coeff| (zeros excluded, ties by position): the first entry whose
+    // coefficient divides a drift IS the lowest-|coeff| divider, so the channeling partner scan
+    // stops at its first hit instead of walking the whole row per proposed move (#1442) — on the
+    // unit-coefficient rows of set-covering decompositions that is the first unpinned term.
+    private val byAbsCoeff: IntArray by lazy {
+        val nonZero = (0 until vars.size).filter { coeffs[it] != 0L }
+        nonZero.sortedBy { if (coeffs[it] < 0) -coeffs[it] else coeffs[it] }.toIntArray()
+    }
+
     override fun initialize(state: LocalSearchState, factorId: Int) = initLinearSum(state, factorId, coeffs, vars)
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -28,7 +41,7 @@ internal class LinearInvariant(
         linearDegree(state.longPayload[factorId], op, bound, state.violationSoftCap)
 
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
-        val coeff = findCoeff(coeffs, vars, intVar)
+        val coeff = coeffIndex.coeffOf(intVar)
         val old = state.assignment.intValue(intVar)
         val sum = state.longPayload[factorId]
         val newSum = sum + coeff * (newValue - old)
@@ -38,7 +51,7 @@ internal class LinearInvariant(
     }
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
-        val coeff = findCoeff(coeffs, vars, intVar)
+        val coeff = coeffIndex.coeffOf(intVar)
         val cur = state.assignment.intValue(intVar)
         val oldSum = state.longPayload[factorId]
         val newSum = oldSum + coeff * (cur - oldValue)
@@ -53,26 +66,44 @@ internal class LinearInvariant(
         if (op == LinearOp.NE) {
             // sum == bound; bump any non-zero-coeff variable by ±1 within its domain. Each
             // single shift changes sum by ±|c_i| ≠ 0 → breaks the equality.
-            for (i in vars.indices) {
+            forEachRepairTerm(state) { i ->
                 val v = vars[i]
                 val c = coeffs[i]
-                if (c == 0L) continue
-                val cur = state.assignment.intValue(v)
-                val d = state.rootDomains[v]
-                if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
-                if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
+                if (c != 0L) {
+                    val cur = state.assignment.intValue(v)
+                    val d = state.rootDomains[v]
+                    if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
+                    if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
+                }
             }
             return
         }
-        for (i in vars.indices) {
+        forEachRepairTerm(state) { i ->
             val v = vars[i]
             val c = coeffs[i]
-            if (c == 0L) continue
-            val cur = state.assignment.intValue(v)
-            val sumWithout = sum - c * cur
-            val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true) ?: continue
-            val clamped = state.rootDomains[v].clamp(target)
-            if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
+            if (c != 0L) {
+                val cur = state.assignment.intValue(v)
+                val sumWithout = sum - c * cur
+                val target = snapLinearTarget(op, bound, c, sumWithout, wantHolds = true)
+                if (target != null) {
+                    val clamped = state.rootDomains[v].clamp(target)
+                    if (clamped != cur) sink.addChannelingIntSet(state, v, clamped)
+                }
+            }
+        }
+    }
+
+    /** Visit every term index on a narrow row, or a fresh [REPAIR_SAMPLE_CAP]-sized random sample on a
+     *  wide one (#1442): a full wide-row enumeration floods one pick with tens of thousands of
+     *  candidates whose scoring outlives the deadline, while a per-pick sample keeps the repair
+     *  pressure and lets successive picks cover different slices of the row. */
+    private inline fun forEachRepairTerm(state: LocalSearchState, action: (Int) -> Unit) {
+        val n = vars.size
+        if (n <= REPAIR_SAMPLE_CAP) {
+            for (i in 0 until n) action(i)
+        } else {
+            val rng = state.rng
+            repeat(REPAIR_SAMPLE_CAP) { action(rng.nextInt(n)) }
         }
     }
 
@@ -89,21 +120,17 @@ internal class LinearInvariant(
         sink: ChannelingSink,
     ) {
         if (op != LinearOp.EQ || state.violated.contains(factorId)) return
-        val coeffV = findCoeff(coeffs, vars, intVar)
+        val coeffV = coeffIndex.coeffOf(intVar)
         if (coeffV == 0L) return
         val drift = coeffV * (newValue - oldValue)
+        // Ascending-|coeff| order makes the first dividing, unpinned partner the lowest-|coeff| one.
         var bestIdx = -1
-        var bestAbs = Long.MAX_VALUE
-        for (i in vars.indices) {
+        for (i in byAbsCoeff) {
             val u = vars[i]
             if (u == intVar || sink.isPinned(u)) continue
-            val cu = coeffs[i]
-            if (cu == 0L) continue
-            val absC = if (cu < 0) -cu else cu
-            if (absC < bestAbs && drift % cu == 0L) {
-                bestAbs = absC
-                bestIdx = i
-            }
+            if (drift % coeffs[i] != 0L) continue
+            bestIdx = i
+            break
         }
         if (bestIdx < 0) return
         val u = vars[bestIdx]
@@ -203,14 +230,14 @@ internal class LinearInvariant(
             else -> 0L
         }
         if (slack <= 0L) return
-        for (i in vars.indices) {
+        forEachRepairTerm(state) inner@{ i ->
             val c = coeffs[i]
-            if (c == 0L) continue
+            if (c == 0L) return@inner
             val v = vars[i]
             val cur = state.assignment.intValue(v)
             val absC = if (c < 0) -c else c
             val maxStep = slack / absC
-            if (maxStep <= 0L) continue
+            if (maxStep <= 0L) return@inner
             val dom = state.rootDomains[v]
             // For LE: positive c → decrease v (frees more slack), negative c → increase v.
             // For GE: opposite. Either way, the move stays feasible because |Δ·c| ≤ slack.
@@ -231,5 +258,11 @@ internal class LinearInvariant(
          *  revert. 32 is enough to land useful candidates on the dominant decomposed-CP
          *  shape (sum-of-bools = constant) without dominating descent step cost. */
         const val PAIR_SAMPLE_CAP: Int = 32
+
+        /** Per-pick cap on repair proposals from one wide row (#1442): past this arity the terms are
+         *  sampled fresh each pick instead of enumerated, so a violated tens-of-thousands-wide row
+         *  can't flood a single pick with more candidates than the deadline can score, while
+         *  successive picks still cover different slices of the row. */
+        const val REPAIR_SAMPLE_CAP: Int = 256
     }
 }

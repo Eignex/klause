@@ -500,6 +500,15 @@ class LocalSearchSolver(
                 cancelCountdown = (CANCEL_CHECK_INTERVAL.toLong() * CANCEL_CHECK_TARGET_MS / gapMs)
                     .coerceIn(1L, CANCEL_CHECK_INTERVAL.toLong()).toInt()
                 lastCheckMs = nowMs
+            } else if ((cancelCountdown and (CANCEL_CLOCK_STRIDE - 1)) == 0) {
+                // Mid-window escape hatch (#1442): the window is tuned on the *previous* window's
+                // cost, so a step mix that suddenly turns expensive — an ultra-wide row entering the
+                // violated repair pool — would otherwise grind out up to a full window of monster
+                // steps before the next poll. A clock glance every [CANCEL_CLOCK_STRIDE] steps costs
+                // nothing on the fast path and forces the poll once the window blows its budget.
+                if (sink.elapsedMs() - lastCheckMs >= CANCEL_CHECK_TARGET_MS * CANCEL_OVERRUN_FACTOR) {
+                    cancelCountdown = 0
+                }
             }
             if (state.cost == 0L) {
                 // Each descent step is O(numVars); the once-per-CANCEL_CHECK_INTERVAL throttle above
@@ -829,6 +838,14 @@ class LocalSearchSolver(
          *  window down toward this when moves are expensive, so a solve honours its `-t` deadline within
          *  roughly this margin regardless of per-flip cost. */
         const val CANCEL_CHECK_TARGET_MS: Long = 50
+
+        /** Steps between mid-window clock glances (a power of two; masks the countdown). Bounds the
+         *  deadline overrun of a window whose steps turn expensive after the window was tuned. */
+        const val CANCEL_CLOCK_STRIDE: Int = 16
+
+        /** Mid-window wall-clock budget as a multiple of [CANCEL_CHECK_TARGET_MS]; past it the glance
+         *  forces the full poll. Loose enough that a normally-tuned window never trips it. */
+        const val CANCEL_OVERRUN_FACTOR: Long = 4
 
         /** Feasibility-fight moves per round of adaptive-schedule feedback. A round is the batch over
          *  which an adaptive [com.eignex.klause.localsearch.schedule.Schedule] retunes; sized

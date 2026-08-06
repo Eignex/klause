@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.arithmetic.internals.findCoeff
+import com.eignex.klause.factor.arithmetic.internals.LinearCoeffIndex
 import com.eignex.klause.factor.arithmetic.internals.initLinearSum
 import com.eignex.klause.factor.bool.internals.linearDegree
 import com.eignex.klause.factor.bool.internals.linearHolds
@@ -21,6 +21,9 @@ internal class ReifiedLinearInvariant(
     private val op: LinearOp,
     private val bound: Long,
 ) : Invariant {
+
+    // O(1) coefficient queries keep wide-row move scoring linear (#1442); see [LinearCoeffIndex].
+    private val coeffIndex = LinearCoeffIndex(coeffs, vars)
 
     override fun initialize(state: LocalSearchState, factorId: Int) = initLinearSum(state, factorId, coeffs, vars)
 
@@ -48,7 +51,7 @@ internal class ReifiedLinearInvariant(
     override fun deltaIfIntSet(state: LocalSearchState, factorId: Int, intVar: Int, newValue: Long): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
         val sum = state.longPayload[factorId]
-        val coeff = findCoeff(coeffs, vars, intVar)
+        val coeff = coeffIndex.coeffOf(intVar)
         val newSum = sum + coeff * (newValue - state.assignment.intValue(intVar))
         return reifiedDegreeFor(newSum, aux, state.violationSoftCap) - state.factorDegree[factorId]
     }
@@ -63,7 +66,7 @@ internal class ReifiedLinearInvariant(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         val aux = state.assignment.boolValue(auxBoolVar)
-        val coeff = findCoeff(coeffs, vars, intVar)
+        val coeff = coeffIndex.coeffOf(intVar)
         val oldSum = state.longPayload[factorId]
         val newSum = oldSum + coeff * (state.assignment.intValue(intVar) - oldValue)
         state.longPayload[factorId] = newSum
@@ -142,7 +145,7 @@ internal class ReifiedLinearInvariant(
      *  may flip `holds`, in which case the aux's contribution swaps; otherwise no change. */
     override fun updateIntBreakMakeForIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long) {
         val newSum = state.longPayload[factorId]
-        val coeff = findCoeff(coeffs, vars, intVar)
+        val coeff = coeffIndex.coeffOf(intVar)
         val newValue = state.assignment.intValue(intVar)
         val oldSum = newSum - coeff * (newValue - oldValue)
         val oldHolds = linearHolds(oldSum, op, bound)
