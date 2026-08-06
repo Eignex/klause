@@ -103,10 +103,10 @@ internal object ComparisonClauseFold {
                 val v = r.vars[i]
                 val d = domains[v]
                 if (d.min == d.max) {
-                    bound = subExact(bound, mulExact(r.coeffs[i], d.min)) // move the fixed term to the RHS
+                    bound = subExact(bound, mulExact(r.coeff(i), d.min)) // move the fixed term to the RHS
                 } else if (freeVar < 0) {
                     freeVar = v
-                    freeCoeff = r.coeffs[i]
+                    freeCoeff = r.coeff(i)
                 } else {
                     return null // a second free variable — not a single-variable literal
                 }
