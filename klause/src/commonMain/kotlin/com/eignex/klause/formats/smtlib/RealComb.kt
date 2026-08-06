@@ -38,3 +38,30 @@ internal class RealComb(
         }
     }
 }
+
+/**
+ * Sum of [combs], with every element after the first negated when [negateTail] (the n-ary `-` fold).
+ * One mutable accumulator instead of a per-operand map copy, so a wide sum costs linear work in its
+ * operand count (#1432) — the exact-rational twin of `sumIntCombs`.
+ */
+internal fun sumRealCombs(combs: List<RealComb>, negateTail: Boolean = false): RealComb {
+    val ints = HashMap<Int, BigFraction>()
+    val reals = HashMap<Int, BigFraction>()
+    var constant = BigFraction.ZERO
+    for (idx in combs.indices) {
+        val c = combs[idx]
+        val neg = negateTail && idx > 0
+        accumulate(ints, c.intCoeffs, neg)
+        accumulate(reals, c.realCoeffs, neg)
+        constant += if (neg) c.constant * BigFraction.MINUS_ONE else c.constant
+    }
+    return RealComb(ints, reals, constant)
+}
+
+private fun accumulate(into: HashMap<Int, BigFraction>, from: Map<Int, BigFraction>, negate: Boolean) {
+    for ((v, c) in from) {
+        val add = if (negate) c * BigFraction.MINUS_ONE else c
+        val merged = into[v]?.plus(add) ?: add
+        if (merged.isZero) into.remove(v) else into[v] = merged
+    }
+}

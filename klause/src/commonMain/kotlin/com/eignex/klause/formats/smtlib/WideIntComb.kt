@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.addExact
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.mulExact
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -43,12 +44,35 @@ internal fun IntComb.isConstant(): Boolean = when (this) {
     is IntComb.Wide -> lin.coeffs.isEmpty()
 }
 
-/** Sum of two combinations, promoting to [IntComb.Wide] when a `Long` fold overflows. */
-internal fun addIntComb(a: IntComb, b: IntComb): IntComb {
-    if (a is IntComb.Narrow && b is IntComb.Narrow) {
-        runCatching { return IntComb.Narrow(a.lin.plus(b.lin)) }.getOrElse { if (it !is ArithmeticException) throw it }
+/**
+ * Sum of [combs], with every element after the first negated when [negateTail] (the n-ary `-` fold).
+ * One mutable accumulator instead of a per-operand map copy, so a wide sum costs linear work in its
+ * operand count — the miplib-style set-covering constraints sum tens of thousands of terms (#1432).
+ * A `Long` overflow anywhere re-runs the whole sum in arbitrary precision.
+ */
+internal fun sumIntCombs(combs: List<IntComb>, negateTail: Boolean = false): IntComb {
+    if (combs.all { it is IntComb.Narrow }) {
+        runCatching {
+            val m = HashMap<Int, Long>()
+            var constant = 0L
+            for (idx in combs.indices) {
+                val lin = (combs[idx] as IntComb.Narrow).lin
+                val s = if (negateTail && idx > 0) -1L else 1L
+                for ((v, c) in lin.coeffs) m[v] = addExact(m[v] ?: 0L, mulExact(s, c))
+                constant = addExact(constant, mulExact(s, lin.constant))
+            }
+            return IntComb.Narrow(LinComb(m, constant))
+        }.getOrElse { if (it !is ArithmeticException) throw it }
     }
-    return IntComb.Wide(a.toWide().plus(b.toWide()))
+    val m = HashMap<Int, BigInteger>()
+    var constant = BigInteger.ZERO
+    for (idx in combs.indices) {
+        val w = combs[idx].toWide()
+        val neg = negateTail && idx > 0
+        for ((v, c) in w.coeffs) m[v] = (m[v] ?: BigInteger.ZERO) + (if (neg) -c else c)
+        constant += if (neg) -w.constant else w.constant
+    }
+    return IntComb.Wide(WideLinComb(m, constant))
 }
 
 /** This combination scaled by a `Long`, promoting to [IntComb.Wide] on overflow. */
