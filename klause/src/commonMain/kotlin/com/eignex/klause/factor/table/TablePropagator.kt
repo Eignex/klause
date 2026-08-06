@@ -277,12 +277,17 @@ internal class TablePropagator(
             if (!state.tightenIntMin(xs[col], minSup[col], ant)) return false
             if (!state.tightenIntMax(xs[col], maxSup[col], ant)) return false
             val sup = supported[col]
-            val toRemove = LongArrayList()
-            state.intDomains[xs[col]].forEach { value ->
-                if (value !in sup) toRemove.add(value)
-            }
-            for (k in 0 until toRemove.size) {
-                if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+            // A wide (>2^31-span) column keeps its bounds tightening above; skip the per-value support
+            // removal rather than walking the span. Sound: a wide domain is never a full assignment, and
+            // the removal runs once the column narrows to enumerable (every leaf is singleton domains).
+            if (state.intDomains[xs[col]].enumerable) {
+                val toRemove = LongArrayList()
+                state.intDomains[xs[col]].forEach { value ->
+                    if (value !in sup) toRemove.add(value)
+                }
+                for (k in 0 until toRemove.size) {
+                    if (!state.excludeIntValue(xs[col], toRemove[k], ant)) return false
+                }
             }
         }
         return true

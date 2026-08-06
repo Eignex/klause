@@ -174,6 +174,10 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             val index = blockValueIndex[j]
             val list = blockValueList[j]
             for (pos in blockStart[j] until blockStart[j + 1]) {
+                // Abort before walking a domain too large to assign over — notably a wide (>2^31-span)
+                // domain, whose `sizeLong` saturates past the cap, so it is never enumerated. Sound: the
+                // Lagrangian bound is simply skipped (null), never a wrong bound.
+                if (session.intDomain(vars[pos]).sizeLong > MAX_VALUES) return null
                 session.intDomain(vars[pos]).forEach { value ->
                     if (!index.containsKey(value)) {
                         index.put(value, list.size)

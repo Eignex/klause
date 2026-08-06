@@ -47,6 +47,13 @@ internal fun reginFilter(
     val n = filteredVars.size
     if (n < 2) return null
 
+    // A wide (>2^31-span) domain would make the GAC value graph below enumerate its span. Fall back to
+    // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
+    // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
+    if (filteredVars.any { !state.intDomains[it].enumerable }) {
+        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars) else null
+    }
+
     // Unchanged-domains fast path: if the previous fire on this var set succeeded (returned null,
     // i.e. pruned to a GAC fixpoint) and no var's domain has changed since, that fixpoint still
     // holds and there is nothing to prune — skip the matching/SCC rebuild entirely. Sound to drift:

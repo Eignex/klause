@@ -102,12 +102,16 @@ internal class ElementConstState(
     private fun widened(idxDom: IntDomain, resDom: IntDomain): Boolean {
         val pi = domRefIdx.value
         if (pi != null && idxDom !== pi) {
+            // Rebuild (span-safe) whenever the current or previous domain is wide: neither widening
+            // detection nor the delta's removed-set walk can touch a >2^31-span domain.
+            if (!idxDom.enumerable || !pi.enumerable) return true
             var w = false
             idxDom.forEach { v -> if (v !in pi) w = true }
             if (w) return true
         }
         val pr = domRefResult.value
         if (pr != null && resDom !== pr) {
+            if (!resDom.enumerable || !pr.enumerable) return true
             var w = false
             resDom.forEach { v -> if (v !in pr) w = true }
             if (w) return true
@@ -121,9 +125,9 @@ internal class ElementConstState(
         val idxDom = state.intDomains[idx]
         val resDom = state.intDomains[result]
         val counts = IntArray(numValues)
-        idxDom.forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len) counts[idOfPos[pos.toInt()]]++
+        // Walk array positions, not the index domain: a wide index is tested by membership, never walked.
+        for (pos in 0 until len) {
+            if (indexOffset + pos.toLong() in idxDom) counts[idOfPos[pos]]++
         }
         for (id in 0 until numValues) supportCount[id] = counts[id]
         valid.set(1)
@@ -136,14 +140,18 @@ internal class ElementConstState(
         // Seed: idx positions whose constant is not a live result value, and result values with no
         // supporting position (no constant, or zero live positions). Applying them feeds the cascade.
         val idxSeed = LongArrayList()
-        idxDom.forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len && arr[pos.toInt()] !in resDom) idxSeed.add(iv)
+        for (pos in 0 until len) {
+            val iv = indexOffset + pos.toLong()
+            if (iv in idxDom && arr[pos] !in resDom) idxSeed.add(iv)
         }
         val resSeed = LongArrayList()
-        resDom.forEach { rv ->
-            val id = idFor(rv)
-            if (id < 0 || counts[id] == 0) resSeed.add(rv)
+        // A wide result domain is never a full assignment; skip its per-value support scan (sound — it
+        // resumes once result narrows to enumerable, and every leaf has singleton domains).
+        if (resDom.enumerable) {
+            resDom.forEach { rv ->
+                val id = idFor(rv)
+                if (id < 0 || counts[id] == 0) resSeed.add(rv)
+            }
         }
         return applyThenCascade(state, idxSeed, resSeed)
     }
@@ -176,9 +184,9 @@ internal class ElementConstState(
         if (!state.restrictIntToSurvivors(result, resSurvivors.toSortedLongArray())) return false
         // idxDom.forEach is ascending, so the collected survivors are already sorted for the restriction.
         val idxSurvivors = LongArrayList()
-        idxDom.forEach { iv ->
-            val pos = iv - indexOffset
-            if (pos in 0 until len && idSurvives[idOfPos[pos.toInt()]]) idxSurvivors.add(iv)
+        for (pos in 0 until len) {
+            val iv = indexOffset + pos.toLong()
+            if (iv in idxDom && idSurvives[idOfPos[pos]]) idxSurvivors.add(iv)
         }
         return state.restrictIntToSurvivors(idx, idxSurvivors.toLongArray())
     }
