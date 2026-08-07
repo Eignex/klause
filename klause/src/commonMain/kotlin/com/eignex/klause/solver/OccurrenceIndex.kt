@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -79,9 +80,10 @@ class OccurrenceIndex(
         if (!any) {
             boolOccurrences
         } else {
-            Array(numBoolVars) { v ->
-                boolOccurrences[v].filter { !watcherFid[it] }.toIntArray()
-            }
+            // Every variable's filtered list is live at once inside this constructor, so a boxing
+            // `IntArray.filter` would hold the whole occurrence set as `Integer` objects (~24 bytes per
+            // retained occurrence against 4 in the result) — hundreds of MB on clause-heavy models.
+            Array(numBoolVars) { v -> retain(boolOccurrences[v]) { fid -> !watcherFid[fid] } }
         }
     }
 
@@ -122,15 +124,31 @@ class OccurrenceIndex(
             for (w in watches) set.add(IntEvent.intVarOf(w))
             watchedVarsByFactor[fid] = set
         }
+        // Primitive filter for the same reason as [nonBoolWatcherBoolOccurrences]: a boxing
+        // `IntArray.filter` would materialize the whole occurrence set as `Integer` objects at once.
         Array(numIntVars) { v ->
-            intOccurrences[v].filter { fid -> watchedVarsByFactor[fid]?.contains(v) != true }.toIntArray()
+            retain(intOccurrences[v]) { fid -> watchedVarsByFactor[fid]?.contains(v) != true }
         }
+    }
+
+    /** The elements of [src] satisfying [keep], in source order, without the per-element boxing of
+     *  `IntArray.filter`. Binds the shared empty array when nothing survives. */
+    private inline fun retain(src: IntArray, keep: (Int) -> Boolean): IntArray {
+        var kept = 0
+        for (fid in src) if (keep(fid)) kept++
+        if (kept == 0) return EmptyIntArray
+        val out = IntArray(kept)
+        var k = 0
+        for (fid in src) if (keep(fid)) out[k++] = fid
+        return out
     }
 
     private inline fun invert(slots: Int, include: (Int) -> Boolean, vars: (Factor) -> IntArray): Array<IntArray> {
         val counts = IntArray(slots)
         factors.forEachIndexed { id, f -> if (include(id)) for (v in vars(f)) counts[v]++ }
-        val out = Array(slots) { IntArray(counts[it]) }
+        // A variable with no occurrences shares the empty singleton: a distinct 16-byte empty IntArray
+        // per unoccurring variable is pure overhead on models with many such variables.
+        val out = Array(slots) { if (counts[it] == 0) EmptyIntArray else IntArray(counts[it]) }
         val cursor = IntArray(slots)
         factors.forEachIndexed { id, f ->
             if (include(id)) for (v in vars(f)) out[v][cursor[v]++] = id
