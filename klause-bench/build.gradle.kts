@@ -141,7 +141,7 @@ abstract class InstallChocoTask : DefaultTask() {
     }
 }
 
-val installChoco by tasks.registering(InstallChocoTask::class) {
+val installChoco = tasks.register<InstallChocoTask>("installChoco") {
     description = "Provision Choco as a MiniZinc solver (choco-parsers jar + mzn_lib + registered choco.msc)."
     version.set(chocoVersion)
     cacheDir.set(chocoCacheDir)
