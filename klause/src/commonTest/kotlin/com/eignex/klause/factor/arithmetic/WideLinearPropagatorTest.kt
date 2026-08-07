@@ -67,6 +67,21 @@ class WideLinearPropagatorTest {
     }
 
     @Test
+    fun `solver handles a wide row over a sign-straddling variable`() {
+        // 2^64·x = 2^64·(−2) with x ∈ [−3, 3] (straddling zero) forces x = −2. Drives the LP x⁺/x⁻ split
+        // for the wide row and checks the whole path stays sound (no false UNSAT, correct witness).
+        val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w * BigInteger.fromLong(-2))
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(-3, 3)),
+            factors = arrayOf<Factor>(row),
+        )
+        val r = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L))
+        assertEquals(-2L, assertIs<SolveResult.Sat>(r).assignment.ints[0], "x must be pinned to −2")
+    }
+
+    @Test
     fun `solver proves unsat when a wide row has no integer solution`() {
         // 2^64·x = 2·2^64 + 1 has no integer x (remainder 1): the propagator derives x ≤ 2 ∧ x ≥ 3.
         val bound = w * BigInteger.fromLong(2) + BigInteger.ONE
