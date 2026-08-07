@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.isConstant
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
