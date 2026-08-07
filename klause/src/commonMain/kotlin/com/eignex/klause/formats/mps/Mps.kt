@@ -261,7 +261,14 @@ object Mps {
         // A value-less bound (FR/MI/PL/BV) ends at the column; the rest carry a trailing value. This
         // tolerates the optional bound-set name between the type and the column.
         val valueless = type == "FR" || type == "MI" || type == "PL" || type == "BV"
-        val col = if (valueless) fields.last() else fields[fields.size - 2]
+        // A value-less type usually ends at the column, but writers do emit a redundant trailing value
+        // (`BV BOUND1 C_000047 1.0`). Resolving by name keeps a column that looks numeric winning over
+        // such a stray value.
+        val col = when {
+            !valueless -> fields[fields.size - 2]
+            fields.size < 3 || fields.last() in varByName -> fields.last()
+            else -> fields[fields.size - 2]
+        }
         val v = varByName[col] ?: throw MpsFormatException("BOUNDS references unknown column '$col'")
         applyBound(v, type, if (valueless) 0.0 else parseNum(fields.last(), "bound value"))
     }
