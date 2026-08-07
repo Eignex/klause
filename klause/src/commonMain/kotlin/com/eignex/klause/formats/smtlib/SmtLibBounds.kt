@@ -4,9 +4,22 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 
-/** Bound inference for the SMT-LIB front-end: a fixpoint over the conjunctive linear relations tightens
- *  each integer variable's `[lo, hi]`. A bound that stays unprovable is left `null` (infinite) — infinity
- *  is structural, never a `±Long/4` sentinel — so the result is a [PresolveDomain] (finite or still-open). */
+/**
+ * The bounds a single scan of the conjunctive relations yields: for each integer variable, the tightest
+ * `[lo, hi]` implied by the relations that mention it *alone* (`x ≤ 7`, `3·x = 12`, …). A side no such
+ * relation pins is left `null` (infinite) — infinity is structural, never a `±Long/4` sentinel — so the
+ * result is a [PresolveDomain] (finite or still-open).
+ *
+ * Deliberately NOT a fixpoint. Deducing a bound from a multi-variable row is feasibility-based bound
+ * tightening, and running it here would duplicate what the root bake and the deferred
+ * [com.eignex.klause.lp.DeferredIntBounds] run already do over the lowered rows — except that parsing has
+ * no wall-clock budget to bound it with, which is what hung the Petri-net and concurrency QF_LIA
+ * instances (#1414). This pass is O(Σ row width) once, the same order as reading the document.
+ *
+ * What stays here is only what the *lowering* needs before it can run: an unbounded operand widens an
+ * `ite`/`div`/`mod` auxiliary's range and drops `distinct` from an [com.eignex.klause.factor.global.AllDifferent]
+ * to pairwise `≠`. Everything else is left to presolve, which tightens under its budget.
+ */
 internal fun SmtLib.Builder.inferBounds() {
     if (intNames.isEmpty()) return
     // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
@@ -15,78 +28,22 @@ internal fun SmtLib.Builder.inferBounds() {
     val relations = ArrayList<Rel>()
     for (a in asserts) collectConjunctiveRelations(a, relations)
 
-    var changed = true
-    var iter = 0
-    while (changed && iter++ < MAX_BOUND_ITERS) {
-        changed = false
-        for (r in relations) {
-            if (r.op == LinearOp.NE) continue
-            // One O(width) activity pass per relation — Σ min / Σ max of c·x over the finite terms
-            // with the infinite terms counted — then each term isolates its own contribution in
-            // O(1). Recomputing the rest-sum per term is O(width²), which the set-covering rows of
-            // the miplib instances (tens of thousands of terms) turn into minutes (#1432). An
-            // activity overflow degrades that direction to "no finite bound" for every term but the
-            // sole infinite one, exactly like an infinite contributing bound.
-            var totLo: Long? = 0L
-            var infLo = 0
-            var infLoIdx = -1
-            var totHi: Long? = 0L
-            var infHi = 0
-            var infHiIdx = -1
-            for (oi in r.vars.indices) {
-                val c = r.coeffs[oi]
-                if (c == 0L) continue
-                val v = r.vars[oi]
-                val bLo = if (c >= 0) lo[v] else hi[v]
-                if (bLo == null) {
-                    infLo++
-                    infLoIdx = oi
-                } else {
-                    totLo = totLo?.let { mulAdd(it, c, bLo) }
-                }
-                val bHi = if (c >= 0) hi[v] else lo[v]
-                if (bHi == null) {
-                    infHi++
-                    infHiIdx = oi
-                } else {
-                    totHi = totHi?.let { mulAdd(it, c, bHi) }
-                }
-            }
-            val bnd = r.bound
-            for (ti in r.vars.indices) {
-                val tv = r.vars[ti]
-                val ct = r.coeffs[ti]
-                if (ct == 0L) continue
-                // Σ_{other} min: total minus this term's own contribution — finite only when every
-                // other term is finite (no infinities, or this term is the single infinite one).
-                val sLo = when {
-                    infLo == 0 -> totLo?.let { total ->
-                        val own = if (ct >= 0) lo[tv] else hi[tv]
-                        own?.let { b -> mulAdd(0L, ct, b)?.let { subOrNull(total, it) } }
-                    }
-
-                    infLo == 1 && infLoIdx == ti -> totLo
-
-                    else -> null
-                }
-                val sHi = when {
-                    infHi == 0 -> totHi?.let { total ->
-                        val own = if (ct >= 0) hi[tv] else lo[tv]
-                        own?.let { b -> mulAdd(0L, ct, b)?.let { subOrNull(total, it) } }
-                    }
-
-                    infHi == 1 && infHiIdx == ti -> totHi
-
-                    else -> null
-                }
-                if (r.op == LinearOp.LE || r.op == LinearOp.EQ) {
-                    changed = applyCtBound(lo, hi, tv, ct, sLo?.let { subOrNull(bnd, it) }, upper = true) || changed
-                }
-                if (r.op == LinearOp.GE || r.op == LinearOp.EQ) {
-                    changed = applyCtBound(lo, hi, tv, ct, sHi?.let { subOrNull(bnd, it) }, upper = false) || changed
-                }
+    for (r in relations) {
+        if (r.op == LinearOp.NE) continue
+        // Single-term rows only. With no other term the rest-sum is 0, so the bound is the rhs itself.
+        var only = -1
+        var terms = 0
+        for (i in r.vars.indices) {
+            if (r.coeffs[i] != 0L) {
+                terms++
+                only = i
             }
         }
+        if (terms != 1) continue
+        val v = r.vars[only]
+        val c = r.coeffs[only]
+        if (r.op == LinearOp.LE || r.op == LinearOp.EQ) applyCtBound(lo, hi, v, c, r.bound, upper = true)
+        if (r.op == LinearOp.GE || r.op == LinearOp.EQ) applyCtBound(lo, hi, v, c, r.bound, upper = false)
     }
 
     for ((name, v) in intNames) {
@@ -147,12 +104,6 @@ internal fun mulAdd(acc: Long, c: Long, x: Long): Long? {
     return acc
 }
 
-/** `a - b`, or null on overflow. */
-internal fun subOrNull(a: Long, b: Long): Long? {
-    val d = a - b
-    return if (((a xor b) and (a xor d)) < 0) null else d
-}
-
 /** `a + b`, or null on overflow. */
 internal fun addOrNull(a: Long, b: Long): Long? {
     val s = a + b
@@ -201,5 +152,3 @@ internal fun SmtLib.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     }
     return false
 }
-
-private const val MAX_BOUND_ITERS = 64
