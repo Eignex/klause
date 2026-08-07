@@ -88,12 +88,14 @@ data class PortfolioScenario(
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
      *  cuts cross arms, so it never changes any arm's optimum). */
     val shareCuts: Boolean = true,
-    /** LBD bound of the cross-arm glue-clause exchange filter. The default is inherited from the
-     *  original sharing tuning; both halves of the filter are exposed (`--param clause-share-lbd` /
-     *  `clause-share-len`) so the trade between sharing quality and pool pressure is A/B-testable. */
-    val clauseShareMaxLbd: Int = 4,
+    /** LBD bound of the cross-arm glue-clause exchange filter. 6/12 measured best on the 4-core
+     *  backtrack pool at 10s: it beats the historical 4/8 by Borda 189–138 over dimacs-classic +
+     *  pb-comp combined (28–9 strict wins, +2 decided) and beats 9/20 by 186–141 — moderate widening
+     *  shares more useful clauses, past that the import volume costs more than it prunes. Both
+     *  halves stay exposed (`--param clause-share-lbd` / `clause-share-len`) for per-run tuning. */
+    val clauseShareMaxLbd: Int = 6,
     /** Length bound of the cross-arm glue-clause exchange filter; see [clauseShareMaxLbd]. */
-    val clauseShareMaxLen: Int = 8,
+    val clauseShareMaxLen: Int = 12,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
