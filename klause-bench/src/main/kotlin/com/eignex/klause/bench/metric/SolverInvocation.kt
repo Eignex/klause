@@ -10,6 +10,7 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import kotlinx.serialization.Serializable
 import java.io.File
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Uniform subprocess solving: every solver is run as an external process emitting MiniZinc-format
@@ -228,7 +229,7 @@ internal object SolverInvocation {
      *  for `.mzn`/`.fzn`, the PB-competition stream (`s`/`o`/`c key=value`) for XCSP3 `.xml`, MPS,
      *  OPB, DIMACS CNF and WCNF (the DIMACS/MaxSAT conventions are the same `s`/`o`/`v`/`c` shape),
      *  and the SMT-LIB convention (`sat`/`unsat`/`unknown` + `; key=value` comments) for `.smt2`. */
-    private enum class Dialect { MINIZINC, PB_COMPETITION, SMT_LIB }
+    internal enum class Dialect { MINIZINC, PB_COMPETITION, SMT_LIB }
 
     private fun dialectFor(solverId: String, format: Format): Dialect = when {
         solverId != KLAUSE -> Dialect.MINIZINC
@@ -238,13 +239,19 @@ internal object SolverInvocation {
         else -> Dialect.MINIZINC
     }
 
-    private fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
+    internal fun invoke(cmd: List<String>, dialect: Dialect, hardTimeoutMs: Long = Long.MAX_VALUE): Result {
         val process = ProcessBuilder(cmd).redirectErrorStream(false).start()
         // Watchdog: force-kill a runaway that blew past [hardTimeoutMs] so the read loop below (which
         // blocks until the child's stdout closes) can't hang forever on a child that never exits. A
         // killed child's stream closes, the loop returns, and the partial output is scored as usual.
+        val killed = AtomicBoolean(false)
         Thread {
-            runCatching { if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS)) process.destroyForcibly() }
+            runCatching {
+                if (!process.waitFor(hardTimeoutMs, TimeUnit.MILLISECONDS)) {
+                    killed.set(true)
+                    process.destroyForcibly()
+                }
+            }
         }.apply {
             isDaemon = true
             start()
@@ -351,11 +358,23 @@ internal object SolverInvocation {
             }
         }
         if (!process.waitFor(GRACE_MILLIS, TimeUnit.MILLISECONDS)) {
+            killed.set(true)
             process.destroyForcibly()
             process.waitFor()
         }
-        check(process.exitValue() == 0 || anySolution || unsat) {
-            "${cmd.first()} failed (exit ${process.exitValue()}): ${stderr.toString().take(STDERR_CAP)}"
+        // Three-way split on a non-zero exit. A clean exit, or any verdict line (solution / unsat),
+        // is a usable run. A child *we* force-killed for blowing its wall-clock ceiling exits non-zero
+        // with no verdict, but that is an honest "ran out of time, undecided": recording it as an error
+        // would discard its partial output and stats and misattribute a timeout as a failure, so it
+        // returns a feasible=null Result carrying a kill marker instead. Anything else — a missing
+        // binary, bad arguments, a crash — stays loud, since the callers' per-instance runCatching
+        // already contains the throw without aborting the sweep.
+        if (process.exitValue() != 0 && !anySolution && !unsat) {
+            check(killed.get()) {
+                "${cmd.first()} failed (exit ${process.exitValue()}): ${stderr.toString().take(STDERR_CAP)}"
+            }
+            stats["killed"] = "hard-timeout"
+            stats["exit"] = process.exitValue().toString()
         }
         return Result(
             feasible = when {
