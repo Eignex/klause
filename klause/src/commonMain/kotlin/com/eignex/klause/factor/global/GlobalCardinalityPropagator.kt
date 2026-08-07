@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.global.internals.GccIncrementalState
 import com.eignex.klause.factor.global.internals.GccPropCache
@@ -100,10 +101,10 @@ internal class GlobalCardinalityPropagator(
      */
     private fun maintainCounts(state: PropagationState, inc: GccIncrementalState) {
         val n = inc.n
-        // A wide (>2^31-span) domain cannot be walked to detect widening or to count cover membership.
-        // Force a full rebuild (below, counted span-safely per variable) rather than the incremental
-        // delta, whose widen/leave scans enumerate the domain value-by-value.
-        val anyWide = (0 until n).any { !state.intDomains[inc.xs[it]].enumerable }
+        // A domain larger than the walk cap cannot be walked to detect widening or to count cover
+        // membership. Force a full rebuild (below, counted span-safely per variable) rather than the
+        // incremental delta, whose widen/leave scans enumerate the domain value-by-value.
+        val anyWide = (0 until n).any { state.intDomains[inc.xs[it]].sizeLong > DEFAULT_DOMAIN_WALK_CAP }
         var rebuild = inc.valid.value == 0 || anyWide
         if (!rebuild) {
             for (i in 0 until n) {
@@ -130,7 +131,7 @@ internal class GlobalCardinalityPropagator(
             for (i in 0 until n) {
                 inc.pinnedCover[i] = -1
                 val d = state.intDomains[inc.xs[i]]
-                if (d.enumerable) {
+                if (d.sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
                     d.forEach { v ->
                         val k = coverIndexByValue.getOrDefault(v, -1)
                         if (k >= 0) inc.possible[k] = inc.possible[k] + 1
@@ -212,16 +213,17 @@ internal class GlobalCardinalityPropagator(
         if (closed) {
             for (x in effectiveXs) {
                 val d = state.intDomains[x]
-                if (d.enumerable) {
+                if (d.sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
                     val toRemove = LongArrayList()
                     d.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
                     for (k in 0 until toRemove.size) {
                         if (!state.excludeIntValue(x, toRemove[k], gccAntecedents)) return false
                     }
                 } else if (!state.restrictIntToSurvivors(x, cover)) {
-                    // Wide domain: restrict to the (small) cover set directly rather than walking the span
-                    // to collect non-cover values. Removing every non-cover value is an unconditional
-                    // consequence of a closed GCC (no premises), so the antecedent-free restrict is sound.
+                    // A domain too large to walk: restrict to the (small) cover set directly rather than
+                    // walking the span to collect non-cover values. Removing every non-cover value is an
+                    // unconditional consequence of a closed GCC (no premises), so the antecedent-free
+                    // restrict is sound.
                     return false
                 }
             }
@@ -373,9 +375,9 @@ internal class GlobalCardinalityPropagator(
                 var any = false
                 for (i in 0 until n) {
                     val d = state.intDomains[effectiveXs[i]]
-                    // A wide (>2^31-span) domain always holds a value outside the finite cover, so it
-                    // "has other values" by definition — never walk it to find out.
-                    val found = if (!d.enumerable) {
+                    // A domain larger than the walk cap (far exceeding the finite cover) is over-approximated
+                    // as holding a value outside the cover — sound, and never walked to find out.
+                    val found = if (d.sizeLong > DEFAULT_DOMAIN_WALK_CAP) {
                         true
                     } else {
                         var f = false
@@ -501,15 +503,15 @@ internal class GlobalCardinalityPropagator(
             val oIdx = xToOtherEdgeIdx[i]
             if (oIdx >= 0 && flow.flowOf(oIdx) == 0 && sccId[2 + i] != sccId[otherNode]) {
                 val d = state.intDomains[effectiveXs[i]]
-                if (d.enumerable) {
+                if (d.sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
                     val toRemove = LongArrayList()
                     d.forEach { if (!coverIndexByValue.containsKey(it)) toRemove.add(it) }
                     for (k in 0 until toRemove.size) {
                         if (!state.excludeIntValue(effectiveXs[i], toRemove[k], gccAntecedents)) return false
                     }
                 }
-                // A wide domain is skipped here (sound: it is never a full assignment, and the same removal
-                // runs once it narrows to enumerable; every leaf has only singleton, enumerable domains).
+                // A domain too large to walk is skipped here (sound: it is never a full assignment, and the
+                // same removal runs once it narrows below the cap; every leaf has only singleton domains).
             }
         }
         if (presents.isEmpty()) for (i in intVars.indices) cache.cachedDoms[i] = state.intDomains[intVars[i]]

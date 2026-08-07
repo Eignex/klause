@@ -16,14 +16,19 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * Each global propagator here has a variable whose domain span exceeds 2^31, so the old value-by-value
- * scans would hang or crash (NegativeArraySize). The span-safe guards must instead reason over the array
- * positions / cover / support / bounds — solving to a correct verdict without ever walking the span.
+ * Each global propagator here has a variable whose domain is too large to walk — either non-enumerable
+ * (span > 2^31, where the old scans would crash with NegativeArraySize) or merely far past the walk cap
+ * (where they would hang for seconds). The span-safe guards must instead reason over the array positions /
+ * cover / support / bounds — solving to a correct verdict without ever walking the domain.
  */
 class WideDomainPropagationTest {
 
     // span 3 * 10^9 > 2^31, so the domain is non-enumerable — the wide path under test.
     private val wideHi = 3_000_000_000L
+
+    // span 2 * 10^8 < 2^31, so the domain is enumerable, but far past the walk cap: the old `enumerable`
+    // guard would walk its 200 million values (seconds), the cap routes it to the same span-safe fallback.
+    private val bigHi = 200_000_000L
 
     private fun solve(numInt: Int, doms: Array<IntDomain>, vararg f: Factor): SolveResult =
         BacktrackSolver(Problem(0, numInt, intDomains = doms, factors = arrayOf(*f)).bake())
@@ -87,6 +92,55 @@ class WideDomainPropagationTest {
         val r = solve(
             2,
             arrayOf(IntDomain(0, 0), IntDomain(11, wideHi)),
+            Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
+        )
+        assertIs<SolveResult.Unsat>(r)
+    }
+
+    // The same propagators over a large-but-enumerable domain: the walk cap must route these to the
+    // span-safe fallback too, so they stay fast instead of walking hundreds of millions of values.
+
+    @Test
+    fun `global cardinality over a large enumerable domain is not walked`() {
+        val r = solve(
+            2,
+            arrayOf(IntDomain(0, bigHi), IntDomain(5, 5)),
+            GlobalCardinality(
+                xs = intArrayOf(0, 1),
+                cover = longArrayOf(5L),
+                countLow = intArrayOf(1),
+                countHigh = intArrayOf(2),
+                closed = true,
+            ),
+        )
+        assertEquals(5L, assertIs<SolveResult.Sat>(r).assignment.ints[0], "the large variable must be pinned to 5")
+    }
+
+    @Test
+    fun `nvalue over a large enumerable domain is satisfiable`() {
+        val r = solve(
+            3,
+            arrayOf(IntDomain(1, 2), IntDomain(0, bigHi), IntDomain(7, 7)),
+            NValue(n = 0, xs = intArrayOf(1, 2)),
+        )
+        assertIs<SolveResult.Sat>(r)
+    }
+
+    @Test
+    fun `table with a large enumerable column pins to a supporting tuple`() {
+        val r = solve(
+            2,
+            arrayOf(IntDomain(0, bigHi), IntDomain(7, 7)),
+            Table(intArrayOf(0, 1), longArrayOf(5, 7, 8, 9)),
+        )
+        assertEquals(5L, assertIs<SolveResult.Sat>(r).assignment.ints[0], "the large column must be pinned")
+    }
+
+    @Test
+    fun `element with a large enumerable result and no valid value is unsat`() {
+        val r = solve(
+            2,
+            arrayOf(IntDomain(0, 0), IntDomain(11, bigHi)),
             Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
         )
         assertIs<SolveResult.Unsat>(r)
