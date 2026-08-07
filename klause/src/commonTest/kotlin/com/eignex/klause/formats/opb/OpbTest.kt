@@ -1,13 +1,18 @@
 package com.eignex.klause.formats.opb
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -184,15 +189,30 @@ class OpbTest {
     }
 
     @Test
-    fun `rejects a coefficient beyond the 64-bit range with a range error`() {
-        // 2^63 overflows a signed Long by one.
-        assertTrue("64-bit range" in parseError("+9223372036854775808 x1 >= 1 ;"))
+    fun `a wide coefficient or bound is routed to a wide linear row`() {
+        // 2^63 (one past signed Long) as a coefficient, and an over-Int64 bound: both kept in the wide lane.
+        val out = Opb.parse("+9223372036854775808 x1 +1 x2 >= 99999999999999999999 ;")
+        val lin = out.problem.factors.filterIsInstance<Linear>().single()
+        assertTrue(lin.wide, "the over-Int64 values must produce a wide Linear row")
+        assertEquals(2, out.problem.numIntVars, "each literal is channeled to a {0,1} int var")
     }
 
     @Test
-    fun `rejects an out-of-range right-hand side and soft cost`() {
-        assertTrue("64-bit range" in parseError("+1 x1 >= 99999999999999999999 ;"))
+    fun `wide coefficients drive sound reasoning`() {
+        // 2^64·x1 >= 2^64 forces x1 = 1; 2^64·x1 <= 0 forces x1 = 0 — jointly unsatisfiable at full width,
+        // not lost to a 64-bit wrap.
+        val out = Opb.parse("+18446744073709551616 x1 >= 18446744073709551616 ;\n+18446744073709551616 x1 <= 0 ;\n")
+        val r = BacktrackSolver(out.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+        assertIs<SolveResult.Unsat>(r)
+    }
+
+    @Test
+    fun `rejects wide values where the target cannot be wide`() {
+        // Objective coefficients and WBO soft costs are Long; a wide one is still a clean range error, and a
+        // wide coefficient inside a soft constraint is unsupported rather than silently mis-parsed.
+        assertTrue("64-bit range" in parseError("min: 99999999999999999999 x1 ;\n+1 x1 >= 0 ;\n"))
         assertTrue("64-bit range" in parseError("[99999999999999999999] +1 x1 >= 1 ;"))
+        assertTrue("soft constraint" in parseError("soft: 5 ;\n[1] +18446744073709551616 x1 >= 1 ;"))
     }
 
     @Test

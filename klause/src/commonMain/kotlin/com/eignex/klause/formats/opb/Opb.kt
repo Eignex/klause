@@ -1,17 +1,22 @@
 package com.eignex.klause.formats.opb
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -23,6 +28,10 @@ import com.eignex.klause.util.lineSequence
 /** Raised when an OPB/WBO document is malformed, so a caller can catch it via [FormatException] like
  *  the other input formats. */
 class OpbFormatException(msg: String) : FormatException("OPB", msg)
+
+private val LONG_MIN_BIG = BigInteger.fromLong(Long.MIN_VALUE)
+private val LONG_MAX_BIG = BigInteger.fromLong(Long.MAX_VALUE)
+private fun BigInteger.fitsLong(): Boolean = this in LONG_MIN_BIG..LONG_MAX_BIG
 
 private fun opbError(msg: String): Nothing = throw OpbFormatException(msg)
 
@@ -55,10 +64,21 @@ object Opb {
     private val INTEGER = Regex("[+-]?\\d+")
 
     /** A parsed term: [coef] times the conjunction of [lits] (a single literal when linear). */
-    private class Term(val coef: Long, val lits: IntArrayList)
+    private class Term(val coef: BigInteger, val lits: IntArrayList)
 
-    /** A parsed relation `Σ weights(i)·literals(i) op bound` shared by hard and soft constraints. */
-    private class Relation(val weights: LongArray, val literals: IntArray, val op: PbOp, val bound: Long)
+    /** A parsed relation `Σ weights(i)·literals(i) op bound` shared by hard and soft constraints. An
+     *  over-Int64 weight or bound makes it [wide] — lowered to a wide [Linear] over channeled {0,1} int
+     *  vars; a narrow relation keeps the fast [Long] pseudo-Boolean path. */
+    private class Relation(
+        val weights: Array<BigInteger>,
+        val literals: IntArray,
+        val op: PbOp,
+        val bound: BigInteger,
+    ) {
+        val wide: Boolean get() = !bound.fitsLong() || weights.any { !it.fitsLong() }
+        fun longWeights(): LongArray = LongArray(weights.size) { weights[it].longValue() }
+        fun longBound(): Long = bound.longValue()
+    }
 
     /**
      * Accumulates the compiled problem. A product term `c l1 l2 ...` is a coefficient times an
@@ -72,6 +92,15 @@ object Opb {
         var numVars = 0
 
         override fun newBool(): Int = numVars++
+
+        /** {0,1} int vars minted to carry a wide constraint's literals (via [channelBoolTo01]); empty
+         *  unless the model has an over-Int64 coefficient. */
+        val intDomains = ArrayList<IntDomain>()
+
+        fun newBinaryIntVar(): Int {
+            intDomains.add(IntDomain(0, 1))
+            return intDomains.size - 1
+        }
 
         private val productCache = HashMap<List<Int>, Int>()
 
@@ -133,7 +162,7 @@ object Opb {
                 for (term in parseTerms(stmt.subList(1, stmt.size))) {
                     addObjectiveTerm(
                         objWeights,
-                        term.coef,
+                        requireLong(term.coef, "objective coefficient"),
                         builder.literalFor(term.lits),
                     ) { objConstant += it }
                 }
@@ -149,13 +178,32 @@ object Opb {
             val softCost = parseSoftCost(stmt[0])
             val body = if (softCost != null) stmt.subList(1, stmt.size) else stmt
             val relation = parseRelation(builder, body)
-            if (softCost == null) {
-                builder.factors.add(PseudoBoolean(relation.weights, relation.literals, relation.op, relation.bound))
+            if (relation.wide) {
+                if (softCost != null) opbError("OPB wide coefficients in a soft constraint are not supported")
+                // Channel each literal to a {0,1} int var (1 iff the literal holds) and post the constraint
+                // as a wide Linear `Σ weights·ivs op bound` — the exact pseudo-Boolean relation.
+                val ivs = IntArray(relation.literals.size) { k ->
+                    val lit = relation.literals[k]
+                    val iv = builder.newBinaryIntVar()
+                    channelBoolTo01(builder.factors, Lit.variable(lit), iv, whenTrue = Lit.isPositive(lit))
+                    iv
+                }
+                builder.factors.add(Linear(ivs, relation.weights, toLinearOp(relation.op), relation.bound))
+            } else if (softCost == null) {
+                builder.factors.add(
+                    PseudoBoolean(relation.longWeights(), relation.literals, relation.op, relation.longBound()),
+                )
             } else {
                 // Reify the soft relation to `sat`; a violation (¬sat) costs `softCost`.
                 val sat = builder.newBool()
                 builder.factors.add(
-                    ReifiedPseudoBoolean(sat, relation.weights, relation.literals, relation.op, relation.bound),
+                    ReifiedPseudoBoolean(
+                        sat,
+                        relation.longWeights(),
+                        relation.literals,
+                        relation.op,
+                        relation.longBound(),
+                    ),
                 )
                 hasObjective = true
                 objWeights.addTo(sat, -softCost)
@@ -183,8 +231,8 @@ object Opb {
         }
         val problem = Problem(
             numBoolVars = builder.numVars,
-            numIntVars = 0,
-            intDomains = emptyArray(),
+            numIntVars = builder.intDomains.size,
+            intDomains = builder.intDomains.toTypedArray(),
             factors = builder.factors.toTypedArray(),
             // Defer the base bake (root PB/unit propagation) to presolve step 0, so parsing only reads.
         )
@@ -214,20 +262,20 @@ object Opb {
         opbRequire(opIdx + 1 < tokens.size) {
             "OPB constraint missing right-hand side: ${tokens.joinToString(" ")}"
         }
-        val rhs = parseLong(tokens[opIdx + 1], "constraint rhs")
+        val rhs = parseBigInteger(tokens[opIdx + 1], "constraint rhs")
         val op = when (tokens[opIdx]) {
             ">=" -> PbOp.GE
             "<=" -> PbOp.LE
             "=" -> PbOp.EQ
             else -> opbError("unknown OPB operator '${tokens[opIdx]}'")
         }
-        val weights = LongArrayList()
+        val weights = ArrayList<BigInteger>()
         val literals = IntArrayList()
         for (term in parseTerms(tokens.subList(0, opIdx))) {
             weights.add(term.coef)
             literals.add(builder.literalFor(term.lits))
         }
-        return Relation(weights.toLongArray(), literals.toIntArray(), op, rhs)
+        return Relation(weights.toTypedArray(), literals.toIntArray(), op, rhs)
     }
 
     /** The cost of a WBO soft constraint whose statement opens with a `[cost]` token, else null (hard). */
@@ -247,12 +295,29 @@ object Opb {
         opbError("OPB $role not an integer: '$token'")
     }
 
+    /** Parse an OPB integer [token] naming a [role] at arbitrary precision: a value beyond 64 bits is kept
+     *  (routed to the wide lane) rather than rejected; only a non-integer token is an error. */
+    private fun parseBigInteger(token: String, role: String): BigInteger =
+        if (INTEGER.matches(token)) BigInteger.parseString(token.removePrefix("+")) else {
+            opbError("OPB $role not an integer: '$token'")
+        }
+
+    /** Narrow [v] to [Long], rejecting an over-Int64 value where the target cannot be wide (the objective). */
+    private fun requireLong(v: BigInteger, role: String): Long =
+        if (v.fitsLong()) v.longValue() else opbError("OPB $role exceeds the supported 64-bit range: '$v'")
+
+    private fun toLinearOp(op: PbOp): LinearOp = when (op) {
+        PbOp.LE -> LinearOp.LE
+        PbOp.GE -> LinearOp.GE
+        PbOp.EQ -> LinearOp.EQ
+    }
+
     /** Parse a term sequence: each term is a coefficient followed by one or more literals. */
     private fun parseTerms(tokens: List<String>): List<Term> {
         val terms = mutableListOf<Term>()
         var idx = 0
         while (idx < tokens.size) {
-            val coef = parseLong(tokens[idx], "coefficient")
+            val coef = parseBigInteger(tokens[idx], "coefficient")
             idx++
             val lits = IntArrayList()
             while (idx < tokens.size && isVarToken(tokens[idx])) {
