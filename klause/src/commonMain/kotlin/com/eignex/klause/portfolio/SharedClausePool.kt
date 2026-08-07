@@ -168,7 +168,8 @@ internal class PoolClauseExchange(
     }
 
     internal companion object {
-        const val DEFAULT_MAX_LBD = 4
-        const val DEFAULT_MAX_LEN = 8
+        // 6/12 measured best on the 4-core pool (see PortfolioScenario.clauseShareMaxLbd).
+        const val DEFAULT_MAX_LBD = 6
+        const val DEFAULT_MAX_LEN = 12
     }
 }
