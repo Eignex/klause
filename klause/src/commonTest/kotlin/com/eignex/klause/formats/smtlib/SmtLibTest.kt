@@ -246,6 +246,25 @@ class SmtLibTest {
     }
 
     @Test
+    fun `parsing leaves a multi-variable bound to the presolve-phase tightening`() {
+        // Parsing has no wall-clock budget, so it must not run a bound fixpoint: it pins only the
+        // single-variable rows. `x <= 10 - y` needs the row's other term, which is feasibility-based
+        // tightening and belongs to the deferred run — where the presolve budget bounds it.
+        val text = """
+            (declare-const x Int) (declare-const y Int)
+            (assert (>= x 0)) (assert (>= y 0)) (assert (<= (+ x y) 10))
+            (check-sat)
+        """.trimIndent()
+
+        val parsed = SmtLib.parse(text)
+
+        assertEquals(0, parsed.problem.intDomains[0].min, "a single-variable row is pinned at parse")
+        assertTrue(parsed.problem.intDomains[0].max > 10, "parse must not derive a bound across terms")
+        // Nothing is lost by leaving it: the deferred run proves the same bound under the budget.
+        assertEquals(10, parsed.bounded().intDomains[0].max)
+    }
+
+    @Test
     fun `bound inference falls back to the default bound when unprovable`() {
         val p = SmtLib.parse(
             "(declare-const x Int) (assert (<= x 4))",

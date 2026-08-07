@@ -319,6 +319,10 @@ private const val OBBT_NEIGHBORHOOD_ROWS = 512
  *  residual to the LP pass. */
 private const val FBBT_MAX_PASSES = 16
 
+/** Rows between cancellation polls inside one FBBT pass — often enough to bound the overrun on a wide
+ *  model, rare enough that the poll never shows up next to the O(width) row work. */
+private const val FBBT_CANCEL_POLL = 64
+
 /**
  * Feasibility-based bound tightening (FBBT): propagate [constraints] as interval bounds to a fixpoint,
  * closing open sides a single row already implies — the cheap `O(nnz)`-per-pass prefilter for
@@ -358,16 +362,28 @@ private fun fbbtTightenOpenIntBounds(
 
     var pass = 0
     var changed = true
-    while (changed && pass < FBBT_MAX_PASSES) {
-        if (cancellation()) break
+    // A pass is O(Σ row width), so on a wide model a single one outruns the budget and a per-pass poll
+    // never gets to fire (#1414); the stride below bounds the overrun by a row batch instead. Stopping
+    // early keeps the tightenings made so far — sound, since a looser bound removes no solution.
+    var polled = 0
+    var spent = false
+    fun budgetSpent(): Boolean {
+        if (polled++ % FBBT_CANCEL_POLL != 0) return false
+        spent = cancellation()
+        return spent
+    }
+    while (changed && !spent && pass < FBBT_MAX_PASSES) {
         changed = false
         pass++
         for (f in rows) {
-            if (propagateRow(f.coeffs, f.vars, f.bound, sign = 1L, b = b)) changed = true
+            if (spent || budgetSpent()) break
+            val coeffs = f.coeffs // materialising accessor: read once per row, never per direction
+            if (propagateRow(coeffs, f.vars, f.bound, sign = 1L, b = b)) changed = true
             // An equality also bounds from below: `Σ aⱼ·xⱼ ≥ b`, i.e. `−Σ aⱼ·xⱼ ≤ −b`.
-            if (f.op == LinearOp.EQ && propagateRow(f.coeffs, f.vars, f.bound, sign = -1L, b = b)) changed = true
+            if (f.op == LinearOp.EQ && propagateRow(coeffs, f.vars, f.bound, sign = -1L, b = b)) changed = true
         }
         for (f in mixed) {
+            if (spent || budgetSpent()) break
             if (f.op != LinearOp.GE && propagateRealRow(f, sign = 1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
             if (f.op != LinearOp.LE && propagateRealRow(f, sign = -1.0, b = b, rLo = rLo, rUp = rUp)) changed = true
         }
