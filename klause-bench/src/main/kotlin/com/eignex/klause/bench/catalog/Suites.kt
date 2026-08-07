@@ -40,75 +40,91 @@ internal object Suites {
      *  via `-Dklause.bench.select.*`) and fetches the collection on first resolve. */
     val dynamic: List<DynamicSuite> by lazy {
         listOf(
-            DynamicSuite("mzn-bench", "MiniZinc Challenge benchmarks (fetched; 1/family by default)") {
+            DynamicSuite(
+                "mzn-bench",
+                "MiniZinc Challenge benchmarks (fetched; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.minizincBenchmarks,
                     CorpusSelection.Layout.MznChallenge(),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.OPTIMIZATION,
                 )
             },
-            DynamicSuite("libminizinc-tests", "libminizinc compiler test suite (fetched; 1/family by default)") {
+            DynamicSuite(
+                "libminizinc-tests",
+                "libminizinc compiler test suite (fetched; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.libminizincTests,
                     CorpusSelection.Layout.FlatMzn("tests/spec/unit"),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.CSP,
                     expected = { LibminizincExpected.parse(it) },
                 )
             },
-            DynamicSuite("hakank", "hakank MiniZinc collection (fetched; 1/family by default)") {
+            DynamicSuite(
+                "hakank",
+                "hakank MiniZinc collection (fetched; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.hakank,
                     CorpusSelection.Layout.FlatMzn("minizinc"),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.CSP,
                 )
             },
             DynamicSuite(
                 "smtlib-qflia",
-                "SMT-LIB QF_LIA non-incremental set (fetched, full ~13k .smt2; cap with per-family=/max=)",
-            ) {
+                "SMT-LIB QF_LIA non-incremental set (fetched, full ~13k .smt2; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfLia,
                     CorpusSelection.Layout.Flat("non-incremental/QF_LIA", "smt2"),
-                    CorpusSelection.Selection.fromProps(),
+                    sel,
                     Category.CSP,
                     format = Format.SMTLIB,
                 )
             },
             DynamicSuite(
                 "smtlib-qflra",
-                "SMT-LIB QF_LRA non-incremental set (fetched, ~1.7k .smt2; cap with per-family=/max=)",
-            ) {
+                "SMT-LIB QF_LRA non-incremental set (fetched, ~1.7k .smt2; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfLra,
                     CorpusSelection.Layout.Flat("non-incremental/QF_LRA", "smt2"),
-                    CorpusSelection.Selection.fromProps(),
+                    sel,
                     Category.CSP,
                     format = Format.SMTLIB,
                 )
             },
             DynamicSuite(
                 "smtlib-qflira",
-                "SMT-LIB QF_LIRA non-incremental set (fetched, small mixed int/real .smt2)",
-            ) {
+                "SMT-LIB QF_LIRA non-incremental set (fetched, small mixed int/real .smt2; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfLira,
                     CorpusSelection.Layout.Flat("non-incremental/QF_LIRA", "smt2"),
-                    CorpusSelection.Selection.fromProps(),
+                    sel,
                     Category.CSP,
                     format = Format.SMTLIB,
                 )
             },
             DynamicSuite(
                 "miplib2017",
-                "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; cap with max=/per-family=)",
-            ) {
+                "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.miplib2017,
-                    CorpusSelection.Layout.Flat("", "mps"),
-                    CorpusSelection.Selection.fromProps(),
+                    CorpusSelection.Layout.Flat("", "mps", familyOf = ::miplibStem),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.MPS,
                 )
@@ -117,33 +133,41 @@ internal object Suites {
                 "dimacs-classic",
                 "SATLIB classic structured DIMACS CNF — diverse, small Boolean set " +
                     "(aim/jnh/dubois/parity/inductive-inference/pigeon-hole/all-interval)",
-            ) {
+            ) { sel ->
                 ExternalCollections.dimacsClassic.flatMap { (col, category) ->
                     CorpusSelection.select(
                         col,
                         CorpusSelection.Layout.Flat("", "cnf"),
-                        CorpusSelection.Selection.fromProps(),
+                        sel,
                         category,
                         format = Format.DIMACS,
                     )
                 }
             },
-            DynamicSuite("pb-comp", "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)") {
+            DynamicSuite(
+                "pb-comp",
+                "Pseudo-Boolean Competition 2024 selected OPB set (fetched; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 // The archive ships both `.opb.xz` (linear + non-linear PB) and `.wbo.xz` (soft
                 // constraints); this layout takes the `.opb` instances, `pb-comp-wbo` the `.wbo`.
                 CorpusSelection.select(
                     ExternalCollections.pbComp2024,
                     CorpusSelection.Layout.Flat("PB24", "opb", familyOf = { it.substringBeforeLast('/', it) }),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.OPB,
                 )
             },
-            DynamicSuite("pb-comp-wbo", "Pseudo-Boolean Competition 2024 WBO soft-constraint set (fetched; 1/family)") {
+            DynamicSuite(
+                "pb-comp-wbo",
+                "Pseudo-Boolean Competition 2024 WBO soft-constraint set (fetched; 1/family)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.pbComp2024,
                     CorpusSelection.Layout.Flat("PB24", "wbo", familyOf = { it.substringBeforeLast('/', it) }),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.OPB,
                 )
@@ -152,7 +176,7 @@ internal object Suites {
                 "pb07-opb",
                 "PB'07 native pseudo-Boolean OPB benchmarks (fetched, 487 crafted instances; " +
                     "optimization/decision, linear + non-linear)",
-            ) {
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.pb07Other,
                     CorpusSelection.Layout.Flat(
@@ -160,43 +184,57 @@ internal object Suites {
                         "opb",
                         familyOf = { it.substringBeforeLast('/', it) },
                     ),
-                    CorpusSelection.Selection.fromProps(),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.OPB,
                 )
             },
-            DynamicSuite("xcsp3-cop", "XCSP3 competition COP aggregate 2022-25 (fetched, 1000; cap with max=)") {
+            DynamicSuite(
+                "xcsp3-cop",
+                "XCSP3 competition COP aggregate 2022-25 (fetched, 1000; cap with max=)",
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.xcsp3Cop,
                     CorpusSelection.Layout.Flat("COP22to25", "xml", familyOf = ::xcspSeries),
-                    CorpusSelection.Selection.fromProps(),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.XCSP3,
                 )
             },
-            DynamicSuite("xcsp3-csp", "XCSP3 competition CSP aggregate 2022-25 (fetched, 800; cap with max=)") {
+            DynamicSuite(
+                "xcsp3-csp",
+                "XCSP3 competition CSP aggregate 2022-25 (fetched, 800; cap with max=)",
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.xcsp3Csp,
                     CorpusSelection.Layout.Flat("CSP22to25", "xml", familyOf = ::xcspSeries),
-                    CorpusSelection.Selection.fromProps(),
+                    sel,
                     Category.CSP,
                     format = Format.XCSP3,
                 )
             },
-            DynamicSuite("maxsat-unweighted", "MaxSAT Evaluation 2024 exact unweighted track (fetched; 1/family)") {
+            DynamicSuite(
+                "maxsat-unweighted",
+                "MaxSAT Evaluation 2024 exact unweighted track (fetched; 1/family)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.maxsatExactUnweighted,
                     CorpusSelection.Layout.Flat("", "wcnf", familyOf = ::maxsatFamily),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.WCNF,
                 )
             },
-            DynamicSuite("maxsat-weighted", "MaxSAT Evaluation 2024 exact weighted track (fetched; 1/family)") {
+            DynamicSuite(
+                "maxsat-weighted",
+                "MaxSAT Evaluation 2024 exact weighted track (fetched; 1/family)",
+                defaultPerFamily = 1,
+            ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.maxsatExactWeighted,
                     CorpusSelection.Layout.Flat("", "wcnf", familyOf = ::maxsatFamily),
-                    CorpusSelection.Selection.fromProps(defaultPerFamily = 1),
+                    sel,
                     Category.OPTIMIZATION,
                     format = Format.WCNF,
                 )
@@ -552,6 +590,15 @@ internal object Suites {
      *  (`causal-discovery-causal_n6_…` → `causal`), grouping parameterizations for `per-family`
      *  sampling instead of treating every instance as its own family. */
     private fun maxsatFamily(name: String): String = name.substringBefore('-')
+
+    /** MIPLIB family key: the instance-name stem of a flat `.mps` extraction — the name lowercased,
+     *  stripped of any extension and of a trailing `-<digits>`/`_<digits>` parameterization suffix
+     *  (`neos-1122047` → `neos`, `rmatr100-p10` → `rmatr100-p10`). The extraction is flat, so without
+     *  this every instance would be its own family and a `per-family` cap would be inert. */
+    private fun miplibStem(name: String): String =
+        name.substringAfterLast('/').substringBefore('.').replace(PARAM_SUFFIX, "").lowercase()
+
+    private val PARAM_SUFFIX = Regex("""[-_]\d+$""")
 
     private val xcsp3Core = suite("xcsp3-core", "Curated XCSP3 integer CSP/COP instances") {
         format = Format.XCSP3

@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.catalog
 
+import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.solver.Problem
 
 /*
@@ -163,7 +164,13 @@ internal data class Suite(val id: String, val description: String, val problems:
  * fetched cache) rather than listed statically. The [provider] is invoked only when the suite
  * is actually resolved — listing shows [id]/[description] without triggering a fetch.
  */
-internal data class DynamicSuite(val id: String, val description: String, val provider: () -> List<ProblemRef>)
+internal data class DynamicSuite(
+    val id: String,
+    val description: String,
+    /** Instances kept per family when the caller sets no cap; null keeps the whole corpus. */
+    val defaultPerFamily: Int? = null,
+    val provider: (CorpusSelection.Selection) -> List<ProblemRef>,
+)
 
 /** The registry. Static [suites] + [dynamicSuites] are assembled in [Suites]; lookups are by
  *  id / category / tag. */
@@ -176,7 +183,11 @@ internal object Catalog {
 
     fun suite(id: String): Suite {
         suites.firstOrNull { it.id == id }?.let { return it }
-        dynamicSuites.firstOrNull { it.id == id }?.let { return Suite(it.id, it.description, it.provider()) }
+        dynamicSuites.firstOrNull { it.id == id }?.let {
+            // The declared default is by construction the one the provider sees, so a suite over a
+            // large corpus cannot silently resolve uncapped and OOM the in-process ingest.
+            return Suite(it.id, it.description, it.provider(CorpusSelection.Selection.fromProps(it.defaultPerFamily)))
+        }
         error("no such suite: $id (have $suiteIds)")
     }
 
