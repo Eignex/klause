@@ -59,6 +59,35 @@ class OpbTest {
     }
 
     @Test
+    fun `accepts a terminator glued to a variable token`() {
+        val out = Opb.parse("min: 2 x1;\n+1 x1 +1 x2 >= 1;")
+        val obj = assertNotNull(out.objective)
+        assertEquals(2L, obj.boolWeights[0])
+        assertEquals(2, out.problem.numBoolVars)
+    }
+
+    @Test
+    fun `parses a many-term instance to the exact weights literals and bounds`() {
+        val terms = 2000
+        val text = StringBuilder()
+        for (c in 0 until 3) {
+            for (k in 1..terms) text.append(if (k % 2 == 0) "+$k ~x$k " else "+$k x$k ")
+            text.append(">= ").append(c + 1).append(" ;\n")
+        }
+        val out = Opb.parse(text.toString())
+        assertEquals(terms, out.problem.numBoolVars)
+        assertEquals(3, out.problem.factors.size)
+        val expectedWeights = (1L..terms.toLong()).toList()
+        val expectedLiterals = (1..terms).map { Lit.make(it - 1, it % 2 != 0) }
+        out.problem.factors.forEachIndexed { c, factor ->
+            val pb = factor as PseudoBoolean
+            assertEquals(expectedWeights, pb.weights.toList())
+            assertEquals(expectedLiterals, pb.literals.toList())
+            assertEquals((c + 1).toLong(), pb.bound)
+        }
+    }
+
+    @Test
     fun `parses negated literals`() {
         val text = """
             +1 ~x1 +2 x2 <= 1 ;
