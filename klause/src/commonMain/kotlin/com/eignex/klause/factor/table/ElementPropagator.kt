@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.table.internals.ElementCache
 import com.eignex.klause.factor.table.internals.ElementConstState
@@ -106,9 +107,9 @@ internal class ElementPropagator(
         if (positions.size == 0) return false
 
         var resExclude: LongArrayList? = null
-        // A wide result domain is never a full assignment; skip its per-value support scan (sound — the
-        // scan resumes once it narrows to enumerable, and every leaf has singleton domains).
-        if (state.intDomains[result].enumerable) {
+        // A result domain too large to walk skips its per-value support scan (sound — the scan resumes once
+        // it narrows below the cap, and every leaf has singleton domains).
+        if (state.intDomains[result].sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
             state.intDomains[result].forEach { rv ->
                 var supported = false
                 for (k in 0 until positions.size) {
@@ -133,9 +134,9 @@ internal class ElementPropagator(
                 val sel = arr[pos.toInt()].toInt()
                 val resD = state.intDomains[result]
                 var selExclude: LongArrayList? = null
-                // A wide selected-cell domain is never a full assignment; skip its per-value scan (sound —
-                // it resumes once the cell narrows to enumerable, and leaves have singleton domains).
-                if (state.intDomains[sel].enumerable) {
+                // A selected-cell domain too large to walk skips its per-value scan (sound — it resumes
+                // once the cell narrows below the cap, and leaves have singleton domains).
+                if (state.intDomains[sel].sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
                     state.intDomains[sel].forEach { v ->
                         if (v !in resD) (selExclude ?: LongArrayList().also { selExclude = it }).add(v)
                     }
@@ -153,10 +154,10 @@ internal class ElementPropagator(
 /** Whether [a] and [b] share at least one live value (hole-aware). */
 internal fun elementDomainsIntersect(a: IntDomain, b: IntDomain): Boolean {
     if (a.max < b.min || b.max < a.min) return false
-    // Walking the smaller domain to find a shared value is O(span) for a wide domain. When either is
-    // non-enumerable, report an intersection whenever the bounds overlap — a sound over-approximation
-    // (it can only leave an index unpruned, never prune a supported one).
-    if (!a.enumerable || !b.enumerable) return true
+    // Walking the smaller domain to find a shared value is O(span) for a large domain. When either is
+    // larger than the walk cap, report an intersection whenever the bounds overlap — a sound over-
+    // approximation (it can only leave an index unpruned, never prune a supported one).
+    if (a.sizeLong > DEFAULT_DOMAIN_WALK_CAP || b.sizeLong > DEFAULT_DOMAIN_WALK_CAP) return true
     val small = if (a.size <= b.size) a else b
     val large = if (a.size <= b.size) b else a
     var found = false

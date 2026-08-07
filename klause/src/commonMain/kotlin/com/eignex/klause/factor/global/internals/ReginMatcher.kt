@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global.internals
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
@@ -47,10 +48,10 @@ internal fun reginFilter(
     val n = filteredVars.size
     if (n < 2) return null
 
-    // A wide (>2^31-span) domain would make the GAC value graph below enumerate its span. Fall back to
+    // A domain too large to walk would make the GAC value graph below enumerate its span. Fall back to
     // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
     // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
-    if (filteredVars.any { !state.intDomains[it].enumerable }) {
+    if (filteredVars.any { state.intDomains[it].sizeLong > DEFAULT_DOMAIN_WALK_CAP }) {
         return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars) else null
     }
 

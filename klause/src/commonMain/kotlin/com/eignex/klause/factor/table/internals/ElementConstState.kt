@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.table.internals
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
@@ -102,16 +103,16 @@ internal class ElementConstState(
     private fun widened(idxDom: IntDomain, resDom: IntDomain): Boolean {
         val pi = domRefIdx.value
         if (pi != null && idxDom !== pi) {
-            // Rebuild (span-safe) whenever the current or previous domain is wide: neither widening
-            // detection nor the delta's removed-set walk can touch a >2^31-span domain.
-            if (!idxDom.enumerable || !pi.enumerable) return true
+            // Rebuild (span-safe) whenever the current or previous domain is too large to walk: neither
+            // widening detection nor the delta's removed-set walk can touch such a domain.
+            if (idxDom.sizeLong > DEFAULT_DOMAIN_WALK_CAP || pi.sizeLong > DEFAULT_DOMAIN_WALK_CAP) return true
             var w = false
             idxDom.forEach { v -> if (v !in pi) w = true }
             if (w) return true
         }
         val pr = domRefResult.value
         if (pr != null && resDom !== pr) {
-            if (!resDom.enumerable || !pr.enumerable) return true
+            if (resDom.sizeLong > DEFAULT_DOMAIN_WALK_CAP || pr.sizeLong > DEFAULT_DOMAIN_WALK_CAP) return true
             var w = false
             resDom.forEach { v -> if (v !in pr) w = true }
             if (w) return true
@@ -145,9 +146,9 @@ internal class ElementConstState(
             if (iv in idxDom && arr[pos] !in resDom) idxSeed.add(iv)
         }
         val resSeed = LongArrayList()
-        // A wide result domain is never a full assignment; skip its per-value support scan (sound — it
-        // resumes once result narrows to enumerable, and every leaf has singleton domains).
-        if (resDom.enumerable) {
+        // A result domain too large to walk skips its per-value support scan (sound — it resumes once
+        // result narrows below the cap, and every leaf has singleton domains).
+        if (resDom.sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
             resDom.forEach { rv ->
                 val id = idFor(rv)
                 if (id < 0 || counts[id] == 0) resSeed.add(rv)

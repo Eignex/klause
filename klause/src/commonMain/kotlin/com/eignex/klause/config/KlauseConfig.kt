@@ -63,6 +63,17 @@ const val DEFAULT_LP_CEILING_TABLEAU_CELLS: Long = 1L shl 26
  *  A pure storage/speed tradeoff — the domain semantics are identical either way. */
 const val DEFAULT_BITSET_THRESHOLD: Int = 4096
 
+/** Present-value count above which a propagator that would otherwise walk an integer domain value-by-value
+ *  (`forEach`) takes its span-independent fallback (bounds / cover / positions) instead. `enumerable`
+ *  (span < 2^31) only rules out the crash of materialising a wider-than-Int domain, not the seconds-long
+ *  walk of a domain narrowed just under it, so it is a crash guard, not a perf guard; this caps the walk.
+ *  Set to [DEFAULT_BITSET_THRESHOLD]: a domain no larger than this is bitset-stored (≤ 64 words, cheap to
+ *  iterate); a larger one both costs more per value and — as it shrinks across successive fires — risks an
+ *  O(cap²) re-walk, so it is served by the fallback. Above the cap a propagator may prune less (never
+ *  unsoundly) — a pure cost/strength gate, the verdict is unchanged, and it stays well above real domain
+ *  sizes so ordinary propagation is exact. */
+const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
+
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
  *

@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.table
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
@@ -277,10 +278,10 @@ internal class TablePropagator(
             if (!state.tightenIntMin(xs[col], minSup[col], ant)) return false
             if (!state.tightenIntMax(xs[col], maxSup[col], ant)) return false
             val sup = supported[col]
-            // A wide (>2^31-span) column keeps its bounds tightening above; skip the per-value support
-            // removal rather than walking the span. Sound: a wide domain is never a full assignment, and
-            // the removal runs once the column narrows to enumerable (every leaf is singleton domains).
-            if (state.intDomains[xs[col]].enumerable) {
+            // A column too large to walk keeps its bounds tightening above; skip the per-value support
+            // removal rather than walking the span. Sound: such a domain is never a full assignment, and
+            // the removal runs once the column narrows below the cap (every leaf is singleton domains).
+            if (state.intDomains[xs[col]].sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
                 val toRemove = LongArrayList()
                 state.intDomains[xs[col]].forEach { value ->
                     if (value !in sup) toRemove.add(value)

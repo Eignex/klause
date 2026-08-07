@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.config.DEFAULT_DOMAIN_WALK_CAP
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.global.internals.reginTarjanScc
@@ -45,10 +46,10 @@ internal class NValuePropagator(
         // |union of domains|, which ignores that there are only `xs.size` variables. When the count is
         // pinned to that maximum, a maximum matching is mandatory, so Régin value-pruning applies.
         if (mode != NValue.Mode.AtMost) {
-            // The matching build enumerates each variable's domain. On a wide (>2^31-span) domain fall
+            // The matching build enumerates each variable's domain. On a domain too large to walk fall
             // back to the trivial sound upper bound (distinct values ≤ number of variables) and skip the
             // GAC value pruning, which needs the matching.
-            if (xs.all { state.intDomains[it].enumerable }) {
+            if (xs.all { state.intDomains[it].sizeLong <= DEFAULT_DOMAIN_WALK_CAP }) {
                 val matching = buildMatching(state)
                 if (!state.tightenIntMax(n, matching.size.toLong(), ant)) return false
                 if (state.intDomains[n].min == matching.size.toLong()) {
@@ -69,12 +70,12 @@ internal class NValuePropagator(
 
     /** The original order-insensitive greedy bounds, retained for the optional-presence variant. */
     private fun propagateGreedy(state: PropagationState): Boolean {
-        // The union / disjoint-window scans below enumerate each variable's domain. On a wide
-        // (>2^31-span) domain use a bounds-only bound instead: the distinct count is at most the number
-        // of possibly-present variables (sound). No cheap sound lower bound here, so leave the minimum
-        // untightened (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
+        // The union / disjoint-window scans below enumerate each variable's domain. On a domain too large
+        // to walk use a bounds-only bound instead: the distinct count is at most the number of possibly-
+        // present variables (sound). No cheap sound lower bound here, so leave the minimum untightened
+        // (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
-        if (nonAbsent.any { !state.intDomains[xs[it]].enumerable }) {
+        if (nonAbsent.any { state.intDomains[xs[it]].sizeLong > DEFAULT_DOMAIN_WALK_CAP }) {
             val boundsAnt = collectHoleAndBoundAntecedents(state, xs)
             return when (mode) {
                 NValue.Mode.Eq, NValue.Mode.AtLeast -> state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
