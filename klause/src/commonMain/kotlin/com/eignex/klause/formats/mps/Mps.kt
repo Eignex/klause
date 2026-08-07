@@ -26,6 +26,15 @@ data class MpsVar(
     val upper: Double?,
 )
 
+/** An `INDICATORS` entry on a row: the row is enforced only when column [column] takes value 1
+ *  ([whenOne]) or 0, and is relaxed otherwise. */
+data class MpsIndicator(
+    /** Indicator column index into [MpsModel.variables]. */
+    val column: Int,
+    /** True when the row is enforced at `column == 1`, false when it is enforced at `column == 0`. */
+    val whenOne: Boolean,
+)
+
 /**
  * A constraint row as a two-sided linear bound `lower ≤ Σ coeffs(i)·var(indices(i)) ≤ upper`. The MPS
  * row type and any `RANGES` entry are resolved into [lower]/[upper] (`null` = the side is open): an
@@ -43,6 +52,8 @@ data class MpsConstraint(
     val lower: Double?,
     /** Upper bound of the row's linear form; `null` = open above. */
     val upper: Double?,
+    /** `INDICATORS` entry gating the row, or `null` when the row always holds. */
+    val indicator: MpsIndicator? = null,
 )
 
 /** The objective (the first free `N` row): a sparse linear form plus a [constant] (from an `RHS`
@@ -75,7 +86,7 @@ data class MpsModel(
 /**
  * Parser for the MPS (Mathematical Programming System) MIP/LP format. Reads the standard sections —
  * `NAME`, `OBJSENSE`, `ROWS`, `COLUMNS` (with `MARKER`/`INTORG`/`INTEND` integer sections), `RHS`,
- * `RANGES`, `BOUNDS` — into an [MpsModel]. Whitespace ("free") tokenisation is used, which handles the
+ * `RANGES`, `BOUNDS`, `INDICATORS` — into an [MpsModel]. Whitespace ("free") tokenisation is used, which handles the
  * common case; fixed-column files whose names embed spaces are not supported.
  *
  * Bound conventions: a variable defaults to `[0, +∞)`. `RANGES` and `RHS` follow the standard sign
@@ -85,7 +96,7 @@ data class MpsModel(
  */
 object Mps {
 
-    private enum class Section { NONE, NAME, OBJSENSE, ROWS, COLUMNS, RHS, RANGES, BOUNDS, ENDATA }
+    private enum class Section { NONE, NAME, OBJSENSE, ROWS, COLUMNS, RHS, RANGES, BOUNDS, INDICATORS, ENDATA }
 
     private enum class RowType { OBJECTIVE, LE, GE, EQ, FREE }
 
@@ -94,6 +105,7 @@ object Mps {
         val coeffs = LinkedHashMap<Int, Double>()
         var rhs = 0.0
         var range: Double? = null
+        var indicator: MpsIndicator? = null
     }
 
     private class Var(val name: String, val index: Int) {
@@ -149,6 +161,8 @@ object Mps {
 
                 Section.BOUNDS -> readBounds(fields, varByName)
 
+                Section.INDICATORS -> readIndicators(fields, rowByName, varByName)
+
                 else -> Unit // NAME data / ENDATA / NONE
             }
         }
@@ -165,6 +179,7 @@ object Mps {
         "RHS" -> Section.RHS
         "RANGES" -> Section.RANGES
         "BOUNDS" -> Section.BOUNDS
+        "INDICATORS" -> Section.INDICATORS
         "ENDATA" -> Section.ENDATA
         else -> throw MpsFormatException("unknown section header '${fields[0]}'")
     }
@@ -252,6 +267,24 @@ object Mps {
             apply(row, parseNum(value, "$section value"))
             i += 2
         }
+    }
+
+    /** An INDICATORS data line: `IF <row> <col> <0|1>`, reading as `col == value ⇒ row holds` — the row
+     *  is relaxed at the other value. The leading `IF` keyword is optional (some writers omit it). */
+    private fun readIndicators(fields: List<String>, rowByName: Map<String, Row>, varByName: Map<String, Var>) {
+        val rest = if (fields.isNotEmpty() && fields[0].equals("IF", true)) fields.drop(1) else fields
+        if (rest.size < 3) {
+            throw MpsFormatException("INDICATORS line needs a row, a column and a value: '${fields.joinToString(" ")}'")
+        }
+        val row = rowByName[rest[0]] ?: throw MpsFormatException("INDICATORS references unknown row '${rest[0]}'")
+        val v = varByName[rest[1]] ?: throw MpsFormatException("INDICATORS references unknown column '${rest[1]}'")
+        val value = parseNum(rest[2], "INDICATORS value")
+        val whenOne = when (value) {
+            1.0 -> true
+            0.0 -> false
+            else -> throw MpsFormatException("INDICATORS value must be 0 or 1, got '${rest[2]}'")
+        }
+        row.indicator = MpsIndicator(v.index, whenOne)
     }
 
     /** A BOUNDS data line: `<type> [<setname>] <col> [<val>]`. */
@@ -349,7 +382,7 @@ object Mps {
                 val indices = row.coeffs.keys.toIntArray()
                 val coeffs = DoubleArray(indices.size) { row.coeffs.getValue(indices[it]) }
                 val (lo, hi) = bounds(row)
-                MpsConstraint(row.name, indices, coeffs, lo, hi)
+                MpsConstraint(row.name, indices, coeffs, lo, hi, row.indicator)
             }
         val objective = if (objectiveRow == null) {
             MpsObjective("", IntArray(0), DoubleArray(0), 0.0)

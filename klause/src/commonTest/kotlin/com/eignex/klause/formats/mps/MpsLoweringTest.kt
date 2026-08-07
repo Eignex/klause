@@ -1,12 +1,18 @@
 package com.eignex.klause.formats.mps
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.lp.BoundedIntDomains
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class MpsLoweringTest {
@@ -181,6 +187,120 @@ class MpsLoweringTest {
         )
         // The `0 <= 0` placeholder row is redundant and dropped; only the real row lowers to a factor.
         assertEquals(1, m.toProblem().problem.factors.size)
+    }
+
+    // b (column 0) is binary and x (column 1) ranges over [0, 10]; the gated row `x >= 20` is infeasible on
+    // its own, so whether it is enforced or relaxed is directly observable as UNSAT vs SAT. [fixB] pins b.
+    private fun indicatedModel(fixB: Double, whenOne: Boolean, indicatorColumn: MpsVar) = MpsModel(
+        "m",
+        ObjectiveSense.MINIMIZE,
+        noObjective,
+        listOf(indicatorColumn, MpsVar("x", integer = true, lower = 0.0, upper = 10.0)),
+        listOf(
+            MpsConstraint("FIX", intArrayOf(0), doubleArrayOf(1.0), lower = fixB, upper = fixB),
+            MpsConstraint(
+                "GATED",
+                intArrayOf(1),
+                doubleArrayOf(1.0),
+                lower = 20.0,
+                upper = null,
+                indicator = MpsIndicator(column = 0, whenOne = whenOne),
+            ),
+        ),
+    )
+
+    private val binaryColumn = MpsVar("b", integer = true, lower = 0.0, upper = 1.0)
+
+    private fun MpsCompiled.solve(): SolveResult = BacktrackSolver(problem.bake()).solve(BacktrackParams())
+
+    @Test
+    fun `relaxes an indicated row when the indicator column takes the other value`() {
+        val compiled = indicatedModel(fixB = 0.0, whenOne = true, indicatorColumn = binaryColumn).toProblem()
+
+        assertIs<SolveResult.Sat>(compiled.solve())
+    }
+
+    @Test
+    fun `enforces an indicated row when the indicator column takes the trigger value`() {
+        val compiled = indicatedModel(fixB = 1.0, whenOne = true, indicatorColumn = binaryColumn).toProblem()
+
+        assertIs<SolveResult.Unsat>(compiled.solve())
+    }
+
+    @Test
+    fun `enforces an indicated row triggered at zero only when the column is zero`() {
+        val onZero = indicatedModel(fixB = 0.0, whenOne = false, indicatorColumn = binaryColumn).toProblem()
+        val onOne = indicatedModel(fixB = 1.0, whenOne = false, indicatorColumn = binaryColumn).toProblem()
+
+        assertIs<SolveResult.Unsat>(onZero.solve())
+        assertIs<SolveResult.Sat>(onOne.solve())
+    }
+
+    @Test
+    fun `lowers an indicated row over a continuous column to a reified real atom`() {
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            noObjective,
+            listOf(
+                binaryColumn,
+                MpsVar("y", integer = true, lower = 0.0, upper = 10.0),
+                MpsVar("x", integer = false, lower = 0.0, upper = 10.0),
+            ),
+            listOf(
+                MpsConstraint(
+                    "GATED",
+                    intArrayOf(1, 2),
+                    doubleArrayOf(1.0, 1.5),
+                    lower = null,
+                    upper = 4.0,
+                    indicator = MpsIndicator(column = 0, whenOne = true),
+                ),
+            ),
+        )
+
+        val factors = m.toProblem().problem.factors
+
+        assertEquals(1, factors.count { it is ReifiedRealLinear })
+        assertTrue(factors.none { it is Linear }, "the gated row must not be posted unconditionally")
+    }
+
+    @Test
+    fun `gates on an integer indicator column whose declared bounds are wider than binary`() {
+        // An integer column left without an explicit binary bound still gates on the equality test,
+        // rather than costing the whole instance.
+        val wide = MpsVar("b", integer = true, lower = 0.0, upper = 5.0)
+
+        val triggered = indicatedModel(fixB = 1.0, whenOne = true, indicatorColumn = wide).toProblem()
+        val relaxed = indicatedModel(fixB = 0.0, whenOne = true, indicatorColumn = wide).toProblem()
+
+        assertIs<SolveResult.Unsat>(triggered.solve())
+        assertIs<SolveResult.Sat>(relaxed.solve())
+    }
+
+    @Test
+    fun `rejects an indicated row whose indicator column is continuous`() {
+        val real = MpsVar("b", integer = false, lower = 0.0, upper = 1.0)
+        val m = indicatedModel(fixB = 1.0, whenOne = true, indicatorColumn = real)
+
+        assertFailsWith<MpsFormatException> { m.toProblem() }
+    }
+
+    @Test
+    fun `keeps a model without indicators free of Boolean variables`() {
+        val row = MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 5.0)
+        val m = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
+            listOf(MpsVar("x", integer = true, lower = 0.0, upper = 10.0)),
+            listOf(row),
+        )
+
+        val compiled = m.toProblem()
+
+        assertEquals(0, compiled.problem.numBoolVars)
+        assertTrue(compiled.objective?.boolWeights?.isEmpty() == true)
     }
 
     @Test
