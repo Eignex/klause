@@ -16,8 +16,17 @@ class WideLinearLpTest {
     private class RecordingBuilder(private val declared: Map<Int, IntDomain>) : RelaxationBuilder {
         val realRows = mutableListOf<WideRow>()
 
+        // Aux columns get fresh ids above the int-var range; their bounds are recorded by id.
+        private var nextAux = 1000
+        val auxBounds = mutableMapOf<Int, Pair<Long, Long>>()
+
         override fun intColumn(intVar: Int): Int = intVar
         override fun declaredDomain(intVar: Int): IntDomain = declared.getValue(intVar)
+        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int {
+            val c = nextAux++
+            auxBounds[c] = lo to hi
+            return c
+        }
 
         override fun realRow(
             columns: IntArray,
@@ -47,7 +56,6 @@ class WideLinearLpTest {
         ) = error("unused")
         override fun hullEnabled(): Boolean = true
         override fun boolColumn(boolVar: Int): Int = error("unused")
-        override fun auxColumn(lo: Long, hi: Long, presence: LongArray?): Int = error("unused")
         override fun liveDomain(intVar: Int): IntDomain = error("unused")
         override fun row(columns: IntArray, coeffs: LongArray, op: LinearOp, rhs: Long, contribution: Contribution) =
             error("unused")
@@ -78,11 +86,23 @@ class WideLinearLpTest {
     }
 
     @Test
-    fun `a wide row over a sign-straddling variable is left out of the LP`() {
+    fun `a wide row over a sign-straddling variable splits into nonnegative parts`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(-5, 5)))
         row.linearize(b, factorId = 0)
-        assertEquals(0, b.realRows.size, "a straddling variable cannot be single-rounded, so no LP row is emitted")
+        // A link row x = x⁺ − x⁻ and one outer ≤ row over the two nonnegative split columns.
+        assertEquals(2, b.realRows.size)
+        val link = b.realRows.first { it.op == LinearOp.EQ }
+        assertEquals(listOf(1.0, -1.0, 1.0), link.coeffs, "x − x⁺ + x⁻ = 0")
+        assertEquals(0.0, link.rhs)
+        // Split columns are nonnegative with bounds [0, max] and [0, −min].
+        assertEquals(setOf(0L to 5L), b.auxBounds.values.toSet())
+        val outer = b.realRows.first { it.op == LinearOp.LE }
+        assertEquals(2, outer.cols.size, "the straddling term becomes two nonnegative terms")
+        // x⁺ coefficient rounds down (≤ w); x⁻ coefficient is −w rounded down (so its negation ≥ w).
+        assertTrue(BigInteger.tryFromDouble(outer.coeffs[0], exactRequired = false) <= w, "x⁺ coeff rounded down")
+        assertTrue(BigInteger.tryFromDouble(-outer.coeffs[1], exactRequired = false) >= w, "x⁻ coeff rounded up")
+        assertTrue(BigInteger.tryFromDouble(outer.rhs, exactRequired = false) >= w, "bound rounded up")
     }
 
     @Test

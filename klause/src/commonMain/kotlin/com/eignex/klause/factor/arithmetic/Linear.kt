@@ -402,39 +402,73 @@ class Linear private constructor(
      * tightens the rigorous float objective bound). A `≠` row has no LP relaxation, so nothing is emitted.
      */
     private fun emitWideOuterRows(builder: RelaxationBuilder) {
-        when (op) {
-            LinearOp.LE -> emitWideOuterRow(builder, ge = false)
-
-            LinearOp.EQ -> {
-                emitWideOuterRow(builder, ge = false)
-                emitWideOuterRow(builder, ge = true)
-            }
-
-            // GE is canonicalised to LE at construction; NE has no single LP row.
-            else -> Unit
+        // GE is canonicalised to LE at construction; NE has no single LP row.
+        if (op != LinearOp.LE && op != LinearOp.EQ) return
+        // A sign-straddling variable cannot be single-rounded to weaken both signs, so split it into
+        // nonnegative parts `x = x⁺ − x⁻` (each roundable like a nonnegative variable). Decline only the
+        // pathological var whose negative extent `−min` overflows Long — then leave the whole row CP-only.
+        for (i in vars.indices) {
+            val dom = builder.declaredDomain(vars[i])
+            if (dom.min < 0L && dom.max > 0L && dom.min == Long.MIN_VALUE) return
         }
+        val plusCol = IntArray(vars.size) { -1 }
+        val minusCol = IntArray(vars.size) { -1 }
+        for (i in vars.indices) {
+            val dom = builder.declaredDomain(vars[i])
+            if (dom.min < 0L && dom.max > 0L) {
+                val cp = builder.auxColumn(0L, dom.max)
+                val cm = builder.auxColumn(0L, -dom.min)
+                // Exact link `x = x⁺ − x⁻` ties the nonnegative parts to the variable's own column; it never
+                // rounds, so it cannot cut a feasible point (the canonical split `x⁺=max(x,0)` satisfies it).
+                builder.realRow(
+                    intArrayOf(builder.intColumn(vars[i]), cp, cm),
+                    doubleArrayOf(1.0, -1.0, 1.0),
+                    LinearOp.EQ,
+                    0.0,
+                    strict = false,
+                )
+                plusCol[i] = cp
+                minusCol[i] = cm
+            }
+        }
+        emitWideOuterRow(builder, ge = false, plusCol, minusCol)
+        if (op == LinearOp.EQ) emitWideOuterRow(builder, ge = true, plusCol, minusCol)
     }
 
     /**
      * One outer-relaxation row for the wide constraint, oriented `≥` when [ge] else `≤`. Round each
      * coefficient in the direction that weakens the row given the variable's declared sign: for `≤`, a
      * sign-nonnegative variable rounds its coefficient down and a nonpositive one rounds up (the bound
-     * rounds up); `≥` is the mirror (bound rounds down). A variable whose declared domain straddles zero
-     * cannot be single-rounded to weaken both signs, so the whole row is left CP-only (not emitted) rather
-     * than mis-relaxed. Uses the *declared* domain: the coefficient is fixed, so the row must stay a valid
-     * relaxation at every node, not only the current one.
+     * rounds up); `≥` is the mirror (bound rounds down). A sign-straddling variable is emitted through its
+     * split columns ([plusCol]/[minusCol], both nonnegative): `x⁺` carries the coefficient and `x⁻` its
+     * negation, each rounded like a nonnegative term. Uses the *declared* domain: the coefficient is fixed,
+     * so the row must stay a valid relaxation at every node, not only the current one.
      */
-    private fun emitWideOuterRow(builder: RelaxationBuilder, ge: Boolean) {
+    private fun emitWideOuterRow(builder: RelaxationBuilder, ge: Boolean, plusCol: IntArray, minusCol: IntArray) {
         val wc = checkNotNull(wideCoeffs)
-        val cols = IntArray(vars.size)
-        val dcoeffs = DoubleArray(vars.size)
+        var straddle = 0
+        for (i in vars.indices) if (plusCol[i] >= 0) straddle++
+        val cols = IntArray(vars.size + straddle)
+        val dcoeffs = DoubleArray(cols.size)
+        var w = 0
         for (i in vars.indices) {
-            val dom = builder.declaredDomain(vars[i])
-            if (dom.min < 0L && dom.max > 0L) return // sign-straddling: leave the row CP-only
-            // floor for (≤ & nonneg) or (≥ & nonpositive); ceil otherwise.
-            val roundDown = (dom.min >= 0L) != ge
-            cols[i] = builder.intColumn(vars[i])
-            dcoeffs[i] = if (roundDown) floorToDouble(wc[i]) else ceilToDouble(wc[i])
+            if (plusCol[i] >= 0) {
+                // x⁺ (nonnegative, coefficient wc) and x⁻ (nonnegative, coefficient −wc), each rounded to
+                // weaken: floor a nonnegative term for `≤`, ceil for `≥`.
+                cols[w] = plusCol[i]
+                dcoeffs[w] = if (ge) ceilToDouble(wc[i]) else floorToDouble(wc[i])
+                w++
+                cols[w] = minusCol[i]
+                dcoeffs[w] = if (ge) -floorToDouble(wc[i]) else -ceilToDouble(wc[i])
+                w++
+            } else {
+                val dom = builder.declaredDomain(vars[i])
+                // floor for (≤ & nonneg) or (≥ & nonpositive); ceil otherwise.
+                val roundDown = (dom.min >= 0L) != ge
+                cols[w] = builder.intColumn(vars[i])
+                dcoeffs[w] = if (roundDown) floorToDouble(wc[i]) else ceilToDouble(wc[i])
+                w++
+            }
         }
         val rhs = if (ge) floorToDouble(checkNotNull(wideBound)) else ceilToDouble(checkNotNull(wideBound))
         builder.realRow(cols, dcoeffs, if (ge) LinearOp.GE else LinearOp.LE, rhs, strict = false)
