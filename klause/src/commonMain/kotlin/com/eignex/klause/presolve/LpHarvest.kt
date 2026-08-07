@@ -65,8 +65,12 @@ fun lpRootInfeasible(
     objective: LinearObjective,
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
-): Boolean = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-root-feasibility"))
-    .rootLpInfeasibleNoBake(cancellation)
+): Boolean = LpEngine(
+    problem,
+    objective,
+    LpParams(lpPlan = plan, cancellation = cancellation),
+    SolveStatsSink(backend = "lp-root-feasibility"),
+).rootLpInfeasibleNoBake(cancellation)
 
 /** [problem] with each integer variable's domain tightened by the no-bake root-LP OBBT
  *  ([LpEngine.rootLpBoundsNoBake]): the pre-bake bound-tightening a presolve pipeline runs on a wide model
@@ -79,7 +83,12 @@ fun lpRootBounds(
     plan: LpPlan,
     cancellation: Cancellation = Cancellation.Never,
 ): Problem {
-    val engine = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-obbt"))
+    val engine = LpEngine(
+        problem,
+        objective,
+        LpParams(lpPlan = plan, cancellation = cancellation),
+        SolveStatsSink(backend = "lp-obbt"),
+    )
     val shaved = engine.rootLpBoundsNoBake(cancellation)
     if (shaved.isEmpty()) return problem
     val domains = problem.intDomains.copyOf()
@@ -102,7 +111,15 @@ fun lpHarvestReporting(
     bakeConfig: BakeConfig = BakeConfig.NONE,
     cancellation: Cancellation = Cancellation.Never,
 ): LpHarvestResult {
-    val engine = LpEngine(problem, objective, LpParams(lpPlan = plan), SolveStatsSink(backend = "lp-harvest"))
+    // The token must reach the simplex itself, not just the probe loops below: one primal phase-1 on a
+    // large relaxation runs far past the presolve budget, and [RevisedSimplex] polls only what [LpParams]
+    // carries.
+    val engine = LpEngine(
+        problem,
+        objective,
+        LpParams(lpPlan = plan, cancellation = cancellation),
+        SolveStatsSink(backend = "lp-harvest"),
+    )
     if (engine.lpRelaxer == null) return LpHarvestResult(problem, LpHarvestReport())
     // A certified-infeasible root relaxation proves the whole problem has no solution; fold it in as an
     // explicit contradiction so the problem bakes Unsat and every backend short-circuits.

@@ -274,27 +274,44 @@ class LpHarvestTest {
         assertTrue(!report.skipped && report.relaxationNnz > 0, "the built relaxation's size must be reported")
     }
 
+    /** Pairwise covers summing past the total: LP-infeasible, but no single row's bounds contradict, so
+     *  only the relaxation (never bound propagation) reaches the verdict. */
+    private fun coverSystem(): Problem = Problem(
+        0,
+        3,
+        arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
+        arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
+        ),
+    )
+
     @Test
     fun `harvest report flags a root-infeasible relaxation`() {
-        // The LP-infeasible cover system: the report must record that the LP certified root infeasibility.
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 10), IntDomain(0, 10), IntDomain(0, 10)),
-            arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 4),
-            ),
-        )
         val report = lpHarvestReporting(
-            problem,
+            coverSystem(),
             LinearObjective(),
             shavingParams,
             cancellation = Cancellation.Never,
         ).report
         assertTrue(report.rootInfeasible, "root-LP infeasibility must be recorded in the report")
+    }
+
+    @Test
+    fun `harvest yields to a budget that expires inside the simplex`() {
+        // The budget has to reach the simplex, not just the probe loops around it: one root solve on a
+        // large relaxation is what overruns the presolve budget. A token that survives the outer guard
+        // and then fires must stop the very solve that would otherwise certify infeasibility here.
+        val problem = coverSystem()
+        var polls = 0
+        val spent = Cancellation { polls++ > 0 }
+
+        val result = lpHarvestReporting(problem, LinearObjective(), shavingParams, cancellation = spent)
+
+        assertFalse(result.report.rootInfeasible, "an expired budget must stop the root solve short of a verdict")
+        assertSame(problem, result.problem, "a budget-stopped harvest transforms nothing")
     }
 
     @Test

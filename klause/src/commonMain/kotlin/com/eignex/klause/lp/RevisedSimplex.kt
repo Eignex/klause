@@ -261,8 +261,9 @@ internal class RevisedSimplex(
         while (iter++ < maxIter) {
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
             // loop on a large model would still blow the wall-clock limit (#574). On cancellation give
-            // up (null) — the basis is only a heuristic, so this is sound.
-            if (iter % CANCEL_POLL == 0 && cancellation()) return null
+            // up (null) — the basis is only a heuristic, so this is sound. Phased off the first
+            // iteration so an already-spent budget never starts a solve at all.
+            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return null
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
             for (i in 0 until m) rhsAdj[i] = model.rhsD(i)
             for (j in 0 until numVars) {
@@ -596,7 +597,7 @@ internal class RevisedSimplex(
         val maxIter = 50 * (m + numVars) + 200
         var iter = 0
         while (iter++ < maxIter) {
-            if (iter % CANCEL_POLL == 0 && cancellation()) return null
+            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return null
             var w = 0.0
             for (i in 0 until m) {
                 val v = basicVar[i]
@@ -725,7 +726,7 @@ internal class RevisedSimplex(
         var iter = 0
         var degenerate = 0 // consecutive zero-length pivots; past [blandStall] switch to Bland's rule
         while (iter++ < maxIter) {
-            if (iter % CANCEL_POLL == 0 && cancellation()) return null
+            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return null
             // Bland's rule once degenerate pivots pile up: lowest-index entering, lowest-variable leaving
             // tie-break. Guarantees termination on a degenerate LP that the Dantzig rule could cycle on.
             val bland = degenerate >= blandStall
