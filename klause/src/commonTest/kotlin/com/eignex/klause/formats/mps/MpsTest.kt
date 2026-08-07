@@ -148,6 +148,48 @@ class MpsTest {
     }
 
     @Test
+    fun `parses an INDICATORS entry gating a row on a binary column`() {
+        val text = """
+            ROWS
+             N  COST
+             L  C1
+             G  C2
+            COLUMNS
+                X1        COST           1.0   C1             1.0
+                X1        C2             1.0
+                B1        COST           0.0
+                B2        COST           0.0
+            BOUNDS
+             BV BND       B1
+             BV BND       B2
+            INDICATORS
+             IF C1 B1 1
+             IF C2 B2 0
+            ENDATA
+        """.trimIndent()
+
+        val byName = Mps.parse(text).constraints.associateBy { it.name }
+
+        assertEquals(MpsIndicator(column = 1, whenOne = true), byName.getValue("C1").indicator)
+        assertEquals(MpsIndicator(column = 2, whenOne = false), byName.getValue("C2").indicator)
+    }
+
+    @Test
+    fun `rejects an INDICATORS entry naming an unknown row or column`() {
+        val head = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1.0 C1 1.0\n B1 COST 0.0\nBOUNDS\n BV BND B1\n"
+        for (line in listOf("IF NOSUCHROW B1 1", "IF C1 NOSUCHCOL 1")) {
+            assertFailsWith<MpsFormatException>(line) { Mps.parse(head + "INDICATORS\n $line\nENDATA") }
+        }
+    }
+
+    @Test
+    fun `rejects an INDICATORS entry whose trigger value is neither zero nor one`() {
+        val text = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1.0 C1 1.0\n B1 COST 0.0\n" +
+            "BOUNDS\n BV BND B1\nINDICATORS\n IF C1 B1 2\nENDATA"
+        assertFailsWith<MpsFormatException> { Mps.parse(text) }
+    }
+
+    @Test
     fun `rejects an unknown row type`() {
         val text = "ROWS\n X BADROW\nENDATA"
         assertFailsWith<MpsFormatException> { Mps.parse(text) }
