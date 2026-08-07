@@ -91,6 +91,24 @@ class MpsTest {
     }
 
     @Test
+    fun `resolves a value-less bounds type that carries a redundant trailing value`() {
+        // Writers emit lines like `BV BOUND1 C_000047 1.0` where the value-less type still carries a
+        // value. The column is the named one, never the stray trailing number.
+        val cases = listOf(
+            Triple("BV BND X1 1.0", 0.0, 1.0),
+            Triple("FR BND X1 0.0", null, null),
+            Triple("MI BND X1 0.0", null, null),
+            Triple("PL BND X1 1e30", 0.0, null),
+        )
+        for ((line, lo, hi) in cases) {
+            val text = "ROWS\n N COST\nCOLUMNS\n X1 COST 1.0\nBOUNDS\n $line\nENDATA"
+            val v = Mps.parse(text).variables.single()
+            assertEquals(lo, v.lower, "lower for '$line'")
+            assertEquals(hi, v.upper, "upper for '$line'")
+        }
+    }
+
+    @Test
     fun `resolves ranges into two-sided bounds`() {
         // A range R turns a one-sided row into an interval per the MPS sign rules.
         val cases = listOf(
