@@ -2,12 +2,16 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.LinRelation
 import com.eignex.klause.formats.addExact
 import com.eignex.klause.formats.constRelationHolds
+import com.eignex.klause.formats.intCombDiff
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
+import com.eignex.klause.formats.wideConstHolds
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
 

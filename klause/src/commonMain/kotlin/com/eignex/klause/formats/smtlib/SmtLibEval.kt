@@ -4,7 +4,14 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.WideLinComb
+import com.eignex.klause.formats.constProduct
+import com.eignex.klause.formats.isConstant
+import com.eignex.klause.formats.scaleByConst
+import com.eignex.klause.formats.scaleIntComb
+import com.eignex.klause.formats.sumIntCombs
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
