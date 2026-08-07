@@ -9,16 +9,23 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.LinRelation
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.formats.constProduct
 import com.eignex.klause.formats.constRelationHolds
-import com.eignex.klause.formats.linCombDiff
-import com.eignex.klause.formats.mulExact
+import com.eignex.klause.formats.intCombDiff
+import com.eignex.klause.formats.isConstant
 import com.eignex.klause.formats.reifyLinear
+import com.eignex.klause.formats.scaleByConst
+import com.eignex.klause.formats.scaleIntComb
+import com.eignex.klause.formats.sumIntCombs
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinIff
 import com.eignex.klause.formats.tseitinOr
+import com.eignex.klause.formats.wideConstHolds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -364,24 +371,39 @@ object Xcsp3 {
 
                 node is FExpr.Call && node.fn in REL -> {
                     val r = relationParts(node)
-                    if (r.vars.isEmpty()) {
+                    val rel = r.rel
+                    val noVars = when (rel) {
+                        is LinRelation.LongRel -> rel.vars.isEmpty()
+                        is LinRelation.WideRel -> rel.vars.isEmpty()
+                    }
+                    if (noVars) {
                         // Constant relation: a fixed 0/1 term.
-                        val v = if (constRelationHolds(r.op, r.bound)) 1L else 0L
+                        val holds = when (rel) {
+                            is LinRelation.LongRel -> constRelationHolds(r.op, rel.bound)
+                            is LinRelation.WideRel -> wideConstHolds(r.op, rel.bound)
+                        }
+                        val v = if (holds) 1L else 0L
                         newAuxVar(v, v)
                     } else {
-                        // Reify the relation onto a fresh bool, then channel it to a 0/1 int var.
-                        val aux = newBool()
-                        factors.add(ReifiedLinear(aux, r.coeffs, r.vars, r.op, r.bound))
+                        // Reify the relation (wide or narrow) onto a fresh bool, then channel it to a 0/1 int.
+                        val lit = reifyRelationFactor(r)
                         val ch = newAuxVar(0L, 1L)
-                        factors.add(ReifiedLinear(aux, intArrayOf(1), intArrayOf(ch), LinearOp.EQ, 1))
+                        factors.add(
+                            ReifiedLinear(
+                                Lit.variable(lit), intArrayOf(1), intArrayOf(ch),
+                                LinearOp.EQ, if (Lit.isPositive(lit)) 1 else 0,
+                            ),
+                        )
                         ch
                     }
                 }
 
                 else -> {
                     val lin = linear(node)
-                    if (lin.coeffs.isEmpty()) {
-                        newAuxVar(lin.constant, lin.constant)
+                    val narrow = (lin as? IntComb.Narrow)?.lin
+                        ?: throw UnsupportedXcsp3Exception("cannot use an over-64-bit term as a variable")
+                    if (narrow.coeffs.isEmpty()) {
+                        newAuxVar(narrow.constant, narrow.constant)
                     } else {
                         materializeVar(lin)
                     }
@@ -424,7 +446,7 @@ object Xcsp3 {
                     val m = if (coeffs.size == 1 && coeffs[0] == 1) {
                         vars[0]
                     } else {
-                        materializeVar(LinComb(linMap(coeffs, vars), 0L))
+                        materializeVar(IntComb.Narrow(LinComb(linMap(coeffs, vars), 0L)))
                     }
                     val members = parseSetMembers(operand.removeSurrounding("{", "}"))
                     factors.add(
@@ -503,10 +525,27 @@ object Xcsp3 {
         /** Post a lowered relation as a top-level factor: a [Linear] when it carries variable terms, else a
          *  contradiction clause when the constant relation `0 op bound` is false (a true one is dropped). */
         private fun postRel(r: RelParts) {
-            when {
-                r.vars.isNotEmpty() -> factors.add(Linear(r.coeffs, r.vars, r.op, r.bound))
-                !constRelationHolds(r.op, r.bound) -> factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
+            when (val rel = r.rel) {
+                is LinRelation.LongRel ->
+                    if (rel.vars.isNotEmpty()) {
+                        factors.add(Linear(rel.coeffs, rel.vars, r.op, rel.bound))
+                    } else if (!constRelationHolds(r.op, rel.bound)) {
+                        factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
+                    }
+
+                is LinRelation.WideRel ->
+                    if (rel.vars.isNotEmpty()) {
+                        factors.add(Linear(rel.vars, rel.coeffs, r.op, rel.bound))
+                    } else if (!wideConstHolds(r.op, rel.bound)) {
+                        factors.add(Clause(intArrayOf(Lit.negate(trueLit()))))
+                    }
             }
+        }
+
+        /** The reifying literal for a lowered relation, wide or narrow. */
+        private fun reifyRelationFactor(r: RelParts): Int = when (val rel = r.rel) {
+            is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, r.op, rel.bound)
+            is LinRelation.WideRel -> reifyLinear(rel.coeffs, rel.vars, r.op, rel.bound)
         }
 
         /**
@@ -562,11 +601,13 @@ object Xcsp3 {
          *  coefficient is folded by flipping the operator and negating the bound), or `null`. */
         private fun singleVarComparison(node: FExpr.Call): Triple<Int, LinearOp, Long>? {
             val r = relationParts(node)
-            if (r.vars.size != 1) return null
-            val bound = r.bound.toLong()
-            return when (r.coeffs[0]) {
-                1 -> Triple(r.vars[0], r.op, bound)
-                -1 -> Triple(r.vars[0], r.op.flipSign(), -bound)
+            // A wide relation is not a single-variable unit comparison we can fold to a ComparisonClause;
+            // decline (the caller keeps the reify path), which stays sound.
+            val rel = r.rel as? LinRelation.LongRel ?: return null
+            if (rel.vars.size != 1) return null
+            return when (rel.coeffs[0]) {
+                1L -> Triple(rel.vars[0], r.op, rel.bound)
+                -1L -> Triple(rel.vars[0], r.op.flipSign(), -rel.bound)
                 else -> null
             }
         }
@@ -646,13 +687,11 @@ object Xcsp3 {
             if (node.fn == "eq" && node.args.size > 2) {
                 return tseitinAnd(
                     (0 until node.args.size - 1).map {
-                        val r = relationParts(node.args[it], node.args[it + 1], LinearOp.EQ, 0)
-                        reifyLinear(r.coeffs, r.vars, r.op, r.bound)
+                        reifyRelationFactor(relationParts(node.args[it], node.args[it + 1], LinearOp.EQ, 0))
                     },
                 )
             }
-            val r = relationParts(node)
-            return reifyLinear(r.coeffs, r.vars, r.op, r.bound)
+            return reifyRelationFactor(relationParts(node))
         }
 
         /** Map XCSP3 relation names to linear operators and strictness deltas. */
@@ -666,7 +705,7 @@ object Xcsp3 {
             else -> null
         }
 
-        internal class RelParts(val coeffs: IntArray, val vars: IntArray, val op: LinearOp, val bound: Int)
+        internal class RelParts(val rel: LinRelation, val op: LinearOp)
 
         /** Lower `rel(lhs, rhs)` to the coalesced linear components. When both sides share the same
          *  variable terms they cancel to an empty var list, leaving the constant relation `0 op bound`. */
@@ -677,21 +716,12 @@ object Xcsp3 {
             return relationParts(node.args[0], node.args[1], op, delta)
         }
 
-        // Translate a 64-bit overflow from folding an XCSP3 arithmetic expression into a clean
-        // UnsupportedXcsp3Exception — the term exceeds what the solver's integer range represents.
-        private inline fun <T> checkedFold(block: () -> T): T = try {
-            block()
-        } catch (_: ArithmeticException) {
-            throw UnsupportedXcsp3Exception("integer overflow while folding an arithmetic expression")
-        }
-
-        /** Lower `lhs op rhs` (with strictness [delta]) to coalesced linear components. When both sides
-         *  share the same variable terms they cancel to an empty var list, leaving the constant `0 op bound`. */
-        internal fun relationParts(lhs: FExpr, rhs: FExpr, op: LinearOp, delta: Int): RelParts {
-            val (vars, coeffs, bound) = checkedFold { linCombDiff(linear(lhs), linear(rhs), delta.toLong()) }
-            // XCSP3 coefficients/bounds originate from Int-valued FExpr numerals, so they fit Int.
-            return RelParts(IntArray(coeffs.size) { coeffs[it].toInt() }, vars, op, bound.toInt())
-        }
+        /** Lower `lhs op rhs` (with strictness [delta]) to a [LinRelation] over the folded difference of the
+         *  two sides — a [LinRelation.WideRel] when a coefficient or bound overflows the 64-bit range, else a
+         *  [LinRelation.LongRel]. When both sides share the same variable terms they cancel to an empty var
+         *  list, leaving the constant relation `0 op bound`. */
+        internal fun relationParts(lhs: FExpr, rhs: FExpr, op: LinearOp, delta: Int): RelParts =
+            RelParts(intCombDiff(linear(lhs), linear(rhs), delta.toLong()), op)
 
         fun objective(e: XmlElement) {
             val maximize = e.tag == "maximize"
@@ -730,25 +760,29 @@ object Xcsp3 {
             return LinearObjective(intCoefficients = arr)
         }
 
-        internal fun linear(e: FExpr): LinComb = checkedFold { linearFold(e) }
+        internal fun linear(e: FExpr): IntComb = linearFold(e)
 
-        private fun linearFold(e: FExpr): LinComb = when (e) {
-            is FExpr.Num -> LinComb(emptyMap(), e.value.toLong())
+        // Integer folds stay 64-bit until a coefficient or constant overflows Long, then promote to the
+        // arbitrary-precision [IntComb.Wide]; an over-Int64 comparison lowers to a wide [Linear] rather than
+        // being rejected. A wide value can only be a relation coefficient/bound — a materialising op
+        // ([materializeVar]) rejects it, since a Long-domain variable cannot hold it.
+        private fun linearFold(e: FExpr): IntComb = when (e) {
+            is FExpr.Num -> IntComb.Narrow(LinComb(emptyMap(), e.value.toLong()))
 
-            is FExpr.Ref -> LinComb(mapOf(ref(e.name) to 1L), 0L)
+            is FExpr.Ref -> IntComb.Narrow(LinComb(mapOf(ref(e.name) to 1L), 0L))
 
             is FExpr.SetLit -> throw UnsupportedXcsp3Exception("set literal used arithmetically")
 
             is FExpr.Call -> when (e.fn) {
-                "add" -> e.args.map { linear(it) }.reduce { a, b -> a.plus(b) }
+                "add" -> sumIntCombs(e.args.map { linear(it) })
 
-                "sub" -> e.args.drop(1).fold(linear(e.args[0])) { a, x -> a.plus(linear(x).scaled(-1)) }
+                "sub" -> sumIntCombs(e.args.map { linear(it) }, negateTail = true)
 
-                "neg" -> linear(e.args[0]).scaled(-1)
+                "neg" -> scaleIntComb(linear(e.args[0]), -1L)
 
                 "abs" -> absOf(linear(e.args[0]))
 
-                "dist" -> absOf(linear(e.args[0]).plus(linear(e.args[1]).scaled(-1)))
+                "dist" -> absOf(sumIntCombs(listOf(linear(e.args[0]), linear(e.args[1])), negateTail = true))
 
                 "min" -> minMaxTerm(e.args, max = false)
 
@@ -762,14 +796,14 @@ object Xcsp3 {
 
                 "mul" -> {
                     val parts = e.args.map { linear(it) }
-                    val nonConst = parts.filter { it.coeffs.isNotEmpty() }
-                    val k = parts.filter { it.coeffs.isEmpty() }.fold(1L) { a, c -> mulExact(a, c.constant) }
+                    val nonConst = parts.filter { !it.isConstant() }
+                    val k = constProduct(parts.filter { it.isConstant() })
                     when {
-                        k == 0L -> LinComb(emptyMap(), 0L)
+                        k is IntComb.Narrow && k.lin.constant == 0L -> IntComb.Narrow(LinComb(emptyMap(), 0L))
 
-                        nonConst.isEmpty() -> LinComb(emptyMap(), k)
+                        nonConst.isEmpty() -> k
 
-                        nonConst.size == 1 -> nonConst[0].scaled(k)
+                        nonConst.size == 1 -> scaleByConst(nonConst[0], k)
 
                         // A genuine variable product: materialise each factor and chain `Product`s.
                         else -> {
@@ -781,13 +815,14 @@ object Xcsp3 {
                                 factors.add(Product(acc, next, p))
                                 acc = p
                             }
-                            LinComb(mapOf(acc to 1L), 0L).scaled(k)
+                            scaleByConst(IntComb.Narrow(LinComb(mapOf(acc to 1L), 0L)), k)
                         }
                     }
                 }
 
                 // A boolean-valued subexpression used arithmetically is its 0/1 truth value.
-                "in", "notin", in REL, in BOOL_FNS -> LinComb(mapOf(litTo01(compileBool(e)) to 1L), 0L)
+                "in", "notin", in REL, in BOOL_FNS ->
+                    IntComb.Narrow(LinComb(mapOf(litTo01(compileBool(e)) to 1L), 0L))
 
                 else -> throw UnsupportedXcsp3Exception("arithmetic fn '${e.fn}'")
             }
@@ -803,15 +838,15 @@ object Xcsp3 {
         }
 
         /** `min`/`max` of expressions as a linear term, via [ArrayMinMax] over the materialised args. */
-        internal fun minMaxTerm(args: List<FExpr>, max: Boolean): LinComb {
+        internal fun minMaxTerm(args: List<FExpr>, max: Boolean): IntComb {
             val vs = args.map { materializeVar(linear(it)) }.toIntArray()
             val m = newAuxVar(vs.minOf { domains[it].min }, vs.maxOf { domains[it].max })
             factors.add(ArrayMinMax(result = m, xs = vs, max = max))
-            return LinComb(mapOf(m to 1L), 0L)
+            return IntComb.Narrow(LinComb(mapOf(m to 1L), 0L))
         }
 
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
-        internal fun ifTerm(args: List<FExpr>): LinComb {
+        internal fun ifTerm(args: List<FExpr>): IntComb {
             val cond = compileBool(args[0])
             val a = materializeVar(linear(args[1]))
             val b = materializeVar(linear(args[2]))
@@ -820,7 +855,7 @@ object Xcsp3 {
             val eb = reifyLinear(intArrayOf(1, -1), intArrayOf(v, b), LinearOp.EQ, 0)
             factors.add(Clause(intArrayOf(Lit.negate(cond), ea))) // cond ⇒ v = a
             factors.add(Clause(intArrayOf(cond, eb))) // ¬cond ⇒ v = b
-            return LinComb(mapOf(v to 1L), 0L)
+            return IntComb.Narrow(LinComb(mapOf(v to 1L), 0L))
         }
 
         /** Integer `div`/`mod` by a nonzero constant, matching XCSP3's truncated-toward-zero semantics:
@@ -828,11 +863,14 @@ object Xcsp3 {
          *  truncates toward zero and the remainder takes the dividend's sign. Encoded as `a = k·q + r`
          *  with `|r| < |k|` and `r` sharing `a`'s sign. A variable or zero divisor stays unsupported —
          *  a nonlinear/division-by-zero shape we cannot soundly linearize. */
-        internal fun divModTerm(args: List<FExpr>, mod: Boolean): LinComb {
+        internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
             val a = materializeVar(linear(args[0]))
             val bLin = linear(args[1])
-            if (bLin.coeffs.isNotEmpty()) return divModVar(a, materializeVar(bLin), mod)
-            val k = bLin.constant
+            if (!bLin.isConstant()) return divModVar(a, materializeVar(bLin), mod)
+            val k = when (bLin) {
+                is IntComb.Narrow -> bLin.lin.constant
+                is IntComb.Wide -> throw UnsupportedXcsp3Exception("div/mod by an over-64-bit constant divisor")
+            }
             if (k == 0L) throw UnsupportedXcsp3Exception("div/mod by zero divisor")
             val da = domains[a]
             val absK = if (k < 0) -k else k
@@ -858,14 +896,14 @@ object Xcsp3 {
                     factors.add(Clause(intArrayOf(aNonNeg, rNonPos))) // a < 0 ⟹ r ≤ 0
                 }
             }
-            return LinComb(mapOf((if (mod) r else q) to 1L), 0L)
+            return IntComb.Narrow(LinComb(mapOf((if (mod) r else q) to 1L), 0L))
         }
 
         /** Integer `div`/`mod` by a *variable* divisor, supported only when the divisor is provably
          *  positive (`b ≥ 1`, so no division by zero) and the dividend provably non-negative
          *  (`a ≥ 0`) — the range where truncated and floored division coincide: `a = b·q + r`
          *  with `0 ≤ r < b`. Other shapes stay unsupported (sign-dependent truncation / zero divisor). */
-        internal fun divModVar(a: Int, b: Int, mod: Boolean): LinComb {
+        internal fun divModVar(a: Int, b: Int, mod: Boolean): IntComb {
             val da = domains[a]
             val db = domains[b]
             if (da.min < 0L || db.min < 1L) {
@@ -878,11 +916,11 @@ object Xcsp3 {
             factors.add(Product(b, q, p)) // p = b·q
             factors.add(Linear(intArrayOf(1, -1, -1), intArrayOf(a, p, r), LinearOp.EQ, 0)) // a = b·q + r
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(r, b), LinearOp.LE, -1)) // r < b
-            return LinComb(mapOf((if (mod) r else q) to 1L), 0L)
+            return IntComb.Narrow(LinComb(mapOf((if (mod) r else q) to 1L), 0L))
         }
 
         /** `|expr|` as a linear term: `|v| = max(v, -v)` via [ArrayMinMax] over `v` and its negation. */
-        internal fun absOf(lin: LinComb): LinComb {
+        internal fun absOf(lin: IntComb): IntComb {
             val v = materializeVar(lin)
             val d = domains[v]
             val neg = newAuxVar(-d.max, -d.min)
@@ -895,21 +933,24 @@ object Xcsp3 {
             }
             val a = newAuxVar(lo, hi)
             factors.add(ArrayMinMax(result = a, xs = intArrayOf(v, neg), max = true))
-            return LinComb(mapOf(a to 1L), 0L)
+            return IntComb.Narrow(LinComb(mapOf(a to 1L), 0L))
         }
 
         /** Materialise a linear expression as a single int var (returning it directly when it already
-         *  is one), posting `v = expr` otherwise. */
-        internal fun materializeVar(lin: LinComb): Int {
-            if (lin.constant == 0L && lin.coeffs.size == 1 && lin.coeffs.values.first() == 1L) {
-                return lin.coeffs.keys.first()
+         *  is one), posting `v = expr` otherwise. A wide (over-64-bit) expression cannot be materialised —
+         *  a Long-domain variable cannot hold its value — so it is rejected. */
+        internal fun materializeVar(lin: IntComb): Int {
+            val narrow = (lin as? IntComb.Narrow)?.lin
+                ?: throw UnsupportedXcsp3Exception("cannot materialise an over-64-bit expression into a variable")
+            if (narrow.constant == 0L && narrow.coeffs.size == 1 && narrow.coeffs.values.first() == 1L) {
+                return narrow.coeffs.keys.first()
             }
-            val (lo, hi) = linBounds(lin)
+            val (lo, hi) = linBounds(narrow)
             val v = newAuxVar(lo, hi)
-            val vars = lin.coeffs.keys.toList()
-            val cs = LongArray(vars.size + 1) { if (it < vars.size) -lin.coeffs.getValue(vars[it]) else 1L }
+            val vars = narrow.coeffs.keys.toList()
+            val cs = LongArray(vars.size + 1) { if (it < vars.size) -narrow.coeffs.getValue(vars[it]) else 1L }
             val ids = IntArray(vars.size + 1) { if (it < vars.size) vars[it] else v }
-            factors.add(Linear(cs, ids, LinearOp.EQ, lin.constant)) // v − expr = 0
+            factors.add(Linear(cs, ids, LinearOp.EQ, narrow.constant)) // v − expr = 0
             return v
         }
 

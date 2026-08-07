@@ -20,6 +20,7 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -60,6 +61,53 @@ class Xcsp3Test {
         val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(10_000)
             .map { it.ints.toList() }.toHashSet()
         assertEquals(brute, found, "parse+lowering+propagation must enumerate exactly the allowed tuples")
+    }
+
+    @Test
+    fun `an over-Int64 intension coefficient lowers to a wide linear row`() {
+        // mul folds 2e9 · 2e9 · 2e9 = 8e27 (past Long) as x's coefficient: 8e27·x <= 1 forces x = 0.
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><var id="x"> 0..3 </var></variables>
+              <constraints>
+                <intension> le(mul(2000000000,2000000000,2000000000,x), 1) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val lin = Xcsp3.parse(xml).problem.factors.filterIsInstance<Linear>().single()
+        assertTrue(lin.wide, "the over-Int64 product coefficient must produce a wide Linear row")
+        assertEquals(listOf(0), sat(xml).toList(), "8e27·x <= 1 forces x = 0")
+    }
+
+    @Test
+    fun `a mul-folded coefficient above Int range stays an exact Long coefficient`() {
+        // mul(50000,50000,x) = 2.5e9·x — past Int.MAX; the coefficient fits Long, so the row stays narrow
+        // with the exact value (the old fold truncated it to a negative Int).
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><var id="x"> 0..3 </var></variables>
+              <constraints>
+                <intension> le(mul(50000,50000,x), 100) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        val lin = Xcsp3.parse(xml).problem.factors.filterIsInstance<Linear>().single()
+        assertFalse(lin.wide, "2.5e9 fits Long")
+        assertEquals(2_500_000_000L, lin.coeff(0), "the coefficient is exact, not Int-truncated")
+    }
+
+    @Test
+    fun `an over-Int64 value that must be materialised is declined`() {
+        // abs() materialises its operand into a variable, which cannot hold an over-Int64 value.
+        val xml = """
+            <instance format="XCSP3" type="CSP">
+              <variables><var id="x"> 0..3 </var></variables>
+              <constraints>
+                <intension> le(abs(mul(2000000000,2000000000,2000000000,x)), 5) </intension>
+              </constraints>
+            </instance>
+        """.trimIndent()
+        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml) }
     }
 
     @Test
@@ -139,9 +187,9 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `an arithmetic expression overflowing 64 bits is rejected as a format exception`() {
-        // A product of three near-max Int constants exceeds Long; folding it must reject the term rather
-        // than silently wrapping.
+    fun `an arithmetic expression overflowing 64 bits routes to a wide row and stays sound`() {
+        // A product of three near-max Int constants exceeds Long; folding routes it to a wide row rather
+        // than rejecting or silently wrapping. x = 9.26e27 is unsatisfiable for x in 0..10 — decided exactly.
         val xml = """
             <instance format="XCSP3" type="CSP">
               <variables><var id="x"> 0..10 </var></variables>
@@ -150,7 +198,8 @@ class Xcsp3Test {
               </constraints>
             </instance>
         """.trimIndent()
-        assertFailsWith<UnsupportedXcsp3Exception> { Xcsp3.parse(xml) }
+        val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "x in 0..10 cannot equal 9.26e27; expected UNSAT, got $r")
     }
 
     @Test
