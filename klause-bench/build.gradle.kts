@@ -5,7 +5,7 @@ import org.gradle.process.ExecOperations
 import com.google.protobuf.gradle.id
 
 plugins {
-    id("com.eignex.jvm") version "1.2.9"
+    id("com.eignex.jvm") version "1.2.10"
     kotlin("plugin.serialization")
     id("com.google.protobuf") version "0.9.6"
     application
