@@ -57,13 +57,10 @@ internal class TablePropagator(
      * interval intersects the live domain (hole-aware), and supports every live domain value it covers.
      */
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
-        val s = (state.refPayload[factorId] as? TableStr2State) ?: run {
-            val fresh = TableStr2State(IntArray(numTuples) { it }, numTuples, state)
-            state.refPayload[factorId] = fresh
-            fresh
-        }
+        val payload = state.refPayload[factorId]
+        val existing = payload as? TableStr2State
         val dirty = state.drainIntEventDirtyVars(factorId)
-        if (s.started && dirty.isEmpty()) return true
+        if ((existing?.started ?: (payload === NoopStarted)) && dirty.isEmpty()) return true
         // The bitset support map is indexed by (value − lo) and sized to the column span, which only
         // works when every column's domain is within Int range and its span is modest. A wider column
         // (a float-scaled table) takes the value-keyed path, which carries no span dependency.
@@ -90,9 +87,13 @@ internal class TablePropagator(
                 if (d.size.toLong() != d.max - d.min + 1) contiguous = false
             }
             if (contiguous && gc.isNoop(mins, maxs)) {
-                s.started = true
+                // This row sweeps nothing, so it has nothing to filter and needs no live set. A group's
+                // rows share one relation but each would otherwise allocate its own O(numTuples) tuple
+                // index — the dominant term in the build's peak memory on the largest table instances.
+                if (existing != null) existing.started = true else state.refPayload[factorId] = NoopStarted
                 return true
             }
+            val s = existing ?: newLiveSet(state, factorId)
             val ok = propagateBitset(state, s)
             if (ok) {
                 s.started = true
@@ -111,9 +112,18 @@ internal class TablePropagator(
             }
             return ok
         }
+        val s = existing ?: newLiveSet(state, factorId)
         val ok = if (bitsetEligible) propagateBitset(state, s) else propagateWide(state, s)
         if (ok) s.started = true
         return ok
+    }
+
+    /** The STR2 live set for this factor, installed on first genuine use. Every tuple starts live, which
+     *  is exactly the state a sweep would have left: a row reaching here has filtered nothing yet. */
+    private fun newLiveSet(state: PropagationState, factorId: Int): TableStr2State {
+        val fresh = TableStr2State(IntArray(numTuples) { it }, numTuples, state)
+        state.refPayload[factorId] = fresh
+        return fresh
     }
 
     /** Whether the cell at (row, col) — the interval `[cellLo, cellHi]` — has support in domain [d]. */
@@ -312,3 +322,8 @@ internal class TablePropagator(
         }
     }
 }
+
+/** Payload for a table row that has fired but only ever hit the shared group no-op verdict, so its STR2
+ *  live set was never needed. Carries "started" alone; the first fire that must actually sweep replaces
+ *  it with a real [TableStr2State]. */
+private object NoopStarted
