@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    id("com.eignex.kmp") version "1.2.8"
+    id("com.eignex.kmp") version "1.2.9"
     kotlin("plugin.serialization")
 }
 
