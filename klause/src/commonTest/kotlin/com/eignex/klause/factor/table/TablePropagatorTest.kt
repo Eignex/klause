@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.TableGroupCache
+import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -298,5 +299,36 @@ class TablePropagatorTest {
                 .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "shared-cache table #$idx (var0 hi=$h0): must equal brute force")
         }
+    }
+
+    @Test
+    fun `a group row reusing the shared no-op verdict allocates no live set`() {
+        // Rows of a group share one relation but each otherwise holds its own O(numTuples) STR2 live set,
+        // the dominant term in peak memory on the largest table instances. A row whose sweep the shared
+        // verdict has already answered has filtered nothing, so it must not pay for that array.
+        val rel = ArrayList<Long>()
+        for (a in 1..4) {
+            for (b in 1..4) {
+                if (a != b) {
+                    rel.add(a.toLong())
+                    rel.add(b.toLong())
+                }
+            }
+        }
+        val flat = rel.toLongArray()
+        val cache = TableGroupCache()
+        fun mk(v0: Int, v1: Int): Table = Table(xs = intArrayOf(v0, v1), tuples = flat).also { it.groupCache = cache }
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(1, 4) },
+            factors = arrayOf<Factor>(mk(0, 1), mk(2, 3), mk(4, 5)),
+        )
+
+        val state = PropagationState(problem, Assumptions.None)
+        state.runToFixpoint(allFactors = true, skipExpensiveBake = false)
+
+        val withLiveSet = (0 until 3).count { state.refPayload[it] is TableStr2State }
+        assertEquals(1, withLiveSet, "only the row that actually swept may hold a live set")
     }
 }
