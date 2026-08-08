@@ -10,6 +10,10 @@ import com.eignex.klause.util.lineSequence
 /** Raised when an MPS file is malformed or uses a construct outside the supported subset. */
 class MpsFormatException(msg: String) : FormatException("MPS", msg)
 
+/** Reject a malformed line with a clean [MpsFormatException]; `Nothing`-typed so call sites stay
+ *  expression-friendly (an elvis branch reads as a value, not a statement). */
+internal fun mpsError(msg: String): Nothing = throw MpsFormatException(msg)
+
 /**
  * A decision variable. [integer] marks a column declared inside an `INTORG`/`INTEND` marker pair (or
  * given an integer bound type `UI`/`LI`/`BV`). Bounds are resolved to their effective values, with a
@@ -274,15 +278,14 @@ object Mps {
     private fun readIndicators(fields: List<String>, rowByName: Map<String, Row>, varByName: Map<String, Var>) {
         val rest = if (fields.isNotEmpty() && fields[0].equals("IF", true)) fields.drop(1) else fields
         if (rest.size < 3) {
-            throw MpsFormatException("INDICATORS line needs a row, a column and a value: '${fields.joinToString(" ")}'")
+            mpsError("INDICATORS line needs a row, a column and a value: '${fields.joinToString(" ")}'")
         }
-        val row = rowByName[rest[0]] ?: throw MpsFormatException("INDICATORS references unknown row '${rest[0]}'")
-        val v = varByName[rest[1]] ?: throw MpsFormatException("INDICATORS references unknown column '${rest[1]}'")
-        val value = parseNum(rest[2], "INDICATORS value")
-        val whenOne = when (value) {
+        val row = rowByName[rest[0]] ?: mpsError("INDICATORS references unknown row '${rest[0]}'")
+        val v = varByName[rest[1]] ?: mpsError("INDICATORS references unknown column '${rest[1]}'")
+        val whenOne = when (parseNum(rest[2], "INDICATORS value")) {
             1.0 -> true
             0.0 -> false
-            else -> throw MpsFormatException("INDICATORS value must be 0 or 1, got '${rest[2]}'")
+            else -> mpsError("INDICATORS value must be 0 or 1, got '${rest[2]}'")
         }
         row.indicator = MpsIndicator(v.index, whenOne)
     }
