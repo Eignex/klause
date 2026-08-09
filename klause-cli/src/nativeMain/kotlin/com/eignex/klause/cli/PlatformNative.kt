@@ -88,3 +88,7 @@ private fun readCommandOutput(command: String): String {
 }
 
 internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)
+
+// Native has no heap accounting equivalent to the JVM's memory pools, so the dry-run reports no
+// heap figures there rather than inventing one.
+internal actual fun sampleHeap(): HeapSample? = null
