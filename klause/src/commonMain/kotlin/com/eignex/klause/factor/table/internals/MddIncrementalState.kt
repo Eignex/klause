@@ -49,9 +49,29 @@ internal class MddIncrementalState(
     private val totalWords = layerBase[seq.size + 1]
     private val w = layerWords.max()
 
-    private val fwd = RevLongArray(state, totalWords)
-    private val bwd = RevLongArray(state, totalWords)
+    // Held for the deferred [fwd]/[bwd] construction below; every other reversible cell is built here.
+    private val owner = state
+
+    // Two `totalWords`-long reversible bitsets per factor — on a wide diagram (WordDesign2: ~2.4M states)
+    // that is hundreds of KB each, and a `<group>` holds one factor per row over the same diagram. A row
+    // that only ever reuses the shared root snapshot never reads them, so they are built on first real
+    // use rather than at construction. Single-threaded per [PropagationState], hence the unsynchronized
+    // mode. See [snapshotOnly] for what keeps a deferred pair from being read stale.
+    private val fwdLazy = lazy(LazyThreadSafetyMode.NONE) { RevLongArray(owner, totalWords) }
+    private val bwdLazy = lazy(LazyThreadSafetyMode.NONE) { RevLongArray(owner, totalWords) }
+    private val fwd: RevLongArray get() = fwdLazy.value
+    private val bwd: RevLongArray get() = bwdLazy.value
+
+    /** Whether this factor has had to build its own reachability bitsets — false while it is still
+     *  standing on the group's shared root snapshot. */
+    internal val layersBuilt: Boolean get() = fwdLazy.isInitialized()
     private val valid = RevInt(state, 0)
+
+    /** 1 while this factor's reachability is exactly the shared root snapshot and [fwd]/[bwd] therefore
+     *  hold nothing of its own. Reversible alongside [valid], so a backtrack above the point where the
+     *  layers were filled restores it to 1 and the stale bitsets are re-seeded before any incremental
+     *  step reads them. */
+    private val snapshotOnly = RevInt(state, 0)
 
     // Per-layer CSR indices over the transition records (see [MddTransitionIndex]). Shared across the
     // factors of a `<group>` of identical diagrams when the caller passes one in; otherwise built here.
@@ -310,7 +330,11 @@ internal class MddIncrementalState(
         val dirty = state.drainIntEventDirtyVars(factorId)
         if (valid.value == 1 && dirty.isEmpty()) return true
         val ant = state.composeIntVarAtomAntecedents(if (cost >= 0) seq + intArrayOf(cost) else seq)
-        return if (valid.value == 0) rebuild(state, ant) else delta(state, dirty, ant)
+        if (valid.value == 0) return rebuild(state, ant)
+        // Standing on the shared snapshot: take a private copy of it first, since the incremental step
+        // reads and rewrites the bitsets. A vanished snapshot leaves nothing to step from, so recompute.
+        if (snapshotOnly.value == 1 && !seedFromSnapshot()) return computeReachability(state, ant, snapshot = false)
+        return delta(state, dirty, ant)
     }
 
     private fun rebuild(state: PropagationState, ant: IntArray?): Boolean {
@@ -345,6 +369,8 @@ internal class MddIncrementalState(
         val survivors = Array(n) { LongArray(symWords.coerceAtLeast(1)) }
         for (i in n - 1 downTo 0) recomputeBackwardCollecting(state, i, scratch, survivors[i])
         valid.set(1)
+        // The bitsets now hold this factor's own reachability, not the shared snapshot's.
+        snapshotOnly.set(0)
         // Under full domains the survivors are structural; publish them (and the reachability) once for the
         // group's remaining factors to reuse.
         if (snapshot) {
@@ -360,14 +386,35 @@ internal class MddIncrementalState(
     }
 
     private fun applyRootSnapshot(state: PropagationState, snap: MddRootSnapshot, ant: IntArray?): Boolean {
-        for (k in 0 until totalWords) {
-            fwd[k] = snap.fwd[k]
-            bwd[k] = snap.bwd[k]
-        }
+        // The snapshot IS this factor's reachability, so copying it into per-factor bitsets would only
+        // duplicate it. Record that instead and leave [fwd]/[bwd] unbuilt; [seedFromSnapshot] fills them
+        // if and when an incremental step actually needs them. A cost diagram is the exception: its bound
+        // comes from reading the forward lattice below, so it takes its copy now.
+        if (cost >= 0) seedFrom(snap) else snapshotOnly.set(1)
         valid.set(1)
         for (i in 0 until n) if (!excludeNonSurvivors(state, i, snap.survivors[i], ant)) return false
         if (cost >= 0 && !tightenCost(state, ant)) return false
         return true
+    }
+
+    /** Fill [fwd]/[bwd] from the shared root snapshot this factor has been standing on, so an incremental
+     *  step can proceed from its own copy. Returns false when the snapshot is gone, leaving the caller to
+     *  recompute from scratch. */
+    private fun seedFromSnapshot(): Boolean {
+        val snap = idx.rootSnapshot ?: return false
+        seedFrom(snap)
+        return true
+    }
+
+    /** Copy [snap] into this factor's own bitsets, leaving it free to diverge. */
+    private fun seedFrom(snap: MddRootSnapshot) {
+        val f = fwd
+        val b = bwd
+        for (k in 0 until totalWords) {
+            f[k] = snap.fwd[k]
+            b[k] = snap.bwd[k]
+        }
+        snapshotOnly.set(0)
     }
 
     private fun delta(state: PropagationState, dirty: IntArray, ant: IntArray?): Boolean {

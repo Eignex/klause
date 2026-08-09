@@ -4,8 +4,10 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.table.Mdd
+import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -196,5 +198,40 @@ class MddPropagatorTest {
                 .map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(brute, found, "shared-index MDD #$idx: solution set must equal brute force")
         }
+    }
+
+    @Test
+    fun `an MDD factor reusing the shared root snapshot builds no reachability bitsets`() {
+        // Every factor of a group otherwise holds two reversible bitsets sized to the whole diagram, which
+        // on a wide diagram dwarfs the diagram itself once the group has thousands of rows. A factor whose
+        // reachability is exactly the shared snapshot must stand on it rather than copy it.
+        val numStatesPerLayer = intArrayOf(1, 2, 1)
+        val layerStarts = intArrayOf(0, 6, 12)
+        val transitions = longArrayOf(
+            0, 1, 0, 0, 2, 1,
+            0, 2, 0, 1, 1, 0,
+        )
+        val shared = MddTransitionIndex.build(transitions, layerStarts, numStatesPerLayer, 3)
+        fun mdd(a: Int, b: Int): Mdd = Mdd(
+            seq = intArrayOf(a, b),
+            numStatesPerLayer = numStatesPerLayer,
+            layerStarts = layerStarts,
+            transitions = transitions,
+            initial = 0,
+            accepting = intArrayOf(0),
+            recordStride = 3,
+        ).also { it.transitionIndex = shared }
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 6,
+            intDomains = Array(6) { IntDomain(1, 2) },
+            factors = arrayOf<Factor>(mdd(0, 1), mdd(2, 3), mdd(4, 5)),
+        )
+
+        val state = PropagationState(problem, Assumptions.None)
+        state.runToFixpoint(allFactors = true, skipExpensiveBake = false)
+
+        val built = (0 until 3).count { (state.refPayload[it] as? MddIncrementalState)?.layersBuilt == true }
+        assertEquals(1, built, "only the factor that computed the snapshot may hold its own bitsets")
     }
 }
