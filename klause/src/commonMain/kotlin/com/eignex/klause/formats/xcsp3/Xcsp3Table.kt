@@ -184,9 +184,9 @@ private fun Xcsp3.Builder.buildSupportTemplate(arity: Int, text: String): Suppor
         }
         if (allFree) return SupportTemplate(triviallySat = true, tuples = LongArray(0), hi = null)
     }
-    // Ground (all points) ⇒ no upper-bound array, keeping the fast path byte-identical.
-    val short = rows.lo.indices.any { rows.lo[it] != rows.hi[it] }
-    return SupportTemplate(triviallySat = false, tuples = rows.lo, hi = if (short) rows.hi else null)
+    // Ground (all points) ⇒ no upper-bound array, keeping the fast path byte-identical. The parse already
+    // knows whether it saw an interval cell, so this is a flag rather than a rescan of both arrays.
+    return SupportTemplate(triviallySat = false, tuples = rows.lo, hi = if (rows.short) rows.hi else null)
 }
 
 /** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — the disjunction of
@@ -223,16 +223,50 @@ internal fun Xcsp3.Builder.postConflictClauses(vars: IntArray, rows: ShortRows) 
     }
 }
 
-/** Flat short-tuple rows: [lo]/[hi] hold each cell's inclusive interval bounds row-major (equal for a
- *  point value; `[MIN, MAX]` for a `*` wildcard). */
-internal class ShortRows(val lo: LongArray, val hi: LongArray)
+/**
+ * Flat short-tuple rows: [lo]/[hi] hold each cell's inclusive interval bounds row-major (equal for a
+ * point value; `[MIN, MAX]` for a `*` wildcard).
+ *
+ * A ground table — every cell a point — carries no second array at all: [hi] then IS [lo], since the two
+ * would be equal element for element, and a multi-MB table would otherwise pay a full duplicate that
+ * [buildSupportTemplate] immediately discards. [short] reports whether an interval cell was actually
+ * seen, so callers test it instead of rescanning both arrays. Both arrays are read-only.
+ */
+internal class ShortRows(val lo: LongArray, private val intervals: LongArray?) {
+    val hi: LongArray get() = intervals ?: lo
+
+    /** True when some cell is a `*` or a `lo..hi` range, i.e. [hi] is a distinct array. */
+    val short: Boolean get() = intervals != null
+}
 
 /** Parse `<supports>`/`<conflicts>` tuple text into short rows, one row per written tuple: a `*`
  *  column is `[MIN, MAX]`, a `lo..hi` column is that interval, everything else is a point `[v, v]`.
  *  Unary tables use the bare-value form (`0 1 2`, no parentheses). */
 internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
-    val lo = LongArrayList()
-    val hi = LongArrayList()
+    val bare = arity == 1 && '(' !in text
+    // Size the cell arrays exactly from one cheap counting pass. Accumulating into growable lists made a
+    // multi-MB table peak at several times the payload it produces — each list doubles while filling and
+    // is copied once more at the end, and the `hi` list was built in full even for a ground table that
+    // discards it (#1415: Benzenoide-15_c23 died here at 3 GB). `hi` is now materialized only if an
+    // interval cell actually appears, back-filling the points already read.
+    val cells = if (bare) countBareCells(text) else countTuples(text) * arity
+    val lo = LongArray(cells)
+    var intervals: LongArray? = null
+    var k = 0
+
+    fun put(cellLo: Long, cellHi: Long) {
+        lo[k] = cellLo
+        if (cellHi != cellLo) {
+            val hi = intervals ?: LongArray(cells).also { fresh ->
+                lo.copyInto(fresh, 0, 0, k) // every earlier cell was a point, so its hi equals its lo
+                intervals = fresh
+            }
+            hi[k] = cellHi
+        } else {
+            intervals?.set(k, cellHi)
+        }
+        k++
+    }
 
     // A cell is read from the source in place (no substring per field): a `*` wildcard, a `lo..hi`
     // interval, or a point value — the parse of a multi-MB table dominated the ingestion, so it must
@@ -243,8 +277,7 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
         while (a < b && text[a].isWhitespace()) a++
         while (b > a && text[b - 1].isWhitespace()) b--
         if (b - a == 1 && text[a] == '*') {
-            lo.add(Long.MIN_VALUE)
-            hi.add(Long.MAX_VALUE)
+            put(Long.MIN_VALUE, Long.MAX_VALUE)
             return
         }
         // Single pass: parse the first integer, stopping at the first non-digit. If that is `..` the cell
@@ -262,17 +295,15 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
         }
         val first = if (neg) -v else v
         if (p >= b) {
-            lo.add(first)
-            hi.add(first)
+            put(first, first)
         } else {
             require(p + 1 < b && text[p] == '.' && text[p + 1] == '.') { "non-digit '${text[p]}' in table tuple" }
-            lo.add(first)
-            hi.add(parseLongIn(text, p + 2, b))
+            put(first, parseLongIn(text, p + 2, b))
         }
     }
 
     val n = text.length
-    if (arity == 1 && '(' !in text) {
+    if (bare) {
         var i = 0
         while (i < n) {
             while (i < n && text[i].isWhitespace()) i++
@@ -303,7 +334,27 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
             if (i < n) i++ // past ')'
         }
     }
-    return ShortRows(lo.toLongArray(), hi.toLongArray())
+    // A malformed table can produce fewer cells than the count promised; trim rather than leave zeros.
+    return if (k == cells) ShortRows(lo, intervals) else ShortRows(lo.copyOf(k), intervals?.copyOf(k))
+}
+
+/** Number of `(` — one per written tuple — so the cell arrays can be sized exactly before parsing. */
+private fun countTuples(text: String): Int {
+    var count = 0
+    for (c in text) if (c == '(') count++
+    return count
+}
+
+/** Number of whitespace-separated tokens in the bare unary form (`0 1 2`), one cell each. */
+private fun countBareCells(text: String): Int {
+    var count = 0
+    var inToken = false
+    for (c in text) {
+        val space = c.isWhitespace()
+        if (!space && !inToken) count++
+        inToken = !space
+    }
+    return count
 }
 
 /** Parse a base-10 [Long] from `text[from, to)` (an optional sign then digits), without a substring. */

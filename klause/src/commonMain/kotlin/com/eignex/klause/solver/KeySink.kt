@@ -78,6 +78,12 @@ internal interface KeySink {
 internal fun materializeKey(kind: FactorKind, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind).also(build).toKey()
 
+/** [materializeKey] with a payload-size estimate ([Factor.structuralKeyWeight]), so the builder is sized
+ *  once instead of doubling its way up. Worth passing whenever the key splices a whole tuple set or
+ *  transition table, where those growth transients dominate ingest memory. */
+internal fun materializeKey(kind: FactorKind, expectedWords: Int, build: (KeySink) -> Unit): StructuralKey =
+    MaterializingKeySink(kind, expectedWords).also(build).toKey()
+
 /**
  * The `hashCode` of the key `build` describes *after* remapping variables through [boolMap] / [intMap] —
  * the hashing half, allocation-free (no `remap()` copy, no key object). Equals
@@ -89,8 +95,8 @@ internal fun hashRemappedKey(kind: FactorKind, boolMap: IntArray, intMap: IntArr
 
 /** Builds the canonical [StructuralKey] by delegating to [StructuralKeyBuilder] with the identity remap —
  *  so a migrated factor's key is byte-identical to the former hand-written `StructuralKey.of(kind){…}`. */
-internal class MaterializingKeySink(private val kind: FactorKind) : KeySink {
-    private val b = StructuralKeyBuilder()
+internal class MaterializingKeySink(private val kind: FactorKind, expectedWords: Int = 0) : KeySink {
+    private val b = StructuralKeyBuilder(expectedWords)
 
     override fun int(value: Int) = b.int(value)
     override fun long(value: Long) = b.long(value)
