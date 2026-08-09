@@ -20,6 +20,18 @@ internal expect fun cliProp(name: String): String?
 internal fun installCliConfig(): KlauseConfig =
     KlauseConfig.fromProps(lookup = ::cliProp).also { KlauseConfig.current = it }
 
+/**
+ * A heap reading for the `dry-run-presolve` diagnostics. [retainedBytes] is live heap after a
+ * collection — what the phase still holds — and [committedBytes] the heap the JVM has taken from the OS,
+ * which it grows under pressure and rarely returns, so at the end of ingest it approximates the
+ * high-water demand. The two diverge when a phase allocates a large transient (issue #1415).
+ */
+internal class HeapSample(val retainedBytes: Long, val committedBytes: Long)
+
+/** Sample the heap, or null on a platform with no heap accounting (native). Collects first, so it is
+ *  for diagnostics only and must never be called on a solve path. */
+internal expect fun sampleHeap(): HeapSample?
+
 internal expect fun errPrintln(message: String)
 
 internal expect fun exitCli(code: Int): Nothing

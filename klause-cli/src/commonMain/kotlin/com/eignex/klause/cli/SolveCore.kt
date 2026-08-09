@@ -247,6 +247,12 @@ internal object SolveCore {
     ) {
         val passes = stats?.passes.orEmpty()
         errPrintln("presolve dry-run:")
+        // Heap after ingest, which is the quantity an OOM at `-Xmx` is about (#1415). Retained is what
+        // the built problem holds; peak includes the transients the build passed through, so a large gap
+        // points at a structure that is materialized and dropped rather than one that is kept.
+        sampleHeap()?.let { heap ->
+            errPrintln("  heap retained: ${heap.retainedBytes / MIB}MiB, committed: ${heap.committedBytes / MIB}MiB")
+        }
         // Split the load into parse, the root bake (step 0), and the presolve passes. The base bake is
         // deferred to the pipeline (stats.bakeElapsed) for a front-end problem, or ran at construction
         // (original.bakeElapsed) otherwise — only one is non-zero. `elapsed` is the whole presolve phase,
@@ -684,3 +690,6 @@ internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) 
     val start = nowMillis()
     return { worker, e -> log.v { describeEvent(e, nowMillis() - start, worker) } }
 }
+
+/** Bytes per mebibyte — heap figures are reported in MiB, the unit `-Xmx` is set in. */
+private const val MIB = 1024L * 1024L

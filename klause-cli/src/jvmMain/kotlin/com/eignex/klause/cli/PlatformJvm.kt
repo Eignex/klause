@@ -45,3 +45,18 @@ private class ReaderCharSource(private val reader: Reader, private val onEof: ()
 }
 
 internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)
+
+// The collection is the point: without it `retained` reports whatever the allocator happened to be
+// holding rather than live data, which is the whole question when diagnosing an ingest that will not fit
+// in a heap ceiling. Confined to the `dry-run-presolve` diagnostic, never a solve path.
+@Suppress("ExplicitGarbageCollectionCall")
+internal actual fun sampleHeap(): HeapSample? {
+    System.gc()
+    val runtime = Runtime.getRuntime()
+    val retained = runtime.totalMemory() - runtime.freeMemory()
+    // Committed, not a true peak: the JVM grows the heap under pressure and rarely gives it back, so at
+    // the end of ingest this is roughly the high-water demand. Summing the pools' own peak marks was
+    // tried and is unusable — the generations peak at different times, so the sum ran past the `-Xmx`
+    // ceiling itself (5074MiB under `-Xmx3g`). A genuine peak needs a sampling thread.
+    return HeapSample(retained, runtime.totalMemory())
+}
