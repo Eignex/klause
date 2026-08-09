@@ -167,7 +167,7 @@ class Table private constructor(
     // Column c ↔ xs[c], so xs order is kept (positional); rows are a set, so rows are sorted. Encodes
     // the full var sequence and tuple set — collision-free up to variable identity. Only `ints(xs)`
     // varies under a remap; the tuple part is the cached [tupleKey] fragment.
-    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.TABLE, ::buildKey)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.TABLE, structuralKeyWeight, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
         hashRemappedKey(FactorKind.TABLE, boolMap, intMap, ::buildKey)

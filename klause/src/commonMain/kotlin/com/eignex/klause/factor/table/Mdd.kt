@@ -89,7 +89,12 @@ class Mdd(
     /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
      *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
      *  accepting states, the record stride, and the cost var (#531). */
-    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.MDD, ::buildKey)
+    override fun structuralKey(): StructuralKey = materializeKey(FactorKind.MDD, structuralKeyWeight, ::buildKey)
+
+    // The key splices the whole diagram, so the arity-derived default would under-size the builder by
+    // orders of magnitude on a large MDD and leave it doubling its way through the payload.
+    override val structuralKeyWeight: Int
+        get() = seq.size + numStatesPerLayer.size + layerStarts.size + transitions.size + accepting.size
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
         hashRemappedKey(FactorKind.MDD, boolMap, intMap, ::buildKey)

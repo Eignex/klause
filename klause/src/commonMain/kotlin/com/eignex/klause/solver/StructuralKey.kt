@@ -99,8 +99,11 @@ internal enum class FactorKind {
 /** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a
  *  primitive `long` buffer — no per-word boxing, since these keys are rebuilt in symmetry refinement's
  *  per-round inner loop. */
-internal class StructuralKeyBuilder {
-    private var buf = LongArray(INITIAL_CAPACITY)
+internal class StructuralKeyBuilder(expectedWords: Int = 0) {
+    // Sized from the caller's estimate where one is available. A key whose payload is a whole transition
+    // table or tuple set would otherwise double its way up and then be copied once more by [build],
+    // peaking at ~3x the payload it produces (#1415: MagicSquare-mdd-16_c23 died here at 3 GB).
+    private var buf = LongArray(expectedWords.coerceAtLeast(INITIAL_CAPACITY))
     private var size = 0
 
     private fun reserve(extra: Int) {
@@ -167,9 +170,13 @@ internal class StructuralKeyBuilder {
         size += fragment.size
     }
 
-    fun build(kind: FactorKind): StructuralKey = StructuralKey(kind, buf.copyOf(size))
+    // An exactly-filled buffer is handed over rather than duplicated: on a payload that is a whole tuple
+    // set or transition table, that copy is the difference between one and two resident copies.
+    fun build(kind: FactorKind): StructuralKey = StructuralKey(kind, exactWords())
 
-    fun buildWords(): LongArray = buf.copyOf(size)
+    fun buildWords(): LongArray = exactWords()
+
+    private fun exactWords(): LongArray = if (size == buf.size) buf else buf.copyOf(size)
 
     private companion object {
         const val INITIAL_CAPACITY = 16
