@@ -251,7 +251,12 @@ internal object SolveCore {
         // the built problem holds; peak includes the transients the build passed through, so a large gap
         // points at a structure that is materialized and dropped rather than one that is kept.
         sampleHeap()?.let { heap ->
-            errPrintln("  heap retained: ${heap.retainedBytes / MIB}MiB, committed: ${heap.committedBytes / MIB}MiB")
+            val peak = heap.peakBytes?.let { "peak: ${it / MIB}MiB, " }.orEmpty()
+            errPrintln(
+                "  heap retained: ${heap.retainedBytes / MIB}MiB, " +
+                    "$peak" +
+                    "committed: ${heap.committedBytes / MIB}MiB",
+            )
         }
         // Split the load into parse, the root bake (step 0), and the presolve passes. The base bake is
         // deferred to the pipeline (stats.bakeElapsed) for a front-end problem, or ran at construction
