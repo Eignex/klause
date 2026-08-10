@@ -42,7 +42,18 @@ JVM distribution:
 klause-cli/build/install/klause-cli-jvm/bin/klause-cli [flags] <file>
 ```
 
-Standalone native executable (no JVM, instant startup):
+The dist is class file version 69, so the launcher needs a **JDK 25 or newer** on `JAVA_HOME` /
+`PATH`. Gradle itself is unaffected — it provisions the toolchain it compiles against — so a
+machine whose default `java` is older builds fine and then fails at run time with
+`UnsupportedClassVersionError: … class file version 69.0`. Point the launcher at the provisioned
+JDK when that happens:
+
+```
+JAVA_HOME=$(ls -d ~/.gradle/jdks/*-25-*/ | head -1) \
+  klause-cli/build/install/klause-cli-jvm/bin/klause-cli [flags] <file>
+```
+
+Standalone native executable (no JVM, instant startup, no JDK needed):
 
 ```
 ./gradlew :klause-cli:linkReleaseExecutableLinuxX64

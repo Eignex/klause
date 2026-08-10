@@ -20,6 +20,12 @@ bench solve [filters…]      e.g.  bench solve suite=mzn-bench backend=choco
 
 Tune any knob with `-Dklause.*` properties (forwarded to the run JVM), e.g. `-Dklause.bench.mzn.timeoutSec=30`.
 
+Solving with klause needs `./gradlew :klause-cli:installJvmDist`, and that dist runs only on a JDK 25
+or newer — the bench launches it as a subprocess, so a machine whose default `java` is older reports
+every klause instance as a crash (`UnsupportedClassVersionError: … class file version 69.0`) while
+Gradle itself builds fine. See `klause-cli/README.md` for the `JAVA_HOME` fix. Note also that
+`installDist` is a *different*, no-op task that leaves a stale binary in place.
+
 ## Commands
 
 ```
