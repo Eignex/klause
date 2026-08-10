@@ -24,9 +24,21 @@ internal fun installCliConfig(): KlauseConfig =
  * A heap reading for the `dry-run-presolve` diagnostics. [retainedBytes] is live heap after a
  * collection — what the phase still holds — and [committedBytes] the heap the JVM has taken from the OS,
  * which it grows under pressure and rarely returns, so at the end of ingest it approximates the
- * high-water demand. The two diverge when a phase allocates a large transient (issue #1415).
+ * high-water demand. [peakBytes] is the largest usage the sampler started by [startHeapPeakSampler]
+ * observed, null when none was started. The three diverge when a phase allocates a large transient
+ * (issue #1415): peak measures it, retained does not, and committed only records that the JVM grew.
+ *
+ * Peak counts garbage not yet collected, so it drifts up toward whatever `-Xmx` allows: it bounds
+ * demand from above rather than stating the heap a phase requires, and the same ingest reads higher
+ * under a larger ceiling. Compare peaks only at equal `-Xmx`, and keep the OOM/no-OOM outcome under a
+ * ceiling as the decisive signal.
  */
-internal class HeapSample(val retainedBytes: Long, val committedBytes: Long)
+internal class HeapSample(val retainedBytes: Long, val committedBytes: Long, val peakBytes: Long?)
+
+/** Begin recording the process's maximum heap usage, so [HeapSample.peakBytes] covers everything from
+ *  here on. Call before the work being measured — it cannot see backwards. A no-op on a second call and
+ *  on a platform with no heap accounting (native). Diagnostics only. */
+internal expect fun startHeapPeakSampler()
 
 /** Sample the heap, or null on a platform with no heap accounting (native). Collects first, so it is
  *  for diagnostics only and must never be called on a solve path. */
