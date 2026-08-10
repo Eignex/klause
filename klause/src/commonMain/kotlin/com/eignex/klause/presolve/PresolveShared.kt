@@ -13,7 +13,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.MutableIntIntMap
 
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
@@ -84,9 +84,9 @@ internal object PresolveShared {
     fun maximalPersistentAmoCliques(factors: List<Factor>): List<Set<Int>> = mergeCliques(persistentAmoCliques(factors))
 
     /**
-     * Merge a set of at-most-one [cliques] into maximal ones (OR-Tools `TransformIntoMaxCliques`). Every
-     * unordered pair *within* a base clique is a sound exclusion edge, so their union is a conflict
-     * graph; greedily extending each base clique with literals adjacent to all its members yields larger
+     * Merge a set of at-most-one [cliques] into maximal ones. Every unordered pair *within* a base
+     * clique is a sound exclusion edge, so their union is a conflict graph (see [ConflictGraph]);
+     * greedily extending each base clique with literals adjacent to all its members yields larger
      * at-most-one cliques (e.g. three binary clauses forming a triangle collapse to one size-3 clique).
      * Cliques that end up a subset of another are dropped. Deterministic (literals processed in id
      * order) and bounded by [CLIQUE_MERGE_CAP]; sound because a literal joins only when it conflicts with
@@ -94,25 +94,15 @@ internal object PresolveShared {
      */
     fun mergeCliques(cliques: List<Set<Int>>): List<Set<Int>> {
         if (cliques.size < 2 || cliques.size > CLIQUE_MERGE_CAP) return cliques
-        // Conflict graph: lit -> the lits known pairwise-exclusive with it (co-members of some clique).
-        val adj = MutableIntObjectMap<HashSet<Int>>()
-        for (clique in cliques) {
-            for (u in clique) {
-                val nbrs = adj.getOrPut(u) { HashSet() }
-                for (v in clique) if (v != u) nbrs.add(v)
-            }
-        }
+        val graph = ConflictGraph(cliques)
         val grown = ArrayList<Set<Int>>(cliques.size)
         for (clique in cliques) {
             val members = clique.toHashSet()
-            // Candidates: lits adjacent to *every* current member, taken in id order for determinism.
-            val candidates = clique.fold(null as HashSet<Int>?) { acc, u ->
-                val nbrs = adj[u] ?: hashSetOf()
-                if (acc == null) HashSet(nbrs) else acc.apply { retainAll(nbrs) }
-            } ?: hashSetOf()
-            candidates.removeAll(members)
-            for (c in candidates.sorted()) {
-                if (members.all { it == c || adj[it]?.contains(c) == true }) members.add(c)
+            // Candidates: lits adjacent to every base member, taken in id order for determinism. Each
+            // one is then re-checked against the members added before it, which the candidate set of the
+            // *base* clique does not account for.
+            for (c in graph.commonNeighbours(clique)) {
+                if (members.all { it == c || graph.adjacent(it, c) }) members.add(c)
             }
             grown.add(members)
         }
@@ -121,6 +111,101 @@ internal object PresolveShared {
         val kept = ArrayList<Set<Int>>(sorted.size)
         for (c in sorted) if (kept.none { it.size > c.size && it.containsAll(c) }) kept.add(c)
         return kept
+    }
+
+    /**
+     * The conflict graph of a set of at-most-one [cliques], held as *clique membership* rather than as
+     * an adjacency list. Two literals conflict exactly when some clique contains both, so membership
+     * answers the same queries in `Σ|clique|` space where an explicit adjacency needs `Σ|clique|²` — one
+     * at-most-one over 5632 literals is 32 M neighbour entries, and materializing that is what used to
+     * exhaust the heap on a large pseudo-Boolean model.
+     *
+     * Literals are Lit-encoded and arbitrarily sparse, so they are mapped once to dense positions and
+     * everything below is flat primitive arrays, held as a CSR whose per-literal slice lists the
+     * containing clique ids ascending.
+     */
+    private class ConflictGraph(private val cliques: List<Set<Int>>) {
+        private val positionOf = MutableIntIntMap()
+        private val cliqueStart: IntArray
+        private val cliquesOf: IntArray
+
+        /** Scratch for [commonNeighbours]: adjacent-member count per position, and the stamp of the
+         *  member it was last counted for, so a literal sharing two cliques with one member counts once.
+         *  The stamp only ever increases, so [countedFor] needs no clearing between calls. */
+        private val adjacentCount: IntArray
+        private val countedFor: IntArray
+        private var stamp = 0
+
+        init {
+            var next = 0
+            for (clique in cliques) for (u in clique) if (!positionOf.containsKey(u)) positionOf.put(u, next++)
+            val litCount = next
+            cliqueStart = IntArray(litCount + 1)
+            for (clique in cliques) for (u in clique) cliqueStart[positionOf.getOrDefault(u, 0) + 1]++
+            for (p in 0 until litCount) cliqueStart[p + 1] += cliqueStart[p]
+            val fill = cliqueStart.copyOf(litCount)
+            cliquesOf = IntArray(cliqueStart[litCount])
+            for (id in cliques.indices) for (u in cliques[id]) cliquesOf[fill[positionOf.getOrDefault(u, 0)]++] = id
+            adjacentCount = IntArray(litCount)
+            countedFor = IntArray(litCount) { -1 }
+        }
+
+        /** Whether [u] and [v] are pairwise exclusive — i.e. co-members of some base clique. Both slices
+         *  are ascending, so this is a merge rather than a scan of the smaller against a set. */
+        fun adjacent(u: Int, v: Int): Boolean {
+            val pu = positionOf.getOrDefault(u, -1)
+            val pv = positionOf.getOrDefault(v, -1)
+            if (pu < 0 || pv < 0) return false
+            var i = cliqueStart[pu]
+            var j = cliqueStart[pv]
+            val endI = cliqueStart[pu + 1]
+            val endJ = cliqueStart[pv + 1]
+            while (i < endI && j < endJ) {
+                val a = cliquesOf[i]
+                val b = cliquesOf[j]
+                when {
+                    a == b -> return true
+                    a < b -> i++
+                    else -> j++
+                }
+            }
+            return false
+        }
+
+        /**
+         * The literals adjacent to *every* member of [clique] and not in it — the candidates
+         * [mergeCliques] may extend it with, ascending so the greedy extension is deterministic.
+         * Counted by sweeping each member's containing cliques rather than intersecting neighbour sets,
+         * which keeps the working set to the literals actually reachable from [clique].
+         */
+        fun commonNeighbours(clique: Set<Int>): IntArray {
+            val common = IntArrayList()
+            for (u in clique) {
+                stamp++
+                forEachNeighbour(u) { pw, w ->
+                    if (countedFor[pw] != stamp) {
+                        countedFor[pw] = stamp
+                        adjacentCount[pw]++
+                        if (adjacentCount[pw] == clique.size && w !in clique) common.add(w)
+                    }
+                }
+            }
+            for (u in clique) forEachNeighbour(u) { pw, _ -> adjacentCount[pw] = 0 }
+            return common.toIntArray().apply { sort() }
+        }
+
+        /** Apply [action] to every literal sharing a base clique with [u], by position and value. The
+         *  same literal is visited once per shared clique, so callers that must count dedup themselves. */
+        private inline fun forEachNeighbour(u: Int, action: (Int, Int) -> Unit) {
+            val pu = positionOf.getOrDefault(u, -1)
+            if (pu < 0) return
+            for (i in cliqueStart[pu] until cliqueStart[pu + 1]) {
+                for (w in cliques[cliquesOf[i]]) {
+                    val pw = positionOf.getOrDefault(w, -1)
+                    if (pw >= 0) action(pw, w)
+                }
+            }
+        }
     }
 
     /**
