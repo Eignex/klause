@@ -143,6 +143,47 @@ class PresolveSharedTest {
     }
 
     @Test
+    fun `a literal joins a clique only when it conflicts with every member`() {
+        // 3 is adjacent to 1 and 2 but not to 0, so it may not extend the base clique {0,1,2}; the pair
+        // it does form survives on its own.
+        val merged = PresolveShared.mergeCliques(
+            listOf(setOf(0, 1, 2), setOf(1, 3), setOf(2, 3)),
+        )
+        assertEquals(setOf(setOf(0, 1, 2), setOf(1, 2, 3)), merged.toSet())
+    }
+
+    @Test
+    fun `a clique that is a subset of a larger one is dropped`() {
+        val merged = PresolveShared.mergeCliques(listOf(setOf(0, 1, 2), setOf(0, 1)))
+        assertEquals(listOf(setOf(0, 1, 2)), merged)
+    }
+
+    @Test
+    fun `disjoint cliques are left unmerged`() {
+        val cliques = listOf(setOf(0, 1), setOf(2, 3))
+        assertEquals(cliques.toSet(), PresolveShared.mergeCliques(cliques).toSet())
+    }
+
+    @Test
+    fun `the merge is independent of the order the base cliques arrive in`() {
+        // Extension is greedy, so it is only deterministic because candidates are taken in id order —
+        // permuting the input must not change the result.
+        val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2), setOf(2, 3), setOf(1, 3), setOf(0, 3))
+        val expected = PresolveShared.mergeCliques(base).toSet()
+
+        assertEquals(expected, PresolveShared.mergeCliques(base.reversed()).toSet())
+        assertEquals(expected, PresolveShared.mergeCliques(base.sortedBy { it.sum() }).toSet())
+    }
+
+    @Test
+    fun `negative literals merge like positive ones`() {
+        // Lit encoding makes members arbitrary ints, including negative ones, so the conflict graph
+        // cannot assume dense non-negative keys.
+        val merged = PresolveShared.mergeCliques(listOf(setOf(-1, -2), setOf(-2, -3), setOf(-1, -3)))
+        assertEquals(listOf(setOf(-1, -2, -3)), merged)
+    }
+
+    @Test
     fun `maxIntSpan reports the widest integer domain span`() {
         val problem = Problem(
             0,
