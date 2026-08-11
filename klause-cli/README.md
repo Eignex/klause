@@ -106,10 +106,10 @@ Solver-control flags are common to **every** mode:
     `smooth-factor`; recipe axes `sources`, `scoring` (`weighted|raw`), `acceptance`
     (`greedy|walksat|probsat|skew|sa`), `cb`, `skew-alpha`, `cooling-rate`, `initial-temp`, `min-temp`
   - `portfolio`: `ls`, `bt` (worker counts), `seed`, `lambda`
-  - presolve (any engine): `affine-pivot-order` (`stable_id|markowitz`) — the order affine elimination
-    picks its pivots in. `stable_id` (the default) takes them in model order; `markowitz` takes the
-    lowest estimated fill first. A cost knob only: both yield the same solutions, and which is faster is
-    per-model, so it is a benchmarking axis rather than something to set globally.
+  - presolve (any engine): `affine-pivot-order` (`markowitz|stable_id`) — the order affine elimination
+    picks its pivots in. `markowitz` (the default) takes the lowest estimated fill first; `stable_id` takes
+    them in model order. Both yield the same solutions; the order decides how many variables the pass
+    eliminates within its fill-in budget, so `stable_id` is only there as a measurement baseline.
 
 MiniZinc-mode-only flags:
 

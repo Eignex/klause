@@ -33,7 +33,7 @@ object Presolve {
         sharedIntOcc: SharedIntOccurrence? = null,
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
     ): PassDelta = AffineSingletons.eliminateAffineSingletons(
         problem,
         objectiveIntVars,

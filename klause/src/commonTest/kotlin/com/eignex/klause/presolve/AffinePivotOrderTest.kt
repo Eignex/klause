@@ -48,16 +48,16 @@ class AffinePivotOrderTest {
     private fun totalTerms(problem: Problem): Int = problem.factors.filterIsInstance<Linear>().sumOf { it.vars.size }
 
     @Test
-    fun `the configured default order is by stable id`() {
-        assertEquals(AffinePivotOrder.STABLE_ID, PresolveConfig.AUTO.affinePivotOrder)
+    fun `the configured default order is by fill`() {
+        assertEquals(AffinePivotOrder.MARKOWITZ, PresolveConfig.AUTO.affinePivotOrder)
     }
 
     @Test
-    fun `the default pivot order reduces exactly as the unparameterized pass does`() {
+    fun `the unparameterized pass uses the configured default order`() {
         val problem = sinkModel(sink = 20, wideFirst = 10)
 
         val implicit = Presolve.eliminateAffineSingletons(problem)
-        val explicit = Presolve.eliminateAffineSingletons(problem, pivotOrder = AffinePivotOrder.STABLE_ID)
+        val explicit = Presolve.eliminateAffineSingletons(problem, pivotOrder = AffinePivotOrder.MARKOWITZ)
 
         assertEquals(implicit.droppedIndices.toList(), explicit.droppedIndices.toList())
         assertEquals(implicit.addedFactors.size, explicit.addedFactors.size)

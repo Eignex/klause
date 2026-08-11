@@ -71,7 +71,7 @@ data class PresolveContext(
      *  stable as later rounds shrink the factor set; the affine pass uses it to cap runaway wide folds. */
     val affineUnderdetermined: Boolean = false,
     /** The order affine elimination picks its pivots in, threaded from [PresolveConfig.affinePivotOrder]. */
-    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
     /** The incremental round engine's persistent subsume state and the factors changed since subsume last
      *  ran, so [PresolvePass.REMOVE_REDUNDANT] reprocesses only the delta instead of rescanning every
      *  factor. `null` on the fresh path, where subsume recomputes from scratch each call. */
@@ -675,9 +675,9 @@ class PresolveConfig(
     private val probeBudgetPerVarOverride: Int? = null,
     /** Total SAC probe budget; `null` follows the [emphasis] tier. */
     private val probeTotalBudgetOverride: Int? = null,
-    /** The order affine elimination picks its pivots in. A cost knob only — every order yields the same
-     *  solutions — kept at [AffinePivotOrder.STABLE_ID] until measurement says otherwise. */
-    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+    /** The order affine elimination picks its pivots in. Every order yields the same solutions, so this
+     *  only decides how far the pass gets within its fill-in budget. */
+    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
 ) {
 
     /** Per-var cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
