@@ -14,6 +14,7 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
+import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
@@ -54,7 +55,11 @@ internal object SolveCore {
         // overrides this default verbatim, so an LS run can be benchmarked *with* those passes on
         // (the A/B that decides whether the LS-specific stripping is worth keeping).
         val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
-        val config = if (engine.pureLs && common.presolve == null) base.forLocalSearch() else base
+        val forEngine = if (engine.pureLs && common.presolve == null) base.forLocalSearch() else base
+        // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
+        // orders differ in what they fold first, never in what the problem means — exposed so the choice
+        // can be A/B'd on a corpus rather than argued about.
+        val config = affinePivotOrderParam(common)?.let { forEngine.withAffinePivotOrder(it) } ?: forEngine
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -325,6 +330,25 @@ internal object SolveCore {
      *  that would read as an exact total. */
     private fun spanText(problem: Problem): String =
         domainSpan(problem).let { if (it == Long.MAX_VALUE) "unbounded" else it.toString() }
+
+    /**
+     * The `affine-pivot-order` param, or `null` to keep the configured default. This is a *presolve*
+     * knob sharing the `--param` namespace the engines validate, so it is consumed out of
+     * [CommonOptions.engineParams] here — otherwise every engine's unknown-key check would reject it.
+     */
+    private fun affinePivotOrderParam(common: CommonOptions): AffinePivotOrder? {
+        val prefix = "$AFFINE_PIVOT_ORDER_KEY="
+        val idx = common.engineParams.indexOfFirst { it.startsWith(prefix) }
+        if (idx < 0) return null
+        val id = common.engineParams.removeAt(idx).removePrefix(prefix)
+        return AffinePivotOrder.entries.firstOrNull { it.name.equals(id, ignoreCase = true) }
+            ?: usageError(
+                "engine param `$AFFINE_PIVOT_ORDER_KEY` expects " +
+                    AffinePivotOrder.entries.joinToString("|") { it.name.lowercase() } + ", got `$id`",
+            )
+    }
+
+    private const val AFFINE_PIVOT_ORDER_KEY = "affine-pivot-order"
 
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()

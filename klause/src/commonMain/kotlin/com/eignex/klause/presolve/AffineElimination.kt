@@ -16,6 +16,24 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 
+/**
+ * The order affine elimination picks its pivots in. Elimination cost depends on the order as much as on
+ * the set of pivots — folding the cheap ones first shrinks the constraint graph, so folds that would have
+ * been expensive become cheap or stop existing — and every order yields the same solutions, so this is a
+ * cost knob only.
+ */
+enum class AffinePivotOrder {
+
+    /** Lowest stable id first, i.e. the order the model presents its constraints in. Arbitrary with
+     *  respect to elimination cost, but the cheapest to maintain: the scan resumes rather than restarts. */
+    STABLE_ID,
+
+    /** Cheapest estimated fill first (Markowitz). Costs more to maintain — a heap over the candidates,
+     *  revalidated as folds change it — and is the lever against the fold-sink and row-densification
+     *  pathologies that the fill-in gates can only refuse rather than defer. */
+    MARKOWITZ,
+}
+
 internal object AffineSingletons {
 
     /**
@@ -54,6 +72,7 @@ internal object AffineSingletons {
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
         maxFactors: Int = AFFINE_MAX_FACTORS,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
         // On instances with millions of factors the pass scans the whole set for candidates and can run
@@ -103,21 +122,20 @@ internal object AffineSingletons {
         // membership predicates it runs are answered from the incremental occurrence index.
         // Poll the budget so it stops with the eliminations made so far — sound (the remaining
         // affine-defined variables simply stay and are solved directly).
-        // The candidate scan is lowest-stable-id-first. A fold only changes the content of the factors it
-        // rewrites, so no factor below their minimum id can newly become a candidate; resume the next scan
-        // from that minimum instead of restarting at 0, turning the loop from O(eliminations · factors) into
-        // O(factors + Σ rewrites). Every factor below [scanFrom] is a confirmed non-candidate (unchanged
-        // since it was last examined), so the selection order — and the eliminations — are unchanged.
-        var scanFrom = 0
+        // Which pivot to take next is a policy ([AffinePivotOrder]), because elimination cost depends on
+        // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
+        // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
+        // cap) can only refuse a fold; they cannot defer one.
+        val order = newPivotOrder(pivotOrder, ws, eliminated, objectiveIntVars, capWide, cancellation)
         // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
         // folds is superlinear and can dominate presolve on large models where it barely simplifies;
         // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
         // solved directly (sound). The budget is far above what productive models spend.
         var fillIn = 0L
         while (!cancellation()) {
-            val cand = findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide, cancellation) ?: break
+            val cand = order.next() ?: break
             fillIn += ws.degreeOf(cand.x).toLong() * cand.termVars.size
-            scanFrom = foldOutVariable(problem, ws, cand)
+            order.onFolded(foldOutVariable(problem, ws, cand))
             eliminated[cand.x] = true
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
             if (fillIn > AFFINE_FILL_IN_BUDGET) break
@@ -145,6 +163,219 @@ internal object AffineSingletons {
             domains,
             AffineElimination(subs)::reconstruct,
         )
+    }
+
+    /**
+     * The next pivot to fold out, and the bookkeeping that keeps that choice cheap across eliminations.
+     * The two orders differ only in *which* admissible candidate they hand back — every candidate is
+     * vetted by the same [candidateInFactor] gate, so no order can produce an unsound fold, and stopping
+     * early is always sound (an unfolded variable simply stays and is solved directly).
+     */
+    private interface PivotOrder {
+
+        /** The next pivot to fold, or `null` when no admissible candidate remains. */
+        fun next(): AffineCandidate?
+
+        /** Record that the fold just made rewrote factors from stable id [minRewrittenId] upward. */
+        fun onFolded(minRewrittenId: Int)
+    }
+
+    private fun newPivotOrder(
+        policy: AffinePivotOrder,
+        ws: FactorOcc,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+        capWide: Boolean,
+        cancellation: Cancellation,
+    ): PivotOrder = when (policy) {
+        AffinePivotOrder.STABLE_ID -> StableIdOrder(ws, eliminated, objectiveIntVars, capWide, cancellation)
+        AffinePivotOrder.MARKOWITZ -> MarkowitzOrder(ws, eliminated, objectiveIntVars, capWide, cancellation)
+    }
+
+    /**
+     * Lowest-stable-id-first: the first admissible candidate at or after a resume point. A fold only
+     * changes the content of the factors it rewrites, so no factor below their minimum id can newly
+     * become a candidate; resuming from that minimum instead of restarting at 0 turns the loop from
+     * O(eliminations · factors) into O(factors + Σ rewrites). Every factor below the resume point is a
+     * confirmed non-candidate (unchanged since it was last examined), so the selection order — and the
+     * eliminations — match what a full rebuild would produce.
+     */
+    private class StableIdOrder(
+        private val ws: FactorOcc,
+        private val eliminated: BooleanArray,
+        private val objectiveIntVars: Set<Int>,
+        private val capWide: Boolean,
+        private val cancellation: Cancellation,
+    ) : PivotOrder {
+        private var scanFrom = 0
+
+        override fun next(): AffineCandidate? =
+            findAffineCandidate(ws, scanFrom, eliminated, objectiveIntVars, capWide, cancellation)
+
+        override fun onFolded(minRewrittenId: Int) {
+            scanFrom = minRewrittenId
+        }
+    }
+
+    /**
+     * Cheapest-fill-first, the classic Markowitz rule for sparse elimination: prefer the pivot whose
+     * substitution creates the fewest new nonzeros, `(r − 1)(c − 1)` for a pivot in `r` rows and a row of
+     * `c` nonzeros — here [markowitzCost]. Ordering is a different lever from the fill-in gates: a
+     * threshold judges a fold in isolation and must refuse it, while an order defers it, and a deferred
+     * fold is often cheap by the time it comes round because the folds ahead of it shrank the graph.
+     *
+     * Costs go stale as folds change the degrees of variables in candidates already queued. Rather than
+     * invalidate exactly — measured to cost as much as it saves on a dense constraint graph — the heap
+     * keeps possibly-stale keys and revalidates on pop: a candidate whose true cost exceeds its key is
+     * re-queued at the true cost, so a popped candidate is always the cheapest known. A key that is too
+     * *low* only degrades the heuristic, never correctness, which is why an approximate order is enough.
+     */
+    private class MarkowitzOrder(
+        private val ws: FactorOcc,
+        private val eliminated: BooleanArray,
+        private val objectiveIntVars: Set<Int>,
+        private val capWide: Boolean,
+        private val cancellation: Cancellation,
+    ) : PivotOrder {
+        private val heap = PivotHeap()
+        private var seeded = false
+
+        /** Promotions already queued. [FactorOcc.promotedAt] is append-only, so the tail is exactly the
+         *  ids that folds turned into candidates since the last look. */
+        private var promotionsQueued = 0
+
+        override fun next(): AffineCandidate? {
+            if (!seeded) {
+                seed()
+                seeded = true
+            }
+            queuePromotions()
+            var polled = 0
+            while (!heap.isEmpty()) {
+                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+                val key = heap.peekCost()
+                val id = heap.popId()
+                // A candidate that no longer holds is dropped rather than re-queued: the gates that reject
+                // it (eliminated pivot, absorbed-fold sink, overflow) are the ones a later fold only makes
+                // harder to pass, and the stable-id scan likewise never revisits what it has stepped past.
+                val cand = candidateInFactor(ws, id, eliminated, objectiveIntVars, capWide, cancellation)
+                    ?: continue
+                val cost = markowitzCost(ws, cand)
+                // Stale key. Re-queue at the true cost and take the new minimum; the key is now exact for
+                // this working set, so the same id cannot be re-queued twice in one call.
+                if (cost > key) {
+                    heap.push(cost, id)
+                    continue
+                }
+                return cand
+            }
+            return null
+        }
+
+        override fun onFolded(minRewrittenId: Int) {
+            // Queued costs are now stale, which the pop-time revalidation absorbs. Newly promoted ids are
+            // picked up by [queuePromotions] on the next call.
+        }
+
+        /** Seed every pivot-candidate id at a *lower bound* on its cost. An underestimate is what the
+         *  revalidation is built for, and bounding is O(arity) per row against the O(occurrences) a full
+         *  admissibility check would cost on every row up front. */
+        private fun seed() {
+            var id = ws.nextEqId(0)
+            while (id < ws.size) {
+                heap.push(costLowerBound(id), id)
+                id = ws.nextEqId(id + 1)
+            }
+            promotionsQueued = ws.promotedCount()
+        }
+
+        private fun queuePromotions() {
+            val n = ws.promotedCount()
+            while (promotionsQueued < n) {
+                val id = ws.promotedAt(promotionsQueued++)
+                heap.push(costLowerBound(id), id)
+            }
+        }
+
+        /** The least `(r − 1)(c − 1)` any variable of the row at [id] could give as its pivot. */
+        private fun costLowerBound(id: Int): Long {
+            val f = ws.factorAt(id) ?: return 0L
+            val vars = f.intVars
+            if (vars.size < 2) return 0L
+            var minDegree = Int.MAX_VALUE
+            for (v in vars) {
+                val d = ws.degreeOf(v)
+                if (d < minDegree) minDegree = d
+            }
+            return (minDegree - 1).toLong() * (vars.size - 1)
+        }
+    }
+
+    /** The fill a fold on [cand]'s pivot would create: `(r − 1)(c − 1)` over the `r` rows mentioning the
+     *  pivot and the `c` nonzeros of its defining row. The same quantity the [WIDE_FILL_IN] gate tests. */
+    private fun markowitzCost(ws: FactorOcc, cand: AffineCandidate): Long =
+        (ws.degreeOf(cand.x) - 1).toLong() * cand.termVars.size
+
+    /**
+     * A binary min-heap of `(cost, stable id)` packed into one `Long` — cost in the high word (saturated
+     * to fit), id in the low. Packing makes the comparison a single `Long` compare *and* breaks cost ties
+     * by ascending id, so the order is deterministic rather than dependent on heap shape.
+     */
+    private class PivotHeap {
+        private val entries = LongArrayList(0)
+
+        fun isEmpty(): Boolean = entries.size == 0
+
+        fun push(cost: Long, id: Int) {
+            entries.add(pack(cost, id))
+            var i = entries.size - 1
+            while (i > 0) {
+                val parent = (i - 1) / 2
+                if (entries[parent] <= entries[i]) break
+                swap(i, parent)
+                i = parent
+            }
+        }
+
+        fun peekCost(): Long = entries[0] ushr ID_BITS
+
+        /** Remove and return the minimum entry's stable id. */
+        fun popId(): Int {
+            val top = entries[0]
+            val last = entries.size - 1
+            entries[0] = entries[last]
+            entries.truncateTo(last)
+            siftDown()
+            return (top and ID_MASK).toInt()
+        }
+
+        private fun siftDown() {
+            var i = 0
+            while (true) {
+                val left = 2 * i + 1
+                if (left >= entries.size) break
+                val right = left + 1
+                val child = if (right < entries.size && entries[right] < entries[left]) right else left
+                if (entries[i] <= entries[child]) break
+                swap(i, child)
+                i = child
+            }
+        }
+
+        private fun swap(a: Int, b: Int) {
+            val t = entries[a]
+            entries[a] = entries[b]
+            entries[b] = t
+        }
+
+        private fun pack(cost: Long, id: Int): Long = (cost.coerceIn(0L, MAX_COST) shl ID_BITS) or id.toLong()
+
+        private companion object {
+            /** Stable ids index the working set, so 32 bits always cover them and leave 31 for the cost. */
+            const val ID_BITS = 32
+            const val ID_MASK = 0xFFFFFFFFL
+            const val MAX_COST = Int.MAX_VALUE.toLong()
+        }
     }
 
     /** The `Int` value window; a single-partner global's affine view (an index/position shift) is only
@@ -487,6 +718,15 @@ internal object AffineSingletons {
          *  fold (the pristine seed), so it only ever defers a pivot targeting an established fold sink. */
         fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean
 
+        /** How many ids a rewrite has *promoted* into the pivot-candidate set so far. The promotion list is
+         *  append-only, so a reader that remembers this count picks up later promotions from its tail
+         *  ([promotedAt]) instead of re-walking every candidate id. Zero on the pristine seed, which
+         *  rewrites nothing. */
+        fun promotedCount(): Int
+
+        /** The [k]-th promoted stable id (`0 until promotedCount()`). */
+        fun promotedAt(k: Int): Int
+
         /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
          *  mentions [x] (other than [defIdx]) would overflow 64-bit arithmetic. When it would, the
          *  candidate is skipped and `x` is left un-eliminated (sound) rather than wrapping a coefficient. */
@@ -623,6 +863,11 @@ internal object AffineSingletons {
 
         // The seed is the pristine input before any fold, so no row has absorbed one yet.
         override fun anyOtherLinearAtAbsorbCap(defIdx: Int, x: Int): Boolean = false
+
+        // The seed is the pristine input, so nothing has been rewritten and nothing can have been promoted.
+        override fun promotedCount(): Int = 0
+
+        override fun promotedAt(k: Int): Int = error("the pristine seed promotes nothing")
     }
 
     /**
@@ -818,6 +1063,10 @@ internal object AffineSingletons {
             val self = if (absorbed[defIdx] >= FOLD_ABSORB_CAP && isCappable(slots[defIdx])) 1 else 0
             return total - self > 0
         }
+
+        override fun promotedCount(): Int = promoted.size
+
+        override fun promotedAt(k: Int): Int = promoted[k]
 
         /**
          * Fold `x = constTerm + Σ termCoeffs·termVars` out of the working set, dropping the defining
