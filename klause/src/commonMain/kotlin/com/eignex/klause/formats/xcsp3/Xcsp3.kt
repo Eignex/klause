@@ -390,8 +390,11 @@ object Xcsp3 {
                         val ch = newAuxVar(0L, 1L)
                         factors.add(
                             ReifiedLinear(
-                                Lit.variable(lit), intArrayOf(1), intArrayOf(ch),
-                                LinearOp.EQ, if (Lit.isPositive(lit)) 1 else 0,
+                                Lit.variable(lit),
+                                intArrayOf(1),
+                                intArrayOf(ch),
+                                LinearOp.EQ,
+                                if (Lit.isPositive(lit)) 1 else 0,
                             ),
                         )
                         ch
