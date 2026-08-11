@@ -76,6 +76,9 @@ internal object AffineSingletons {
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
+        // Membership is tested per candidate variable, so the caller's boxed set is unpacked once here
+        // rather than boxing an Int on every check.
+        val objVars = IntHashSet().apply { for (v in objectiveIntVars) add(v) }
         // On instances with millions of factors the pass scans the whole set for candidates and can run
         // for several seconds while barely simplifying (e.g. Coprime/ItemsetMining: ~10M factors, net
         // factor change in the tens). Skipping it there keeps presolve bounded; it is sound (the
@@ -100,14 +103,14 @@ internal object AffineSingletons {
                     seed,
                     incrementalTouchedVars,
                     eliminated,
-                    objectiveIntVars,
+                    objVars,
                     capWide,
                     problem.intDomains,
                     cancellation,
                 )
             } else {
-                findAffineCandidate(seed, 0, eliminated, objectiveIntVars, capWide, cancellation) != null ||
-                    findResidueCandidate(seed, eliminated, objectiveIntVars, problem.intDomains, cancellation) != null
+                findAffineCandidate(seed, 0, eliminated, objVars, capWide, cancellation) != null ||
+                    findResidueCandidate(seed, eliminated, objVars, problem.intDomains, cancellation) != null
             }
             if (!hasCandidate) return PassDelta()
         }
@@ -127,7 +130,7 @@ internal object AffineSingletons {
         // the order as much as on the set: folding the cheap pivots first shrinks the graph, so folds that
         // would have been expensive become cheap or stop existing. The gates below (fill-in budget, absorb
         // cap) can only refuse a fold; they cannot defer one.
-        val order = newPivotOrder(pivotOrder, ws, eliminated, objectiveIntVars, capWide, cancellation)
+        val order = newPivotOrder(pivotOrder, ws, eliminated, objVars, capWide, cancellation)
         // Cumulative substitution fill-in (Σ pivot-degree · substituted-terms). A dense chain of wide
         // folds is superlinear and can dominate presolve on large models where it barely simplifies;
         // once the budget is spent the loop stops, leaving the remaining affine-defined variables to be
@@ -148,7 +151,7 @@ internal object AffineSingletons {
         // is always a surviving variable.
         val domains = problem.intDomains.copyOf()
         while (!cancellation()) {
-            val r = findResidueCandidate(ws, eliminated, objectiveIntVars, domains, cancellation) ?: break
+            val r = findResidueCandidate(ws, eliminated, objVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)
             domains[r.y] = r.restrictedY
             eliminated[r.x] = true
@@ -185,7 +188,7 @@ internal object AffineSingletons {
         policy: AffinePivotOrder,
         ws: FactorOcc,
         eliminated: BooleanArray,
-        objectiveIntVars: Set<Int>,
+        objectiveIntVars: IntHashSet,
         capWide: Boolean,
         cancellation: Cancellation,
     ): PivotOrder = when (policy) {
@@ -204,7 +207,7 @@ internal object AffineSingletons {
     private class StableIdOrder(
         private val ws: FactorOcc,
         private val eliminated: BooleanArray,
-        private val objectiveIntVars: Set<Int>,
+        private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
         private val cancellation: Cancellation,
     ) : PivotOrder {
@@ -234,7 +237,7 @@ internal object AffineSingletons {
     private class MarkowitzOrder(
         private val ws: FactorOcc,
         private val eliminated: BooleanArray,
-        private val objectiveIntVars: Set<Int>,
+        private val objectiveIntVars: IntHashSet,
         private val capWide: Boolean,
         private val cancellation: Cancellation,
     ) : PivotOrder {
@@ -288,11 +291,17 @@ internal object AffineSingletons {
             // picked up by [queuePromotions] on the next call.
         }
 
-        /** Seed every pivot-candidate id at a *lower bound* on its cost. An underestimate is what the
-         *  revalidation is built for, and bounding is O(arity) per row against the O(occurrences) a full
-         *  admissibility check would cost on every row up front. */
+        /** Seed every pivot-candidate id at its [estimatedCost], counting them first so the heap is sized
+         *  once rather than doubled into — the seed is the largest it ever gets. */
         private fun seed() {
+            var count = 0
             var id = ws.nextEqId(0)
+            while (id < ws.size) {
+                count++
+                id = ws.nextEqId(id + 1)
+            }
+            heap.reserve(count)
+            id = ws.nextEqId(0)
             while (id < ws.size) {
                 heap.push(estimatedCost(id), id)
                 id = ws.nextEqId(id + 1)
@@ -353,9 +362,14 @@ internal object AffineSingletons {
      * by ascending id, so the order is deterministic rather than dependent on heap shape.
      */
     private class PivotHeap {
-        private val entries = LongArrayList(0)
+        private var entries = LongArrayList(0)
 
         fun isEmpty(): Boolean = entries.size == 0
+
+        /** Pre-size the backing store for [n] pushes. */
+        fun reserve(n: Int) {
+            if (n > 0 && entries.size == 0) entries = LongArrayList(n)
+        }
 
         fun push(cost: Long, id: Int) {
             entries.add(pack(cost, id))
@@ -460,7 +474,7 @@ internal object AffineSingletons {
     private fun findResidueCandidate(
         ws: FactorOcc,
         eliminated: BooleanArray,
-        objectiveIntVars: Set<Int>,
+        objectiveIntVars: IntHashSet,
         domains: Array<IntDomain>,
         cancellation: Cancellation = Cancellation.Never,
     ): ResidueCandidate? {
@@ -486,7 +500,7 @@ internal object AffineSingletons {
         ws: FactorOcc,
         di: Int,
         eliminated: BooleanArray,
-        objectiveIntVars: Set<Int>,
+        objectiveIntVars: IntHashSet,
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
         val f = ws.factorAt(di) ?: return null
@@ -561,7 +575,7 @@ internal object AffineSingletons {
         ws: FactorOcc,
         start: Int,
         eliminated: BooleanArray,
-        objectiveIntVars: Set<Int>,
+        objectiveIntVars: IntHashSet,
         capWide: Boolean,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
@@ -610,7 +624,7 @@ internal object AffineSingletons {
         ws: FactorOcc,
         di: Int,
         eliminated: BooleanArray,
-        objectiveIntVars: Set<Int>,
+        objectiveIntVars: IntHashSet,
         capWide: Boolean,
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
@@ -686,7 +700,7 @@ internal object AffineSingletons {
         seed: SeedOcc,
         touchedVars: IntArray,
         eliminated: BooleanArray,
-        objectiveIntVars: Set<Int>,
+        objectiveIntVars: IntHashSet,
         capWide: Boolean,
         domains: Array<IntDomain>,
         cancellation: Cancellation = Cancellation.Never,
