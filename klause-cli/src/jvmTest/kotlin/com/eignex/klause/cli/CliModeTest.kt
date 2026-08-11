@@ -374,6 +374,27 @@ class CliModeTest {
     }
 
     @Test
+    fun `dry-run-presolve reports a domain span too wide for a Long as unbounded`() {
+        // Three vars whose widths each approach 2^63 sum past Long.MAX_VALUE, which a plain sum wraps
+        // to a negative that reads as a real measurement.
+        val smt = File.createTempFile("cli", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LIA)\n" +
+                    (1..3).joinToString("") { "(declare-const x$it Int)\n" } +
+                    (1..3).joinToString("") { "(assert (>= (* 18446712406915678208 x$it) 0))\n" } +
+                    "(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+        val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
+
+        val span = out.lineSequence().first { "int-domain span:" in it }
+        val sides = span.substringAfter("int-domain span:").split("->").map { it.trim() }
+        assertEquals("unbounded", sides.first(), "an overflowing span must be named, not wrapped: $span")
+        assertTrue(sides.none { it.startsWith("-") }, "a span is never negative: $span")
+    }
+
+    @Test
     fun `the lp-harvest presolve pass reports its contribution when enabled`() {
         // x+y<=3, y+z<=3, x+z<=3 imply x+y+z<=5 (LP max 4.5), so the lp-harvest pass drops it. The pass is
         // opt-in, so it fires only with the +lp-harvest delta; the dry-run must then report the removal.

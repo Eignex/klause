@@ -274,7 +274,7 @@ internal object SolveCore {
         errPrintln("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
         errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
         errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
-        errPrintln("  int-domain span: ${domainSpan(original)} -> ${domainSpan(presolved)}")
+        errPrintln("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
         val before = factorHistogram(original)
         val after = factorHistogram(presolved)
         for (kind in (before.keys + after.keys).sorted()) {
@@ -304,12 +304,27 @@ internal object SolveCore {
         }
     }
 
-    /** Total integer-domain span `Σ (max − min)` — the coarse problem-size measure presolve shrinks. */
+    /**
+     * Total integer-domain span `Σ (max − min)` — the coarse problem-size measure presolve shrinks —
+     * saturating at [Long.MAX_VALUE]. Both the per-domain width and the sum exceed a `Long` on a model
+     * with near-full-range domains, and a wrapped total reads as a plausible figure rather than as
+     * overflow, so each is checked. Matches the saturating convention of `PresolveShared.maxIntSpan`.
+     */
     private fun domainSpan(problem: Problem): Long {
         var span = 0L
-        for (d in problem.intDomains) span += d.max - d.min
+        for (d in problem.intDomains) {
+            val width = d.max - d.min
+            if (width < 0L) return Long.MAX_VALUE
+            span += width
+            if (span < 0L) return Long.MAX_VALUE
+        }
         return span
     }
+
+    /** [domainSpan] for the dry-run readout, naming the saturated case instead of printing a number
+     *  that would read as an exact total. */
+    private fun spanText(problem: Problem): String =
+        domainSpan(problem).let { if (it == Long.MAX_VALUE) "unbounded" else it.toString() }
 
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
