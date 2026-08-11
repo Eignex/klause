@@ -3,8 +3,9 @@ name: build
 on:
   push:
     branches: [ main ]
+  # Every pull request, whatever it targets. Restricting this to a `main` base left a PR in a
+  # stack — one branch based on another — with no checks at all, so it could merge unverified.
   pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 # A newer push supersedes any in-flight run for the same ref.
