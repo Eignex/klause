@@ -70,6 +70,8 @@ data class PresolveContext(
      *  without simplifying (dense, unproductive fill-in). Set once from the original problem so it stays
      *  stable as later rounds shrink the factor set; the affine pass uses it to cap runaway wide folds. */
     val affineUnderdetermined: Boolean = false,
+    /** The order affine elimination picks its pivots in, threaded from [PresolveConfig.affinePivotOrder]. */
+    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
     /** The incremental round engine's persistent subsume state and the factors changed since subsume last
      *  ran, so [PresolvePass.REMOVE_REDUNDANT] reprocesses only the delta instead of rescanning every
      *  factor. `null` on the fresh path, where subsume recomputes from scratch each call. */
@@ -101,6 +103,9 @@ data class PresolveContext(
      *  original problem and threads it so the affine pass's wide-fold cap is stable across rounds. */
     fun withAffineUnderdetermined(underdetermined: Boolean): PresolveContext =
         copy(affineUnderdetermined = underdetermined)
+
+    /** This context carrying the configured affine pivot order. */
+    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveContext = copy(affinePivotOrder = pivotOrder)
 
     /** This context carrying the incremental round engine's session-maintained occurrence index for the
      *  current pass input, so the affine / dup-columns candidate search reuses it. */
@@ -326,6 +331,7 @@ enum class PresolvePass(
             ctx.sharedIntOcc,
             ctx.affineUnderdetermined,
             ctx.affineTouchedVars,
+            ctx.affinePivotOrder,
         )
     },
 
@@ -669,6 +675,9 @@ class PresolveConfig(
     private val probeBudgetPerVarOverride: Int? = null,
     /** Total SAC probe budget; `null` follows the [emphasis] tier. */
     private val probeTotalBudgetOverride: Int? = null,
+    /** The order affine elimination picks its pivots in. A cost knob only — every order yields the same
+     *  solutions — kept at [AffinePivotOrder.STABLE_ID] until measurement says otherwise. */
+    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
 ) {
 
     /** Per-var cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
@@ -676,6 +685,10 @@ class PresolveConfig(
 
     /** Total cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
     fun probeTotalBudget(): Int = probeTotalBudgetOverride ?: emphasis.probeTotalBudget
+
+    /** This config with a different affine pivot order — the benchmarking knob for that choice. */
+    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig =
+        PresolveConfig(emphasis, overrides, probeBudgetPerVarOverride, probeTotalBudgetOverride, pivotOrder)
 
     /** Whether [pass] runs under [context]: an explicit override wins, else the emphasis rule. */
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
@@ -705,6 +718,7 @@ class PresolveConfig(
             .associateWith { false },
         probeBudgetPerVarOverride,
         probeTotalBudgetOverride,
+        affinePivotOrder,
     )
 
     /** Predefined configs and the spec-string [parse]r. */
@@ -803,7 +817,9 @@ object Presolver {
         // shrink the factor set, so a per-round ratio would spuriously read as underdetermined.
         val underdetermined = problem.factors.isNotEmpty() &&
             problem.numIntVars.toLong() > problem.factors.size.toLong() * UNDERDETERMINED_RATIO
-        val ctx = context.withCancellation(cancellation).withAffineUnderdetermined(underdetermined)
+        val ctx = context.withCancellation(cancellation)
+            .withAffineUnderdetermined(underdetermined)
+            .withAffinePivotOrder(config.affinePivotOrder)
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
         // each pass's delta instead of rebuilding a [Problem] per firing pass. Scoped away from any
