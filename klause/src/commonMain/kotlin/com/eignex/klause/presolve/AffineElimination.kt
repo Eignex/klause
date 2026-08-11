@@ -25,12 +25,13 @@ import com.eignex.klause.util.LongHashSet
 enum class AffinePivotOrder {
 
     /** Lowest stable id first, i.e. the order the model presents its constraints in. Arbitrary with
-     *  respect to elimination cost, but the cheapest to maintain: the scan resumes rather than restarts. */
+     *  respect to elimination cost, and kept only as the baseline to measure against. */
     STABLE_ID,
 
-    /** Cheapest estimated fill first (Markowitz). Costs more to maintain — a heap over the candidates,
-     *  revalidated as folds change it — and is the lever against the fold-sink and row-densification
-     *  pathologies that the fill-in gates can only refuse rather than defer. */
+    /** Cheapest estimated fill first (Markowitz), the default. The pass is bounded by a cumulative
+     *  fill-in budget, so the order decides how many variables that budget buys: taking the model's own
+     *  order spends it on a handful of runaway dense folds on the models that have any (31 eliminations
+     *  for the whole budget on one MIPLIB instance, against 1167 for the same budget here). */
     MARKOWITZ,
 }
 
@@ -72,7 +73,7 @@ internal object AffineSingletons {
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
         maxFactors: Int = AFFINE_MAX_FACTORS,
-        pivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+        pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
         // On instances with millions of factors the pass scans the whole set for candidates and can run
@@ -244,6 +245,11 @@ internal object AffineSingletons {
          *  ids that folds turned into candidates since the last look. */
         private var promotionsQueued = 0
 
+        /** Ids that failed the candidate gate, held for one more look after the next fold. */
+        private val deferred = IntArrayList(0)
+        private var folds = 0
+        private var foldsAtRefill = -1
+
         override fun next(): AffineCandidate? {
             if (!seeded) {
                 seed()
@@ -251,30 +257,44 @@ internal object AffineSingletons {
             }
             queuePromotions()
             var polled = 0
-            while (!heap.isEmpty()) {
-                if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
-                val key = heap.peekCost()
-                val id = heap.popId()
-                // A candidate that no longer holds is dropped rather than re-queued: the gates that reject
-                // it (eliminated pivot, absorbed-fold sink, overflow) are the ones a later fold only makes
-                // harder to pass, and the stable-id scan likewise never revisits what it has stepped past.
-                val cand = candidateInFactor(ws, id, eliminated, objectiveIntVars, capWide, cancellation)
-                    ?: continue
-                val cost = markowitzCost(ws, cand)
-                // Stale key. Re-queue at the true cost and take the new minimum; the key is now exact for
-                // this working set, so the same id cannot be re-queued twice in one call.
-                if (cost > key) {
-                    heap.push(cost, id)
-                    continue
+            while (true) {
+                while (!heap.isEmpty()) {
+                    if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return null
+                    val key = heap.peekCost()
+                    val id = heap.popId()
+                    val cand = candidateInFactor(ws, id, eliminated, objectiveIntVars, capWide, cancellation)
+                    if (cand == null) {
+                        // Inadmissible *now*. Several of the gates are transient — a row at the absorb cap,
+                        // a fold that would overflow, an occurrence not yet linear — so the id is set aside
+                        // rather than dropped, and reconsidered once folds have moved the working set.
+                        // Dropping it outright leaves whole families under-reduced.
+                        deferred.add(id)
+                        continue
+                    }
+                    val cost = markowitzCost(ws, cand)
+                    // Stale key. Re-queue at the true cost and take the new minimum; the key is now exact
+                    // for this working set, so the same id cannot be re-queued twice in one call.
+                    if (cost > key) {
+                        heap.push(cost, id)
+                        continue
+                    }
+                    foldsAtRefill = folds
+                    return cand
                 }
-                return cand
+                // The heap is empty. Anything set aside since the last refill is worth one more look, but
+                // only if a fold has happened since — otherwise nothing it depends on has changed and a
+                // refill would spin.
+                if (deferred.isEmpty() || folds == foldsAtRefill) return null
+                foldsAtRefill = folds
+                for (k in 0 until deferred.size) heap.push(costLowerBound(deferred[k]), deferred[k])
+                deferred.clear()
             }
-            return null
         }
 
         override fun onFolded(minRewrittenId: Int) {
             // Queued costs are now stale, which the pop-time revalidation absorbs. Newly promoted ids are
             // picked up by [queuePromotions] on the next call.
+            folds++
         }
 
         /** Seed every pivot-candidate id at a *lower bound* on its cost. An underestimate is what the
