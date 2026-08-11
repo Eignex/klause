@@ -15,6 +15,9 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * The order affine elimination picks its pivots in. Elimination cost depends on the order as much as on
@@ -73,6 +76,7 @@ internal object AffineSingletons {
         incrementalTouchedVars: IntArray? = null,
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+        batchFolds: Boolean = false,
     ): PassDelta {
         if (problem.numIntVars == 0) return PassDelta()
         // On instances with millions of factors the pass scans the whole set for candidates and can run
@@ -134,10 +138,22 @@ internal object AffineSingletons {
         var fillIn = 0L
         while (!cancellation()) {
             val cand = order.next() ?: break
-            fillIn += ws.degreeOf(cand.x).toLong() * cand.termVars.size
-            order.onFolded(foldOutVariable(problem, ws, cand))
-            eliminated[cand.x] = true
-            subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
+            // Fold a whole wave of mutually independent pivots into each row at once where possible: a row
+            // absorbing k folds one at a time is rebuilt k times and grows as it goes, which is the O(k²)
+            // the absorb cap exists to bound. A single-pivot wave is the sequential path verbatim.
+            val wave = collectWave(ws, cand, eliminated, objectiveIntVars, capWide, batchFolds, cancellation)
+            // Charged off the pre-fold degrees, so this is read before the working set moves.
+            val waveFill = wave.map { ws.degreeOf(it.x).toLong() * it.termVars.size }
+            // A wave that cannot be applied without overflowing falls back to its seed (`wave[0]`) alone,
+            // which the candidate gate has already cleared.
+            val batched = if (wave.size > 1) ws.foldWave(problem, wave) else null
+            val applied = if (batched != null) wave else listOf(cand)
+            fillIn += if (batched != null) waveFill.sum() else waveFill.first()
+            order.onFolded(batched ?: foldOutVariable(problem, ws, cand))
+            for (c in applied) {
+                eliminated[c.x] = true
+                subs.add(AffineSub(c.x, c.constTerm, c.termVars, c.termCoeffs))
+            }
             if (fillIn > AFFINE_FILL_IN_BUDGET) break
         }
         // Residue-class doubletons (#522): a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
@@ -164,6 +180,78 @@ internal object AffineSingletons {
             AffineElimination(subs)::reconstruct,
         )
     }
+
+    /** Most pivots a single wave folds together. A wave costs one scan to collect, so it has to fold
+     *  enough rows to pay for it; past this the marginal row rebuild it saves is not worth holding more
+     *  pending state, and a shorter wave keeps the pivots closer to the order's own preference. */
+    private const val MAX_WAVE = 64
+
+    /**
+     * [seed] plus every later candidate that can be folded *in the same rewrite of each row*. Two pivots
+     * qualify when neither appears in the other's defining row: their substitutions then touch disjoint
+     * terms, so applying both to a row in one pass gives exactly what applying them in sequence gives.
+     *
+     * Aliases are excluded — a rename goes through [WorkingSet.alias] over every factor type rather than
+     * through a linear rewrite — and so is any candidate that would push one of its target rows past
+     * [FOLD_ABSORB_CAP], counting the wave's own pending folds, so batching does not quietly widen the
+     * rows the cap is there to bound.
+     */
+    private fun collectWave(
+        ws: FactorOcc,
+        seed: AffineCandidate,
+        eliminated: BooleanArray,
+        objectiveIntVars: Set<Int>,
+        capWide: Boolean,
+        batchFolds: Boolean,
+        cancellation: Cancellation,
+    ): List<AffineCandidate> {
+        if (!batchFolds || seed.isAlias) return listOf(seed)
+        val wave = ArrayList<AffineCandidate>(1).apply { add(seed) }
+        // Every variable of every defining row already in the wave. A later pivot may not be one of them
+        // (its fold would rewrite a row the wave still reads), and its own row may hold no wave pivot.
+        val defRowVars = IntHashSet().apply { for (v in rowVars(ws, seed.defIdx)) add(v) }
+        val pivots = IntHashSet().apply { add(seed.x) }
+        val pending = MutableIntIntMap()
+        chargePending(ws, seed, pending)
+        var polled = 0
+        var di = ws.nextEqId(seed.defIdx + 1)
+        while (di < ws.size && wave.size < MAX_WAVE) {
+            if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) break
+            val c = candidateInFactor(ws, di, eliminated, objectiveIntVars, capWide, cancellation)
+            if (c != null && !c.isAlias && independent(ws, c, defRowVars, pivots) && fitsAbsorbCap(ws, c, pending)) {
+                wave.add(c)
+                for (v in rowVars(ws, c.defIdx)) defRowVars.add(v)
+                pivots.add(c.x)
+                chargePending(ws, c, pending)
+            }
+            di = ws.nextEqId(di + 1)
+        }
+        return wave
+    }
+
+    private fun rowVars(ws: FactorOcc, id: Int): IntArray = ws.factorAt(id)?.intVars ?: EMPTY_INTS
+
+    /** Whether [c] can join a wave whose defining rows span [defRowVars] and whose pivots are [pivots]. */
+    private fun independent(ws: FactorOcc, c: AffineCandidate, defRowVars: IntHashSet, pivots: IntHashSet): Boolean {
+        if (c.x in defRowVars || c.x in pivots) return false
+        for (v in rowVars(ws, c.defIdx)) if (v in pivots) return false
+        return true
+    }
+
+    /** Count the fold [c] would add to each row it rewrites, so a wave sees its own accumulation. */
+    private fun chargePending(ws: FactorOcc, c: AffineCandidate, pending: MutableIntIntMap) {
+        for (id in ws.occurrencesOf(c.x)) if (id != c.defIdx) pending.addTo(id, 1)
+    }
+
+    private fun fitsAbsorbCap(ws: FactorOcc, c: AffineCandidate, pending: MutableIntIntMap): Boolean {
+        for (id in ws.occurrencesOf(c.x)) {
+            if (id == c.defIdx) continue
+            if (ws.absorbedBy(id) + pending.getOrDefault(id, 0) >= FOLD_ABSORB_CAP) return false
+        }
+        return true
+    }
+
+    private val EMPTY_INTS = IntArray(0)
 
     /**
      * The next pivot to fold out, and the bookkeeping that keeps that choice cheap across eliminations.
@@ -727,6 +815,13 @@ internal object AffineSingletons {
         /** The [k]-th promoted stable id (`0 until promotedCount()`). */
         fun promotedAt(k: Int): Int
 
+        /** The stable ids of the live factors mentioning [x], as a snapshot safe to iterate while the
+         *  working set is mutated. */
+        fun occurrencesOf(x: Int): IntArray
+
+        /** How many folds the row at [id] has absorbed — `0` everywhere on the pristine seed. */
+        fun absorbedBy(id: Int): Int
+
         /** Whether folding the pivot `x = constTerm + Σ termCoeffs·termVars` into any Linear row that
          *  mentions [x] (other than [defIdx]) would overflow 64-bit arithmetic. When it would, the
          *  candidate is skipped and `x` is left un-eliminated (sound) rather than wrapping a coefficient. */
@@ -868,6 +963,11 @@ internal object AffineSingletons {
         override fun promotedCount(): Int = 0
 
         override fun promotedAt(k: Int): Int = error("the pristine seed promotes nothing")
+
+        override fun occurrencesOf(x: Int): IntArray =
+            IntArray(occ.offsets[x + 1] - occ.offsets[x]) { occ.flat[occ.offsets[x] + it] }
+
+        override fun absorbedBy(id: Int): Int = 0
     }
 
     /**
@@ -958,10 +1058,10 @@ internal object AffineSingletons {
 
         /** Replace live stable id [id] — currently holding [prev] — with [next], moving its occurrence
          *  entries from [prev]'s variables to [next]'s and recording that it absorbed a fold. */
-        private fun replace(id: Int, prev: Factor, next: Factor) {
+        private fun replace(id: Int, prev: Factor, next: Factor, folds: Int = 1) {
             val was = absorbed[id]
             if (was >= FOLD_ABSORB_CAP && isCappable(prev)) for (v in prev.intVars) atCapCount[v]--
-            absorbed[id] = was + 1
+            absorbed[id] = was + folds
             for (v in prev.intVars) intOcc[v].removeValue(id)
             slots[id] = next
             for (v in next.intVars) intOcc[v].add(id)
@@ -1067,6 +1167,55 @@ internal object AffineSingletons {
         override fun promotedCount(): Int = promoted.size
 
         override fun promotedAt(k: Int): Int = promoted[k]
+
+        override fun occurrencesOf(x: Int): IntArray = intOcc[x].let { occ -> IntArray(occ.size) { occ[it] } }
+
+        override fun absorbedBy(id: Int): Int = absorbed[id]
+
+        /**
+         * Fold every pivot in [wave] out in one rewrite per affected row. The wave's pivots are pairwise
+         * independent — none appears in another's defining row — so a row's combined rewrite is exactly
+         * what folding them one at a time would leave, and the terms are laid out in that same order:
+         * the row's surviving terms first, then each pivot's substituted terms in wave order.
+         *
+         * Returns the lowest rewritten stable id, or `null` if any row would overflow 64-bit arithmetic.
+         * Every rewrite is computed before any is installed, so a `null` leaves the working set untouched
+         * and the caller can fall back to the single-pivot path.
+         */
+        fun foldWave(problem: Problem, wave: List<AffineCandidate>): Int? {
+            val byPivot = MutableIntObjectMap<AffineCandidate>()
+            val defIds = IntHashSet()
+            for (c in wave) {
+                byPivot.put(c.x, c)
+                defIds.add(c.defIdx)
+            }
+            val targets = IntHashSet()
+            for (c in wave) for (id in occurrencesOf(c.x)) if (!defIds.contains(id)) targets.add(id)
+            val ids = targets.toIntArray().apply { sort() }
+            val rewritten = arrayOfNulls<Factor>(ids.size)
+            for (i in ids.indices) {
+                val f = slots[ids[i]] ?: continue
+                rewritten[i] = foldWaveIntoFactor(f, wave, byPivot) ?: return null
+            }
+            var minTouched = ids.firstOrNull() ?: Int.MAX_VALUE
+            for (c in wave) if (c.defIdx < minTouched) minTouched = c.defIdx
+            for (i in ids.indices) {
+                val next = rewritten[i] ?: continue
+                val prev = slots[ids[i]] ?: continue
+                if (next !== prev) replace(ids[i], prev, next, folds = pivotsIn(prev, byPivot))
+            }
+            for (c in wave) {
+                drop(c.defIdx)
+                for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+            }
+            return minTouched
+        }
+
+        private fun pivotsIn(f: Factor, byPivot: MutableIntObjectMap<AffineCandidate>): Int {
+            var n = 0
+            for (v in f.intVars) if (byPivot[v] != null) n++
+            return n
+        }
 
         /**
          * Fold `x = constTerm + Σ termCoeffs·termVars` out of the working set, dropping the defining
@@ -1192,6 +1341,75 @@ internal object AffineSingletons {
             w++
         }
         return Linear(newCoeffs, newVars, l.op, l.bound - cX * c.constTerm)
+    }
+
+    /** [f] with every pivot of [wave] that it mentions substituted out at once, or `null` if that cannot
+     *  be done without overflow (or a global declines the affine view), which aborts the wave. */
+    private fun foldWaveIntoFactor(
+        f: Factor,
+        wave: List<AffineCandidate>,
+        byPivot: MutableIntObjectMap<AffineCandidate>,
+    ): Factor? {
+        if (f is Linear && f.isIntegerCore) return foldWaveIntoLinear(f, wave, byPivot)
+        // A global takes each applicable pivot through its own affine view, one at a time — the pivots are
+        // independent, so the sequence is immaterial. Only a single-partner pivot has such a view.
+        var cur = f
+        for (c in wave) {
+            if (c.termVars.size != 1 || !cur.intVars.contains(c.x)) continue
+            cur = cur.substituteAffine(c.x, c.termCoeffs[0].toInt(), c.constTerm.toInt(), c.termVars[0])
+                ?: return null
+        }
+        return cur
+    }
+
+    /**
+     * [l] with every pivot of [wave] it mentions substituted out in one rebuild. Laid out as the
+     * equivalent run of [foldAffineIntoLinear] calls would leave it — surviving terms in place, then each
+     * pivot's terms appended in wave order — so batching changes when the row is built, not what it is.
+     * `null` when the arithmetic would overflow, including in the coalescing the [Linear] constructor
+     * does, which is checked here while aborting is still possible.
+     */
+    private fun foldWaveIntoLinear(
+        l: Linear,
+        wave: List<AffineCandidate>,
+        byPivot: MutableIntObjectMap<AffineCandidate>,
+    ): Linear? {
+        var hit = 0
+        var extra = 0
+        for (v in l.vars) {
+            val c = byPivot[v] ?: continue
+            hit++
+            extra += c.termVars.size
+        }
+        if (hit == 0) return l
+        val newVars = IntArray(l.vars.size - hit + extra)
+        val newCoeffs = LongArray(newVars.size)
+        var w = 0
+        for (j in l.vars.indices) {
+            if (byPivot[l.vars[j]] != null) continue
+            newVars[w] = l.vars[j]
+            newCoeffs[w] = l.coeff(j)
+            w++
+        }
+        var bound = l.bound
+        try {
+            for (c in wave) {
+                val ix = l.vars.indexOf(c.x)
+                if (ix < 0) continue
+                val cX = l.coeff(ix)
+                for (k in c.termVars.indices) {
+                    newVars[w] = c.termVars[k]
+                    newCoeffs[w] = mulExact(cX, c.termCoeffs[k])
+                    w++
+                }
+                bound = subExact(bound, mulExact(cX, c.constTerm))
+            }
+            val sums = MutableIntLongMap()
+            for (i in newVars.indices) sums.put(newVars[i], addExact(sums.getOrDefault(newVars[i], 0L), newCoeffs[i]))
+        } catch (_: LpOverflowException) {
+            return null
+        }
+        return Linear(newCoeffs, newVars, l.op, bound)
     }
 
     /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within

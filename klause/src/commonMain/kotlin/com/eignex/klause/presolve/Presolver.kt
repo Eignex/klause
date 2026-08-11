@@ -72,6 +72,8 @@ data class PresolveContext(
     val affineUnderdetermined: Boolean = false,
     /** The order affine elimination picks its pivots in, threaded from [PresolveConfig.affinePivotOrder]. */
     val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+    /** Whether affine elimination folds independent pivots in waves, from [PresolveConfig.affineBatchFolds]. */
+    val affineBatchFolds: Boolean = false,
     /** The incremental round engine's persistent subsume state and the factors changed since subsume last
      *  ran, so [PresolvePass.REMOVE_REDUNDANT] reprocesses only the delta instead of rescanning every
      *  factor. `null` on the fresh path, where subsume recomputes from scratch each call. */
@@ -106,6 +108,9 @@ data class PresolveContext(
 
     /** This context carrying the configured affine pivot order. */
     fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveContext = copy(affinePivotOrder = pivotOrder)
+
+    /** This context carrying the configured affine fold-batching setting. */
+    fun withAffineBatchFolds(batch: Boolean): PresolveContext = copy(affineBatchFolds = batch)
 
     /** This context carrying the incremental round engine's session-maintained occurrence index for the
      *  current pass input, so the affine / dup-columns candidate search reuses it. */
@@ -332,6 +337,7 @@ enum class PresolvePass(
             ctx.affineUnderdetermined,
             ctx.affineTouchedVars,
             ctx.affinePivotOrder,
+            ctx.affineBatchFolds,
         )
     },
 
@@ -678,6 +684,9 @@ class PresolveConfig(
     /** The order affine elimination picks its pivots in. A cost knob only — every order yields the same
      *  solutions — kept at [AffinePivotOrder.STABLE_ID] until measurement says otherwise. */
     val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+    /** Whether affine elimination folds independent pivots in waves — one rewrite per row instead of one
+     *  per fold. A cost knob only; kept off until measurement says otherwise. */
+    val affineBatchFolds: Boolean = false,
 ) {
 
     /** Per-var cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
@@ -687,8 +696,24 @@ class PresolveConfig(
     fun probeTotalBudget(): Int = probeTotalBudgetOverride ?: emphasis.probeTotalBudget
 
     /** This config with a different affine pivot order — the benchmarking knob for that choice. */
-    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig =
-        PresolveConfig(emphasis, overrides, probeBudgetPerVarOverride, probeTotalBudgetOverride, pivotOrder)
+    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig = PresolveConfig(
+        emphasis,
+        overrides,
+        probeBudgetPerVarOverride,
+        probeTotalBudgetOverride,
+        pivotOrder,
+        affineBatchFolds,
+    )
+
+    /** This config with fold batching toggled — the benchmarking knob for that choice. */
+    fun withAffineBatchFolds(batch: Boolean): PresolveConfig = PresolveConfig(
+        emphasis,
+        overrides,
+        probeBudgetPerVarOverride,
+        probeTotalBudgetOverride,
+        affinePivotOrder,
+        batch,
+    )
 
     /** Whether [pass] runs under [context]: an explicit override wins, else the emphasis rule. */
     fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
@@ -719,6 +744,7 @@ class PresolveConfig(
         probeBudgetPerVarOverride,
         probeTotalBudgetOverride,
         affinePivotOrder,
+        affineBatchFolds,
     )
 
     /** Predefined configs and the spec-string [parse]r. */
@@ -820,6 +846,7 @@ object Presolver {
         val ctx = context.withCancellation(cancellation)
             .withAffineUnderdetermined(underdetermined)
             .withAffinePivotOrder(config.affinePivotOrder)
+            .withAffineBatchFolds(config.affineBatchFolds)
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
         // each pass's delta instead of rebuilding a [Problem] per firing pass. Scoped away from any

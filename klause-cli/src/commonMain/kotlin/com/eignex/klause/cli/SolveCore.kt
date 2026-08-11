@@ -59,7 +59,11 @@ internal object SolveCore {
         // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
         // orders differ in what they fold first, never in what the problem means — exposed so the choice
         // can be A/B'd on a corpus rather than argued about.
-        val config = affinePivotOrderParam(common)?.let { forEngine.withAffinePivotOrder(it) } ?: forEngine
+        val ordered = affinePivotOrderParam(common)?.let { forEngine.withAffinePivotOrder(it) } ?: forEngine
+        // `affine-batch-folds` folds independent pivots into each row in one rewrite instead of one per
+        // fold. Also a cost knob, and on the same benchmarking footing.
+        val config = boolPresolveParam(common, AFFINE_BATCH_FOLDS_KEY)?.let { ordered.withAffineBatchFolds(it) }
+            ?: ordered
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -349,6 +353,19 @@ internal object SolveCore {
     }
 
     private const val AFFINE_PIVOT_ORDER_KEY = "affine-pivot-order"
+    private const val AFFINE_BATCH_FOLDS_KEY = "affine-batch-folds"
+
+    /** A boolean presolve param, consumed out of the engine namespace like [affinePivotOrderParam]. */
+    private fun boolPresolveParam(common: CommonOptions, key: String): Boolean? {
+        val prefix = "$key="
+        val idx = common.engineParams.indexOfFirst { it.startsWith(prefix) }
+        if (idx < 0) return null
+        return when (val v = common.engineParams.removeAt(idx).removePrefix(prefix)) {
+            "true", "1", "on", "yes" -> true
+            "false", "0", "off", "no" -> false
+            else -> usageError("engine param `$key` expects a boolean, got `$v`")
+        }
+    }
 
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()

@@ -34,6 +34,7 @@ object Presolve {
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.STABLE_ID,
+        batchFolds: Boolean = false,
     ): PassDelta = AffineSingletons.eliminateAffineSingletons(
         problem,
         objectiveIntVars,
@@ -42,6 +43,7 @@ object Presolve {
         capWide,
         incrementalTouchedVars,
         pivotOrder = pivotOrder,
+        batchFolds = batchFolds,
     )
 
     /** Constraint subsumption / redundant-constraint removal. See [RedundantConstraints]. */
