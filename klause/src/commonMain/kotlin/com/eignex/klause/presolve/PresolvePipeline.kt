@@ -47,12 +47,14 @@ object PresolvePipeline {
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
         cancellation: Cancellation = Cancellation.Never,
+        presolveBudget: PresolveBudget? = null,
     ): PresolveOutcome {
         // Root-bake probing (failed-literal / SAC) runs in the presolve lane via [RootBaker]: resolve it
         // from the config once and thread it through the context so every rebuild re-derives it.
         val bakeConfig = BakeConfig.from(config)
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withBakeConfig(bakeConfig)
+            .withPresolveBudget(presolveBudget)
         // LP-relaxation harvest (#10): fold the LP's proven domain tightenings, redundant-row removals and
         // implied equalities into the problem permanently so every backend sees them. Gated by the
         // `lp-harvest` pass; the harvest's own LP relaxation+shaving is enabled here directly.

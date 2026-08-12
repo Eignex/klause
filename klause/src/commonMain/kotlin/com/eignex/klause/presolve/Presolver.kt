@@ -72,6 +72,9 @@ data class PresolveContext(
     val affineUnderdetermined: Boolean = false,
     /** The order affine elimination picks its pivots in, threaded from [PresolveConfig.affinePivotOrder]. */
     val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
+    /** The presolve phase's remaining time, so the round engine can give each pass a slice of it rather
+     *  than let the first expensive pass spend all of it. `null` leaves every pass on [cancellation]. */
+    val presolveBudget: PresolveBudget? = null,
     /** The incremental round engine's persistent subsume state and the factors changed since subsume last
      *  ran, so [PresolvePass.REMOVE_REDUNDANT] reprocesses only the delta instead of rescanning every
      *  factor. `null` on the fresh path, where subsume recomputes from scratch each call. */
@@ -106,6 +109,9 @@ data class PresolveContext(
 
     /** This context carrying the configured affine pivot order. */
     fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveContext = copy(affinePivotOrder = pivotOrder)
+
+    /** This context carrying the presolve phase's remaining-time budget. */
+    fun withPresolveBudget(budget: PresolveBudget?): PresolveContext = copy(presolveBudget = budget)
 
     /** This context carrying the incremental round engine's session-maintained occurrence index for the
      *  current pass input, so the affine / dup-columns candidate search reuses it. */
@@ -820,6 +826,7 @@ object Presolver {
         val ctx = context.withCancellation(cancellation)
             .withAffineUnderdetermined(underdetermined)
             .withAffinePivotOrder(config.affinePivotOrder)
+            .withPresolveBudget(context.presolveBudget)
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
         // each pass's delta instead of rebuilding a [Problem] per firing pass. Scoped away from any
@@ -841,7 +848,7 @@ object Presolver {
 
             override fun complexity(): Long = complexity(current)
         }
-        val rounds = runRounds(passes, maxRounds, cancellation, host)
+        val rounds = runRounds(passes, maxRounds, cancellation, host, ctx.presolveBudget)
         return Presolved(
             host.current,
             composeReconstructs(rounds.reconstructs),
@@ -924,7 +931,7 @@ object Presolver {
 
             override fun complexity(): Long = session.complexity()
         }
-        val rounds = runRounds(passes, maxRounds, cancellation, host)
+        val rounds = runRounds(passes, maxRounds, cancellation, host, ctx.presolveBudget)
 
         // No pass fired: presolve is a no-op, so return the input problem itself (identity) exactly like
         // the fresh path returns `current === problem` — several callers assertSame on a fixpoint.
@@ -938,10 +945,26 @@ object Presolver {
         )
     }
 
+    /**
+     * The slice the next pass gets: at most half of what is left while other passes are still to run, and
+     * all of it for the last one. Splitting the remainder *equally* was tried and is far too flat — the
+     * passes differ in cost by orders of magnitude, so an even share starves the expensive ones without
+     * the cheap ones needing theirs. Halving lets a hungry pass take most of the budget while still
+     * leaving a geometric tail for everything behind it. The pass also stops on the phase-wide
+     * [cancellation], which carries the solve deadline.
+     */
+    private fun sliceOf(budget: PresolveBudget, cancellation: Cancellation, eligible: Int): Cancellation {
+        val left = budget.remaining()
+        val share = if (eligible > 1) left / 2 else left
+        val slice = budget.slice(share)
+        return Cancellation { cancellation() || slice() }
+    }
+
     /** The per-path operations the shared [runRounds] scheduler drives: where a pass reads its input,
      *  how its context is specialised, where a firing pass's delta lands, and the complexity measure
      *  for the diminishing-returns abort. [run] backs it with a rebuilt [Problem] per firing pass,
      *  [runIncremental] with a persistent [PresolveSession]. */
+
     private interface RoundHost {
         /** The problem view the next pass reads. */
         fun passInput(): Problem
@@ -978,6 +1001,7 @@ object Presolver {
         maxRounds: Int,
         cancellation: Cancellation,
         host: RoundHost,
+        budget: PresolveBudget? = null,
     ): RoundResult {
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
         var version = 0
@@ -988,13 +1012,26 @@ object Presolver {
         var roundStartComplexity = host.complexity()
         while (round < maxRounds && !cancellation()) {
             var ranAny = false
+            // Passes still eligible this round. Each one is given an equal share of what is left *at the
+            // moment it starts*, so a pass that returns early hands its remainder to those behind it
+            // instead of the share being a fixed quantum.
+            var eligible = passes.count { it !in exhausted && ranAtVersion[it] != version }
             for (pass in passes) {
                 if (cancellation()) break
                 if (pass in exhausted) continue
                 if (ranAtVersion[pass] == version) continue
                 ranAtVersion[pass] = version
                 ranAny = true
-                val delta = pass.apply(host.passInput(), host.passContext(pass))
+                // [passInput] first, always: it refreshes the live-id mapping that [passContext]'s shared
+                // occurrence view is keyed against. Building the context first hands the pass an index
+                // derived from the previous round's live set.
+                val input = host.passInput()
+                val ctx = host.passContext(pass)
+                val sliced = budget?.let { b ->
+                    ctx.withCancellation(sliceOf(b, cancellation, eligible))
+                } ?: ctx
+                eligible--
+                val delta = pass.apply(input, sliced)
                 if (!delta.isEmpty) {
                     delta.reconstruct?.let { reconstructs.add(it) }
                     host.applyDelta(delta)

@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
@@ -252,6 +253,7 @@ internal fun Solvable.presolved(
     solutionSetSensitive: Boolean,
     cancellation: Cancellation = Cancellation.Never,
     boundingCancellation: Cancellation = cancellation,
+    presolveBudget: PresolveBudget? = null,
 ): Solvable {
     // Domain bounding (OBBT) is deferred out of parsing into this phase, so it runs here (parsing only
     // reads) and the pipeline's passes see the tightened domains. It is bounded by the whole-solve
@@ -259,7 +261,15 @@ internal fun Solvable.presolved(
     // closing, so it gets the same budget it had at load. It only tightens integer domains (no variable
     // remap), so no reconstruction is threaded for it.
     val boundedProblem = deferredBounds?.invoke(boundingCancellation) ?: problem
-    val outcome = PresolvePipeline.run(boundedProblem, linearObjective, config, solutionSetSensitive, cancellation)
+    val outcome =
+        PresolvePipeline.run(
+            boundedProblem,
+            linearObjective,
+            config,
+            solutionSetSensitive,
+            cancellation,
+            presolveBudget,
+        )
     if (!outcome.changed) {
         if (deferredBounds == null) return this
         return copyWith(boundedProblem, presolve, render, objectiveValue)
