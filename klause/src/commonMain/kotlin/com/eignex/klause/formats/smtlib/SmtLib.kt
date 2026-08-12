@@ -226,7 +226,12 @@ object SmtLib {
                     ?: throw UnsupportedSmtException("define-fun '$name': bad parameter")
             }
             val retSort = e.atomAt(3, "define-fun '$name' return sort")
-            macros[name] = Macro(params, e.argAt(4, "define-fun '$name' body"), isBool = retSort == "Bool")
+            macros[name] = Macro(
+                params,
+                e.argAt(4, "define-fun '$name' body"),
+                isBool = retSort == "Bool",
+                isReal = retSort == "Real",
+            )
         }
 
         private fun declare(name: String, sort: String) {
@@ -276,6 +281,9 @@ object SmtLib {
         }
     }
 
-    /** A non-recursive `define-fun` macro: its [params], [body] term, and whether it returns `Bool`. */
-    internal class Macro(val params: List<String>, val body: SExpr, val isBool: Boolean)
+    /** A non-recursive `define-fun` macro: its [params], [body] term, and its return sort. [isReal] is
+     *  what lets the syntactic real classifier see through a macro reference: a `Real`-returning macro
+     *  used in a relation is a real relation even when nothing else in the relation is syntactically
+     *  real, so its body is inlined in a real — not integer — context. */
+    internal class Macro(val params: List<String>, val body: SExpr, val isBool: Boolean, val isReal: Boolean)
 }

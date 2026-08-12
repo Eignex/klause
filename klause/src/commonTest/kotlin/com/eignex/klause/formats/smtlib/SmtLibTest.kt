@@ -505,6 +505,23 @@ class SmtLibTest {
     }
 
     @Test
+    fun `a real-returning define-fun in a relation keeps its body in a real context`() {
+        val parsed = SmtLib.parse(
+            """
+            (set-logic QF_LRA)
+            (declare-fun x () Real)
+            (assert (and (<= 0 x) (<= x 1)))
+            (define-fun obj () Real (* 10000 x))
+            (assert (>= obj 5000))
+            (check-sat)
+            """.trimIndent(),
+        )
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        assertTrue(r.assignment.reals[0] >= 0.5, "10000*x >= 5000 forces x >= 0.5")
+    }
+
+    @Test
     fun `abs constrains the absolute value`() {
         val text = """
             (set-logic QF_LIA)

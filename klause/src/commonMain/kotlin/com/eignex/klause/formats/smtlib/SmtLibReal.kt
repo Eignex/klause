@@ -51,9 +51,10 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
                 if (node.text in realNames || isRealLiteral(node.text) || lookup(node.text)?.isReal == true) {
                     return true
                 }
+                if (macros[node.text]?.isReal == true) return true
             }
 
-            is SExpr.SList -> when ((node.items[0] as? SExpr.Atom)?.text) {
+            is SExpr.SList -> when (val head = (node.items[0] as? SExpr.Atom)?.text) {
                 "to_real", "/" -> return true
 
                 "to_int" -> Unit
@@ -68,7 +69,7 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
 
                 "let" -> work.addLast(node.items[2])
 
-                else -> Unit
+                else -> if (macros[head]?.isReal == true) return true
             }
         }
     }
