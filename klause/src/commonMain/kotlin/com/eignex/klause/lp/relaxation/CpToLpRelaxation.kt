@@ -291,12 +291,12 @@ internal class CpToLpRelaxation(
     private val tableHull: Boolean = false,
     /** When true, emit the energetic makespan lower-bound row for each Cumulative / Disjunctive whose
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
-    private val cumulative: Boolean = false,
+    cumulative: Boolean = false,
     /** When true, project each constant-size Diffn onto both axes as a cumulative and emit the same
      *  energetic makespan row (#655) — a sound lower bound on a strip-length / extent variable (its
      *  `t1 = min-est` case is the area bound `Σ wᵢ·hᵢ ≤ W·H`). One row per derived plan; a no-op unless
      *  an axis extent is provably an upper bound on every task end (so it only fires when it helps). */
-    private val diffn: Boolean = false,
+    diffn: Boolean = false,
     /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
      *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
      *  columns, so it is hard-gated on the horizon and total cell count. */

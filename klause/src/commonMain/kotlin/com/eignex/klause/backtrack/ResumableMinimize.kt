@@ -60,7 +60,7 @@ internal sealed interface StepEvent {
 internal class ResumableMinimize(
     // Carries the [BacktrackSolver.problem] plus the search primitives defined as its extension
     // functions (advance, applyPhase, backjumpAndLearn, …); the solver holds no state beyond the problem.
-    private val solver: BacktrackSolver,
+    solver: BacktrackSolver,
     private val objective: LinearObjective,
     params0: BacktrackParams,
     // true: a fired cancellation is a slice boundary the caller may resume past ([runSlice]); false:

@@ -26,7 +26,7 @@ package com.eignex.klause.lp.bounding
  * @param reprobeMax  ceiling on the backoff interval — a disabled family still re-probes this often.
  */
 internal class LpSeparatorGate(
-    private val count: Int,
+    count: Int,
     private val warmup: Int = DEFAULT_WARMUP,
     private val window: Int = DEFAULT_WINDOW,
     private val reprobeBase: Int = LpEffortLadder.DEFAULT_REPROBE_BASE,

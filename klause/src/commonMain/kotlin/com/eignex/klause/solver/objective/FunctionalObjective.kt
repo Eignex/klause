@@ -35,12 +35,12 @@ import kotlin.math.abs
 internal class FunctionalObjective internal constructor(
     /** Int objective terms `Σ termCoeffs[k]·terms[k]`, "lower is better": each term is a cone var
      *  (evaluated through [nodes]) or a bare int leaf. A single-variable objective is one term. */
-    private val terms: IntArray,
-    private val termCoeffs: LongArray,
-    private val constant: Long,
+    terms: IntArray,
+    termCoeffs: LongArray,
+    constant: Long,
     private val minimize: Boolean,
     /** Int defining nodes in topological order — every node's inputs are leaves or earlier nodes. */
-    private val nodes: List<Node>,
+    nodes: List<Node>,
     /** Int decision (leaf) variables the cone reads — the vars a local-search strategy should seed
      *  candidate moves on to descend this objective. Empty when the cone has no int var leaves. */
     val leafVars: IntArray,
@@ -48,10 +48,10 @@ internal class FunctionalObjective internal constructor(
      *  is a bool cone var (evaluated through [boolNodes]) or a bare bool leaf; empty for a pure-int
      *  objective (the FlatZinc/XCSP3 case), non-empty for a bool-weighted objective over AND/OR
      *  indicators (OPB product terms, `array_bool_and`). */
-    private val boolTerms: IntArray = EmptyIntArray,
-    private val boolTermCoeffs: LongArray = EmptyLongArray,
+    boolTerms: IntArray = EmptyIntArray,
+    boolTermCoeffs: LongArray = EmptyLongArray,
     /** Bool defining nodes (AND/OR folds) in topological order. */
-    private val boolNodes: List<BoolFold> = emptyList(),
+    boolNodes: List<BoolFold> = emptyList(),
     /** Bool decision (leaf) variables the bool cone reads. */
     val boolLeafVars: IntArray = EmptyIntArray,
 ) : IncrementalObjective {
