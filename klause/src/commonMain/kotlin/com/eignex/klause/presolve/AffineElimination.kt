@@ -294,7 +294,7 @@ internal object AffineSingletons {
         private fun seed() {
             var id = ws.nextEqId(0)
             while (id < ws.size) {
-                heap.push(costLowerBound(id), id)
+                heap.push(estimatedCost(id), id)
                 id = ws.nextEqId(id + 1)
             }
             promotionsQueued = ws.promotedCount()
@@ -304,15 +304,35 @@ internal object AffineSingletons {
             val n = ws.promotedCount()
             while (promotionsQueued < n) {
                 val id = ws.promotedAt(promotionsQueued++)
-                heap.push(costLowerBound(id), id)
+                heap.push(estimatedCost(id), id)
             }
         }
 
-        /** The least `(r − 1)(c − 1)` any variable of the row at [id] could give as its pivot. */
-        private fun costLowerBound(id: Int): Long {
+        /**
+         * The `(r − 1)(c − 1)` the row at [id] is expected to cost. [candidateInFactor] takes the *first*
+         * admissible pivot in row order rather than the cheapest, so mirroring that choice — the first
+         * unit-coefficient variable that is neither eliminated nor in the objective — is exact for the
+         * unit-pivot rows that dominate, and costs O(arity) instead of the gate's occurrence walk.
+         *
+         * Getting this close matters more than it looks: the key only has to be *a* bound for the lazy
+         * revalidation to be correct, but every under-estimate costs a pop, a re-push and a second pop.
+         * A slack bound made 90% of pops on Coprime-23 re-pushes.
+         */
+        private fun estimatedCost(id: Int): Long {
             val f = ws.factorAt(id) ?: return 0L
             val vars = f.intVars
             if (vars.size < 2) return 0L
+            if (f is Linear) {
+                for (xi in f.vars.indices) {
+                    val x = f.vars[xi]
+                    if (eliminated[x] || x in objectiveIntVars) continue
+                    val cx = f.coeff(xi)
+                    if (cx != 1L && cx != -1L) continue
+                    return (ws.degreeOf(x) - 1).toLong() * (f.vars.size - 1)
+                }
+            }
+            // No unit pivot to mirror; fall back to the cheapest conceivable one, which only ever
+            // under-estimates and is corrected on pop.
             var minDegree = Int.MAX_VALUE
             for (v in vars) {
                 val d = ws.degreeOf(v)
