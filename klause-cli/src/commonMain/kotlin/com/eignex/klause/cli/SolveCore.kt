@@ -15,6 +15,7 @@ import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
 import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.presolve.AffinePivotOrder
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
@@ -69,11 +70,13 @@ internal object SolveCore {
         // each phase restart the clock and blow the limit cumulatively.
         val (deadline, cancel) = deadlineCancellation(common)
         val presolveStart = TimeSource.Monotonic.markNow()
+        val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
         val solvable = rawSolvable.presolved(
             config,
             solutionSetSensitive,
-            presolveCancellation(cancel, deadline),
+            presolveCancel,
             boundingCancellation = cancel,
+            presolveBudget = presolveBudget,
         )
         val presolveElapsed = presolveStart.elapsedNow()
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
@@ -147,17 +150,29 @@ internal object SolveCore {
         return deadline to cancel
     }
 
-    /** Presolve sees [solveCancel] (the `-t` deadline) tightened by a soft per-phase wall-clock budget
-     *  ([CliKnobs.presolveBudgetMs], default [CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS]). The round engine and
-     *  its long-running passes poll it and stop with the reductions made so far, so presolve stays
-     *  bounded on a pathologically large model while every ordinary instance finishes far under it (and
-     *  is unaffected). A budget `≤ 0` disables the cap, leaving only the solve deadline. */
-    private fun presolveCancellation(solveCancel: Cancellation, solveDeadline: Long?): Cancellation {
-        val budgetMs = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull() ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS
-        if (budgetMs <= 0) return solveCancel
+    /**
+     * The presolve phase's allowance, as a [Cancellation] for the phase and a [PresolveBudget] the round
+     * engine slices per pass. Derived as a share of the run's own `-t` budget
+     * ([CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION]) rather than a flat figure, which is most of a short
+     * budget and a rounding error on a long one. An explicit `klause.presolve.budget.ms` still wins, and
+     * a run with no `-t` falls back to the flat backstop since there is no total to take a share of.
+     */
+    private fun presolveAllowance(
+        common: CommonOptions,
+        solveCancel: Cancellation,
+        solveDeadline: Long?,
+    ): Pair<Cancellation, PresolveBudget?> {
+        val explicit = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull()
+        val fraction = cliProp(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
+            ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
+        val derived = common.timeLimitMs
+            ?.let { (it * fraction).toLong().coerceAtLeast(CliKnobs.MIN_PRESOLVE_BUDGET_MS) }
+            ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS
+        val budgetMs = explicit ?: derived
+        if (budgetMs <= 0) return solveCancel to null
         val presolveDeadline = nowMillis() + budgetMs
         val cap = solveDeadline?.let { minOf(it, presolveDeadline) } ?: presolveDeadline
-        return Cancellation { nowMillis() > cap }
+        return Cancellation { nowMillis() > cap } to PresolveBudget { cap - nowMillis() }
     }
 
     // --- single-engine paths ---

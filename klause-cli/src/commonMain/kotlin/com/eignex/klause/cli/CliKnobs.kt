@@ -24,9 +24,23 @@ internal object CliKnobs {
      *  in presolve. `0` or negative disables the cap. Defaults to [DEFAULT_PRESOLVE_BUDGET_MS]. */
     val presolveBudgetMs by propertyKnob()
 
-    /** Default presolve wall-clock budget: bounds presolve on pathological models while leaving ordinary
-     *  instances untouched. Set well above the corpus's normal presolve times so the cap only ever fires
-     *  as a runaway backstop — the long-running passes (affine, symmetry) still bail promptly via
-     *  cooperative cancellation once it trips. */
+    /** Share of the solve budget presolve may spend: `klause.presolve.budget.fraction` /
+     *  `KLAUSE_PRESOLVE_BUDGET_FRACTION`. Overridden by an explicit [presolveBudgetMs]. */
+    val presolveBudgetFraction by propertyKnob()
+
+    /** Fraction of the `-t` budget presolve may spend. A flat allowance is wrong in both directions —
+     *  it is most of a short budget and a rounding error on a long one — so the phase scales with the
+     *  run it precedes. */
+    const val DEFAULT_PRESOLVE_BUDGET_FRACTION = 0.1
+
+    /** Presolve budget when the run carries no `-t` at all, so there is no total to take a share of.
+     *  A pure backstop against a pathological model; the long-running passes bail promptly once it
+     *  trips via cooperative cancellation. */
     const val DEFAULT_PRESOLVE_BUDGET_MS = 5000L
+
+    /** Floor on the derived budget: the flat allowance presolve had before it scaled with `-t`. A short
+     *  run therefore behaves exactly as it used to, and only a long one gets more — measured, a 10% slice
+     *  of a 10s budget leaves presolve unable to finish a single pass on a large model. Still capped by
+     *  the solve deadline, so the floor can never outlive the run. */
+    const val MIN_PRESOLVE_BUDGET_MS = DEFAULT_PRESOLVE_BUDGET_MS
 }
