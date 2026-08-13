@@ -119,6 +119,26 @@ class DuplicateColumnsTest {
     }
 
     @Test
+    fun `leaves duplicate columns alone when their aggregate domain would overflow`() {
+        // Both columns are pinned at the open-domain clamp value, so they are singletons — contiguous,
+        // hence eligible — whose Minkowski sum reaches 2^63 and wraps to Long.MIN_VALUE. The aggregate is
+        // then a well-formed singleton at the wrong value, which is why it reads as a plain UNSAT.
+        val pinned = IntDomain(1L shl 62, 1L shl 62)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(pinned, pinned),
+            factors = listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
+        )
+        val delta = Presolve.mergeDuplicateColumns(problem)
+        val aggregates = delta.domains ?: problem.intDomains
+        assertTrue(
+            aggregates.all { it.min >= 0L },
+            "aggregating two non-negative columns must not wrap to a negative domain",
+        )
+    }
+
+    @Test
     fun `does not merge columns that differ in one factor`() {
         // x (0) and y (1) share a row x + y + z <= 5 but x carries coefficient 2 there and y carries 1
         // — the columns differ, so they are not duplicates and nothing is merged.
