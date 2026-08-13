@@ -153,6 +153,7 @@ private fun divModU(a: U128, b: U128, q: U128) {
  *  Classic schoolbook with a running carry: each 64×64 partial product `(pHi, pLo)` adds its low
  *  word (plus the carry so far) at position `i + j`, and the next carry is `pHi` plus the add's
  *  carry-outs — which cannot wrap, since a 64×64 product's high word is at most 2⁶⁴ − 2³³. */
+@OptIn(ExperimentalUnsignedTypes::class)
 private fun mul256(a: U128, b: U128, out: ULongArray) {
     out.fill(0uL)
     val aw = ulongArrayOf(a.lo, a.hi)
@@ -191,6 +192,7 @@ private fun mul256(a: U128, b: U128, out: ULongArray) {
 }
 
 /** `a * b` into [out] when the product fits 128 bits; false (out unspecified) otherwise. */
+@OptIn(ExperimentalUnsignedTypes::class)
 private fun mulU(a: U128, b: U128, out: U128): Boolean {
     val limbs = ULongArray(4)
     mul256(a, b, limbs)

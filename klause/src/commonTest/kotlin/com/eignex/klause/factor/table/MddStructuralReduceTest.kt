@@ -41,7 +41,7 @@ class MddStructuralReduceTest {
         val d1 = IntDomain(1, 2)
         val r = mdd().structuralReduce(arrayOf(d0, d1))
         assertTrue(r is FactorReduction.Rewrite)
-        val reduced = (r as FactorReduction.Rewrite).replacement.single() as Mdd
+        val reduced = r.replacement.single() as Mdd
         assertTrue(reduced.numStatesPerLayer.sum() < mdd().numStatesPerLayer.sum(), "a dead state must be removed")
         assertEquals(setOf(listOf(1, 2)), enumerate(reduced, d0, d1), "reduced diagram must accept exactly (1,2)")
     }
