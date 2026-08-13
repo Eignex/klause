@@ -17,7 +17,7 @@ class TableStructuralReduceTest {
         // x0 pinned to 0 ⇒ only (0,0) and (0,1) survive.
         val r = allPairs.structuralReduce(arrayOf(IntDomain(0, 0), IntDomain(0, 1)))
         assertTrue(r is FactorReduction.Rewrite)
-        val table = (r as FactorReduction.Rewrite).replacement.single() as Table
+        val table = r.replacement.single() as Table
         assertEquals(2, table.numTuples)
         assertTrue(table.tuples.toList() == listOf(0L, 0L, 0L, 1L))
     }
@@ -27,7 +27,7 @@ class TableStructuralReduceTest {
         // x0 = 1, x1 = 0 ⇒ only (1,0) survives.
         val r = allPairs.structuralReduce(arrayOf(IntDomain(1, 1), IntDomain(0, 0)))
         assertTrue(r is FactorReduction.Rewrite)
-        val repl = (r as FactorReduction.Rewrite).replacement
+        val repl = r.replacement
         assertTrue(repl.all { it is Linear }, "single tuple pins each variable via an equality")
         assertEquals(2, repl.size)
     }
