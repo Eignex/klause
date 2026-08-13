@@ -42,12 +42,20 @@ class DeferredIntBounds internal constructor(
             realUpper = DoubleArray(numReal) { Double.POSITIVE_INFINITY },
         )
         var clamped = false
+        val openLo = BooleanArray(openBounds.size)
+        val openHi = BooleanArray(openBounds.size)
         val domains = Array(openBounds.size) { v ->
-            val lo = tightened[v].lo ?: fallbackLo.also { if (lossy) clamped = true }
-            val hi = tightened[v].hi ?: fallbackHi.also { if (lossy) clamped = true }
+            val lo = tightened[v].lo ?: fallbackLo.also {
+                openLo[v] = true
+                if (lossy) clamped = true
+            }
+            val hi = tightened[v].hi ?: fallbackHi.also {
+                openHi[v] = true
+                if (lossy) clamped = true
+            }
             if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
         }
-        return BoundedIntDomains(domains, clamped)
+        return BoundedIntDomains(domains, clamped, openLo, openHi)
     }
 }
 
@@ -57,4 +65,10 @@ class BoundedIntDomains internal constructor(
     val domains: Array<IntDomain>,
     /** True when a side fell back to a lossy clamp, so an `unsat` over the box is only `unknown`. */
     val clamped: Boolean,
+    /** Sides the box invented rather than derived: `true` where OBBT left the low side genuinely open and
+     *  the domain's `min` is the fallback. Carried into `Problem.openIntLo` so the LP relaxation can build
+     *  the column over its true range instead of the box. */
+    val openLo: BooleanArray,
+    /** Sides where the high bound is the fallback; see [openLo]. */
+    val openHi: BooleanArray,
 )

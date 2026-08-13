@@ -187,6 +187,14 @@ internal interface RelaxationDomains {
 
     /** The pin of Boolean variable [varId] — `true`/`false` when fixed, null when free. */
     fun boolValue(varId: Int): Boolean?
+
+    /**
+     * Whether a side [Problem.openIntLo] / [Problem.openIntHi] marks as invented should be built as an
+     * open LP column rather than at the finite clamp. Only the root view may: a bound in a live search
+     * state is a decision the node depends on, and cannot be told apart from the clamp it sits on, so
+     * relaxing it there would drop the branch's own constraint.
+     */
+    val honorsOpenSides: Boolean get() = false
 }
 
 /** [RelaxationDomains] over a [Problem]'s declared domains: every integer variable at its full domain
@@ -195,6 +203,7 @@ internal interface RelaxationDomains {
 internal class RootDomains(private val problem: Problem) : RelaxationDomains {
     override fun intDomain(varId: Int): IntDomain = problem.intDomains[varId]
     override fun boolValue(varId: Int): Boolean? = null
+    override val honorsOpenSides: Boolean get() = true
 }
 
 /** [RelaxationDomains] backed by a live [PropagationSession]'s search state. */
@@ -655,12 +664,32 @@ internal class CpToLpRelaxation(
             if (sec) circuitModels.add(CircuitArcModel(n, tails.toIntArray(), heads.toIntArray(), cols.toIntArray()))
         }
 
-        /** Column for integer variable `intVar`, created on first use with its live domain bounds. */
+        /**
+         * Column for integer variable `intVar`, created on first use with its live domain bounds.
+         *
+         * A side the front-end could not bound is an artefact of the finite search box, not a constraint
+         * of the model, so at the root ([RelaxationDomains.honorsOpenSides]) the column is built over its
+         * true range instead: reasoning the simplex does there — a Farkas refutation, an OBBT bound —
+         * then holds over the unbounded model rather than only inside the box.
+         *
+         * Only the upper side opens here. A lo-open column would have to split as `x = x⁺ − x⁻` the way
+         * [realColumn] does — a `−2⁶²` column shift folds `coeff · 2⁶²` into the rhs doubles, whose
+         * spacing at that magnitude swallows ordinary right-hand sides — and every row mentioning it
+         * would need its negative half mirrored. Left at the box until that mirroring exists: keeping a
+         * side closed only forgoes global validity for it, it never makes the relaxation wrong.
+         */
         override fun intColumn(intVar: Int): Int {
             var c = intCol[intVar]
             if (c == -1) {
                 val dom = domains.intDomain(intVar)
-                c = builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
+                val openHi = domains.honorsOpenSides &&
+                    problem.openIntHi?.get(intVar) == true &&
+                    problem.openIntLo?.get(intVar) != true
+                c = if (openHi) {
+                    builder.addFreeVar(dom.min, null, intCost(intVar), tag = intVar)
+                } else {
+                    builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
+                }
                 intCol[intVar] = c
                 colVarId.add(intVar)
                 colIsBool.add(0)

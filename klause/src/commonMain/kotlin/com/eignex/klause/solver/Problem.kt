@@ -96,6 +96,19 @@ open class Problem(
     val realLower: DoubleArray = EmptyDoubleArray,
     /** Upper bound of each real variable (length [numRealVars]); `Double.POSITIVE_INFINITY` for open. */
     val realUpper: DoubleArray = EmptyDoubleArray,
+    /**
+     * Integer variables whose declared domain is genuinely open on the low side, indexed by int var id;
+     * `null` (the common case) means every domain is a real declared bound.
+     *
+     * Search needs a finite box, so a front-end that cannot bound a side closes it at
+     * [com.eignex.klause.config.KlauseConfig.unboundedSearchBound] and [intDomains] carries that clamp.
+     * The clamp is an artefact, not a constraint: a refutation that leans on it holds only inside the
+     * box. This records which sides were invented so the LP relaxation can build the column over its
+     * true (open) range — where the simplex reasons soundly — while CP search keeps the finite domain.
+     */
+    val openIntLo: BooleanArray? = null,
+    /** Integer variables genuinely open on the high side; see [openIntLo]. */
+    val openIntHi: BooleanArray? = null,
 ) {
     /**
      * Domain (bounds) of each integer variable, indexed by int var id. On a raw [Problem] these are the
@@ -154,6 +167,8 @@ open class Problem(
         numRealVars: Int = 0,
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
+        openIntLo: BooleanArray? = null,
+        openIntHi: BooleanArray? = null,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -166,6 +181,8 @@ open class Problem(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        openIntLo = openIntLo,
+        openIntHi = openIntHi,
     )
 
     /**
@@ -173,8 +190,15 @@ open class Problem(
      * open sides after parsing, before the problem flows into presolve. Every other structure (factors,
      * real bounds, implied/symmetry flags) is shared. The result is a raw [Problem] whose root bake is
      * still deferred; must not be called on a [BakedProblem], whose fold this copy would not reproduce.
+     *
+     * [newOpenLo] / [newOpenHi] record which sides of [newDomains] the bounding invented rather than
+     * derived, so the LP relaxation can keep those columns open; `null` leaves the existing marks.
      */
-    fun withIntDomains(newDomains: Array<IntDomain>): Problem {
+    fun withIntDomains(
+        newDomains: Array<IntDomain>,
+        newOpenLo: BooleanArray? = null,
+        newOpenHi: BooleanArray? = null,
+    ): Problem {
         require(this !is BakedProblem) { "withIntDomains is for raw (front-end) problems only" }
         return Problem(
             numBoolVars = numBoolVars,
@@ -186,6 +210,8 @@ open class Problem(
             numRealVars = numRealVars,
             realLower = realLower,
             realUpper = realUpper,
+            openIntLo = newOpenLo ?: openIntLo,
+            openIntHi = newOpenHi ?: openIntHi,
         )
     }
 
@@ -293,6 +319,8 @@ open class Problem(
             numRealVars = numRealVars,
             realLower = realLower,
             realUpper = realUpper,
+            openIntLo = openIntLo,
+            openIntHi = openIntHi,
         )
     }
 
@@ -500,6 +528,8 @@ class BakedProblem internal constructor(
     numRealVars: Int = 0,
     realLower: DoubleArray = EmptyDoubleArray,
     realUpper: DoubleArray = EmptyDoubleArray,
+    openIntLo: BooleanArray? = null,
+    openIntHi: BooleanArray? = null,
     cancellation: Cancellation = Cancellation.Never,
     /**
      * When `true`, [intDomains] already carry the root-bake fold (an incremental presolve pass view or a
@@ -521,6 +551,8 @@ class BakedProblem internal constructor(
     numRealVars = numRealVars,
     realLower = realLower,
     realUpper = realUpper,
+    openIntLo = openIntLo,
+    openIntHi = openIntHi,
 ) {
     init {
         if (!alreadyFolded) {

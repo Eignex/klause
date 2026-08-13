@@ -45,7 +45,7 @@ internal object MpsMode : CliMode {
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
-                compiled.problem.withIntDomains(bounded.domains)
+                compiled.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
             }
         }
 
