@@ -31,6 +31,14 @@ internal interface LpSolver {
     /** The float candidate Farkas ray at a dual-unbounded termination, for [integerFarkasRay] to round
      *  and certify; null unless the last [solve] returned null on infeasibility. */
     val infeasibleRay: DoubleArray?
+
+    /** The dual-unbounded basis behind [infeasibleRay], for the exact ray solve that a model with an
+     *  unbounded column needs. Null on an engine that keeps no basis; certification then falls back to
+     *  rounding [infeasibleRay]. */
+    val infeasibleBasis: Basis? get() = null
+
+    /** The leaving row of [infeasibleBasis]; `-1` when there is none. */
+    val infeasibleRow: Int get() = -1
 }
 
 /**

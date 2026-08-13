@@ -71,9 +71,9 @@ internal class RevisedSimplex(
      *  for the most-violated basic row), the basis and that leaving row at termination, for the exact
      *  Farkas infeasibility check ([integerFarkasRay]). Null on any other failure (non-convergence,
      *  singular pivot, budget) — so the caller only prunes on a genuine infeasibility. */
-    var infeasibleBasis: Basis? = null
+    override var infeasibleBasis: Basis? = null
         private set
-    var infeasibleRow: Int = -1
+    override var infeasibleRow: Int = -1
         private set
 
     /** The float candidate Farkas ray `ρ = B⁻ᵀeᵣ` at a dual-unbounded termination, for [integerFarkasRay]
