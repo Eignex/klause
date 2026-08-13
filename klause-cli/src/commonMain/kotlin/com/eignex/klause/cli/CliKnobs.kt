@@ -38,9 +38,14 @@ internal object CliKnobs {
      *  trips via cooperative cancellation. */
     const val DEFAULT_PRESOLVE_BUDGET_MS = 5000L
 
-    /** Floor on the derived budget: the flat allowance presolve had before it scaled with `-t`. A short
-     *  run therefore behaves exactly as it used to, and only a long one gets more — measured, a 10% slice
-     *  of a 10s budget leaves presolve unable to finish a single pass on a large model. Still capped by
-     *  the solve deadline, so the floor can never outlive the run. */
+    /** Floor on the derived budget: a 10% slice of a short budget leaves presolve unable to finish a
+     *  single pass on a large model, so the floor buys it enough to be worth entering at all. Bounded
+     *  above by [MAX_PRESOLVE_BUDGET_SHARE] — the floor may raise a small budget, never take the run. */
     const val MIN_PRESOLVE_BUDGET_MS = DEFAULT_PRESOLVE_BUDGET_MS
+
+    /** Ceiling on presolve's share of `-t`, applied after [MIN_PRESOLVE_BUDGET_MS]. Without it the flat
+     *  floor wins outright on any run shorter than `MIN_PRESOLVE_BUDGET_MS / fraction` (50s at the
+     *  default 0.1) — at `-t 5000` presolve is handed the entire time limit and the search gets none.
+     *  Only ever binds where the floor would otherwise displace the search it precedes. */
+    const val MAX_PRESOLVE_BUDGET_SHARE = 0.25
 }
