@@ -209,12 +209,27 @@ internal fun integerCertify(model: LpModel, y: DoubleArray, scaleBits: Int = DEF
  * float-misled ray simply fails the check and the node is kept — the prune is sound regardless. Null
  * when neither sign certifies, the rounding fails, or a 128-bit term overflows.
  */
-internal fun integerFarkasRay(model: LpModel, ray: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS): LongArray? {
+internal fun integerFarkasRay(
+    model: LpModel,
+    ray: DoubleArray,
+    scaleBits: Int = DEFAULT_SCALE_BITS,
+    basis: Basis? = null,
+    basisRow: Int = -1,
+): LongArray? {
     if (model.hasContinuous) {
         // A real model is certified over its scaled-integer rationalization (the existing 128-bit Farkas);
         // scaling by a positive 2ᵏ preserves feasibility, so an infeasibility proof carries back exactly.
         val integral = rationalizeToIntegerModel(model, outwardRealUppers = true)?.model ?: return null
-        return integerFarkasRay(integral, ray, scaleBits)
+        return integerFarkasRay(integral, ray, scaleBits, basis, basisRow)
+    }
+    // The exact basis solve first: it is the only source that annihilates the open columns exactly, which
+    // a model with an unbounded variable requires of any certificate (see [exactFarkasRay]).
+    if (basis != null) {
+        exactFarkasRay(model, basis, basisRow)?.let { exact ->
+            if (farkasCertifies(model, exact)) return exact
+            val negExact = LongArray(exact.size) { if (exact[it] == Long.MIN_VALUE) return@let else -exact[it] }
+            if (farkasCertifies(model, negExact)) return negExact
+        }
     }
     val rd = roundDuals(model, ray, scaleBits) ?: return null
     if (farkasCertifies(model, rd.mult)) return rd.mult

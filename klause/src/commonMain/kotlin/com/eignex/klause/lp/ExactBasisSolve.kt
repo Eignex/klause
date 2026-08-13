@@ -197,6 +197,51 @@ private fun detSign(v: Int128): Int = when {
     else -> 1
 }
 
+/**
+ * The exact Farkas ray `ρ = B⁻ᵀeᵣ` of the dual-unbounded [basis] with leaving row [row], scaled by
+ * `|det B|` so every entry is an integer. Null when the basis is singular, oversized, or a minor escapes
+ * the exact range — the caller then falls back to rounding the float ray.
+ *
+ * Rounding the float ray cannot serve here. A certificate must satisfy `ρ·Aⱼ = 0` *exactly* for every
+ * column with no finite upper bound: a variable split as `x = x⁺ − x⁻` has `A_{x⁻} = −A_{x⁺}`, so a
+ * nonzero `ρ·A_{x⁺}` leaves one of the two halves unbounded above in the box max whichever sign the ray
+ * takes, and no scaling repairs it. The float ray satisfies the condition only to within its own error,
+ * and per-entry rounding turns that residual into a nonzero integer. Solving the basis exactly gives the
+ * annihilation for free: `ρ·Aⱼ = eᵣᵀB⁻¹Aⱼ` is an entry of a unit vector for every basic column.
+ *
+ * Cramer's rule supplies it without an inverse: `ρᵢ·det B = det(Bᵀ with column i replaced by eᵣ)`. The
+ * result is normalized to a *positive* multiple of `ρ`, since a negative multiple of a Farkas ray is not
+ * one.
+ */
+internal fun exactFarkasRay(model: LpModel, basis: Basis, row: Int): LongArray? {
+    val m = model.m
+    if (m == 0 || row < 0 || row >= m || m > MAX_EXACT_BASIS) return null
+    val basic = basis.basicVars
+    if (basic.size != m) return null
+
+    // Bᵀ[t][i] = B[i][t] = A[i][basic[t]].
+    val bt = Array(m) { LongArray(m) }
+    for (t in 0 until m) {
+        forEachColumnEntry(model, basic[t]) { i, a -> bt[t][i] = a }
+    }
+    val det = bareissDet(Array(m) { bt[it].copyOf() }) ?: return null
+    if (det == 0L) return null
+
+    val ray = LongArray(m)
+    for (i in 0 until m) {
+        val mi = Array(m) { t -> bt[t].copyOf() }
+        for (t in 0 until m) mi[t][i] = if (t == row) 1L else 0L
+        ray[i] = bareissDet(mi) ?: return null
+    }
+    if (det < 0L) {
+        for (i in 0 until m) {
+            if (ray[i] == Long.MIN_VALUE) return null
+            ray[i] = -ray[i]
+        }
+    }
+    return ray
+}
+
 /** Iterate column [col]'s nonzero entries of the integer [model] as `(row, coeff)` — structural columns
  *  from the CSC, a slack column as the implicit unit vector. */
 private inline fun forEachColumnEntry(model: LpModel, col: Int, action: (row: Int, coeff: Long) -> Unit) {

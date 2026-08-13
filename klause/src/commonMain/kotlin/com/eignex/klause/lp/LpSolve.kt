@@ -76,7 +76,11 @@ internal fun solveAndCertify(
             // A dual-unbounded termination is only a *candidate* infeasibility — confirm it with an exact
             // Farkas certificate. Any other failure (non-convergence / singular) is indeterminate.
             val floatRay = solver.infeasibleRay
-            val ray = if (floatRay != null) integerFarkasRay(model, floatRay) else null
+            val ray = if (floatRay != null) {
+                integerFarkasRay(model, floatRay, basis = solver.infeasibleBasis, basisRow = solver.infeasibleRow)
+            } else {
+                null
+            }
             if (ray != null) {
                 return CertifiedLpResult(
                     LpVerdict.INFEASIBLE,

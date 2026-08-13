@@ -51,6 +51,19 @@ class UnboundedRefutationTest {
     }
 
     @Test
+    fun `refutes a cycle whose multipliers are not all one`() {
+        // 3·(x0 − x1 ≤ −1) + 2·(x1 − x2 ≤ −2) + 6·(x2 − x0 ≤ 0) does not cancel termwise; the refutation
+        // needs the scaled combination, so the certificate rests on multipliers the basis has to supply
+        // exactly rather than on a sum of unit rows.
+        val rows = listOf(
+            Linear(intArrayOf(2, -2), intArrayOf(0, 1), LinearOp.LE, -1),
+            Linear(intArrayOf(3, -3), intArrayOf(1, 2), LinearOp.LE, -2),
+            Linear(intArrayOf(6, -6), intArrayOf(2, 0), LinearOp.LE, 1),
+        )
+        assertTrue(unboundedlyInfeasible(open(3), rows))
+    }
+
+    @Test
     fun `refutes with an unbounded row present`() {
         // The refutation lives in the two-sided pair; a third row whose direction is unbounded must
         // neither hide it nor be needed for it.
