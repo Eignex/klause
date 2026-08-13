@@ -45,7 +45,13 @@ internal object MpsMode : CliMode {
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
-                compiled.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
+                if (bounded.openlyInfeasible) {
+                    // Refuted over the genuinely open ranges: no solution anywhere, not merely none in
+                    // the search box, so the verdict carries no clamp caveat.
+                    refutedProblem(compiled.problem)
+                } else {
+                    compiled.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
+                }
             }
         }
 
