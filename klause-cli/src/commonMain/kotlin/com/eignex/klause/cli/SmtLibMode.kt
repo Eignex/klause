@@ -1,8 +1,12 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 
 /**
@@ -48,7 +52,14 @@ internal object SmtLibMode : CliMode {
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
-                parsed.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
+                if (bounded.openlyInfeasible) {
+                    // Refuted over the genuinely open ranges, so the model has no solution anywhere —
+                    // not merely none in the search box. Hand the search a problem that says so, and
+                    // leave the clamp flag clear so the verdict is reported as the `unsat` it is.
+                    refutedProblem(parsed.problem)
+                } else {
+                    parsed.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
+                }
             }
         }
 
@@ -88,4 +99,25 @@ internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : Buffer
     private companion object {
         private val SMT_SEARCH_KEYS = setOf("nodes", "failures", "propagations")
     }
+}
+
+/**
+ * [problem] rewritten so it is plainly unsatisfiable: every integer pinned to zero and one row demanding
+ * `x₀ ≥ 1`. Used when the model has already been refuted over its genuinely open ranges — the search must
+ * not be handed the original domains (it would explore an invented box and could only answer `unknown`),
+ * and it must not be handed a merely *pinned* problem either, since that could be satisfiable by accident
+ * and would then report a model the original does not have.
+ */
+private fun refutedProblem(problem: Problem): Problem {
+    val pinned = Array(problem.numIntVars) { IntDomain(0L, 0L) }
+    val contradiction = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+    return Problem(
+        numBoolVars = problem.numBoolVars,
+        numIntVars = problem.numIntVars,
+        intDomains = pinned,
+        factors = problem.factors.toList() + contradiction,
+        numRealVars = problem.numRealVars,
+        realLower = problem.realLower,
+        realUpper = problem.realUpper,
+    )
 }

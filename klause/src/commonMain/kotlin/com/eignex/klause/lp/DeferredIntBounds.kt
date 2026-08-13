@@ -33,6 +33,19 @@ class DeferredIntBounds internal constructor(
     /** Run the deferred OBBT under [cancellation] (the solve deadline) and produce the final finite domains
      *  plus whether any side fell back to a lossy clamp. */
     fun run(cancellation: Cancellation): BoundedIntDomains {
+        // Refute over the genuinely open ranges first. A certificate there rules out the unbounded model
+        // itself, so the verdict needs no clamp caveat — where an `unsat` found inside the fallback box
+        // would only ever be reportable as `unknown`.
+        if (lossy && unboundedlyInfeasible(openBounds, intConstraints, cancellation)) {
+            val domains = Array(openBounds.size) { IntDomain(0L, 0L) }
+            return BoundedIntDomains(
+                domains,
+                clamped = false,
+                openLo = BooleanArray(openBounds.size),
+                openHi = BooleanArray(openBounds.size),
+                openlyInfeasible = true,
+            )
+        }
         val tightened = tightenOpenIntBounds(
             openBounds,
             intConstraints,
@@ -71,4 +84,10 @@ class BoundedIntDomains internal constructor(
     val openLo: BooleanArray,
     /** Sides where the high bound is the fallback; see [openLo]. */
     val openHi: BooleanArray,
+    /**
+     * The model was refuted over its genuinely open ranges, so it has no solution at all — not merely
+     * none inside the search box. [domains] are a placeholder the caller never searches; the verdict is
+     * `unsat` outright, with none of the clamp caveat an in-box refutation would carry.
+     */
+    val openlyInfeasible: Boolean = false,
 )
