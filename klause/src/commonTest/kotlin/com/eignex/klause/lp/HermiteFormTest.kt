@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
  * than the exact entries: the factorisation `H = A·V` holds, and `V` is unimodular — without the second,
  * `x = Vy` is not a bijection of the integer lattice and the transformed system is not equisatisfiable.
  */
-class HermiteNormalFormTest {
+class HermiteFormTest {
 
     private fun mat(vararg rows: LongArray): Array<Array<BigInteger>> =
         Array(rows.size) { i -> Array(rows[i].size) { j -> BigInteger.fromLong(rows[i][j]) } }
