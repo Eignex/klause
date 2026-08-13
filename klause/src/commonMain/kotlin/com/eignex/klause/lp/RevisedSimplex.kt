@@ -540,7 +540,14 @@ internal class RevisedSimplex(
             status[model.slackCol(i)] = VarStatus.BASIC
         }
         for (j in 0 until n) {
-            status[j] = if (model.costD(j) >= 0.0) VarStatus.AT_LOWER else VarStatus.AT_UPPER
+            // A column with no finite upper has no upper seat to take, whatever its cost: seating it
+            // there reads an upper the model does not have — for a genuinely open column, the stale
+            // probe-derived slot — and starts the solve outside the feasible set.
+            status[j] = if (model.costD(j) >= 0.0 || !model.hasFiniteUpper(j)) {
+                VarStatus.AT_LOWER
+            } else {
+                VarStatus.AT_UPPER
+            }
         }
     }
 
