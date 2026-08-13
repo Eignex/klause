@@ -2,7 +2,7 @@
   "id": "com.eignex.klause.ls",
   "name": "Klause LS",
   "description": "Klause local-search backend (LocalSearchSolver)",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "mznlib": "../klause",
   "executable": "../../../bin/klause-fzn-ls",
   "tags": ["cbls", "int", "finite-domain", "localsearch"],
