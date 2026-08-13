@@ -312,6 +312,9 @@ internal class LpBuilder {
     private val clampedLoCols = HashSet<Int>()
     private val clampedHiCols = HashSet<Int>()
 
+    /** Structural columns added by [addOpenAboveVar]: genuinely `[lo, +∞)`, so they carry no upper. */
+    private val openAboveCols = HashSet<Int>()
+
     // LP-only continuous columns and their real bounds/cost — the double data the [LpDoubleView] is built
     // from. Empty for the pure-integer core, which never materializes a double view.
     private val continuousCols = HashSet<Int>()
@@ -370,6 +373,24 @@ internal class LpBuilder {
         val j = addVar(lower ?: -LP_UNBOUNDED_PROBE, upper ?: LP_UNBOUNDED_PROBE, cost, tag)
         if (lower == null) clampedLoCols.add(j)
         if (upper == null) clampedHiCols.add(j)
+        return j
+    }
+
+    /**
+     * Add a structural column over `[lower, +∞)` that carries **no** upper bound at all, rather than the
+     * [LP_UNBOUNDED_PROBE] stand-in [addFreeVar] uses. The simplex already runs unbounded-above columns —
+     * every inequality slack is one — and the difference matters for certification: a refutation that
+     * never reads an upper bound refutes the open model, whereas one resting on the probe only rules out
+     * points inside a box the model never had.
+     *
+     * The cost is that bound extraction cannot see an optimum "ride to the frontier", which is how
+     * [safeVariableBound] recognises an unbounded direction; a caller wanting a bound from such a column
+     * must handle a genuinely unbounded optimum instead. Use [addFreeVar] unless refutation strength over
+     * the open model is the point.
+     */
+    fun addOpenAboveVar(lower: Long, cost: Long = 0L, tag: Int = -1): Int {
+        val j = addVar(lower, LP_UNBOUNDED_PROBE, cost, tag)
+        openAboveCols.add(j)
         return j
     }
 
@@ -500,7 +521,7 @@ internal class LpBuilder {
         for (j in 0 until n) {
             cost[j] = mulExact(signedSense, this.cost[j])
             upper[j] = subExact(hi[j], lo[j])
-            hasUpper[j] = true
+            hasUpper[j] = j !in openAboveCols
             // c_j·x_j = c_j·x'_j + c_j·lo_j; the shifted constants accumulate here.
             objConstant = addExact(objConstant, mulExact(cost[j], lo[j]))
         }

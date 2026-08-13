@@ -686,7 +686,7 @@ internal class CpToLpRelaxation(
                     problem.openIntHi?.get(intVar) == true &&
                     problem.openIntLo?.get(intVar) != true
                 c = if (openHi) {
-                    builder.addFreeVar(dom.min, null, intCost(intVar), tag = intVar)
+                    builder.addOpenAboveVar(dom.min, intCost(intVar), tag = intVar)
                 } else {
                     builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
                 }
