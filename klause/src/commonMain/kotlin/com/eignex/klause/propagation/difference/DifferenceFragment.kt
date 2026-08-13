@@ -15,23 +15,64 @@ import com.eignex.klause.solver.Lit
  * and any general linear rows stay exactly as they are, and whatever difference rows exist become a graph.
  *
  * [edges] hold the constraints; an edge guarded by a Boolean literal only constrains once the search
- * decides that literal, which is how a reified row participates. [zeroNode] is the extra vertex standing
- * for the constant 0, so a one-variable row is a difference like any other.
+ * decides that literal, which is how a reified row participates. An endpoint of [ZERO] is the constant 0,
+ * so a one-variable row is a difference like any other.
  */
 internal class DifferenceFragment(
     val edges: List<DifferenceEdge>,
-    val zeroNode: Int,
-    /** Number of graph vertices: every integer variable plus [zeroNode]. */
-    val numNodes: Int,
     /** Factors whose whole content became edges, so a consumer knows what the graph already covers. */
     val absorbedFactors: IntArray,
 ) {
+    /** The integer variables the edges mention, ascending. [ZERO] is not among them. */
+    val nodes: IntArray = run {
+        val seen = HashSet<Int>()
+        for (e in edges) {
+            if (e.source != ZERO) seen.add(e.source)
+            if (e.target != ZERO) seen.add(e.target)
+        }
+        seen.toIntArray().sortedArray()
+    }
+
+    /** Graph vertices: one per entry of [nodes], plus a final one for [ZERO]. */
+    val numNodes: Int get() = nodes.size + 1
+
+    /** The vertex standing for the constant 0. */
+    val zeroNode: Int get() = nodes.size
+
+    /**
+     * Vertex index of an edge endpoint. The graph is numbered over [nodes] alone rather than over every
+     * integer variable, so a model with a handful of difference rows among many variables does not pay
+     * for a graph the size of the model.
+     */
+    fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
+
     /** A graph over [edges], for a consumer that wants to run a cycle search over the whole set. */
     fun graph(): DifferenceGraph {
         val g = DifferenceGraph(numNodes)
-        for (e in edges) g.addEdge(e.source, e.target, e.bound)
+        for (e in edges) g.addEdge(nodeOf(e.source), nodeOf(e.target), e.bound)
         return g
     }
+
+    internal companion object {
+        /** Endpoint value standing for the constant 0, so a one-variable row is still a difference. */
+        const val ZERO: Int = -1
+    }
+}
+
+/** Position of [value] in the ascending [sorted], which must contain it. */
+internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
+    var lo = 0
+    var hi = sorted.size - 1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        val v = sorted[mid]
+        when {
+            v < value -> lo = mid + 1
+            v > value -> hi = mid - 1
+            else -> return mid
+        }
+    }
+    return -1
 }
 
 /**
@@ -46,7 +87,7 @@ internal fun differenceFragmentOf(
     numIntVars: Int,
     intDomains: Array<IntDomain>,
 ): DifferenceFragment? {
-    val zero = numIntVars
+    val zero = DifferenceFragment.ZERO
     val edges = ArrayList<DifferenceEdge>()
     val absorbed = ArrayList<Int>()
     factors.forEachIndexed { id, f ->
@@ -60,24 +101,22 @@ internal fun differenceFragmentOf(
 
             is ReifiedLinear ->
                 // The row holds when the aux is true, so the edges carry that literal as their guard.
-                appendDifferenceEdges(
-                    f.vars,
-                    f::coeff,
-                    f.op,
-                    f.bound,
-                    zero,
-                    Lit.make(f.auxBoolVar, true),
-                    edges,
-                )
+                appendDifferenceEdges(f.vars, f::coeff, f.op, f.bound, zero, Lit.make(f.auxBoolVar, true), edges)
 
             else -> Unit
         }
     }
     if (edges.isEmpty()) return null
-    for (v in 0 until numIntVars) {
+    val mentioned = HashSet<Int>()
+    for (e in edges) {
+        if (e.source != zero) mentioned.add(e.source)
+        if (e.target != zero) mentioned.add(e.target)
+    }
+    for (v in mentioned.toIntArray().sortedArray()) {
+        if (v >= numIntVars) continue
         val d = intDomains[v]
         if (d.max != Long.MAX_VALUE) edges.add(DifferenceEdge(zero, v, d.max))
         if (d.min != Long.MIN_VALUE) edges.add(DifferenceEdge(v, zero, -d.min))
     }
-    return DifferenceFragment(edges, zero, numIntVars + 1, absorbed.toIntArray())
+    return DifferenceFragment(edges, absorbed.toIntArray())
 }

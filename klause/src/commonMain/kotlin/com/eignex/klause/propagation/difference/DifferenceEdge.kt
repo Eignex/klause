@@ -7,12 +7,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
  * graph. [guard] is the Boolean literal that must hold for it to be asserted, or [ALWAYS] when the row is
  * unconditional — a reified row only constrains once the search has decided its aux variable.
  */
-internal class DifferenceEdge(
-    val source: Int,
-    val target: Int,
-    val bound: Long,
-    val guard: Int = ALWAYS,
-) {
+internal class DifferenceEdge(val source: Int, val target: Int, val bound: Long, val guard: Int = ALWAYS) {
     internal companion object {
         /** [guard] value for a row that holds unconditionally. */
         const val ALWAYS: Int = -1
@@ -52,17 +47,35 @@ internal fun appendDifferenceEdges(
     val hi: Int
     val lo: Int
     when {
-        n == 1 && c0 == 1L -> { hi = a; lo = zero }
-        n == 1 && c0 == -1L -> { hi = zero; lo = a }
-        c0 == 1L && c1 == -1L -> { hi = a; lo = b }
-        c0 == -1L && c1 == 1L -> { hi = b; lo = a }
+        n == 1 && c0 == 1L -> {
+            hi = a
+            lo = zero
+        }
+
+        n == 1 && c0 == -1L -> {
+            hi = zero
+            lo = a
+        }
+
+        c0 == 1L && c1 == -1L -> {
+            hi = a
+            lo = b
+        }
+
+        c0 == -1L && c1 == 1L -> {
+            hi = b
+            lo = a
+        }
+
         else -> return false
     }
     when (op) {
         // Flooring is exact over the integers: it admits no value the original row forbids.
         LinearOp.LE -> out.add(DifferenceEdge(lo, hi, floorDiv(bound, g), guard))
+
         // `hi − lo ≥ b` is `lo − hi ≤ −b`, and the integer-tight form of `≥` ceils.
         LinearOp.GE -> out.add(DifferenceEdge(hi, lo, -ceilDiv(bound, g), guard))
+
         LinearOp.EQ -> {
             if (bound % g != 0L) return false // no integer point satisfies it; leave it to the general path
             out.add(DifferenceEdge(lo, hi, bound / g, guard))

@@ -94,6 +94,7 @@ internal enum class FactorKind {
     SYMMETRY_HANDLING,
     OBJECTIVE_BOUND,
     COMPARISON_CLAUSE,
+    DIFFERENCE_SYSTEM,
 }
 
 /** Payload builder for `StructuralKey.of`. Appends scalars and length-prefixed array segments into a

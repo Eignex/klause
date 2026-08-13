@@ -25,8 +25,7 @@ class DifferenceFragmentTest {
     private fun frag(factors: List<Factor>, n: Int, domains: Array<IntDomain> = open(n)) =
         differenceFragmentOf(factors.toTypedArray(), n, domains)
 
-    private fun diff(a: Int, b: Int, op: LinearOp, c: Int) =
-        Linear(intArrayOf(1, -1), intArrayOf(a, b), op, c)
+    private fun diff(a: Int, b: Int, op: LinearOp, c: Int) = Linear(intArrayOf(1, -1), intArrayOf(a, b), op, c)
 
     @Test
     fun `an unconditional difference row becomes an unguarded edge`() {
