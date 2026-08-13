@@ -35,12 +35,17 @@ internal fun unboundedlyInfeasible(
 }
 
 /**
- * Whether the relaxation of [constraints] over the genuinely open [openBounds] is Farkas-certifiably
- * infeasible. The columns carry their true ranges, so a certificate here refutes the unbounded model —
- * unlike a refutation over the search clamp, which only rules out points inside an invented box.
+ * Whether the relaxation of [constraints] over the genuinely open [openBounds] is certifiably infeasible.
+ * The columns carry their true ranges, so a verdict here refutes the unbounded model — unlike a
+ * refutation over the search clamp, which only rules out points inside an invented box.
  *
- * Every inconclusive path answers `false`: an unexpressible relaxation, a solve that finds a point, a
- * termination with no ray, or a ray the exact 128-bit certification declines.
+ * Decided by [solveAndCertify] rather than by reading the simplex's ray directly: a dual-unbounded
+ * termination is only a *candidate* infeasibility, and when its float ray does not survive exact Farkas
+ * certification that routine still settles the question exactly in rationals. Reading the ray alone gives
+ * up at that point, which is silent on every model whose terminating basis is not the certifying one.
+ *
+ * Every inconclusive path answers `false`: an unexpressible relaxation, a feasible point, or an
+ * indeterminate verdict.
  */
 private fun rootLpInfeasibleOverOpenDomains(
     openBounds: Array<OpenIntBounds>,
@@ -59,8 +64,5 @@ private fun rootLpInfeasibleOverOpenDomains(
         return false
     }
     if (model.n == 0 || cancellation()) return false
-    val simplex = RevisedSimplex(model, cancellation)
-    if (simplex.solve() != null) return false
-    val ray = simplex.infeasibleRay ?: return false
-    return integerFarkasRay(model, ray) != null
+    return solveAndCertify(model, cancellation = cancellation).verdict == LpVerdict.INFEASIBLE
 }
