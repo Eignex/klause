@@ -96,11 +96,18 @@ internal object DuplicateColumns {
                 if (members.size <= k) continue
                 val rep = members[0]
                 val drop = members[k]
-                merges.add(ColumnMerge(keep = rep, drop = drop, keepDomain = domains[rep], dropDomain = domains[drop]))
-                keepOf[drop] = rep
                 val keep = domains[rep]
+                // The Minkowski sum must be representable: two columns pinned at the open-domain clamp
+                // (2^62 each) sum to 2^63, which wraps to Long.MIN_VALUE — a well-formed aggregate at the
+                // wrong value, so the model is declared UNSAT with nothing to show the bound was lost.
+                // Saturating instead would admit a `z` no `(x, y)` can realise, which reconstruction
+                // could not split, so the pair is left unmerged.
+                val lo = addExactOrNull(keep.min, domains[drop].min) ?: continue
+                val hi = addExactOrNull(keep.max, domains[drop].max) ?: continue
+                merges.add(ColumnMerge(keep = rep, drop = drop, keepDomain = keep, dropDomain = domains[drop]))
+                keepOf[drop] = rep
                 // Widen the aggregate to the Minkowski sum; the session reseeds on this widen via [PassDelta.domains].
-                domains[rep] = IntDomain(keep.min + domains[drop].min, keep.max + domains[drop].max)
+                domains[rep] = IntDomain(lo, hi)
             }
             batches.add(merges)
         }
@@ -206,6 +213,12 @@ internal object DuplicateColumns {
             }
         }
         return Array(numIntVars) { entries[it]?.takeIf { e -> e.isNotEmpty() } }
+    }
+
+    /** `a + b`, or null when it overflows [Long]. Overflow iff the operands share a sign the sum does not. */
+    private fun addExactOrNull(a: Long, b: Long): Long? {
+        val r = a + b
+        return if (((a xor r) and (b xor r)) < 0L) null else r
     }
 
     private fun IntDomain.isContiguous(): Boolean = size.toLong() == max - min + 1
