@@ -256,11 +256,20 @@ internal fun Solvable.presolved(
     presolveBudget: PresolveBudget? = null,
 ): Solvable {
     // Domain bounding (OBBT) is deferred out of parsing into this phase, so it runs here (parsing only
-    // reads) and the pipeline's passes see the tightened domains. It is bounded by the whole-solve
-    // deadline ([boundingCancellation]), not the tighter presolve-pass budget — it is essential domain
-    // closing, so it gets the same budget it had at load. It only tightens integer domains (no variable
-    // remap), so no reconstruction is threaded for it.
-    val boundedProblem = deferredBounds?.invoke(boundingCancellation) ?: problem
+    // reads) and the pipeline's passes see the tightened domains. It only tightens integer domains (no
+    // variable remap), so no reconstruction is threaded for it.
+    //
+    // It takes a slice of the presolve budget rather than the whole-solve deadline: on a model whose
+    // relaxation it cannot close quickly it otherwise spends the entire allowance, and the round engine
+    // starts with none left — presolve then reports no reduction at all despite having run to its limit.
+    // Half of what remains, so a slow bounding still leaves the passes behind it something to work in.
+    val boundsCancellation = presolveBudget
+        ?.let { budget ->
+            val slice = budget.slice(budget.remaining() / 2)
+            Cancellation { boundingCancellation() || slice() }
+        }
+        ?: boundingCancellation
+    val boundedProblem = deferredBounds?.invoke(boundsCancellation) ?: problem
     val outcome =
         PresolvePipeline.run(
             boundedProblem,

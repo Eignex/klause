@@ -151,11 +151,22 @@ internal object SolveCore {
     }
 
     /**
+     * Presolve's slice of a [timeLimitMs] run at [fraction], bounded below by
+     * [CliKnobs.MIN_PRESOLVE_BUDGET_MS] so a short run still buys a pass worth entering, and above by
+     * [CliKnobs.MAX_PRESOLVE_BUDGET_SHARE] so that floor can never take the whole run. A run with no
+     * `-t` has no total to take a share of, so it falls back to the flat backstop.
+     */
+    internal fun derivedPresolveBudgetMs(timeLimitMs: Long?, fraction: Double): Long {
+        if (timeLimitMs == null) return CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS
+        val share = (timeLimitMs * fraction).toLong()
+        val ceiling = (timeLimitMs * CliKnobs.MAX_PRESOLVE_BUDGET_SHARE).toLong()
+        return minOf(share.coerceAtLeast(CliKnobs.MIN_PRESOLVE_BUDGET_MS), ceiling)
+    }
+
+    /**
      * The presolve phase's allowance, as a [Cancellation] for the phase and a [PresolveBudget] the round
-     * engine slices per pass. Derived as a share of the run's own `-t` budget
-     * ([CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION]) rather than a flat figure, which is most of a short
-     * budget and a rounding error on a long one. An explicit `klause.presolve.budget.ms` still wins, and
-     * a run with no `-t` falls back to the flat backstop since there is no total to take a share of.
+     * engine slices per pass. Derived by [derivedPresolveBudgetMs] as a share of the run's own `-t`
+     * budget rather than a flat figure. An explicit `klause.presolve.budget.ms` still wins.
      */
     private fun presolveAllowance(
         common: CommonOptions,
@@ -165,10 +176,7 @@ internal object SolveCore {
         val explicit = cliProp(CliKnobs.presolveBudgetMs)?.toLongOrNull()
         val fraction = cliProp(CliKnobs.presolveBudgetFraction)?.toDoubleOrNull()
             ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_FRACTION
-        val derived = common.timeLimitMs
-            ?.let { (it * fraction).toLong().coerceAtLeast(CliKnobs.MIN_PRESOLVE_BUDGET_MS) }
-            ?: CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS
-        val budgetMs = explicit ?: derived
+        val budgetMs = explicit ?: derivedPresolveBudgetMs(common.timeLimitMs, fraction)
         if (budgetMs <= 0) return solveCancel to null
         val presolveDeadline = nowMillis() + budgetMs
         val cap = solveDeadline?.let { minOf(it, presolveDeadline) } ?: presolveDeadline

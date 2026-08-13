@@ -616,4 +616,26 @@ class CliModeTest {
         val out = capture { main(arrayOf("--format", "xcsp3", "-t", "5000", txt.absolutePath)) }
         assertTrue("s SATISFIABLE" in out, out)
     }
+
+    @Test
+    fun `the presolve budget floor never takes more than its share of a short run`() {
+        // 0.1 of 5s is 500ms, which the 5000ms floor would raise to the whole time limit.
+        assertEquals(1250L, SolveCore.derivedPresolveBudgetMs(5_000L, 0.1))
+    }
+
+    @Test
+    fun `the presolve budget floor still lifts a mid-length run`() {
+        // 0.1 of 30s is 3s; the floor lifts it to 5s, which is under the 25% ceiling of 7.5s.
+        assertEquals(5_000L, SolveCore.derivedPresolveBudgetMs(30_000L, 0.1))
+    }
+
+    @Test
+    fun `the presolve budget is a plain share once the run is long enough`() {
+        assertEquals(12_000L, SolveCore.derivedPresolveBudgetMs(120_000L, 0.1))
+    }
+
+    @Test
+    fun `the presolve budget falls back to the flat backstop without a time limit`() {
+        assertEquals(CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS, SolveCore.derivedPresolveBudgetMs(null, 0.1))
+    }
 }
