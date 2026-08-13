@@ -240,7 +240,10 @@ private fun farkasCertifies(model: LpModel, rho: LongArray): Boolean {
         if (!ajAcc.fitsLong()) return false
         val aj = ajAcc.toLong()
         if (aj > 0L) {
-            if (!model.hasUpper[j]) return false // box max unbounded ⇒ this ρ cannot certify
+            // A probe-clamped side stands in for `+∞`, so its `upper` is an artefact of the encoding
+            // rather than a bound of the model: folding it into the box max would certify against a
+            // box the model never had. Treated as unbounded, exactly like a column with no upper.
+            if (!model.hasUpper[j] || (j < model.n && model.probeClampedHi[j])) return false
             boxMax.addProduct(aj, model.upper[j])
         }
     }
