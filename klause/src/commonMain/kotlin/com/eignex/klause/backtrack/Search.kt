@@ -128,8 +128,19 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
             // domain), so both children stay non-empty; the partition `x <= s` / `x >= s+1` is complete for
             // any `s`, so this changes cost, never soundness.
             val s = when {
+                // A preferred value strictly inside a wide domain is a real signal — on the LP path it is
+                // the relaxation's own value for this column ([LpHints.order]) — and branching there is the
+                // branch-and-bound split `x ≤ ⌊v⌋` / `x ≥ ⌈v⌉`. It matters most on a column left open by the
+                // search clamp, where the midpoint is a bisection of an invented box rather than of
+                // anything the model says. A preferred sitting *at* a bound carries no such signal (that is
+                // what `indomain_min`/`max` produce), and following it would peel one value per level —
+                // O(span) depth — so those still bisect.
+                !d.enumerable && preferred > d.min && preferred < d.max -> preferred
+
                 !d.enumerable -> boundsMidpoint(d)
+
                 preferred >= d.max -> d.max - 1
+
                 else -> maxOf(preferred, d.min)
             }
             splitLo = s
