@@ -3,8 +3,8 @@ package com.eignex.klause.lp
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.EmptyIntArray
-import com.eignex.koblas.EtaBasis
-import com.eignex.koblas.SparseLu
+import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.sparse.lu
 import kotlin.math.abs
 
 /**
@@ -29,7 +29,7 @@ internal class FloatLpResult(
 
 /**
  * Double-precision bounded-variable **dual** simplex in *revised* form: the basis is held as a
- * sparse LU factorization ([SparseLu], `O(nnz)` memory) and the constraint columns in sparse CSC,
+ * sparse LU factorization (`O(nnz)` memory) and the constraint columns in sparse CSC,
  * instead of a full `m × (n+m)` dense tableau or an explicit dense `B⁻¹`.
  * The decision logic — slack cold start, most-violated leaving variable, dual ratio-test entering
  * variable — is the textbook bounded-variable dual simplex; only the linear algebra is revised
@@ -127,21 +127,23 @@ internal class RevisedSimplex(
     /** Refactorize the current basis `B` (`B[i][t] = A_full[i][basicVar[t]]`) into a fresh, empty
      *  [EtaBasis]; null if singular. */
     private fun refactor(): EtaBasis? {
-        val rows = Array(m) { HashMap<Int, Double>() }
         var nnzB = 0
-        for (t in 0 until m) {
+        // Basis slot t holds column basicVar(t), so the basis is naturally column-major: slack column
+        // n+i is the unit vector e_i, a structural column is its CSC entries verbatim.
+        val columns = List(m) { t ->
             val col = basicVar[t]
             if (col >= n) {
-                rows[col - n][t] = 1.0
                 nnzB++
+                listOf((col - n) to 1.0)
             } else {
                 val rs = colRows[col]
                 val vs = colVals[col]
-                for (k in rs.indices) rows[rs[k]][t] = vs[k]
                 nnzB += rs.size
+                List(rs.size) { k -> rs[k] to vs[k] }
             }
         }
-        val lu = SparseLu.factorize(rows, m, equilibrate = true) ?: return null
+        val lu = SparseMatrix.ofColumns(m, m, columns).lu()
+        if (lu.singular) return null
         // Track LU fill (#27): how much the factorization grows the basis (fill ratio) and how dense
         // it becomes (nnz / m²). If density approaches 1 on real bases, the "sparse" LU is dense.
         if (m > 0 && nnzB > 0) {
@@ -150,7 +152,7 @@ internal class RevisedSimplex(
             val density = lu.nnz.toDouble() / (m.toDouble() * m.toDouble())
             if (density > maxLuDensity) maxLuDensity = density
         }
-        return EtaBasis.of(lu, m)
+        return EtaBasis.of(lu)
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
@@ -158,7 +160,7 @@ internal class RevisedSimplex(
         // Zero objective (the gated feasibility filter): the duals solve `Bᵀy = 0`, so the whole
         // BTRAN — a full pass over the LU plus the eta chain, once per iteration — is a zero vector.
         if (allZeroCost) return DoubleArray(m)
-        return factor.btran(DoubleArray(m) { model.costD(basicVar[it]) })
+        return factor.solve(DoubleArray(m) { model.costD(basicVar[it]) }, transpose = true)
     }
 
     /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
@@ -278,7 +280,7 @@ internal class RevisedSimplex(
                     }
                 }
             }
-            val beta = factor.ftran(rhsAdj)
+            val beta = factor.solve(rhsAdj)
             // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
             // dual steepest edge). `worst` keeps the *raw* violation of the chosen row for the
             // bound-flipping ratio test.
@@ -311,7 +313,7 @@ internal class RevisedSimplex(
             val y = duals(factor)
             // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r; entering column by dual ratio test.
             for (i in 0 until m) unit[i] = if (i == r) 1.0 else 0.0
-            val rho = factor.btran(unit)
+            val rho = factor.solve(unit, transpose = true)
             // Collect the dual-feasible entering candidates and their ratios; eligibility is the sign
             // rule that keeps reduced costs feasible as the leaving variable moves to its bound.
             elig.clear()
@@ -345,7 +347,7 @@ internal class RevisedSimplex(
             val q = chooseEntering(elig, ratioBuf, pivotRowEntry, worst)
 
             denseColumn(q, aq)
-            val alpha = factor.ftran(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
+            val alpha = factor.solve(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
             if (abs(alpha[r]) < TOL) return null // numerically singular pivot
             updateGamma(alpha, r)
             status[basicVar[r]] = if (belowLower) VarStatus.AT_LOWER else VarStatus.AT_UPPER
@@ -388,7 +390,7 @@ internal class RevisedSimplex(
             if (enforced[row] || status[sc] == VarStatus.BASIC) continue
             if (guard++ > 2 * m) return null
             denseColumn(sc, aq)
-            val alpha = factor.ftran(aq)
+            val alpha = factor.solve(aq)
             // Pivot the slack in where its spike is largest, preferring not to evict another
             // unenforced slack (which would only re-queue it).
             var r = -1
@@ -567,7 +569,7 @@ internal class RevisedSimplex(
                 for (k in rs.indices) rhsAdj[rs[k]] -= vs[k] * u
             }
         }
-        return factor.ftran(rhsAdj)
+        return factor.solve(rhsAdj)
     }
 
     private fun primalFeasible(beta: DoubleArray): Boolean {
@@ -618,7 +620,7 @@ internal class RevisedSimplex(
             }
             if (w <= FEAS_TOL) return factor // feasible
 
-            val pi = factor.btran(gamma)
+            val pi = factor.solve(gamma, transpose = true)
             // Entering reduces w: from lower if π·A_j > 0, from upper if π·A_j < 0; pick the steepest.
             var q = -1
             var qAtLower = true
@@ -637,7 +639,7 @@ internal class RevisedSimplex(
             if (q == -1) return null // w > 0 with no improving column ⇒ primal infeasible
 
             denseColumn(q, aq)
-            val alpha = factor.ftran(aq)
+            val alpha = factor.solve(aq)
             val dir = if (qAtLower) 1.0 else -1.0
             var tMax = if (model.hasFiniteUpper(q)) model.upperD(q) else Double.MAX_VALUE
             var leaving = -1
@@ -755,7 +757,7 @@ internal class RevisedSimplex(
             if (q == -1) return optimal(beta, factor) // no improving column ⇒ optimal
 
             denseColumn(q, aq)
-            val alpha = factor.ftran(aq) // α = B⁻¹ A_q
+            val alpha = factor.solve(aq) // α = B⁻¹ A_q
             val dir = if (qAtLower) 1.0 else -1.0 // x_q moves by dir·t, t ≥ 0
             // Ratio test with the entering variable's own bound flip as a candidate blocker.
             var tMax = if (model.hasFiniteUpper(q)) model.upperD(q) else Double.MAX_VALUE
