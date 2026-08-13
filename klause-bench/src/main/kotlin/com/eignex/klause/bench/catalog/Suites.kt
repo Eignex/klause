@@ -104,6 +104,32 @@ internal object Suites {
                 )
             },
             DynamicSuite(
+                "smtlib-qfidl",
+                "SMT-LIB QF_IDL non-incremental set (fetched, integer difference logic; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfIdl,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_IDL", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfrdl",
+                "SMT-LIB QF_RDL non-incremental set (fetched, real difference logic; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfRdl,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_RDL", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
                 "smtlib-qflira",
                 "SMT-LIB QF_LIRA non-incremental set (fetched, small mixed int/real .smt2; 1/family by default)",
                 defaultPerFamily = 1,
@@ -813,6 +839,28 @@ internal object ExternalCollections {
         url = "https://zenodo.org/records/11061097/files/QF_LIRA.tar.zst?download=1",
         license = "SMT-LIB (per-family licenses)",
         reason = "small mixed int/real benchmark set (0.2MB compressed); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
+    )
+
+    /** SMT-LIB QF_IDL non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. A difference
+     *  constraint `x − y ⋈ c` bounds neither of its variables, so a system built only from them can leave
+     *  every integer domain open — the shape the deferred bounding has to invent a search box for. */
+    val smtlibQfIdl = ExternalCollection(
+        id = "smtlib-qf_idl",
+        url = "https://zenodo.org/records/11061097/files/QF_IDL.tar.zst?download=1",
+        license = "SMT-LIB (per-family licenses)",
+        reason = "integer difference-logic benchmark set (408MB compressed); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
+    )
+
+    /** SMT-LIB QF_RDL non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. The real
+     *  counterpart of [smtlibQfIdl]: its variables are continuous, so they are LP-only columns and never
+     *  meet the integer search box at all. Small, so it is the cheap one to sweep. */
+    val smtlibQfRdl = ExternalCollection(
+        id = "smtlib-qf_rdl",
+        url = "https://zenodo.org/records/11061097/files/QF_RDL.tar.zst?download=1",
+        license = "SMT-LIB (per-family licenses)",
+        reason = "real difference-logic benchmark set (10MB compressed); fetched rather than vendored",
         fetch = FetchMethod.TarballZst,
     )
 
