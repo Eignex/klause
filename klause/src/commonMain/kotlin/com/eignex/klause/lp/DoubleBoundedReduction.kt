@@ -31,25 +31,11 @@ internal fun boundedRowMask(
 ): BooleanArray {
     val out = BooleanArray(constraints.size)
     if (constraints.isEmpty()) return out
-    val n = bounds.size
 
-    // Columns for the problem variables, split below zero exactly as the OBBT build does: a probe-
-    // magnitude lower bound folded into the rhs doubles would absorb every real right-hand side.
-    val builder = LpBuilder()
-    val posCol = IntArray(n)
-    val negCol = IntArray(n) { -1 }
-    for (v in 0 until n) {
-        val b = bounds[v]
-        if (b.lo != null) {
-            posCol[v] = if (b.hi != null) builder.addVar(b.lo, b.hi) else builder.addFreeVar(b.lo, null)
-        } else {
-            posCol[v] = if (b.hi != null && b.hi >= 0L) builder.addVar(0L, b.hi) else builder.addFreeVar(0L, null)
-            negCol[v] = builder.addFreeVar(0L, null)
-            if (b.hi != null && b.hi < 0L) {
-                builder.addRow(intArrayOf(posCol[v], negCol[v]), longArrayOf(1L, -1L), Relation.LE, b.hi)
-            }
-        }
-    }
+    val cb = openColumns(builderOf(), bounds)
+    val builder = cb.builder
+    val posCol = cb.posCol
+    val negCol = cb.negCol
 
     // One auxiliary column per row, tied by `aᵢᵀx − zᵢ = 0`, so the row's direction is bounded exactly
     // when zᵢ is. Rows are added for every constraint, the auxiliary equalities on top.
@@ -111,8 +97,47 @@ internal fun boundedRowMask(
     return out
 }
 
+/** The split column pair per variable, plus the builder they were added to. */
+internal class OpenColumns(val builder: LpBuilder, val posCol: IntArray, val negCol: IntArray)
+
+internal fun builderOf(): LpBuilder = LpBuilder()
+
+/**
+ * Add one column per variable over its genuinely open range: a variable open below enters split as
+ * `x = x⁺ − x⁻` with both parts non-negative, never as a probe-magnitude lower bound — the double view
+ * folds a column's lower bound into the row rhs, and at that magnitude the fold absorbs the true rhs.
+ */
+internal fun openColumns(builder: LpBuilder, bounds: Array<OpenIntBounds>): OpenColumns {
+    val n = bounds.size
+    val posCol = IntArray(n)
+    val negCol = IntArray(n) { -1 }
+    for (v in 0 until n) {
+        val b = bounds[v]
+        if (b.lo != null) {
+            // A hi-open column carries no upper at all rather than the probe stand-in: a Farkas
+            // certificate that reads a probe bound proves nothing about the unbounded model.
+            posCol[v] = if (b.hi != null) builder.addVar(b.lo, b.hi) else builder.addOpenAboveVar(b.lo)
+        } else {
+            posCol[v] = if (b.hi != null && b.hi >= 0L) builder.addVar(0L, b.hi) else builder.addFreeVar(0L, null)
+            negCol[v] = builder.addFreeVar(0L, null)
+            if (b.hi != null && b.hi < 0L) {
+                builder.addRow(intArrayOf(posCol[v], negCol[v]), longArrayOf(1L, -1L), Relation.LE, b.hi)
+            }
+        }
+    }
+    return OpenColumns(builder, posCol, negCol)
+}
+
+/** The builder relation for a linear row, or null for an operator the relaxation cannot express. */
+internal fun relationOfLinear(f: Linear): Relation? = when (f.op) {
+    LinearOp.LE -> Relation.LE
+    LinearOp.GE -> Relation.GE
+    LinearOp.EQ -> Relation.EQ
+    else -> null
+}
+
 /** Row terms over the split column pairs: a variable represented `x = x⁺ − x⁻` contributes both halves. */
-private fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<IntArray, LongArray> {
+internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<IntArray, LongArray> {
     var extra = 0
     for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
     val cols = IntArray(f.vars.size + extra)
