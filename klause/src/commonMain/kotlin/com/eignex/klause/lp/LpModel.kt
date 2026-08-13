@@ -249,6 +249,44 @@ internal class LpModel(
         )
     }
 
+    /**
+     * A model identical in structure and bounds whose objective is `Σ coeffs[k]·x_cols[k]`, the
+     * multi-column counterpart of [withSingleColumnObjective]. The boundedness test of a whole
+     * *direction* — is `aᵢᵀx` bounded in this system — needs a row's coefficients as the objective, not
+     * a unit cost on one column.
+     *
+     * Shares and mutates [cost] with the same discipline: [prevCols] (the columns the previous call set,
+     * empty on the first) are reset to `0` before the new ones are written, so a sweep over every row
+     * allocates no per-solve cost vector.
+     */
+    fun withRowObjective(cols: IntArray, coeffs: LongArray, prevCols: IntArray): LpModel {
+        for (c in prevCols) cost[c] = 0L
+        var constant = 0L
+        for (k in cols.indices) {
+            cost[cols[k]] = coeffs[k]
+            constant = addExact(constant, mulExact(coeffs[k], loShift[cols[k]]))
+        }
+        val dv = doubleView
+        if (dv != null) {
+            for (c in prevCols) dv.cost[c] = 0.0
+            var dc = 0.0
+            for (k in cols.indices) {
+                dv.cost[cols[k]] = coeffs[k].toDouble()
+                dc += dv.cost[cols[k]] * dv.loShift[cols[k]]
+            }
+            dv.objConstant = dc
+        }
+        return LpModel(
+            n = n, m = m, csc = csc, rhs = rhs, cost = cost,
+            upper = upper, hasUpper = hasUpper, loShift = loShift,
+            objConstant = constant, sense = sense, tag = tag,
+            rowGlobal = rowGlobal, rowPremises = rowPremises, flippedRhs = flippedRhs,
+            probeClampedLo = probeClampedLo, probeClampedHi = probeClampedHi,
+            colContinuous = colContinuous,
+            doubleView = dv,
+        )
+    }
+
     /** Column index of row `i`'s slack variable. */
     fun slackCol(i: Int): Int = n + i
 
