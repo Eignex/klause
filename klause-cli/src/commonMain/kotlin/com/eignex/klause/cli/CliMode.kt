@@ -1,6 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.presolve.PresolveBudget
@@ -9,6 +11,7 @@ import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -621,4 +624,25 @@ internal interface CliMode {
     /** Recognised file extensions (lowercase, no dot). */
     val extensions: List<String>
     fun newSession(): ModeSession
+}
+
+/**
+ * [problem] rewritten so it is plainly unsatisfiable: every integer pinned to zero and one row demanding
+ * `x₀ ≥ 1`. Used when the model has already been refuted over its genuinely open ranges — the search must
+ * not be handed the original domains (it would explore an invented box and could only answer `unknown`),
+ * and it must not be handed a merely *pinned* problem either, since that could be satisfiable by accident
+ * and would then report a model the original does not have.
+ */
+internal fun refutedProblem(problem: Problem): Problem {
+    val pinned = Array(problem.numIntVars) { IntDomain(0L, 0L) }
+    val contradiction = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
+    return Problem(
+        numBoolVars = problem.numBoolVars,
+        numIntVars = problem.numIntVars,
+        intDomains = pinned,
+        factors = problem.factors.toList() + contradiction,
+        numRealVars = problem.numRealVars,
+        realLower = problem.realLower,
+        realUpper = problem.realUpper,
+    )
 }

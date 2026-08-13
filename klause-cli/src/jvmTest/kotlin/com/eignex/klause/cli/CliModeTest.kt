@@ -638,4 +638,21 @@ class CliModeTest {
     fun `the presolve budget falls back to the flat backstop without a time limit`() {
         assertEquals(CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS, SolveCore.derivedPresolveBudgetMs(null, 0.1))
     }
+
+    @Test
+    fun `an unbounded model refuted over its true ranges reports unsat, not unknown`() {
+        // x - y <= -1 and y - x <= -1 sum to 0 <= -2, with neither variable bounded anywhere. The
+        // refutation owes nothing to the finite search box, so softening it to `unknown` would be
+        // throwing away a real answer.
+        val smt = File.createTempFile("cli", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LIA)\n" +
+                    "(declare-const x Int)\n(declare-const y Int)\n" +
+                    "(assert (< x y))\n(assert (< y x))\n(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+        val out = capture { main(arrayOf(smt.absolutePath)) }
+        assertTrue("unsat" in out, "expected unsat, got: $out")
+    }
 }
