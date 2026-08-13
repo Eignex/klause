@@ -634,6 +634,10 @@ internal interface CliMode {
  * and would then report a model the original does not have.
  */
 internal fun refutedProblem(problem: Problem): Problem {
+    // The contradiction is carried by an integer column, so one has to exist. A refutation can only come
+    // from open integer domains, which implies at least one — the guard keeps the row from naming a
+    // variable that is not there should that ever stop holding.
+    if (problem.numIntVars == 0) return problem
     val pinned = Array(problem.numIntVars) { IntDomain(0L, 0L) }
     val contradiction = Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)
     return Problem(
