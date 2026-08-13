@@ -215,14 +215,15 @@ private fun LpEngine.safeMaxNoBake(coeffs: LongArray, token: Cancellation): Doub
  * [shaveVariableBounds]'s unit-step SAC (which shaves at most [SHAVE_MAX_ITERS] units in total), so it
  * collapses in one solve a wide clamped domain the root bake would otherwise grind down one step per
  * round (O(span)). **Sound:** the safe bound over/under-estimates the true LP optimum, which bounds every
- * integer solution, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables.
+ * integer solution, so no feasible value is removed. Bounded by [OBBT_MAX_VARS] variables, spent on the
+ * widest domains first — see [widestFirst].
  */
 internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound> {
     if (lpRelaxer == null || token()) return emptyList()
     val n = problem.numIntVars
     val out = ArrayList<ShavedBound>()
     var done = 0
-    for (v in 0 until n) {
+    for (v in widestFirst(n)) {
         if (done >= OBBT_MAX_VARS || token()) break
         val d = problem.intDomains[v]
         if (d.min >= d.max) continue
@@ -236,6 +237,22 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
     }
     return out
 }
+
+/**
+ * The free integer variables, widest declared domain first, so [rootLpBoundsNoBake]'s [OBBT_MAX_VARS]
+ * solves land where a bound is worth proving. Index order spends the whole allowance on whichever
+ * variables happen to come first, which on a model whose open columns sit late is every variable but
+ * the ones OBBT exists for: measured, `neos-3046601-motu` and `Rulemining-hab-07-3-30` shaved nothing
+ * in index order and 8 and 7 bounds respectively in this one. A domain that overflows [Long] sorts
+ * first — it is the most open there is.
+ */
+private fun LpEngine.widestFirst(n: Int): List<Int> =
+    (0 until n).filter { problem.intDomains[it].min < problem.intDomains[it].max }
+        .sortedByDescending {
+            val d = problem.intDomains[it]
+            val width = d.max - d.min
+            if (width < 0L) Long.MAX_VALUE else width
+        }
 
 /** Whether the root relaxation is provably infeasible — the LP relaxation has no real point at an
  *  infinite incumbent, so `pruneNode` fires only on a genuine, certified infeasibility (the same sound

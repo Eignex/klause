@@ -370,6 +370,27 @@ class LpHarvestTest {
     }
 
     @Test
+    fun `lpRootBounds tightens a wide domain that sits past its solve allowance in index order`() {
+        // The coupled pair from the test above, placed after 80 already-tight columns — more than the
+        // per-run solve allowance — so an index-order scan spends every solve before reaching them.
+        val padding = 80
+        val domains = Array(padding + 2) { if (it < padding) IntDomain(0, 1) else IntDomain(0, 1_000_000_000) }
+        val x = padding
+        val y = padding + 1
+        val problem = Problem(
+            0,
+            padding + 2,
+            domains,
+            arrayOf<Factor>(
+                Linear(intArrayOf(1, 1), intArrayOf(x, y), LinearOp.LE, 10),
+                Linear(intArrayOf(1, -1), intArrayOf(x, y), LinearOp.LE, 0),
+            ),
+        )
+        val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
+        assertEquals(5L, tightened.intDomains[x].max, "the widest domain is probed regardless of its index")
+    }
+
+    @Test
     fun `lpRootBounds returns the problem unchanged when the LP tightens nothing`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 5)), arrayOf<Factor>())
         assertSame(
