@@ -231,7 +231,7 @@ class CliModeTest {
     @Test
     fun `--version prints name and version on a single line`() {
         val out = capture { main(arrayOf("--version")) }.trim()
-        assertTrue(out == "Klause 0.1.0", out)
+        assertTrue(out == "Klause 0.0.1", out)
     }
 
     @Test

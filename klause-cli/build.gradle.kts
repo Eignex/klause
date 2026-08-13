@@ -8,7 +8,7 @@ plugins {
 // generated BuildInfo that `--version` reports.
 val cliAppName = "Klause"
 val cliAppId = "com.eignex.klause"
-val cliVersion = "0.1.0"
+val cliVersion = "0.0.1"
 
 eignexCli {
     mainClass.set("com.eignex.klause.cli.MainKt")
