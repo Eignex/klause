@@ -3,7 +3,8 @@ package com.eignex.klause.lp
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
-import com.eignex.koblas.SparseLu
+import com.eignex.koblas.SparseMatrix
+import com.eignex.koblas.sparse.lu
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.sqrt
@@ -47,16 +48,18 @@ internal fun integerTableauCuts(
 
     // Float LU of the basis `B` (its column `t` is the basic column `basic[t]`, which may be a slack);
     // btran gives the tableau rows.
-    val rowsMap = Array(m) { HashMap<Int, Double>() }
-    for (t in 0 until m) {
+    val columns = List(m) { t ->
         val col = basis.basicVars[t]
         if (col < n) {
-            model.forEachInColumn(col) { i, v -> rowsMap[i][t] = v.toDouble() }
+            val entries = ArrayList<Pair<Int, Double>>()
+            model.forEachInColumn(col) { i, v -> entries.add(i to v.toDouble()) }
+            entries
         } else {
-            rowsMap[col - n][t] = 1.0 // slack column is the unit vector e_{col−n}
+            listOf((col - n) to 1.0) // slack column is the unit vector e_{col−n}
         }
     }
-    val lu = SparseLu.factorize(rowsMap, m) ?: return emptyList()
+    val lu = SparseMatrix.ofColumns(m, m, columns).lu()
+    if (lu.singular) return emptyList()
 
     val isLeRow = BooleanArray(m) { !model.hasUpper[model.slackCol(it)] } // ≤-row slack is free above
     val zStar = DoubleArray(n) { primal[it] - model.loShift[it].toDouble() } // shifted LP point
@@ -70,7 +73,7 @@ internal fun integerTableauCuts(
         if (abs(primal[bvar] - round(primal[bvar])) < TABLEAU_FRAC_TOL) continue // integral ⇒ no cut
 
         for (r in 0 until m) unit[r] = if (r == i) 1.0 else 0.0
-        val w = roundDuals(model, lu.btran(unit))?.mult ?: continue
+        val w = roundDuals(model, lu.solve(unit, transpose = true))?.mult ?: continue
 
         var global = true
         var anyWeight = false

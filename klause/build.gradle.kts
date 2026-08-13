@@ -60,7 +60,7 @@ kotlin {
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:0.3.0")
-            implementation("com.eignex:koblas:0.1.0")
+            implementation("com.eignex:koblas:0.1.1-SNAPSHOT")
             implementation("com.eignex:kumulant:0.3.3")
             implementation("com.eignex:kpermute:1.2.0")
             implementation("com.ionspin.kotlin:bignum:0.3.10")

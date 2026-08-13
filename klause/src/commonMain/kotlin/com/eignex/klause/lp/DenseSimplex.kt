@@ -2,7 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.solver.Cancellation
 import com.eignex.koblas.DenseMatrix
-import com.eignex.koblas.LuDecomposition
+import com.eignex.koblas.dense.LuDecomposition
 import com.eignex.koblas.koblas
 import kotlin.math.abs
 
@@ -70,11 +70,12 @@ internal class DenseSimplex(private val model: LpModel, private val cancellation
         while (true) {
             if (iter++ > maxIter || cancellation()) return null
 
-            // Basis matrix B (m×m), row-major, column t = basicVar[t]; factor with koblas dense LU.
+            // Basis matrix B (m×m) in koblas's column-major storage — entry (i, t) at i + t·m — with
+            // column t = basicVar[t]; factor with koblas dense LU.
             val bData = DoubleArray(m * m)
             for (t in 0 until m) {
                 val col = column(basicVar[t])
-                for (i in 0 until m) bData[i * m + t] = col[i]
+                for (i in 0 until m) bData[i + t * m] = col[i]
             }
             val lu = koblas.factor(DenseMatrix.wrap(m, m, bData))
             if (lu.singular) return null
