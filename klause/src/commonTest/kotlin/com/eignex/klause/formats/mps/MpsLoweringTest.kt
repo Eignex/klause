@@ -25,7 +25,12 @@ class MpsLoweringTest {
     // OBBT is deferred to the presolve phase; run it here to assert the effective bounded domains and
     // clamp flag (a fully-finite model has no deferred bounding, so its domains stand and it never clamps).
     private fun MpsCompiled.bounded(cancellation: Cancellation = Cancellation.Never): BoundedIntDomains =
-        deferredBounds?.run(cancellation) ?: BoundedIntDomains(problem.intDomains, false)
+        deferredBounds?.run(cancellation) ?: BoundedIntDomains(
+            problem.intDomains,
+            false,
+            BooleanArray(problem.numIntVars),
+            BooleanArray(problem.numIntVars),
+        )
 
     @Test
     fun `keeps an unbounded float column as an open LP-only continuous variable`() {

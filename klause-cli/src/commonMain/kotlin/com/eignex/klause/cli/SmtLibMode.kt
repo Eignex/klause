@@ -48,7 +48,7 @@ internal object SmtLibMode : CliMode {
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
-                parsed.problem.withIntDomains(bounded.domains)
+                parsed.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
             }
         }
 
