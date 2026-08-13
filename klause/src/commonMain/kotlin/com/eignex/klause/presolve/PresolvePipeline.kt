@@ -80,7 +80,7 @@ object PresolvePipeline {
         // bake would reach. Gated on span so small models never pay the LP.
         val wideSpan = Presolve.maxIntSpan(problem) > KlauseConfig.current.largeSpanThreshold
         val lpInfeasible = !strengthenInfeasible && wideSpan &&
-            lpRootInfeasible(problem, objective, LpPlan(bounding = true), cancellation)
+            lpRootInfeasible(problem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
         val preBakeInfeasible = strengthenInfeasible || lpInfeasible
 
         // On a wide but feasible domain the LP still can't be skipped like the infeasible case, but its
@@ -89,7 +89,7 @@ object PresolvePipeline {
         // one step per round (O(span)). Solution-set-preserving, so it is sound before the bake. Gated on
         // span so small models never pay the OBBT; skipped when already proven infeasible.
         val prebaked = if (!preBakeInfeasible && wideSpan) {
-            lpRootBounds(problem, objective, LpPlan(bounding = true), cancellation)
+            lpRootBounds(problem, objective, LpPlan(bounding = true), preBakeSlice(cancellation, presolveBudget))
         } else {
             problem
         }
@@ -149,3 +149,15 @@ object PresolvePipeline {
         return PresolveOutcome(current, reconstruct, stats, changed = true)
     }
 }
+
+/**
+ * A slice of [budget] for one pre-bake root LP, falling back to [cancellation] when the phase carries no
+ * budget. These run before any pass, so a relaxation the LP cannot close in the time available would
+ * otherwise spend the whole allowance and leave the round engine none — and, cancelled mid-solve, it
+ * yields nothing at all for the time it took. Half of what remains, matching the round engine's own
+ * per-pass policy, so each stage costs a bounded share of the phase rather than the phase itself.
+ */
+private fun preBakeSlice(cancellation: Cancellation, budget: PresolveBudget?): Cancellation = budget?.let {
+    val slice = it.slice(it.remaining() / 2)
+    Cancellation { cancellation() || slice() }
+} ?: cancellation
