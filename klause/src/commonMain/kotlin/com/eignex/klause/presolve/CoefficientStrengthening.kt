@@ -4,6 +4,10 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.lp.LpOverflowException
+import com.eignex.klause.lp.addExact
+import com.eignex.klause.lp.mulExact
+import com.eignex.klause.lp.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
@@ -173,10 +177,22 @@ internal object CoefficientStrengthening {
      *
      * `d ≤ 0` ⟹ the constraint is always satisfied (dropped). `≥` is complemented to `≤` first;
      * `=` can't be lifted by clamping (it ties both directions) and `≠` isn't a knapsack — both pass
-     * through, as do out-of-`Int`-range slacks. Fixed variables (`cⱼ = 0`) are folded into the bound
-     * and never clamped (their coefficient is immaterial to the feasible set).
+     * through, as does a row whose lift arithmetic leaves `Long`. Fixed variables (`cⱼ = 0`) are folded
+     * into the bound and never clamped (their coefficient is immaterial to the feasible set).
+     *
+     * Every step runs in checked arithmetic. On a column carrying the unbounded-search clamp a capacity
+     * `uⱼ − lⱼ` already reaches `2^62`, and the maximal activity `Σ a̅ⱼcⱼ` over a handful of such columns
+     * leaves `Long` — wrapped, it yields either a dropped row (`d ≤ 0` read as always-satisfied) or a
+     * lifted row whose bound has no relation to the original. Both change the feasible set, so an
+     * overflow anywhere returns the row untouched.
      */
-    private fun liftLinear(l: Linear, domains: Array<IntDomain>): Factor? {
+    private fun liftLinear(l: Linear, domains: Array<IntDomain>): Factor? = try {
+        liftLinearExact(l, domains)
+    } catch (_: LpOverflowException) {
+        l // the row is not liftable within Long; keep it exactly as it stands
+    }
+
+    private fun liftLinearExact(l: Linear, domains: Array<IntDomain>): Factor? {
         // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound (#365).
         val coeffs: LongArray
         val bound: Long
@@ -201,16 +217,16 @@ internal object CoefficientStrengthening {
         for (i in 0 until n) {
             val a = coeffs[i]
             val dom = domains[l.vars[i]]
-            cap[i] = dom.max - dom.min
+            cap[i] = subExact(dom.max, dom.min)
             absA[i] = if (a < 0) -a else a
             // Fold the variable's contribution at its zero-of-zⱼ end into the bound:
             // aⱼ>0 shifts by aⱼ·lⱼ, aⱼ<0 (complemented) shifts by aⱼ·uⱼ.
             val zeroEnd = if (a >= 0) dom.min else dom.max
-            b -= a * zeroEnd
+            b = subExact(b, mulExact(a, zeroEnd))
         }
         var amax = 0L
-        for (i in 0 until n) amax += absA[i] * cap[i]
-        val d = amax - b
+        for (i in 0 until n) amax = addExact(amax, mulExact(absA[i], cap[i]))
+        val d = subExact(amax, b)
         if (d <= 0L) return null // maximal activity within bound ⇒ always satisfied
         var changed = false
         val lifted = LongArray(n) { i ->
@@ -224,16 +240,16 @@ internal object CoefficientStrengthening {
         if (!changed) return l
         // New bound in z-space: Σ a̅'ⱼcⱼ − d, then de-shift each variable back to xⱼ.
         var newBound = -d
-        for (i in 0 until n) newBound += lifted[i] * cap[i]
+        for (i in 0 until n) newBound = addExact(newBound, mulExact(lifted[i], cap[i]))
         val newCoeffs = LongArray(n)
         for (i in 0 until n) {
             val dom = domains[l.vars[i]]
             if (coeffs[i] >= 0) {
                 newCoeffs[i] = lifted[i]
-                newBound += lifted[i] * dom.min
+                newBound = addExact(newBound, mulExact(lifted[i], dom.min))
             } else {
                 newCoeffs[i] = -lifted[i]
-                newBound -= lifted[i] * dom.max
+                newBound = subExact(newBound, mulExact(lifted[i], dom.max))
             }
         }
         return Linear(newCoeffs, l.vars.copyOf(), LinearOp.LE, newBound)
