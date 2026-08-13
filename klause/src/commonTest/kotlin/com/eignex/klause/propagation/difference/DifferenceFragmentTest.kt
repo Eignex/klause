@@ -1,0 +1,89 @@
+package com.eignex.klause.propagation.difference
+
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/**
+ * Gathering a model's difference constraints. The cases that matter are the mixed ones: a real QF_IDL
+ * instance is clauses and reified rows around a core of differences, so collecting must compose with
+ * structure it does not understand rather than refusing the model.
+ */
+class DifferenceFragmentTest {
+
+    private fun open(n: Int) = Array(n) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) }
+
+    private fun frag(factors: List<Factor>, n: Int, domains: Array<IntDomain> = open(n)) =
+        differenceFragmentOf(factors.toTypedArray(), n, domains)
+
+    private fun diff(a: Int, b: Int, op: LinearOp, c: Int) =
+        Linear(intArrayOf(1, -1), intArrayOf(a, b), op, c)
+
+    @Test
+    fun `an unconditional difference row becomes an unguarded edge`() {
+        val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
+        assertEquals(1, f.edges.count { it.guard == DifferenceEdge.ALWAYS })
+    }
+
+    @Test
+    fun `a reified difference row becomes an edge guarded by its aux`() {
+        val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)
+        val f = assertNotNull(frag(listOf(r), 2))
+        val guarded = f.edges.single { it.guard != DifferenceEdge.ALWAYS }
+        assertEquals(Lit.make(7, true), guarded.guard, "the edge holds exactly when the aux is true")
+    }
+
+    @Test
+    fun `a clause does not disqualify the model`() {
+        // The all-or-nothing predecessor recognised 0 of 30 real instances for exactly this reason.
+        val f = assertNotNull(
+            frag(listOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))), 2),
+        )
+        assertTrue(f.edges.any { it.guard == DifferenceEdge.ALWAYS })
+    }
+
+    @Test
+    fun `a general linear row is left out but the differences are still collected`() {
+        val general = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)
+        val f = assertNotNull(frag(listOf(general, diff(0, 1, LinearOp.LE, 3)), 2))
+        assertEquals(1, f.absorbedFactors.size, "only the difference row is absorbed")
+        assertEquals(1, f.absorbedFactors[0], "and it is the one at index 1")
+    }
+
+    @Test
+    fun `a contradictory pair is refuted by the graph`() {
+        val f = assertNotNull(
+            frag(listOf(diff(0, 1, LinearOp.LE, -1), diff(1, 0, LinearOp.LE, -1)), 2),
+        )
+        assertNotNull(f.graph().negativeCycle(), "the pair sums to 0 ≤ −2")
+    }
+
+    @Test
+    fun `an equality contributes both directions`() {
+        val f = assertNotNull(
+            frag(listOf(diff(0, 1, LinearOp.EQ, 2), diff(0, 1, LinearOp.LE, 1)), 2),
+        )
+        assertNotNull(f.graph().negativeCycle())
+    }
+
+    @Test
+    fun `declared domains enter as differences against zero`() {
+        val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2, arrayOf(IntDomain(0, 5), IntDomain(0, 5))))
+        assertEquals(4, f.edges.count { it.guard == DifferenceEdge.ALWAYS && it.bound != 3L })
+    }
+
+    @Test
+    fun `a model with no difference rows yields nothing`() {
+        val general = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)
+        assertNull(frag(listOf(general), 2), "no edges is not a fragment")
+    }
+}
