@@ -327,4 +327,23 @@ class CoefficientStrengtheningTest {
             assertLinearEquivalent(n, 3, Linear(coeffs, IntArray(n) { idx -> idx }, op, bound))
         }
     }
+
+    @Test
+    fun `a row over open-domain columns is kept when its lift arithmetic would overflow`() {
+        // Each column carries the unbounded-search clamp, so a capacity is 2^62 and the maximal
+        // activity over three of them leaves Long. Unguarded, the wrapped activity yields either a row
+        // dropped as always-satisfied or a lifted row whose bound is unrelated to the original — both
+        // change the feasible set.
+        val open = IntDomain(0, 1L shl 62)
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(open, open, open),
+            factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 10)),
+        )
+        assertTrue(
+            Presolve.strengthenCoefficients(problem).isEmpty,
+            "an unliftable row must pass through unchanged, neither dropped nor rewritten",
+        )
+    }
 }
