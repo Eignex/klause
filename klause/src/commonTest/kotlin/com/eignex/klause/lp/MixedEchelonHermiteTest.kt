@@ -90,4 +90,31 @@ class MixedEchelonHermiteTest {
         assertTrue(b.lo.all { it == null }, "an unbounded y must not yield a bounded x")
         assertTrue(b.hi.all { it == null })
     }
+
+    @Test
+    fun `a derived bound never excludes a solution of the original system`() {
+        // The safety property the DeferredIntBounds wiring rests on: a bound derived through the
+        // transformation must CONTAIN every solution, or search inside it would miss models and a
+        // refutation inside it would be a false unsat. Enumerated exhaustively over a small box.
+        val original = mat(longArrayOf(2, -2)) // 2*x0 - 2*x1 = 0, i.e. x0 == x1
+        val r = mixedEchelonHermite(original, emptyArray(), 2)
+        val span = 6L
+        val yLo = arrayOf<BigInteger?>(BigInteger.fromLong(-span), BigInteger.fromLong(-span))
+        val yHi = arrayOf<BigInteger?>(BigInteger.fromLong(span), BigInteger.fromLong(span))
+        val b = r.originalBounds(yLo, yHi)
+        for (y0 in -span..span) {
+            for (y1 in -span..span) {
+                val y = vec(y0, y1)
+                if (!dot(r.equalities[0], y).isZero()) continue // not a solution of the rewritten row
+                val x = r.recover(y)
+                assertEquals(BigInteger.ZERO, dot(original[0], x), "recovered x must solve the original")
+                for (i in x.indices) {
+                    val lo = b.lo[i]
+                    val hi = b.hi[i]
+                    assertTrue(lo == null || x[i] >= lo, "x[$i]=${x[i]} fell below the derived lower bound $lo")
+                    assertTrue(hi == null || x[i] <= hi, "x[$i]=${x[i]} rose above the derived upper bound $hi")
+                }
+            }
+        }
+    }
 }
