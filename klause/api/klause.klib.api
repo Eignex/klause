@@ -3849,6 +3849,23 @@ final class com.eignex.klause.formats.opb/OpbProblem { // com.eignex.klause.form
     final fun toString(): kotlin/String // com.eignex.klause.formats.opb/OpbProblem.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.formats.smtlib/IntDigitColumns { // com.eignex.klause.formats.smtlib/IntDigitColumns|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/Int) // com.eignex.klause.formats.smtlib/IntDigitColumns.<init>|<init>(kotlin.IntArray;kotlin.Int){}[0]
+
+    final val columns // com.eignex.klause.formats.smtlib/IntDigitColumns.columns|{}columns[0]
+        final fun <get-columns>(): kotlin/IntArray // com.eignex.klause.formats.smtlib/IntDigitColumns.columns.<get-columns>|<get-columns>(){}[0]
+    final val width // com.eignex.klause.formats.smtlib/IntDigitColumns.width|{}width[0]
+        final fun <get-width>(): kotlin/Int // com.eignex.klause.formats.smtlib/IntDigitColumns.width.<get-width>|<get-width>(){}[0]
+
+    final fun component1(): kotlin/IntArray // com.eignex.klause.formats.smtlib/IntDigitColumns.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.eignex.klause.formats.smtlib/IntDigitColumns.component2|component2(){}[0]
+    final fun copy(kotlin/IntArray = ..., kotlin/Int = ...): com.eignex.klause.formats.smtlib/IntDigitColumns // com.eignex.klause.formats.smtlib/IntDigitColumns.copy|copy(kotlin.IntArray;kotlin.Int){}[0]
+    final fun decimalIn(kotlin/LongArray): kotlin/String // com.eignex.klause.formats.smtlib/IntDigitColumns.decimalIn|decimalIn(kotlin.LongArray){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/IntDigitColumns.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/IntDigitColumns.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/IntDigitColumns.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.formats.smtlib/SExprReader { // com.eignex.klause.formats.smtlib/SExprReader|null[0]
     constructor <init>(com.eignex.klause.util/CharReader) // com.eignex.klause.formats.smtlib/SExprReader.<init>|<init>(com.eignex.klause.util.CharReader){}[0]
     constructor <init>(com.eignex.klause.util/CharSource) // com.eignex.klause.formats.smtlib/SExprReader.<init>|<init>(com.eignex.klause.util.CharSource){}[0]
@@ -3859,12 +3876,16 @@ final class com.eignex.klause.formats.smtlib/SExprReader { // com.eignex.klause.
 }
 
 final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klause.formats.smtlib/SmtLibProblem|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ..., com.eignex.klause.lp/DeferredIntBounds?) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense;com.eignex.klause.lp.DeferredIntBounds?){}[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ..., com.eignex.klause.lp/DeferredIntBounds?, kotlin/Boolean = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.formats.smtlib/IntDigitColumns> = ...) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense;com.eignex.klause.lp.DeferredIntBounds?;kotlin.Boolean;kotlin.collections.Map<kotlin.Int,com.eignex.klause.formats.smtlib.IntDigitColumns>){}[0]
 
     final val boolVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
+    final val clamped // com.eignex.klause.formats.smtlib/SmtLibProblem.clamped|{}clamped[0]
+        final fun <get-clamped>(): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibProblem.clamped.<get-clamped>|<get-clamped>(){}[0]
     final val deferredBounds // com.eignex.klause.formats.smtlib/SmtLibProblem.deferredBounds|{}deferredBounds[0]
         final fun <get-deferredBounds>(): com.eignex.klause.lp/DeferredIntBounds? // com.eignex.klause.formats.smtlib/SmtLibProblem.deferredBounds.<get-deferredBounds>|<get-deferredBounds>(){}[0]
+    final val intDigits // com.eignex.klause.formats.smtlib/SmtLibProblem.intDigits|{}intDigits[0]
+        final fun <get-intDigits>(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.formats.smtlib/IntDigitColumns> // com.eignex.klause.formats.smtlib/SmtLibProblem.intDigits.<get-intDigits>|<get-intDigits>(){}[0]
     final val intVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
     final val objective // com.eignex.klause.formats.smtlib/SmtLibProblem.objective|{}objective[0]
@@ -3883,7 +3904,9 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klaus
     final fun component5(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component5|component5(){}[0]
     final fun component6(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.component6|component6(){}[0]
     final fun component7(): com.eignex.klause.lp/DeferredIntBounds? // com.eignex.klause.formats.smtlib/SmtLibProblem.component7|component7(){}[0]
-    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ..., com.eignex.klause.lp/DeferredIntBounds? = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense;com.eignex.klause.lp.DeferredIntBounds?){}[0]
+    final fun component8(): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibProblem.component8|component8(){}[0]
+    final fun component9(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.formats.smtlib/IntDigitColumns> // com.eignex.klause.formats.smtlib/SmtLibProblem.component9|component9(){}[0]
+    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ..., com.eignex.klause.lp/DeferredIntBounds? = ..., kotlin/Boolean = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.formats.smtlib/IntDigitColumns> = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense;com.eignex.klause.lp.DeferredIntBounds?;kotlin.Boolean;kotlin.collections.Map<kotlin.Int,com.eignex.klause.formats.smtlib.IntDigitColumns>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibProblem.toString|toString(){}[0]
@@ -5231,6 +5254,12 @@ final class com.eignex.klause.lp/BoundedIntDomains { // com.eignex.klause.lp/Bou
         final fun <get-clamped>(): kotlin/Boolean // com.eignex.klause.lp/BoundedIntDomains.clamped.<get-clamped>|<get-clamped>(){}[0]
     final val domains // com.eignex.klause.lp/BoundedIntDomains.domains|{}domains[0]
         final fun <get-domains>(): kotlin/Array<com.eignex.klause.solver/IntDomain> // com.eignex.klause.lp/BoundedIntDomains.domains.<get-domains>|<get-domains>(){}[0]
+    final val openHi // com.eignex.klause.lp/BoundedIntDomains.openHi|{}openHi[0]
+        final fun <get-openHi>(): kotlin/BooleanArray // com.eignex.klause.lp/BoundedIntDomains.openHi.<get-openHi>|<get-openHi>(){}[0]
+    final val openLo // com.eignex.klause.lp/BoundedIntDomains.openLo|{}openLo[0]
+        final fun <get-openLo>(): kotlin/BooleanArray // com.eignex.klause.lp/BoundedIntDomains.openLo.<get-openLo>|<get-openLo>(){}[0]
+    final val openlyInfeasible // com.eignex.klause.lp/BoundedIntDomains.openlyInfeasible|{}openlyInfeasible[0]
+        final fun <get-openlyInfeasible>(): kotlin/Boolean // com.eignex.klause.lp/BoundedIntDomains.openlyInfeasible.<get-openlyInfeasible>|<get-openlyInfeasible>(){}[0]
 }
 
 final class com.eignex.klause.lp/DeferredIntBounds { // com.eignex.klause.lp/DeferredIntBounds|null[0]
@@ -8598,8 +8627,8 @@ open class com.eignex.klause.schema/VariableSchema : com.eignex.skema/Schema<com
 }
 
 open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Problem|null[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin.collections/List<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.collections.List<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin.collections/List<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.collections.List<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
 
     final val baked // com.eignex.klause.solver/Problem.baked|{}baked[0]
         final fun <get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.baked.<get-baked>|<get-baked>(){}[0]
@@ -8639,6 +8668,10 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
         final fun <get-numRealVars>(): kotlin/Int // com.eignex.klause.solver/Problem.numRealVars.<get-numRealVars>|<get-numRealVars>(){}[0]
     final val occurrences // com.eignex.klause.solver/Problem.occurrences|{}occurrences[0]
         final fun <get-occurrences>(): com.eignex.klause.solver/OccurrenceIndex // com.eignex.klause.solver/Problem.occurrences.<get-occurrences>|<get-occurrences>(){}[0]
+    final val openIntHi // com.eignex.klause.solver/Problem.openIntHi|{}openIntHi[0]
+        final fun <get-openIntHi>(): kotlin/BooleanArray? // com.eignex.klause.solver/Problem.openIntHi.<get-openIntHi>|<get-openIntHi>(){}[0]
+    final val openIntLo // com.eignex.klause.solver/Problem.openIntLo|{}openIntLo[0]
+        final fun <get-openIntLo>(): kotlin/BooleanArray? // com.eignex.klause.solver/Problem.openIntLo.<get-openIntLo>|<get-openIntLo>(){}[0]
     final val propagators // com.eignex.klause.solver/Problem.propagators|{}propagators[0]
         final fun <get-propagators>(): kotlin/Array<out com.eignex.klause.propagation/Propagator> // com.eignex.klause.solver/Problem.propagators.<get-propagators>|<get-propagators>(){}[0]
     final val realLower // com.eignex.klause.solver/Problem.realLower|{}realLower[0]
@@ -8659,7 +8692,7 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
     final fun bake(com.eignex.klause.solver/Cancellation = ...): com.eignex.klause.solver/BakedProblem // com.eignex.klause.solver/Problem.bake|bake(com.eignex.klause.solver.Cancellation){}[0]
     final fun foldIntoDomains(com.eignex.klause.propagation/PropagationResult) // com.eignex.klause.solver/Problem.foldIntoDomains|foldIntoDomains(com.eignex.klause.propagation.PropagationResult){}[0]
     final fun propagate(com.eignex.klause.solver/Assumptions = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.propagate|propagate(com.eignex.klause.solver.Assumptions;com.eignex.klause.solver.Cancellation;kotlin.Boolean){}[0]
-    final fun withIntDomains(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/Problem // com.eignex.klause.solver/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun withIntDomains(kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...): com.eignex.klause.solver/Problem // com.eignex.klause.solver/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/DomainMaxRegret : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/DomainMaxRegret|null[0]
