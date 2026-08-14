@@ -87,4 +87,25 @@ class WideIntColumnsTest {
         val c = wideIntColumns(big("340282366920938463463374607431768211456"), BigInteger.ONE, counter())!!
         assertNull(c.rewriteTerm(big("4611686018427387904")), "a wrapping coefficient must be refused")
     }
+
+    @Test
+    fun `materialising a wide term yields digit columns of equal value`() {
+        val v = big("18446744073709551616") // 2^64
+        var posted: WideLinComb? = null
+        val term = WideLinComb(mapOf(7 to BigInteger.ONE), BigInteger.ZERO)
+        val digits = materializeWide(term, v, counter()) { posted = it }!!
+        assertTrue(digits.coeffs.isNotEmpty(), "the result ranges over the digit columns")
+        assertEquals(BigInteger.ZERO, digits.constant)
+        // The channeling row is `term - digits`, so variable 7 keeps coefficient 1 and every digit
+        // column appears negated.
+        val row = posted!!
+        assertEquals(BigInteger.ONE, row.coeffs.getValue(7))
+        for ((col, c) in digits.coeffs) assertEquals(-c, row.coeffs.getValue(col), "digit $col must negate")
+    }
+
+    @Test
+    fun `materialising refuses a term whose coefficient leaves no digit width`() {
+        val term = WideLinComb(mapOf(1 to big("4611686018427387904")), BigInteger.ZERO)
+        assertNull(materializeWide(term, big("18446744073709551616"), counter()) { })
+    }
 }

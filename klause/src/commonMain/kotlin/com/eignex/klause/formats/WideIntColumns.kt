@@ -69,3 +69,35 @@ internal fun WideIntColumns.rewriteTerm(coeff: BigInteger): List<Pair<Int, Long>
     }
     return out
 }
+
+/**
+ * Materialise a wide combination into digit variables: the returned combination has the same value but
+ * ranges over fresh digit columns, each with an ordinary `Long` domain.
+ *
+ * This is the operation the front end is missing. A term can already be *carried* as
+ * [IntComb.Wide] — `WideLinComb` holds BigInteger coefficients — but an op that must put a value *in a
+ * variable* (`div`, `mod`, `abs`, `ite`, `to_real`) has nowhere to put one that exceeds `Long`. Digit
+ * columns are that somewhere: `Σᵢ (posᵢ − negᵢ)·2^(width·i)` is itself a wide combination, so the result
+ * needs no new representation and every downstream consumer keeps working unchanged.
+ *
+ * [magnitude] bounds the values the term can take; [fresh] supplies variable indices and [channel]
+ * receives the row tying the original term to its digits, which the caller posts. Returns null when the
+ * term's largest coefficient leaves no usable digit width — that row belongs to the wide-coefficient
+ * propagators instead.
+ */
+internal fun materializeWide(
+    term: WideLinComb,
+    magnitude: BigInteger,
+    fresh: () -> Int,
+    channel: (WideLinComb) -> Unit,
+): WideLinComb? {
+    val maxCoeff = term.coeffs.values.fold(BigInteger.ONE) { a, c -> if (c.abs() > a) c.abs() else a }
+    val cols = wideIntColumns(magnitude, maxCoeff, fresh) ?: return null
+    var digits = WideLinComb(emptyMap(), BigInteger.ZERO)
+    cols.weights().forEachIndexed { i, w ->
+        digits = digits.plus(WideLinComb(mapOf(cols.columns[i] to w, cols.negative[i] to -w), BigInteger.ZERO))
+    }
+    // term − digits = 0 ties the original value to its encoding; the caller posts it as an equality.
+    channel(term.plus(digits.scaled(BigInteger.ONE.negate())))
+    return digits
+}
