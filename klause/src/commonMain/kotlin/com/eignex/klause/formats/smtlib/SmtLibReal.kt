@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.WideLinComb
 import com.eignex.klause.formats.isConstant
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -37,6 +38,14 @@ internal fun LinComb.toRealComb(): RealComb = RealComb(
     coeffs.mapValues { BigFraction.ofLong(it.value) },
     emptyMap(),
     BigFraction.ofLong(constant),
+)
+
+/** Embed an arbitrary-precision integer combination into the reals; [RealComb] is exact rational
+ *  already, so a magnitude past 64 bits needs no approximation on the way in. */
+internal fun WideLinComb.toRealComb(): RealComb = RealComb(
+    coeffs.mapValues { BigFraction.of(it.value, BigInteger.ONE) },
+    emptyMap(),
+    BigFraction.of(constant, BigInteger.ONE),
 )
 
 /** Syntactic real classifier, worklist-driven like [SmtLib.Builder.isBoolExpr] so a deeply

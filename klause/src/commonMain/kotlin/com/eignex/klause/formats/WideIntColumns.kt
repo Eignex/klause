@@ -3,101 +3,48 @@ package com.eignex.klause.formats
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
- * A wide integer variable rewritten as digit columns.
+ * A wide integer quantity rewritten as digit columns.
  *
- * [columns] are the fresh variables standing for the digits, least significant first; each ranges over
- * `[0, 2^width)`. [negative] is the matching vector for the negative part — a signed quantity is carried
- * as the difference of two non-negative digit vectors, so every digit domain stays a plain
- * `[0, 2^width)` and the sign lives in the linear row rather than in the encoding.
+ * [columns] are the variables standing for the digits, least significant first, and the value is
+ * `Σᵢ dᵢ·2^(width·i)`. Every digit but the last ranges over `[0, 2^width)`; the most significant one
+ * ranges over `[−2^width, 2^width)` and carries the sign.
  *
- * The value is `Σᵢ (posᵢ − negᵢ)·2^(width·i)`, which [weights] gives directly as the coefficients to use
- * when a row that mentioned the original variable is rewritten over its digits.
+ * The signed leading digit is what makes the encoding a *bijection*: every value in range has exactly
+ * one digit vector, because the leading digit is the quotient by `2^(width·(n−1))` and the rest is its
+ * remainder. Carrying the sign instead as the difference of two non-negative vectors would give a single
+ * value as many representations as a digit has values, and search would wander through all of them
+ * before deciding anything.
  */
-internal class WideIntColumns(val columns: IntArray, val negative: IntArray, val width: Int) {
+internal class WideIntColumns(val columns: IntArray, val width: Int) {
     /** `2^(width·i)` per digit position, the coefficient a rewritten row multiplies each digit by. */
     fun weights(): Array<BigInteger> = Array(columns.size) { WideIntDigits.pow2(width * it) }
-
-    /** Upper bound of each digit's domain: `2^width − 1`. */
-    fun digitMax(): Long = (WideIntDigits.pow2(width) - BigInteger.ONE).longValue()
 }
 
 /**
- * Allocate digit columns for a variable whose values reach [magnitude], using coefficients up to
- * [maxCoeff] in the rows it appears in. [fresh] supplies a new variable index per call.
+ * Allocate digit columns for a quantity reaching [magnitude], appearing with coefficients up to
+ * [maxCoeff]. [fresh] supplies a new variable index per call, receiving the digit's inclusive bounds so
+ * the caller can give the column its domain.
  *
  * Returns null when [maxCoeff] leaves no usable digit width ([WideIntDigits.NO_ROOM]): the coefficient
  * itself is out of range there, so the row belongs to the wide-coefficient propagators rather than to
  * this decomposition.
  *
- * The width is chosen so that `maxCoeff · 2^width` stays inside `Long`. That is what keeps the ordinary
- * bound reasoning working on the rewritten rows — decomposing the variable alone is not enough, because
- * a propagator that overflows multiplying a coefficient by a domain bound stops deriving the bound and
- * the row silently loses its refutation strength while still admitting solutions.
+ * The width is chosen so that `maxCoeff · 2^width` stays inside `Long`, which keeps the ordinary bound
+ * reasoning working at the least significant position — decomposing alone is not enough, because a
+ * propagator that overflows multiplying a coefficient by a domain bound stops deriving the bound and the
+ * row silently loses its refutation strength while still admitting solutions.
  */
-internal fun wideIntColumns(magnitude: BigInteger, maxCoeff: BigInteger, fresh: () -> Int): WideIntColumns? {
+internal fun wideIntColumns(
+    magnitude: BigInteger,
+    maxCoeff: BigInteger,
+    fresh: (Long, Long) -> Int,
+): WideIntColumns? {
     val width = WideIntDigits.widthFor(maxCoeff)
     if (width == WideIntDigits.NO_ROOM) return null
-    val count = WideIntDigits.digitCount(magnitude, width)
-    val pos = IntArray(count) { fresh() }
-    val neg = IntArray(count) { fresh() }
-    return WideIntColumns(pos, neg, width)
-}
-
-/**
- * A linear term set rewritten over digit columns: `terms` pairs each column with its coefficient.
- *
- * A row that mentioned a decomposed variable with coefficient `c` gains, per digit position `i`, the
- * pair `(posᵢ, c·2^(width·i))` and `(negᵢ, −c·2^(width·i))` — the positive and negative vectors differ
- * only in sign, which is how a signed value is carried while every digit domain stays non-negative.
- *
- * Every emitted coefficient fits `Long` by construction: the width was chosen against the largest
- * coefficient the variable appears with, so no `coefficient × digit-bound` product can overflow. A
- * position whose coefficient would nonetheless escape `Long` yields null rather than a wrapped row.
- */
-internal fun WideIntColumns.rewriteTerm(coeff: BigInteger): List<Pair<Int, Long>>? {
-    val out = ArrayList<Pair<Int, Long>>(columns.size * 2)
-    val limit = BigInteger.fromLong(Long.MAX_VALUE)
-    val floor = BigInteger.fromLong(Long.MIN_VALUE)
-    weights().forEachIndexed { i, w ->
-        val c = coeff * w
-        if (c > limit || c < floor) return null
-        val asLong = c.longValue()
-        if (asLong == 0L) return@forEachIndexed
-        out.add(columns[i] to asLong)
-        if (asLong == Long.MIN_VALUE) return null // its negation is not representable
-        out.add(negative[i] to -asLong)
-    }
-    return out
-}
-
-/**
- * Materialise a wide combination into digit variables: the returned combination has the same value but
- * ranges over fresh digit columns, each with an ordinary `Long` domain.
- *
- * This is the operation the front end is missing. A term can already be *carried* as
- * [IntComb.Wide] — `WideLinComb` holds BigInteger coefficients — but an op that must put a value *in a
- * variable* (`div`, `mod`, `abs`, `ite`, `to_real`) has nowhere to put one that exceeds `Long`. Digit
- * columns are that somewhere: `Σᵢ (posᵢ − negᵢ)·2^(width·i)` is itself a wide combination, so the result
- * needs no new representation and every downstream consumer keeps working unchanged.
- *
- * [magnitude] bounds the values the term can take; [fresh] supplies variable indices and [channel]
- * receives the row tying the original term to its digits, which the caller posts. Returns null when the
- * term's largest coefficient leaves no usable digit width — that row belongs to the wide-coefficient
- * propagators instead.
- */
-internal fun materializeWide(
-    term: WideLinComb,
-    magnitude: BigInteger,
-    fresh: () -> Int,
-    channel: (WideLinComb) -> Unit,
-): WideLinComb? {
-    val maxCoeff = term.coeffs.values.fold(BigInteger.ONE) { a, c -> if (c.abs() > a) c.abs() else a }
-    val cols = wideIntColumns(magnitude, maxCoeff, fresh) ?: return null
-    var digits = WideLinComb(emptyMap(), BigInteger.ZERO)
-    cols.weights().forEachIndexed { i, w ->
-        digits = digits.plus(WideLinComb(mapOf(cols.columns[i] to w, cols.negative[i] to -w), BigInteger.ZERO))
-    }
-    // term − digits = 0 ties the original value to its encoding; the caller posts it as an equality.
-    channel(term.plus(digits.scaled(BigInteger.ONE.negate())))
-    return digits
+    // One position beyond the magnitude's own digits, so the leading signed digit has room for the sign
+    // without borrowing range from the value.
+    val count = WideIntDigits.digitCount(magnitude, width) + 1
+    val max = (WideIntDigits.pow2(width) - BigInteger.ONE).longValue()
+    val cols = IntArray(count) { i -> if (i == count - 1) fresh(-max - 1, max) else fresh(0L, max) }
+    return WideIntColumns(cols, width)
 }

@@ -42,19 +42,16 @@ internal sealed interface Res {
 private fun Res.asLit(): Int = (this as Res.B).lit
 private fun Res.asIntComb(): IntComb = (this as Res.I).term
 
-/** The 64-bit integer combination of an int result, rejecting a wide value — for the narrow-only ops
- *  (`div`/`mod`/`abs`/`ite`/`to_real`/real embedding) that have no arbitrary-precision path. */
-private fun Res.asLin(): LinComb = when (val t = (this as Res.I).term) {
-    is IntComb.Narrow -> t.lin
-    is IntComb.Wide -> smtUnsupported("integer beyond the 64-bit range in a context that requires 64-bit")
-}
-
 private fun narrowRes(lin: LinComb): Res.I = Res.I(IntComb.Narrow(lin))
 
 /** A folded operand as a real combination: real results directly, int results via the embedding. */
 private fun Res.asReal(): RealComb = when (this) {
     is Res.R -> comb
-    is Res.I -> asLin().toRealComb()
+    is Res.I -> when (val t = term) {
+        is IntComb.Narrow -> t.lin.toRealComb()
+        is IntComb.Wide -> t.lin.toRealComb()
+    }
+
     is Res.B -> smtUnsupported("boolean term used as Real")
 }
 
@@ -315,7 +312,7 @@ private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: Li
         } else if (args.size == 2) {
             Res.B(reifyRelArgs(node, head, args))
         } else {
-            Res.B(chainEqToFirst(args.map { it.asLin() }, ::reifyEq))
+            Res.B(chainEqToFirst(args.map { it.asIntComb() }) { x, y -> reifyRelation("=", x, y) })
         }
     } else {
         Res.B(chainEqToFirst(args.map { it.asLit() }, ::tseitinIff))
@@ -351,29 +348,51 @@ private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when
         else -> smtUnsupported("to_int over a boolean term")
     }
 
-    "abs" -> narrowRes(absTerm(args[0].asLin()))
+    "abs" -> when (val x = args[0].asIntComb()) {
+        is IntComb.Narrow -> narrowRes(absTerm(x.lin))
+        is IntComb.Wide -> Res.I(wideAbsTerm(x.lin))
+    }
 
-    "div" -> narrowRes(divModTerm(args[0].asLin(), args[1].asLin(), quotient = true))
+    "div" -> divModRes(args[0].asIntComb(), args[1].asIntComb(), quotient = true)
 
-    "mod" -> narrowRes(divModTerm(args[0].asLin(), args[1].asLin(), quotient = false))
+    "mod" -> divModRes(args[0].asIntComb(), args[1].asIntComb(), quotient = false)
 
-    "ite" -> {
-        // v = if cond then a else b: a fresh int pinned to each branch by the condition. Its domain is
-        // the union of the two branch ranges, so an unbounded default never enters the reified equality.
-        val cond = args[0].asLit()
-        val a = args[1].asLin()
-        val b = args[2].asLin()
-        val (aLo, aHi) = linCombRange(a)
-        val (bLo, bHi) = linCombRange(b)
+    "ite" -> iteRes(args[0].asLit(), args[1].asIntComb(), args[2].asIntComb())
+
+    else -> smtUnsupported("unsupported int op '$head'")
+}
+
+/** `div`/`mod` on the 64-bit path when both operands fit it, at arbitrary precision otherwise. */
+private fun SmtLib.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean): Res =
+    if (a is IntComb.Narrow && b is IntComb.Narrow) {
+        narrowRes(divModTerm(a.lin, b.lin, quotient))
+    } else {
+        Res.I(wideDivModTerm(a, b, quotient))
+    }
+
+/**
+ * `v = if cond then a else b`: a fresh quantity pinned to each branch by the condition.
+ *
+ * On the 64-bit path its domain is the union of the two branch ranges, so an unbounded default never
+ * enters the reified equality. Past 64 bits the quantity is digit columns wide enough for either branch.
+ */
+private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
+    if (a is IntComb.Narrow && b is IntComb.Narrow) {
+        val (aLo, aHi) = linCombRange(a.lin)
+        val (bLo, bHi) = linCombRange(b.lin)
         val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
         val hiU = if (aHi == null || bHi == null) null else maxOf(aHi, bHi)
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
-        factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a)))) // cond ⇒ v = a
-        factors.add(Clause(intArrayOf(cond, reifyEq(self, b)))) // ¬cond ⇒ v = b
-        narrowRes(self)
+        factors.add(Clause(intArrayOf(Lit.negate(cond), reifyEq(self, a.lin)))) // cond ⇒ v = a
+        factors.add(Clause(intArrayOf(cond, reifyEq(self, b.lin)))) // ¬cond ⇒ v = b
+        return narrowRes(self)
     }
-
-    else -> smtUnsupported("unsupported int op '$head'")
+    val magA = intCombMagnitude(a) ?: smtUnsupported("ite branch is unbounded beyond the 64-bit range")
+    val magB = intCombMagnitude(b) ?: smtUnsupported("ite branch is unbounded beyond the 64-bit range")
+    val self = freshWideInt(if (magA > magB) magA else magB)
+    factors.add(Clause(intArrayOf(Lit.negate(cond), reifyRelation("=", self, a))))
+    factors.add(Clause(intArrayOf(cond, reifyRelation("=", self, b))))
+    return Res.I(self)
 }
 
 /** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
@@ -466,10 +485,12 @@ private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: Lis
 /** Pairwise `!=` over folded distinct operands (bool operands channelled to a 0/1 int term). */
 private fun SmtLib.Builder.distinctFromArgs(args: List<Res>): Int {
     if (args.size < 2) return trueLit()
-    val terms = args.map { if (it is Res.B) litToIntTerm(it.lit) else it.asLin() }
+    val terms = args.map {
+        if (it is Res.B) IntComb.Narrow(litToIntTerm(it.lit)) else it.asIntComb()
+    }
     val neLits = ArrayList<Int>()
     for (i in terms.indices) {
-        for (j in i + 1 until terms.size) neLits.add(reifyNe(terms[i], terms[j]))
+        for (j in i + 1 until terms.size) neLits.add(reifyRelation("distinct", terms[i], terms[j]))
     }
     return tseitinAnd(neLits)
 }

@@ -687,6 +687,63 @@ class SmtLibTest {
     }
 
     @Test
+    fun `an ite branch beyond 64 bits is decided instead of rejected`() {
+        // The branch value 2^64 has no 64-bit domain to live in, so the ite result is carried as digit
+        // columns. Asserting p forces the wide branch, and 2^64·x = 2^64 pins x = 1.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const p Bool)
+            (assert (>= x 0)) (assert (<= x 3))
+            (assert (= (ite p 18446744073709551616 0) (* 18446744073709551616 x)))
+            (assert p)
+            (check-sat)
+        """.trimIndent()
+        assertEquals(1L, solve(text)[0], "the wide branch value pins x = 1")
+    }
+
+    @Test
+    fun `an ite branch beyond 64 bits still refutes an impossible equality`() {
+        // The digit encoding must keep refutation, not merely admit models: 2^64 = 1 cannot hold.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const p Bool)
+            (assert (= (ite p 18446744073709551616 0) 1))
+            (assert p)
+            (check-sat)
+        """.trimIndent()
+        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
+    }
+
+    @Test
+    fun `abs of a value beyond 64 bits is its magnitude`() {
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int)
+            (assert (>= x 0)) (assert (<= x 3))
+            (assert (= (abs (- 0 18446744073709551616)) (* 18446744073709551616 x)))
+            (check-sat)
+        """.trimIndent()
+        assertEquals(1L, solve(text)[0], "|-2^64| = 2^64 pins x = 1")
+    }
+
+    @Test
+    fun `div and mod by a divisor beyond 64 bits are decided`() {
+        // (2^64 + 1) div 2^64 = 1 and its remainder is 1, both past what a 64-bit quotient variable holds.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const y Int)
+            (assert (>= x 0)) (assert (<= x 3)) (assert (>= y 0)) (assert (<= y 3))
+            (assert (= x (div 18446744073709551617 18446744073709551616)))
+            (assert (= y (mod 18446744073709551617 18446744073709551616)))
+            (check-sat)
+        """.trimIndent()
+        val ints = solve(text)
+        assertEquals(1L, ints[0], "quotient")
+        assertEquals(1L, ints[1], "remainder")
+    }
+
+    @Test
     fun `structural s-expression errors surface as a format exception`() {
         // An unbalanced or unterminated token is a structural parse failure; it must surface through
         // the catchable FormatException supertype, not a raw IllegalArgumentException from require{}.
