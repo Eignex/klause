@@ -42,3 +42,30 @@ internal fun wideIntColumns(magnitude: BigInteger, maxCoeff: BigInteger, fresh: 
     val neg = IntArray(count) { fresh() }
     return WideIntColumns(pos, neg, width)
 }
+
+/**
+ * A linear term set rewritten over digit columns: `terms` pairs each column with its coefficient.
+ *
+ * A row that mentioned a decomposed variable with coefficient `c` gains, per digit position `i`, the
+ * pair `(posᵢ, c·2^(width·i))` and `(negᵢ, −c·2^(width·i))` — the positive and negative vectors differ
+ * only in sign, which is how a signed value is carried while every digit domain stays non-negative.
+ *
+ * Every emitted coefficient fits `Long` by construction: the width was chosen against the largest
+ * coefficient the variable appears with, so no `coefficient × digit-bound` product can overflow. A
+ * position whose coefficient would nonetheless escape `Long` yields null rather than a wrapped row.
+ */
+internal fun WideIntColumns.rewriteTerm(coeff: BigInteger): List<Pair<Int, Long>>? {
+    val out = ArrayList<Pair<Int, Long>>(columns.size * 2)
+    val limit = BigInteger.fromLong(Long.MAX_VALUE)
+    val floor = BigInteger.fromLong(Long.MIN_VALUE)
+    weights().forEachIndexed { i, w ->
+        val c = coeff * w
+        if (c > limit || c < floor) return null
+        val asLong = c.longValue()
+        if (asLong == 0L) return@forEachIndexed
+        out.add(columns[i] to asLong)
+        if (asLong == Long.MIN_VALUE) return null // its negation is not representable
+        out.add(negative[i] to -asLong)
+    }
+    return out
+}
