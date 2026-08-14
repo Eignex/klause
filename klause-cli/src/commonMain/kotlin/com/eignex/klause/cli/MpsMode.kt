@@ -70,7 +70,8 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
 
 /**
  * MPS output protocol (PB-competition-style `s`/`o`/`v`). When a variable was clamped to the finite
- * search range, a proven optimum is only optimal within the clamp, so it is softened to `SATISFIABLE`.
+ * search range, a proven optimum is only optimal within the clamp and an `unsat` only holds within it,
+ * so both are softened (to `SATISFIABLE` / `UNKNOWN`) — the honest verdict for the unbounded problem.
  */
 internal class MpsOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedBestOutput() {
     override val commentPrefix: String = "c"
@@ -79,7 +80,7 @@ internal class MpsOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedB
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
         Verdict.OPTIMAL -> if (clamp.clamped) "s SATISFIABLE" else "s OPTIMUM FOUND"
-        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+        Verdict.UNSATISFIABLE -> if (clamp.clamped) "s UNKNOWN" else "s UNSATISFIABLE"
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
