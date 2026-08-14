@@ -31,6 +31,9 @@ internal fun unboundedlyInfeasible(
     if (constraints.isEmpty()) return false
     // Nothing is open ⇒ the ordinary search is already deciding the real model; no need for this at all.
     if (openBounds.none { it.lo == null || it.hi == null }) return false
+    // Exact interval propagation first: it is cheap, and it reaches the systems whose forced values are
+    // too large for the relaxation to even build.
+    if (exactBoundsInfeasible(openBounds, constraints, cancellation)) return true
     return rootLpInfeasibleOverOpenDomains(openBounds, constraints, cancellation)
 }
 
