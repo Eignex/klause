@@ -64,6 +64,40 @@ class UnboundedRefutationTest {
     }
 
     @Test
+    fun `refutes a chain whose forced values leave the 64-bit range`() {
+        // b = 8a, c = 8b, d = 8c, e = 8d with a >= 2^60 forces e past 2^72, contradicting e < 0. The
+        // relaxation cannot be built at those magnitudes, so this is the exact pass's to refute.
+        val big = 1L shl 60
+        val rows = listOf(
+            Linear(longArrayOf(1, -8), intArrayOf(1, 0), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -8), intArrayOf(2, 1), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -8), intArrayOf(3, 2), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -8), intArrayOf(4, 3), LinearOp.EQ, 0L),
+        )
+        val bounds = arrayOf(
+            OpenIntBounds(big, null),
+            OpenIntBounds(null, null),
+            OpenIntBounds(null, null),
+            OpenIntBounds(null, null),
+            OpenIntBounds(null, -1L),
+        )
+        assertTrue(unboundedlyInfeasible(bounds, rows))
+    }
+
+    @Test
+    fun `stays silent on a chain that is satisfiable at large values`() {
+        // The same chain without the contradicting upper bound has solutions; the exact pass must not
+        // mistake "the values are huge" for "there are none".
+        val big = 1L shl 60
+        val rows = listOf(
+            Linear(longArrayOf(1, -8), intArrayOf(1, 0), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -8), intArrayOf(2, 1), LinearOp.EQ, 0L),
+        )
+        val bounds = arrayOf(OpenIntBounds(big, null), OpenIntBounds(null, null), OpenIntBounds(null, null))
+        assertFalse(unboundedlyInfeasible(bounds, rows))
+    }
+
+    @Test
     fun `refutes with an unbounded row present`() {
         // The refutation lives in the two-sided pair; a third row whose direction is unbounded must
         // neither hide it nor be needed for it.

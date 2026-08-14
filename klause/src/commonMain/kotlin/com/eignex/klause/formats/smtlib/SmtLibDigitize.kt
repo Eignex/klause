@@ -39,7 +39,10 @@ internal fun SmtLib.Builder.digitizeWideInts(
 ): Map<Int, WideIntColumns> {
     val rows = factors.filterIsInstance<Linear>()
     if (rows.any { it.hasReals }) return emptyMap()
-    val needed = forcedOutOfRange(inventedLo, inventedHi, rows)
+    // A null verdict means the propagation emptied a domain: the model is refutable over its open ranges,
+    // and that refutation lives in the deferred bounding, which substituting would discard. Leave it be —
+    // a real `unsat` beats a representable search every time.
+    val needed = forcedOutOfRange(inventedLo, inventedHi, rows) ?: return emptyMap()
     if (needed.isEmpty()) return emptyMap()
     val magnitude = derivedMagnitudes(inventedLo, inventedHi, rows)
     // Only the rows that carry integer terms can be rewritten; anything else mentioning a substituted
@@ -119,12 +122,15 @@ private fun expandTerms(
  * with an invented side taken as infinite rather than as the box. A bound derived that way is the model's,
  * so a variable it pushes past `Long` genuinely has nowhere to live, which is the only case where trading
  * the row's LP relaxation for digits pays.
+ *
+ * Null when the propagation empties a domain: the system is then refutable over its open ranges, which is
+ * a better answer than any amount of reach.
  */
 private fun SmtLib.Builder.forcedOutOfRange(
     inventedLo: BooleanArray,
     inventedHi: BooleanArray,
     rows: List<Linear>,
-): List<Int> {
+): List<Int>? {
     val lo = arrayOfNulls<BigInteger>(nextInt)
     val hi = arrayOfNulls<BigInteger>(nextInt)
     for (v in 0 until nextInt) {
@@ -160,6 +166,9 @@ private fun SmtLib.Builder.forcedOutOfRange(
                 val curLo = lo[v]
                 if (newHi != null && (curHi == null || newHi < curHi)) hi[v] = newHi
                 if (newLo != null && (curLo == null || newLo > curLo)) lo[v] = newLo
+                val l = lo[v]
+                val h = hi[v]
+                if (l != null && h != null && l > h) return null
             }
         }
     }
