@@ -69,6 +69,33 @@ internal class AtomRun {
         return if (p < pendKeys.size && pendKeys[p] == k) pendIds[p] else -1
     }
 
+    /**
+     * Atom id of the greatest threshold strictly below [k], or -1. Searches both runs and takes the
+     * nearer, so a neighbour lookup never forces a merge — the caller runs on every atom allocation.
+     */
+    fun below(k: Long): Int {
+        val i = mainKeys.lowerBound(k)
+        val j = pendKeys.lowerBound(k)
+        if (i == 0 && j == 0) return -1
+        if (j == 0) return mainIds[i - 1]
+        if (i == 0) return pendIds[j - 1]
+        return if (mainKeys[i - 1] >= pendKeys[j - 1]) mainIds[i - 1] else pendIds[j - 1]
+    }
+
+    /** Atom id of the least threshold strictly above [k], or -1. Merge-free, like [below]. */
+    fun above(k: Long): Int {
+        var i = mainKeys.lowerBound(k)
+        while (i < mainKeys.size && mainKeys[i] <= k) i++
+        var j = pendKeys.lowerBound(k)
+        while (j < pendKeys.size && pendKeys[j] <= k) j++
+        val hasMain = i < mainKeys.size
+        val hasPend = j < pendKeys.size
+        if (!hasMain && !hasPend) return -1
+        if (!hasPend) return mainIds[i]
+        if (!hasMain) return pendIds[j]
+        return if (mainKeys[i] <= pendKeys[j]) mainIds[i] else pendIds[j]
+    }
+
     /** `√n`, floored to a small minimum so a short run does not merge on every insert. */
     private fun mergeThreshold(): Int {
         var s = MIN_PENDING
