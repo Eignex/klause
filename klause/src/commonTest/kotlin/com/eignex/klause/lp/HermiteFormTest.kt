@@ -111,4 +111,22 @@ class HermiteFormTest {
         assertWellFormed(a, f)
         assertEquals(BigInteger.ONE, f.h[1][0], "row 1 pivots at the gcd of 2 and 3")
     }
+
+    @Test
+    fun `intermediate coefficients stay bounded on an adversarial matrix`() {
+        // The column-Euclidean form is the version cited for intermediate coefficient explosion, so the
+        // growth is measured rather than assumed: a dense matrix of coprime-ish entries is its bad case.
+        val n = 8
+        val primes = longArrayOf(1000003, 999983, 1000033, 999979, 1000037, 999961, 1000039, 999959)
+        val m = Array(n) { i -> Array(n) { j -> BigInteger.fromLong(primes[(i * 3 + j * 5) % n] + i * 7L + j) } }
+        val f = hermiteNormalForm(m)
+        var widest = 0
+        for (row in f.h) for (e in row) widest = maxOf(widest, e.abs().toString().length)
+        for (row in f.v) for (e in row) widest = maxOf(widest, e.abs().toString().length)
+        // Measured: 18 digits out of 7-digit inputs. The pivot-smallest rule plus the canonical
+        // reduction hold growth to roughly 2.5x here, so this form is not the blow-up its reputation
+        // suggests on this shape. The ceiling is generous but fails loudly if it is ever swapped for one
+        // that does explode.
+        assertTrue(widest < 40, "widest entry was $widest digits")
+    }
 }
