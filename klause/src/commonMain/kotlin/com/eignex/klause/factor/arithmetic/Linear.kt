@@ -404,6 +404,10 @@ class Linear private constructor(
     private fun emitWideOuterRows(builder: RelaxationBuilder) {
         // GE is canonicalised to LE at construction; NE has no single LP row.
         if (op != LinearOp.LE && op != LinearOp.EQ) return
+        // A value past the `Double` range has no finite double to round outward to. The row is still
+        // enforced exactly by its wide propagator, and a relaxation is only ever a bound, so leaving this
+        // one out weakens the LP and nothing else.
+        if (!wideFitsDouble()) return
         // A sign-straddling variable cannot be single-rounded to weaken both signs, so split it into
         // nonnegative parts `x = x⁺ − x⁻` (each roundable like a nonnegative variable). Decline only the
         // pathological var whose negative extent `−min` overflows Long — then leave the whole row CP-only.
@@ -433,6 +437,13 @@ class Linear private constructor(
         }
         emitWideOuterRow(builder, ge = false, plusCol, minusCol)
         if (op == LinearOp.EQ) emitWideOuterRow(builder, ge = true, plusCol, minusCol)
+    }
+
+    /** Whether every wide value of this row has a finite `Double` — the precondition for rounding one
+     *  outward into a relaxation row. */
+    private fun wideFitsDouble(): Boolean {
+        if (!checkNotNull(wideBound).doubleValue(exactRequired = false).isFinite()) return false
+        return checkNotNull(wideCoeffs).all { it.doubleValue(exactRequired = false).isFinite() }
     }
 
     /**

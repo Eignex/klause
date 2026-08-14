@@ -34,11 +34,7 @@ internal class WideIntColumns(val columns: IntArray, val width: Int) {
  * propagator that overflows multiplying a coefficient by a domain bound stops deriving the bound and the
  * row silently loses its refutation strength while still admitting solutions.
  */
-internal fun wideIntColumns(
-    magnitude: BigInteger,
-    maxCoeff: BigInteger,
-    fresh: (Long, Long) -> Int,
-): WideIntColumns? {
+internal fun wideIntColumns(magnitude: BigInteger, maxCoeff: BigInteger, fresh: (Long, Long) -> Int): WideIntColumns? {
     val width = WideIntDigits.widthFor(maxCoeff)
     if (width == WideIntDigits.NO_ROOM) return null
     // One position beyond the magnitude's own digits, so the leading signed digit has room for the sign
