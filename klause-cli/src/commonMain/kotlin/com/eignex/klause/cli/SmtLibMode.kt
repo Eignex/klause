@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.formats.smtlib.IntDigitColumns
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.solver.Sample
 
@@ -39,11 +40,12 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
+            val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s, parsed.intDigits) }
             val base = linearSolvable(parsed.problem, parsed.objective, parsed.sense == ObjectiveSense.MAXIMIZE, render)
             // Defer OBBT into the presolve phase: parsing only reads, and the LP tightening runs under the
             // presolve budget instead of unbounded at load. The run also decides the clamp verdict. Absent
             // when the model has no open domain (nothing to bound, never clamped).
+            clamp.clamped = parsed.clamped
             val deferred = parsed.deferredBounds ?: return base
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
@@ -65,17 +67,27 @@ internal object SmtLibMode : CliMode {
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
  *  declared variable. Real values come from the leaf LP solve. */
-internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
-    buildString {
-        append("(\n")
-        for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
-        for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
-        for ((name, id) in reals) {
-            val v = if (id < s.reals.size) s.reals[id] else 0.0
-            append("  (define-fun $name () Real $v)\n")
-        }
-        append(")")
+internal fun renderModel(
+    ints: Map<String, Int>,
+    bools: Map<String, Int>,
+    reals: Map<String, Int>,
+    s: Sample,
+    intDigits: Map<Int, IntDigitColumns> = emptyMap(),
+): String = buildString {
+    append("(\n")
+    for ((name, id) in ints) append("  (define-fun $name () Int ${intValue(id, s, intDigits)})\n")
+    for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
+    for ((name, id) in reals) {
+        val v = if (id < s.reals.size) s.reals[id] else 0.0
+        append("  (define-fun $name () Real $v)\n")
     }
+    append(")")
+}
+
+/** A declared integer's value: off its digit columns when it was lowered onto them, off the variable
+ *  otherwise. */
+private fun intValue(id: Int, s: Sample, intDigits: Map<Int, IntDigitColumns>): String =
+    intDigits[id]?.decimalIn(s.ints) ?: s.ints[id].toString()
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. When [clamp] is set
  *  (by the presolve-phase deferred bounding), an `unsat` is only `unsat` within the finite solver range —
