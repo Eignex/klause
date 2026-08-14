@@ -14,6 +14,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
+import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Raised when an SMT-LIB construct outside the supported linear-arithmetic subset is encountered. */
 class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB", msg)
@@ -44,7 +45,29 @@ data class SmtLibProblem(
      *  phase ([DeferredIntBounds.run]), which also decides whether a side fell back to a lossy clamp — the
      *  honest-`unknown` signal, known only after that runs. */
     val deferredBounds: DeferredIntBounds?,
+    /** True when the box was invented at parse and no [deferredBounds] run will say so later, so an `unsat`
+     *  over it is only `unsat` within the box. */
+    val clamped: Boolean = false,
+    /** Declared int ids lowered onto digit columns, by id — their value is read off the digits, not off the
+     *  variable, which no longer appears in any row. */
+    val intDigits: Map<Int, IntDigitColumns> = emptyMap(),
 )
+
+/** How a declared integer lowered onto digit columns is read back: `value = Σᵢ columns(i)·2^(width·i)`,
+ *  the most significant digit signed. */
+data class IntDigitColumns(
+    /** The digit variables, least significant first. */
+    val columns: IntArray,
+    /** Bits per digit, so digit `i` carries weight `2^(width·i)`. */
+    val width: Int,
+) {
+    /** The decimal value these digits hold in an assignment's integer values. */
+    fun decimalIn(ints: LongArray): String {
+        var acc = BigInteger.ZERO
+        for (i in columns.indices.reversed()) acc = acc.shl(width) + BigInteger.fromLong(ints[columns[i]])
+        return acc.toString()
+    }
+}
 
 /** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
  *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
@@ -246,7 +269,20 @@ object SmtLib {
         fun build(): SmtLibProblem {
             inferBounds()
             for (a in asserts) assert(a)
-            val deferred = prepareDeferredBounds()
+            val inventedLo = BooleanArray(nextInt)
+            val inventedHi = BooleanArray(nextInt)
+            val deferred = prepareDeferredBounds(inventedLo, inventedHi)
+            // A declared variable the model drives past the 64-bit range gets digit columns. Its own rows
+            // are rewritten over them, so the deferred OBBT (which reports domains for the pre-substitution
+            // variables) no longer applies and the clamp verdict is carried directly instead.
+            val digits = if (deferred != null && objectiveSpec == null) {
+                digitizeWideInts(
+                    inventedLo,
+                    inventedHi,
+                )
+            } else {
+                emptyMap()
+            }
             val objective = objectiveSpec?.let { (t, neg) ->
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
@@ -276,7 +312,9 @@ object SmtLib {
                 boolVarNames = LinkedHashMap(boolNames),
                 realVarNames = LinkedHashMap(realNames),
                 sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
-                deferredBounds = deferred,
+                deferredBounds = if (digits.isEmpty()) deferred else null,
+                clamped = digits.isNotEmpty(),
+                intDigits = digits.mapValues { (_, c) -> IntDigitColumns(c.columns, c.width) },
             )
         }
     }

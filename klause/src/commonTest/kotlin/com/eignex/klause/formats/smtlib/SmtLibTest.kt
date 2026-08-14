@@ -28,7 +28,7 @@ class SmtLibTest {
 
     // OBBT is deferred to the presolve phase, so the clamp verdict is decided by running the deferred
     // bounding (not at parse). Run it eagerly here to assert the same behaviour.
-    private fun SmtLibProblem.clamped(): Boolean = deferredBounds?.run(Cancellation.Never)?.clamped ?: false
+    private fun SmtLibProblem.clamped(): Boolean = clamped || deferredBounds?.run(Cancellation.Never)?.clamped == true
 
     // Parse leaves domain bounding (OBBT) deferred; the CLI runs it in presolve before solving. Mirror
     // that here so tests exercise the bounded problem, not the raw wide-fallback one.
@@ -671,19 +671,28 @@ class SmtLibTest {
     @Test
     fun `constant folding overflow promotes to a wide value instead of wrapping`() {
         // SMT integers are unbounded; 2^63-1 + 1 = 2^63 overflows Long, so it is carried as a wide value
-        // (never silently wrapped to Long.MIN). x = 2^63 exceeds any Long domain, so the problem is unsat.
+        // (never silently wrapped to Long.MIN). x = 2^63 has no Long domain to live in, so x is lowered
+        // onto digit columns and the witness reads back exactly 2^63.
         val text = "(declare-const x Int) (assert (= x (+ 9223372036854775807 1))) (check-sat)"
-        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Unsat, "x = 2^63 is out of the Long range, so unsat, got $r")
+        assertEquals(BigInteger.parseString("9223372036854775808"), soleIntValue(text))
     }
 
     @Test
     fun `constant multiplication overflow promotes to a wide value`() {
-        // 3037000500^2 = 9223372037000250000 overflows Long; it is carried wide (not rejected or wrapped),
-        // and x = it exceeds the Long range, so the problem is unsat.
+        // 3037000500^2 = 9223372037000250000 overflows Long; it is carried wide (not rejected or wrapped)
+        // and x holds it on digit columns.
         val text = "(declare-const x Int) (assert (= x (* 3037000500 3037000500))) (check-sat)"
-        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Unsat, "x = 9.22e18 (> Long.MAX) is unsat, got $r")
+        assertEquals(BigInteger.parseString("9223372037000250000"), soleIntValue(text))
+    }
+
+    /** The value of the single declared int in [text], read off its digit columns when it has them. */
+    private fun soleIntValue(text: String): BigInteger {
+        val parsed = SmtLib.parse(text)
+        val r = BacktrackSolver(parsed.problem.bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        val id = parsed.intVarNames.values.first()
+        return parsed.intDigits[id]?.decimalIn(r.assignment.ints)?.let { BigInteger.parseString(it) }
+            ?: BigInteger.fromLong(r.assignment.ints[id])
     }
 
     @Test
@@ -713,6 +722,34 @@ class SmtLibTest {
         """.trimIndent()
         val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Unsat, "expected UNSAT, got $r")
+    }
+
+    @Test
+    fun `a declared integer the model drives past Long is lowered onto digit columns`() {
+        // e = 4096·a with a ≥ 2^60 forces e past 2^72, so no assignment fits a Long domain and the search
+        // has nothing to find. The digits give e somewhere to live, and the witness reads back off them.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-fun a () Int) (declare-fun b () Int) (declare-fun c () Int)
+            (assert (= b (* 64 a))) (assert (= c (* 64 b)))
+            (assert (>= a 1152921504606846977))
+            (check-sat)
+        """.trimIndent()
+        val parsed = SmtLib.parse(text)
+        val digits = parsed.intDigits
+        assertTrue(digits.isNotEmpty(), "c reaches 2^72, so it must be lowered onto digits")
+        assertTrue(parsed.clamped, "the box is still invented, so an unsat over it stays unknown")
+        val r = BacktrackSolver(parsed.problem.bake()).solve(BacktrackParams())
+        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
+        // The recovered values satisfy the original chain exactly.
+        val values = parsed.intVarNames.mapValues { (_, id) ->
+            digits[id]?.decimalIn(r.assignment.ints)?.let { BigInteger.parseString(it) }
+                ?: BigInteger.fromLong(r.assignment.ints[id])
+        }
+        val sixtyFour = BigInteger.fromLong(64)
+        assertEquals(values.getValue("b"), values.getValue("a") * sixtyFour, "b = 64a")
+        assertEquals(values.getValue("c"), values.getValue("b") * sixtyFour, "c = 64b")
+        assertTrue(values.getValue("a") >= BigInteger.parseString("1152921504606846977"), "a keeps its bound")
     }
 
     @Test

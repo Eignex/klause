@@ -10,8 +10,14 @@ import com.eignex.klause.lp.smallModelIntBound
  * box so the initial [com.eignex.klause.solver.Problem] is finite. The LP tightening itself is deferred
  * (see [DeferredIntBounds]); this does no LP, so parsing only reads. Returns `null` when every domain is
  * already finite — there is no open side to close, so OBBT has nothing to do and no clamp can arise.
+ *
+ * [inventedLo] and [inventedHi] are written per variable: true where that side came from the box rather
+ * than from the model. They are what tell the digit lowering which bound it may widen.
  */
-internal fun SmtLib.Builder.prepareDeferredBounds(): DeferredIntBounds? {
+internal fun SmtLib.Builder.prepareDeferredBounds(
+    inventedLo: BooleanArray,
+    inventedHi: BooleanArray,
+): DeferredIntBounds? {
     if ((0 until nextInt).none { intDomains[it] is PresolveDomain.Open }) return null
     val linears = factors.filterIsInstance<Linear>()
     val openBounds = Array(nextInt) { v ->
@@ -34,7 +40,11 @@ internal fun SmtLib.Builder.prepareDeferredBounds(): DeferredIntBounds? {
     // [openBounds] and only then decides the final (possibly tighter) domains and the clamp flag.
     for (v in 0 until nextInt) {
         val d = intDomains[v]
-        if (d is PresolveDomain.Open) intDomains[v] = openOrFinite(d.lo ?: fallbackLo, d.hi ?: fallbackHi)
+        if (d is PresolveDomain.Open) {
+            if (d.lo == null) inventedLo[v] = true
+            if (d.hi == null) inventedHi[v] = true
+            intDomains[v] = openOrFinite(d.lo ?: fallbackLo, d.hi ?: fallbackHi)
+        }
     }
     return DeferredIntBounds(
         openBounds,
