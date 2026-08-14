@@ -64,6 +64,50 @@ class UnboundedRefutationTest {
     }
 
     @Test
+    fun `refutes a chain by substituting away the variables it defines`() {
+        // y = 4x, z = 4y, z <= x with x >= 2^62. Interval propagation alone diverges here — the bound
+        // grows by 16 per round and never closes — but eliminating the two defined variables leaves the
+        // single row 15x <= 0, which the lower bound on x contradicts outright.
+        val rows = listOf(
+            Linear(longArrayOf(1, -4), intArrayOf(1, 0), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -4), intArrayOf(2, 1), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0L),
+        )
+        val bounds = arrayOf(
+            OpenIntBounds(1L shl 62, null),
+            OpenIntBounds(null, null),
+            OpenIntBounds(null, null),
+        )
+        assertTrue(unboundedlyInfeasible(bounds, rows))
+    }
+
+    @Test
+    fun `stays silent on the same chain without the contradicting row`() {
+        val rows = listOf(
+            Linear(longArrayOf(1, -4), intArrayOf(1, 0), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1, -4), intArrayOf(2, 1), LinearOp.EQ, 0L),
+        )
+        val bounds = arrayOf(
+            OpenIntBounds(1L shl 62, null),
+            OpenIntBounds(null, null),
+            OpenIntBounds(null, null),
+        )
+        assertFalse(unboundedlyInfeasible(bounds, rows))
+    }
+
+    @Test
+    fun `keeps a bounded variable rather than substituting it away`() {
+        // z is defined by an equality but carries its own upper bound, so eliminating it would discard
+        // what that bound states. The system is satisfiable (x = 0, z = 0) and must not be refuted.
+        val rows = listOf(
+            Linear(longArrayOf(1, -1), intArrayOf(1, 0), LinearOp.EQ, 0L),
+            Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 0L),
+        )
+        val bounds = arrayOf(OpenIntBounds(null, null), OpenIntBounds(null, 5L))
+        assertFalse(unboundedlyInfeasible(bounds, rows))
+    }
+
+    @Test
     fun `refutes a chain whose forced values leave the 64-bit range`() {
         // b = 8a, c = 8b, d = 8c, e = 8d with a >= 2^60 forces e past 2^72, contradicting e < 0. The
         // relaxation cannot be built at those magnitudes, so this is the exact pass's to refute.
