@@ -59,7 +59,7 @@ internal object SmtLibMode : CliMode {
             }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput(clamp)
+        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput()
     }
 }
 
@@ -77,15 +77,13 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals:
         append(")")
     }
 
-/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. When [clamp] is set
- *  (by the presolve-phase deferred bounding), an `unsat` is only `unsat` within the finite solver range —
- *  the sound verdict for the original (unbounded) problem is `unknown`, so it is reported as such. */
-internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedBestOutput() {
+/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
+internal class SmtLibOutput : BufferedBestOutput() {
     override val commentPrefix: String = ";"
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "sat"
-        Verdict.UNSATISFIABLE -> if (clamp.clamped) "unknown" else "unsat"
+        Verdict.UNSATISFIABLE -> "unsat"
         Verdict.UNKNOWN -> "unknown"
     }
 
