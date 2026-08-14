@@ -131,11 +131,11 @@ internal fun PropagationState.registerChannelingFor(newAtomId: Int) {
     val newVar = nb + newAtomId
     when (atoms.kind[newAtomId]) {
         AtomKind.GE -> {
-            val keys = idx.keysOf(AtomKind.GE)
-            val ids = idx.idsOf(AtomKind.GE)
-            val at = keys.lowerBound(k)
-            if (at + 1 < keys.size) enqueueChannel(nb + ids[at + 1], newVar) // [x≥kt] → [x≥k]
-            if (at >= 1) enqueueChannel(newVar, nb + ids[at - 1]) // [x≥k] → [x≥kl]
+            val run = idx.runOf(AtomKind.GE)
+            val up = run.above(k)
+            if (up >= 0) enqueueChannel(nb + up, newVar) // [x≥kt] → [x≥k]
+            val down = run.below(k)
+            if (down >= 0) enqueueChannel(newVar, nb + down) // [x≥k] → [x≥kl]
             val eq = idx.find(AtomKind.EQ, k)
             if (eq >= 0) enqueueChannel(nb + eq, newVar) // [x=k] → [x≥k]
             val dual = idx.find(AtomKind.LE, k - 1)
@@ -145,11 +145,11 @@ internal fun PropagationState.registerChannelingFor(newAtomId: Int) {
         }
 
         AtomKind.LE -> {
-            val keys = idx.keysOf(AtomKind.LE)
-            val ids = idx.idsOf(AtomKind.LE)
-            val at = keys.lowerBound(k)
-            if (at >= 1) enqueueChannel(nb + ids[at - 1], newVar) // [x≤kl] → [x≤k]
-            if (at + 1 < keys.size) enqueueChannel(newVar, nb + ids[at + 1]) // [x≤k] → [x≤kt]
+            val run = idx.runOf(AtomKind.LE)
+            val down = run.below(k)
+            if (down >= 0) enqueueChannel(nb + down, newVar) // [x≤kl] → [x≤k]
+            val up = run.above(k)
+            if (up >= 0) enqueueChannel(newVar, nb + up) // [x≤k] → [x≤kt]
             val eq = idx.find(AtomKind.EQ, k)
             if (eq >= 0) enqueueChannel(nb + eq, newVar) // [x=k] → [x≤k]
             val dual = idx.find(AtomKind.GE, k + 1)
