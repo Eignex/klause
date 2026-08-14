@@ -75,3 +75,35 @@ private fun applyTransform(row: Array<BigInteger>, v: Array<Array<BigInteger>>, 
         for (k in row.indices) if (k < v.size) acc += row[k] * v[k][j]
         acc
     }
+
+/**
+ * Ranges for the ORIGINAL variables implied by ranges for the rewritten ones, through `x = V·y`.
+ *
+ * This is what makes the transformation usable without rewriting the problem: the rewritten variables
+ * are bounded by the model's own structure ([triangularBounds] over the triangular equality block), and
+ * pushing those ranges back through `V` bounds the original variables too. A bound obtained this way is
+ * the model's, not an invented search box, so a refutation inside it is a real refutation.
+ *
+ * A side stays `null` when any term feeding it is open — an unbounded `y` makes `x` unbounded in the
+ * direction its coefficient points, and claiming otherwise would invent exactly the box this avoids.
+ */
+internal fun MixedEchelonHermite.originalBounds(yLo: Array<BigInteger?>, yHi: Array<BigInteger?>): TriangularBounds {
+    val n = transform.size
+    val lo = arrayOfNulls<BigInteger>(n)
+    val hi = arrayOfNulls<BigInteger>(n)
+    for (i in 0 until n) {
+        var accLo: BigInteger? = BigInteger.ZERO
+        var accHi: BigInteger? = BigInteger.ZERO
+        for (j in transform[i].indices) {
+            val c = transform[i][j]
+            if (c.isZero()) continue
+            val termLo = if (c > BigInteger.ZERO) yLo.getOrNull(j)?.times(c) else yHi.getOrNull(j)?.times(c)
+            val termHi = if (c > BigInteger.ZERO) yHi.getOrNull(j)?.times(c) else yLo.getOrNull(j)?.times(c)
+            accLo = if (termLo == null || accLo == null) null else accLo + termLo
+            accHi = if (termHi == null || accHi == null) null else accHi + termHi
+        }
+        lo[i] = accLo
+        hi[i] = accHi
+    }
+    return TriangularBounds(lo, hi)
+}
