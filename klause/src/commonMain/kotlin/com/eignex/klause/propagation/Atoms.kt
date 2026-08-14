@@ -12,9 +12,9 @@ internal fun PropagationState.markAtomWatched(atomId: Int) {
     val kind = atoms.kind[atomId]
     val k = atoms.threshold[atomId]
     val idx = atoms.watchedByVar[v] ?: VarAtomIndex().also { atoms.watchedByVar[v] = it }
-    val keys = idx.keysOf(kind)
-    val at = keys.lowerBound(k)
-    if (at < keys.size && keys[at] == k) return // already tracked
+    // A membership test, so it goes through the merge-free lookup: reading the ordered array here would
+    // fold the staging buffer on every watch installation, which is the whole cost this index avoids.
+    if (idx.find(kind, k) >= 0) return // already tracked
     idx.insert(kind, k, atomId)
 }
 
