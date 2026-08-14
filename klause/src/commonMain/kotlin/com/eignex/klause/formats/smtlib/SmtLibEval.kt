@@ -47,6 +47,7 @@ private fun narrowRes(lin: LinComb): Res.I = Res.I(IntComb.Narrow(lin))
 /** A folded operand as a real combination: real results directly, int results via the embedding. */
 private fun Res.asReal(): RealComb = when (this) {
     is Res.R -> comb
+
     is Res.I -> when (val t = term) {
         is IntComb.Narrow -> t.lin.toRealComb()
         is IntComb.Wide -> t.lin.toRealComb()
@@ -387,8 +388,8 @@ private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         factors.add(Clause(intArrayOf(cond, reifyEq(self, b.lin)))) // ¬cond ⇒ v = b
         return narrowRes(self)
     }
-    val magA = intCombMagnitude(a) ?: smtUnsupported("ite branch is unbounded beyond the 64-bit range")
-    val magB = intCombMagnitude(b) ?: smtUnsupported("ite branch is unbounded beyond the 64-bit range")
+    val magA = intCombMagnitude(a)
+    val magB = intCombMagnitude(b)
     val self = freshWideInt(if (magA > magB) magA else magB)
     factors.add(Clause(intArrayOf(Lit.negate(cond), reifyRelation("=", self, a))))
     factors.add(Clause(intArrayOf(cond, reifyRelation("=", self, b))))

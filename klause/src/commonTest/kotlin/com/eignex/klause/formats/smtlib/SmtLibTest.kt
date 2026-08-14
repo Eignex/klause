@@ -716,6 +716,20 @@ class SmtLibTest {
     }
 
     @Test
+    fun `an ite branch over an unbounded variable is decided rather than refused`() {
+        // The branch value ranges over an open domain, so its magnitude comes from the same fallback box
+        // the deferred bounding uses. Refusing it instead gave no verdict at all on the calypto family.
+        val text = """
+            (set-logic QF_LIA)
+            (declare-const x Int) (declare-const p Bool)
+            (assert (= (ite p (* 18446744073709551616 x) 0) 18446744073709551616))
+            (assert p)
+            (check-sat)
+        """.trimIndent()
+        assertEquals(1L, solve(text)[0], "2^64·x = 2^64 pins x = 1")
+    }
+
+    @Test
     fun `abs of a value beyond 64 bits is its magnitude`() {
         val text = """
             (set-logic QF_LIA)
