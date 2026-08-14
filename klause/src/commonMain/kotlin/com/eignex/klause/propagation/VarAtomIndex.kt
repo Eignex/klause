@@ -16,19 +16,6 @@ internal class VarAtomIndex {
     /** Atom id for threshold [k] of [kind], or -1 if not materialized. */
     fun find(kind: AtomKind, k: Long): Int = runOf(kind).find(k)
 
-    /** The kind's thresholds as one ordered array, staging folded in. Prefer [AtomRun.visitRange] on a
-     *  hot path: this has to merge, and merging on every read is what made an earlier attempt slower. */
-    fun keysOf(kind: AtomKind): LongArrayList = runOf(kind).let {
-        it.flush()
-        it.mainKeys
-    }
-
-    /** Atom ids parallel to [keysOf]. */
-    fun idsOf(kind: AtomKind): IntArrayList = runOf(kind).let {
-        it.flush()
-        it.mainIds
-    }
-
     fun runOf(kind: AtomKind): AtomRun = when (kind) {
         AtomKind.GE -> ge
         AtomKind.LE -> le
@@ -104,8 +91,6 @@ internal class AtomRun {
     }
 
     /** Fold the staged entries into the main run, back to front so each lands in one pass. */
-    fun flush() = merge()
-
     private fun merge() {
         val p = pendKeys.size
         if (p == 0) return
