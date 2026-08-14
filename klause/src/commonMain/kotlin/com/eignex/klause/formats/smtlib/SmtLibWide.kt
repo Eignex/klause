@@ -26,25 +26,36 @@ private fun SmtLib.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (val 
     is PresolveDomain.Open -> d.lo to d.hi
 }
 
-/** The value range of [w] over the current presolve domains; a side is null when it is unbounded. */
-internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger?, BigInteger?> {
-    var lo: BigInteger? = w.constant
-    var hi: BigInteger? = w.constant
+/**
+ * How far an open side is taken to reach: the same fallback box the deferred bounding closes an open
+ * domain to.
+ *
+ * Reading an open side this way invents nothing the model does not already carry — a model with an open
+ * domain is flagged clamped by the deferred bounding regardless, so its `unsat` is already reported
+ * `unknown`. What it buys is a decidable `sat`: the quantity gets digits enough to hold every value the
+ * box admits, where refusing the term outright gave no verdict at all.
+ */
+private fun SmtLib.Builder.openSide(hi: Boolean): Long =
+    if (hi) minOf(unboundedIntHi, searchBound) else maxOf(unboundedIntLo, -searchBound)
+
+/** The value range of [w] over the current presolve domains, an open side read as [openSide]. */
+internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteger> {
+    var lo = w.constant
+    var hi = w.constant
     for ((v, c) in w.coeffs) {
         if (c.isZero()) continue
         val (dLo, dHi) = domainBounds(v)
-        val loBound = if (c.signum() > 0) dLo else dHi
-        val hiBound = if (c.signum() > 0) dHi else dLo
-        lo = if (lo == null || loBound == null) null else lo + c * BigInteger.fromLong(loBound)
-        hi = if (hi == null || hiBound == null) null else hi + c * BigInteger.fromLong(hiBound)
+        val loBound = if (c.signum() > 0) dLo ?: openSide(hi = false) else dHi ?: openSide(hi = true)
+        val hiBound = if (c.signum() > 0) dHi ?: openSide(hi = true) else dLo ?: openSide(hi = false)
+        lo += c * BigInteger.fromLong(loBound)
+        hi += c * BigInteger.fromLong(hiBound)
     }
     return lo to hi
 }
 
-/** A bound on `|value|` of [t], or null when the term is unbounded on either side. */
-internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger? {
+/** A bound on `|value|` of [t]. */
+internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger {
     val (lo, hi) = wideRange(t.toWide())
-    if (lo == null || hi == null) return null
     val a = lo.abs()
     val b = hi.abs()
     return if (a > b) a else b
@@ -72,9 +83,7 @@ internal fun SmtLib.Builder.freshWideInt(magnitude: BigInteger): IntComb {
 
 /** `|x|` as a fresh quantity `y` with `y ≥ x`, `y ≥ −x` and `y = x ∨ y = −x`, at arbitrary precision. */
 internal fun SmtLib.Builder.wideAbsTerm(x: WideLinComb): IntComb {
-    val magnitude = intCombMagnitude(IntComb.Wide(x))
-        ?: smtUnsupported("abs of an unbounded term beyond the 64-bit range")
-    val y = freshWideInt(magnitude)
+    val y = freshWideInt(intCombMagnitude(IntComb.Wide(x)))
     val xc = IntComb.Wide(x)
     val negX = IntComb.Wide(x.scaled(BigInteger.ONE.negate()))
     assertRelation(">=", y, xc)
@@ -94,7 +103,6 @@ internal fun SmtLib.Builder.wideDivModTerm(a: IntComb, b: IntComb, quotient: Boo
     if (d.isZero()) smtUnsupported("division by zero in div/mod")
     val absd = d.abs()
     val aMagnitude = intCombMagnitude(a)
-        ?: smtUnsupported("div/mod of an unbounded term beyond the 64-bit range")
     // |q| ≤ |a|/|d| + 1: the quotient of the widest value the dividend can reach, with a unit of slack
     // for the remainder's sign.
     val qMagnitude = aMagnitude / absd + BigInteger.ONE
