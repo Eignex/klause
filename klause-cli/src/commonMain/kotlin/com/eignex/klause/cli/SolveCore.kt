@@ -215,6 +215,11 @@ internal object SolveCore {
                 // Advisory total budget so the LP subsystem sizes its wall-clock caps against the real
                 // `-t` deadline on the FD track, not the absolute root-LP ceiling.
                 solveBudgetMillis = common.timeLimitMs,
+                // Under a wall clock a fixpoint must be interruptible. The default floor only polls after
+                // a fire count no atom-allocating fixpoint reaches, so `-t` was overshot 3x. That floor
+                // is for a slice budget, where abandoning a fixpoint mid-way would change the resumed
+                // result; a deadline carries no such obligation — when the time is gone it is gone.
+                propagationCancelFloor = if (common.timeLimitMs != null) 0 else base.propagationCancelFloor,
                 onEvent = verboseListener(common.verbose),
                 lpConfig = lpConfig,
             ),
