@@ -73,4 +73,21 @@ class MixedEchelonHermiteTest {
             assertEquals(BigInteger.ZERO, dot(original[0], x), "x = V*y must satisfy the original row")
         }
     }
+
+    @Test
+    fun `bounded rewritten variables bound the original ones`() {
+        val r = mixedEchelonHermite(mat(longArrayOf(2, 3)), emptyArray(), 2)
+        val b = r.originalBounds(arrayOf(BigInteger.ZERO, BigInteger.ZERO), arrayOf(BigInteger.ZERO, BigInteger.ZERO))
+        // y pinned to the origin pins x to the origin, whatever V is.
+        assertEquals(BigInteger.ZERO, b.lo[0])
+        assertEquals(BigInteger.ZERO, b.hi[0])
+    }
+
+    @Test
+    fun `an open rewritten variable leaves the original open in that direction`() {
+        val r = mixedEchelonHermite(mat(longArrayOf(2, 3)), emptyArray(), 2)
+        val b = r.originalBounds(arrayOf(null, null), arrayOf(null, null))
+        assertTrue(b.lo.all { it == null }, "an unbounded y must not yield a bounded x")
+        assertTrue(b.hi.all { it == null })
+    }
 }
