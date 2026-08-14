@@ -408,7 +408,12 @@ internal class LpBuilder {
      * stays private to this package.
      */
     fun addFreeVar(lower: Long?, upper: Long?, cost: Long = 0L, tag: Int = -1): Int {
-        val j = addVar(lower ?: -LP_UNBOUNDED_PROBE, upper ?: LP_UNBOUNDED_PROBE, cost, tag)
+        // A declared bound past the probe magnitude would make the stand-in box empty and reject a model
+        // the caller never over-constrained; the open side widens to clear the declared one instead. The
+        // side stays flagged, so [safeVariableBound] still refuses to read a bound off the frontier.
+        val lo = lower ?: minOf(-LP_UNBOUNDED_PROBE, upper ?: -LP_UNBOUNDED_PROBE)
+        val hi = upper ?: maxOf(LP_UNBOUNDED_PROBE, lo)
+        val j = addVar(lo, hi, cost, tag)
         if (lower == null) clampedLoCols.add(j)
         if (upper == null) clampedHiCols.add(j)
         return j
@@ -427,7 +432,10 @@ internal class LpBuilder {
      * the open model is the point.
      */
     fun addOpenAboveVar(lower: Long, cost: Long = 0L, tag: Int = -1): Int {
-        val j = addVar(lower, LP_UNBOUNDED_PROBE, cost, tag)
+        // The stand-in only has to keep the box non-empty for the float ride — the column is open above,
+        // so nothing downstream reads this upper (certification declines on `hasUpper = false`). A model
+        // whose own lower bound already exceeds the probe would otherwise build an empty domain.
+        val j = addVar(lower, maxOf(lower, LP_UNBOUNDED_PROBE), cost, tag)
         openAboveCols.add(j)
         return j
     }
