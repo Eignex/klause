@@ -106,6 +106,17 @@ class WideLinearLpTest {
     }
 
     @Test
+    fun `a coefficient past the Double range emits no relaxation row instead of an infinite one`() {
+        // 2^2000 has no finite Double to round outward to, so the row stays CP-only; rounding it anyway
+        // would put an infinity in the LP.
+        val huge = BigInteger.ONE.shl(2000)
+        val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
+        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
+        row.linearize(b, factorId = 0)
+        assertEquals(0, b.realRows.size, "no row is emitted for values the LP cannot represent")
+    }
+
+    @Test
     fun `a wide equality emits a bracketing pair of outer rows`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
