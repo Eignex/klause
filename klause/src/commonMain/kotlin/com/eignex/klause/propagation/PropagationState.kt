@@ -31,7 +31,11 @@ private const val CANCEL_POLL_MASK: Int = 1023
 /** Fires a single [PropagationState.runToFixpoint] must exceed before its cancellation poll engages.
  *  Below it the deadline is left to the engine's between-decision poll — only a runaway fixpoint (an
  *  O(span) bound crawl) does this many fires in one call, so normal propagation and resumable slicing
- *  stay untouched. A multiple of `CANCEL_POLL_MASK + 1` so the aligned poll lands exactly on it. */
+ *  stay untouched. A multiple of `CANCEL_POLL_MASK + 1` so the aligned poll lands exactly on it.
+ *
+ *  NOTE: a floor counts *fires*, but a deadline is spent in *work*. A fixpoint whose fires each allocate
+ *  order atoms can burn tens of seconds in far fewer fires than this trips, leaving `-t` ignored; see
+ *  [com.eignex.klause.backtrack.BacktrackParams.propagationCancelFloor] for the per-run override. */
 internal const val PROPAGATION_CANCEL_FLOOR: Int = 1 shl 20
 
 /**

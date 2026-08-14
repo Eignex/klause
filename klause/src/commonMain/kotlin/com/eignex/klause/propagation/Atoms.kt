@@ -341,9 +341,9 @@ private inline fun PropagationState.wakeMinCrossing(
     eqAction: (atomId: Int) -> Unit,
 ) {
     atoms.pendingMoveAnt = ant
-    visitAtomRange(idx.geKeys, idx.geIds, oldMin + 1, newMin) { id -> wakeAtom(id, true) }
-    visitAtomRange(idx.leKeys, idx.leIds, oldMin, newMin - 1) { id -> wakeAtom(id, false) }
-    visitAtomRange(idx.eqKeys, idx.eqIds, oldMin, newMin - 1, eqAction)
+    idx.ge.visitRange(oldMin + 1, newMin) { id -> wakeAtom(id, true) }
+    idx.le.visitRange(oldMin, newMin - 1) { id -> wakeAtom(id, false) }
+    idx.eq.visitRange(oldMin, newMin - 1, eqAction)
 }
 
 /** Mirror of [wakeMinCrossing] for an upper-bound move `oldMax → newMax`: `[v ≤ t]` in
@@ -357,9 +357,9 @@ private inline fun PropagationState.wakeMaxCrossing(
     eqAction: (atomId: Int) -> Unit,
 ) {
     atoms.pendingMoveAnt = ant
-    visitAtomRange(idx.leKeys, idx.leIds, newMax, oldMax - 1) { id -> wakeAtom(id, true) }
-    visitAtomRange(idx.geKeys, idx.geIds, newMax + 1, oldMax) { id -> wakeAtom(id, false) }
-    visitAtomRange(idx.eqKeys, idx.eqIds, newMax + 1, oldMax, eqAction)
+    idx.le.visitRange(newMax, oldMax - 1) { id -> wakeAtom(id, true) }
+    idx.ge.visitRange(newMax + 1, oldMax) { id -> wakeAtom(id, false) }
+    idx.eq.visitRange(newMax + 1, oldMax, eqAction)
 }
 
 /**
@@ -418,11 +418,11 @@ internal fun PropagationState.propagateAtomsForVar(
     }
     if (carved != NO_CARVE && carved in (newMin + 1) until newMax) {
         atoms.pendingMoveAnt = antFar
-        visitAtomRange(idx.eqKeys, idx.eqIds, carved, carved) { id -> wakeAtom(id, false) }
+        idx.eq.visitRange(carved, carved) { id -> wakeAtom(id, false) }
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
         atoms.pendingMoveAnt = antFar
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
+        idx.eq.visitRange(newMin, newMin) { id -> wakeAtom(id, true) }
     }
 }
 
@@ -457,11 +457,11 @@ internal fun PropagationState.propagateAtomsForExclusionBatch(
         atoms.pendingMoveAnt = interiorAnt
         for (i in 0 until interiorVals.size) {
             val x = interiorVals[i]
-            visitAtomRange(idx.eqKeys, idx.eqIds, x, x) { id -> wakeAtom(id, false) }
+            idx.eq.visitRange(x, x) { id -> wakeAtom(id, false) }
         }
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
+        idx.eq.visitRange(newMin, newMin) { id -> wakeAtom(id, true) }
     }
 }
 
@@ -490,26 +490,11 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
         wakeMaxCrossing(idx, newMax, oldMax, ant) { id -> wakeAtom(id, false) }
     }
     atoms.pendingMoveAnt = ant
-    visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMax) { id ->
+    idx.eq.visitRange(newMin, newMax) { id ->
         if (survivors.binarySearchLong(atoms.threshold[id]) < 0) wakeAtom(id, false)
     }
     if (newMin == newMax && (newMin > oldMin || newMax < oldMax)) {
-        visitAtomRange(idx.eqKeys, idx.eqIds, newMin, newMin) { id -> wakeAtom(id, true) }
-    }
-}
-
-internal inline fun PropagationState.visitAtomRange(
-    keys: LongArrayList,
-    ids: IntArrayList,
-    from: Long,
-    to: Long,
-    action: (atomId: Int) -> Unit,
-) {
-    if (to < from || keys.size == 0) return
-    var i = keys.lowerBound(from)
-    while (i < keys.size && keys[i] <= to) {
-        action(ids[i])
-        i++
+        idx.eq.visitRange(newMin, newMin) { id -> wakeAtom(id, true) }
     }
 }
 
