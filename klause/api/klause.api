@@ -4047,6 +4047,8 @@ public final class com/eignex/klause/lp/Contribution : java/lang/Enum {
 public final class com/eignex/klause/lp/DeferredIntBounds {
 	public final fun noBetterThan ([JJZJLcom/eignex/klause/solver/Cancellation;)Z
 	public static synthetic fun noBetterThan$default (Lcom/eignex/klause/lp/DeferredIntBounds;[JJZJLcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)Z
+	public final fun noWorseThan ([J[DJZJLcom/eignex/klause/solver/Cancellation;)Z
+	public static synthetic fun noWorseThan$default (Lcom/eignex/klause/lp/DeferredIntBounds;[J[DJZJLcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)Z
 	public final fun run (Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/lp/BoundedIntDomains;
 }
 

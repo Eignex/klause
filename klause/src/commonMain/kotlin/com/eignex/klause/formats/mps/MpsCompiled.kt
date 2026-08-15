@@ -162,7 +162,17 @@ fun MpsModel.toProblem(
     val minimiseCost = objectiveIntCoefficients(isFloat, intVarOf, numInt, objScaleForCost, sense)
     val openBounds = dualFixableBounds(numInt, factors, declaredBounds) { minimiseCost[it] }
     val deferredBounds = if (openBounds.any { it.lo == null || it.hi == null }) {
-        DeferredIntBounds(openBounds, intLinears, realLinears, numReal, -box, box, small == null)
+        DeferredIntBounds(
+            openBounds,
+            intLinears,
+            realLinears,
+            numReal,
+            -box,
+            box,
+            small == null,
+            realLower = realLower,
+            realUpper = realUpper,
+        )
     } else {
         null
     }

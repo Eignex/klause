@@ -75,102 +75,10 @@ internal fun tightenOpenIntBounds(
     if (work.none { it.lo == null || it.hi == null }) return work // nothing open left for the LP pass
     if (cancellation()) return work // the prefilter consumed the budget; don't start a factorization
 
-    // A variable open below enters split, x = x⁺ − x⁻ with both parts ≥ 0, never as a −2⁶¹ probe lower
-    // bound: the double view folds each column's lower bound into the row rhs in doubles, and at the
-    // probe's magnitude (ULP 512) that fold absorbs the true rhs — every row would degenerate and every
-    // derived bound void at the frontier. Splitting keeps the fold at zero. The open direction is then
-    // x⁻ riding to *its* probe upper, which the caller flags to the bound extraction explicitly.
-    val builder = LpBuilder()
-    val posCol = IntArray(n)
-    val negCol = IntArray(n) { -1 }
-    for (v in 0 until n) {
-        val b = work[v]
-        if (b.lo != null) {
-            posCol[v] = if (b.hi != null) builder.addVar(b.lo, b.hi) else builder.addFreeVar(b.lo, null)
-        } else {
-            posCol[v] = if (b.hi != null && b.hi >= 0L) builder.addVar(0L, b.hi) else builder.addFreeVar(0L, null)
-            negCol[v] = builder.addFreeVar(0L, null)
-            if (b.hi != null && b.hi < 0L) {
-                // x⁺ is pinned to 0 above; the finite negative upper bound survives as a row on the pair.
-                builder.addRow(intArrayOf(posCol[v], negCol[v]), longArrayOf(1L, -1L), Relation.LE, b.hi)
-            }
-        }
-    }
-    for (f in constraints) {
-        val rel = when (f.op) {
-            LinearOp.LE -> Relation.LE
-            LinearOp.GE -> Relation.GE
-            LinearOp.EQ -> Relation.EQ
-            else -> continue
-        }
-        var extra = 0
-        for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
-        val cols = IntArray(f.vars.size + extra)
-        val vals = LongArray(cols.size)
-        var w = 0
-        for (k in f.vars.indices) {
-            val v = f.vars[k]
-            cols[w] = posCol[v]
-            vals[w] = f.coeff(k)
-            w++
-            if (negCol[v] >= 0) {
-                cols[w] = negCol[v]
-                vals[w] = -f.coeff(k)
-                w++
-            }
-        }
-        builder.addRow(cols, vals, rel, f.bound)
-    }
-    // Mixed integer/real rows join through LP-only continuous columns, so a variable whose only
-    // definition rides a real row (a floor definition, a to_real bridge) is still boundable. A strict
-    // row enters non-strict — a relaxation, so every derived bound stays sound. Real columns open
-    // below split exactly like the integer ones, for the same rhs-absorption reason.
-    if (realConstraints.isNotEmpty()) {
-        val realPos = HashMap<Int, Int>()
-        val realNeg = HashMap<Int, Int>()
-        for (f in realConstraints) {
-            val rel = when (f.op) {
-                LinearOp.LE -> Relation.LE
-                LinearOp.GE -> Relation.GE
-                LinearOp.EQ -> Relation.EQ
-                else -> continue
-            }
-            var extra = 0
-            for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
-            for (j in f.realVars.indices) {
-                val rv = f.realVars[j]
-                if (rv !in realPos) addRealColumns(builder, rv, rLo, rUp, realPos, realNeg)
-                if (realNeg.containsKey(rv)) extra++
-            }
-            val cols = IntArray(f.vars.size + f.realVars.size + extra)
-            val vals = DoubleArray(cols.size)
-            var w = 0
-            for (k in f.vars.indices) {
-                val v = f.vars[k]
-                cols[w] = posCol[v]
-                vals[w] = f.realIntCoeffs[k]
-                w++
-                if (negCol[v] >= 0) {
-                    cols[w] = negCol[v]
-                    vals[w] = -f.realIntCoeffs[k]
-                    w++
-                }
-            }
-            for (j in f.realVars.indices) {
-                val rv = f.realVars[j]
-                cols[w] = realPos.getValue(rv)
-                vals[w] = f.realCoeffs[j]
-                w++
-                val neg = realNeg[rv]
-                if (neg != null) {
-                    cols[w] = neg
-                    vals[w] = -f.realCoeffs[j]
-                    w++
-                }
-            }
-            builder.addRealRow(cols, vals, rel, f.realBound)
-        }
-    }
+    val rx = openRelaxation(work, constraints, realConstraints, rLo, rUp)
+    val builder = rx.builder
+    val posCol = rx.posCol
+    val negCol = rx.negCol
     val base = try {
         builder.build(Sense.MINIMIZE)
     } catch (_: LpOverflowException) {
