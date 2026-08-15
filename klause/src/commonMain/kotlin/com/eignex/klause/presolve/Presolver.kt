@@ -564,6 +564,19 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ),
+
+    /** Post the model's reified difference rows as one joint difference-constraint system, so the search
+     *  can refute a row's aux from a negative cycle the asserted rows already carry. Run outside this
+     *  enum's round engine: the system mentions the variables it reads, which would keep them alive
+     *  against affine elimination, so it is appended once the round fixpoint is reached and can no longer
+     *  block a pass. Redundant with the rows it reads, which stay posted. */
+    POST_DIFFERENCE_SYSTEM(
+        "difference-system",
+        Stage.EXTERNAL,
+        PresolveTiming.FAST,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ),
     ;
 
     /** Transform [problem] under [ctx], returning the change as a [PassDelta] against [problem]'s factor

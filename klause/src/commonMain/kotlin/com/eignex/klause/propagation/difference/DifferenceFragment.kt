@@ -100,8 +100,21 @@ internal fun differenceFragmentOf(
                 }
 
             is ReifiedLinear ->
-                // The row holds when the aux is true, so the edges carry that literal as their guard.
-                appendDifferenceEdges(f.vars, f::coeff, f.op, f.bound, zero, Lit.make(f.auxBoolVar, true), edges)
+                // The aux is an equivalence, so both polarities constrain: the row under a true aux, its
+                // integer negation under a false one. A wide row's Long coefficients are placeholders, so
+                // its shape cannot be read here at all.
+                if (!f.wide) {
+                    appendDifferenceEdges(f.vars, f::coeff, f.op, f.bound, zero, Lit.make(f.auxBoolVar, true), edges)
+                    appendNegatedDifferenceEdges(
+                        f.vars,
+                        f::coeff,
+                        f.op,
+                        f.bound,
+                        zero,
+                        Lit.make(f.auxBoolVar, false),
+                        edges,
+                    )
+                }
 
             else -> Unit
         }

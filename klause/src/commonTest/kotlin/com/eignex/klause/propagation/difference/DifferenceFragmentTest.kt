@@ -37,8 +37,25 @@ class DifferenceFragmentTest {
     fun `a reified difference row becomes an edge guarded by its aux`() {
         val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         val f = assertNotNull(frag(listOf(r), 2))
-        val guarded = f.edges.single { it.guard != DifferenceEdge.ALWAYS }
-        assertEquals(Lit.make(7, true), guarded.guard, "the edge holds exactly when the aux is true")
+        val guarded = f.edges.single { it.guard == Lit.make(7, true) }
+        assertEquals(3L, guarded.bound, "the edge holds exactly when the aux is true")
+    }
+
+    @Test
+    fun `a reified row also contributes the negation its false aux asserts`() {
+        // `¬(x0 − x1 ≤ 3)` is `x1 − x0 ≤ −4` over the integers, a difference in its own right.
+        val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)
+        val f = assertNotNull(frag(listOf(r), 2))
+        val negated = f.edges.single { it.guard == Lit.make(7, false) }
+        assertEquals(-4L, negated.bound)
+    }
+
+    @Test
+    fun `a reified equality contributes nothing under a false aux`() {
+        // Its negation is a disequality, which is outside the fragment.
+        val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 3)
+        val f = assertNotNull(frag(listOf(r), 2))
+        assertTrue(f.edges.none { it.guard == Lit.make(7, false) })
     }
 
     @Test

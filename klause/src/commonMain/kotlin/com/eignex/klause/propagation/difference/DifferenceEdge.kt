@@ -82,9 +82,34 @@ internal fun appendDifferenceEdges(
             out.add(DifferenceEdge(hi, lo, -(bound / g), guard))
         }
 
-        else -> return false
+        LinearOp.NE -> return false
     }
     return true
+}
+
+/**
+ * The same for the row's *negation*, which a reified row asserts when its aux is false.
+ *
+ * Over the integers `¬(Σ ≤ b)` is `Σ ≥ b + 1` and `¬(Σ ≥ b)` is `Σ ≤ b − 1`, both differences again — so
+ * a reified difference constrains under either polarity, and the false branch is as informative as the
+ * true one. `=` negates to a disequality, which is not a difference, so it contributes nothing.
+ */
+internal fun appendNegatedDifferenceEdges(
+    vars: IntArray,
+    coeff: (Int) -> Long,
+    op: LinearOp,
+    bound: Long,
+    zero: Int,
+    guard: Int,
+    out: MutableList<DifferenceEdge>,
+): Boolean = when {
+    op == LinearOp.LE && bound != Long.MAX_VALUE ->
+        appendDifferenceEdges(vars, coeff, LinearOp.GE, bound + 1, zero, guard, out)
+
+    op == LinearOp.GE && bound != Long.MIN_VALUE ->
+        appendDifferenceEdges(vars, coeff, LinearOp.LE, bound - 1, zero, guard, out)
+
+    else -> false
 }
 
 private fun gcdOf(a: Long, b: Long): Long {

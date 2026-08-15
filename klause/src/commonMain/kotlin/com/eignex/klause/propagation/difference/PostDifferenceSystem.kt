@@ -1,0 +1,36 @@
+package com.eignex.klause.propagation.difference
+
+import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.solver.Problem
+
+/**
+ * This [Problem] with a [DifferenceSystem] over its difference rows appended, or the problem unchanged
+ * when it carries none the joint propagator could act on.
+ *
+ * Posted exactly once, after the presolve fixpoint — never as a round pass. A factor pins every variable
+ * it mentions into the model, so a system posted between rounds keeps a variable alive that affine
+ * elimination would otherwise substitute away, trading a whole class of reductions for the deduction.
+ * After the fixpoint no pass can be blocked, and the search sees the same system either way.
+ *
+ * The gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
+ * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
+ * built only from those repeats work the model already does; it is the reified ones, whose truth the
+ * Boolean layer decides, that the joint graph can refute ahead of a decision.
+ */
+internal fun Problem.withDifferenceSystem(): Problem {
+    val fragment = differenceFragmentOf(factors, numIntVars, intDomains) ?: return this
+    if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
+    // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
+    // `alreadyFolded` reuses that fold and `seedDeductions` carries the proven deductions forward.
+    return BakedProblem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intDomains = intDomains,
+        factors = factors + DifferenceSystem(fragment.edges),
+        seedDeductions = baked,
+        cancellation = cancellation,
+        impliedFactorMask = impliedFactorMask?.let { it + false },
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        alreadyFolded = true,
+    )
+}
