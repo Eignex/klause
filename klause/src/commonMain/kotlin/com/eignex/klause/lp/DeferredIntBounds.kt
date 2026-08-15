@@ -162,9 +162,12 @@ private fun structuralBounds(numVars: Int, constraints: List<Linear>): Triangula
         }
         row
     }
-    val mixed = mixedEchelonHermite(eq, emptyArray(), numVars)
-    if (mixed.equalities.isEmpty()) return null
-    val rhs = Array<BigInteger?>(mixed.equalities.size) { BigInteger.fromLong(eqRows[it].bound) }
+    val rhsIn = Array(eqRows.size) { BigInteger.fromLong(eqRows[it].bound) }
+    val mixed = mixedEchelonHermite(eq, emptyArray(), numVars, rhsIn)
+    if (mixed.equalities.isEmpty() || mixed.equalityRhs.size != mixed.equalities.size) return null
+    // The reduced rows carry the reduced right-hand sides: pairing them with the *input* rows' bounds
+    // would attach a bound to whichever row a swap happened to move into that slot.
+    val rhs = Array<BigInteger?>(mixed.equalities.size) { mixed.equalityRhs[it] }
     val y = triangularBounds(mixed.equalities, rhs, rhs)
     return mixed.originalBounds(y.lo, y.hi)
 }
