@@ -50,9 +50,14 @@ internal object MpsMode : CliMode {
             // objective is the one thing that can settle that — the feasible region itself runs to
             // infinity in those directions. Kept for the status line, where the incumbent is known.
             certify = { value -> globalOptimum(compiled, deferred, value) }
+            val log = cliLogger(common.verbose)
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
+                log.v {
+                    val invented = bounded.openLo.indices.count { bounded.openLo[it] || bounded.openHi[it] }
+                    "deferred bounds: clamped=${bounded.clamped} invented-side columns=$invented"
+                }
                 if (bounded.openlyInfeasible) {
                     // Refuted over the genuinely open ranges: no solution anywhere, not merely none in
                     // the search box, so the verdict carries no clamp caveat.
@@ -84,9 +89,25 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
  */
 private fun globalOptimum(compiled: MpsCompiled, deferred: DeferredIntBounds, value: Long): Boolean {
     val objective = compiled.objective ?: return false
-    if (compiled.problem.numRealVars > 0 || objective.realCoefficients.any { it != 0.0 }) return false
+    // A boolean weight is not a column of the relaxation, so neither certificate can express it.
     if (objective.boolWeights.any { it != 0L }) return false
-    return deferred.noBetterThan(objective.intCoefficients, objective.constant, compiled.maximize, value)
+    // The refutation is the sharper of the two where it applies — it asks about integer points, not the
+    // relaxation's corner — but it turns "strictly better" into "better by a whole unit", so it needs an
+    // integral *objective*. Real columns elsewhere in the model do not disqualify it: it refutes over the
+    // integer rows alone, and dropping the rest only relaxes what it has to refute.
+    val integral = objective.realCoefficients.all { it == 0.0 }
+    if (integral &&
+        deferred.noBetterThan(objective.intCoefficients, objective.constant, compiled.maximize, value)
+    ) {
+        return true
+    }
+    return deferred.noWorseThan(
+        objective.intCoefficients,
+        objective.realCoefficients,
+        objective.constant,
+        compiled.maximize,
+        value,
+    )
 }
 
 /**

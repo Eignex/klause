@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.util.EmptyDoubleArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -35,6 +36,13 @@ class DeferredIntBounds internal constructor(
      *  kind — so a point satisfying them is a complete solution rather than a partial assignment the rest
      *  of the model might reject. Only then may [BoundedIntDomains.openSolution] be offered. */
     private val conjunctive: Boolean = false,
+    /** Declared lower bounds of those real columns, or empty for a front-end that declares none — where a
+     *  column reads as unbounded below, which is what a missing bound means. Load-bearing for the dual
+     *  bound: a continuous column free below leaves the whole relaxation unbounded, and a MIP's columns
+     *  are overwhelmingly `0 ≤ y`. */
+    private val realLower: DoubleArray = EmptyDoubleArray,
+    /** Declared upper bounds of the real columns; see [realLower]. */
+    private val realUpper: DoubleArray = EmptyDoubleArray,
 ) {
     /** Run the deferred OBBT under [cancellation] (the solve deadline) and produce the final finite domains
      *  plus whether any side fell back to a lossy clamp. */
@@ -57,8 +65,8 @@ class DeferredIntBounds internal constructor(
             intConstraints,
             cancellation = cancellation,
             realConstraints = realConstraints,
-            realLower = DoubleArray(numReal) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(numReal) { Double.POSITIVE_INFINITY },
+            realLower = declaredRealLower(),
+            realUpper = declaredRealUpper(),
         )
         // Where OBBT leaves a side open, the model's own structure may still bound it: the equality rows
         // drive a unimodular change of variables whose triangular block bounds its pivots by forward
@@ -124,7 +132,47 @@ class DeferredIntBounds internal constructor(
         )
         return unboundedlyInfeasible(openBounds, intConstraints + row, cancellation)
     }
+
+    /**
+     * Whether the relaxation's own dual bound already puts [value] at the optimum — the same certificate
+     * as [noBetterThan], reached by measuring rather than refuting.
+     *
+     * [noBetterThan] has to turn "strictly better" into "better by a whole unit" to state it as a row, so
+     * it needs an integral objective and stops at the first continuous term. A MIP objective almost always
+     * carries one. Comparing the incumbent against the relaxation optimum needs no such step: the
+     * relaxation drops integrality and nothing else, so its optimum bounds every integer solution's, and
+     * the real columns simply join the relaxation as the continuous columns they already are.
+     *
+     * False means "no conclusion", exactly as in [noBetterThan].
+     */
+    fun noWorseThan(
+        intCoefficients: LongArray,
+        realCoefficients: DoubleArray,
+        constant: Long,
+        maximize: Boolean,
+        value: Long,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Boolean = noWorseThanDualBound(
+        openBounds,
+        intConstraints,
+        realConstraints,
+        declaredRealLower(),
+        declaredRealUpper(),
+        OpenObjective(intCoefficients, realCoefficients, constant, maximize),
+        value,
+        cancellation,
+    )
+
+    /** The real columns' lower bounds, defaulting an undeclared column to unbounded below. */
+    private fun declaredRealLower(): DoubleArray = realBox(realLower, numReal, Double.NEGATIVE_INFINITY)
+
+    /** The real columns' upper bounds, defaulting an undeclared column to unbounded above. */
+    private fun declaredRealUpper(): DoubleArray = realBox(realUpper, numReal, Double.POSITIVE_INFINITY)
 }
+
+/** [declared] padded to [n] columns, with anything the front-end did not state left at [absent]. */
+private fun realBox(declared: DoubleArray, n: Int, absent: Double): DoubleArray =
+    if (declared.size >= n) declared else DoubleArray(n) { declared.getOrNull(it) ?: absent }
 
 /** `a + b`, or null when it would wrap — a wrapped target is a row the model never stated. */
 private fun addOrNull(a: Long, b: Long): Long? {
