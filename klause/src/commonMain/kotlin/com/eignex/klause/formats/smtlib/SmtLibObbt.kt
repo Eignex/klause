@@ -19,7 +19,10 @@ internal fun SmtLib.Builder.prepareDeferredBounds(
     inventedHi: BooleanArray,
 ): DeferredIntBounds? {
     if ((0 until nextInt).none { intDomains[it] is PresolveDomain.Open }) return null
-    val linears = factors.filterIsInstance<Linear>()
+    // A reified row whose literal a unit clause fixes is an ordinary constraint of the model; without
+    // this it reaches neither the bound tightening nor the open-domain refutation, both of which read
+    // linear rows only.
+    val linears = factors.filterIsInstance<Linear>() + rootFixedReifiedRows(factors)
     val openBounds = Array(nextInt) { v ->
         when (val d = intDomains[v]) {
             is PresolveDomain.Finite -> OpenIntBounds(d.domain.min, d.domain.max)
