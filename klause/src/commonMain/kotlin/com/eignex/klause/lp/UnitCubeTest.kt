@@ -23,6 +23,9 @@ import kotlin.math.round
  * system stays feasible however far the bound moves. Where the search would need an invented box, the
  * cube finds the solution outright.
  *
+ * Rows come in as `≤` or `≥`, the latter negated into the former. An equality is declined outright: it
+ * pins its variables to a hyperplane, and a hyperplane has no interior for a cube to sit in.
+ *
  * Incomplete by construction: a polyhedron can hold integer points without holding a unit cube — a thin
  * or degenerate one holds no cube at all — so a failure means "no conclusion". It is also *checked*: the
  * rounded centre is verified against the rows before it is returned, so a mistake anywhere above costs a
@@ -35,9 +38,10 @@ internal fun unitCubeSolution(
 ): LongArray? {
     if (openBounds.isEmpty() || constraints.isEmpty()) return null
     // An equality pins its variables to a hyperplane, which has no interior for a cube to sit in.
-    if (constraints.any { it.op != LinearOp.LE }) return null
+    if (constraints.any { it.op != LinearOp.LE && it.op != LinearOp.GE }) return null
+    val rows = constraints.map { asLe(it) ?: return null }
     val cb = openColumns(builderOf(), openBounds)
-    for (f in constraints) {
+    for (f in rows) {
         val shifted = cubeShiftedBound(f) ?: return null
         val (cols, vals) = splitTerms(f, cb.posCol, cb.negCol)
         cb.builder.addRow(cols, vals, Relation.LE, shifted)
@@ -60,7 +64,24 @@ internal fun unitCubeSolution(
         }
         rounded.toLong()
     }
-    return if (satisfies(candidate, openBounds, constraints)) candidate else null
+    return if (satisfies(candidate, openBounds, rows)) candidate else null
+}
+
+/**
+ * [f] as a `≤` row, negating a `≥` in place of it. Null when a coefficient or the bound cannot be negated
+ * without wrapping, or when [f] carries coefficients too wide for the `Long` row this builds.
+ */
+private fun asLe(f: Linear): Linear? {
+    if (f.wideCoeffs != null) return null
+    if (f.op == LinearOp.LE) return f
+    if (f.op != LinearOp.GE) return null
+    if (f.bound == Long.MIN_VALUE) return null
+    val coeffs = LongArray(f.vars.size) {
+        val c = f.coeff(it)
+        if (c == Long.MIN_VALUE) return null
+        -c
+    }
+    return Linear(coeffs, f.vars, LinearOp.LE, -f.bound)
 }
 
 /**

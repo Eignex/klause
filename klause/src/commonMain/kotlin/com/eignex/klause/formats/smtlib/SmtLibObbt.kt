@@ -58,5 +58,6 @@ internal fun SmtLib.Builder.prepareDeferredBounds(
         fallbackLo,
         fallbackHi,
         lossy,
+        conjunctive = nextBool == 0 && nextReal == 0 && factors.all { it is Linear && it.isIntegerCore },
     )
 }

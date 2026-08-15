@@ -83,6 +83,27 @@ class UnitCubeTestTest {
     }
 
     @Test
+    fun `a lower-bounded row is read in its own direction`() {
+        // x0 >= 100 and -x0 >= -200: the band 100..200, stated entirely with `>=`.
+        val rows = listOf(
+            Linear(longArrayOf(1L), intArrayOf(0), LinearOp.GE, 100L),
+            Linear(longArrayOf(-1L), intArrayOf(0), LinearOp.GE, -200L),
+        )
+        val x = assertNotNull(unitCubeSolution(open(1), rows), "a band 100 wide holds a unit cube")
+        assertTrue(x[0] in 100L..200L, "x0=${x[0]} is outside the band the rows state")
+    }
+
+    @Test
+    fun `a mix of directions is satisfied in both`() {
+        val rows = listOf(
+            le(longArrayOf(1L, -1L), intArrayOf(0, 1), 10L),
+            Linear(longArrayOf(1L, -1L), intArrayOf(0, 1), LinearOp.GE, -10L),
+        )
+        val x = assertNotNull(unitCubeSolution(open(2), rows))
+        assertTrue(x[0] - x[1] in -10L..10L, "x=${x.toList()} escaped the band")
+    }
+
+    @Test
     fun `an empty system yields nothing`() {
         assertNull(unitCubeSolution(open(2), emptyList()))
     }

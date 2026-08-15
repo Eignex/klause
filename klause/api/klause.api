@@ -4032,6 +4032,7 @@ public final class com/eignex/klause/lp/BoundedIntDomains {
 	public final fun getDomains ()[Lcom/eignex/klause/solver/IntDomain;
 	public final fun getOpenHi ()[Z
 	public final fun getOpenLo ()[Z
+	public final fun getOpenSolution ()[J
 	public final fun getOpenlyInfeasible ()Z
 }
 
