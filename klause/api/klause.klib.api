@@ -382,6 +382,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry LP_HARVEST // com.eignex.klause.presolve/PresolvePass.LP_HARVEST|null[0]
     enum entry MERGE_AMO_CLIQUES // com.eignex.klause.presolve/PresolvePass.MERGE_AMO_CLIQUES|null[0]
     enum entry MERGE_DUPLICATE_COLUMNS // com.eignex.klause.presolve/PresolvePass.MERGE_DUPLICATE_COLUMNS|null[0]
+    enum entry POST_DIFFERENCE_SYSTEM // com.eignex.klause.presolve/PresolvePass.POST_DIFFERENCE_SYSTEM|null[0]
     enum entry PROBE // com.eignex.klause.presolve/PresolvePass.PROBE|null[0]
     enum entry PROBE_FAILED_LITERALS // com.eignex.klause.presolve/PresolvePass.PROBE_FAILED_LITERALS|null[0]
     enum entry PROBE_INT_BOUNDS // com.eignex.klause.presolve/PresolvePass.PROBE_INT_BOUNDS|null[0]

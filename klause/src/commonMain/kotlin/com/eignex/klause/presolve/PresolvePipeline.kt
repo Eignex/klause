@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -132,21 +133,34 @@ object PresolvePipeline {
         // fold, report no change and let the caller keep its raw problem — preserving object identity for a
         // genuine no-op presolve, exactly as an already-baked input did before the bake became a fresh type.
         val onlyBaseBake = current === seeded && prebaked === problem && seeded === baked
-        if ((current === problem || onlyBaseBake) && !infeasible) {
+        // The joint difference system is appended here rather than by a round pass: it mentions every
+        // variable its edges touch, so between rounds it would hold those variables against affine
+        // elimination. After the fixpoint there is no pass left to block.
+        val reduced = current
+        val posted = if (!infeasible && config.resolved(PresolvePass.POST_DIFFERENCE_SYSTEM, context)) {
+            reduced.withDifferenceSystem()
+        } else {
+            reduced
+        }
+        if ((current === problem || onlyBaseBake) && !infeasible && posted === reduced) {
             return PresolveOutcome(problem, reconstruct, PresolveStats(), changed = false)
         }
 
         // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
         // and the net constraint drop / proven infeasibility, with the LP harvest's own breakdown attached.
-        val passes = firedPasses.toList() + (if (!harvest.isEmpty) listOf("lp-harvest") else emptyList())
+        val passes = firedPasses.toList() +
+            (if (!harvest.isEmpty) listOf("lp-harvest") else emptyList()) +
+            (if (posted !== reduced) listOf(PresolvePass.POST_DIFFERENCE_SYSTEM.id) else emptyList())
         val stats = PresolveStats(
             passes = passes,
-            constraintsRemoved = problem.factors.size - current.factors.size,
+            // Counted against the reduced problem: the appended system is redundant with the rows it
+            // reads, so it is not a constraint the reductions failed to remove.
+            constraintsRemoved = problem.factors.size - reduced.factors.size,
             infeasible = infeasible || harvest.rootInfeasible,
             lpHarvest = harvest.takeUnless { it.isEmpty },
             bakeElapsed = bakeElapsed,
         )
-        return PresolveOutcome(current, reconstruct, stats, changed = true)
+        return PresolveOutcome(posted, reconstruct, stats, changed = true)
     }
 }
 
