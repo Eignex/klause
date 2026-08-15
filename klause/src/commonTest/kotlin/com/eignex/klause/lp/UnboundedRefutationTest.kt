@@ -64,6 +64,32 @@ class UnboundedRefutationTest {
     }
 
     @Test
+    fun `refutes an equality whose coefficients cannot reach its right-hand side`() {
+        // 3x + 3y = 1: every value the left side takes is a multiple of 3, so no integer solution exists
+        // however large x and y grow. The relaxation is feasible and no interval closes, which leaves the
+        // coefficients themselves as the only thing that can refute it.
+        val rows = listOf(Linear(intArrayOf(3, 3), intArrayOf(0, 1), LinearOp.EQ, 1))
+        assertTrue(unboundedlyInfeasible(open(2), rows))
+    }
+
+    @Test
+    fun `stays silent when the coefficients do reach the right-hand side`() {
+        val rows = listOf(Linear(intArrayOf(3, 3), intArrayOf(0, 1), LinearOp.EQ, 6))
+        assertFalse(unboundedlyInfeasible(open(2), rows))
+    }
+
+    @Test
+    fun `refutes a divisibility contradiction that only substitution exposes`() {
+        // y = 2x makes the second row 6x = 1, which no integer x satisfies. In the original coefficients
+        // that row reads 3y = 1 with y free, so the contradiction appears only after eliminating y.
+        val rows = listOf(
+            Linear(intArrayOf(1, -2), intArrayOf(1, 0), LinearOp.EQ, 0),
+            Linear(intArrayOf(3), intArrayOf(1), LinearOp.EQ, 1),
+        )
+        assertTrue(unboundedlyInfeasible(open(2), rows))
+    }
+
+    @Test
     fun `refutes a chain by substituting away the variables it defines`() {
         // y = 4x, z = 4y, z <= x with x >= 2^62. Interval propagation alone diverges here — the bound
         // grows by 16 per round and never closes — but eliminating the two defined variables leaves the
