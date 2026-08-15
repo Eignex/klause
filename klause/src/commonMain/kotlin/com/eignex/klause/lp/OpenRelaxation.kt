@@ -7,8 +7,8 @@ import com.eignex.klause.util.EmptyDoubleArray
 /**
  * The LP relaxation of a system over its **genuinely open** integer ranges, shared by everything that has
  * to reason about a model outside the box the search is given: the bound tightening
- * ([tightenOpenIntBounds]), and the dual bound that certifies an in-box optimum global
- * ([DeferredIntBounds.noWorseThan]).
+ * ([tightenOpenIntBounds]), and the refutations that certify an in-box verdict global
+ * ([unboundedlyInfeasible], [nothingBeatsOverOpenRanges]).
  *
  * A variable open below enters split, `x = x⁺ − x⁻` with both parts non-negative, never as a probe-
  * magnitude lower bound: the double view folds each column's lower bound into the row rhs in doubles, and
@@ -30,41 +30,27 @@ internal class OpenRelaxation(
 /**
  * Build the relaxation of [constraints] (and the real-bearing [realConstraints]) over [bounds].
  *
- * [intCost] and [realCost] attach an objective as the columns are created, which is the only point at
- * which a *real* cost can be set — the in-place objective swaps on a built model carry integer costs
- * only. A variable represented `x = x⁺ − x⁻` gets `+c` on its positive column and `−c` on its negative,
- * so the objective is exactly `c·x` either way. Null leaves every cost zero, the shape the per-column
- * bound probes want.
+ * Every column is created with zero cost: the callers either probe one column at a time through the
+ * in-place objective swaps on the built model, or state what they want as a row.
  */
-@Suppress("LongParameterList")
 internal fun openRelaxation(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
     realConstraints: List<Linear> = emptyList(),
     realLower: DoubleArray = EmptyDoubleArray,
     realUpper: DoubleArray = EmptyDoubleArray,
-    intCost: LongArray? = null,
-    realCost: DoubleArray? = null,
 ): OpenRelaxation {
     val n = bounds.size
     val builder = LpBuilder()
     val posCol = IntArray(n)
     val negCol = IntArray(n) { -1 }
-    // A split column needs `−c` as well as `c`, so a cost that cannot be negated leaves the objective off
-    // entirely rather than silently wrong on one half of a pair.
-    val costs = intCost?.takeIf { c -> c.none { it == Long.MIN_VALUE } }
     for (v in 0 until n) {
         val b = bounds[v]
-        val c = costs?.getOrNull(v) ?: 0L
         if (b.lo != null) {
-            posCol[v] = if (b.hi != null) builder.addVar(b.lo, b.hi, c) else builder.addFreeVar(b.lo, null, c)
+            posCol[v] = if (b.hi != null) builder.addVar(b.lo, b.hi) else builder.addFreeVar(b.lo, null)
         } else {
-            posCol[v] = if (b.hi != null && b.hi >= 0L) {
-                builder.addVar(0L, b.hi, c)
-            } else {
-                builder.addFreeVar(0L, null, c)
-            }
-            negCol[v] = builder.addFreeVar(0L, null, -c)
+            posCol[v] = if (b.hi != null && b.hi >= 0L) builder.addVar(0L, b.hi) else builder.addFreeVar(0L, null)
+            negCol[v] = builder.addFreeVar(0L, null)
             if (b.hi != null && b.hi < 0L) {
                 // x⁺ is pinned to 0 above; the finite negative upper bound survives as a row on the pair.
                 builder.addRow(intArrayOf(posCol[v], negCol[v]), longArrayOf(1L, -1L), Relation.LE, b.hi)
@@ -103,7 +89,7 @@ internal fun openRelaxation(
         for (j in f.realVars.indices) {
             val rv = f.realVars[j]
             if (rv !in realPos) {
-                addRealRelaxationColumns(builder, rv, realLower, realUpper, realPos, realNeg, realCost)
+                addRealRelaxationColumns(builder, rv, realLower, realUpper, realPos, realNeg)
             }
             if (realNeg.containsKey(rv)) extra++
         }
@@ -146,21 +132,15 @@ private fun addRealRelaxationColumns(
     realUpper: DoubleArray,
     realPos: HashMap<Int, Int>,
     realNeg: HashMap<Int, Int>,
-    realCost: DoubleArray?,
 ) {
-    val cost = realCost?.getOrNull(rv)?.takeIf { it.isFinite() } ?: 0.0
     val lo = realLower.getOrNull(rv)?.takeIf { it.isFinite() }
     val hi = realUpper.getOrNull(rv)?.takeIf { it.isFinite() }
     if (lo != null) {
-        realPos[rv] = builder.addRealVar(lo, hi, cost)
+        realPos[rv] = builder.addRealVar(lo, hi)
         return
     }
-    val pos = if (hi != null && hi >= 0.0) {
-        builder.addRealVar(0.0, hi, cost)
-    } else {
-        builder.addRealVar(0.0, null, cost)
-    }
-    val neg = builder.addRealVar(0.0, null, -cost)
+    val pos = if (hi != null && hi >= 0.0) builder.addRealVar(0.0, hi) else builder.addRealVar(0.0, null)
+    val neg = builder.addRealVar(0.0, null)
     realPos[rv] = pos
     realNeg[rv] = neg
     if (hi != null && hi < 0.0) {

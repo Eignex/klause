@@ -23,7 +23,7 @@ class OpenObjectiveTest {
         value: Long,
         maximize: Boolean = false,
         constant: Long = 0L,
-    ) = noWorseThanDualBound(
+    ) = nothingBeatsOverOpenRanges(
         bounds,
         rows,
         realConstraints = emptyList(),
@@ -72,6 +72,24 @@ class OpenObjectiveTest {
     fun `a closed model is left to the search that already decided it`() {
         val rows = listOf(Linear(longArrayOf(1L), intArrayOf(0), LinearOp.GE, 3L))
         assertFalse(certify(arrayOf(OpenIntBounds(0L, 10L)), rows, longArrayOf(1L), value = 3L))
+    }
+
+    @Test
+    fun `a continuous objective term is certified without any rounding step`() {
+        // min x0 + 0.5*r0 over x0 >= 3 (open above) and r0 >= 4: the optimum is 5, so 5 cannot be beaten.
+        val intRow = Linear(longArrayOf(1L), intArrayOf(0), LinearOp.GE, 3L)
+        val realRow = Linear(IntArray(0), DoubleArray(0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 4.0)
+        fun ask(value: Long) = nothingBeatsOverOpenRanges(
+            open(0L, null),
+            listOf(intRow),
+            realConstraints = listOf(realRow),
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+            objective = OpenObjective(longArrayOf(1L), doubleArrayOf(0.5), 0L, maximize = false),
+            value = value,
+        )
+        assertTrue(ask(5L), "nothing beats the optimum of 5")
+        assertFalse(ask(9L), "4 and 5 both beat 9 so no certificate may be issued")
     }
 
     @Test

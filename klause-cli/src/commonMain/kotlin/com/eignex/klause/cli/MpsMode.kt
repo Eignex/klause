@@ -84,8 +84,8 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
 
 /**
  * Whether [value] cannot be improved on anywhere, so an optimum proved inside the search box is the
- * model's optimum. Only an all-integer objective qualifies: the certificate is a linear row over the
- * integer columns, and a continuous term in the objective is not expressible there.
+ * model's optimum. Two certificates answer it, tried strongest first; a boolean objective weight defeats
+ * both, being no column of the relaxation.
  */
 private fun globalOptimum(compiled: MpsCompiled, deferred: DeferredIntBounds, value: Long): Boolean {
     val objective = compiled.objective ?: return false

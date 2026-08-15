@@ -17,37 +17,31 @@ internal class OpenObjective(
 )
 
 /**
- * Whether the LP relaxation over the **genuinely open** ranges already proves that nothing anywhere beats
- * [value] — the certificate that turns an optimum found inside the search box into the model's optimum.
+ * Whether nothing anywhere beats [value] — the certificate that turns an optimum found inside the search
+ * box into the model's optimum, for an objective that need not be integral.
  *
- * The relaxation drops integrality and nothing else, so its optimum is a bound on every integer solution's
- * objective, in the box and outside it alike. For a minimisation, a relaxation optimum at or above [value]
- * therefore says no integer point improves on [value], and the incumbent is optimal outright.
+ * "Something beats [value]" is a row, and refuting it over the **genuinely open** ranges refutes it
+ * everywhere. The relaxation drops integrality and nothing else, so an integer point beating [value] would
+ * be a point of the relaxation beating it; no such point means no such integer point.
  *
- * This is the general form of the refutation [DeferredIntBounds.noBetterThan] runs. That one asks whether
- * "beats [value]" is infeasible, which needs the objective to be integral — "strictly better" has to
- * become "better by a whole unit" before a non-strict row can express it. Comparing against the dual bound
- * needs no such step, so it reaches the models whose objective carries continuous terms, which is most of
- * a MIP corpus.
+ * The one thing that row needs is *strictness*. [DeferredIntBounds.noBetterThan] gets it by rounding — an
+ * integral objective improves by whole units, so `< value` can be stated as `≤ value − 1` — and a
+ * continuous term takes that away. Here the row is stated strict and the model decided in exact rational
+ * arithmetic, where a strict row's right-hand side is carried by an infinitesimal rather than approximated
+ * ([rationalOutcome]). No rounding step, so no integrality requirement.
  *
- * Two bounds are available and the stronger is preferred: the exact 128-bit integer dual bound when the
- * relaxation is all-integer, and otherwise the Neumaier-Shcherbina safe bound, which accounts for
- * floating-point error by directed rounding and so is a proof rather than an estimate (Neumaier and
- * Shcherbina, *Safe bounds in linear and mixed-integer linear programming*, Mathematical Programming 99,
- * 2004). Where neither is available the answer is `false`.
- *
- * The safe bound is weak wherever a column is genuinely open, and measurably so: an open side enters the
- * model as a probe-magnitude stand-in for infinity, and the safe bound scales its rounding-error term by
- * each column's box, so a reduced cost that float error nudges below zero is multiplied by that magnitude
- * and the bound collapses far below anything usable. It is still a bound — the collapse is downward — so
- * the certificate stays sound and merely goes quiet. Closing that needs an exact dual bound for models
- * with continuous columns, which [integerCertify] declines to give (#127).
+ * Deliberately not a dual-bound comparison, which is the other way to ask this and the one that does not
+ * work here: an open side enters the model as a probe-magnitude stand-in for infinity, and the safe dual
+ * bound scales its rounding-error term by each column's box, so a reduced cost that float error nudges
+ * below zero is multiplied by that magnitude and the bound collapses far below anything usable. Refuting
+ * exactly asks the same question and never meets that magnitude.
  *
  * `false` always means "no conclusion", never "something better exists": an unexpressible relaxation, an
- * overflow, an unbounded or indeterminate solve, and a spent budget all answer `false`, leaving the caller
- * the clamped verdict it would have reported anyway.
+ * overflow, a feasible point, an indeterminate solve and a spent budget all answer `false`, leaving the
+ * caller the clamped verdict it would have reported anyway.
  */
-internal fun noWorseThanDualBound(
+@Suppress("ReturnCount")
+internal fun nothingBeatsOverOpenRanges(
     openBounds: Array<OpenIntBounds>,
     intConstraints: List<Linear>,
     realConstraints: List<Linear>,
@@ -60,24 +54,46 @@ internal fun noWorseThanDualBound(
     if (openBounds.isEmpty()) return false
     // Nothing is open ⇒ the search already ran over the real model and its optimum needs no certificate.
     if (openBounds.none { it.lo == null || it.hi == null }) return false
-    // The relaxation minimises. A maximisation is certified by minimising the negated objective and
-    // comparing against the negated incumbent, so one code path serves both directions.
-    val sign = if (objective.maximize) -1L else 1L
-    val intCost = LongArray(objective.intCoefficients.size) {
-        val c = objective.intCoefficients[it]
-        if (c == Long.MIN_VALUE) return false
-        sign * c
+    // A split column pair needs `−c` as well as `c`, so a coefficient that cannot be negated is one the
+    // row cannot state.
+    if (objective.intCoefficients.any { it == Long.MIN_VALUE }) return false
+    if (objective.realCoefficients.any { !it.isFinite() }) return false
+    // The row states the objective's own value, which excludes the constant the solver adds back.
+    val target = subOrNull(value, objective.constant)?.toDouble() ?: return false
+    val rx = openRelaxation(openBounds, intConstraints, realConstraints, realLower, realUpper)
+    val cols = ArrayList<Int>()
+    val vals = ArrayList<Double>()
+    for (v in objective.intCoefficients.indices) {
+        val c = objective.intCoefficients[v]
+        if (c == 0L || v >= rx.posCol.size) continue
+        cols.add(rx.posCol[v])
+        vals.add(c.toDouble())
+        val neg = rx.negCol[v]
+        if (neg >= 0) {
+            cols.add(neg)
+            vals.add(-c.toDouble())
+        }
     }
-    val realCost = DoubleArray(objective.realCoefficients.size) { sign * objective.realCoefficients[it] }
-    if (intCost.all { it == 0L } && realCost.all { it == 0.0 }) return false
-    val rx = openRelaxation(
-        openBounds,
-        intConstraints,
-        realConstraints,
-        realLower = realLower,
-        realUpper = realUpper,
-        intCost = intCost,
-        realCost = realCost,
+    for (rv in objective.realCoefficients.indices) {
+        val c = objective.realCoefficients[rv]
+        if (c == 0.0) continue
+        // A real column in no row of the relaxation has no column here to name, and leaving its term out
+        // would state a different objective than the one being certified.
+        val pos = rx.realPos[rv] ?: return false
+        cols.add(pos)
+        vals.add(c)
+        rx.realNeg[rv]?.let {
+            cols.add(it)
+            vals.add(-c)
+        }
+    }
+    if (cols.isEmpty()) return false
+    rx.builder.addRealRow(
+        cols.toIntArray(),
+        vals.toDoubleArray(),
+        if (objective.maximize) Relation.GE else Relation.LE,
+        target,
+        strict = true,
     )
     val model = try {
         rx.builder.build(Sense.MINIMIZE)
@@ -85,29 +101,11 @@ internal fun noWorseThanDualBound(
         return false
     }
     if (model.n == 0 || cancellation()) return false
-    val outcome = solveAndCertify(model, cancellation = cancellation)
-    if (outcome.verdict != LpVerdict.OPTIMAL) return false
-    // `value` is the incumbent including the objective constant, which the relaxation does not carry.
-    val target = subOrNull(value, objective.constant)?.let { mulOrNull(sign, it) } ?: return false
-    outcome.exactLowerBound?.let { return it >= target }
-    val safe = outcome.safeLowerBound ?: return false
-    // Past 2^53 a `Long` target no longer round-trips through `Double`, and a target that rounded *down*
-    // would let a bound below it read as above. Those decline rather than compare.
-    if (target > EXACT_DOUBLE_LONG || target < -EXACT_DOUBLE_LONG) return false
-    return safe.isFinite() && safe >= target.toDouble()
+    return solveAndCertify(model, cancellation = cancellation).verdict == LpVerdict.INFEASIBLE
 }
 
-/** Largest magnitude a `Long` keeps exactly through a `Double`. */
-private const val EXACT_DOUBLE_LONG = 1L shl 53
-
-/** `a - b`, or null when it would wrap. */
+/** `a - b`, or null when it would wrap — a wrapped target is a row the model never stated. */
 private fun subOrNull(a: Long, b: Long): Long? {
     val d = a - b
     return if (((a xor b) and (a xor d)) < 0L) null else d
-}
-
-/** `a * b`, or null when it would wrap. */
-private fun mulOrNull(a: Long, b: Long): Long? {
-    val p = a * b
-    return if (a != 0L && (p / a != b || (a == -1L && b == Long.MIN_VALUE))) null else p
 }
