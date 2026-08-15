@@ -9,6 +9,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.channelBoolTo01
+import com.eignex.klause.formats.dualFixableBounds
 import com.eignex.klause.formats.rootFixedReifiedRows
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.lp.OpenIntBounds
@@ -147,7 +148,14 @@ fun MpsModel.toProblem(
     // fallback box now, and capture the OBBT inputs so the deferred run can tighten under the solve
     // deadline. A side the LP cannot bound stays at the fallback, clamped when that box is lossy.
     @Suppress("UNCHECKED_CAST")
-    val openBounds = obbtInput as Array<OpenIntBounds>
+    val declaredBounds = obbtInput as Array<OpenIntBounds>
+    // Close what the objective makes pointless to explore before deciding anything is open: a column the
+    // cost only ever pushes toward one end has an optimum there, and a side closed that way is the
+    // model's own, not an invented window. OBBT cannot reach these — the relaxation is genuinely
+    // unbounded in those directions.
+    val objScaleForCost = if (objectiveNeedsScaling(isFloat)) floatScale else 1L
+    val minimiseCost = objectiveIntCoefficients(isFloat, intVarOf, numInt, objScaleForCost, sense)
+    val openBounds = dualFixableBounds(numInt, factors, declaredBounds) { minimiseCost[it] }
     val deferredBounds = if (openBounds.any { it.lo == null || it.hi == null }) {
         DeferredIntBounds(openBounds, intLinears, realLinears, numReal, -box, box, small == null)
     } else {
@@ -159,7 +167,7 @@ fun MpsModel.toProblem(
         if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
     }
 
-    val objScale = if (objectiveNeedsScaling(isFloat)) floatScale else 1L
+    val objScale = objScaleForCost
     val objective = if (objective.indices.isEmpty()) {
         null
     } else {
@@ -339,6 +347,22 @@ private fun emitIndicatedRealRow(
 private fun MpsModel.objectiveNeedsScaling(isFloat: BooleanArray): Boolean =
     objective.indices.withIndex().any { (k, idx) -> !isFloat[idx] && !isIntegral(objective.coeffs[k]) } ||
         !isIntegral(objective.constant)
+
+/** The objective's integer coefficients oriented for minimisation, whatever the model's sense. */
+private fun MpsModel.objectiveIntCoefficients(
+    isFloat: BooleanArray,
+    intVarOf: IntArray,
+    numInt: Int,
+    scale: Long,
+    sense: ObjectiveSense,
+): LongArray {
+    val out = LongArray(numInt)
+    val flip = if (sense == ObjectiveSense.MAXIMIZE) -1L else 1L
+    objective.indices.forEachIndexed { k, idx ->
+        if (!isFloat[idx]) out[intVarOf[idx]] = flip * (objective.coeffs[k] * scale).roundToLong()
+    }
+    return out
+}
 
 private fun MpsModel.buildObjective(
     isFloat: BooleanArray,
