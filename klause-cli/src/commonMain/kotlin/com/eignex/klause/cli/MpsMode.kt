@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Sample
 
 /**
@@ -25,6 +26,9 @@ internal object MpsMode : CliMode {
         // optimum/unsat over a clamped box is reported honestly.
         private val clamp = ClampFlag()
 
+        /** Proves an in-box optimum global, given the incumbent's objective value; null before load. */
+        private var certify: ((Long) -> Boolean)? = null
+
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
@@ -42,6 +46,10 @@ internal object MpsMode : CliMode {
             // presolve budget instead of unbounded at load. The run also decides the clamp verdict. Absent
             // when every integer column is already finite (nothing to bound, never clamped).
             val deferred = compiled.deferredBounds ?: return base
+            // An optimum proved inside the box is global only if nothing outside it is better, and the
+            // objective is the one thing that can settle that — the feasible region itself runs to
+            // infinity in those directions. Kept for the status line, where the incumbent is known.
+            certify = { value -> globalOptimum(compiled, deferred, value) }
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
@@ -55,7 +63,8 @@ internal object MpsMode : CliMode {
             }
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(clamp)
+        override fun output(common: CommonOptions): OutputProtocol =
+            MpsOutput(clamp) { value -> certify?.invoke(value) == true }
     }
 }
 
@@ -69,18 +78,43 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
 }
 
 /**
+ * Whether [value] cannot be improved on anywhere, so an optimum proved inside the search box is the
+ * model's optimum. Only an all-integer objective qualifies: the certificate is a linear row over the
+ * integer columns, and a continuous term in the objective is not expressible there.
+ */
+private fun globalOptimum(compiled: MpsCompiled, deferred: DeferredIntBounds, value: Long): Boolean {
+    val objective = compiled.objective ?: return false
+    if (compiled.problem.numRealVars > 0 || objective.realCoefficients.any { it != 0.0 }) return false
+    if (objective.boolWeights.any { it != 0L }) return false
+    return deferred.noBetterThan(objective.intCoefficients, objective.constant, compiled.maximize, value)
+}
+
+/**
  * MPS output protocol (PB-competition-style `s`/`o`/`v`). When a variable was clamped to the finite
  * search range, a proven optimum is only optimal within the clamp and an `unsat` only holds within it,
  * so both are softened (to `SATISFIABLE` / `UNKNOWN`) — the honest verdict for the unbounded problem.
  */
-internal class MpsOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedBestOutput() {
+internal class MpsOutput(
+    private val clamp: ClampFlag = ClampFlag(),
+    private val globalOptimum: (Long) -> Boolean = { false },
+) : BufferedBestOutput() {
+    private var bestObjective: Long? = null
+
+    override fun onSolutionObjective(objective: Long?) {
+        if (objective != null) bestObjective = objective
+    }
+
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
-        Verdict.OPTIMAL -> if (clamp.clamped) "s SATISFIABLE" else "s OPTIMUM FOUND"
+
+        Verdict.OPTIMAL ->
+            if (!clamp.clamped || bestObjective?.let(globalOptimum) == true) "s OPTIMUM FOUND" else "s SATISFIABLE"
+
         Verdict.UNSATISFIABLE -> if (clamp.clamped) "s UNKNOWN" else "s UNSATISFIABLE"
+
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 

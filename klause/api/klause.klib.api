@@ -5263,6 +5263,7 @@ final class com.eignex.klause.lp/BoundedIntDomains { // com.eignex.klause.lp/Bou
 }
 
 final class com.eignex.klause.lp/DeferredIntBounds { // com.eignex.klause.lp/DeferredIntBounds|null[0]
+    final fun noBetterThan(kotlin/LongArray, kotlin/Long, kotlin/Boolean, kotlin/Long, com.eignex.klause.solver/Cancellation = ...): kotlin/Boolean // com.eignex.klause.lp/DeferredIntBounds.noBetterThan|noBetterThan(kotlin.LongArray;kotlin.Long;kotlin.Boolean;kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
     final fun run(com.eignex.klause.solver/Cancellation): com.eignex.klause.lp/BoundedIntDomains // com.eignex.klause.lp/DeferredIntBounds.run|run(com.eignex.klause.solver.Cancellation){}[0]
 }
 
