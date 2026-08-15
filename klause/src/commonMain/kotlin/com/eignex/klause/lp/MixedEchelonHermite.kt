@@ -20,6 +20,12 @@ internal class MixedEchelonHermite(
     val inequalities: Array<Array<BigInteger>>,
     /** The unimodular `V` of `x = V·y`, row-major and `cols × cols`. */
     val transform: Array<Array<BigInteger>>,
+    /** The equality right-hand sides after the same elimination, index-aligned with [equalities]; empty
+     *  when the caller did not supply them. The Hermite step is a *column* operation, so it leaves these
+     *  untouched — only the echelon step recombines them. */
+    val equalityRhs: Array<BigInteger> = emptyArray(),
+    /** True when the equalities reduced to `0 = c` for a non-zero `c`, refuting them on their own. */
+    val inconsistent: Boolean = false,
 ) {
     /** The original point `x = V·y` for a solution [y] of the rewritten system. */
     fun recover(y: Array<BigInteger>): Array<BigInteger> = Array(transform.size) { i ->
@@ -51,12 +57,16 @@ internal fun mixedEchelonHermite(
     equalities: Array<Array<BigInteger>>,
     inequalities: Array<Array<BigInteger>>,
     cols: Int,
+    equalityRhs: Array<BigInteger>? = null,
 ): MixedEchelonHermite {
     if (cols == 0) {
         return MixedEchelonHermite(emptyArray(), inequalities, emptyArray())
     }
-    // Independent equalities only; a dependent one adds nothing and would widen the Hermite step.
-    val independent = if (equalities.isEmpty()) emptyArray() else bareissEchelon(equalities).rows
+    // Independent equalities only; a dependent one adds nothing and would widen the Hermite step. The
+    // right-hand sides ride along through the elimination, since row swaps and combinations reorder and
+    // recombine them exactly as they do the coefficients.
+    val echelon = if (equalities.isEmpty()) null else bareissEchelon(equalities, equalityRhs)
+    val independent = echelon?.rows ?: emptyArray()
     val v: Array<Array<BigInteger>>
     val eq: Array<Array<BigInteger>>
     if (independent.isEmpty()) {
@@ -69,7 +79,7 @@ internal fun mixedEchelonHermite(
         eq = hnf.h
     }
     val ineq = Array(inequalities.size) { i -> applyTransform(inequalities[i], v, cols) }
-    return MixedEchelonHermite(eq, ineq, v)
+    return MixedEchelonHermite(eq, ineq, v, echelon?.rhs ?: emptyArray(), echelon?.inconsistent == true)
 }
 
 /** One row in the new variables: `(a·V)ⱼ = Σₖ aₖ·V[k][j]`. */

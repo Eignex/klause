@@ -12,7 +12,16 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * [rows] is the reduced matrix; [pivots] holds, per reduced row, the column its leading entry sits in,
  * ascending. A row that reduced to all zeros is dropped, so [rows] has exactly the system's rank.
  */
-internal class BareissEchelon(val rows: Array<Array<BigInteger>>, val pivots: IntArray)
+internal class BareissEchelon(
+    val rows: Array<Array<BigInteger>>,
+    val pivots: IntArray,
+    /** The right-hand sides carried through the same row operations, when the caller supplied them.
+     *  Index-aligned with [rows]; empty when the elimination was run on coefficients alone. */
+    val rhs: Array<BigInteger> = emptyArray(),
+    /** True when a row reduced to `0 = c` with `c` non-zero: the equalities alone are unsatisfiable.
+     *  Only ever set when right-hand sides were supplied, since without them it cannot be seen. */
+    val inconsistent: Boolean = false,
+)
 
 /**
  * Row echelon form of [a] (row-major) by Bareiss fraction-free elimination.
@@ -30,11 +39,14 @@ internal class BareissEchelon(val rows: Array<Array<BigInteger>>, val pivots: In
  * Zero rows are dropped rather than kept, so [BareissEchelon.rows] is exactly the rank — a system whose
  * equalities are dependent contributes only its independent ones.
  */
-internal fun bareissEchelon(a: Array<Array<BigInteger>>): BareissEchelon {
+internal fun bareissEchelon(a: Array<Array<BigInteger>>, rhsIn: Array<BigInteger>? = null): BareissEchelon {
     val m = a.size
     val n = if (m == 0) 0 else a[0].size
     if (m == 0 || n == 0) return BareissEchelon(emptyArray(), IntArray(0))
     val w = Array(m) { i -> Array(n) { j -> a[i][j] } }
+    // The right-hand side is just another column: it must take every swap and every elimination the
+    // coefficients take, or the reduced rows end up paired with bounds that belong to other rows.
+    val rhs = rhsIn?.copyOf()
 
     val pivots = ArrayList<Int>()
     var prev = BigInteger.ONE
@@ -54,6 +66,11 @@ internal fun bareissEchelon(a: Array<Array<BigInteger>>): BareissEchelon {
             val t = w[sel]
             w[sel] = w[r]
             w[r] = t
+            if (rhs != null) {
+                val tb = rhs[sel]
+                rhs[sel] = rhs[r]
+                rhs[r] = tb
+            }
         }
         val pivot = w[r][c]
         for (i in r + 1 until m) {
@@ -64,13 +81,17 @@ internal fun bareissEchelon(a: Array<Array<BigInteger>>): BareissEchelon {
                 // the original matrix, so the division never leaves the integers.
                 w[i][j] = (pivot * w[i][j] - factor * w[r][j]) / prev
             }
+            if (rhs != null) rhs[i] = (pivot * rhs[i] - factor * rhs[r]) / prev
         }
         prev = pivot
         pivots.add(c)
         r++
     }
 
-    // Drop the rows that reduced away; what remains is the rank.
+    // Drop the rows that reduced away; what remains is the rank. A dropped row whose right-hand side did
+    // not reduce with it says `0 = c` for a non-zero `c`, which refutes the equalities outright.
+    val inconsistent = rhs != null && (r until m).any { !rhs[it].isZero() }
     val kept = Array(r) { i -> w[i] }
-    return BareissEchelon(kept, pivots.toIntArray())
+    val keptRhs = if (rhs == null) emptyArray() else Array(r) { i -> rhs[i] }
+    return BareissEchelon(kept, pivots.toIntArray(), keptRhs, inconsistent)
 }
