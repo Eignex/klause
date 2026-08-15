@@ -134,14 +134,12 @@ class DeferredIntBounds internal constructor(
     }
 
     /**
-     * Whether the relaxation's own dual bound already puts [value] at the optimum — the same certificate
-     * as [noBetterThan], reached by measuring rather than refuting.
+     * The same certificate as [noBetterThan], for an objective that carries continuous terms.
      *
-     * [noBetterThan] has to turn "strictly better" into "better by a whole unit" to state it as a row, so
-     * it needs an integral objective and stops at the first continuous term. A MIP objective almost always
-     * carries one. Comparing the incumbent against the relaxation optimum needs no such step: the
-     * relaxation drops integrality and nothing else, so its optimum bounds every integer solution's, and
-     * the real columns simply join the relaxation as the continuous columns they already are.
+     * [noBetterThan] turns "strictly better" into "better by a whole unit" so a non-strict row can state
+     * it, which needs the objective to be integral — and a MIP objective almost always is not. This states
+     * the row strict instead and refutes it in exact rational arithmetic, where strictness is carried
+     * rather than rounded away. See [nothingBeatsOverOpenRanges].
      *
      * False means "no conclusion", exactly as in [noBetterThan].
      */
@@ -152,7 +150,7 @@ class DeferredIntBounds internal constructor(
         maximize: Boolean,
         value: Long,
         cancellation: Cancellation = Cancellation.Never,
-    ): Boolean = noWorseThanDualBound(
+    ): Boolean = nothingBeatsOverOpenRanges(
         openBounds,
         intConstraints,
         realConstraints,
