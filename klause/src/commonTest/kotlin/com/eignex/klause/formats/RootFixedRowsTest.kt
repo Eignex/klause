@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.formats
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp

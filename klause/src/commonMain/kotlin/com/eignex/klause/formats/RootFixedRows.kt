@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.formats
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
@@ -18,7 +18,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  *
  * Recovering them matters wherever a model's bounds live in its boolean structure — bound tightening and
  * the open-domain refutation both reason over linear rows alone, so what they never receive they can
- * never use.
+ * never use. Front-end agnostic: MPS lowers indicator constraints to the same reified form.
  */
 internal fun rootFixedReifiedRows(factors: List<Factor>): List<Linear> {
     val fixed = HashMap<Int, Boolean>()
