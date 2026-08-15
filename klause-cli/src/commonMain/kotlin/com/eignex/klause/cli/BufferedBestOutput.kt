@@ -25,8 +25,12 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** Whether the search-counter [key] is included in this format's statistics block. */
     protected abstract fun keepStat(key: String): Boolean
 
+    /** The incumbent's objective, for a format whose status line depends on it. */
+    protected open fun onSolutionObjective(objective: Long?) = Unit
+
     final override fun onSolution(rendered: String, objective: Long?) {
         best = rendered
+        onSolutionObjective(objective)
         if (streamObjective && objective != null) println("o $objective")
     }
 

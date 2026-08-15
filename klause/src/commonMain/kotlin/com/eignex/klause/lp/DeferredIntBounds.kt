@@ -77,6 +77,48 @@ class DeferredIntBounds internal constructor(
         }
         return BoundedIntDomains(domains, clamped, openLo, openHi)
     }
+
+    /**
+     * Whether nothing anywhere improves on [value] — the certificate that turns an optimum proved inside
+     * the search box into an optimum outright.
+     *
+     * An optimisation model can be bounded through its objective alone: the feasible region runs to
+     * infinity in a column's direction and only cost stops it, so no bound tightening closes that side and
+     * the box has to be invented. Asking the question this way sidesteps the box — "beats [value]" is
+     * itself a linear row, and refuting it over the *genuinely open* ranges refutes it everywhere.
+     *
+     * False means "no conclusion", never "something better exists": an objective with no integer terms, a
+     * target that would wrap, or a refutation that does not close all answer false, leaving the caller the
+     * clamped verdict it would have reported anyway.
+     *
+     * [intCoefficients] and [constant] are the objective as the solver evaluates it, so [value] is
+     * `constant + Σ intCoefficients·x` at the incumbent. Boolean objective weights are not covered.
+     */
+    fun noBetterThan(
+        intCoefficients: LongArray,
+        constant: Long,
+        maximize: Boolean,
+        value: Long,
+        cancellation: Cancellation = Cancellation.Never,
+    ): Boolean {
+        val vars = intCoefficients.indices.filter { intCoefficients[it] != 0L }
+        if (vars.isEmpty()) return false
+        // Coefficients and the objective are integral, so "strictly better" is better by a whole unit.
+        val target = addOrNull(value, if (maximize) 1L else -1L)?.let { addOrNull(it, -constant) } ?: return false
+        val row = Linear(
+            LongArray(vars.size) { intCoefficients[vars[it]] },
+            vars.toIntArray(),
+            if (maximize) LinearOp.GE else LinearOp.LE,
+            target,
+        )
+        return unboundedlyInfeasible(openBounds, intConstraints + row, cancellation)
+    }
+}
+
+/** `a + b`, or null when it would wrap — a wrapped target is a row the model never stated. */
+private fun addOrNull(a: Long, b: Long): Long? {
+    val sum = a + b
+    return if (((a xor sum) and (b xor sum)) < 0L) null else sum
 }
 
 /** Result of [DeferredIntBounds.run]. */
