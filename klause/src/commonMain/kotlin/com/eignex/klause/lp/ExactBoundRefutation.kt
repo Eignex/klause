@@ -39,8 +39,31 @@ internal fun exactBoundsInfeasible(
     val rows = constraints.mapNotNull { rowOf(it, n) }.toMutableList()
     if (rows.isEmpty()) return false
     eliminateOpenDefinitions(rows, lo, hi, cancellation)
+    if (rows.any { divisibilityFails(it) }) return true
     return propagateToEmpty(rows, lo, hi, cancellation)
 }
+
+/**
+ * Whether an equality is unsatisfiable over the integers because its coefficients' common divisor does
+ * not divide its right-hand side.
+ *
+ * This is the refutation that survives unbounded domains: `Σ cᵢxᵢ` is a multiple of `gcd(cᵢ)` whatever
+ * the `xᵢ` are, so a right-hand side outside that lattice has no integer solution however large the
+ * variables may grow. A relaxation cannot see it — such a system is usually feasible over the rationals —
+ * and interval propagation cannot either, which leaves it to arithmetic on the coefficients themselves.
+ *
+ * Worth doing after substitution rather than before: eliminating a variable changes a row's coefficients,
+ * so a contradiction can appear in a row that was clean in the original system.
+ */
+private fun divisibilityFails(row: Row): Boolean {
+    if (!row.equality || row.coeffs.isEmpty()) return false
+    var g = BigInteger.ZERO
+    for (c in row.coeffs.values) g = gcd(g, c.abs())
+    if (g.isZero() || g == BigInteger.ONE) return false
+    return !(row.bound % g).isZero()
+}
+
+private tailrec fun gcd(a: BigInteger, b: BigInteger): BigInteger = if (b.isZero()) a else gcd(b, a % b)
 
 /** A row `Σ coeffs·vars ⟨op⟩ bound` in exact arithmetic, mutable so substitution can rewrite it. */
 private class Row(val coeffs: MutableMap<Int, BigInteger>, var bound: BigInteger, val equality: Boolean)
