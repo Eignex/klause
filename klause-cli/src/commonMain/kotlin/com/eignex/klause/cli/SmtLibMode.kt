@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.IntDigitColumns
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
 
 /**
@@ -47,10 +48,26 @@ internal object SmtLibMode : CliMode {
             // when the model has no open domain (nothing to bound, never clamped).
             clamp.clamped = parsed.clamped
             val deferred = parsed.deferredBounds ?: return base
+            // A single witness answers "is it satisfiable"; it answers neither "what are all the solutions"
+            // nor "which is best", so those callers must search as usual.
+            val witnessUsable = parsed.objective == null && !common.allSolutions && common.solutionCap == null
             return base.withDeferredBounds { cancellation ->
                 val bounded = deferred.run(cancellation)
                 clamp.clamped = bounded.clamped
-                if (bounded.openlyInfeasible) {
+                // The digit lowering can add columns after the bounds were captured, leaving the witness
+                // shorter than the problem; it covers only the variables it was derived over.
+                val witness = bounded.openSolution
+                    ?.takeIf { witnessUsable && it.size == parsed.problem.numIntVars }
+                if (witness != null) {
+                    // Verified against every row of the model before it was offered, and the model is
+                    // nothing but those rows — so pinning to it hands the search a solution to confirm,
+                    // where the invented box it would otherwise search may hold none.
+                    parsed.problem.withIntDomains(
+                        Array(witness.size) { IntDomain(witness[it], witness[it]) },
+                        BooleanArray(witness.size),
+                        BooleanArray(witness.size),
+                    )
+                } else if (bounded.openlyInfeasible) {
                     // Refuted over the genuinely open ranges, so the model has no solution anywhere —
                     // not merely none in the search box. Hand the search a problem that says so, and
                     // leave the clamp flag clear so the verdict is reported as the `unsat` it is.

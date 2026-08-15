@@ -5258,6 +5258,8 @@ final class com.eignex.klause.lp/BoundedIntDomains { // com.eignex.klause.lp/Bou
         final fun <get-openHi>(): kotlin/BooleanArray // com.eignex.klause.lp/BoundedIntDomains.openHi.<get-openHi>|<get-openHi>(){}[0]
     final val openLo // com.eignex.klause.lp/BoundedIntDomains.openLo|{}openLo[0]
         final fun <get-openLo>(): kotlin/BooleanArray // com.eignex.klause.lp/BoundedIntDomains.openLo.<get-openLo>|<get-openLo>(){}[0]
+    final val openSolution // com.eignex.klause.lp/BoundedIntDomains.openSolution|{}openSolution[0]
+        final fun <get-openSolution>(): kotlin/LongArray? // com.eignex.klause.lp/BoundedIntDomains.openSolution.<get-openSolution>|<get-openSolution>(){}[0]
     final val openlyInfeasible // com.eignex.klause.lp/BoundedIntDomains.openlyInfeasible|{}openlyInfeasible[0]
         final fun <get-openlyInfeasible>(): kotlin/Boolean // com.eignex.klause.lp/BoundedIntDomains.openlyInfeasible.<get-openlyInfeasible>|<get-openlyInfeasible>(){}[0]
 }

@@ -19,6 +19,14 @@ import com.eignex.klause.solver.Cancellation
  * `1 ≤ 3x₁ − 3x₂ ≤ 2` has two bounded rows and two unbounded variables — so it does not on its own make
  * a search terminate. Closing that gap is the Mixed-Echelon-Hermite transformation's job.
  *
+ * The reduction preserves *satisfiability*, not the solution set, and that is what keeps it out of the
+ * two uses it otherwise looks made for. It cannot close a domain for the search: the guarantee is that
+ * *some* solution survives inside the derived box, not that every solution lies there, so a bound taken
+ * from it could cut away the optimum or the solutions an enumeration owes its caller — unlike the
+ * containment bounds [tightenOpenIntBounds] and the echelon block produce. And it cannot refute; see
+ * [unboundedlyInfeasible] for why. What is left is searching the reduced system itself and rebuilding an
+ * original solution by travelling the discarded directions, and that rebuilding is the missing piece.
+ *
  * A direction is bounded exactly when the auxiliary variable `z = aᵢᵀx` is, so each candidate row gets
  * one auxiliary column and the ordinary per-variable bound extraction decides it — including its
  * probe-frontier rule, which is what distinguishes "optimum at a real bound" from "rode to the stand-in

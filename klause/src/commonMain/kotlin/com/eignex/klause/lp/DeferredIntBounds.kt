@@ -31,6 +31,10 @@ class DeferredIntBounds internal constructor(
     /** True when the fallback box is not equisatisfiable with the unbounded model (so a side closed by it
      *  makes the model clamped); false when the small-model bound proves the box loses no solutions. */
     private val lossy: Boolean,
+    /** True when [intConstraints] are the *whole* model — no booleans, no reals, no factor of any other
+     *  kind — so a point satisfying them is a complete solution rather than a partial assignment the rest
+     *  of the model might reject. Only then may [BoundedIntDomains.openSolution] be offered. */
+    private val conjunctive: Boolean = false,
 ) {
     /** Run the deferred OBBT under [cancellation] (the solve deadline) and produce the final finite domains
      *  plus whether any side fell back to a lossy clamp. */
@@ -75,7 +79,14 @@ class DeferredIntBounds internal constructor(
             }
             if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
         }
-        return BoundedIntDomains(domains, clamped, openLo, openHi)
+        // Only where a side is still the invented box is there anything to gain: elsewhere the search runs
+        // over the model's own domains and needs no witness handed to it.
+        val solution = if (clamped && conjunctive) {
+            unitCubeSolution(openBounds, intConstraints, cancellation)
+        } else {
+            null
+        }
+        return BoundedIntDomains(domains, clamped, openLo, openHi, openSolution = solution)
     }
 
     /**
@@ -139,6 +150,19 @@ class BoundedIntDomains internal constructor(
      * `unsat` outright, with none of the clamp caveat an in-box refutation would carry.
      */
     val openlyInfeasible: Boolean = false,
+    /**
+     * A complete integer solution found without any bounds at all, or null when none was — which is the
+     * usual answer, since the cube test that produces it is incomplete.
+     *
+     * The mirror of [openlyInfeasible] on the satisfying side. Where that refutes a model the invented box
+     * could only have reported `unknown`, this decides one the box was never wide enough to reach: the
+     * point is verified against every row and declared bound before it is offered, and it is offered only
+     * when those rows are the whole model.
+     *
+     * A caller that must produce *every* solution, or the best one, cannot use it — it is one witness, with
+     * no claim to being the only or the best. Such a caller ignores it and searches as before.
+     */
+    val openSolution: LongArray? = null,
 )
 
 /**
