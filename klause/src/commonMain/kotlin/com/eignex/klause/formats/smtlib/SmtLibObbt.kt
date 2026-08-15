@@ -1,6 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.formats.rootFixedReifiedRows
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.smallModelIntBound

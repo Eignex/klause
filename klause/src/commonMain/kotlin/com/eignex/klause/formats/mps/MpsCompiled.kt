@@ -9,6 +9,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.channelBoolTo01
+import com.eignex.klause.formats.rootFixedReifiedRows
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.smallModelIntBound
@@ -127,7 +128,13 @@ fun MpsModel.toProblem(
     }
 
     // OBBT over the purely-integer rows only (a real-bearing Linear carries placeholder integer data).
-    val intLinears = factors.filterIsInstance<Linear>().filter { it.isIntegerCore }
+    // An indicator row whose literal a unit clause fixes is an ordinary constraint of the model, so it
+    // belongs here too — otherwise a bound the model states through its boolean structure is invisible.
+    val allLinears = factors.filterIsInstance<Linear>() + rootFixedReifiedRows(factors)
+    val intLinears = allLinears.filter { it.isIntegerCore }
+    // A mixed row is context, not noise: on a MIP the rows that bound an integer column usually carry
+    // continuous terms too, so leaving them out leaves OBBT nothing to bound those columns with.
+    val realLinears = allLinears.filter { it.hasReals }
 
     // A pure-integer feasibility model whose small-model bound ([smallModelIntBound]) fits keeps exact
     // verdicts: the finite box is equisatisfiable with the unbounded model, so no clamp flag. Never under
@@ -142,7 +149,7 @@ fun MpsModel.toProblem(
     @Suppress("UNCHECKED_CAST")
     val openBounds = obbtInput as Array<OpenIntBounds>
     val deferredBounds = if (openBounds.any { it.lo == null || it.hi == null }) {
-        DeferredIntBounds(openBounds, intLinears, emptyList(), 0, -box, box, small == null)
+        DeferredIntBounds(openBounds, intLinears, realLinears, numReal, -box, box, small == null)
     } else {
         null
     }
