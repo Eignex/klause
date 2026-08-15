@@ -3,6 +3,10 @@ package com.eignex.klause.lp
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
+ * Bromberger, *A Reduction from Unbounded Linear Mixed Arithmetic Problems into Bounded Problems*
+ * (IJCAR 2018): the Mixed-Echelon-Hermite half of the pair of transformations that turn an unbounded
+ * system into an equisatisfiable bounded one, in polynomial time and without a priori bounds.
+ *
  * A system rewritten in the variables `y`, together with the change of variables that produced it.
  *
  * [transform] is unimodular, so `x = V·y` is a bijection of the integer lattice: `y` ranges over exactly

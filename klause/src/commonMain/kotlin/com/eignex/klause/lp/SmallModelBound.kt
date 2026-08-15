@@ -9,6 +9,11 @@ import kotlin.math.ceil
 import kotlin.math.log2
 
 /**
+ * Papadimitriou, *On the Complexity of Integer Programming* (JACM 1981): a feasible integer system of
+ * `m` rows over `n` variables with largest entry `a` has a solution inside `n(ma)^(2m+1)`. Exponential
+ * in the row count, which is why it fits only small systems and why the structural transformations are
+ * preferred where they apply.
+ *
  * Small-model magnitude bound for a pure-integer linear model: when [factors] are boolean
  * structure ([Clause]) over integer-linear rows ([Linear] / [ReifiedLinear]), a satisfiable model
  * has an integer witness with every coordinate's magnitude within the returned bound. This is the
