@@ -5,6 +5,10 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 /**
+ * Neumaier and Shcherbina, *Safe Bounds in Linear and Mixed-Integer Linear Programming* (Mathematical
+ * Programming, 2004): a floating-point LP bound made rigorous by directed rounding of the dual, so a
+ * prune rests on an inequality that holds exactly rather than on the float arithmetic that produced it.
+ *
  * Neumaier–Shcherbina safe lower bound on the minimized objective `cᵀz` from an *approximate* dual
  * vector [y] (e.g. from [RevisedSimplex]). The model is standard-form-with-slacks — `A_full z = rhs`,
  * `0 ≤ z ≤ ub` — so for **any** `y` the Lagrangian `y·rhs + Σ_j min_{z_j∈[0,ub_j]} d_j·z_j` (with

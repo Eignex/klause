@@ -3,6 +3,10 @@ package com.eignex.klause.lp
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
+ * Bareiss, *Sylvester's Identity and Multistep Integer-Preserving Gaussian Elimination* (Mathematics of
+ * Computation, 1968): fraction-free elimination, so an integer matrix stays integer throughout and the
+ * intermediate entries stay bounded by the minors rather than growing without limit.
+ *
  * A system reduced to row echelon form by fraction-free elimination, with the pivot column of each row.
  *
  * [rows] is the reduced matrix; [pivots] holds, per reduced row, the column its leading entry sits in,

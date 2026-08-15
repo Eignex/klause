@@ -3,6 +3,10 @@ package com.eignex.klause.lp
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
+ * Kannan and Bachem, *Polynomial Algorithms for Computing the Smith and Hermite Normal Forms of an
+ * Integer Matrix* (SIAM J. Computing, 1979): the column Hermite form with its unimodular transform, so
+ * the change of variables is a bijection of the integer lattice rather than merely of the rationals.
+ *
  * A matrix in column Hermite normal form together with the column operations that produced it:
  * `H = A · V`, where [v] is unimodular (integer, determinant ±1) and therefore a bijection of the
  * integer lattice — so `Ax ⋛ b` and `Hy ⋛ b` have the same integer solutions, related by `x = Vy`.
