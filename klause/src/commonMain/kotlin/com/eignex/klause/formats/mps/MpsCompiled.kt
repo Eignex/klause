@@ -142,7 +142,12 @@ fun MpsModel.toProblem(
     // an objective (the box could truncate an unbounded optimum into a spurious finite one); mixed models
     // and oversized bounds fall back to the lossy searchable window.
     val small = if (numReal == 0 && objective.indices.isEmpty()) smallModelIntBound(numInt, factors) else null
-    val box = small ?: searchBound
+    // The fallback box is a stand-in, so choose one the objective can still be evaluated over. At the full
+    // searchable range a column reaches ~2^62 and the weighted sum wraps on the first few terms, which is
+    // worse than a narrow box: the search then optimises a wrapped value and is rewarded for driving
+    // columns further out. Narrowing keeps the model clamped either way — it only keeps the arithmetic
+    // honest.
+    val box = small ?: minOf(searchBound, objectiveSafeBox(isFloat, intVarOf, numInt, floatScale))
 
     // Defer OBBT to the presolve phase (compiling only reads): close each open integer side to the cheap
     // fallback box now, and capture the OBBT inputs so the deferred run can tighten under the solve
@@ -347,6 +352,23 @@ private fun emitIndicatedRealRow(
 private fun MpsModel.objectiveNeedsScaling(isFloat: BooleanArray): Boolean =
     objective.indices.withIndex().any { (k, idx) -> !isFloat[idx] && !isIntegral(objective.coeffs[k]) } ||
         !isIntegral(objective.constant)
+
+/**
+ * The widest box over which `constant + Σ c·x` still fits `Long`, or [Long.MAX_VALUE] when the objective
+ * places no limit. Deliberately generous — half the range is left as headroom for the accumulation order,
+ * which the evaluator is free to choose.
+ */
+private fun MpsModel.objectiveSafeBox(isFloat: BooleanArray, intVarOf: IntArray, numInt: Int, scale: Long): Long {
+    var weight = 0L
+    objective.indices.forEachIndexed { k, idx ->
+        if (isFloat[idx] || intVarOf[idx] >= numInt) return@forEachIndexed
+        val c = (objective.coeffs[k] * scale).roundToLong()
+        val magnitude = if (c < 0L) -c else c
+        // Saturate rather than wrap while measuring; a saturated total simply yields the narrowest box.
+        weight = if (weight > Long.MAX_VALUE - magnitude) Long.MAX_VALUE else weight + magnitude
+    }
+    return if (weight <= 1L) Long.MAX_VALUE else (Long.MAX_VALUE / 2L) / weight
+}
 
 /** The objective's integer coefficients oriented for minimisation, whatever the model's sense. */
 private fun MpsModel.objectiveIntCoefficients(
