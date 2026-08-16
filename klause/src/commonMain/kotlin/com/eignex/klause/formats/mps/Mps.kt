@@ -89,7 +89,8 @@ data class MpsModel(
 
 /**
  * Parser for the MPS (Mathematical Programming System) MIP/LP format. Reads the standard sections —
- * `NAME`, `OBJSENSE`, `ROWS`, `COLUMNS` (with `MARKER`/`INTORG`/`INTEND` integer sections), `RHS`,
+ * `NAME`, `OBJSENSE`, `ROWS` (and `LAZYCONS`, whose rows are ordinary constraints), `COLUMNS` (with
+ * `MARKER`/`INTORG`/`INTEND` integer sections), `RHS`,
  * `RANGES`, `BOUNDS`, `INDICATORS` — into an [MpsModel]. Whitespace ("free") tokenisation is used, which handles the
  * common case; fixed-column files whose names embed spaces are not supported.
  *
@@ -100,7 +101,20 @@ data class MpsModel(
  */
 object Mps {
 
-    private enum class Section { NONE, NAME, OBJSENSE, ROWS, COLUMNS, RHS, RANGES, BOUNDS, INDICATORS, ENDATA }
+    private enum class Section {
+        NONE,
+        NAME,
+        OBJSENSE,
+        ROWS,
+        LAZYCONS,
+        USERCUTS,
+        COLUMNS,
+        RHS,
+        RANGES,
+        BOUNDS,
+        INDICATORS,
+        ENDATA,
+    }
 
     private enum class RowType { OBJECTIVE, LE, GE, EQ, FREE }
 
@@ -139,7 +153,10 @@ object Mps {
             // Comments start with `*`; blank lines are skipped. A line with no leading whitespace and a
             // recognised keyword opens a new section, otherwise it is a data line for the current one.
             if (rawLine.isBlank() || rawLine.startsWith("*")) continue
-            val fields = rawLine.trim().splitWhitespace()
+            // `$` opens a comment that runs to end of line, so a data line may carry one after its
+            // fields; taking the whole line as data reads the comment text as a row or column name.
+            val fields = rawLine.trim().splitWhitespace().takeWhile { !it.startsWith("$") }
+            if (fields.isEmpty()) continue
             if (!rawLine[0].isWhitespace()) {
                 section = openSection(fields).also {
                     if (it == Section.NAME) name = fields.getOrElse(1) { "" }
@@ -153,7 +170,14 @@ object Mps {
             when (section) {
                 Section.OBJSENSE -> if (isMaximize(fields.getOrNull(0))) sense = ObjectiveSense.MAXIMIZE
 
-                Section.ROWS -> readRow(fields, rows, rowByName)
+                // A lazy constraint is a constraint of the model; a solver may hold it back as an
+                // efficiency choice, but dropping it would admit points the model forbids. Posted as an
+                // ordinary row, which is correct and merely forgoes the lazy scheme.
+                Section.ROWS, Section.LAZYCONS -> readRow(fields, rows, rowByName)
+
+                // A user cut is redundant by construction - it cuts no integer solution - so skipping it
+                // loses only a tightening, never a solution.
+                Section.USERCUTS -> Unit
 
                 Section.COLUMNS ->
                     inIntegerMarker =
@@ -179,6 +203,8 @@ object Mps {
         "NAME" -> Section.NAME
         "OBJSENSE" -> Section.OBJSENSE
         "ROWS" -> Section.ROWS
+        "LAZYCONS" -> Section.LAZYCONS
+        "USERCUTS" -> Section.USERCUTS
         "COLUMNS" -> Section.COLUMNS
         "RHS" -> Section.RHS
         "RANGES" -> Section.RANGES

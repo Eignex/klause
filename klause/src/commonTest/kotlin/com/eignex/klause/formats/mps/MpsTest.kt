@@ -54,6 +54,69 @@ class MpsTest {
     }
 
     @Test
+    fun `a lazy constraint is posted as an ordinary constraint`() {
+        val text = """
+            NAME          LAZY
+            ROWS
+             N  COST
+             L  C1
+            LAZYCONS
+             G  L1
+            COLUMNS
+                X1        COST           1.0   C1             1.0
+                X1        L1             1.0
+            RHS
+                RHS       C1             4.0   L1             2.0
+            ENDATA
+        """.trimIndent()
+
+        val model = Mps.parse(text)
+
+        // A solver may add it lazily, but it constrains the model either way: dropping it would admit
+        // points the model forbids.
+        val l1 = model.constraints.single { it.name == "L1" }
+        assertEquals(2.0 to null, l1.lower to l1.upper)
+        assertEquals(listOf(1.0), l1.coeffs.toList())
+    }
+
+    @Test
+    fun `a user cut is skipped because it cuts no solution`() {
+        val text = """
+            NAME          CUTS
+            ROWS
+             N  COST
+             L  C1
+            USERCUTS
+             L  U1
+            COLUMNS
+                X1        COST           1.0   C1             1.0
+            RHS
+                RHS       C1             4.0
+            ENDATA
+        """.trimIndent()
+
+        assertEquals(listOf("C1"), Mps.parse(text).constraints.map { it.name })
+    }
+
+    @Test
+    fun `a trailing dollar comment is not read as data`() {
+        val text = """
+            NAME          COMMENT
+            ROWS
+             N  COST
+             L  C1
+            COLUMNS
+                X1        COST           1.0   C1             1.0   ${'$'} empty column
+            RHS
+                RHS       C1             4.0
+            ENDATA
+        """.trimIndent()
+
+        val c1 = Mps.parse(text).constraints.single()
+        assertEquals(listOf(1.0), c1.coeffs.toList())
+    }
+
+    @Test
     fun `defaults a variable to the zero to positive-infinity range`() {
         val text = """
             ROWS
