@@ -154,7 +154,7 @@ private fun propagateToEmpty(
         var changed = false
         for (row in rows) {
             if (cancellation()) return false
-            if (tightenRow(row, lo, hi) { changed = true }) return true
+            if (tightenRow(row, lo, hi, cancellation) { changed = true }) return true
         }
         if (!changed) return false
     }
@@ -166,9 +166,15 @@ private inline fun tightenRow(
     row: Row,
     lo: Array<BigInteger?>,
     hi: Array<BigInteger?>,
+    cancellation: Cancellation,
     onChange: () -> Unit,
 ): Boolean {
     for ((j, c) in row.coeffs) {
+        // Each term re-sums the rest of the row in big integers, so a wide row is quadratic and one row
+        // alone can outlast the whole budget. Polled per term, which caps the uninterruptible unit at a
+        // single pass over the row; the caller reads the early exit as "not refuted", the same answer an
+        // exhausted propagation gives.
+        if (cancellation()) return false
         var restMin: BigInteger? = BigInteger.ZERO
         var restMax: BigInteger? = BigInteger.ZERO
         for ((i, ci) in row.coeffs) {

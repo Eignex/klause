@@ -72,7 +72,7 @@ class DeferredIntBounds internal constructor(
         // drive a unimodular change of variables whose triangular block bounds its pivots by forward
         // substitution, and those ranges push back onto the original variables. A bound obtained that way
         // is the model's, not an invented box, so it closes the side WITHOUT making the model clamped.
-        val structural = structuralBounds(openBounds.size, intConstraints)
+        val structural = structuralBounds(openBounds.size, intConstraints, cancellation)
         var clamped = false
         val openLo = BooleanArray(openBounds.size)
         val openHi = BooleanArray(openBounds.size)
@@ -219,7 +219,7 @@ class BoundedIntDomains internal constructor(
  * through the same change of variables. A side comes back null wherever the structure implies nothing,
  * which is the honest answer — inventing one there is precisely what the clamp does.
  */
-private fun structuralBounds(numVars: Int, constraints: List<Linear>): TriangularBounds? {
+private fun structuralBounds(numVars: Int, constraints: List<Linear>, cancellation: Cancellation): TriangularBounds? {
     if (numVars == 0) return null
     val eqRows = constraints.filter { it.op == LinearOp.EQ && it.isIntegerCore }
     if (eqRows.isEmpty()) return null
@@ -233,7 +233,7 @@ private fun structuralBounds(numVars: Int, constraints: List<Linear>): Triangula
         row
     }
     val rhsIn = Array(eqRows.size) { BigInteger.fromLong(eqRows[it].bound) }
-    val mixed = mixedEchelonHermite(eq, emptyArray(), numVars, rhsIn)
+    val mixed = mixedEchelonHermite(eq, emptyArray(), numVars, rhsIn, cancellation)
     if (mixed.equalities.isEmpty() || mixed.equalityRhs.size != mixed.equalities.size) return null
     // The reduced rows carry the reduced right-hand sides: pairing them with the *input* rows' bounds
     // would attach a bound to whichever row a swap happened to move into that slot.
