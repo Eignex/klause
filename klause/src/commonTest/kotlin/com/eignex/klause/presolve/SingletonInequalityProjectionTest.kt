@@ -69,7 +69,9 @@ class SingletonInequalityProjectionTest {
             Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.LE, 10),
         )
         val d = SingletonInequalityProjection.project(p, emptySet())
-        // Only the pure singletons y (var1) and z (var2) may be projected; x (var0) must stay.
-        assertTrue(d.droppedIndices.size <= 2)
+        // Only the pure singletons y (var1) and z (var2) are projected; both survivors are still on x.
+        assertEquals(listOf(listOf(0), listOf(0)), d.addedFactors.map { (it as Linear).vars.toList() })
+        val rebuilt = d.reconstruct!!(Sample(bools = BooleanArray(0), ints = longArrayOf(4, 6, 6)))
+        assertEquals(4L, rebuilt.ints[0], "x must not be pinned by the projection")
     }
 }
