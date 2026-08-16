@@ -110,6 +110,10 @@ internal fun rationalFeasible(
     maxPivots: Int = defaultRationalPivotCap(model),
 ): RationalFeasibility = rationalOutcome(model, cancellation, maxPivots).feasibility
 
+/** Entry ceiling for the dense rational tableau. At a boxed entry apiece this is already hundreds of
+ *  MiB, past which the allocation is the failure rather than the solve. */
+private const val MAX_DENSE_TABLEAU_ENTRIES = 16_000_000L
+
 internal fun rationalOutcome(
     model: LpModel,
     cancellation: Cancellation = Cancellation.Never,
@@ -137,6 +141,12 @@ private fun <F> runSimplex(
 
     // Dense tableau T over all columns with basis = slack columns (identity), so initially
     // x_slack(i) = rhs(i) − Σ_struct A(i,j)·x(j) with every structural column nonbasic at zero.
+    //
+    // Dense whatever the model's sparsity, so a large sparse relaxation asks for rows x columns entries
+    // before a single pivot runs — past any heap, and past the reach of the pivot cap and cancellation
+    // alike, both of which only bite once the tableau exists. Declining here yields an undecided verdict,
+    // which every caller already handles as "no conclusion".
+    if (m.toLong() * total > MAX_DENSE_TABLEAU_ENTRIES) return null
     val t = Array(m) { MutableList(total) { ops.zero } }
     if (dv != null) {
         for (j in 0 until model.n) {

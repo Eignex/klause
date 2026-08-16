@@ -223,6 +223,14 @@ private fun structuralBounds(numVars: Int, constraints: List<Linear>, cancellati
     if (numVars == 0) return null
     val eqRows = constraints.filter { it.op == LinearOp.EQ && it.isIntegerCore }
     if (eqRows.isEmpty()) return null
+    // Everything downstream works on DENSE matrices, so cost follows rows x columns whatever the model's
+    // sparsity: the equality block is one, and the unimodular change of variables is another at
+    // columns x columns. A large sparse model asks for more than any heap holds - 197155 rows over 86002
+    // columns, and 86002 squared for the transform - and both requests are made before a single pivot
+    // runs, so neither the budget nor cancellation can intervene. Declining leaves the sides open, which
+    // is the same answer the structure gives when it implies nothing.
+    val entries = maxOf(eqRows.size.toLong(), numVars.toLong()) * numVars
+    if (entries > MAX_DENSE_ECHELON_ENTRIES) return null
     val eq = Array(eqRows.size) { r ->
         val row = Array(numVars) { BigInteger.ZERO }
         val f = eqRows[r]
@@ -241,6 +249,11 @@ private fun structuralBounds(numVars: Int, constraints: List<Linear>, cancellati
     val y = triangularBounds(mixed.equalities, rhs, rhs)
     return mixed.originalBounds(y.lo, y.hi)
 }
+
+/** Entry ceiling for the dense matrices the echelon transformation needs — the equality block and the
+ *  columns-squared change of variables. At 8 bytes a reference this is a few hundred MiB, past which the
+ *  allocation is the failure rather than the elimination. */
+private const val MAX_DENSE_ECHELON_ENTRIES = 32_000_000L
 
 /** This value as a [Long], or null when it does not fit — a bound past `Long` cannot close a side here. */
 private fun BigInteger.longOrNull(): Long? =

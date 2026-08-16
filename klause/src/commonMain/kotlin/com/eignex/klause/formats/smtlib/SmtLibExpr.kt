@@ -127,6 +127,20 @@ internal fun SmtLib.Builder.isBoolExpr(t: SExpr): Boolean {
     }
 }
 
+/**
+ * Post `distinct` over [args]: [AllDifferent] when every operand is a distinct simple variable with a
+ * finite domain, pairwise disequalities otherwise.
+ *
+ * The wide/open case stays pairwise **by decision, not by omission**. [AllDifferent]'s propagator already
+ * copes — its bounds filter reads only min/max as `Long` and the matcher selects it above the value-walk
+ * cap — but its *constructor* is parameterised by a value window (`domainMin`/`domainSize: Int`), and
+ * unpicking that reaches `seedGreedy`'s per-value domain walk, `seedByMatching`'s value-indexed arrays,
+ * the bounds filter's arithmetic at a full-`Long` clamp, and the span guards in structural reduction and
+ * `NValue`. That is surgery on a core propagator, and the exposure does not justify it: across the whole
+ * QF_LIA corpus only one family carries a wide `distinct` at all, only six of its instances exceed
+ * arity 1000 where pairwise turns pathological, and those six are declared `unknown` upstream. Below that
+ * the pairwise cost is some tens of thousands of rows.
+ */
 internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
     if (args.size < 2) return
     if (args.all { !isBoolExpr(it) }) {
