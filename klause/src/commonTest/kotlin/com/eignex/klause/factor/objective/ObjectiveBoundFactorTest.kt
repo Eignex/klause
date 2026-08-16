@@ -1,10 +1,14 @@
 package com.eignex.klause.factor.objective
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.strategy.ProbSat
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -41,6 +45,42 @@ class ObjectiveBoundFactorTest {
 
         val best = assertIs<MinimizeResult.BestFound>(result, "the ratchet arm should reach a feasible incumbent")
         assertEquals(1.0, best.objective, "the ratchet should drive the objective to the optimum (one true)")
+    }
+
+    @Test
+    fun `int set deltas match the cost the applied move produces`() {
+        // Mixed-sign int coefficients: the invariant's predicted delta for an IntSet must equal the
+        // cost the move actually produces, and the incrementally maintained sum must survive the apply.
+        val problem = Problem(
+            0,
+            2,
+            arrayOf(IntDomain(0, 4), IntDomain(0, 4)),
+            listOf(Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2)),
+        )
+        val objective = LinearObjective(intCoefficients = longArrayOf(3, -2))
+        val (overlay, bound) = assertIs<Pair<Problem, MutableObjectiveBound>>(objectiveBoundOverlay(problem, objective))
+        val state = LocalSearchState(overlay, Random(0))
+        state.assignment.setInt(0, 4)
+        state.assignment.setInt(1, 0)
+        state.recompute()
+        bound.tightenBelow(10.0) // sum 3·4 − 2·0 = 12 > bound 9, so the bound factor is violated
+        val boundFactorId = overlay.numFactors - 1
+
+        for (move in listOf(Move.IntSet(0, 1), Move.IntSet(1, 4), Move.IntSet(0, 0))) {
+            state.assignment.setInt(0, 4)
+            state.assignment.setInt(1, 0)
+            state.recompute()
+            assertTrue(state.violated.contains(boundFactorId), "$move: the bound factor starts violated")
+            val predicted = state.netDelta(move)
+            val before = state.cost
+            state.apply(move)
+            assertEquals(state.cost - before, predicted, "$move: predicted delta must match the applied cost")
+            // Each move drives the weighted sum to at most 9, so the bound factor must come back satisfied.
+            assertTrue(!state.violated.contains(boundFactorId), "$move: the bound factor must be repaired")
+            val incremental = state.cost
+            state.recompute()
+            assertEquals(state.cost, incremental, "$move: the incremental sum must match a full recompute")
+        }
     }
 
     @Test

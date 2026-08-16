@@ -88,21 +88,23 @@ class RootBakerTest {
 
     @Test
     fun `per-var budget caps the probe count`() {
-        // With a per-var budget of 1, only the first probe per var runs. The downstream Linear
-        // propagation may still lift y.min indirectly, so we only assert x's min came in tighter.
+        // x = y, x + y ≤ 3 over [0..3]^2. Only the max probe deduces anything (x=3 and x=2 both fail),
+        // so an unbounded budget lands x.max at 1 while a per-var budget of 1 is spent on the min probe.
         val p = Problem(
             numBoolVars = 0,
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
             factors = arrayOf<Factor>(
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
-                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, bound = 3),
             ),
         )
-        val baked = assertIs<PropagationResult.Implied>(
+        val unbounded = assertIs<PropagationResult.Implied>(bake(p, BakeConfig(probeIntBounds = true)))
+        assertEquals(1L, unbounded.intMaxOrNullCompat(0), "an unbounded budget probes x.max down to 1")
+        val capped = assertIs<PropagationResult.Implied>(
             bake(p, BakeConfig(probeIntBounds = true, probeBudgetPerVar = 1)),
         )
-        assertEquals(1L, baked.intMinOrNullCompat(0))
+        assertEquals(3L, capped.intMaxOrNullCompat(0) ?: 3L, "a budget of 1 leaves no call for the max probe")
     }
 
     @Test

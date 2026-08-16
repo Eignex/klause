@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.Factor
@@ -106,6 +107,24 @@ class BoundedVariableEliminationTest {
             objectiveBoolVars = setOf(0, 1, 2),
         )
         assertTrue(mentions(reduced, 0), "the objective variable is protected")
+    }
+
+    @Test
+    fun `never eliminates a variable a non-clause factor mentions`() {
+        // a resolves out cleanly on the clause side, but the cardinality also constrains it and no
+        // reconstruction can restore a value that satisfies it — so the clauses must stay.
+        val problem = Problem(
+            3,
+            0,
+            emptyArray(),
+            listOf(
+                clause(pos(0), pos(1)),
+                clause(neg(0), pos(2)),
+                Cardinality(intArrayOf(pos(0), pos(1)), min = 1, max = 1),
+            ),
+        )
+        val reduced = problem.withPassDelta(Presolve.eliminateBoolVars(problem, emptySet()), BakeConfig.NONE)
+        assertTrue(mentions(reduced, 0), "a variable outside the clause database must survive BVE")
     }
 
     @Test
