@@ -17,7 +17,6 @@ import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
@@ -330,7 +329,11 @@ internal object SolveCore {
                 errPrintln("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
             }
         }
-        if (presolved.baked is PropagationResult.Unsat) {
+        // Read the verdict presolve already reached. Asking the problem for its own `baked` instead forces
+        // a lazy that a rebuilt (already-folded) problem has never run, so the report pays a fresh root
+        // fixpoint over every factor - after the whole summary has printed, which from outside reads as
+        // the process hanging rather than as the diagnostic costing anything.
+        if (stats?.infeasible == true) {
             errPrintln("  INFEASIBLE: presolve proved the problem unsatisfiable")
         }
     }
