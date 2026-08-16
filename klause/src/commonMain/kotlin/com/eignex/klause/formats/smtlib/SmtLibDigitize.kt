@@ -34,6 +34,10 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 private val LONG_MAX_MAGNITUDE = BigInteger.fromLong(Long.MAX_VALUE)
 private val LONG_MIN_MAGNITUDE = BigInteger.fromLong(Long.MIN_VALUE)
 
+/** Term-pair budget for the widening propagation; past it the substitution is declined rather than
+ *  paid for, since digits only pay on a model no ordinary domain can hold at all. */
+private const val MAX_WIDEN_TERM_WORK = 40_000_000L
+
 /** Digit columns per substituted variable, empty when nothing needed substituting. */
 internal fun SmtLib.Builder.digitizeWideInts(
     inventedLo: BooleanArray,
@@ -146,7 +150,14 @@ private fun SmtLib.Builder.forcedOutOfRange(
         if (!inventedLo[v]) lo[v] = BigInteger.fromLong(domainMin(v))
         if (!inventedHi[v]) hi[v] = BigInteger.fromLong(domainMax(v))
     }
-    repeat(minOf(nextInt, MAX_WIDEN_ROUNDS)) {
+    // Each round costs O(rows x terms^2) in big integers, so a wide model spends the whole round budget
+    // before parsing finishes - and the rounds are pure waste once a pass stops moving a bound. Stop at
+    // the fixpoint, and cap total term work as a backstop: running short only leaves bounds looser, and a
+    // looser bound digitises fewer variables, which is the safe direction.
+    var work = 0L
+    var rounds = minOf(nextInt, MAX_WIDEN_ROUNDS)
+    while (rounds-- > 0) {
+        var changed = false
         for (f in rows) {
             if (f.op != LinearOp.LE && f.op != LinearOp.EQ) continue
             val n = f.vars.size
@@ -173,10 +184,19 @@ private fun SmtLib.Builder.forcedOutOfRange(
                 val v = f.vars[j]
                 val curHi = hi[v]
                 val curLo = lo[v]
-                if (newHi != null && (curHi == null || newHi < curHi)) hi[v] = newHi
-                if (newLo != null && (curLo == null || newLo > curLo)) lo[v] = newLo
+                if (newHi != null && (curHi == null || newHi < curHi)) {
+                    hi[v] = newHi
+                    changed = true
+                }
+                if (newLo != null && (curLo == null || newLo > curLo)) {
+                    lo[v] = newLo
+                    changed = true
+                }
             }
+            work += n.toLong() * n
+            if (work > MAX_WIDEN_TERM_WORK) return emptyList()
         }
+        if (!changed) break
     }
     return (0 until nextInt).filter { v ->
         val l = lo[v]

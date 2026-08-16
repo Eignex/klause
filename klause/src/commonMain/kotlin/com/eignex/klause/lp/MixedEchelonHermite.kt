@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.solver.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -58,6 +59,7 @@ internal fun mixedEchelonHermite(
     inequalities: Array<Array<BigInteger>>,
     cols: Int,
     equalityRhs: Array<BigInteger>? = null,
+    cancellation: Cancellation = Cancellation.Never,
 ): MixedEchelonHermite {
     if (cols == 0) {
         return MixedEchelonHermite(emptyArray(), inequalities, emptyArray())
@@ -65,7 +67,7 @@ internal fun mixedEchelonHermite(
     // Independent equalities only; a dependent one adds nothing and would widen the Hermite step. The
     // right-hand sides ride along through the elimination, since row swaps and combinations reorder and
     // recombine them exactly as they do the coefficients.
-    val echelon = if (equalities.isEmpty()) null else bareissEchelon(equalities, equalityRhs)
+    val echelon = if (equalities.isEmpty()) null else bareissEchelon(equalities, equalityRhs, cancellation)
     val independent = echelon?.rows ?: emptyArray()
     val v: Array<Array<BigInteger>>
     val eq: Array<Array<BigInteger>>

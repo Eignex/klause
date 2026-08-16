@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.solver.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -39,7 +40,11 @@ internal class BareissEchelon(
  * Zero rows are dropped rather than kept, so [BareissEchelon.rows] is exactly the rank — a system whose
  * equalities are dependent contributes only its independent ones.
  */
-internal fun bareissEchelon(a: Array<Array<BigInteger>>, rhsIn: Array<BigInteger>? = null): BareissEchelon {
+internal fun bareissEchelon(
+    a: Array<Array<BigInteger>>,
+    rhsIn: Array<BigInteger>? = null,
+    cancellation: Cancellation = Cancellation.Never,
+): BareissEchelon {
     val m = a.size
     val n = if (m == 0) 0 else a[0].size
     if (m == 0 || n == 0) return BareissEchelon(emptyArray(), IntArray(0))
@@ -53,6 +58,11 @@ internal fun bareissEchelon(a: Array<Array<BigInteger>>, rhsIn: Array<BigInteger
     var r = 0
     for (c in 0 until n) {
         if (r >= m) break
+        // Each pivot column costs O(m·n) big-integer multiply-divides, and the entries grow with the
+        // minors, so on a large equality block the whole elimination runs far past any budget it was
+        // given. Polled per column: the caller treats a short result as "no bound derived", which is the
+        // same answer it gets when the structure implies nothing.
+        if (cancellation()) return BareissEchelon(emptyArray(), IntArray(0))
         // A non-zero in this column at or below the current row makes it a pivot column.
         var sel = -1
         for (i in r until m) {
