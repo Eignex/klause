@@ -21,10 +21,6 @@ import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 
-// ---------------------------------------------------------------------------------------
-// Engine.
-// ---------------------------------------------------------------------------------------
-
 /** Map touched-seed-level [IntArray] to the subset of [input] assumptions at those
  *  levels. Returns `null` when the input was empty (no assumption layer to
  *  project) or no level was touched (no information). */
@@ -171,7 +167,7 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
  * The satisfaction [SearchPolicy]: pure complete DFS with no LP bounding and no incumbent. Every
  * feasible leaf is surfaced; the selectors' `onSolution` hooks fire in [DfsEngine] before the leaf is
  * surfaced, so this only returns the sample. On a budget exit the trailing glue clauses are published
- * for cross-arm import (#381).
+ * for cross-arm import.
  */
 private class SatPolicy(private val params: BacktrackParams, private val problem: Problem) : SearchPolicy<Sample> {
     /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so the

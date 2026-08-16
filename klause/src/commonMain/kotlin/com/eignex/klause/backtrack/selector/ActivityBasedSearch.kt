@@ -7,8 +7,8 @@ import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 
 /**
- * Activity-Based Search (Michel-Van Hentenryck 2012). Choco's flagship variable selection.
- * Maintains a per-variable *activity* counter that increments every time the variable is
+ * Activity-Based Search (Michel-Van Hentenryck 2012). Maintains a per-variable *activity*
+ * counter that increments every time the variable is
  * forced into a singleton by a propagation step (read off [PropagationResult.Implied]).
  * Different from VSIDS: VSIDS bumps only on conflicts; ABS bumps on *every* propagation
  * event the variable participates in — a broader, lower-variance signal of which variables
@@ -20,8 +20,8 @@ import kotlin.random.Random
  * learns from one run to the next; set [resetOnRestart] to true to clear them at every
  * Luby restart for an aggressive variant.
  *
- *  - [decay] ∈ (0, 1): higher = more conservative (gives long-tail history more weight);
- *    Choco default is 0.999. Lower = more aggressive (forgets old conflicts fast).
+ *  - [decay] ∈ (0, 1): higher = more conservative (gives long-tail history more weight),
+ *    lower = more aggressive (forgets old conflicts fast).
  *  - [resetOnRestart] = false (default): preserve activities across restarts; true clears
  *    them, useful for "ABS restart" mode where each run rebuilds the activity map.
  *

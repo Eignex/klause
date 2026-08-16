@@ -18,7 +18,7 @@ import kotlin.math.round
 import kotlin.random.Random
 
 /**
- * LP-rounding primal heuristic (#287) on the sparse revised-simplex path: solve the root relaxation,
+ * LP-rounding primal heuristic on the sparse revised-simplex path: solve the root relaxation,
  * round each variable's fractional LP value to the nearest in-domain integer, and propagate. Returns a
  * complete assignment when rounding-then-propagation reaches a fixpoint without a wipeout, else null.
  * Sound by construction — the result is a candidate that the caller re-evaluates against the objective
@@ -89,7 +89,7 @@ private fun pinIntTowardLp(session: PropagationSession, v: Int, lp: Double?, lo:
 }
 
 /**
- * Feasibility pump (#52) on the primal pass: when single-shot rounding ([lpRoundingProbe]) fails to
+ * Feasibility pump on the primal pass: when single-shot rounding ([lpRoundingProbe]) fails to
  * land a feasible point, alternate between an LP solution and its integer rounding, each round
  * re-solving the relaxation under an L1-distance objective that pulls the LP toward the current
  * rounding, then retrying the rounding. The distance objective is exact (linear) over variables whose

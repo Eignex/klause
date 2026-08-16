@@ -32,7 +32,7 @@ internal data class ReferenceEntry(
     val elapsedMs: Long,
     val solver: String,
     val budgetMs: Long,
-    // --- Source-text features (from `bench classify`); blank/null until an instance is classified. ---
+    // Source-text features (from `bench classify`); blank/null until an instance is classified.
     /** Source format: `minizinc` / `xcsp3` / `opb` / `dimacs` / …. */
     val format: String = "",
     /** Structure class: `pseudo-boolean` / `sat` / `global` / `linear` / `arithmetic` (blank = unclassified). */

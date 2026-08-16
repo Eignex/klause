@@ -102,7 +102,7 @@ internal enum class FactorKind {
 internal class StructuralKeyBuilder(expectedWords: Int = 0) {
     // Sized from the caller's estimate where one is available. A key whose payload is a whole transition
     // table or tuple set would otherwise double its way up and then be copied once more by [build],
-    // peaking at ~3x the payload it produces (#1415: MagicSquare-mdd-16_c23 died here at 3 GB).
+    // peaking at ~3x the payload it produces (MagicSquare-mdd-16_c23 died here at 3 GB).
     private var buf = LongArray(expectedWords.coerceAtLeast(INITIAL_CAPACITY))
     private var size = 0
 

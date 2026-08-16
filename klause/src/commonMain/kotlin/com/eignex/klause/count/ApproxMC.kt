@@ -48,7 +48,7 @@ internal object ApproxMC {
         }
         if (estimates.isEmpty()) {
             // No usable cell in any run (e.g. every run hit the per-cell decision budget). Surface
-            // "unknown" rather than fabricate base.count (≈thresh) as a point estimate (#79).
+            // "unknown" rather than fabricate base.count (≈thresh) as a point estimate.
             val lo = base.count.toLong()
             return Count(estimate = lo, lower = lo, upper = Long.MAX_VALUE, exact = false, confidence = 0.0)
         }
@@ -66,11 +66,11 @@ internal object ApproxMC {
      * One ApproxMC2 iteration over a nested hash sequence (`H_1 ⊂ … ⊂ H_n`). The cell count is
      * non-increasing in `m`, so "cell ≤ thresh" flips false→true exactly once; a galloping +
      * bisection search seeded from [startM] (the previous iteration's transition) finds the smallest
-     * fitting `m` in `O(log n)` solves instead of the `O(n)` linear scan (#92).
+     * fitting `m` in `O(log n)` solves instead of the `O(n)` linear scan.
      *
      * Returns `count · 2^m` at that `m`; on an empty (over-split) cell it recovers with
      * `thresh · 2^(m-1)` from the level below rather than discarding the run, which would bias the
-     * median upward (#79). `null` only when no prefix in `[1, n]` is sub-threshold.
+     * median upward. `null` only when no prefix in `[1, n]` is sub-threshold.
      */
     private fun core(ctx: CellContext, thresh: Int, seed: Long, startM: Int): CoreResult? {
         val n = ctx.hashDomain.size

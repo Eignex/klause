@@ -18,7 +18,7 @@ import kotlin.math.abs
 import kotlin.math.ln
 
 /**
- * A portfolio arm running hybrid ALNS with CP repair (#644): an outer destroy/repair loop over the
+ * A portfolio arm running hybrid ALNS with CP repair: an outer destroy/repair loop over the
  * incumbent, each freed neighbourhood repaired by a bounded backtrack LCG+LP solve under the pinned
  * complement ([BacktrackRepair]) — full propagation, clause learning, and LP bounding on the fragment,
  * unlike a pure-LS repair. An LS-class engine: it optimises anytime and returns
@@ -46,12 +46,12 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default) 
         pools: SharedPools?,
     ): PortfolioWorker {
         val workerLabel = "alns/${profile.label}"
-        // Cross-repair clause sharing (#644): one pool persists globally-valid learned clauses across
+        // Cross-repair clause sharing: one pool persists globally-valid learned clauses across
         // fragments so later repairs re-descend under earlier repairs' learning. Gated for soundness —
         // the repair learns under assumptions/an incumbent, so its permanent (objective-bound, blocking)
         // clauses and LP Farkas nogoods hold only under its pins and must not be shared.
         val repairClauses = SharedClausePool()
-        // Bidirectional cross-engine flow (#644): publish accepted incumbents into the shared pool and, at
+        // Bidirectional cross-engine flow: publish accepted incumbents into the shared pool and, at
         // the top of each iteration, destroy from the pool's global best — so ALNS both feeds and follows
         // the incumbents backtrack and LS arms find.
         val solutions = pools?.solutions

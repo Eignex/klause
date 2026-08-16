@@ -104,7 +104,7 @@ class NValue(
 
     /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with
      *  their presence literal to keep an opt position with its presence); [n] (the count var) and
-     *  [mode] are positional constants (#443). */
+     *  [mode] are positional constants. */
     // Not migrated to the KeySink allocation-free hash: the `pairsByKey(xs){ presents… }` value is a
     // Boolean literal (remappable), which the sink's constant-value pair methods can't remap.
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.NVALUE) {
@@ -117,11 +117,11 @@ class NValue(
     override val intVars: IntArray = xs + intArrayOf(n)
 
     override fun asPropagator(): Propagator {
-        /** Advisor subscription (#623) for the non-optional variant: the distinct-count bounds read each
-         *  variable's full domain (union membership + domain-overlap disjointness), so subscribe to every
-         *  kind and consume the dirty-variable delta (#624) to skip fires where nothing changed. The
-         *  optional variant keeps occurrence wakeup — a presence-bool flip changes the count but is not in
-         *  the int-domain delta, so it must not be gated out. */
+        // Advisor subscription for the non-optional variant: the distinct-count bounds read each
+        // variable's full domain (union membership + domain-overlap disjointness), so subscribe to every
+        // kind and consume the dirty-variable delta to skip fires where nothing changed. The optional
+        // variant keeps occurrence wakeup — a presence-bool flip changes the count but is not in the
+        // int-domain delta, so it must not be gated out.
         val initialIntEventWatchesVal: IntArray? = if (presents.isNotEmpty()) {
             null
         } else {
@@ -179,7 +179,7 @@ class NValue(
             val existing = yByValue.getOrDefault(v, -1) // columns are non-negative, so -1 marks absent
             if (existing >= 0) return existing
             // The "used" indicator is free in [0,1] regardless of the live domains — an empty
-            // requirement keeps it present so the relaxation stays persistent (#43).
+            // requirement keeps it present so the relaxation stays persistent.
             val col = builder.auxColumn(0L, 1L, presence = EmptyLongArray)
             yCols.add(col)
             yByValue.put(v, col)

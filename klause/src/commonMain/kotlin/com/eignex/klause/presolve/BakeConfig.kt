@@ -1,10 +1,9 @@
 package com.eignex.klause.presolve
 
 /**
- * Which root-bake probing tiers [RootBaker.bake] runs, and their budgets. Formerly the six `probe*`
- * parameters on the kernel `Problem`; now threaded through the presolve / backtrack lanes so the kernel
- * carries no probing policy. [NONE] disables all probing (the common case — a plain [RootBaker.bake] is
- * then a no-op returning the base bake).
+ * Which root-bake probing tiers [RootBaker.bake] runs, and their budgets. Threaded through the
+ * presolve / backtrack lanes so the kernel carries no probing policy. [NONE] disables all probing
+ * (the common case — a plain [RootBaker.bake] is then a no-op returning the base bake).
  */
 class BakeConfig(
     /**

@@ -84,8 +84,7 @@ class Table private constructor(
         // Rows are a set, so order-independence comes from sorting rows into a canonical order. Short
         // tables tie-break equal-lower-bound rows by their upper bound so the key stays canonical, and
         // interleave the upper-bound word after each lower bound so an interval cell can never collide
-        // with a point (a point has hi == lo). A ground table keeps the compact one-word-per-cell form,
-        // so its key is byte-identical to before short supports existed.
+        // with a point (a point has hi == lo). A ground table keeps the compact one-word-per-cell form.
         val order = argsortBy(numTuples) { r1, r2 ->
             var c = 0
             var d = 0
@@ -177,7 +176,7 @@ class Table private constructor(
         sink.constWords(tupleKey())
     }
 
-    /** Relabel every tuple entry (#374): each column holds domain values of its variable, all in the
+    /** Relabel every tuple entry: each column holds domain values of its variable, all in the
      *  one value universe, so a single map relabels the whole table. */
     override fun remapValues(valueMap: (Long) -> Long): Factor {
         val h = hi ?: return Table(xs, LongArray(tuples.size) { valueMap(tuples[it]) })

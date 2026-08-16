@@ -74,10 +74,10 @@ class Inverse(
      *   2. bidirectional value removal — if `i + fOffset` is absent from `dom(g[j])`, also remove
      *      `j + gOffset` from `dom(f[i])`, and symmetrically. This is the arc-consistent closure of
      *      `f[i]=j ⇔ g[j]=i`;
-     *   3. Hall/matching filtering on f and on g (#541). The biconditional forces f and g to be
+     *   3. Hall/matching filtering on f and on g. The biconditional forces f and g to be
      *      bijections (`f[i1]=f[i2]=j ⇒ g[j]=i1=i2`), so each side is all-different; the channel AC
      *      alone reaches a mutual non-GAC fixpoint (e.g. it keeps `f2=0` because `g0=2` is unpruned
-     *      and vice versa). Régin matching on f and on g punches the Hall-set values the channel
+     *      and vice versa). Matching-based filtering on f and on g punches the Hall-set values the channel
      *      misses, reusing the shared `reginFilter`.
      */
 

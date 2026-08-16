@@ -6,7 +6,8 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Integer max-flow (Dinic's) over a graph stored as parallel arrays. Edges come in forward/reverse
+ * Integer max-flow (level graph + blocking flow) over a graph stored as parallel arrays. Edges come
+ * in forward/reverse
  * pairs; even indices are forward edges (original capacity), odd indices are residual reverses
  * (initially zero). Flow pushed on edge `e` is `originalCap - cap(e)` for forward edges.
  *
@@ -17,7 +18,7 @@ import com.eignex.klause.util.IntArrayList
  *    trail ([RevIntArray]), so the flow *survives across fires and restores on backtrack* — the
  *    variable→value edge set is invariant (built for the root, widest domains), and a fire only blocks
  *    the edges whose value left ([blockEdge]) and tops the flow back up. This removes the per-fire
- *    network rebuild and the O(n) warm-start replay (#669).
+ *    network rebuild and the O(n) warm-start replay.
  */
 internal class GccFlowBuilder {
     private var adj: Array<IntArrayList> = emptyArray()
@@ -257,10 +258,10 @@ internal class GccFlowBuilder {
     }
 
     /**
-     * Dinic's max-flow: repeatedly build a BFS level graph over the residual edges, then saturate it with
+     * Blocking-flow max-flow: repeatedly build a BFS level graph over the residual edges, then saturate it with
      * a blocking flow (a DFS that advances a per-node edge cursor so each edge is examined once per phase).
      * `O(V²E)` in general and near `O(E√V)` on the unit-capacity variable→value matching graphs the GCC
-     * propagator builds. Any maximum flow is equally valid for the Régin GAC filtering that reads the final
+     * propagator builds. Any maximum flow is equally valid for the residual-SCC GAC filtering that reads the final
      * residual graph, so the value is unchanged.
      */
     fun maxFlow(source: Int, sink: Int): Int {
@@ -331,11 +332,12 @@ internal class GccFlowBuilder {
     private var sccIter = EmptyIntArray
 
     /**
-     * Residual-SCC labels over nodes `0 until limit`, written into [sccId]. Iterative Tarjan run
-     * *directly* over the residual edges (`adj[v]` filtered by `capGet(e) > 0` and `edgeTo(e) < limit`)
-     * with no materialized adjacency — the per-fire `nodeAdj` build was a top cost on cardinality-heavy
-     * propagation. Visitation order matches the materialized version, and the prune only reads the SCC
-     * partition (not label values), so pruning is unchanged. Scratch buffers are reused across fires.
+     * Residual-SCC labels over nodes `0 until limit`, written into [sccId]. An iterative index/lowlink
+     * pass run *directly* over the residual edges (`adj[v]` filtered by `capGet(e) > 0` and
+     * `edgeTo(e) < limit`) with no materialized adjacency — materializing `nodeAdj` per fire is a top
+     * cost on cardinality-heavy propagation. Visitation order matches the materialized form, and the
+     * prune only reads the SCC partition (not label values), so pruning is unaffected. Scratch buffers
+     * are reused across fires.
      */
     fun computeSccResidual(limit: Int, sccId: IntArray) {
         if (sccIndex.size < limit) {

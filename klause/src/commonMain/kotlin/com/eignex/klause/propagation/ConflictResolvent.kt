@@ -11,7 +11,7 @@ import com.eignex.klause.util.IntArrayList
  * ([finalizeResult]).
  *
  * Splitting the resolvent from the graph walk is the single generalization that lets one CDCL core serve
- * more than one learned-constraint algebra (#1119). The default and only implementation is
+ * more than one learned-constraint algebra. The default and only implementation is
  * [ClauseResolvent] — a disjunction of literals resolved by the classical set-union step. A pseudo-Boolean
  * cutting-planes resolvent, whose [resolve] is coefficient cancellation with rounding and saturation and
  * whose [liveAtCurrentLevel] is a slack condition, slots in as a second implementation without touching

@@ -20,11 +20,12 @@ import com.eignex.klause.util.MutableIntObjectMap
 
 internal object SymmetryBreaking {
 
-    /** Cap on a verified-symmetry candidate group; larger groups are skipped (#367 size guard). */
+    /** Cap on a verified-symmetry candidate group; larger groups are skipped — verification is
+     *  quadratic in the group size, and skipping only forgoes symmetries, never invents one. */
     private const val MAX_VERIFIED_GROUP = 40
 
     /**
-     * Symmetry breaking by detecting interchangeable variables (#317, #334). A variable transposition
+     * Symmetry breaking by detecting interchangeable variables. A variable transposition
      * is broken only when swapping the two variables maps the factor multiset onto itself — verified by
      * remapping every factor and comparing [Factor.structuralKey] counts, so it is sound by
      * construction. Candidate groups come from Weisfeiler–Leman colour refinement (only same-colour
@@ -33,8 +34,8 @@ internal object SymmetryBreaking {
      * sound (never removes the last solution of an orbit).
      *
      * Variables in [objectiveIntVars] / [objectiveBoolVars] are excluded so an asymmetric objective
-     * can't be cut — keep those sets empty for pure feasibility. (Per the issue policy this runs by
-     * default except in a pure local-search portfolio.)
+     * can't be cut — keep those sets empty for pure feasibility. Enabled by default except in a pure
+     * local-search portfolio.
      *
      * Also breaks value symmetry ([breakValueSymmetry]).
      */
@@ -82,24 +83,21 @@ internal object SymmetryBreaking {
     }
 
     /**
-     * Value symmetry breaking (#366, #374). A permutation of values that maps every domain to itself
+     * Value symmetry breaking. A permutation of values that maps every domain to itself
      * and the factor set to itself is a symmetry. Candidate orbits are values with the same
      * domain-incidence (the set of variables whose domain contains them) — so any transposition
      * within an orbit already maps every domain to itself. Each transposition is then *verified*
      * against the factors: applying it via [Factor.remapValues] and comparing the [Factor.structuralKey]
-     * multiset proves the swap is a symmetry, the value analog of the [Factor.remap]-based automorphism check
-     * (#334). Transpositions generate the full symmetric group on a verified orbit, so one variable
+     * multiset proves the swap is a symmetry, the value analog of the [Factor.remap]-based
+     * automorphism check. Transpositions generate the full symmetric group on a verified orbit, so one variable
      * whose domain lies entirely within an orbit is pinned to the orbit minimum — a sound break (a
      * solution can always be relabeled within the orbit so that variable takes the minimum).
      *
      * When every factor is value-anonymous ([Factor.isValueAnonymous] — AllDifferent), verification is
      * skipped: anonymity means every relabeling is a symmetry, so the whole incidence group is one
-     * orbit (the #366 fast path). Otherwise verification widens detection to problems with
+     * orbit (the anonymity fast path). Otherwise verification widens detection to problems with
      * value-relabelable factors (GlobalCardinality, Table, …) that the anonymity gate switched off; a
      * factor that is unkeyed or returns `null` from [Factor.remapValues] conservatively blocks it.
-     *
-     * The stronger Law–Lee value precedence (ordering first-occurrences across all variables) needs
-     * auxiliary variables and a var-growing reconstruction, and is a follow-up.
      */
     private fun breakValueSymmetry(
         problem: Problem,
@@ -137,7 +135,7 @@ internal object SymmetryBreaking {
     /**
      * The verified-interchangeable value orbits shared by [breakValueSymmetry] and
      * [breakValuePrecedence]: values grouped by domain-incidence, then refined against the factors
-     * ([verifyValueOrbits]) unless every factor is value-anonymous (the #366 fast path skips
+     * ([verifyValueOrbits]) unless every factor is value-anonymous (the anonymity fast path skips
      * verification). Returns the orbits of size ≥ 2, or `null` when nothing is eligible (no int
      * variables, an unkeyed factor on the verified path, or an empty value range) — each caller maps
      * `null` to its own "post nothing" result. Objective-variable exclusion happens at each caller's
@@ -200,8 +198,8 @@ internal object SymmetryBreaking {
     }
 
     /**
-     * Law–Lee value precedence (#374), the strong value-symmetry break, posted with the native
-     * [ValuePrecede] propagator (#432). For the value-anonymous case (#366: every factor is
+     * Law–Lee value precedence, the strong value-symmetry break, posted with the native
+     * [ValuePrecede] propagator. For the value-anonymous case (every factor is
      * [Factor.isValueAnonymous], so any value relabeling is a symmetry), each orbit of interchangeable
      * values is forced to be *introduced in sorted order*: the first occurrence of the orbit's `j`-th
      * smallest value precedes the first occurrence of its `(j+1)`-th, over the variables whose domain
@@ -281,7 +279,6 @@ internal object SymmetryBreaking {
         return PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remapValues(swap) }
     }
 
-    /** Whether every value in [d] lies in [values]. */
     private fun domainWithin(d: IntDomain, values: LongHashSet): Boolean {
         for (v in d.min..d.max) {
             if (v !in d) continue
@@ -296,7 +293,7 @@ internal object SymmetryBreaking {
 
     // Colour-refinement signatures are [RefineKey]s (LongArray-backed, the non-string analog of
     // StructuralKey). The leading word is a *space* tag so an int and a bool variable never share a
-    // colour; bool sorts below int (preserving the former "B" < "I" canonical order). The next word
+    // colour; bool sorts below int, matching the "B" < "I" canonical order. The next word
     // discriminates the seed/signature shape so distinct logical signatures never collide.
     private const val SPACE_BOOL = 0L
     private const val SPACE_INT = 1L
@@ -350,15 +347,15 @@ internal object SymmetryBreaking {
         RefineKey(longArrayOf(space, SEED_OBJECTIVE, v.toLong()))
 
     /**
-     * Weisfeiler–Leman colour refinement (#373) seeding verified-symmetry candidates. Two variables
-     * can be interchangeable only if they share a WL colour (colour is an automorphism invariant),
+     * Colour refinement seeding verified-symmetry candidates. Two variables
+     * can be interchangeable only if they share a colour (colour is an automorphism invariant),
      * so the colour classes are the candidate groups — finer than grouping ints by domain and all
      * bools together. Returns `(intColour, boolColour)`, parallel to the variable ids.
      *
      * Initial colour separates kinds, distinct domains, and each objective variable (a distinguished
      * fixed point). Each round refines a variable's colour by its current colour plus, for every
      * incident factor, that factor's [Factor.structuralKey] computed with the focal variable
-     * remapped to [WL_FOCAL] and every other variable to its current colour — the WL "edge"
+     * remapped to [WL_FOCAL] and every other variable to its current colour — the refinement "edge"
      * signature, derived generically for any keyed factor with no per-type code. Iterated to a
      * fixpoint (partition stops refining). Soundness never rests on this: the pairwise/block verifier
      * re-checks every candidate, so a wrong colouring can only miss symmetries, never invent one.
@@ -508,36 +505,33 @@ internal object SymmetryBreaking {
         return ids.size
     }
 
-    /** Test-only view of [refineColours] with no objective variables (#373). */
+    /** Test-only view of [refineColours] with no objective variables. */
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         refineColours(problem, emptySet(), emptySet())
 
-    // Three guards on the generator search, mirroring CP-SAT's FindCpModelSymmetries
-    // (ortools/sat/cp_model_symmetries.cc): a size skip for models too large to bother, a deterministic
+    // Three guards on the generator search: a size skip for models too large to bother, a deterministic
     // work budget on the refinement, and bailing with the generators found so far when it runs out.
     // All three are sound: skipping or stopping early only ever finds *fewer* symmetries, never invents
-    // one (every returned permutation is still verified by [isAutomorphism]).
+    // one (every returned permutation is verified by [isAutomorphism]).
 
     /** Skip the search when a single colour-refinement round is too expensive. One round remaps every
      *  factor once per incident variable and rebuilds its [Factor.structuralKey], so a factor of degree
      *  `d` and key weight `w` costs `Θ(d·w)` per round and the round costs `Σ_f d_f·w_f` (for a plain
      *  factor `w ≈ d`, so this reduces to `Σ d²`; a data-heavy factor like a wide table has `w ≫ d`).
-     *  CP-SAT skips on raw node/arc counts (`cp_model_symmetries.cc:665,685`); klause's per-arc work is
-     *  far heavier (a structural-key rebuild, not a graph-edge walk), so the realistic guard is on that
-     *  weighted work, not a 1e6 node count. Above this even the first round cannot complete within
+     *  Per-arc work here is a structural-key rebuild rather than a graph-edge walk, so the realistic
+     *  guard is on that weighted work rather than a raw node/arc count. Above this even the first
+     *  round cannot complete within
      *  [GENERATOR_WORK_BUDGET], and such large models empirically carry no verifiable variable symmetry,
      *  so the search is skipped outright. Sound — skipping only finds fewer symmetries. Calibrated
      *  against the corpus: every instance that carries verifiable symmetry has a round cost at or below a
      *  crossword grid's ≈ 3.5·10⁵, while the many-rows / many-column models that only burn a fruitless
      *  search (constraint-programming rosters, rack placement, linear systems) sit from ≈ 5·10⁵ into the
-     *  tens of millions. The cap is placed above the former with margin, so it skips the fruitless band
-     *  the old 10⁶ value let through (each was costing ~0.25–0.35s of dead search) without dropping any
-     *  symmetry the corpus actually breaks. */
+     *  tens of millions. The cap sits above the symmetry-bearing band with margin: it skips the fruitless one
+     *  (~0.25–0.35s of dead search each) without dropping any symmetry the corpus actually breaks. */
     private const val GENERATOR_ROUND_COST_BUDGET = 500_000L
 
     /** Deterministic work budget for the whole generator search, charged per refinement arc visited
-     *  (a variable's incident factor, the unit of [equitablePartition] work) — the analog of CP-SAT's
-     *  `symmetry_detection_deterministic_time_limit`. A work count, not wall-clock, so it is
+     *  (a variable's incident factor, the unit of [equitablePartition] work). A work count, not wall-clock, so it is
      *  reproducible across machines; when it runs out the search bails with what it has found. */
     private const val GENERATOR_WORK_BUDGET = 200_000
 
@@ -567,7 +561,7 @@ internal object SymmetryBreaking {
 
     /**
      * Generators of the constraint-graph automorphism group, found by individualization–refinement
-     * (a CP-SAT / nauty-style search) over the unified variable+factor colouring. Unlike the
+     * over the unified variable+factor colouring. Unlike the
      * transposition/same-shape-block heuristics this catches composite symmetries and — because the
      * automorphism is verified on the whole factor multiset ([isAutomorphism]) rather than per-kind
      * factor rows — symmetries whose factors mix bool and int variables (e.g. lowered set/list

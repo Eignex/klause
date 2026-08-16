@@ -13,7 +13,7 @@ import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * `result = intOperand · realOperand` (issue #1232, Phase 7): a mixed integer·continuous product where
+ * `result = intOperand · realOperand`: a mixed integer·continuous product where
  * [intOperand] is an integer CP search variable and [realOperand] / [result] are LP-only continuous
  * (real) columns — ids in the problem's real-variable namespace, absent from CP search. It carries no
  * CP or local-search semantics ([NoPropagator] / [NoInvariant]); its feasibility is enforced entirely by

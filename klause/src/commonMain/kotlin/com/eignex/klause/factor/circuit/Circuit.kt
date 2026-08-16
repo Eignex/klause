@@ -53,7 +53,7 @@ class Circuit(
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Circuit(succ.remapVars(intMap), subcircuit)
 
     /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
-     *  keeps the variables in order rather than sorting them (#443). The [subcircuit] mode is a key field
+     *  keeps the variables in order rather than sorting them. The [subcircuit] mode is a key field
      *  (as [com.eignex.klause.factor.arithmetic.ArrayMinMax] keys its `max`), so a circuit and a
      *  subcircuit over the same successors never share a bucket. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CIRCUIT, ::buildKey)

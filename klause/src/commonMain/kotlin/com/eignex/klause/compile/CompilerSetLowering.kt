@@ -153,9 +153,6 @@ private fun unionUniverse(a: IntArray, b: IntArray): IntArray {
     return out
 }
 
-// -----------------------------------------------------------------------------------
-//  Top-level assertions over set BoolExprs
-// -----------------------------------------------------------------------------------
 // `assertExpr` calls into these for set BoolExprs that appear as direct top-level
 // constraints; `lowerToLit` calls the [reify*] variants below when the same expression
 // shows up inside a sub-expression position.
@@ -197,8 +194,6 @@ internal fun Lowering.assertSetSubsetOf(expr: SetSubsetOf) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     // ∀ e ∈ universe(L): if e ∈ universe(R) then L[e] → R[e], else L[e] = false.
-    // (The former SetBitsetSubset bulk factor was dropped, #209 — these per-element clauses
-    // are its exact equivalent and what bit-blasting expanded it to anyway.)
     for (i in l.universe.indices) {
         val v = l.universe[i]
         val ll = Lit.make(l.indicatorBoolIds[i], positive = true)
@@ -215,7 +210,7 @@ internal fun Lowering.assertSetSubsetOf(expr: SetSubsetOf) {
 internal fun Lowering.assertSetDisjoint(expr: SetDisjoint) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
-    // ∀ e ∈ universe(L) ∩ universe(R): ¬(L[e] ∧ R[e]). (SetBitsetDisjoint bulk factor dropped, #209.)
+    // ∀ e ∈ universe(L) ∩ universe(R): ¬(L[e] ∧ R[e]).
     for (i in l.universe.indices) {
         val v = l.universe[i]
         val ri = r.indexOf(v)
@@ -230,7 +225,7 @@ internal fun Lowering.assertSetEq(expr: SetEq) {
     val l = materializeSet(expr.left)
     val r = materializeSet(expr.right)
     val union = unionUniverse(l.universe, r.universe)
-    // Per-element biconditional over the unified universe. (SetBitsetEq bulk factor dropped, #209.)
+    // Per-element biconditional over the unified universe.
     for (v in union) {
         val li = l.indexOf(v)
         val ri = r.indexOf(v)
@@ -252,10 +247,6 @@ internal fun Lowering.assertSetEq(expr: SetEq) {
         }
     }
 }
-
-// -----------------------------------------------------------------------------------
-//  Reified set-expression lowering
-// -----------------------------------------------------------------------------------
 
 internal fun Lowering.reifySetIn(expr: SetIn): Int {
     val set = materializeSet(expr.set)
@@ -342,10 +333,6 @@ internal fun Lowering.reifySetEq(expr: SetEq): Int {
     return lowerToLit(andOf(pieces))
 }
 
-// -----------------------------------------------------------------------------------
-//  SetCard lift
-// -----------------------------------------------------------------------------------
-
 /** Lift `card(S)` to a fresh int var whose value equals `Σ indicator_i`. */
 internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     val layout = materializeSet(expr.set)
@@ -383,10 +370,6 @@ internal fun Lowering.liftSetCard(expr: SetCard): IntRef {
     return IntRef(aux)
 }
 
-// -----------------------------------------------------------------------------------
-//  Helpers
-// -----------------------------------------------------------------------------------
-
 /** Wrap a bool var id (allocated for a set indicator) as a [BoolExpr] reusable in the
  *  AST-level Tseitin pipeline. Each indicator gets a synthetic name so the existing
  *  `BoolRef` machinery can route it through the standard bool-lookup path. */
@@ -406,8 +389,6 @@ private fun Lowering.indicatorBoolExpr(boolId: Int): BoolExpr {
 /** Resolve a [SetExpr] to a set-var name if it's a bare [SetRef]; else null. */
 private fun setRefName(expr: SetExpr): String? = (expr as? SetRef)?.name
 
-/** Combine per-element [pieces] into one [BoolExpr]: the lone piece if there's just one, else [And]. */
 private fun andOf(pieces: List<BoolExpr>): BoolExpr = if (pieces.size == 1) pieces[0] else And(pieces)
 
-/** Combine per-element [pieces] into one [BoolExpr]: the lone piece if there's just one, else [Or]. */
 private fun orOf(pieces: List<BoolExpr>): BoolExpr = if (pieces.size == 1) pieces[0] else Or(pieces)

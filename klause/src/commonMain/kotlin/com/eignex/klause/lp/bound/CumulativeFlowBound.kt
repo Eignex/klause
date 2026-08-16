@@ -13,7 +13,7 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 
 /**
- * Preemptive min-cost-flow feasibility bound for the scheduling globals (#454). The exact
+ * Preemptive min-cost-flow feasibility bound for the scheduling globals. The exact
  * **preemptive** relaxation of a [com.eignex.klause.factor.scheduling.Cumulative]
  * (including its unary no-overlap mode): every task `i` must place its work `Eᵢ = durᵢ·resᵢ`
  * somewhere in its release/deadline window `[estᵢ, lstᵢ + durᵢ)` at a rate of at most `resᵢ` per time
@@ -29,7 +29,7 @@ import com.eignex.klause.util.LongHashSet
  * This is strictly stronger than the pairwise-window [CumulativeEnergeticBound] scan (which checks
  * one window at a time): the flow balances all release/deadline windows simultaneously. It is also
  * horizon-independent — the network's time nodes are the `O(n)` distinct start-bound breakpoints, not
- * the time axis — so it complements the horizon-gated time-indexed LP (#453). Under an incumbent that
+ * the time axis — so it complements the horizon-gated time-indexed LP. Under an incumbent that
  * has tightened the makespan (hence the task deadlines `lstᵢ`), the same feasibility test prunes
  * objective-suboptimal subtrees, which is its bounding contribution.
  *

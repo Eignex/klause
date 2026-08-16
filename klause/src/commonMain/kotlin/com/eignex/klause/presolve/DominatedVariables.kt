@@ -15,7 +15,7 @@ import com.eignex.klause.util.IntHashSet
 internal object DominatedVariables {
 
     /**
-     * Dual fixing / dominated-variable reductions (#448). A minimize objective `min Σ cⱼxⱼ` plus the
+     * Dual fixing / dominated-variable reductions. A minimize objective `min Σ cⱼxⱼ` plus the
      * constraint structure can pin a variable to a bound without changing the optimum:
      *  - **down-safe**: lowering `xⱼ` never violates any constraint — it occurs only in `≤` rows with a
      *    positive coefficient or `≥` rows with a negative one; if also `cⱼ ≥ 0` (lowering never raises
@@ -25,7 +25,7 @@ internal object DominatedVariables {
      * Integers: a variable whose every occurrence is a monotone `≤`/`≥` row exposed by
      * [Factor.linearRows] (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
      * undecidable, so it is excluded) is pinned by tightening its domain to a singleton.
-     * Booleans (#469/#470): the pure-literal mirror, extended past [Clause] to every
+     * Booleans: the pure-literal mirror, extended past [Clause] to every
      * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
      * direction per literal) and a [PseudoBoolean] `≤`/`≥`. In all of these, flipping a literal moves
      * the row's sum one known way, so one value of the variable is safe; an `=` pseudo-Boolean, a
@@ -37,7 +37,7 @@ internal object DominatedVariables {
      * The integer side reasons only over monotone `≤`/`≥` rows from [Factor.linearRows] — plain linear
      * comparators and the increasing chain both qualify; reified rows are full biconditionals (their
      * inner vars affect feasibility both ways) and other globals expose no exact linear rows, so they
-     * exclude their vars — see #470.
+     * exclude their vars.
      *
      * No elimination, identity reconstruction. Solution-set altering (discards optimum-equivalent and
      * feasible-but-suboptimal assignments), so the engine runs it only for non-solution-set-sensitive
@@ -117,7 +117,7 @@ internal object DominatedVariables {
         return PassDelta(addedFactors = extra, domains = if (domainsNarrowed) domains else null)
     }
 
-    /** Fold [f]'s contribution to the Boolean pure-literal safety analysis (#469/#470). A bool var is
+    /** Fold [f]'s contribution to the Boolean pure-literal safety analysis. A bool var is
      *  pinnable only if it occurs solely in *monotone* rows — [Clause] (an at-least-one lower bound),
      *  [Cardinality] (its active lower/upper sides), and [PseudoBoolean] `≤`/`≥` — where flipping a
      *  literal moves the row's sum in one known direction. Any other bool factor (a reified row, a

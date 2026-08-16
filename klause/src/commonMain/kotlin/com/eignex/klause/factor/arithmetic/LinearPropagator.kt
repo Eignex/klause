@@ -19,7 +19,7 @@ internal class LinearPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): `propagateLinearBounds` derives everything from the interval
+     * Advisor subscription: `propagateLinearBounds` derives everything from the interval
      * `[c·min, c·max]` of each term — it reads only `min`/`max` and never inspects interior holes.
      * So the propagator subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each variable
      * and is not woken by interior `VALUE_REMOVED`. Terms are coalesced, so [vars] is duplicate-free.

@@ -54,7 +54,7 @@ class CompiledSchema internal constructor(
      *  int-universe set vars. */
     val setNominalLabels: Map<String, List<String>> = emptyMap(),
     /** Real (LP-only continuous) variable id by schema name, for floats lowered as LP-only columns
-     *  (issue #1232) rather than bucketed; their value is read from [Sample.reals]. Empty when floats
+     * rather than bucketed; their value is read from [Sample.reals]. Empty when floats
      *  are bucketed (see [floatDecoders]). */
     internal val realVarIdByName: Map<String, Int> = emptyMap(),
 ) {
@@ -137,8 +137,8 @@ class CompiledSchema internal constructor(
         return out
     }
 
-    /** Decode [handle]'s real value from [sample] — from [Sample.reals] for an LP-only continuous column
-     *  (issue #1232), else from the bucket index. */
+    /** Decode [handle]'s real value from [sample] — from [Sample.reals] for an LP-only continuous
+     *  column, else from the bucket index. */
     fun decode(handle: FloatHandle, sample: Sample): Double {
         realVarIdByName[handle.name]?.let { return sample.reals[it] }
         val spec = floatDecoders[handle.name]
@@ -204,7 +204,7 @@ class CompiledSchema internal constructor(
     }
 
     /** A single-real-column [LinearObjective] over LP-only continuous var [realId]; the always-minimising
-     *  frame negates the coefficient to maximise (issue #1232). */
+     *  frame negates the coefficient to maximise. */
     private fun realObjective(realId: Int, maximize: Boolean): LinearObjective {
         val coeffs = DoubleArray(problem.numRealVars)
         coeffs[realId] = if (maximize) -1.0 else 1.0

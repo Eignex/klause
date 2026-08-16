@@ -6,9 +6,10 @@ import kotlin.random.Random
 
 /**
  * Solution-guided value selection (Demoen-Garcia-de-la-Banda 2009 / Beck-Davenport). Wraps
- * a [base] value heuristic: once a SAT leaf is observed via [onSolution], the heuristic
- * snapshots the assignment, and on every subsequent pick it tries the snapshot's value for
- * the var first (falling back to [base]'s order for everything else). The snapshot is
+ * a [base] value heuristic: once a SAT leaf is observed
+ * via [onSolution], the heuristic snapshots the assignment, and on every subsequent pick it
+ * tries the snapshot's value for the var first (falling back to [base]'s order for everything
+ * else). The snapshot is
  * refreshed on each new solution — typical use is optimisation, where successive incumbents
  * are similar and a search biased to stay near the previous incumbent finds the next one
  * faster than starting from scratch.

@@ -42,7 +42,6 @@ internal fun FlatZincCompiler.emitFloatLinear(c: FznConstraint, reified: Boolean
     postLinear(scaled.coeffs.toLongs(), scaled.vars, op, scaled.bound, if (reified) resolveBoolLit(c.args[3]) else null)
 }
 
-/** Widen scaled-float `Int` coefficients to the `Long` the linear factors now carry. */
 private fun IntArray.toLongs(): LongArray = LongArray(size) { this[it].toLong() }
 
 /** Lower `int2float` as a scaled linear equality on bucket indices. */
@@ -237,8 +236,8 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     val bRef = resolveFloatVarOrConst(c.args[1])
     val cRef = resolveFloatVarOrConst(c.args[2])
     // A constant operand makes the product linear (`c = k·x`), so lower it as a float linear equality
-    // rather than a var·var product table — the linear-in-reals refinement of issue #1232. Handles the
-    // common `x·k` / `k·x` with a variable result; the genuinely non-linear var·var case keeps the table.
+    // rather than a var·var product table. Handles the common `x·k` / `k·x` with a variable result; the
+    // genuinely non-linear var·var case keeps the table.
     if (cRef is FloatRef.Var && (aRef is FloatRef.Const) != (bRef is FloatRef.Const)) {
         val k = (aRef as? FloatRef.Const)?.value ?: (bRef as FloatRef.Const).value
         val xArg = if (aRef is FloatRef.Const) c.args[1] else c.args[0]
@@ -258,7 +257,7 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     }
     // int·real product: one operand is an `int2float` image of an integer variable and the other operand
     // and the result are LP-only reals. Lower as an exact [RealProduct] `result = n·y` — at a search leaf
-    // `n` is fixed, so the product is the exact linear equality the residual LP decides (issue #1232).
+    // `n` is fixed, so the product is the exact linear equality the residual LP decides.
     val aInt = (c.args[0] as? FznExpr.Ident)?.name?.let { int2floatSource[it] }
     val bInt = (c.args[1] as? FznExpr.Ident)?.name?.let { int2floatSource[it] }
     val intExpr = aInt ?: bInt // exactly one is non-null in the branch below (an XOR guard)

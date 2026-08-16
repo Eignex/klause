@@ -302,12 +302,12 @@ internal class CpToLpRelaxation(
      *  makespan variable can be verified (see [CumulativeRelaxation]). One row per plan. */
     cumulative: Boolean = false,
     /** When true, project each constant-size Diffn onto both axes as a cumulative and emit the same
-     *  energetic makespan row (#655) — a sound lower bound on a strip-length / extent variable (its
+     *  energetic makespan row — a sound lower bound on a strip-length / extent variable (its
      *  `t1 = min-est` case is the area bound `Σ wᵢ·hᵢ ≤ W·H`). One row per derived plan; a no-op unless
      *  an axis extent is provably an upper bound on every task end (so it only fires when it helps). */
     diffn: Boolean = false,
     /** When true, emit the time-indexed `x_{i,t}` relaxation of each Cumulative / Disjunctive over a
-     *  bounded horizon (#453): assignment + start channel + per-time resource rows. Adds O(n·H)
+     *  bounded horizon: assignment + start channel + per-time resource rows. Adds O(n·H)
      *  columns, so it is hard-gated on the horizon and total cell count. */
     private val cumulativeTimeIndexed: Boolean = false,
     /** When true, linearize each NValue with a one-hot value model (per-value "used" indicators) so
@@ -327,7 +327,7 @@ internal class CpToLpRelaxation(
      *  bound. Adds O(Σ|domain|) columns, so it is gated. */
     private val gccCountHull: Boolean = false,
     /**
-     * #571: build only the **objective cone** — the rows and variables transitively connected to the
+     * Build only the **objective cone** — the rows and variables transitively connected to the
      * objective through the linear/Boolean constraints — and **drop every big-M [ReifiedLinear] row**.
      * The result is a small structural sub-relaxation that always fits the dense-tableau cap (no
      * disjunctive ordering bools), yet is a genuine lower bound: for scheduling it is the
@@ -348,7 +348,7 @@ internal class CpToLpRelaxation(
     /** When true, build the arc-indicator relaxation of each [Circuit] / [Circuit] (degree +
      *  channelling rows over one `y_ij ∈ [0,1]` column per candidate arc). For Circuit it also records
      *  a [CircuitArcModel] feeding [CircuitSeparator]'s subtour-elimination cuts; Subcircuit gets the
-     *  hull only (its cutset structure differs, #431). Adds O(arcs) columns, so it is gated. */
+     *  hull only (its cutset structure differs). Adds O(arcs) columns, so it is gated. */
     private val circuitArcs: Boolean = false,
     /** When true, relax each [Product] `result = a·b` with its **McCormick envelope** (four bound-derived
      *  inequalities). For `a = b` (a square) the envelope degenerates to the secant/tangent relaxation.
@@ -378,7 +378,7 @@ internal class CpToLpRelaxation(
         }
 
     /**
-     * Whether this relaxer emits no row whose coefficients depend on the live domains (#39), the
+     * Whether this relaxer emits no row whose coefficients depend on the live domains, the
      * row-side half of [LpRelaxation.persistentEligible]: the objective cone (different per-cone
      * structure), the cumulative / diffn energetic rows (live-coefficient rows with no auxiliary
      * column to gate them), and live-M reified rows are excluded. Auxiliary-column hulls (circuit,
@@ -395,7 +395,7 @@ internal class CpToLpRelaxation(
             }
 
     /**
-     * #571 objective-cone membership, structural (depends only on [Problem.factors] and the
+     * Objective-cone membership, structural (depends only on [Problem.factors] and the
      * objective, never on live domains), so it is computed once and reused across nodes. `first` is
      * per-int-var, `second` per-bool-var: `true` when the variable is transitively connected to the
      * objective through a cone-relevant factor (every LP-emittable type except the dropped big-M
@@ -448,12 +448,12 @@ internal class CpToLpRelaxation(
     }
 
     /** Per-hull dense-tableau caps. Internal so [com.eignex.klause.lp.bounding.LpAutoConfig]'s
-     *  size guard (#484) estimates each enabled hull against the *same* thresholds the builders skip
+     *  size guard estimates each enabled hull against the *same* thresholds the builders skip
      *  at — one source of truth, no drift. */
     internal companion object {
         /** Above this candidate-arc count the circuit arc model is skipped — a defensive bound on
          *  the dense-tableau cost. Gating on arc count (LP columns) rather than node count lets
-         *  large but sparse routing graphs through (#431); #429 may bench this threshold. */
+         *  large but sparse routing graphs through. */
         const val MAX_CIRCUIT_ARCS: Int = 1024
 
         /** Boolean RLT skips knapsack rows wider than this (each adds O(width) product columns). */
@@ -517,7 +517,7 @@ internal class CpToLpRelaxation(
         // Primary column -> negative-part column of a split lower-unbounded real variable.
         private val realNegOf = HashMap<Int, Int>()
 
-        // Per-column live-bound rule for the persistent relaxation (#39/#43). For an auxiliary column,
+        // Per-column live-bound rule for the persistent relaxation. For an auxiliary column,
         // colReq[c] holds its presence requirement as flat (intVar, value) membership pairs and
         // colPresentUpper[c] the upper bound when present — so a node can re-bind the column (upper = 0
         // when any required value left the live domain, else the present-upper) instead of rebuilding.
@@ -578,7 +578,7 @@ internal class CpToLpRelaxation(
          * The column *layout* uses the declared domain so it is identical across nodes (warm-start
          * safe). A circuit whose candidate-arc count exceeds [MAX_CIRCUIT_ARCS] is skipped (the LP
          * column count would dominate); gating on arc count rather than n lets large sparse graphs
-         * through (#431). Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
+         * through. Arcs are recorded sparsely for the [CircuitSeparator] — no O(n²) matrix.
          */
         private fun buildCircuitArcs(factor: Circuit) = buildArcModel(factor.succ, selfLoops = false, sec = true)
 
@@ -627,7 +627,7 @@ internal class CpToLpRelaxation(
                     val jn = j.toInt() // validated node index in [0, n)
                     val present = live.contains(j)
                     // The arc is present exactly while head j stays in succ[i]'s live domain — the single
-                    // membership that lets the persistent relaxation re-bind this column (#43).
+                    // membership that lets the persistent relaxation re-bind this column.
                     val col = auxColumn(
                         0L,
                         if (present) 1L else 0L,
@@ -824,7 +824,7 @@ internal class CpToLpRelaxation(
 
         fun assemble(extraCuts: List<Cut>): LpRelaxation {
             // Materialize objective-only variables first so the relaxed objective is complete — including
-            // LP-only continuous columns (issue #1232), else a real objective term with no constraint on it
+            // LP-only continuous columns, else a real objective term with no constraint on it
             // never reaches the LP and the objective is not minimised over it.
             objective?.let { obj ->
                 for (i in obj.intCoefficients.indices) if (obj.intCoefficients[i] != 0L) intColumn(i)
@@ -852,7 +852,7 @@ internal class CpToLpRelaxation(
 
             val coneL = cone
             for ((factorId, factor) in problem.factors.withIndex()) {
-                // #571: in cone mode emit only factors connected to the objective; this also drops
+                // In cone mode emit only factors connected to the objective; this also drops
                 // every big-M ReifiedLinear row (they never extend the cone — see [coneTouches]).
                 if (coneL != null && !coneTouches(factor, coneL.first, coneL.second)) continue
                 if (realResidual && !touchesReals(factor)) continue

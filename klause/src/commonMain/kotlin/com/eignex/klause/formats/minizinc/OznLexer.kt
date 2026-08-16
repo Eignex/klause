@@ -5,8 +5,8 @@ internal class OznLexer(private val source: String) {
     private var pos: Int = 0
 
     // Line tracking. `pos` only advances, so counting newlines forward from the last scanned offset
-    // makes [lineAt] O(1) amortized — the old `substring(0, pos).count { '\n' }` per token was O(n²)
-    // over a large `.ozn`.
+    // makes [lineAt] O(1) amortized; recounting from offset 0 per token would be O(n²) over a large
+    // `.ozn`.
     private var lineNo: Int = 1
     private var lineScanned: Int = 0
     private fun lineAt(): Int {

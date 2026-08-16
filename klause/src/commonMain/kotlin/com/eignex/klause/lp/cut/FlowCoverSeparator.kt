@@ -15,8 +15,8 @@ import kotlin.math.max
  *  - **Explicit flow**: a capacity row `Σⱼ yⱼ ≤ b` whose flow variables each carry a variable-upper-bound
  *    `yⱼ ≤ uⱼ·xⱼ` (a 2-term [Linear] `yⱼ − uⱼ·xⱼ ≤ 0`, `xⱼ ∈ {0,1}`).
  *  - **Implicit / bin-packing**: a 0/1 knapsack `Σⱼ wⱼ·xⱼ ≤ C` (`xⱼ ∈ {0,1}`, `wⱼ > 0`) viewed as a
- *    single-node flow with `yⱼ = wⱼ·xⱼ` — the flow and its indicator share the column, capacity `wⱼ`
- *    (#843). This exposes the flow-cover family to bin-packing / network-flow models, which carry the
+ *    single-node flow with `yⱼ = wⱼ·xⱼ` — the flow and its indicator share the column, capacity `wⱼ`.
+ *    This exposes the flow-cover family to bin-packing / network-flow models, which carry the
  *    structure as plain weighted knapsacks rather than explicit flow variables.
  *
  * For a cover `C` whose capacity exceeds the demand by `λ = Σ_C capⱼ − b > 0`, every feasible point

@@ -6,7 +6,7 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * An activity-managed pool of globally-valid cuts (#40). Cuts are added with deduplication by
+ * An activity-managed pool of globally-valid cuts. Cuts are added with deduplication by
  * [Cut.key]; a hard [maxCuts] cap bounds the per-node LP cost the pool imposes once its cuts are folded
  * into every node's relaxation. When the cap is exceeded the least-active cuts are evicted, where
  * activity is tightness at the LP optimum — the cut-management signal: a cut the LP point sits

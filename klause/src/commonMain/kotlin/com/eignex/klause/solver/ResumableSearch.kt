@@ -14,7 +14,7 @@ import com.eignex.klause.solver.result.MinimizeResult
  *
  * This is the engine seam a single-threaded portfolio ([com.eignex.klause.portfolio.SequentialPortfolio])
  * needs to schedule an arm in segments without the cold-restart re-learning that dominated its
- * time-to-best (#381): each scheduled segment resumes the arm where the previous one paused.
+ * time-to-best: each scheduled segment resumes the arm where the previous one paused.
  *
  * No coroutine suspension is involved — the search loop is a sequence of atomic steps gated by a
  * top-of-loop slice check, so returning at that check and re-entering from the top is a faithful
@@ -65,7 +65,7 @@ interface ResumableOptimizer<P : SolverParams> : Optimizer<P> {
 
 /**
  * A reusable handle for solving a sequence of pinned sub-problems on one persistent search — the LNS
- * destroy/repair loop (#644). Each [repair] re-seeds the same session and LP relaxation on a new
+ * destroy/repair loop. Each [repair] re-seeds the same session and LP relaxation on a new
  * assumption set instead of rebuilding, so the learned-clause database and LP warm start carry across
  * fragments. Single-threaded and stateful; obtain one from a backtrack solver.
  */

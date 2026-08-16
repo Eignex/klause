@@ -76,7 +76,7 @@ data class LinearObjective(
      * Objective coefficient of each LP-only continuous (real) variable, indexed by real var id (size
      * `problem.numRealVars`; empty for the integer/Boolean core). The real part of the objective is
      * resolved by the LP at nodes and leaves, not by [evaluateLong] — the integer/Boolean methods here
-     * cover only the discrete part. See the LP-only-columns hybrid engine (issue #1232).
+     * cover only the discrete part. See the LP-only-columns hybrid engine.
      */
     val realCoefficients: DoubleArray = EmptyDoubleArray,
 ) : Objective {
@@ -95,7 +95,7 @@ data class LinearObjective(
 
     override fun evaluate(sample: Sample): Double {
         // The discrete part is exact; the continuous part is the LP-only real terms, present in [sample]
-        // only at a leaf where the residual LP resolved them (issue #1232).
+        // only at a leaf where the residual LP resolved them.
         var total = evaluateLong(sample).toDouble()
         for (r in 0 until minOf(sample.reals.size, realCoefficients.size)) {
             total += realCoefficients[r] * sample.reals[r]

@@ -68,7 +68,7 @@ internal fun BacktrackSolver.advance(
             // conflicts funnel through, so both the satisfy (driveSearch) and
             // branch-and-bound (ResumableMinimize) loops report failures regardless
             // of whether the conflict backjumps or falls through to chronological
-            // within-node value enumeration (#509).
+            // within-node value enumeration.
             sink?.search?.observeFail()
             onConflictTick?.invoke()
             // Forward the full conflict reason record so activity-, weight-, and
@@ -104,7 +104,7 @@ internal fun BacktrackSolver.advance(
                 sink?.search?.observeLearn()
                 return AdvanceOutcome.Backjump(learned)
             }
-            // #588 diagnostic: classify why this conflict did NOT learn — the gate breakdown
+            // Diagnostic: classify why this conflict did NOT learn — the gate breakdown
             // tells us which barrier (no clause / non-asserting / already-true literal) is
             // responsible for the low asserting rate.
             when {
@@ -116,12 +116,12 @@ internal fun BacktrackSolver.advance(
         }
         if (pruneIf != null && pruneIf(session)) {
             // A bound-pruned node is a failed node, same as a propagation conflict — count it so
-            // the failure total matches solvers that post the objective bound as a constraint
-            // (Gecode/Chuffed). This covers the dominant linear objective-bound prune, which has
+            // the failure total matches the convention where the objective bound is posted as a
+            // constraint. This covers the dominant linear objective-bound prune, which has
             // no other counter; the lp/energetic/lagrangian sub-counters set inside pruneIf remain
-            // a breakdown of part of this total (#509).
+            // a breakdown of part of this total.
             sink?.search?.observeFail()
-            // Immediate LP backjump (#280): if the prune carried an asserting Farkas 1UIP clause,
+            // Immediate LP backjump: if the prune carried an asserting Farkas 1UIP clause,
             // convert this node into a non-chronological backjump-and-learn. Revert the current
             // pin first (the propagation-conflict path reaches the Backjump return with the failed
             // pin already self-reverted, so trail.size == decisionLevel; match that here), then
@@ -192,7 +192,7 @@ internal fun BacktrackSolver.forgetIfOverCap(session: PropagationSession, params
 }
 
 /**
- * Three-tier reduction policy (#201). Each learned clause is classified by LBD into a
+ * Three-tier reduction policy. Each learned clause is classified by LBD into a
  * permanent core (LBD ≤ [BacktrackParams.lbdGlueThreshold]), a mid tier
  * (LBD ≤ [BacktrackParams.midLbdThreshold]) and a local tier; tiers persist across
  * reductions. Reuse since the last reduction (the clause detected a conflict or forced a
@@ -264,7 +264,7 @@ internal fun BacktrackSolver.forgetTiered(
 }
 
 /**
- * Clause vivification inprocessing (#203) — Piette-Hamadi-Saïs 2008. Walks a bounded
+ * Clause vivification inprocessing (Piette-Hamadi-Saïs 2008). Walks a bounded
  * round-robin slice ([BacktrackParams.vivifyBatch]) of the learned-clause database and
  * strengthens each pure-Boolean, non-permanent clause via [vivifyClause]. Must be called
  * with the session at root (the restart boundary pops the DFS trail first). Strengthened
@@ -295,7 +295,7 @@ internal fun BacktrackSolver.vivify(session: PropagationSession, params: Backtra
         cursor = (cursor + 1) % count
         examined++
         if (session.learnedClausePermanent(idx)) continue
-        if (!session.isLearnedClause(idx)) continue // pseudo-Boolean nogoods aren't vivified (#1119)
+        if (!session.isLearnedClause(idx)) continue // pseudo-Boolean nogoods aren't vivified
         if (!native && !session.learnedClauseAt(idx).allLiteralsBool(numBool)) continue
         val lits = session.learnedClauseLiterals(idx)
         // Nothing to shorten below 3 literals (we never emit units).
@@ -405,7 +405,7 @@ internal fun BacktrackSolver.backjumpAndLearn(
             trail.removeAt(trail.size - 1)
         }
         // Materialize the learned constraint and assert it — a clause for a 1UIP clause, a
-        // pseudo-Boolean constraint for a cutting-planes nogood (#1119 Phase 3). Empty ⇒ stuck.
+        // pseudo-Boolean constraint for a cutting-planes nogood. Empty ⇒ stuck.
         if (current.guardLiterals.isEmpty()) return BackjumpTerm.Stuck
         val result = when (val c = current) {
             is Learned -> session.addLearnedClause(Clause(c.literals), c.lbd)

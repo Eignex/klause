@@ -125,7 +125,7 @@ fun Cbls(
         add(ConfiguredSource(ObjectiveSeed()))
         // Generic pair-swaps: coordinated 2-flips that keep feasibility where no single flip can (the
         // packing/knapsack plateau escape). ScoreOnly, so one is taken only when it out-scores every
-        // single-move candidate — the objective-descent fallback the engine used to run inline.
+        // single-move candidate.
         if (pairSwapCap > 0) add(ConfiguredSource(PairSwap(cap = pairSwapCap)))
         if (stallSwapCap > 0) add(ConfiguredSource(StallSwaps(stallSwapCap), stallGated = true))
         if (stallChainCap > 0) {
@@ -164,7 +164,7 @@ fun Cbls(
         perturbation = if (stallKickAfter > 0) StallKickPerturbation(stallKickAfter, stallKickVars) else null,
         feasibleDescent = FeasibleDescent.SelfOwned,
         // Fight infeasibility with WalkSAT noise, but descend the objective strictly: take only
-        // objective-improving feasible moves, restart at a local optimum (the old greedy tail's contract).
+        // objective-improving feasible moves, restart at a local optimum.
         feasibleAcceptance = AcceptanceRule.GreedyDescent,
         feasibleResampleCap = feasibleResampleCap,
     )

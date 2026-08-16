@@ -7,7 +7,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Clause subsumption and self-subsuming resolution over the live learned database (#1252). Walks a
+ * Clause subsumption and self-subsuming resolution over the live learned database. Walks a
  * bounded round-robin slice ([BacktrackParams.subsumeBatch]) of the learned clauses: a clause with a
  * subset among the other learned clauses is dropped, and a clause whose subset match holds with
  * exactly one literal negated is strengthened by resolving that literal away. Runs on both clause
@@ -35,7 +35,7 @@ internal fun BacktrackSolver.subsume(session: PropagationSession, params: Backtr
     val sigs = LongArray(count)
     for (i in 0 until count) {
         if (session.learnedClausePermanent(i)) continue
-        if (!session.isLearnedClause(i)) continue // pseudo-Boolean nogoods don't participate (#1119)
+        if (!session.isLearnedClause(i)) continue // pseudo-Boolean nogoods don't participate
         if (!native && !session.learnedClauseAt(i).allLiteralsBool(numBool)) continue
         val l = session.learnedClauseLiterals(i).copyOf()
         if (l.size < 2) continue

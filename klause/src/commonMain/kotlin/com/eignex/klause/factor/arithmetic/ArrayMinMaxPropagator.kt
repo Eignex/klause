@@ -15,7 +15,7 @@ internal class ArrayMinMaxPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): `propagate` tightens `result` against the operands' bounds and
+     * Advisor subscription: `propagate` tightens `result` against the operands' bounds and
      * pushes `result`'s bound back onto every operand — reading only `min`/`max`. An interior hole
      * never moves a `min`/`max`, so the factor subscribes to [IntEvent.LB_RAISED] /
      * [IntEvent.UB_LOWERED] on each variable and skips interior `VALUE_REMOVED` wakes. A repeated

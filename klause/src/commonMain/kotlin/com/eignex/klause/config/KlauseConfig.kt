@@ -45,7 +45,7 @@ const val DEFAULT_FLOAT_BUCKETS: Int = 1024
 const val DEFAULT_FLOAT_SCALE: Long = 1_000_000L
 
 /** Default **base** relaxation-size cap (`rows × (cols + rows + 1)` cells). The sparse revised simplex
- *  is the only LP engine (#705); this is a pure per-node cost guard (not a memory bound), and the bound
+ *  is the only LP engine; this is a pure per-node cost guard (not a memory bound), and the bound
  *  stays sound either way. A model whose *base* relaxation fits this cap budgets its gated hulls against
  *  it; a larger base (still under [DEFAULT_LP_CEILING_TABLEAU_CELLS]) budgets hulls against that
  *  ceiling. Raise it (env below) to spend more per node for hull reach on small models. */
@@ -77,9 +77,9 @@ const val DEFAULT_DOMAIN_WALK_CAP: Long = DEFAULT_BITSET_THRESHOLD.toLong()
 /**
  * Central, process-wide configuration for klause's core (compiler + frontends).
  *
- * Historically these knobs were scattered as ad-hoc `System.getenv` / `System.getProperty`
- * reads and loose constants resolved at each call site. [KlauseConfig] consolidates the ones
- * that affect *compilation and solving semantics* into a single immutable value object.
+ * [KlauseConfig] consolidates the knobs that affect *compilation and solving semantics* into a
+ * single immutable value object, rather than ad-hoc `System.getenv` / `System.getProperty` reads
+ * and loose constants resolved at each call site.
  *
  * Two usage modes:
  *  - **Ambient:** set [current] once at startup (e.g. a CLI entry point translating env vars

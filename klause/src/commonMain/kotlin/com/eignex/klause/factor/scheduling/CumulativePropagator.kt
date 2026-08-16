@@ -14,7 +14,7 @@ import com.eignex.klause.util.argsortBy
 
 /**
  * CP propagator for [Cumulative]. Constructed by [Cumulative.asPropagator] and holds the
- * time-tabling and Vilím Θ-tree edge-finding logic so those data structures are only allocated
+ * time-tabling and Θ-tree edge-finding logic so those data structures are only allocated
  * when a CP engine is initialised.
  */
 internal class CumulativePropagator(
@@ -102,7 +102,7 @@ internal class CumulativePropagator(
             // live `start ≤ dom.max ≤ t` and `start ≥ dom.min ≥ t-d+1` already entail the task spans
             // `t`, and they are the canonical order literals the trail stamps — so 1UIP resolves them
             // instead of leaving the generalised thresholds as extra same-var leaves that a single
-            // bound decision crossed, which left these nogoods non-asserting (#744). Mirrors how every
+            // bound decision crossed, leaving these nogoods non-asserting. Mirrors how every
             // other global constraint reasons ([PropagationState.composeIntVarAtomAntecedents]).
             val orig = state.rootDomains[starts[k]]
             if (dom.max < orig.max) out.add(Lit.make(state.atomVarLe(starts[k], dom.max), false))
@@ -284,7 +284,7 @@ internal class CumulativePropagator(
         if (capacityVar < 0) capacity else state.intDomains[capacityVar].max
 
     /**
-     * Naive energetic reasoning (after Baptiste–Le Pape–Nuijten, as in choco's `energyNaive`). For
+     * Naive energetic reasoning (after Baptiste–Le Pape–Nuijten). For
      * the running window `[xMin, xMax]` spanned by the tasks seen so far in non-decreasing latest
      * completion order, every such task's whole execution lies inside the window, so their minimum
      * energies sum to at most `capacity · |window|`. That bounds the current task's resource height
@@ -338,7 +338,7 @@ internal class CumulativePropagator(
     }
 
     /**
-     * Profile-based resource-height pruning (choco's `updateHeights`). A mandatory profile built
+     * Profile-based resource-height pruning. A mandatory profile built
      * from each present task's compulsory part `[start.max, start.min + minDur)` at its *minimum*
      * demand bounds how tall a task spanning a peak may be: `height ≤ capacity − (peak − ownMin)`.
      * Sharper than the energetic area bound at a tall, narrow compulsory peak inside a long window.

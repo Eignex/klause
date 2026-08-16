@@ -25,8 +25,8 @@ internal fun installCliConfig(): KlauseConfig =
  * collection — what the phase still holds — and [committedBytes] the heap the JVM has taken from the OS,
  * which it grows under pressure and rarely returns, so at the end of ingest it approximates the
  * high-water demand. [peakBytes] is the largest usage the sampler started by [startHeapPeakSampler]
- * observed, null when none was started. The three diverge when a phase allocates a large transient
- * (issue #1415): peak measures it, retained does not, and committed only records that the JVM grew.
+ * observed, null when none was started. The three diverge when a phase allocates a large transient:
+ * peak measures it, retained does not, and committed only records that the JVM grew.
  *
  * Peak counts garbage not yet collected, so it drifts up toward whatever `-Xmx` allows: it bounds
  * demand from above rather than stating the heap a phase requires, and the same ingest reads higher

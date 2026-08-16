@@ -229,7 +229,7 @@ object BenchCli {
         println(ArmCalibration.render(ArmCalibration.scoreWinnerSets(arms, won)))
     }
 
-    /** BO config search (task #24): greedy residual rounds ([BoTuning]) that ask a [Tuner] for config
+    /** BO config search: greedy residual rounds ([BoTuning]) that ask a [Tuner] for config
      *  points over an engine's `ConfigSpace`, evaluate each in-process on the selection, and build a
      *  diverse palette one complement per round. The reward is per instance kind — gap-to-optimum for a
      *  COP, time-to-first-feasible for a CSP — so `kind=cop` and `kind=csp` both work. Filters:
@@ -248,7 +248,7 @@ object BenchCli {
         // COP (objective) → gap-to-optimum reward; CSP (satisfy) → time-to-first-feasible. The `select`
         // `kind=cop|csp` filter picks which; a mixed selection is scored per-instance by its own kind.
         // The pool is stratified from the reference tables and resolves lazily — only each round's mini-batch is
-        // built, so a huge selection never materialises (the point of #35).
+        // built, so a huge selection never materialises.
         val pool = StratifiedPool(select(f))
         if (!pool.isNotEmpty()) {
             println("(no referenced instances matched — a stratified pool needs reference-table rows)")

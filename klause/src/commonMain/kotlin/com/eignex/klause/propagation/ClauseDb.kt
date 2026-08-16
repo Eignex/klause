@@ -13,8 +13,8 @@ import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 
 /**
- * Invoke [action] with the *other* literal of every binary clause that contains [lit]
- * (#202). Binary clauses watch both their literals and never relocate a watch (there is
+ * Invoke [action] with the *other* literal of every binary clause that contains [lit].
+ * Binary clauses watch both their literals and never relocate a watch (there is
  * no third literal to move to), so [BoolWatcherIndex.byLit] reliably lists every binary clause
  * on [lit]. No-op for atom-literal [lit] (the bool watcher index only covers bool vars).
  */
@@ -63,7 +63,7 @@ internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: In
     learned.permanent.add(if (permanent) 1 else 0)
     learned.tier.add(ClauseTier.UNSET.ordinal)
     learned.usedFlags.add(0)
-    if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the #202 gate current
+    if (clause.literals.size == 2) learned.binaryClauseCount++ // keep the binary-resolution gate current
     refPayloadStore.add(null)
     val watchers = clause.initialBoolWatchers
     val blockers = clause.initialBoolWatcherBlockers
@@ -72,7 +72,7 @@ internal fun PropagationState.addLearnedClause(clause: ClausePropagator, lbd: In
 }
 
 /**
- * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` (#1119 Phase 3) and return
+ * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and return
  * its factor id. Stored in the same [LearnedClauseDb] as clauses (as a [LearnedPropagator]), with the
  * forgetting policy columns. A PB constraint has no watched-literal scheme, so it wakes on *every* literal
  * going false — install a watch on each literal (the ≥-form only tightens when a positive-weight literal
@@ -102,7 +102,7 @@ internal fun PropagationState.addLearnedPb(
     learned.usedFlags.add(0)
     refPayloadStore.add(null)
     // Install only the weighted covering watch set; the constraint wakes when a watched literal goes
-    // false, not on every literal change (#1119 Phase 3 lever 1).
+    // false, not on every literal change.
     val watched = prop.selectWatched(this)
     for (lit in watched) installLitWatch(lit, newFid, NO_BLOCKER)
     refPayload[newFid] = watched
@@ -125,7 +125,7 @@ internal fun PropagationState.learnedClauseLbd(learnedIndex: Int): Int =
 internal fun PropagationState.learnedClausePermanent(learnedIndex: Int): Boolean =
     nativeEngine?.permanentOf(learnedIndex) ?: (learned.permanent[learnedIndex] == 1)
 
-/** Three-tier (#201) DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
+/** Three-tier DB tier of learned clause [learnedIndex] ([ClauseTier.UNSET] until the
  *  reduction policy classifies it). */
 internal fun PropagationState.learnedClauseTier(learnedIndex: Int): ClauseTier =
     nativeEngine?.tierOf(learnedIndex) ?: ClauseTier.entries[learned.tier[learnedIndex]]
@@ -157,7 +157,7 @@ internal fun PropagationState.clearLearnedClauseUsed(learnedIndex: Int) {
 
 /** Mark learned clause [fid] (a factor id; ignored when it isn't a learned clause) as
  *  used since the last reduction — it just detected a conflict or forced a unit. Drives
- *  three-tier promotion (#201). */
+ *  three-tier promotion. */
 internal fun PropagationState.noteLearnedUse(fid: Int) {
     nativeEngine?.let {
         it.markUsed(fid)

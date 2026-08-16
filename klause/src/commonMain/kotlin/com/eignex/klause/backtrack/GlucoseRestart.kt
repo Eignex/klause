@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
 /**
- * Glucose-style adaptive restart policy (Audemard-Simon 2009/2012) for the pure-Boolean
- * search path (#198). Instead of a fixed, instance-blind Luby schedule, it restarts when the
+ * LBD-adaptive restart policy (Audemard-Simon 2009/2012) for the pure-Boolean search path.
+ * Instead of a fixed, instance-blind Luby schedule, it restarts when the
  * solver is *learning poorly*: a short exponential window of recent learned-clause LBD running
  * hotter than the long-run global LBD average means the recent clauses are low-quality and the
  * search should re-pick. The complementary trail-size blocking suppresses a restart when the
@@ -16,10 +16,10 @@ package com.eignex.klause.backtrack
  *  - [lbdWindow] — capacity of the recent-LBD window. The restart check is gated on this
  *    window being full, so tiny instances never restart.
  *  - [trailWindow] — capacity of the recent-trail-size window for the blocking check.
- *  - [restartMargin] `K` — restart when `recentLbdAvg * K > globalLbdAvg` (Glucose default
- *    0.8, i.e. recent LBD ≈25% above the long-run average).
- *  - [blockingFactor] `R` — block the restart when `trailSize > R * recentTrailAvg` (Glucose
- *    default 1.4).
+ *  - [restartMargin] `K` — restart when `recentLbdAvg * K > globalLbdAvg` (default 0.8,
+ *    i.e. recent LBD ≈25% above the long-run average).
+ *  - [blockingFactor] `R` — block the restart when `trailSize > R * recentTrailAvg`
+ *    (default 1.4).
  *
  * The long-run LBD sum and conflict count accumulate for the whole search; the recent windows
  * are circular buffers that evict their oldest entry when full, and are fast-cleared whenever a

@@ -24,8 +24,8 @@ import kotlin.random.Random
  *    [BacktrackParams]. **Both slots must reference the same `SelectorPortfolio` instance
  *    to share state**; treat the portfolio as the unit, not the two slots.
  *  - At restart, the variable-heuristic delegate is responsible for the bandit update +
- *    arm switch; the value-heuristic delegate just forwards `onRestart` to the (now new)
- *    arm's inner value heuristic. Engine fires var first, then value, which matches this
+ *    arm switch; the value-heuristic delegate just forwards `onRestart` to the newly
+ *    selected arm's inner value heuristic. Engine fires var first, then value, which matches this
  *    convention.
  *
  * Reward signal:
@@ -107,7 +107,7 @@ internal class SelectorPortfolio(
         }
         override fun onRestart() {
             // Update the bandit on the just-ended run, switch to the next arm, then forward
-            // restart to the (now new) arm's variable heuristic for its own decay/reset.
+            // restart to the newly selected arm's variable heuristic for its own decay/reset.
             updateAndSwitch()
             current.variableSelector.onRestart()
         }
@@ -123,7 +123,7 @@ internal class SelectorPortfolio(
         override fun onSolution(snapshot: Sample) = current.valueSelector.onSolution(snapshot)
         override fun onRestart() {
             // Bandit update is owned by the variable-heuristic delegate (fired first by the
-            // engine). Here we just forward restart to the (now new) arm's value heuristic.
+            // engine). Here we just forward restart to the newly selected arm's value heuristic.
             current.valueSelector.onRestart()
         }
     }

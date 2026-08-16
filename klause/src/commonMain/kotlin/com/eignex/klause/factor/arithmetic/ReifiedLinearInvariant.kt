@@ -22,7 +22,7 @@ internal class ReifiedLinearInvariant(
     private val bound: Long,
 ) : Invariant {
 
-    // O(1) coefficient queries keep wide-row move scoring linear (#1442); see [LinearCoeffIndex].
+    // O(1) coefficient queries keep wide-row move scoring linear; see [LinearCoeffIndex].
     private val coeffIndex = LinearCoeffIndex(coeffs, vars)
 
     override fun initialize(state: LocalSearchState, factorId: Int) = initLinearSum(state, factorId, coeffs, vars)

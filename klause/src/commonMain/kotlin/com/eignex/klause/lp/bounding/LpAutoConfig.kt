@@ -45,7 +45,7 @@ import com.eignex.klause.solver.Problem
  *  - **[LpPlan.circuit]** — a [Circuit] is present (subtour-elimination cuts).
  *  - **[LpPlan.element]** — a constant-array [Element] is present (its convex hull).
  *  - **[LpPlan.table]** — a [Table] is present (its convex hull).
- *  - **[LpPlan.nValue]** — an [NValue] is present (its one-hot value hull, #435).
+ *  - **[LpPlan.nValue]** — an [NValue] is present (its one-hot value hull).
  *  - **[LpPlan.lagrangian]** — an [AllDifferent] is present (the weighted-assignment bound).
  *  - **[LpPlan.energeticReasoning]** — a [Cumulative] is present. When the auto path is
  *    the one enabling it, [LpPlan.energeticEvery] is derived from the models' task counts
@@ -53,17 +53,17 @@ import com.eignex.klause.solver.Problem
  *    budget normalization, [ENERGETIC_OPS_PER_CHECK] — the same class of guard as the tableau
  *    cap, not a tuning judgement); a caller who enabled the check explicitly keeps their cadence.
  *  - **[LpPlan.cumulative]** — a [Cumulative] with a *verifiable*
- *    makespan variable is present (the energetic makespan LP row, #430). Applicability is the
+ *    makespan variable is present (the energetic makespan LP row). Applicability is the
  *    structural fact that [CumulativeRelaxation] proves a makespan link, so this also lets the
  *    scheduling globals turn the LP bounding stack on; size-gated like the other relaxation flags.
  *
  * The LP-relaxation flags are additionally gated by a **size guard** (the sparse revised simplex is the
- * only LP engine, #705; these are per-node solve-cost bounds, not tuning judgements). LP is declined
+ * only LP engine; these are per-node solve-cost bounds, not tuning judgements). LP is declined
  * once the estimated relaxation size (`rows × (cols + rows + 1)`) exceeds the ceiling
  * [KlauseConfig.lpCeilingTableauCells]. The gated hulls (circuit / element / table / nvalue /
  * time-indexed) then compete for a hull budget — the base cap [KlauseConfig.lpMaxTableauCells] when the
  * base relaxation fits it, else the ceiling — accepted smallest-first, so a stack of hulls is shed
- * rather than allowed to defeat the guard (#484). The Lagrangian and energetic bounds have their own
+ * rather than allowed to defeat the guard. The Lagrangian and energetic bounds have their own
  * internal caps and are not size-gated here. An explicit caller flag bypasses the guard: every flag is
  * OR-ed onto `base`, so an explicit setting is never turned *off*.
  *
@@ -86,19 +86,19 @@ object LpAutoConfig {
      * added dimensions `cols + rows` stay under this, since per-node simplex bounding is already paying
      * for an LP there and a small hull only tightens it. The expensive hulls (a large Table / Regular /
      * Mdd / time-indexed expansion) stay gated to `AGGRESSIVE`. Hulls are sound relaxations, so this only
-     * trades a little build cost for a tighter bound; the #484 budget still caps the admitted stack.
+     * trades a little build cost for a tighter bound; the size budget still caps the admitted stack.
      */
     const val SMALL_HULL_DIM: Long = 128L
 
     /** `base` with every structurally-applicable LP technique enabled — i.e. [resolve] at the
-     *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). The historical structural auto-config. */
+     *  [LpEmphasis.AGGRESSIVE] ceiling (no cost gating). */
     fun recommend(problem: Problem, base: LpPlan = LpPlan()): LpPlan = resolve(problem, LpConfig.AGGRESSIVE, base)
 
     /**
      * `base` with each LP technique enabled where [problem]'s structure makes it applicable **and**
      * [config] permits it (the emphasis cost ceiling + per-technique overrides — see [LpConfig]).
      * Structural applicability and the dense-tableau size guard are unchanged; the emphasis just caps
-     * which cost tiers may run, so `AGGRESSIVE` reproduces the old all-applicable [recommend] and the
+     * which cost tiers may run, so `AGGRESSIVE` reproduces the all-applicable [recommend] and the
      * cheaper levels switch the expensive tiers off. Flags are OR-ed onto `base`, so an explicit
      * caller setting is never turned off.
      */
@@ -192,7 +192,7 @@ object LpAutoConfig {
                 else -> Unit
             }
         }
-        // ── #484 dense-tableau size guard ────────────────────────────────────────────────────────
+        // Dense-tableau size guard.
         // The per-node tableau is the base relaxation PLUS every enabled gated-hull's columns/rows.
         // Estimate each hull against the same MAX_* caps the builders skip at, then accept them
         // smallest-first only while the combined `base + accepted` tableau stays under the budget — so
@@ -209,7 +209,7 @@ object LpAutoConfig {
         }
         rows += diffnPlans.toLong()
         val baseCols = problem.numIntVars.toLong() + problem.numBoolVars.toLong()
-        // Two per-node cost-guard tiers (the sparse revised simplex is the only LP engine, #705; both are
+        // Two per-node cost-guard tiers (the sparse revised simplex is the only LP engine; both are
         // pure cost guards on solve time, the bound is sound either way). `tableauCells` is a size proxy,
         // not a literal allocation. The base cap bounds the hull budget of a small base relaxation; the
         // ceiling is the absolute size past which LP is declined.
@@ -223,7 +223,7 @@ object LpAutoConfig {
             lpEmittable || cutEligible || pseudoBoolean || circuit || constArrayElement ||
                 table || nValue || regular || mdd || gccCount || makespanPlans > 0 || diffnPlans > 0 ||
                 arrayMinMax || product
-        // #571: an explicit objective-cone request drops the disjunctive big-M rows and every variable
+        // An explicit objective-cone request drops the disjunctive big-M rows and every variable
         // disconnected from the objective, so it always fits the cap even when the full model is over it.
         val coneRequested = base.objectiveCone
         val baseFits = coneRequested || cells <= baseCap
@@ -262,7 +262,7 @@ object LpAutoConfig {
         }
         val acceptedHulls = acceptUnderBudget(rows, baseCols, candidates, hullCap)
 
-        // Cuts run whenever LP bounding is active (#705): the structural separators read the LP point
+        // Cuts run whenever LP bounding is active: the structural separators read the LP point
         // through the revised simplex. Cut-eligible structure required.
         val cuts = lpActive && (cutEligible || pseudoBoolean) && config.resolved(LpTechnique.CUTS)
         val energetic = cumulative && config.resolved(LpTechnique.ENERGETIC)
@@ -331,7 +331,7 @@ object LpAutoConfig {
 
     /** Accept hulls smallest-first while the combined `base + accepted` size stays under [maxCells]
      *  (the configurable [KlauseConfig.lpMaxTableauCells]); the rest are shed (their flag stays off),
-     *  so a stack of hulls can't push the per-node LP past the budget (#484). */
+     *  so a stack of hulls can't push the per-node LP past the budget. */
     private fun acceptUnderBudget(
         baseRows: Long,
         baseCols: Long,
@@ -399,7 +399,7 @@ object LpAutoConfig {
     }
 
     /** Time-indexed `x_{i,t}` columns + resource/assignment/channel rows over the bounded-horizon
-     *  scheduling factors (#453), honouring the horizon / column caps (mirrors `buildCumulativeTimeIndexed`). */
+     *  scheduling factors, honouring the horizon / column caps (mirrors `buildCumulativeTimeIndexed`). */
     private fun timeIndexedEstimate(problem: Problem): HullEstimate? {
         var cols = 0L
         var rows = 0L

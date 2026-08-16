@@ -64,7 +64,7 @@ internal class RevisedSimplex(
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
     private var pivots = 0
-    private var maxLuFill = 0.0 // max (nnz(L)+nnz(U)) / nnz(B) over this solve's factorizations (#27)
+    private var maxLuFill = 0.0 // max (nnz(L)+nnz(U)) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz(L)+nnz(U)) / m² — 1.0 means the LU is effectively dense
 
     /** When [solve] returns null because the primal is infeasible (dual unbounded — no entering column
@@ -144,7 +144,7 @@ internal class RevisedSimplex(
         }
         val lu = SparseMatrix.ofColumns(m, m, columns).lu()
         if (lu.singular) return null
-        // Track LU fill (#27): how much the factorization grows the basis (fill ratio) and how dense
+        // Track LU fill: how much the factorization grows the basis (fill ratio) and how dense
         // it becomes (nnz / m²). If density approaches 1 on real bases, the "sparse" LU is dense.
         if (m > 0 && nnzB > 0) {
             val fill = lu.nnz.toDouble() / nnzB
@@ -196,7 +196,7 @@ internal class RevisedSimplex(
 
     /**
      * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
-     * model structure (cross-node basis reuse, #705). Tightening a child's variable bounds leaves the
+     * model structure (cross-node basis reuse). Tightening a child's variable bounds leaves the
      * parent basis dual-feasible (reduced costs are bound-independent), so the dual simplex resumes from
      * near the optimum in a few pivots. The warm basis only changes the search path, never the result:
      * a structural mismatch or a singular factorization silently falls back to a cold start, so reuse is
@@ -262,7 +262,7 @@ internal class RevisedSimplex(
         var iter = 0
         while (iter++ < maxIter) {
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
-            // loop on a large model would still blow the wall-clock limit (#574). On cancellation give
+            // loop on a large model would still blow the wall-clock limit. On cancellation give
             // up (null) — the basis is only a heuristic, so this is sound. Phased off the first
             // iteration so an already-spent budget never starts a solve at all.
             if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return null
@@ -506,7 +506,7 @@ internal class RevisedSimplex(
     /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
 
-    /** Gomory (Chvátal) integrality cuts from the last optimal basis (#22), up to [maxCuts]; empty if the
+    /** Gomory (Chvátal) integrality cuts from the last optimal basis, up to [maxCuts]; empty if the
      *  last solve was not optimal. Integer-multiplier row aggregation + super-additive rounding in 128
      *  bits ([integerTableauCuts]), so the cuts are rigorously valid. */
     override fun gomoryCuts(maxCuts: Int): List<Cut> {
@@ -516,7 +516,7 @@ internal class RevisedSimplex(
         return integerTableauCuts(model, basis, primal, maxCuts, mir = false)
     }
 
-    /** Gomory mixed-integer (MIR) cuts from the last optimal basis (#22), up to [maxCuts]. */
+    /** Gomory mixed-integer (MIR) cuts from the last optimal basis, up to [maxCuts]. */
     override fun mirCuts(maxCuts: Int): List<Cut> {
         if (model.hasContinuous) return emptyList() // integer tableau cuts need an integer matrix
         val basis = optimalBasis ?: return emptyList()

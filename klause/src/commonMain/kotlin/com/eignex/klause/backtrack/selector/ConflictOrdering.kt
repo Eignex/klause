@@ -8,26 +8,26 @@ import kotlin.random.Random
 
 /**
  * Conflict-Ordering Search (Gay-Hartert-Lecoutre-Schaus 2015). Generalisation of
- * [LastConflict]: instead of pinning the *single* most recent conflict variable, COS
- * maintains a per-variable *timestamp* of its last conflict and picks the unpinned
- * variable with the most recent stamp. Variables never implicated in a conflict have
- * stamp 0 and fall through to the [base] heuristic.
+ * [LastConflict]: instead of pinning the *single*
+ * most recent conflict variable, COS maintains a per-variable *timestamp* of its last conflict
+ * and picks the unpinned variable with the most recent stamp. Variables never implicated in a
+ * conflict have stamp 0 and fall through to the [base] heuristic.
  *
  * Why it's better than plain last-conflict: when the search backjumps past several
  * conflict layers, COS replays them in reverse-chronological order — the deepest unstable
  * subtree is re-explored first, then the next deepest, etc. Plain last-conflict only
- * remembers the very top conflict and forgets the rest. Empirically COS is Choco's
- * default search and routinely beats plain heuristics on structured CSPs.
+ * remembers the very top conflict and forgets the rest. Empirically COS routinely beats
+ * plain heuristics on structured CSPs.
  *
- *  - Stamps persist across [onRestart] (Choco's default behaviour). The conflict structure
- *    is a global property of the constraint network, not a per-run signal.
+ *  - Stamps persist across [onRestart]: the conflict structure is a global property of the
+ *    constraint network, not a per-run signal.
  *  - The richer [onConflict] hook (with `unsat`) stamps **every** variable in the
  *    reason set, not just the failed decision. So COS sees the full conflict-graph
  *    attribution (same as VSIDS / dom-wdeg) at no extra plumbing cost.
  *
  * Composes cleanly: `ConflictOrdering(Vsids())` gives COS-on-VSIDS — recent conflicts
- * lead, activity drives the long tail. `ConflictOrdering(DomWdeg())` is the
- * Lecoutre-recommended configuration.
+ * lead, activity drives the long tail; `ConflictOrdering(DomWdeg())` pairs it with
+ * constraint-hardness weighting.
  */
 internal class ConflictOrdering(private val base: VariableSelector) : VariableSelector {
 

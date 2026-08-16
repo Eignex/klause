@@ -48,8 +48,8 @@ internal fun Lowering.lift(expr: IntExpr): IntExpr = when (expr) {
 }
 
 /**
- * Lower `n div d` and `n mod d` with truncated-toward-zero semantics (matching MiniZinc's
- * `int_div`/`int_mod`, the same convention as `kotlin.Int.rem` / Java's `%`): `|r| < |d|`
+ * Lower `n div d` and `n mod d` with truncated-toward-zero semantics (the FlatZinc
+ * `int_div`/`int_mod` convention, the same as `kotlin.Int.rem`): `|r| < |d|`
  * and `r` takes the sign of the dividend `n`, e.g. `(-7) mod 3 = -1` with `q = -2`. The
  * encoding is shared with the FlatZinc front-end via [IntFunctionLowering.truncatedDivMod];
  * `d ≠ 0` is required up front rather than left to propagation.
@@ -193,7 +193,7 @@ internal fun Lowering.domainOf(expr: IntExpr): IntDomain = when (expr) {
         val c = expr.coeff.toLong()
         val d = domainOf(expr.child)
         // Widen the constant fold to Long and require it fits Int — a wide coefficient times a
-        // wide domain otherwise wraps a 32-bit endpoint into a garbage domain (issue #73).
+        // wide domain otherwise wraps a 32-bit endpoint into a garbage domain.
         val lo: Long
         val hi: Long
         if (c >= 0) {
@@ -243,7 +243,7 @@ internal fun Lowering.affine(expr: IntExpr): Affine = when (expr) {
 
     is IntScale -> {
         // Accumulate coefficients / constant in Long and narrow once, so a large literal or a
-        // wide coefficient can't wrap the Int product silently (issue #73).
+        // wide coefficient can't wrap the Int product silently.
         val a = affine(expr.child)
         val c = expr.coeff.toLong()
         val coeffs = HashMap<String, Int>(a.coeffs.size)
@@ -266,7 +266,7 @@ internal fun Lowering.affine(expr: IntExpr): Affine = when (expr) {
 }
 
 /** Drop zero coefficients and narrow each surviving `Long` coefficient back to `Int`,
- *  failing loudly on overflow (issue #73). */
+ *  failing loudly on overflow. */
 private fun narrowCoeffs(coeffs: Map<String, Long>): Map<String, Int> {
     val out = HashMap<String, Int>(coeffs.size)
     for ((k, v) in coeffs) {

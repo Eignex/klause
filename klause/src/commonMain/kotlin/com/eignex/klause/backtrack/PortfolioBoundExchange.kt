@@ -6,7 +6,7 @@ import com.eignex.klause.solver.objective.SingleIntObjective
 import kotlin.math.ceil
 
 /**
- * Level-0 bound exchange with sibling portfolio arms (#844). At the root the branch-and-bound engine
+ * Level-0 bound exchange with sibling portfolio arms. At the root the branch-and-bound engine
  * imports bounds proven by peers — a tighter objective floor and globally-valid variable
  * tightenings — and republishes its own, so a bound proven mid-search on any arm propagates through
  * the pool. Every method is a no-op unless the corresponding [BacktrackParams] supplier/sink is wired

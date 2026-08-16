@@ -16,7 +16,7 @@ import kotlin.random.Random
  *
  * Picks the unpinned variable with the maximum regret. Branching where the objective is
  * most sensitive lets the engine drive the upper bound down (or lower bound up) fastest —
- * a standard Choco / OR-tools default for `minimize`. When every remaining variable has
+ * a standard default for `minimize`. When every remaining variable has
  * regret 0 (singleton or zero coefficient), delegates to [base] so the search makes
  * progress on feasibility too.
  *

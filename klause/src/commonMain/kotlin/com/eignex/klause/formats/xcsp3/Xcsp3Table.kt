@@ -12,11 +12,12 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableIntIntMap
 
-// `<extension>` (positive/negative table) lowering for the XCSP3 front-end — split out of Xcsp3.kt.
+// `<extension>` (positive/negative table) lowering for the XCSP3 front-end.
 //
 // A tuple column may be a value, a `*` wildcard, or a `lo..hi` range. Positive tables carry these as
 // short-support cells (each written tuple is one row — no Cartesian expansion), and negative tables
-// lower to one nogood clause per forbidden tuple. Both avoid the blow-up the old expansion capped.
+// lower to one nogood clause per forbidden tuple. Both keep the encoding linear in the written tuples
+// rather than in the Cartesian product the wildcards denote.
 
 internal fun Xcsp3.Builder.extension(e: XmlElement) {
     val vars = listVars(e)
@@ -247,7 +248,7 @@ internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     // Size the cell arrays exactly from one cheap counting pass. Accumulating into growable lists made a
     // multi-MB table peak at several times the payload it produces — each list doubles while filling and
     // is copied once more at the end, and the `hi` list was built in full even for a ground table that
-    // discards it (#1415: Benzenoide-15_c23 died here at 3 GB). `hi` is now materialized only if an
+    // discards it (Benzenoide-15_c23 died here at 3 GB). `hi` is now materialized only if an
     // interval cell actually appears, back-filling the points already read.
     val cells = if (bare) countBareCells(text) else countTuples(text) * arity
     val lo = LongArray(cells)
@@ -357,7 +358,7 @@ private fun countBareCells(text: String): Int {
     return count
 }
 
-/** Parse a base-10 [Long] from `text[from, to)` (an optional sign then digits), without a substring. */
+// Parse a base-10 [Long] from `text[from, to)` (an optional sign then digits), without a substring.
 private fun parseLongIn(text: String, from: Int, to: Int): Long {
     var a = from
     val neg = a < to && text[a] == '-'

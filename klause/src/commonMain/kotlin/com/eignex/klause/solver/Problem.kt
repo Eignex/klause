@@ -42,7 +42,7 @@ open class Problem(
     /** The constraints over the variables. */
     val factors: Array<Factor>,
     /**
-     * Extra root deductions computed outside the kernel — the failed-literal / SAC probing tiers now
+     * Extra root deductions computed outside the kernel — the failed-literal / SAC probing tiers
      * live in [com.eignex.klause.presolve.RootBaker], which runs them against an already-base-baked
      * [Problem] and feeds the result back here. Merged into the base `propagate(Assumptions.None)`
      * bake before it folds into [intDomains], so the extra pins / bound tightenings / holes become
@@ -55,7 +55,7 @@ open class Problem(
      * full-propagation fixpoint and between SAC passes so a `-t` deadline can abort an
      * otherwise-uncancellable bake on a slow propagator over wide domains. The partial bake
      * that results is sound (it only ever tightens). Defaults to [Cancellation.Never], so
-     * every consumer that doesn't pass a deadline bakes to completion exactly as before.
+     * every consumer that doesn't pass a deadline bakes to completion.
      */
     val cancellation: Cancellation = Cancellation.Never,
     /**
@@ -88,8 +88,8 @@ open class Problem(
      * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
      * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
      * continuous column but absent from CP search — it has no [intDomains] entry, no trail, and is never
-     * branched. The simplex resolves it at nodes and leaves (see the LP-only-columns hybrid engine,
-     * issue #1232). Zero for the pure integer/Boolean core, which every existing consumer builds.
+     * branched. The simplex resolves it at nodes and leaves (the LP-only-columns hybrid engine).
+     * Zero for the pure integer/Boolean core, which every existing consumer builds.
      */
     val numRealVars: Int = 0,
     /** Lower bound of each real variable (length [numRealVars]); `Double.NEGATIVE_INFINITY` for open. */
@@ -255,7 +255,7 @@ open class Problem(
     /**
      * True iff this problem is a pure-Boolean CNF: no integer variables and every factor is a
      * [com.eignex.klause.factor.bool.Clause]. Such a problem never materialises an order-literal
-     * atom, so the CDCL core degenerates to classical SAT — the native-SAT lane (#1119 Phase 1)
+     * atom, so the CDCL core degenerates to classical SAT — the native-SAT lane
      * gates on this to run an arena-packed, atom-free BCP loop. Pseudo-Boolean and global-bearing
      * problems fail the gate and stay on the general LCG path. Computed once, then cached. */
     val isNativeSatEligible: Boolean by lazy(LazyThreadSafetyMode.NONE) {
@@ -337,7 +337,7 @@ open class Problem(
         result.forEachIntMax { v, hi -> intDomains[v] = intDomains[v].withMaxAtMost(hi) }
         // Group the baked holes per variable and exclude each set in one merged pass. Applying a
         // wide hole set one value at a time rebuilds the hole array per value (O(holes^2)) — the
-        // construction-time wedge on Element-heavy instances (#599). Holes are interior to the
+        // construction-time wedge on Element-heavy instances. Holes are interior to the
         // bounds folded above, so excluding them never empties a domain of an Implied bake.
         val holesByVar = MutableIntObjectMap<LongArrayList>()
         result.forEachIntHole { v, value -> holesByVar.getOrPut(v) { LongArrayList() }.add(value) }
@@ -535,7 +535,7 @@ class BakedProblem internal constructor(
      * When `true`, [intDomains] already carry the root-bake fold (an incremental presolve pass view or a
      * presolve rebuild supplies its re-propagated array): share the array and skip the fold. When `false`
      * (the [Problem.bake] path), [intDomains] are the raw declared domains and this constructor folds the
-     * base bake into them, exactly as construction used to.
+     * base bake into them.
      */
     alreadyFolded: Boolean = false,
 ) : Problem(

@@ -43,7 +43,7 @@ class PortfolioWorker private constructor(
      * instead). [readBound] exposes the portfolio's shared best objective so the resumable backtrack
      * search prunes on it, exactly like [improvements]'s `withBound` seam. The single-threaded
      * [SequentialPortfolio] holds one handle per backtrack arm and resumes it each segment, so the arm
-     * never cold-restarts between slices (#381). */
+     * never cold-restarts between slices. */
     fun newResumableSearch(readBound: () -> Double): ResumableSearch? = resumableFn?.invoke(readBound)
 
     /** Stream improving incumbents against this worker's *own* objective representation (the one

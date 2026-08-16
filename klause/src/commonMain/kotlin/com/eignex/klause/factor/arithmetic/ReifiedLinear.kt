@@ -125,7 +125,7 @@ class ReifiedLinear private constructor(
     /**
      * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced
      * (their coefficients summed) so the local-search payload stays consistent regardless of
-     * caller (issue #84).
+     * caller.
      */
     constructor(auxBoolVar: Int, coeffs: IntArray, vars: IntArray, op: LinearOp, bound: Int) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound.toLong())
@@ -144,7 +144,7 @@ class ReifiedLinear private constructor(
     }
 
     /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the distinct factor kind keeps it disjoint
-     *  from a bare linear's key, so a reified row and an asserted one never share a bucket (#443). */
+     *  from a bare linear's key, so a reified row and an asserted one never share a bucket. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_LINEAR, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =

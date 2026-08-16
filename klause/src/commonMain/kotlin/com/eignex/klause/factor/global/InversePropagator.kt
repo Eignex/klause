@@ -21,8 +21,8 @@ internal class InversePropagator(
     private val gIndexOf: IntIntMap,
 ) : Propagator {
 
-    /** Advisor subscription (#623): channel GAC over interior domains, so subscribe to every kind on
-     *  every (distinct) channel variable and consume the dirty-variable delta (#624) — the propagator
+    /** Advisor subscription: channel GAC over interior domains, so subscribe to every kind on
+     *  every (distinct) channel variable and consume the dirty-variable delta — the propagator
      *  scopes its O(n²) channel sweep to the rows/columns whose domain actually changed. */
     override val initialIntEventWatches: IntArray = run {
         val distinct = intVars.toHashSet()

@@ -61,14 +61,14 @@ data class MpsCompiled(
 private const val MPS_INFINITY = 1e20
 
 /**
- * Lower an [MpsModel] to a klause [Problem] for the hybrid MIP/CP engine (issue #1232):
+ * Lower an [MpsModel] to a klause [Problem] for the hybrid MIP/CP engine:
  *  - **integer columns** become integer (CP search) variables; a side left unbounded (or at the `1e30`
  *    marker) is closed to the cheap fallback box now, and the OBBT tightening over the constraint
  *    relaxation is deferred to the presolve phase ([MpsCompiled.deferredBounds]); a side OBBT cannot bound
  *    stays clamped to `±[searchBound]`.
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
  *    search; the simplex resolves them at nodes and leaves. Their real bounds carry through directly, so
- *    an unbounded float is no longer rejected (its open side is `±∞`).
+ *    an unbounded float keeps an open side of `±∞`.
  *  - an **indicated row** (an `INDICATORS` entry) becomes a reified row plus a `guard -> cond` clause over
  *    a Boolean channelled to its binary column, so the row is relaxed at the column's other value.
  *  - a constraint or objective term touching a float becomes a real ([Double]-coefficient) [Linear] row;

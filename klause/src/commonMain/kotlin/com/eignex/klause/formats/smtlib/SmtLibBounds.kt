@@ -14,7 +14,7 @@ import com.eignex.klause.factor.arithmetic.internals.floorDivLong
  * tightening, and running it here would duplicate what the root bake and the deferred
  * [com.eignex.klause.lp.DeferredIntBounds] run already do over the lowered rows — except that parsing has
  * no wall-clock budget to bound it with, which is what hung the Petri-net and concurrency QF_LIA
- * instances (#1414). This pass is O(Σ row width) once, the same order as reading the document.
+ * instances. This pass is O(Σ row width) once, the same order as reading the document.
  *
  * What stays here is only what the *lowering* needs before it can run: an unbounded operand widens an
  * `ite`/`div`/`mod` auxiliary's range and drops `distinct` from an [com.eignex.klause.factor.global.AllDifferent]

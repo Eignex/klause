@@ -16,7 +16,7 @@ data class FloatBucketing(
     val hi: Double,
     /** Number of uniformly-spaced buckets. */
     val buckets: Int,
-    /** True when this float is lowered as an LP-only continuous variable (issue #1232) rather than a
+    /** True when this float is lowered as an LP-only continuous variable rather than a
      *  bucket index — then [varId] is a real var id and its value is read directly, not via [valueOf]. */
     val lpOnly: Boolean = false,
 ) {

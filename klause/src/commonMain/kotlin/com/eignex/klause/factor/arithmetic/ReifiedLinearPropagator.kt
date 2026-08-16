@@ -22,7 +22,7 @@ internal class ReifiedLinearPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): like [Linear], the integer reasoning is purely interval-based.
+     * Advisor subscription: like [Linear], the integer reasoning is purely interval-based.
      * Subscribe term variables to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED]; the indicator
      * [auxBoolVar] keeps its separate Boolean wakeup.
      */
@@ -87,7 +87,7 @@ internal class ReifiedLinearPropagator(
             // coefficient. The equality can then never hold, so pin the aux false now with a
             // hole-aware antecedent. Without this the aux stays free, search may set it true, and the
             // resulting empty-domain conflict carries a bounds-only (hole-blind) reason that yields an
-            // unsound learned clause — the latent false-UNSAT of #121.
+            // unsound learned clause — a latent false-UNSAT.
             extraFalsePin = {
                 if (op == LinearOp.EQ && vars.size == 1 && eqTargetUnreachable(state)) {
                     state.pinBool(auxBoolVar, false, eqUnreachableReason(state))
@@ -116,7 +116,7 @@ internal class ReifiedLinearPropagator(
      * `x` via [collectHoleAndBoundAntecedents]. Mirrors that collector's original-vs-current
      * distinction: a value never in the declared domain (or a non-integer target) is structural, so
      * the pin is a root fact with no antecedent; a value excluded by a bound tighten cites that
-     * bound; an interior hole carved during search cites its eq-atom (the #121 soundness case).
+     * bound; an interior hole carved during search cites its eq-atom (the soundness-critical case).
      */
     private fun eqUnreachableReason(state: PropagationState): IntArray? {
         val c = coeffs[0]

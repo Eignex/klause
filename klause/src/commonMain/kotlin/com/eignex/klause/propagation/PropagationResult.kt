@@ -228,7 +228,7 @@ sealed interface PropagationResult {
             // Set-restrictions accumulate by INTERSECTION: v ∈ S and v ∈ T both hold, so v ∈ S ∩ T.
             // A var restricted on only one side keeps that side's survivors; an empty intersection is
             // left as-is (an empty survivor set signals infeasibility on apply, exactly as a crossed
-            // min/max bound already does). Preserving these is why the PR #958 wide-sparse fold isn't
+            // min/max bound already does). Preserving these keeps the wide-sparse fold from being
             // silently discarded when root-probing seeds a merge.
             val sets = HashMap<Int, LongArray>()
             forEachIntSet { id, s -> sets[id] = s }
@@ -431,11 +431,9 @@ sealed interface PropagationResult {
      *    are derived from [conflictLevels] for convenience; CSP-style DFS samplers typically
      *    read [conflictLevels] directly to compute their backjump target.
      *  - [conflictFactors] is the set of [com.eignex.klause.solver.Problem.factors] ids that
-     *    derived the contradiction. Currently populated only with the *single* factor that
-     *    returned `false` from `propagate` — sound but minimal in the trivial sense. Full
-     *    propagation-graph attribution (every factor whose firing contributed to the
-     *    failing factor's premises) requires a reason trail and lands with LCG-style clause
-     *    learning. Empty when the contradiction came from a seed assumption check.
+     *    derived the contradiction: the factor that returned `false` from `propagate` plus,
+     *    via a backward walk of the reason trail, every factor whose firing contributed to its
+     *    premises. Empty when the contradiction came from a seed assumption check.
      *
      *  The conflict subset is jointly unsatisfiable but not guaranteed minimal — callers must
      *  not assume minimality. An empty result means the contradiction was implied by problem

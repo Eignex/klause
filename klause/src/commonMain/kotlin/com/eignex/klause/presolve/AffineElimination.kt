@@ -38,7 +38,7 @@ enum class AffinePivotOrder {
 internal object AffineSingletons {
 
     /**
-     * Affine variable elimination (#318/#335/#445). Eliminates an integer variable `x` defined by an
+     * Affine variable elimination. Eliminates an integer variable `x` defined by an
      * `n`-term equality `c_x·x + Σ_j c_j·y_j = b` with a **unit** pivot coefficient `|c_x| = 1`, i.e.
      * `x = B + Σ_j A_j·y_j` where `A_j = −c_x·c_j` and `B = c_x·b`. The defining equality is dropped,
      * the affine relation is folded into every other [Linear] that mentions `x`, and bounds on the
@@ -46,20 +46,20 @@ internal object AffineSingletons {
      * rebuilt from the solution via [AffineElimination.reconstruct].
      *
      * Two-term equalities are the common case (an alias or a one-partner definition); the `n`-term
-     * generalisation (#445) projects out an *implied-free* variable defined by a longer sum (e.g. an
+     * generalisation projects out an *implied-free* variable defined by a longer sum (e.g. an
      * auxiliary `x = y1 + y2 − y3` used nowhere a global needs it). The unit-pivot restriction keeps
      * every folded coefficient integral unconditionally; a **non-unit** pivot is admitted only for an
-     * implied-free (contained) `x` and only when `c_x` divides every other coefficient and the bound
-     * (#601), so `x = b/c_x + Σ_j (−c_j/c_x)·y_j` stays integral for *all* partner assignments. A
+     * implied-free (contained) `x` and only when `c_x` divides every other coefficient and the
+     * bound, so `x = b/c_x + Σ_j (−c_j/c_x)·y_j` stays integral for *all* partner assignments. A
      * non-unit pivot that fails the divisibility test is left to the residue-class doubleton below.
      *
      * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
-     * variable rename, applied to *every* factor via [Factor.remap] regardless of type (#364).
+     * variable rename, applied to *every* factor via [Factor.remap] regardless of type.
      * Otherwise the relation folds into every other [Linear]; a **single-partner** `x = a·y + b`
      * additionally projects out of any non-linear factor that can represent the affine view via
      * [Factor.substituteAffine] (an Element index shift, a Table column rewrite). A multi-partner
      * `B + Σ A_j·y_j` only folds into [Linear] factors — a global keyed on `x`'s value as a sum can't
-     * represent it. The #318 contained slice (`x` in no other factor) is the zero-fold special case,
+     * represent it. The contained slice (`x` in no other factor) is the zero-fold special case,
      * and is what lets an `n`-term definition be projected out.
      *
      * Variables in [objectiveIntVars] are never eliminated: the objective reads them directly and
@@ -144,7 +144,7 @@ internal object AffineSingletons {
             subs.add(AffineSub(cand.x, cand.constTerm, cand.termVars, cand.termCoeffs))
             if (fillIn > AFFINE_FILL_IN_BUDGET) break
         }
-        // Residue-class doubletons (#522): a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
+        // Residue-class doubletons: a 2-term `a·x + b·y = c` with no unit pivot, where `x` is
         // contained, determines `x = (c − b·y)/a` only for the `y` values keeping it an in-domain
         // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
@@ -640,7 +640,7 @@ internal object AffineSingletons {
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
             // unit pivot trivially, and for a non-unit pivot exactly when `x` is implied-free
-            // (contained in this equality alone) and `c_x | gcd(c_j, bound)` (#445/#601). A
+            // (contained in this equality alone) and `c_x | gcd(c_j, bound)`. A
             // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
             // so it is left for the residue-class doubleton pass or for propagation.
             val isUnit = cx == 1L || cx == -1L
@@ -1252,7 +1252,7 @@ internal object AffineSingletons {
 
 /** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by
  *  [Presolve.eliminateAffineSingletons]. [divisor] is `1` for the unit-pivot cases and the
- *  pivot coefficient for a residue-class doubleton (#522), where the division is always exact on the
+ *  pivot coefficient for a residue-class doubleton, where the division is always exact on the
  *  values the partner's restricted domain admits. */
 internal class AffineSub(
     val x: Int,

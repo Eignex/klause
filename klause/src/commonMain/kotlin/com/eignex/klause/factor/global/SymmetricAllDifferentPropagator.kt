@@ -15,7 +15,7 @@ internal class SymmetricAllDifferentPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): `propagate` reads only each variable's `min`/`max` — it tightens
+     * Advisor subscription: `propagate` reads only each variable's `min`/`max` — it tightens
      * into the index range, detects clashes among already-fixed variables, and forces the involution
      * mirror of a fixed variable. An interior hole moves no bound and fixes nothing, so the factor
      * subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips interior

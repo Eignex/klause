@@ -8,9 +8,9 @@ package com.eignex.klause.propagation
  * factor.
  *
  * Naming the contract (rather than typing the store to a concrete clause) is what lets the learned database
- * hold more than one learned-constraint kind (#1119): a [com.eignex.klause.factor.bool.ClausePropagator]
- * today, a pseudo-Boolean cutting-planes propagator alongside it once PB learning lands, with the policy
- * columns and forgetting machinery unchanged.
+ * hold more than one learned-constraint kind — a [com.eignex.klause.factor.bool.ClausePropagator] and a
+ * pseudo-Boolean cutting-planes propagator side by side — over one set of policy columns and one
+ * forgetting pass.
  */
 internal interface LearnedPropagator : Propagator {
     /** Boolean (and atom-lit) variable ids this learned constraint watches. */

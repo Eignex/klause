@@ -9,18 +9,18 @@ import kotlin.math.max
 import kotlin.random.Random
 
 /**
- * The Bayesian-optimization config search (task #24), run as **greedy residual rounds** — boosting's
+ * The Bayesian-optimization config search, run as **greedy residual rounds** — boosting's
  * stagewise loop with a set-cover (max) combination rule. A portfolio combines its arms by taking the
  * *best* arm's result per instance, so the palette this produces is scored the same way: each round
  * keeps the config that best covers the strata the palette-so-far is weakest on.
  *
- * **Mini-batch over a pool (#39/#35).** The [SamplingPool] is a large *universe*; a config is never run
+ * **Mini-batch over a pool.** The [SamplingPool] is a large *universe*; a config is never run
  * against all of it. Each trial samples a handful (`sampleSize`) of problems and runs the config on just
  * those, so cost is `rounds × trials × sampleSize × budget`, independent of pool size. The batch
  * coverage-gain is a *noisy* estimate — which the GP-bandit is built to handle, provided the study is
  * told so (`noisy=true` → Vizier `observation_noise=HIGH`) and the draws are unbiased.
  *
- * **Stratum-granular frontier (#35).** The coverage `frontier` is keyed by the pool's *stratum*, not by
+ * **Stratum-granular frontier.** The coverage `frontier` is keyed by the pool's *stratum*, not by
  * instance. A per-instance frontier dilutes on a large pool (a small batch touches too few instances, so
  * most of the frontier stays 0 and the residual degrades to plain mean-reward); a stratum frontier is a
  * handful of buckets that every mini-batch covers, so the specialist-hunting residual survives any pool
@@ -142,7 +142,7 @@ internal object BoTuning {
     )
 
     /**
-     * Tune the unified engine-gated space (#34): one residual-round campaign searches LS and BT configs
+     * Tune the unified engine-gated space: one residual-round campaign searches LS and BT configs
      * together over [pool], routing each config's evaluation to the right engine. The reward branches by
      * kind as elsewhere. An exploration floor ([floorFraction]) forces the lagging engine so both
      * per-engine projections stay deep even if one engine dominates coverage. Returns the three set-cover
@@ -406,5 +406,5 @@ internal object BoTuning {
     }
 }
 
-/** The engine axis for the `bench tune` command. MIXED searches LS and BT jointly (#34). */
+/** The engine axis for the `bench tune` command. MIXED searches LS and BT jointly. */
 internal enum class TuneEngine { LS, BT, MIXED }

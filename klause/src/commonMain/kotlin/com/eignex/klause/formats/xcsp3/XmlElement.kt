@@ -93,7 +93,7 @@ private fun expandParams(text: String, tokens: List<String>, usedIndices: Set<In
     return sb.toString()
 }
 
-/** If a `..%<digits>` range tail begins at [at] in [text], the index just past its last digit; else -1. */
+// If a `..%<digits>` range tail begins at [at] in [text], the index just past its last digit; else -1.
 private fun rangeUpperEnd(text: String, at: Int): Int {
     if (!text.startsWith("..%", at)) return -1
     var k = at + 3
@@ -231,7 +231,7 @@ internal class XmlReader(private val reader: CharReader) {
         }
     }
 
-    /** Skip prolog, comments, doctype, and whitespace. */
+    // Skip prolog, comments, doctype, and whitespace.
     private fun skipMisc() {
         while (!reader.eof()) {
             when {

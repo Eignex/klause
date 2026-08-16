@@ -8,7 +8,7 @@ import com.eignex.klause.util.LongArrayList
 
 /*
  * Reversible, delta-driven GAC for [Regular] — the incremental counterpart to the full
- * forward+backward layered-DAG rebuild Regular.propagate ran every fire. Pesant's GAC keeps, per
+ * forward+backward layered-DAG rebuild in Regular.propagate. The layered GAC keeps, per
  * layer, the set of DFA states forward-reachable from q0 and backward-co-reachable to an accepting
  * state; a symbol at position i survives iff some forward-reachable state at i transitions on it to a
  * backward-co-reachable state at i+1. Both layer-bitset arrays ride the engine undo trail

@@ -10,7 +10,7 @@ import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.PresolveStats
 import kotlin.time.TimeSource
 
-/** Round cap for the presolve↔LP-harvest fixpoint (#14): a spin guard, never the real stop. The loop
+/** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop
  *  exits as soon as a harvest tightens nothing, which is the common case after the first round. */
 private const val MAX_PRESOLVE_HARVEST_ROUNDS = 4
 
@@ -28,7 +28,7 @@ class PresolveOutcome(
 
 /**
  * The presolve driver: the full-model transform pipeline, independent of any front-end representation.
- * Presolve and the LP-relaxation harvest are iterated to a fixpoint (#14): the harvest's proven domain
+ * Presolve and the LP-relaxation harvest are iterated to a fixpoint: the harvest's proven domain
  * tightenings can unlock further reductions (coefficient strengthening, affine elimination, structural
  * reductions), which can in turn expose more for the next harvest. The loop is self-gating — it runs a
  * second [Presolver.run] only when a harvest actually tightened the problem — and bounded by
@@ -55,7 +55,7 @@ object PresolvePipeline {
         val context = PresolveContext.of(linearObjective, solutionSetSensitive, problem.hasSymmetryBreaking)
             .withBakeConfig(bakeConfig)
             .withPresolveBudget(presolveBudget)
-        // LP-relaxation harvest (#10): fold the LP's proven domain tightenings, redundant-row removals and
+        // LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals and
         // implied equalities into the problem permanently so every backend sees them. Gated by the
         // `lp-harvest` pass; the harvest's own LP relaxation+shaving is enabled here directly.
         val harvestPlan = if (config.resolved(PresolvePass.LP_HARVEST, context)) {

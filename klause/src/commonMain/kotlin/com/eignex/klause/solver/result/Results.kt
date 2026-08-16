@@ -4,8 +4,8 @@ import com.eignex.klause.solver.Sample
 /**
  * Why a solver / optimiser returned without a definitive verdict. Lets callers tell
  * "ran out of decisions" apart from "wall-clock timeout" apart from "the embedding
- * application cancelled the call" — all of which previously collapsed onto a `null`
- * return or a bare `Unknown`. Backends that don't distinguish these pick the closest fit.
+ * application cancelled the call", which a `null` return or a bare `Unknown` conflates.
+ * Backends that don't distinguish these pick the closest fit.
  */
 enum class TerminationReason {
     /** Solver-specific budget (maxFlips, maxDecisions, maxAttempts) hit. */
@@ -36,9 +36,9 @@ enum class TerminationReason {
 }
 
 /**
- * Result of [com.eignex.klause.solver.Solver.sample]. Replaces the previous `Sample?` with an explicit
- * three-way distinction so a `null`-style return can't conflate "no feasible
- * assignment exists" (provable Unsat) with "budget exhausted before any was found."
+ * Result of [com.eignex.klause.solver.Solver.sample]. An explicit three-way distinction, so a
+ * `null`-style return can't conflate "no feasible assignment exists" (provable Unsat) with
+ * "budget exhausted before any was found."
  *
  *  - [Found] — a satisfying assignment.
  *  - [Infeasible] — only returned by complete backends that proved no satisfying

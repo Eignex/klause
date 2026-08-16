@@ -9,8 +9,8 @@ import com.eignex.klause.util.PermutationGroup
 import com.eignex.klause.util.toSortedIntArray
 
 /**
- * Dynamic symmetry handling: one global propagator for the whole automorphism group, replacing the
- * static enumeration of lex-leader factors. Holds the verified generators (each a kind-preserving
+ * Dynamic symmetry handling: one global propagator for the whole automorphism group rather than an
+ * enumeration of lex-leader factors. Holds the verified generators (each a kind-preserving
  * permutation of the variables); at every search node it enforces the lex-leader predicate
  * `V ≤lex σ(V)` for each generator, pruning the symmetric completions the prefix already rules
  * out. The lex-minimum of every orbit satisfies `V ≤lex σ(V)` for every group element, so each
@@ -19,7 +19,9 @@ import com.eignex.klause.util.toSortedIntArray
  * A generator permutes integer and Boolean variables independently (detection is kind-preserving),
  * so the lex sequence orders the integer support in id order, then the Boolean support in id order;
  * each position compares a variable against its image of the same kind. The filtering is the
- * Frisch–Hnich–Kiziltan–Miguel–Walsh `α`/`β` rule generalised over typed positions: a Boolean reads
+ * Frisch–Hnich–Kiziltan–Miguel–Walsh `α`/`β` lex rule (α = first undecided position, β = start of
+ * the forced `≥` suffix) generalised
+ * over typed positions: a Boolean reads
  * as the domain `[0,1]` (`true` ⇒ `[1,1]`, `false` ⇒ `[0,0]`), so a bound tightening at a Boolean
  * position is a pin. Reasons cite the fixed-equal prefix, the deciding pair, and — when the step is
  * forced strict — the scanned suffix, as integer order-atoms plus Boolean literals.

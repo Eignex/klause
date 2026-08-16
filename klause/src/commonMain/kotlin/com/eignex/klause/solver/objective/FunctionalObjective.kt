@@ -22,7 +22,7 @@ import kotlin.math.abs
  * decision variable `x` leaves `V`'s stored value untouched (it merely breaks `V`'s defining
  * constraint), so the move scores an objective-delta of 0 and CBLS is blind to the gradient
  * that actually matters. The search then only descends opportunistically via constraint repair
- * and plateaus far from the optimum (observed: city-position stuck ~460× off OR-Tools' optimum).
+ * and plateaus far from the optimum (observed: city-position stuck ~460× off the true optimum).
  *
  * This objective instead recomputes `V` from the leaf (decision) variables by evaluating the
  * cone bottom-up, so a move on `x` yields the *true* change in `V` — the gradient CBLS needs to
@@ -128,15 +128,13 @@ internal class FunctionalObjective internal constructor(
         return if (minimize) v else -v
     }
 
-    /**
-     * Dense bottom-up evaluator for the defining cone. Each node-output variable owns a slot in a
-     * flat [LongArray] indexed in the nodes' topological order, so evaluating the cone is array
-     * writes plus O(1) slot lookups — replacing the per-evaluation `HashMap<Int, Long>` of boxed
-     * values the cone used to rebuild on every move (the dominant per-move allocation, since
-     * [deltaIfApplied] evaluates the cone twice). The slot index is computed once; the value array
-     * is allocated per [evaluate], so a single instance stays safe to share across concurrent
-     * local-search workers (the objective is held in [com.eignex.klause.localsearch.LocalSearchParams]).
-     */
+    // Dense bottom-up evaluator for the defining cone. Each node-output variable owns a slot in a
+    // flat LongArray indexed in the nodes' topological order, so evaluating the cone is array writes
+    // plus O(1) slot lookups rather than a per-evaluation map of boxed values rebuilt on every move
+    // — the dominant per-move allocation, since deltaIfApplied evaluates the cone twice. The slot
+    // index is computed once; the value array is allocated per evaluate, so a single instance stays
+    // safe to share across concurrent local-search workers (the objective is held in
+    // LocalSearchParams).
     private class ConeMemo(
         private val nodes: List<Node>,
         private val terms: IntArray,

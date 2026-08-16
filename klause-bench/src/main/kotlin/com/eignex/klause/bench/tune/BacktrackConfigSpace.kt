@@ -27,7 +27,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 
 /**
- * The backtrack config search space (task #21) — variable/value selectors × restart cadence × phase
+ * The backtrack config search space — variable/value selectors × restart cadence × phase
  * saving × LP emphasis/plan × learned-DB knobs as a lazy [ConfigSpace], decoded into [BacktrackParams]
  * by [toParams] over a preset base. The BO searches this directly; each evaluated point builds one
  * params object on demand (the backtrack analogue of [LocalSearchConfigSpace]). The declared knobs

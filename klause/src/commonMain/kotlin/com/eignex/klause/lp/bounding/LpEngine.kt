@@ -77,7 +77,7 @@ internal class LpEngine(
     private val sink: SolveStatsSink,
 ) {
     /** The relaxation-bound family resolved from the high-level emphasis ([LpParams.lpConfig])
-     *  against this problem's structure (#429); with no emphasis set, the explicit
+     *  against this problem's structure; with no emphasis set, the explicit
      *  [LpParams.lpPlan] is used verbatim. Resolving here makes the engine the single home for
      *  the intent→plan step, so callers carry only the intent and never a separately-resolved copy. */
     val params: LpParams =
@@ -117,7 +117,7 @@ internal class LpEngine(
     var lpRelaxer = buildRelaxer(params.lpPlan)
         private set
 
-    // Structure-based cut separators (#22/#705) run on the sparse LP point; circuit cuts are deferred
+    // Structure-based cut separators run on the sparse LP point; circuit cuts are deferred
     // until the arc model is rebuilt on the sparse relaxation.
     val lpSeparators: List<CutSeparator> = if (params.lpPlan.cuts || params.lpPlan.circuit) {
         buildList {
@@ -138,15 +138,15 @@ internal class LpEngine(
         emptyList()
     }
 
-    // Persistent pool of global cuts (#22/#40): seeded from the root harvest in [initRootLp] and grown
-    // by during-search separation (#41). Every cut is global, so the pool is sound at every node.
+    // Persistent pool of global cuts: seeded from the root harvest in [initRootLp] and grown
+    // by during-search separation. Every cut is global, so the pool is sound at every node.
     val cutPool = CutPool()
 
     /** The global cuts folded into every node's relaxation — the live contents of [cutPool]. */
     val lpGlobalCuts: List<Cut> get() = cutPool.cuts()
 
     /**
-     * Exchange this engine's global cuts with a portfolio peer via [exchange] (#809): import the cuts
+     * Exchange this engine's global cuts with a portfolio peer via [exchange]: import the cuts
      * other arms published — re-mapped onto this engine's stable column layout — and export this
      * engine's own. A no-op until a persistent relaxation exists, since cut sharing rides its
      * fixed column→variable maps; a non-persistent relaxation has no single layout to map through.
@@ -169,7 +169,7 @@ internal class LpEngine(
     }
 
     /**
-     * Persist the globally-valid members of [cuts] into the [cutPool] (#41); node-local cuts are
+     * Persist the globally-valid members of [cuts] into the [cutPool]; node-local cuts are
      * ignored here (the caller uses them transiently). The pool is trimmed to its cap by activity at
      * [primal]. The cut-free persistent base is untouched — every node folds the violated subset via
      * [CutPool.select]. Sound: every persisted cut is global, valid at every solution.
@@ -263,7 +263,7 @@ internal class LpEngine(
      *  root work, by [com.eignex.klause.backtrack.ResumableMinimize]. Root work never counts as a prune. */
     fun chargeRootLpWall(millis: Long) = lpWallBreaker.charge(millis, pruned = false)
 
-    // Adaptive LP effort ladder (#32, generalizing the #614 auto-off): the emphasis sets the ceiling
+    // Adaptive LP effort ladder: the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
     // at a time — shedding during-search cuts before the bound — re-probing upward on backoff. Sound:
     // every rung is a valid bound / off, so the gate only changes work, never solutions.
@@ -272,7 +272,7 @@ internal class LpEngine(
         reprobeBase = if (params.lpPlan.autoOffReprobe) LpEffortLadder.DEFAULT_REPROBE_BASE else Int.MAX_VALUE,
     )
 
-    // Per-separator activity gate (#59): disables a single unproductive cut family while the others keep
+    // Per-separator activity gate: disables a single unproductive cut family while the others keep
     // separating — the per-technique complement of the whole-rung [lpLadder]. Sound: skipping a separator
     // only forgoes its cuts, never a solution.
     val lpSeparatorGate = LpSeparatorGate(
@@ -288,7 +288,7 @@ internal class LpEngine(
     var lpHints: LpHintSink? = null
     private var lpBackjump: Learned? = null
 
-    // Persistent global LP (#39): for a node-invariant relaxation (no auxiliary columns, no live-M
+    // Persistent global LP: for a node-invariant relaxation (no auxiliary columns, no live-M
     // rows) the per-node delta is column bounds only, so the relaxation is built once from the declared
     // domains and re-bound at each node instead of rebuilt. The base is cut-free — global cuts are folded
     // per node by [LpBounding] via [CutPool.select], so the pool can grow without invalidating the base.
@@ -296,12 +296,12 @@ internal class LpEngine(
     private var persistentRelaxation: LpRelaxation? = null
 
     /**
-     * The **cut-free** LP relaxation for the current node (#39): the persistent relaxation re-bound to
+     * The **cut-free** LP relaxation for the current node: the persistent relaxation re-bound to
      * [session]'s live column bounds when eligible, else a fresh per-node build. On first call it builds a
      * base relaxation from the declared domains; if that base is [LpRelaxation.persistentEligible] it is
      * cached and every node re-binds it — bit-identical to a rebuild for eligible models, but skipping the
      * matrix reconstruction. The harvested global cuts are not baked in here: the bound path folds the
-     * subset its LP point actually violates via [CutPool.select] (#40 / D8), so the base stays
+     * subset its LP point actually violates via [CutPool.select], so the base stays
      * node-invariant and the per-node cut count is bounded by efficacy rather than the whole pool.
      */
     internal fun nodeRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation {
@@ -342,7 +342,7 @@ internal class LpEngine(
     // rows toggle by per-row enforcement alone, plus ONE simplex instance that re-solves it with its
     // kept LU factorization — the per-node build+factorize that dominated the satisfaction path
     // collapses to a few dual pivots. Exact certificates never read this model; they run on the
-    // per-node pin-consulting build as before.
+    // per-node pin-consulting build.
     private var gatedResolved = false
     private var gatedFilter: GatedResidual? = null
 
@@ -380,7 +380,7 @@ internal class LpEngine(
     val residualOversized: Boolean = params0.lpPlan.realResidual &&
         problem.factors.count { it is ReifiedRealLinear || (it is Linear && it.hasReals) } > RESIDUAL_MAX_ROWS
 
-    /** The asserting LP backjump clause derived during the last [pruneNode] (#280), or null. */
+    /** The asserting LP backjump clause derived during the last [pruneNode], or null. */
     fun lastBackjump(): Learned? = lpBackjump
 
     /**
@@ -473,7 +473,7 @@ internal class LpEngine(
         ): Boolean = linearLowerBound(objective, session) >= effectiveBound
     }
 
-    /** Scheduling-feasibility prune arm (energetic #562, cumulative-flow — same prune family): every
+    /** Scheduling-feasibility prune arm (energetic and cumulative-flow — same prune family): every
      *  [checkEvery] visits, prune the node when [bound] proves the schedule infeasible, recording the
      *  explanation as an LP nogood. One class drives both bounds. */
     private inner class SchedulingFeasibilityArm(
@@ -496,7 +496,7 @@ internal class LpEngine(
         }
     }
 
-    /** Lagrangian dual prune arm (#429, and knapsack-Lagrangian): reassigns its own persistent
+    /** Lagrangian dual prune arm (structured and knapsack-Lagrangian): reassigns its own persistent
      *  multiplier vector each call and prunes when the dual bound beats the incumbent. One class
      *  drives both bounds. */
     private inner class LagrangianArm(private val bound: LagrangianDualBound) : RelaxationBound {
@@ -519,7 +519,7 @@ internal class LpEngine(
 
     /** LP-relaxation simplex bound with depth/freq/auto-off gating, warm-start basis caching and
      *  LP-learned backjump/nogood recording. Sets the outer [lpBackjump] when it derives an
-     *  asserting clause (#280). */
+     *  asserting clause. */
     private inner class LpSimplexBound : RelaxationBound {
         override val applicable: Boolean get() = lpRelaxer != null
 
@@ -546,10 +546,10 @@ internal class LpEngine(
             ) {
                 return false
             }
-            // The ladder's run rung decides whether during-search cuts separate at this node (#32).
+            // The ladder's run rung decides whether during-search cuts separate at this node.
             val cutsAllowed = lpLadder.cutsEnabled
             val depth = session.decisionLevel
-            // Warm-start this node's LP from the parent depth's optimal basis (#705): tightening
+            // Warm-start this node's LP from the parent depth's optimal basis: tightening
             // a child's bounds keeps that basis dual-feasible, so the re-solve takes a few pivots.
             val warm = if (params.lpPlan.warmStart && depth - 1 in lpBasisByDepth.indices) {
                 lpBasisByDepth[depth - 1]

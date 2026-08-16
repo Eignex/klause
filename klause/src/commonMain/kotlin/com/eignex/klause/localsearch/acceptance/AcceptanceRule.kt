@@ -53,8 +53,7 @@ sealed interface AcceptanceRule {
     /** Strict-improvement greedy: the minimum-scored move over both pools, but only when it strictly
      *  improves (`score < 0`); returns `null` at a local optimum so the engine restarts instead of
      *  committing a worsening move. The feasible-phase acceptance for CBLS-style objective descent
-     *  (`SourceDrivenStrategy.feasibleAcceptance`) — the "commit only if it improves, else restart" the
-     *  engine's greedy descent used to enforce inline. */
+     *  (`SourceDrivenStrategy.feasibleAcceptance`). */
     data object GreedyDescent : AcceptanceRule {
         override fun choose(
             rng: Random,
@@ -96,7 +95,7 @@ sealed interface AcceptanceRule {
     }
 
     /**
-     * probSAT roulette (Balint & Schöning 2012): sample the noise pool with weight
+     * probSAT roulette (Balint and Schöning 2012): sample the noise pool with weight
      * `(eps + score + shift)^(-cb)` — low-scored moves get exponentially more mass; the `shift` keeps
      * the base non-negative when scores go negative. Falls back to the deterministic best over the
      * score-only pool when the noise pool is empty (score-only moves are never roulette-drawn).

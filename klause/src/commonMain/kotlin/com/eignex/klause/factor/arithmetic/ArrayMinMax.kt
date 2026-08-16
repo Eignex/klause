@@ -17,8 +17,8 @@ import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * `result = max(xs)` or `result = min(xs)` — covers MiniZinc's `array_int_maximum(result,
- * xs)` / `array_int_minimum(result, xs)`. Mode selected by [max].
+ * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
+ * xs)` / `array_int_minimum(result, xs)` builtins. Mode selected by [max].
  *
  * Propagation tightens [result] against the bound of [xs] and pushes back from [result]
  * to every `xs(i)` (for max: every `xs(i).max <= result.max`; for min the dual). LS keeps
@@ -69,7 +69,7 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
 
     /**
      * LP relaxation: the always-emitted envelope (`result ≥ xs[i]` for max, `result ≤ xs[i]` for min) as
-     * CORE rows, plus the Anderson tight face as HULL — one-hot selectors `z_i` with `Σ z_i = 1` and a
+     * CORE rows, plus the tight convex-hull face as HULL — one-hot selectors `z_i` with `Σ z_i = 1` and a
      * per-operand big-M row forcing `result = xs[i]` when `z_i = 1`. Each `M_i` comes from the declared
      * domains, so it bounds `|result − xs[i]|` globally and the rows hold at every integer solution.
      */

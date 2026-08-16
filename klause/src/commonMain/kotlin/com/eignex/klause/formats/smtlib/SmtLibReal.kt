@@ -108,8 +108,8 @@ internal fun parseRealLiteral(s: String): BigFraction? {
     return BigFraction.of(num, den)
 }
 
-/** Post a top-level real relation `(op a b)` as a hard LP-only row. Strict and `distinct` forms
- *  need the real-atom machinery and reject for now. */
+/** Post a top-level real relation `(op a b)` as a hard LP-only row; strictness rides through to the
+ *  delta-rational deciders. `distinct` needs the real-atom machinery and rejects. */
 internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
     val op = node.atomAt(0, "relation operator")
     requireBinaryRelation(node, op)
@@ -203,14 +203,12 @@ internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean =
     return Linear(intVars, intCoeffs, realVars, realCoeffs, op, bound, strict)
 }
 
-/**
- * Exact encoding of a row whose least-common-denominator scale pushes an integer coefficient past the
- * exact-double range: each oversized coefficient `C·x` decomposes in base `B = 2⁴⁰` over **chain
- * variables** `x⁽ᵏ⁾ = Bᵏ·x` (fresh reals tied by exact defining rows, cached per variable), so every
- * emitted coefficient is a base-B digit — an exact double. An oversized constant moves onto the
- * auxiliary real pinned to 1. Depth is capped at [WIDE_MAX_DIGITS] digits; beyond that the row rejects
- * (exact-or-reject, never approximated).
- */
+// Exact encoding of a row whose least-common-denominator scale pushes an integer coefficient past the
+// exact-double range: each oversized coefficient `C·x` decomposes in base `B = 2⁴⁰` over chain
+// variables `x⁽ᵏ⁾ = Bᵏ·x` (fresh reals tied by exact defining rows, cached per variable), so every
+// emitted coefficient is a base-B digit — an exact double. An oversized constant moves onto the
+// auxiliary real pinned to 1. Depth is capped at WIDE_MAX_DIGITS digits; beyond that the row rejects
+// (exact-or-reject, never approximated).
 private fun SmtLib.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: LinearOp, strict: Boolean): Linear {
     val realVarsL = ArrayList<Int>()
     val realCoeffsL = ArrayList<Double>()
@@ -258,7 +256,7 @@ private fun SmtLib.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: Line
     )
 }
 
-/** The chain variable standing for `Bᵏ · var`, with its exact defining row added on first use. */
+// The chain variable standing for `Bᵏ · var`, with its exact defining row added on first use.
 private fun SmtLib.Builder.chainVar(varId: Int, k: Int, isInt: Boolean): Int {
     val key = (varId.toLong() shl 3) or (k.toLong() shl 1) or (if (isInt) 1L else 0L)
     realChainVars[key]?.let { return it }
@@ -276,7 +274,7 @@ private fun SmtLib.Builder.chainVar(varId: Int, k: Int, isInt: Boolean): Int {
     return fresh
 }
 
-/** The auxiliary real pinned to 1 (for oversized row constants), created on first use. */
+// The auxiliary real pinned to 1 (for oversized row constants), created on first use.
 private fun SmtLib.Builder.oneVar(): Int {
     if (realOneVar >= 0) return realOneVar
     val fresh = nextReal++
@@ -408,15 +406,15 @@ private fun BigFraction.toExactDoubleOrNull(): Double? {
     return if (back == this) v else null
 }
 
-/** Coefficient magnitude cap for an emitted row: integers up to 2^53 are exact doubles. */
+// Coefficient magnitude cap for an emitted row: integers up to 2^53 are exact doubles.
 private const val MAX_EXACT_ROW = 1L shl 53
 
 private val MAX_EXACT_ROW_BIG = BigInteger.fromLong(MAX_EXACT_ROW)
 
-/** Chain-encoding digit base: digits stay far under the exact-double cap. */
+// Chain-encoding digit base: digits stay far under the exact-double cap.
 private const val WIDE_BASE = 1L shl 40
 
 private val WIDE_BASE_BIG = BigInteger.fromLong(WIDE_BASE)
 
-/** Digit cap for the chain encoding (`B⁴ = 2¹⁶⁰` covers any realistic decimal literal). */
+// Digit cap for the chain encoding (`B⁴ = 2¹⁶⁰` covers any realistic decimal literal).
 private const val WIDE_MAX_DIGITS = 4

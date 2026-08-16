@@ -14,11 +14,11 @@ import com.eignex.klause.util.IntArrayList
 
 /** CP propagator for [PseudoBoolean]: bounds propagation for `Σ weights_i * lit_i ⟨op⟩ bound`.
  *
- *  [watched] enables a weighted watched-literal wakeup scheme (#1119 Phase 3 lever 1), used for learned
+ *  [watched] enables a weighted watched-literal wakeup scheme, used for learned
  *  `≥` constraints so they don't wake on every literal change. While the summed weight of the non-false
  *  watched literals is at least `bound + maxCoeff`, the constraint has slack ≥ every coefficient and can
  *  neither propagate nor conflict — so it only needs to fire when a *watched* literal goes false. Base
- *  pseudo-Boolean constraints keep the occurrence-list wakeup (`watched = false`), unchanged. */
+ *  pseudo-Boolean constraints keep the occurrence-list wakeup (`watched = false`). */
 internal class PseudoBooleanPropagator(
     override val boolVars: IntArray,
     override val intVars: IntArray,
@@ -80,7 +80,7 @@ internal class PseudoBooleanPropagator(
     private fun propagateWatched(state: PropagationState, factorId: Int): Boolean {
         val old = state.refPayload[factorId] as? IntArray ?: EmptyIntArray
         val next = selectWatched(state)
-        // Reconcile watches: drop those no longer watched, install the newly watched. Safe to mutate the
+        // Reconcile watches against the new selection: drop the dropped, install the added. Safe to mutate the
         // watcher index here — propagate runs after the wakeup walk over the fired literal's list.
         for (lit in old) if (!next.contains(lit)) state.removeBoolWatch(factorId, lit)
         for (lit in next) if (!old.contains(lit)) state.installLitWatch(lit, factorId)
@@ -98,7 +98,7 @@ internal class PseudoBooleanPropagator(
 
     /**
      * Load this constraint into [acc] as a coefficient-carrying `≥` reason for pseudo-Boolean
-     * cutting-planes conflict analysis (#1119 Phase 3). `GE` loads directly; `LE` flips every literal's
+     * cutting-planes conflict analysis. `GE` loads directly; `LE` flips every literal's
      * polarity and sets the degree to `Σweights − bound`. An `EQ` is two `≥` constraints — the relevant
      * half is the one that forced [forcedLit] (forced-true own-literal ⇒ lower `≥` bound; forced-false ⇒
      * upper `≤` bound); with no forced literal (a seed) the direction is ambiguous and it falls back to

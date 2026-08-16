@@ -11,7 +11,7 @@ package com.eignex.klause.util
 internal class Bits(val size: Int) {
     @PublishedApi internal val words: LongArray = LongArray((size + 63) ushr 6)
 
-    // Single-bit get/set/clear sit on the propagation hot path  so no checks
+    // Single-bit get/set/clear sit on the propagation hot path, so they carry no index checks.
     fun get(i: Int): Boolean = (words[i ushr 6] ushr (i and 63)) and 1L == 1L
 
     fun set(i: Int) {

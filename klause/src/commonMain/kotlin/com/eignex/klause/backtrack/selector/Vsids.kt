@@ -7,7 +7,7 @@ import com.eignex.klause.util.IndexedMaxHeap
 import kotlin.random.Random
 
 /**
- * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001 / MiniSAT). The
+ * Variable State Independent Decaying Sum (Moskewicz et al., Chaff 2001). The
  * activity counter for each variable is bumped on every conflict the variable is implicated
  * in, with the bump amount `increment` growing geometrically over time so recent conflicts
  * dominate. Equivalent to per-bump multiplicative decay by a factor of [decay] applied
@@ -18,14 +18,13 @@ import kotlin.random.Random
  * (bools precede ints). Activities persist across [onRestart] — that's the whole point of
  * VSIDS, learning carries over.
  *
- * Pre-LCG limitation: today the engine's [Unsat]
- * carries the *decision variables* at conflict levels, not every variable on the
- * propagation-reason path. Bumping decision variables only gives a useful (if coarser)
- * signal — still consistently better than random / smallest-domain on hard instances. When
- * full conflict-graph attribution lands (alongside [no-good / lazy clause learning]) this
- * heuristic will see the richer set automatically through [onConflict].
+ * Attribution is coarse: the engine's [Unsat] carries the *decision variables* at conflict
+ * levels, not every variable on the propagation-reason path. Bumping decision variables only
+ * still gives a useful signal — consistently better than random / smallest-domain on hard
+ * instances — and a richer reason set would reach this heuristic through [onConflict]
+ * unchanged.
  *
- * Defaults follow MiniSAT: `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
+ * Default `decay = 0.95`. Lower decay (e.g., 0.8) makes the heuristic more
  * aggressive about following recent conflicts; higher (e.g., 0.99) is more conservative.
  */
 class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Double = 1e100) : VariableSelector {
@@ -40,8 +39,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
 
     // Combined index space: 0..numBool-1 are bool ids; numBool..numBool+numInt-1 are int ids
     // offset by numBool. One indexed max-heap over both gives O(log n) bumps and amortised
-    // O((1 + pinned-skip) · log n) picks instead of the O(numBool + numInt) linear scan the
-    // hand-rolled loop did.
+    // O((1 + pinned-skip) · log n) picks instead of an O(numBool + numInt) linear scan.
     private var heap: IndexedMaxHeap? = null
     private var numBoolCached: Int = 0
     private var numIntCached: Int = 0
@@ -73,7 +71,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
             val total = numBoolCached + numIntCached
             for (id in 0 until total) if (!h.contains(id)) h.restore(id)
         }
-        // MiniSAT-style decision pop: extract the max-activity id and *keep it out* of the
+        // Decision pop: extract the max-activity id and *keep it out* of the
         // heap. Already-pinned ids surfacing here (a propagated var sitting near the top) are
         // dropped, not restored — [onUnassign] re-inserts every variable a backtrack frees, so
         // the heap holds (roughly) only unassigned variables and pick stays O(log n) regardless
@@ -157,9 +155,8 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
     }
 
     /** Scale every activity (and `increment`) by `1/rescaleThreshold` so the relative
-     *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. Standard MiniSAT
-     *  rescale; the heap's [IndexedMaxHeap.scaleKeys] applies the uniform factor without
-     *  resifting. */
+     *  ordering is preserved but we step well clear of `Double.MAX_VALUE`. The heap's
+     *  [IndexedMaxHeap.scaleKeys] applies the uniform factor without resifting. */
     private fun rescaleAll(h: IndexedMaxHeap) {
         val k = 1.0 / rescaleThreshold
         h.scaleKeys(k)

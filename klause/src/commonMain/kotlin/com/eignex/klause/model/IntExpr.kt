@@ -137,9 +137,6 @@ data class SetCard(
     val set: SetExpr,
 ) : IntExpr
 
-// -----------------------------------------------------------------------------------
-//  Optional-variable globals
-// -----------------------------------------------------------------------------------
 // Each *Opt node mirrors its non-opt sibling but carries a parallel [presents] list of
 // Boolean expressions. The compiler reads each [BoolExpr] as a presence literal, threads
 // it into the corresponding factor's `presents: IntArray`, and the factor handles the

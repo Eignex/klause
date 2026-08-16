@@ -48,7 +48,7 @@ internal class FlatZincCompiler(
     override fun newBool(): Int = numBoolVars++
     override var trueLitCache: Int = -1
 
-    // LP-only continuous columns (issue #1232): the scalar float var names a prepass ([classifyLpOnlyFloats])
+    // LP-only continuous columns: the scalar float var names a prepass ([classifyLpOnlyFloats])
     // colours LP-only — each is lowered as a real variable rather than a bucket-index int, and the linear
     // float handlers emit real [Linear] rows the simplex resolves. Parallel real bounds by real var id.
     internal var lpOnlyFloats: Set<String> = emptySet()
@@ -57,7 +57,7 @@ internal class FlatZincCompiler(
 
     // Float var name -> the integer argument of the `int2float` that defines it (the float is that int's
     // continuous image). Lets a `float_times` with one such operand lower as an exact int·real product
-    // ([com.eignex.klause.factor.arithmetic.RealProduct]) rather than a bucket table (issue #1232, Phase 7).
+    // ([com.eignex.klause.factor.arithmetic.RealProduct]) rather than a bucket table.
     internal val int2floatSource = HashMap<String, FznExpr>()
 
     internal val enumLabelsByVar = HashMap<String, List<String>>()
@@ -410,7 +410,7 @@ internal class FlatZincCompiler(
 
     internal fun allocFloat(name: String, lo: Double, hi: Double): Int {
         if (name in lpOnlyFloats) {
-            // LP-only continuous column: a real variable, absent from CP search (issue #1232). The linear
+            // LP-only continuous column: a real variable, absent from CP search. The linear
             // float handlers emit real rows over it; the returned id is a real var id (not an int var).
             val rid = realLo.size
             realLo.add(lo)
@@ -440,7 +440,7 @@ internal class FlatZincCompiler(
         return (if (aInt) b else a) in scalarFloats
     }
 
-    // Colour each scalar float variable name LP-only or bucketed (issue #1232). A scalar float is LP-only
+    // Colour each scalar float variable name LP-only or bucketed. A scalar float is LP-only
     // iff its constraint-connected component is purely linear-in-reals: floats that share a constraint are
     // unioned (a single row is emitted over all of them, so they must share a representation), and a
     // component is tainted — kept bucketed — if any of its constraints is non-linear / strict / `ne` /

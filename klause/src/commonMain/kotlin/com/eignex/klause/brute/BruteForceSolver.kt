@@ -224,7 +224,6 @@ class BruteForceSolver(override val problem: BakedProblem) :
         for (p in window) if (candidate.hammingDistanceTo(p) < minDistance) return false
         return true
     }
-    // ---- chunked-space layout ----
 
     private enum class DimKind { BOOL, INT }
     private data class Dim(val kind: DimKind, val varId: Int, val radix: Long)

@@ -30,7 +30,7 @@ class OznApplier(oznSource: String) {
         }
         for ((name, b) in program.floatVarsByName) {
             // An LP-only continuous float carries its value on the sample's reals; a bucketed one via its
-            // bucket index (issue #1232).
+            // bucket index.
             val value = if (b.lpOnly) sample.reals[b.varId] else b.valueOf(sample.ints[b.varId].toInt())
             out[name] = OznValue.FloatV(value)
         }

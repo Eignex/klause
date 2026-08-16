@@ -24,11 +24,11 @@ import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
 import com.eignex.klause.localsearch.strategy.WalkSat
 
 /**
- * The local-search config search space (task #21) — the full sub-algorithm knob cross-product as a
+ * The local-search config search space — the full sub-algorithm knob cross-product as a
  * lazy [ConfigSpace], decoded into an [LocalSearchRecipe] by [toRecipe]. A `family` categorical
  * (cbls/probsat/walksat/sa/fjump) gates the per-family knobs (conditional params), so a CBLS-only
- * cap is inactive for a ProbSat point. This replaces the fixed 4-axis RecipeSpace + strategy=sweep
- * MAB: the BO searches this space directly and each evaluated point builds one recipe on demand.
+ * cap is inactive for a ProbSat point. The BO searches this space directly and each evaluated point
+ * builds one recipe on demand.
  */
 internal object LocalSearchConfigSpace : ConfigSpace(PARAMS) {
 
@@ -162,7 +162,6 @@ private fun family(vararg f: String): (Map<String, Any>) -> Boolean = { it["fami
 private val PARAMS: List<ConfigParam> = listOf(
     CategoricalParam("family", FAMILIES),
     CategoricalParam("restart", listOf("fixed", "luby", "perturb", "ils-basin")),
-    // CBLS
     CategoricalParam(
         "cbls.augment",
         listOf(
@@ -174,13 +173,10 @@ private val PARAMS: List<ConfigParam> = listOf(
     DoubleParam("cbls.noise", 0.0, 0.2, family("cbls")),
     IntParam("cbls.tabu", 0, 20, family("cbls")),
     CategoricalParam("cbls.scoring", listOf("weighted", "raw"), family("cbls")),
-    // probSAT
     CategoricalParam("probsat.variant", listOf("static", "adaptive", "bandit"), family("probsat")),
     DoubleParam("probsat.cb", 1.5, 3.0, family("probsat")),
-    // WalkSAT
     CategoricalParam("walksat.variant", listOf("fixed", "adaptive"), family("walksat")),
     DoubleParam("walksat.noise", 0.0, 0.6, family("walksat")),
     CategoricalParam("walksat.cc", listOf("false", "true"), family("walksat")),
-    // simulated annealing
     CategoricalParam("sa.schedule", listOf("geometric", "reheat", "phased"), family("sa")),
 )

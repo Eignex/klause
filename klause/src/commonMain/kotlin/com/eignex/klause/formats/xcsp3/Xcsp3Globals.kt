@@ -23,7 +23,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
-// XCSP3 global-constraint family emitters (allDifferent excepted) — split out of Xcsp3.kt.
+// XCSP3 global-constraint family emitters (allDifferent excepted).
 
 internal fun Xcsp3.Builder.count(e: XmlElement) {
     val vars = listVars(e)
@@ -278,7 +278,7 @@ private class StateInterner(sizeHint: Int) {
     }
 }
 
-/** Src/symbol/dst columns of a regular/mdd transition list, states interned to dense ids `1..[numStates]`. */
+// Src/symbol/dst columns of a regular/mdd transition list, states interned to dense ids `1..[numStates]`.
 private class InternedTransitions(
     val numStates: Int,
     val idOf: (String) -> Int,
@@ -321,7 +321,7 @@ private fun parseSym(s: String, from: Int, to: Int): Int {
 private fun internTransitions(text: String, firstState: String? = null): InternedTransitions {
     val n = text.length
     val interner = StateInterner(n / 8) // ~1 state per short transition tuple, an over-estimate
-    if (firstState != null) interner.internWhole(firstState) // pin its id to 1 (matches the old numbering)
+    if (firstState != null) interner.internWhole(firstState) // the start state must hold id 1
     val srcIds = IntArrayList()
     val symbols = IntArrayList()
     val dstIds = IntArrayList()
@@ -373,7 +373,7 @@ private inline fun Xcsp3.Builder.automatonFor(text: String, compute: () -> Regul
     return built
 }
 
-/** Assemble the transition table from interned transitions (symbols shifted to 1-based columns). */
+// Assemble the transition table from interned transitions (symbols shifted to 1-based columns).
 private fun buildAutomaton(trs: InternedTransitions, numStates: Int, q0: Int, accepting: IntArray): RegularAutomaton {
     var minSym = trs.symbols[0]
     var maxSym = trs.symbols[0]
@@ -455,7 +455,7 @@ private fun mddRoot(trs: InternedTransitions, isSrc: BooleanArray, isDst: Boolea
     return -1
 }
 
-/** Flattened-DFA fallback: a [Regular] automaton over the mdd's states (the sinks are the accepting set). */
+// Flattened-DFA fallback: a [Regular] automaton over the mdd's states (the sinks are the accepting set).
 private fun buildMddAutomaton(trs: InternedTransitions): RegularAutomaton {
     val q = trs.numStates
     val isSrc = BooleanArray(q + 1)

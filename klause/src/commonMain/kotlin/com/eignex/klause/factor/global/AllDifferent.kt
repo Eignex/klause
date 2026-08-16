@@ -41,19 +41,18 @@ class AllDifferent(
     /** Number of values in the shared value domain. */
     val domainSize: Int,
     /** Per-position presence literals; empty for the non-opt fast path. When non-empty,
-     *  only present positions are required pairwise-different, and Régin filtering treats
+     *  only present positions are required pairwise-different, and matching-based filtering treats
      *  unpinned-presence positions as "may yet be absent" — they neither demand a matching
      *  slot nor block other positions from claiming their value. */
     override val presents: IntArray = EmptyIntArray,
     /** Values exempt from the distinctness requirement: any number of variables may share a
-     *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family, #433).
-     *  Empty for plain all-different — then this factor behaves exactly as before. Excepted
-     *  values are modelled inside `reginFilter` as capacity-n value copies, so the exact
-     *  Hall/matching machinery applies unchanged. */
+     *  value in this set (the `alldifferent_except` / `alldifferent_except_0` family). Empty for
+     *  plain all-different. Excepted values are modelled inside `reginFilter` as capacity-n value
+     *  copies, so the exact Hall/matching machinery applies unchanged. */
     val exceptSet: LongArray = EmptyLongArray,
     /** When true, the constraint carried the FlatZinc `::bounds` annotation — the modeller
      *  asked for bounds-consistency rather than full GAC (e.g. ghoulomb's `distinct ::bounds`,
-     *  Régin's matching/SCC/Hall machinery is then skipped in favour of a much cheaper
+     *  the matching/SCC/Hall machinery is then skipped in favour of a much cheaper
      *  filter, trading pruning strength for per-node throughput as the model intends. */
     val boundsConsistent: Boolean = false,
 ) : Factor,
@@ -81,7 +80,7 @@ class AllDifferent(
             ).also { s -> for (e in exceptSet) s.add(e) }
         }
 
-    // Propagation strength: full GAC via Régin's matching + SCC algorithm over the
+    // Propagation strength: full GAC via bipartite matching plus SCC support pruning over the
     // definitely-present positions. IntDomain supports interior holes, so non-matching
     // value pruning lands at the variable domain level. Opt-aware: definitely-absent
     // positions are skipped entirely; unpinned-presence positions are skipped too, so any
@@ -101,12 +100,12 @@ class AllDifferent(
         sink.bool(boundsConsistent)
     }
 
-    /** Plain distinctness ignores which values are used — invariant under any value relabeling
-     *  (#366); an excepted-value set names those values, so it is no longer value-anonymous. */
+    /** Plain distinctness ignores which values are used — invariant under any value relabeling;
+     *  an excepted-value set names those values, so it is not value-anonymous. */
     override fun isValueAnonymous(): Boolean = exceptSet.isEmpty()
 
     /** Plain all-different names no value, so any relabeling leaves it unchanged; with an
-     *  excepted-value set the excepted values are named and must be relabeled too (#374). */
+     *  excepted-value set the excepted values are named and must be relabeled too. */
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (exceptSet.isEmpty()) {
         this
     } else {
@@ -131,7 +130,7 @@ class AllDifferent(
 
     // Structural reductions for a plain all-different (the optional / excepted-value variants have
     // weaker semantics and are left alone):
-    //  - two variables → the disequality `v0 != v1` (a cheap binary propagator instead of Régin);
+    //  - two variables → the disequality `v0 != v1` (a cheap binary propagator instead of matching);
     //  - otherwise, split into independent all-differents over value-disjoint components — when the
     //    variables' value ranges partition into groups that cannot share a value, distinctness across
     //    groups is automatic, so each group is its own (smaller, cheaper) all-different and any
@@ -180,7 +179,7 @@ class AllDifferent(
             }
             // domainSize is an Int-sized value-span used to size occurrence/matching scratch; a
             // component whose value range overflows Int can't be represented, so leave the whole
-            // constraint intact rather than emit an unsound split (Régin GAC still runs on it).
+            // constraint intact rather than emit an unsound split (matching GAC still runs on it).
             val span = hi - lo + 1
             if (span > Int.MAX_VALUE) return FactorReduction.Unchanged
             replacement.add(AllDifferent(group.toIntArray(), domainMin = lo, domainSize = span.toInt()))

@@ -7,7 +7,7 @@ import com.eignex.klause.util.LongArrayList
 
 /**
  * Time-indexed `x_{i,t}` relaxation of one scheduling [view] over the bounded horizon
- * `[T0, T1)` (#453). For each task a binary `x_{i,t} ∈ [0,1]` per declared-feasible start `t`
+ * `[T0, T1)`. For each task a binary `x_{i,t} ∈ [0,1]` per declared-feasible start `t`
  * (pinned to 0 when `t` left the live start domain — layout stable across nodes for warm
  * starts), with `Σ_t x_{i,t} = 1` (starts once), the start channel `Σ_t t·x_{i,t} = startᵢ`
  * (ties to the integer column), and per-time-point resource rows
@@ -18,17 +18,17 @@ import com.eignex.klause.util.LongArrayList
  * skipped (only loosens). Column and row emission order is warm-start load-bearing — the layout
  * must be reproducible across nodes, so nothing here may reorder by live state.
  *
- * ## No separate makespan row (#472)
+ * ## No separate makespan row
  * There is deliberately no disaggregated makespan row here. The makespan links through the
  * start channel and the model's own `M ≥ startᵢ + durᵢ` `Linear`s, so the LP makespan is
  * `Σ_t t·x_{i,t} + durᵢ` — the *expected* completion under a fractional `x`. The disaggregated
- * `M ≥ (t+durᵢ)·x_{i,t}` rows the issue weighed (and the completion-indicator step variant)
+ * disaggregated `M ≥ (t+durᵢ)·x_{i,t}` rows (and the completion-indicator step variant)
  * cannot tighten that: any makespan lower bound linear in one task's `x` is dominated by the
  * expected-completion value, which `M ≥ startᵢ + durᵢ` already attains exactly (verified — the
  * disaggregated rows raised the bound on 0 of 2623 structured instances). The only makespan
  * lever is the *cross-task* resource coupling above, which already lifts the bound past the
- * energetic windowed row (#430) on multi-capacity profiles. So the model is not redundant with
- * #430 for makespan, but the disaggregated strengthening would be; #472 closed as such.
+ * energetic windowed row on multi-capacity profiles. So the model is not redundant with the
+ * energetic makespan row, but the disaggregated strengthening would be.
  */
 internal fun RelaxationBuilder.buildCumulativeTimeIndexed(view: SchedulingView) {
     val n = view.starts.size

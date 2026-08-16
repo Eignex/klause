@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 /**
- * Three-tier learned-clause database classification (#201). The reduction policy in
+ * Three-tier learned-clause database classification. The reduction policy in
  * `BacktrackSolver` assigns and ages each learned clause through these tiers; the tier is
  * persistent per-clause state (rather than a pure function of LBD) so reuse can promote a
  * clause and idleness demote it.

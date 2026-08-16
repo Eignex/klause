@@ -226,14 +226,14 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
         IntCmpOp.NE -> LinearOp.NE
     }
     if (schemaFloatsLpOnly) {
-        // LP-only continuous columns (issue #1232): emit the raw double coefficients over the real
+        // LP-only continuous columns: emit the raw double coefficients over the real
         // columns, no bucket scaling. The gate admits only LE/GE/EQ float-linears here.
         val realVars = IntArray(n) { realVarIdByName.getValue(c.varNames[it]) }
         factors += Linear(EmptyIntArray, EmptyDoubleArray, realVars, c.coeffs.copyOf(), realOp, c.bound)
         return
     }
-    // Bucketed-int rewrite for the factor list. Reuses the same SCALE
-    // historically used by [com.eignex.klause.schema.FloatExpr.multiHandleBucketCompare].
+    // Bucketed-int rewrite for the factor list. Uses the same SCALE as
+    // [com.eignex.klause.schema.FloatExpr.multiHandleBucketCompare], so the two agree.
     val scale = 1_000_000.0
     var scaledBound = c.bound
     val scaledCoeffs = IntArray(n)
@@ -250,7 +250,7 @@ internal fun Lowering.assertFloatLinear(c: FloatLinearConstraint) {
     }
     // The scaled sum is integer-valued, so for a real bound B (= scaledBound * scale) a strict
     // `< B` is exactly `≤ ceil(B) − 1` and `> B` is `≥ floor(B) + 1`. Using ceil/floor (rather than
-    // truncate-then-±1) is correct when B is non-integral and for either sign (#83). Non-strict ops
+    // truncate-then-±1) is correct when B is non-integral and for either sign. Non-strict ops
     // keep the truncated bound.
     val scaledReal = scaledBound * scale
     val scaledBoundLong = when (c.op) {

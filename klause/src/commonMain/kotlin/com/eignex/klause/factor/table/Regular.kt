@@ -60,8 +60,8 @@ class Regular(
         Regular(seq.remapVars(intMap), numStates, alphabetSize, transitions, q0, accepting)
 
     /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
-     *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting states
-     *  (#531). */
+     *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting
+     *  states. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REGULAR, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
@@ -76,7 +76,7 @@ class Regular(
         sink.intVars(seq)
     }
 
-    /** Symbol-alphabet relabeling (#536): the `seq` values *are* the symbols, so a value permutation
+    /** Symbol-alphabet relabeling: the `seq` values *are* the symbols, so a value permutation
      *  permutes the transition table's symbol axis — `δ'(q, valueMap(s)) = δ(q, s)`. Sound because
      *  Regular has no positional-variable/constant coupling (unlike Element): swapping symbol values in
      *  a sequence and the matching columns preserves acceptance exactly. Returns `null` if [valueMap]
@@ -245,7 +245,7 @@ class Regular(
     }
 
     /*
-     * Pesant's layered-DAG GAC, now reversible and delta-driven (see `RegularIncrementalState`):
+     * Reversible, delta-driven layered-DAG GAC (see `RegularIncrementalState`):
      * per layer a state-bitset records forward-reachability from q0 and backward-co-reachability to
      * an accepting state, both on the engine undo trail. A symbol `s ∈ dom(seq[i])` survives iff some
      * forward-reachable state at `i` transitions on it to a co-reachable state at `i+1`; the conflict

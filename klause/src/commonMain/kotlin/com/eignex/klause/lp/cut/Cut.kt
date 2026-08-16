@@ -479,7 +479,7 @@ internal fun conflictGraph(problem: Problem): ConflictGraph {
  * `C`, so `Σ_{i∈C} x_i ≤ |C| − 1` is a valid inequality. Separation finds a violated cover greedily by
  * fractional value: take the highest-`x*` items until their weight exceeds `b`; if the resulting
  * cover's `Σ x*` exceeds `|C| − 1` the cut is violated and emitted. The cover is then minimised and
- * **lifted** (#552): every non-cover variable is up-lifted by sequential lifting — its coefficient is
+ * **lifted**: every non-cover variable is up-lifted by sequential lifting — its coefficient is
  * `αₖ = (|C| − 1) − max{ Σ aᵢxᵢ : Σ wᵢxᵢ ≤ b − wₖ }` over the already-lifted items, where the max is a
  * small DP. When an at-most-one clique graph is present (binary clauses / AMO factors), the max is
  * solved as a GUB knapsack (at most one item per clique), shrinking it and so strengthening the lift —
@@ -493,7 +493,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
     override fun separate(ctx: CutContext): List<Cut> {
         val cuts = ArrayList<Cut>()
         // At-most-one conflict graph (binary clauses + AMO factors), shared across all knapsacks. Used
-        // for GUB lifting: within a clique at most one item is 1, which strengthens the lift (#552).
+        // for GUB lifting: within a clique at most one item is 1, which strengthens the lift.
         val conflict = conflictGraph(ctx.problem).adjacency
         for (factor in ctx.problem.factors) {
             if (factor !is PseudoBoolean || factor.op != PbOp.LE) continue
@@ -539,7 +539,7 @@ internal class KnapsackCoverSeparator : CutSeparator {
                 }
             }
             val r = (coverCount - 1).toLong()
-            // Sequential up-lifting (#552): start from the cover (coefficient 1) and lift each non-cover
+            // Sequential up-lifting: start from the cover (coefficient 1) and lift each non-cover
             // variable k with the exact coefficient αₖ = r − max{ Σ aᵢxᵢ : Σ wᵢxᵢ ≤ b − wₖ over lifted
             // items, at most one per AMO clique }. The clique cap (GUB lifting) shrinks that max, giving
             // a larger — still valid — αₖ. The max is a small GUB-knapsack solved by DP; skip lifting

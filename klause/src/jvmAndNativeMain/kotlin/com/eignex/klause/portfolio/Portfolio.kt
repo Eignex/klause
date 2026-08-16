@@ -79,7 +79,7 @@ class Portfolio(
 
     /**
      * Parallel branch-and-bound minimisation (blocking) with a shared best bound. Each worker
-     * streams its own improvements **against the objective representation it was built with** (#63);
+     * streams its own improvements **against the objective representation it was built with**;
      * new incumbents fold into a shared bound exposed back to every worker through its bound supplier
      * (backtrack prunes on it; LS ignores it). A worker proving Optimal cancels the rest; otherwise
      * the global incumbent is returned as BestFound, or Optimal if every worker terminated cleanly.
@@ -153,7 +153,7 @@ class Portfolio(
         while (true) {
             val cur = incumbent.load()
             if (objective >= cur.bound) return false
-            // One CAS swaps bound + sample together so a reported bound always matches its sample (#81).
+            // One CAS swaps bound + sample together so a reported bound always matches its sample.
             if (incumbent.compareAndSet(cur, Incumbent(objective, sample))) return true
         }
     }
@@ -207,7 +207,7 @@ class Portfolio(
 }
 
 /** Immutable (bound, sample) pair published as one [AtomicReference] cell so the shared bound and
- *  the best sample are swapped together in a single CAS — they can never desync under a race (#81). */
+ *  the best sample are swapped together in a single CAS — they can never desync under a race. */
 private class Incumbent(val bound: Double, val sample: Sample?)
 
 /** Strategy knobs for [Portfolio]. Affects `solve` only; `samples` always fans in from every worker

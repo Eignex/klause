@@ -35,7 +35,7 @@ import com.eignex.klause.util.LongHashSet
  *
  * Why decomposition rather than reifying the native factor:
  *
- *  - Native factor propagators (Régin matching, Theta-tree, max-flow) detect *infeasibility*
+ *  - Native factor propagators (matching, Theta-tree, max-flow) detect *infeasibility*
  *    on partial states but don't produce a "the constraint is false right now" witness. A
  *    reified form needs both directions — true *and* false — so we'd have to invent the
  *    false-side machinery from scratch per factor. Decomposition gives both directions for
@@ -91,7 +91,7 @@ internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
         val d = domainOf(xLifted)
         for (v in d.min..d.max) unionSet.add(v)
     }
-    // Iterate in ascending value order (was a sorted set; commonMain has no sortedSetOf).
+    // Iterate in ascending value order so the lowering is deterministic; commonMain has no sortedSetOf.
     val perValue: List<IntExpr> = unionSet.toLongArray().sorted().map { v ->
         val anyHolds = expr.xs.indices.map { i ->
             And(listOf(expr.presents[i], IntCompare(expr.xs[i], IntCmpOp.EQ, IntLit(v.toInt()))))

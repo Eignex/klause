@@ -82,12 +82,8 @@ fun setOfInts(range: IntRange): IntSetLiteralTerm = IntSetLiteralTerm(range.toLi
 /** Builder for a nominal-set literal. Accepted everywhere a nominal-set handle is. */
 fun setOfLabels(vararg labels: String): NominalSetLiteralTerm = NominalSetLiteralTerm(labels.toList())
 
-// -----------------------------------------------------------------------------------
-//  Set operators
-// -----------------------------------------------------------------------------------
-// Mirror the README's promised surface: inSet, subsetOf, disjointFrom, union, intersect,
-// diff, eq, ne, card. Every operator is a thin AST constructor — the compiler does the
-// actual lowering against the indicator-bool encoding.
+// Every set operator is a thin AST constructor — the compiler does the actual lowering
+// against the indicator-bool encoding.
 
 /** `int ∈ set`. */
 infix fun IntTerm.inSet(s: SetTerm): BoolExpr = SetIn(this.toIntExpr(), s.toSetExpr())

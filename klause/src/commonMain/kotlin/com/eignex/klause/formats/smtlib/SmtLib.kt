@@ -239,7 +239,7 @@ object SmtLib {
             declare(name, e.atomAt(3, "declare-fun '$name' sort"))
         }
 
-        /** Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro. */
+        // Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro.
         private fun defineFun(e: SExpr.SList) {
             val name = e.atomAt(1, "define-fun name")
             val paramList = e.items.getOrNull(2) as? SExpr.SList
@@ -304,8 +304,8 @@ object SmtLib {
                     realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
                     // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
                     // integer-infeasible equality (e.g. a divisibility contradiction) would grind O(span)
-                    // at construction. Presolve's strengthen pass now catches that infeasibility first, at
-                    // solve time, before the (now-lazy) bake runs.
+                    // at construction. Presolve's strengthen pass catches that infeasibility first, at
+                    // solve time, before the lazy bake runs.
                 ),
                 objective,
                 intVarNames = LinkedHashMap(intNames),

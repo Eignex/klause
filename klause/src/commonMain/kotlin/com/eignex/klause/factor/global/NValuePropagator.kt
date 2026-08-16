@@ -44,7 +44,7 @@ internal class NValuePropagator(
         // atLeast / eq: the distinct count cannot exceed the maximum number of variables that can be
         // assigned pairwise-distinct values — a maximum bipartite var↦value matching. Tighter than
         // |union of domains|, which ignores that there are only `xs.size` variables. When the count is
-        // pinned to that maximum, a maximum matching is mandatory, so Régin value-pruning applies.
+        // pinned to that maximum, a maximum matching is mandatory, so matching-support pruning applies.
         if (mode != NValue.Mode.AtMost) {
             // The matching build enumerates each variable's domain. On a domain too large to walk fall
             // back to the trivial sound upper bound (distinct values ≤ number of variables) and skip the
@@ -59,7 +59,7 @@ internal class NValuePropagator(
                 return false
             }
         }
-        // atMost / eq: Beldiceanu's O(n+d) bound-consistency — the count is at least the size of a
+        // atMost / eq: O(n+d) bound-consistency — the count is at least the size of a
         // maximal set of pairwise-disjoint value windows, and when that lower bound meets `n`'s upper
         // bound every variable is forced into the window of its kernel representative.
         if (mode != NValue.Mode.AtLeast) {
@@ -68,7 +68,7 @@ internal class NValuePropagator(
         return true
     }
 
-    /** The original order-insensitive greedy bounds, retained for the optional-presence variant. */
+    /** Order-insensitive greedy bounds, the fallback for the optional-presence variant. */
     private fun propagateGreedy(state: PropagationState): Boolean {
         // The union / disjoint-window scans below enumerate each variable's domain. On a domain too large
         // to walk use a bounds-only bound instead: the distinct count is at most the number of possibly-
@@ -120,7 +120,8 @@ internal class NValuePropagator(
         return true
     }
 
-    /** A maximum bipartite matching between `xs` and their domain values (Kuhn's algorithm). */
+    /** A maximum bipartite matching between `xs` and their domain values, grown one augmenting path
+     *  per variable. */
     private class Matching(
         val varToVal: IntArray,
         val valToVar: IntArray,
@@ -159,7 +160,7 @@ internal class NValuePropagator(
     }
 
     /**
-     * Régin value-pruning for atLeast/eq once the count is pinned to the maximum matching size: a
+     * Matching-support value pruning for atLeast/eq once the count is pinned to the maximum matching size: a
      * maximum matching is then mandatory, so any var-value pair that lies in no maximum matching has
      * no support and is removed, while a matched pair that crosses a strong component (in every
      * maximum matching) is forced. Orientation: matched edges value→var, the rest var→value, with a
@@ -217,13 +218,13 @@ internal class NValuePropagator(
     }
 
     /**
-     * Bound-consistency for atMost (Beldiceanu, "Filtering Algorithms for the NValue Constraint").
-     * Mirrors choco's `PropAtMostNValues_BC`: a kernel is a maximal set of pairwise-disjoint
-     * `[lb, ub]` windows; its size lower-bounds the distinct count, and when it equals `n`'s upper
-     * bound each variable is squeezed into the window of its kernel representative. Bounds-only, so
-     * interior holes are ignored (sound — the interval over-approximates the domain). Each `while`
-     * iteration takes one snapshot of the bounds and runs both a lower-bound pass and an upper-bound
-     * pass off it (as in choco), looping until neither pass narrows anything.
+     * Bound-consistency for atMost (Beldiceanu, "Filtering Algorithms for the NValue Constraint")
+     * over kernels of disjoint bound windows: a kernel is a maximal set
+     * of pairwise-disjoint `[lb, ub]` windows; its size lower-bounds the distinct count, and when it
+     * equals `n`'s upper bound each variable is squeezed into the window of its kernel representative.
+     * Bounds-only, so interior holes are ignored (sound — the interval over-approximates the domain).
+     * Each `while` iteration takes one snapshot of the bounds and runs both a lower-bound pass and an
+     * upper-bound pass off it, looping until neither pass narrows anything.
      */
     private fun kernelBoundConsistency(state: PropagationState, ant: IntArray?): Boolean {
         val nv = xs.size
@@ -259,8 +260,8 @@ internal class NValuePropagator(
         lowerPass: Boolean,
     ): Int {
         // Scan variables in value order (lower bound ascending, or upper bound descending), ties by
-        // index descending — matching choco's bucket-and-reverse traversal so the kernel grouping is
-        // identical. A window closes whenever the next variable cannot overlap the running one. The
+        // index descending, so the kernel grouping is deterministic across fires. A window closes
+        // whenever the next variable cannot overlap the running one. The
         // sort key `primary` is `minVal` (or `-maxVal` to sort descending) and ties break by index
         // descending; sorting an index permutation by the full `Long` key (rather than packing key and
         // index into one word) keeps wide bounds intact.

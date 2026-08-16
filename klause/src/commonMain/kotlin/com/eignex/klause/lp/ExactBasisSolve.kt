@@ -4,7 +4,7 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
- * Exact feasibility of the float primal **point** itself (issue #1232): when every structural value the
+ * Exact feasibility of the float primal **point** itself: when every structural value the
  * float solve reported snaps to an exact dyadic rational `p_j / 2ᴷ`, verify that point satisfies every
  * row (`Σ aᵢⱼ zⱼ = rhs` for an equality slack, `≤ rhs` for an inequality one) and the box `0 ≤ zⱼ ≤ uⱼ`
  * exactly, in 128-bit integer arithmetic over the scaled-integer rationalization. Returns true only on a
@@ -108,8 +108,8 @@ private const val DEC_MAX_INT = 9.007199254740992E15
 
 /**
  * Exact primal-feasibility check of a reported LP [Basis] over an integer-coefficient [LpModel], in
- * bounded 128-bit arithmetic — the feasibility twin of [integerFarkasRay] (issue #1232, Phase 8). The
- * float simplex reports which `m` columns are basic and where each nonbasic column is pinned; this
+ * bounded 128-bit arithmetic — the feasibility twin of [integerFarkasRay]. The float simplex reports
+ * which `m` columns are basic and where each nonbasic column is pinned; this
  * reconstructs the basic solution `x_B = B⁻¹ b'` **exactly** (Cramer's rule over fraction-free / Bareiss
  * determinants, so every intermediate is an exact integer) and checks `0 ≤ x_B ≤ u` exactly.
  *

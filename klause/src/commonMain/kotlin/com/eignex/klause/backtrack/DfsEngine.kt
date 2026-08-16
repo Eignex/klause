@@ -196,7 +196,7 @@ internal class DfsEngine<L>(
                 rootExhausted =
                     EngineEvent.Exhausted(solver.coreOf(seedResult), solver.touchedToArray(touchedSeedLevels))
             } else {
-                // Import nogoods already in the shared pool before the first run (cross-arm, #381); the
+                // Import nogoods already in the shared pool before the first run (cross-arm); the
                 // session persists for the whole search so this arm's own clauses are never lost.
                 params.clauseExchange?.onSearchStart(session)
             }
@@ -229,7 +229,7 @@ internal class DfsEngine<L>(
         numSeed = assumptions.boolKeys.size + assumptions.intKeys.size
         touchedSeedLevels = if (numSeed > 0) IntHashSet() else null
         // Diff against the pins the previous fragment left standing rather than clearing to root: the
-        // shared complement carries over, so re-seeding a small-delta fragment stays cheap (#644).
+        // shared complement carries over, so re-seeding a small-delta fragment stays cheap.
         val seedResult = session.reseedFrom(assumptions)
         if (seedResult is PropagationResult.Unsat) {
             recordTouchedSeedLevels(seedResult.conflictLevels)
@@ -270,7 +270,7 @@ internal class DfsEngine<L>(
                 if (poller.due()) {
                     if (policy.cancelled()) {
                         // Publish trailing glue clauses so the next segment (this arm or a sibling)
-                        // imports them at its start (#381), then hand the cancellation to the driver.
+                        // imports them at its start, then hand the cancellation to the driver.
                         params.clauseExchange?.onSearchEnd(session)
                         return EngineEvent.Cancelled
                     }
@@ -400,10 +400,9 @@ internal class DfsEngine<L>(
         }
     }
 
-    /** Restart housekeeping. Returns a terminal [EngineEvent.Exhausted] when a root contradiction proves
-     *  exhaustion, else null. The side-effect order matches the pre-unification loops on both paths; the
-     *  optimize-only cut/bound exchanges ride the [SearchPolicy.onRestartCuts] / [SearchPolicy.onRestartBounds]
-     *  hooks placed exactly where they sat before. */
+    // Restart housekeeping. Returns a terminal [EngineEvent.Exhausted] when a root contradiction proves
+    // exhaustion, else null. The side-effect order is load-bearing: nogood drain and clause exchange run
+    // before the objective bound is asserted, so the bound is posted against the fully updated root.
     private fun doRestart(): EngineEvent<L>? {
         popTrailToRoot()
         val restartBlock = pendingBlock
@@ -433,8 +432,8 @@ internal class DfsEngine<L>(
     }
 
     /**
-     * Re-phase toward the best assignment any arm has published (#644 collaboration): if the shared pool
-     * now holds a solution this engine has not yet imported, adopt it as solution-phasing hints so the
+     * Re-phase toward the best assignment any arm has published: if the shared pool holds a solution
+     * this engine has not yet imported, adopt it as solution-phasing hints so the
      * stable phase dives toward the global incumbent rather than only this arm's own. Identity-gated so an
      * unchanged pool costs nothing. Pure heuristic — [PhaseSaving.onSolution]/[PhaseSaving.applyPhase] only
      * reorder value trials (clamping out-of-domain integers), so a foreign assignment cannot make the

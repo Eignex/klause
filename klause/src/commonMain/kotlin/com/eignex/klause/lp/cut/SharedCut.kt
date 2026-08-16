@@ -100,7 +100,7 @@ interface CutSharing {
 /**
  * Exchanges globally-valid cuts between a worker and a cross-worker store via the worker's [CutSharing]
  * view: import the cuts other workers published and export this worker's own. The pooled implementation
- * is [com.eignex.klause.portfolio.PoolCutExchange]; the portfolio wiring (#809) decides when [exchange]
+ * is [com.eignex.klause.portfolio.PoolCutExchange]; the portfolio wiring decides when [exchange]
  * fires (the restart boundary). Importing only ever adds globally-valid cuts, so it is sound regardless
  * of the worker's current search node.
  */

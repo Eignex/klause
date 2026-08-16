@@ -29,7 +29,7 @@ object PortfolioBuilder {
      * same objective for the local-search workers (see `LocalSearchParams.lsObjective`); backtrack
      * workers ignore it.
      *
-     * [definitionalSweep] is threaded into every LS worker (per-move invariants, #153). [onEvent]
+     * [definitionalSweep] is threaded into every LS worker (per-move invariants). [onEvent]
      * threads the [SearchEvent] seam through to every worker tagged with its label; workers run
      * concurrently under a parallel `Portfolio`, so the listener must be thread-safe and cheap.
      */
@@ -69,7 +69,7 @@ object PortfolioBuilder {
     }
 
     /**
-     * Override entry for the per-worker credit campaign (#9): materialise an **explicit** arm mix —
+     * Override entry for the per-worker credit campaign: materialise an **explicit** arm mix —
      * the LS configs named in [lsLabels] (or the whole pool for `["all"]`) plus [backtrackWorkers]
      * backtrack arms of [kind] — bypassing [PortfolioComposition] so the campaign can attribute
      * credit to an arbitrary composition. All other wiring matches [build].
@@ -136,7 +136,7 @@ object PortfolioBuilder {
      * from the executor's concurrency: a no-op under the single-threaded [SequentialPortfolio]
      * (`Concurrency.None`, zero overhead — the clause pool is just cross-segment memory there) and a
      * platform mutex under the parallel `Portfolio`'s concurrent writers. The clause pool is always
-     * present; the cut pool only when [PortfolioScenario.shareCuts] opts in (#809).
+     * present; the cut pool only when [PortfolioScenario.shareCuts] opts in.
      */
     private fun poolsFor(scenario: PortfolioScenario, problem: BakedProblem): SharedPools? {
         if (scenario.engine == EngineMix.LOCAL_SEARCH) return null

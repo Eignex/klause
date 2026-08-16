@@ -580,8 +580,8 @@ internal fun buildPortfolioScenario(
  *  - the per-solver override keys ([BACKTRACK_OVERRIDE_KEYS] — `var-selector`/`val-selector`/`luby`/…)
  *    *edit the curated pool* ([backtrackOverride]): every arm keeps its own seed/lp/luby diversity with
  *    the override pinned across it, so `-p8 -e cp --param var-selector=vsids` stays a full 8-worker pool
- *    (the arms converge to one only if the overrides pin every distinguishing axis). This subsumes the
- *    former single `cp-single` engine — its one-solver A/B is just this pool at `-p1`.
+ *    (the arms converge to one only if the overrides pin every distinguishing axis). A one-solver A/B
+ *    is this same pool at `-p1`.
  *
  * `null` when neither is set — the curated pool is used. A resolved pool is the *set* of arms; the
  * worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as `lsPool` does.
@@ -617,13 +617,13 @@ internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> Backtrack
 private fun editRecipe(recipe: BacktrackRecipe, edit: (BacktrackParams) -> BacktrackParams): BacktrackRecipe =
     BacktrackRecipe(recipe.label) { seed, onEvent -> edit(recipe.build(seed, onEvent)) }
 
-/** Auto-tuned default arm-pool size, scaling with the core count (#406): [ARMS_PER_CORE] arms per
+/** Auto-tuned default arm-pool size, scaling with the core count: [ARMS_PER_CORE] arms per
  *  core — always *more* arms than cores, so the bandit (single core) / parallel race always has a
  *  pool to draw on — floored at [PortfolioScenario.DEFAULT_ARMS] so the single-core free track still
  *  gets a real pool. Overridable via `--param arms=N`. */
 internal fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * ARMS_PER_CORE)
 
-/** Default arms-per-core oversubscription factor for [autoArms] (a #9 tuning knob). */
+/** Default arms-per-core oversubscription factor for [autoArms]. */
 private const val ARMS_PER_CORE = 2
 
 /** `var-selector` `--param` values for the `cp` engine's override pool (each maps to a [VariableSelector]).

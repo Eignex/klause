@@ -7,7 +7,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
 /*
- * Reversible, delta-driven Régin GAC for plain alldifferent (no excepted values) — the incremental
+ * Reversible, delta-driven matching GAC for plain alldifferent (no excepted values) — the incremental
  * counterpart to the full per-fire rebuild in reginFilter. State lives in ReginIncrementalState
  * (declared with ReginCache in ReginMatcher.kt): the maximum matching and the canonical SCC labels
  * ride the engine undo trail, so a backtrack restores them in O(changes) rather than triggering a
@@ -20,7 +20,7 @@ import com.eignex.klause.util.MutableIntObjectMap
  * conflict reasons (ReginIncrementalTest, AllFactorsOracle, AllDifferentTest, ReginGacTest).
  */
 
-/** Incremental Régin GAC for [vars] (plain alldifferent). Returns `null` after pruning to the GAC
+/** Incremental matching GAC for [vars] (plain alldifferent). Returns `null` after pruning to the GAC
  *  fixpoint, or the Hall-violator variable ids on infeasibility — same contract as [reginFilter]. */
 internal fun reginIncremental(state: PropagationState, vars: IntArray, cache: ReginCache): IntArray? {
     val inc = cache.incremental(state, vars)
@@ -150,7 +150,7 @@ private fun buildValuesPerVar(state: PropagationState, vars: IntArray, cache: Re
  *  [dirtyLabels] = `null` recomputes every SCC label (the rebuild path). A non-null set recomputes
  *  only the components with those labels (the delta path): deleting an intra-component edge can
  *  only *split* that component, never merge or alter any other, so the partition restricted to a
- *  dirty old component is recovered by re-running Tarjan on that component's nodes alone (edges kept
+ *  dirty old component is recovered by re-running the SCC pass on that component's nodes alone (edges kept
  *  only between same-old-label endpoints). Canonical min-node labels make the two paths agree. */
 private fun reginSccReachPrune(
     state: PropagationState,
@@ -233,7 +233,7 @@ private fun reginSccReachPrune(
 /** Recompute SCC labels only for nodes whose current (old) label is in [dirtyLabels]. Each such
  *  component is re-decomposed on its own nodes, keeping only edges between same-old-label endpoints
  *  (so distinct dirty components are not merged), and the resulting sub-components are canonically
- *  relabelled by their minimum global node id — matching what a full canonical Tarjan would yield,
+ *  relabelled by their minimum global node id — matching what a full canonical SCC pass would yield,
  *  since deletion only splits components. */
 private fun reginRecomputeDirtyScc(
     adj: Array<IntArrayList>,

@@ -18,8 +18,8 @@ import com.eignex.klause.util.MutableIntIntMap
 import kotlin.math.ceil
 
 /**
- * Subgradient Lagrangian bound for a 0/1 **multi-knapsack** decomposition (#572 / #632 — a
- * non-assignment exact subproblem). For `minimize Σ cᵢ·xᵢ` over Boolean variables subject to several
+ * Subgradient Lagrangian bound for a 0/1 **multi-knapsack** decomposition over a
+ * non-assignment exact subproblem. For `minimize Σ cᵢ·xᵢ` over Boolean variables subject to several
  * `PseudoBoolean` capacity rows `Σ aᵢ·xᵢ ≤ Cap`, **one** capacity row is kept as the subproblem and
  * solved **exactly** by 0/1-knapsack dynamic programming, while the remaining `PseudoBoolean` rows are
  * **dualized** with multipliers λ. For any valid-sign λ,
@@ -28,9 +28,9 @@ import kotlin.math.ceil
  * bound. The exact knapsack captures integrality the monolithic LP relaxes away, so at good λ the
  * bound can exceed the LP bound — the point of decomposition over plain relaxation.
  *
- * ## Why a knapsack (and not the scheduling subproblem #632 also lists)
+ * ## Why a knapsack (and not a single-machine scheduling subproblem)
  * The 0/1 knapsack DP is exact, pseudo-polynomial, and unambiguously sound; the single-machine
- * scheduling subproblem #632 also names overlaps klause's edge-finding propagation and was deferred
+ * scheduling alternative overlaps klause's edge-finding propagation and was deferred
  * for that reason (see [CumulativeEnergeticBound]). This is the self-contained, clearly-sound slice.
  *
  * ## Exactness

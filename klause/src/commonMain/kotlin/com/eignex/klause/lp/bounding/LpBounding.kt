@@ -123,7 +123,7 @@ internal class LpNogoodPool(private val cap: Int = 4096) {
 }
 
 /**
- * LP-relaxation bounding, reduced-cost fixing and infeasibility pruning (#705) for one search node,
+ * LP-relaxation bounding, reduced-cost fixing and infeasibility pruning for one search node,
  * over the sparse revised-simplex pipeline (the only LP path). Builds the relaxation, solves it in
  * float, and prunes when it is infeasible (exact Farkas certificate) or its safe objective bound
  * reaches the incumbent; also propagates the objective variable and fixes reduced-cost-dominated
@@ -157,8 +157,8 @@ internal fun LpEngine.lpBoundAndFix(
 }
 
 /**
- * Fold the pooled global cuts the LP point [res] violates into the node relaxation and re-solve
- * (#40 / D8). [CutPool.select] ranks the pool by efficacy (normalised violation) at [res], drops the
+ * Fold the pooled global cuts the LP point [res] violates into the node relaxation and re-solve.
+ * [CutPool.select] ranks the pool by efficacy (normalised violation) at [res], drops the
  * cuts the point already satisfies, and keeps a mutually-orthogonal subset — so only cuts that actually
  * move this point are loaded, bounding the per-node cut count by efficacy rather than the whole pool.
  * Returns the tightened `(relaxation, result)` when a cut subset re-solves, else [base]/[res] unchanged
@@ -187,7 +187,7 @@ private fun LpEngine.foldSelectedCuts(
 }
 
 /**
- * Cheap sound prune + objective-bound propagation for the LP path (#705): float revised
+ * Cheap sound prune + objective-bound propagation for the LP path: float revised
  * simplex for the duals, then the O(nnz) Neumaier–Shcherbina safe bound — no exact certify on the
  * common path, so the per-node cost is bounded and `-t` is honored. Prunes when the relaxation is
  * infeasible (exact Farkas certificate) or the safe bound reaches the incumbent, tightens an
@@ -286,14 +286,14 @@ internal fun LpEngine.sparseSafePrune(
     val floatResult = simplex.solve(warm)
     if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
     val result = floatResult ?: run {
-        // Infeasibility prune (#705): a dual-unbounded termination is only a *candidate* infeasibility —
+        // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
         // Any other failure (non-convergence / singular) keeps the node.
         val floatRay = simplex.infeasibleRay
         val ray = if (floatRay != null) integerFarkasRay(model, floatRay) else null
         if (ray != null) {
             sink.lp.observeInfeasiblePrune()
-            // With learning, the Farkas ray becomes a bound-atom nogood (#247) for a 1UIP backjump;
+            // With learning, the Farkas ray becomes a bound-atom nogood for a 1UIP backjump;
             // null (auxiliary column / unbacked non-global row / constraint-only) prunes reason-less.
             val clause = if (learn) LpExplanation.infeasibilityClause(relaxation, ray, session) else null
             return LpNodeOutcome(true, null, clause)
@@ -318,11 +318,11 @@ internal fun LpEngine.sparseSafePrune(
     }
     sink.lp.observePivots(result.pivots)
     sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity)
-    // LP-guided branching (#287): record the fractional primal + reduced costs so the descent can order
+    // LP-guided branching: record the fractional primal + reduced costs so the descent can order
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
     hints?.record(relaxation, result.primal, result.duals)
-    // The optimal basis is cached by the caller and reused to warm-start this node's children (#705).
+    // The optimal basis is cached by the caller and reused to warm-start this node's children.
     // It is the basis of the un-tightened persistent relaxation, which the children re-solve.
     val optimalBasis = result.basis
     val canPrune = bound.isFinite()
@@ -330,12 +330,12 @@ internal fun LpEngine.sparseSafePrune(
     if (!canPrune && !canPropagate) {
         return LpNodeOutcome(false, optimalBasis) // feasible, nothing more to deduce
     }
-    // During-search separation (#41): at a gated shallow node, tighten this node's relaxation with the
+    // During-search separation: at a gated shallow node, tighten this node's relaxation with the
     // cuts its LP point violates. Global cuts are persisted into the pool (descendants inherit them);
     // node-local cuts tighten only this solve, so they never leak to a sibling and the bound stays sound.
     // The bound, certificate and reduced-cost fixing below read the tightened relaxation; the cached
     // warm-start basis stays the cut-free one for the children.
-    // The pooled global cuts this node's LP point violates are folded in first (#40 / D8): the
+    // The pooled global cuts this node's LP point violates are folded in first: the
     // most-effective, mutually-orthogonal subset chosen by CutPool.select, re-solved once. A subset of
     // globally-valid cuts only tightens the bound, and selecting against the live point loads just the
     // cuts that move it — bounding the per-node cut count by efficacy instead of the whole pool.
@@ -349,7 +349,7 @@ internal fun LpEngine.sparseSafePrune(
         var rounds = 0
         while (rounds++ < SEARCH_CUT_ROUNDS && !cancellation()) {
             val ctx = CutContext(problem, boundRel, boundRes.primal, session)
-            // Per-separator gating (#59): skip a family the gate has disabled for being unproductive, and
+            // Per-separator gating: skip a family the gate has disabled for being unproductive, and
             // credit each family it does run with whether it produced a violated cut this round.
             val fresh = ArrayList<Cut>()
             for (i in lpSeparators.indices) {
@@ -378,7 +378,7 @@ internal fun LpEngine.sparseSafePrune(
         sink.lp.observePrune()
         return LpNodeOutcome(true, null)
     }
-    // The exact basis-certificate backs both the learnable objective-bound reason (#281/#705) and the
+    // The exact basis-certificate backs both the learnable objective-bound reason and the
     // reduced-cost fixing. Compute it once when either needs it; a singular/unbounded certify yields
     // null and both fall back to the cheap reason-less paths, which is sound.
     val cert = if ((learn && canPropagate) || canPrune) {
@@ -386,7 +386,7 @@ internal fun LpEngine.sparseSafePrune(
     } else {
         null
     }
-    // Objective-bound propagation (#281): the integer objective is ≥ ceil(LP lower bound). With
+    // Objective-bound propagation: the integer objective is ≥ ceil(LP lower bound). With
     // learning, propagate the exact certified bound (tighter than the safe bound) and attach the
     // reduced-cost reason so an Unsat tightening backjumps; otherwise tighten to ceil(safe bound)
     // reason-less (a sound conflict-analysis leaf). The safe bound only under-estimates the optimum,
@@ -426,7 +426,7 @@ internal fun LpEngine.sparseSafePrune(
             }
         }
     }
-    // Reduced-cost fixing (#21) on the exact certified reduced costs — needs a finite incumbent for
+    // Reduced-cost fixing on the exact certified reduced costs — needs a finite incumbent for
     // the improving gap, so it runs only when pruning is possible.
     if (canPrune && cert != null &&
         applySparseReducedCostFixing(
@@ -439,7 +439,7 @@ internal fun LpEngine.sparseSafePrune(
 }
 
 /**
- * Reduced-cost fixing (#21/#282) from the [IntegerCertificate], over exact scaled integers. At the LP
+ * Reduced-cost fixing from the [IntegerCertificate], over exact scaled integers. At the LP
  * optimum a nonbasic column sits at a bound; moving it Δ integer steps raises the
  * objective by `|reducedCost|·Δ`, and any incumbent-beating solution has objective `≤ ⌈bound⌉ − 1`, so
  * the column can move at most `floor((improvingMax − lpOptimum) / |reducedCost|)` steps before it alone
@@ -463,7 +463,7 @@ internal fun LpEngine.applySparseReducedCostFixing(
     val improvingMax = ceil(bound).toLong() - 1L // best objective that still beats the incumbent
     if (!cert.improvingGapNonNegative(improvingMax)) return false // gap ≥ 0 (node not bound-pruned)
     val status = basis.status
-    // Learnable reason support (#282): a fixing of column `col` is justified
+    // Learnable reason support: a fixing of column `col` is justified
     // by the OTHER support columns' seated bounds (premise side = reduced-cost sign) + the incumbent
     // bound `objVar ≤ improvingMax` + the validity premises of any dual-weighted non-global row.
     // Expressible only with a single-var ascending objective whose live upper bound already meets the
@@ -649,7 +649,7 @@ internal fun LpEngine.rootLpObjective(
 }
 
 /**
- * Harvest a persistent pool of **global** cuts from the root relaxation (#22/#705) on the sparse
+ * Harvest a persistent pool of **global** cuts from the root relaxation on the sparse
  * revised-simplex path. Each round solves the (cut-augmented) root LP, separates violated cuts from the
  * LP point, and keeps the fresh ones; because the separation reads the undecided root domains, every
  * harvested cut is valid at *every* solution of the problem, so it is forced [Cut.global] = true and
@@ -698,13 +698,13 @@ internal fun LpEngine.harvestRootCuts(
     return pool.cuts()
 }
 
-/** Most Gomory cuts to draw from one tableau per separation round (#22). */
+/** Most Gomory cuts to draw from one tableau per separation round. */
 internal const val GOMORY_CUTS_PER_ROUND: Int = 8
 
 /** Separation rounds when harvesting the persistent root cut pool. */
 internal const val CUT_POOL_ROUNDS: Int = 8
 
-/** Separation rounds per during-search node (#41) — fewer than the root harvest, since the node solve
+/** Separation rounds per during-search node — fewer than the root harvest, since the node solve
  *  repeats deeper in the tree. */
 internal const val SEARCH_CUT_ROUNDS: Int = 4
 

@@ -74,7 +74,7 @@ sealed interface FExpr {
             is Num, is SetLit -> template
         }
 
-        /** The index `i` of a `%i` placeholder [Ref] name, or `-1` for an ordinary variable reference. */
+        // The index `i` of a `%i` placeholder [Ref] name, or `-1` for an ordinary variable reference.
         private fun placeholderIndex(name: String): Int {
             if (name.length < 2 || name[0] != '%') return -1
             for (k in 1 until name.length) if (!name[k].isDigit()) return -1

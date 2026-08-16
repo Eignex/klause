@@ -10,7 +10,7 @@ import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
 
 /**
- * At-most-one clique merging (#17, OR-Tools `TransformIntoMaxCliques` materialisation). The scattered
+ * At-most-one clique merging. The scattered
  * pairwise exclusion constraints of a problem — a binary clause `(a ∨ b)` excludes the literal pair
  * `{¬a, ¬b}`, a `Cardinality(max = 1)` excludes every pair of its literals — form a conflict graph;
  * [PresolveShared.maximalPersistentAmoCliques] grows the base cliques into maximal ones. This pass

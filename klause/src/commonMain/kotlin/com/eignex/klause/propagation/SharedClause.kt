@@ -63,7 +63,7 @@ interface ClauseExchange {
      *  restart, so clauses the arm already holds are not re-imported. */
     fun onRestart(session: PropagationSession)
 
-    /** Full (re)import at the post-seed root before the first DFS run (#381). Unlike [onRestart] this
+    /** Full (re)import at the post-seed root before the first DFS run. Unlike [onRestart] this
      *  fires on a *fresh* session — a single-threaded portfolio rebuilds the session every scheduled
      *  segment, so its learned DB is empty and the arm must re-import the whole pool, **including its
      *  own** clauses from earlier segments (which a persistent session would still hold). The session

@@ -44,7 +44,7 @@ internal class ClausePropagator(
         if (literals.size == 1) null else intArrayOf(literals[1], literals[0])
 
     /**
-     * Two-watched-literal propagation (Zhang–Stickel / MiniSAT). Caches a pair of literal
+     * Two-watched-literal propagation (Zhang–Stickel). Caches a pair of literal
      * indices on [PropagationState.refPayload]; each fire checks at most those two before
      * looking further. Common case (both watches non-false): returns in O(1) regardless of
      * clause arity. Slow case (a watch turned false): scans for a non-false replacement,

@@ -59,7 +59,7 @@ private fun renderScalar(program: FlatZincProgram, sample: Sample, name: String)
     throw IllegalArgumentException("output: unknown var `$name`")
 }
 
-/** Reconstruct MiniZinc set output `{a, b, c}` from indicator bools. */
+// Reconstruct MiniZinc set output `{a, b, c}` from indicator bools.
 private fun renderSet(sample: Sample, layout: SetVarLayout): String {
     val sb = StringBuilder("{")
     var first = true

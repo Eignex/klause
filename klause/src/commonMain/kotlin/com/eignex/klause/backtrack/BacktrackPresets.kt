@@ -18,7 +18,7 @@ object BacktrackPresets {
      * Competitive modern-CDCL configuration for SAT-style search:
      *  - VSIDS activity branching;
      *  - phase saving plus target phasing with periodic rephasing;
-     *  - glucose-style adaptive restarts with trail-size blocking;
+     *  - LBD-adaptive restarts with trail-size blocking;
      *  - a capped three-tier learned-clause database with promotion on reuse;
      *  - binary-resolution learned-clause minimization (always on in the analyzer).
      *

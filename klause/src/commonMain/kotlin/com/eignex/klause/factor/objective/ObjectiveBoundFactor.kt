@@ -51,7 +51,7 @@ private fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProbl
 
 /**
  * Shared, mutable upper bound on an objective's weighted sum `Σ w·b + Σ c·i` — the ratchet knob for
- * the objective-as-constraint local-search arm (#928 follow-up). The [ObjectiveBoundFactor] reads
+ * the objective-as-constraint local-search arm. The [ObjectiveBoundFactor] reads
  * [value]; the minimize engine calls [tightenBelow] each time it reaches a feasible incumbent, so the
  * factor goes violated again and the feasibility fight repairs "beat the incumbent" like any other
  * constraint. [Long.MAX_VALUE] (the initial value) is inactive: the raw sum never exceeds it, so the

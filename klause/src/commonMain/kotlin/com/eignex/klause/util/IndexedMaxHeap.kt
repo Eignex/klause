@@ -104,8 +104,8 @@ internal class IndexedMaxHeap(val capacity: Int) {
     }
 
     /** Reset every id's key to [value] and rebuild the heap in ascending id order, so
-     *  equal-key ties resolve to the lowest id (preserves the historical "id-order tie-break"
-     *  of the linear-scan pickers ABS / DomWdeg replaced). Requires `size == capacity` —
+     *  equal-key ties resolve to the lowest id — the deterministic tie-break the variable pickers
+     *  (ABS, DomWdeg) depend on after a key reset. Requires `size == capacity` —
      *  callers in the variable-picker world hold the full set between picks (skip buffers
      *  get restored before pick returns). O(n). */
     fun resetAllKeysInIdOrder(value: Double) {

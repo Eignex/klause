@@ -43,7 +43,6 @@ private fun FlatZincCompiler.intVarUnionBounds(vars: IntArray): Pair<Long, Long>
     return lo to hi
 }
 
-/** Emit `alldifferent_except(xs, except)`. */
 private fun FlatZincCompiler.emitAllDifferentExcept(vars: IntArray, except: LongArray) {
     emitAllDifferentCore(vars, exceptSet = except, boundsConsistent = false)
 }
@@ -342,7 +341,6 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint) {
     factors.add(Cumulative.unary(starts = starts, durations = durations, durationVars = durationVars))
 }
 
-/** Returns `(constOrUbValues, vars)` for int arrays. */
 private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongArray, IntArray> {
     val asConst = tryEvalIntConstArrayLong(e)
     if (asConst != null) return asConst to EmptyIntArray
@@ -351,7 +349,6 @@ private fun FlatZincCompiler.resolveIntArrayConstOrVars(e: FznExpr): Pair<LongAr
     return ubs to vars
 }
 
-/** Returns `(constOrUb, varId)` for int scalar arguments. */
 private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
     val asConst = evalIntConstOrNull(e)
     if (asConst != null) return asConst.toInt() to -1
@@ -359,7 +356,7 @@ private fun FlatZincCompiler.resolveIntConstOrVar(e: FznExpr): Pair<Int, Int> {
     return intDomains[varId].max.toInt() to varId
 }
 
-/** Returns `(constOrUb, varId)` for int scalar arguments whose value may exceed 32-bit range. */
+// Returns `(constOrUb, varId)` for int scalar arguments whose value may exceed 32-bit range.
 private fun FlatZincCompiler.resolveLongConstOrVar(e: FznExpr): Pair<Long, Int> {
     val asConst = evalIntConstOrNull(e)
     if (asConst != null) return asConst to -1
@@ -367,7 +364,7 @@ private fun FlatZincCompiler.resolveLongConstOrVar(e: FznExpr): Pair<Long, Int> 
     return intDomains[varId].max to varId
 }
 
-/** Shared body for `{exactly,at_least,at_most}_int`. */
+// Shared body for `{exactly,at_least,at_most}_int`.
 private fun FlatZincCompiler.emitCountComparison(
     c: FznConstraint,
     tag: String,

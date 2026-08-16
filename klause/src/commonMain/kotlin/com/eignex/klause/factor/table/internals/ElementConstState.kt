@@ -17,8 +17,8 @@ import com.eignex.klause.util.toSortedLongArray
 /*
  * Reversible, delta-driven GAC for the constant-array element constraint `result = arr(idx)` — the
  * incremental counterpart to Element.propagateConstArray's full O(idx + result + len) rescan + per-
- * prune O(span) domain rebuild on every fire. That rebuild-each-fire shape was the dominant per-node
- * cost on element-heavy instances (liner-sf, #612: ~28 O(span) excludeValues rebuilds/node).
+ * prune O(span) domain rebuild on every fire. That rebuild-each-fire shape is the dominant per-node
+ * cost on element-heavy instances (liner-sf: ~28 O(span) excludeValues rebuilds/node).
  *
  * State (ElementConstState, stored in refPayload like ReginCache):
  *  - A *support count* per distinct constant value: how many live idx positions hold it. result value

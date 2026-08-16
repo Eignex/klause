@@ -137,8 +137,8 @@ class SExprReader(private val reader: CharReader) {
         }
     }
 
-    // Append the character under the cursor and consume it — the streaming analogue of the old
-    // `src.substring(start, pos)` token capture.
+    // Append the character under the cursor and consume it — the streaming analogue of a
+    // `substring(start, pos)` token capture.
     private fun StringBuilder.appendCurrent() {
         append(reader.peek().toChar())
         reader.advance()

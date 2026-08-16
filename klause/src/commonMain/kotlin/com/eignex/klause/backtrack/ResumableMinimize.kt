@@ -53,8 +53,8 @@ internal sealed interface StepEvent {
  * Two callers drive it, differing only in [pausable]:
  *  - [BacktrackSolver.improvements] streams it lazily — one [StepEvent.Incumbent] yielded per call, then the terminal;
  *    a fired cancellation is a hard stop.
- *  - [runSlice] runs it one time slice at a time for [com.eignex.klause.portfolio.SequentialPortfolio]
- *    (#381): a fired slice deadline pauses ([StepEvent.Paused]); a later call resumes mid-tree so the
+ *  - [runSlice] runs it one time slice at a time for [com.eignex.klause.portfolio.SequentialPortfolio]:
+ *    a fired slice deadline pauses ([StepEvent.Paused]); a later call resumes mid-tree so the
  *    arm never cold-restarts.
  */
 internal class ResumableMinimize(
@@ -74,7 +74,7 @@ internal class ResumableMinimize(
      *  exhausted search with no incumbent must report `unknown` rather than Infeasible. */
     private var sawIndeterminateLeaf = false
 
-    // #429: the LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
+    // The LP-relaxation family is resolved from [BacktrackParams.lpConfig] inside [LpEngine]
     // (the single intent→plan home), so this carries the caller's params verbatim — only the slice
     // cancellation and Hamming knobs are fixed here; the per-slice deadline is re-armed in runSlice.
     // The caller's own token (drives the non-pausable one-shot path); superseded by the slice in
@@ -96,7 +96,7 @@ internal class ResumableMinimize(
     private fun objectiveHasWeight(): Boolean =
         objective.boolWeights.any { it != 0L } || objective.intCoefficients.any { it != 0L }
 
-    // --- Slice control (no coroutine): a re-armable deadline + the current global token. ---
+    // Slice control without a coroutine: a re-armable deadline plus the current global token.
     private var globalToken: Cancellation = Cancellation.Never
     private var sliceEnd: TimeSource.Monotonic.ValueTimeMark? = null
 
@@ -110,7 +110,6 @@ internal class ResumableMinimize(
         baseCancellation()
     }
 
-    // --- Incumbent + objective-bound propagation state. ---
     private var best: Sample? = null
     private var bestObj: Double = Double.POSITIVE_INFINITY
     private val singleObj = objective.singleIntObjective()
@@ -120,9 +119,9 @@ internal class ResumableMinimize(
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffRhs: Long? = null
 
-    // --- LP-relaxation family state (built once; persists across slices = rolling warm starts).
-    // Always constructed so the always-on linear lower bound runs; its internal bounds are null/empty
-    // when their feature flag is off. ---
+    // Built once; persists across slices, so warm starts roll forward. Always constructed so the
+    // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
+    // is off.
     private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink)
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
@@ -181,7 +180,7 @@ internal class ResumableMinimize(
     }
 
     /**
-     * Re-drive this search on a new [assumptions] set with a fresh [decisionBudget] (#644 LNS repair):
+     * Re-drive this search on a new [assumptions] set with a fresh [decisionBudget] (LNS repair):
      * [DfsEngine.reseed]s the persistent session and resets the fragment incumbent, while the LP
      * relaxation warm start and the session's learned-clause database survive. The caller must drive
      * successive repairs against a monotone non-increasing objective cutoff (see [DfsEngine.reseed]).
@@ -321,8 +320,8 @@ internal class ResumableMinimize(
      * One-shot pre-search root work (harvest the global cut pool, capture the root relaxation bound for
      * the integrality-gap metric, root shaving, bound exchange, and the primal probes). Run on the first
      * engine step so the live cancellation gates the LP solves. Returns the first incumbent if a probe
-     * seeds one (in which case the tree-search probe is skipped this call, matching the pre-unification
-     * single first-run block), else null. The root-LP work is time-boxed by [rootLpBudget] (#31).
+     * seeds one (in which case the tree-search probe is skipped this call), else null. The root-LP work
+     * is time-boxed by [rootLpBudget].
      */
     private fun firstRunWork(): MinimizeResult.WithSample? {
         sink.start()
@@ -365,10 +364,10 @@ internal class ResumableMinimize(
         boundExchange.publishGlobalVarBounds()
         // These primal heuristics seed an integer incumbent from the LP/rounding without solving the
         // residual real LP, so their sample carries no continuous values and is not certified real-
-        // feasible. With LP-only continuous variables (issue #1232) only the leaf verdict may surface a
+        // feasible. With LP-only continuous variables only the leaf verdict may surface a
         // solution (it validates the reals and attaches them); skip the heuristics there.
         if (problem.numRealVars == 0) {
-            // LP-rounding primal heuristic (#287): seed an incumbent before search so the bound prunes and
+            // LP-rounding primal heuristic: seed an incumbent before search so the bound prunes and
             // reduced-cost fixing bite from the first node.
             if (lpEngine.params.lpPlan.probe && lpEngine.lpRelaxer != null) {
                 // Single-shot rounding first; if it can't land a feasible point, pump toward one.
@@ -390,7 +389,7 @@ internal class ResumableMinimize(
     /**
      * One-shot pre-search LP work: harvest the global cut pool and capture the root relaxation bound for
      * the integrality-gap metric (search only bounds from level 1 down, so this is the sole root
-     * capture). [token] is the shared root-LP budget (#31) — the slice/global cancellation time-boxed to
+     * capture). [token] is the shared root-LP budget — the slice/global cancellation time-boxed to
      * `LpPlan.rootBudgetFraction`.
      */
     private fun initRootLp(token: Cancellation) {
@@ -421,15 +420,15 @@ internal class ResumableMinimize(
     }
 
     /**
-     * The shared cooperative-cancellation budget for the pre-search root LP work (#31): the
+     * The shared cooperative-cancellation budget for the pre-search root LP work: the
      * slice/global [BacktrackParams.cancellation] OR-ed with a wall-clock deadline of
      * `LpPlan.rootBudgetFraction` of the time remaining (capped at `LpPlan.rootBudgetMillis`). The time
      * remaining is read from the current slice deadline when one is armed, else from
      * [BacktrackParams.solveBudgetMillis] and [startMark] on the non-pausable one-shot path — so
      * the cap tracks the real deadline on the FD track too instead of degrading to the absolute ceiling,
-     * which exceeds a short budget and let root work consume the whole solve. Only the absolute cap
+     * which exceeds a short budget and would let root work consume the whole solve. Only the absolute cap
      * applies when neither the slice end nor the budget is known. A non-positive fraction disables the
-     * cap — the prior behaviour.
+     * cap.
      */
     private fun rootLpBudget(): Cancellation {
         val fraction = params.lpPlan.rootBudgetFraction
@@ -452,7 +451,7 @@ internal class ResumableMinimize(
     }
 
     /** Drains the LP-learned Farkas nogoods at a restart, registering them permanently and sharing each
-     *  globally (its LBD = length would never clear the glue export filter, #844). Returns true iff a
+     *  globally (its LBD = length would never clear the glue export filter). Returns true iff a
      *  root contradiction proves the whole space empty. */
     private fun drainLpNogoods(): Boolean {
         val lpNogoods = lpEngine.lpNogoods ?: return false

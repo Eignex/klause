@@ -6,7 +6,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Two-watched-literal BCP over the arena-packed clauses of a pure-Boolean problem (#1119 Phase 1).
+ * Two-watched-literal BCP over the arena-packed clauses of a pure-Boolean problem.
  * Replaces the general [PropagationState.runToFixpoint] factor-queue loop for a
  * [com.eignex.klause.solver.Problem.isNativeSatEligible] problem: no order-literal atoms are ever
  * materialised, so the driver degenerates to classical CDCL, and propagation runs as a trail-pointer
@@ -15,8 +15,8 @@ import com.eignex.klause.util.IntHashSet
  * Reuse boundary: this owns only the BCP inner loop and the clause watch state. The trail
  * ([PropagationState.boolPinOrder]), the pin machinery ([PropagationState.pinLit] / `pinBoolImpl`,
  * which records reasons, levels, and antecedents), 1UIP conflict analysis, VSIDS, restarts, and the
- * search driver are unchanged — a forced unit records exactly the same antecedent set (the clause's
- * other literals) the general path recorded, so [ConflictAnalyzer] reads it identically.
+ * search driver are shared with the general lane — a forced unit records the same antecedent set (the
+ * clause's other literals) the general path records, so [ConflictAnalyzer] reads it identically.
  *
  * Watches are advisory mutable state, rebuilt per session and allowed to drift across backtrack: the
  * two watched literals of clause `h` sit at within-clause indices `watchPos[2h]` / `watchPos[2h+1]`, and
@@ -49,7 +49,7 @@ internal class NativeSatState(private val state: PropagationState) {
     // A single-literal clause watches nothing (its unit is pinned at root and never unassigned).
     private val watchPos = IntArrayList()
 
-    // Per-literal watch lists (clause handles) with a parallel blocker literal (#200): if the blocker
+    // Per-literal watch lists (clause handles) with a parallel blocker literal: if the blocker
     // is already true the clause is satisfied and the wake is skipped. Indexed by literal id.
     private val watchClauses: Array<IntArrayList> = Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
     private val watchBlockers: Array<IntArrayList> = Array(2 * numBoolVars) { IntArrayList(initialCapacity = 2) }
@@ -205,7 +205,7 @@ internal class NativeSatState(private val state: PropagationState) {
         return baseCount + i
     }
 
-    // ---- Learned-clause policy accessors (native mirror of the LearnedClauseDb columns) ----
+    // Learned-clause policy accessors: the native mirror of the LearnedClauseDb columns.
 
     val count: Int get() = learnedCount
     fun lbdOf(i: Int): Int = learnedLbd[i]
