@@ -55,6 +55,8 @@ class OpbModeTest {
         val out = capture {
             main(
                 arrayOf(
+                    "-e",
+                    "bt",
                     opb(
                         "min: 1 x1 +2 x2 +3 x3 +4 x4 ;\n" +
                             "+1 x1 +1 x2 >= 1 ;\n" +

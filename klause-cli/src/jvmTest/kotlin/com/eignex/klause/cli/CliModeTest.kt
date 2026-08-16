@@ -515,7 +515,7 @@ class CliModeTest {
         assertTrue("%%%mzn-stat: nodes=" !in lsOut, lsOut)
         assertTrue("%%%mzn-stat-end" in lsOut, lsOut)
 
-        val optOut = capture { main(arrayOf("-s", opt.absolutePath)) }
+        val optOut = capture { main(arrayOf("-s", "-e", "bt", opt.absolutePath)) }
         assertTrue("%%%mzn-stat: solutions=" in optOut, optOut)
         assertTrue("%%%mzn-stat-end" in optOut, optOut)
 
@@ -540,10 +540,10 @@ class CliModeTest {
             )
             deleteOnExit()
         }
-        val withFlag = capture { main(arrayOf("--output-objective", "-t", "5000", fzn.absolutePath)) }
+        val withFlag = capture { main(arrayOf("-e", "bt", "--output-objective", "-t", "5000", fzn.absolutePath)) }
         assertTrue("_objective = 9;" in withFlag, withFlag)
 
-        val without = capture { main(arrayOf("-t", "5000", fzn.absolutePath)) }
+        val without = capture { main(arrayOf("-e", "bt", "-t", "5000", fzn.absolutePath)) }
         assertTrue("_objective" !in without, without)
     }
 
@@ -574,7 +574,7 @@ class CliModeTest {
             )
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-t", "5000", "-s", xml.absolutePath)) }
+        val out = capture { main(arrayOf("-e", "bt", "-t", "5000", "-s", xml.absolutePath)) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         // maximize a over 1..3 → optimum 3, reported sign-corrected (not the negated internal).
         assertTrue("o 3" in out, out)
