@@ -21,19 +21,17 @@ class PropagationStateExcludeTest {
     }
 
     @Test
-    fun `excludeIntValue at min becomes a one-step bound tighten`() {
-        val s = state(arrayOf(IntDomain(1, 5)))
-        assertTrue(s.excludeIntValue(0, 1))
-        assertEquals(2, s.intDomains[0].min)
-        assertEquals(5, s.intDomains[0].max)
-    }
-
-    @Test
-    fun `excludeIntValue at max becomes a one-step bound tighten`() {
-        val s = state(arrayOf(IntDomain(1, 5)))
-        assertTrue(s.excludeIntValue(0, 5))
-        assertEquals(1, s.intDomains[0].min)
-        assertEquals(4, s.intDomains[0].max)
+    fun `excludeIntValue at a bound shrinks the interval by one`() {
+        val cases = listOf(
+            Triple(1L, 2L, 5L),
+            Triple(5L, 1L, 4L),
+        )
+        for ((excluded, min, max) in cases) {
+            val s = state(arrayOf(IntDomain(1, 5)))
+            assertTrue(s.excludeIntValue(0, excluded))
+            assertEquals(min, s.intDomains[0].min, "min after excluding $excluded")
+            assertEquals(max, s.intDomains[0].max, "max after excluding $excluded")
+        }
     }
 
     @Test

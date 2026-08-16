@@ -70,7 +70,7 @@ class ImprovementsTest {
 
     @Test
     fun `minimize equals improvements last`() {
-        // Contract: minimize is improvements().last(). Verify on a small problem.
+        // Contract: minimize is improvements().last().
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,

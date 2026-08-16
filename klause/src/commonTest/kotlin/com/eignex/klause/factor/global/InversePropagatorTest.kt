@@ -3,7 +3,6 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
-import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -143,7 +142,7 @@ class InversePropagatorTest {
     }
 
     @Test
-    fun `value removal and its cascade still fire after incremental rewrite`() {
+    fun `a removed value cascades to the mirrored side`() {
         // n=2, 0-based. g[0] (var 2) pinned to 1, so g[0] ≠ 0 ⟹ remove 0 from f[0] (f[0]=1),
         // which in turn forces g[1] (var 3) = 0. Completeness guard for the incremental
         // row/column value-removal sweep.

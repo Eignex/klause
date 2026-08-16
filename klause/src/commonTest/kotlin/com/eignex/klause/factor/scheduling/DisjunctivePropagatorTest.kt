@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
-import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
@@ -76,8 +75,6 @@ class DisjunctivePropagatorTest {
         assertTrue(2 !in citedVars, "idle task 2 must not appear in the sharp reason")
         ConflictReasonOracle.assertEntailed(problem, state, 0, "disjunctive-precedence")
     }
-
-    // --- From DisjunctiveConflictReasonTest ---
 
     @Test
     fun `overload conflict reason is a sound nonempty bound-atom witness`() {
@@ -181,8 +178,6 @@ class DisjunctivePropagatorTest {
             assertEquals(brute, found, "seed=$seed: disjunctive var-duration enumeration must match brute force")
         }
     }
-
-    // --- From DisjunctiveTest (CP tests) ---
 
     @Test
     fun `pairwise detectable precedence pushes the earliest start`() {

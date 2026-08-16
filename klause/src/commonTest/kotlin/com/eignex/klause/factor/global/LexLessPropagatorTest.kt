@@ -3,7 +3,6 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.addLearnedClause
@@ -117,7 +116,7 @@ class LexLessPropagatorTest {
 
     @Test
     fun `learned clause through a per-tighten lex deduction carries the prefix-equality literals`() {
-        // Regression for #75. The deciding-position tightening `xs[a].max ≤ ys[a].max` is sound
+        // The deciding-position tightening `xs[a].max ≤ ys[a].max` is sound
         // only because the prefix `xs[0..a-1] = ys[0..a-1]` is pinned equal — index a is the
         // deciding position precisely because of that prefix. The per-tighten antecedent is
         // recorded on the implied atom `[xs[a] ≤ ys[a].max]`; when a *later* conflict (seeded

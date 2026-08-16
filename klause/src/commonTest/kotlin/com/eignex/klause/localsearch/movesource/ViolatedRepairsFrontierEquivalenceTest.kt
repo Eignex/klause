@@ -36,7 +36,7 @@ class ViolatedRepairsFrontierEquivalenceTest {
     )
 
     /** The reference `Cbls.sampleFromViolated`. */
-    private fun oldSampleFromViolated(state: LocalSearchState, sink: MoveSink) {
+    private fun referenceSampleFromViolated(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         repeat(minOf(sampleCount, state.violated.size)) {
             val fid = state.violated.random(state.rng)
@@ -45,7 +45,7 @@ class ViolatedRepairsFrontierEquivalenceTest {
     }
 
     /** The reference `Cbls.sampleFrontier` + `addNeighbourMoves`. */
-    private fun oldSampleFrontier(state: LocalSearchState, sink: MoveSink) {
+    private fun referenceSampleFrontier(state: LocalSearchState, sink: MoveSink) {
         if (state.violated.isEmpty()) return
         val problem = state.problem
         var budget = frontierCap
@@ -96,10 +96,10 @@ class ViolatedRepairsFrontierEquivalenceTest {
     }
 
     @Test
-    fun `ViolatedRepairs matches the old sampleFromViolated`() {
+    fun `ViolatedRepairs emits the same move multiset as the reference violated sampler`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::ringProblem, seed, ViolatedRepairs(sampleCount)) { state, sink ->
-                oldSampleFromViolated(state, sink)
+                referenceSampleFromViolated(state, sink)
             }
         }
     }
@@ -117,10 +117,10 @@ class ViolatedRepairsFrontierEquivalenceTest {
     }
 
     @Test
-    fun `Frontier matches the old sampleFrontier`() {
+    fun `Frontier emits the same move multiset as the reference frontier sampler`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::ringProblem, seed, Frontier(sampleCount, frontierCap)) { state, sink ->
-                oldSampleFrontier(state, sink)
+                referenceSampleFrontier(state, sink)
             }
         }
     }

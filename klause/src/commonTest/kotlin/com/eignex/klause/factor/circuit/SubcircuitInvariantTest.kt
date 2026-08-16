@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.circuit
 
-import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.solver.Factor

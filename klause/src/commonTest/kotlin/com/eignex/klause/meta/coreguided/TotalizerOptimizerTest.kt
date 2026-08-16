@@ -128,8 +128,8 @@ class TotalizerOptimizerTest {
     }
 
     @Test
-    fun `weighted - large weights solve via lazily-built thresholds`() {
-        // #91 regression. totalWeight = 1999, so the old eager encoding baked ~2000
+    fun `weighted - large weights reach the optimum under a mutex`() {
+        // #91 regression. totalWeight = 1999, so an eager encoding would bake ~2000
         // ReifiedPseudoBoolean threshold factors up front; the lazy path materialises only
         // the handful the OLL loop assumes (here k=1 then k=1000). Optimum under the mutex:
         // keep the weight-1000 soft, drop the weight-999 one ⇒ cost 999.

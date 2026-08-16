@@ -104,10 +104,10 @@ class ConflictAnalyzerTest {
     }
 
     @Test
-    fun `non-clause failing factor returns NotApplicable`() {
+    fun `a non-clause failing factor still proves UNSAT`() {
         // A Linear factor at the conflict — the analyzer can't get a clause-form
-        // reason from it today, so it bails out. The engine falls back to chronological
-        // backtrack (which is the search behaviour without LCG).
+        // reason from it, so it bails out and the engine falls back to chronological
+        // backtrack (the search behaviour without LCG).
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -127,9 +127,8 @@ class ConflictAnalyzerTest {
 
     @Test
     fun `CDB-driven search proves UNSAT on a small encoding`() {
-        // Two-clause direct contradiction. With CDB enabled (always on in the current
-        // engine), the search terminates immediately — the analyzer's bake-time clause
-        // is empty so no jump is requested, but the engine still arrives at Unsat.
+        // Two-clause direct contradiction. The analyzer's clause is empty so no jump is
+        // requested, and the engine still arrives at Unsat.
         val problem = Problem(
             numBoolVars = 1,
             numIntVars = 0,
@@ -145,12 +144,8 @@ class ConflictAnalyzerTest {
 
     @Test
     fun `learned clause persists in the session after backjump`() {
-        // Two-decision conflict that learns [¬a, ¬b]. After backjump to level 1 + clause
-        // assertion, the session's learned-clause registry should contain exactly the
-        // learned clause, and a *fresh* attempt to pin a=true should now be blocked at
-        // level 1 (it would unit-propagate ¬b through the learned clause, then a future
-        // pin of b=true would conflict). Direct way to test: hand-walk the session,
-        // re-pin a=true post-learn, and observe the cascade.
+        // Two-decision conflict that learns [¬a, ¬b]. Once the clause is asserted, a=true forces
+        // b=false through it, so no returned assignment may set both.
         val problem = Problem(
             numBoolVars = 3,
             numIntVars = 0,
@@ -176,43 +171,6 @@ class ConflictAnalyzerTest {
     }
 
     @Test
-    fun `engine accumulates learned clauses across multiple conflicts`() {
-        // Three-decision pigeonhole-flavoured instance designed to trigger multiple
-        // conflicts during search. After solve completes, the session-internal state
-        // should have at least one learned clause stored (validated indirectly via the
-        // solver's correctness — the more direct check would require exposing the
-        // learned-clause list, which would be a public API concession).
-        val problem = Problem(
-            numBoolVars = 4,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(2, false))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
-                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-            ),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 42L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val s = sat.assignment.bools
-        val clauses = listOf(
-            listOf(Lit.make(0, true), Lit.make(1, true)),
-            listOf(Lit.make(0, false), Lit.make(2, true)),
-            listOf(Lit.make(1, false), Lit.make(2, false)),
-            listOf(Lit.make(2, true), Lit.make(3, false)),
-            listOf(Lit.make(2, false), Lit.make(3, true)),
-        )
-        for ((i, c) in clauses.withIndex()) {
-            assertTrue(
-                c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by $s",
-            )
-        }
-    }
-
-    @Test
     fun `LBD reflects the distinct decision levels in the learned clause`() {
         // Same two-decision conflict as `learned clause spans multiple decision levels`,
         // but here we assert the LBD field. Learned clause is [¬a, ¬b]; literals span
@@ -234,8 +192,7 @@ class ConflictAnalyzerTest {
     }
 
     @Test
-    fun `forgetLearnedClauses removes high-LBD clauses and remaps watcher entries`() {
-        // Drive a search that learns multiple clauses, then prune.
+    fun `search stays correct under default learning and under aggressive forgetting`() {
         val problem = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -248,20 +205,6 @@ class ConflictAnalyzerTest {
                 Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
             ),
         )
-        val r = BacktrackSolver(problem.bake()).solve(
-            BacktrackParams(
-                // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
-                // with a tight Luby restart base, the forgetting pass triggers reliably.
-                lubyRestartBase = 4,
-                maxLearnedClauses = 0,
-                lbdGlueThreshold = 2,
-                randomSeed = 7L,
-            ),
-        )
-        // Correctness must survive forgetting — every original clause must still be
-        // satisfied. (The bound enforces forgetting actually runs.)
-        val sat = assertIs<SolveResult.Sat>(r)
-        val s = sat.assignment.bools
         val clauses = listOf(
             listOf(Lit.make(0, true), Lit.make(1, true)),
             listOf(Lit.make(0, false), Lit.make(2, true)),
@@ -269,11 +212,26 @@ class ConflictAnalyzerTest {
             listOf(Lit.make(2, true), Lit.make(3, false)),
             listOf(Lit.make(2, false), Lit.make(3, true)),
         )
-        for ((i, c) in clauses.withIndex()) {
-            assertTrue(
-                c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
-                "clause $i not satisfied by ${s.toList()}",
-            )
+        val runs = listOf(
+            "default learning" to BacktrackParams(randomSeed = 42L),
+            // Cap at 0 → forgetting will drop everything except glue (LBD ≤ 2). Combined
+            // with a tight Luby restart base, the forgetting pass triggers reliably.
+            "aggressive forgetting" to BacktrackParams(
+                lubyRestartBase = 4,
+                maxLearnedClauses = 0,
+                lbdGlueThreshold = 2,
+                randomSeed = 7L,
+            ),
+        )
+        for ((label, params) in runs) {
+            val sat = assertIs<SolveResult.Sat>(BacktrackSolver(problem.bake()).solve(params))
+            val s = sat.assignment.bools
+            for ((i, c) in clauses.withIndex()) {
+                assertTrue(
+                    c.any { Lit.evaluate(it, s[Lit.variable(it)]) },
+                    "$label: clause $i not satisfied by ${s.toList()}",
+                )
+            }
         }
     }
 
@@ -414,10 +372,8 @@ class ConflictAnalyzerTest {
     @Test
     fun `CDB finds SAT on a chained-propagation instance`() {
         // (¬a ∨ b), (¬b ∨ c), (¬c ∨ d), (¬d ∨ e), (a).
-        // a=true forces b → c → d → e via unit propagation. No conflict — search
-        // should reach SAT in one decision. The point of the test is that the
-        // analyzer (which runs on every conflict; here there are none) and the new
-        // sealed AdvanceOutcome path don't break the no-conflict happy path.
+        // a=true forces b → c → d → e via unit propagation. No conflict arises, so this pins the
+        // happy path where the analyzer never runs.
         val problem = Problem(
             numBoolVars = 5,
             numIntVars = 0,

@@ -81,7 +81,7 @@ class CutSearchSeparationTest {
     fun `the during-search separation path executes`() {
         // An AllDifferent COP that branches; opening the depth gate separates nodes with the cuts their
         // LP point violates, changing the LP-solve count from the root-only (cutSearchMaxDepth = 0) run
-        // while preserving the optimum. This proves the new path runs rather than being silently skipped
+        // while preserving the optimum. This proves the separation path runs rather than being skipped
         // (the separated run may issue fewer *total* solves: tighter nodes prune harder).
         val saved = KlauseConfig.current
         try {

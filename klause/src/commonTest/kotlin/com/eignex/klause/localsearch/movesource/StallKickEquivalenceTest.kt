@@ -36,7 +36,7 @@ class StallKickEquivalenceTest {
     )
 
     /** The reference `Cbls.buildStallKick`, adding its result to the sink. */
-    private fun oldBuildStallKick(state: LocalSearchState, out: MoveSink) {
+    private fun referenceBuildStallKick(state: LocalSearchState, out: MoveSink) {
         val kickSink = MoveSink()
         val move = run {
             if (state.violated.isEmpty()) return@run null
@@ -106,10 +106,10 @@ class StallKickEquivalenceTest {
     }
 
     @Test
-    fun `StallKick matches the old buildStallKick`() {
+    fun `StallKick emits the same move multiset as the reference kick builder`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::ringProblem, seed, StallKick(kickVars)) { state, sink ->
-                oldBuildStallKick(state, sink)
+                referenceBuildStallKick(state, sink)
             }
         }
     }

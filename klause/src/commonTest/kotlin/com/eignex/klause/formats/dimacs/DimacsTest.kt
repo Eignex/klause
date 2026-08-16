@@ -169,8 +169,9 @@ class DimacsTest {
 
     @Test
     fun `old wcnf rejects a literal beyond the declared variable count`() {
-        // The old header fixes nvars; a literal past it must be rejected with a clear diagnostic (as the
-        // CNF path does) rather than crashing with a raw index-out-of-bounds deeper in construction.
+        // The old-format header fixes nvars; a literal past it must be rejected with a clear diagnostic
+        // (as the CNF path does) rather than crashing with a raw index-out-of-bounds deeper in
+        // construction.
         val ex = assertFailsWith<DimacsFormatException> { Dimacs.parseWcnf("p wcnf 2 1 10\n10 1 3 0\n") }
         assertTrue(ex.message?.contains("out of range") == true, "unclear diagnostic: ${ex.message}")
     }

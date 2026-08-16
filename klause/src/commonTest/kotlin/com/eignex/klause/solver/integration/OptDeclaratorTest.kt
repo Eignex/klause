@@ -49,7 +49,6 @@ class OptDeclaratorTest {
     fun `decode returns null when presence false`() {
         val s = S()
         val compiled = s.compile()
-        // Construct a sample by hand: presence false, value irrelevant.
         val sample = Sample(
             bools = booleanArrayOf(false),
             ints = longArrayOf(3),
@@ -90,7 +89,6 @@ class OptComparisonSemanticsTest {
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(50).toList()
-        // Should find assignments where x is absent and y > 0.
         val anyAbsentWithBigY = samples.any { sample ->
             compiled.decode(s.x, sample) == null && compiled.decode(s.y, sample) > 0
         }
@@ -124,7 +122,7 @@ class OptAllDifferentTest {
     }
 
     @Test
-    fun `LS finds assignments where two absent collapse to same value`() {
+    fun `LS samples keep the present-only values distinct`() {
         val s = S()
         val compiled = s.compile()
         val solver = LocalSearchSolver(
@@ -132,7 +130,6 @@ class OptAllDifferentTest {
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 300),
         )
         val samples = solver.samples(LocalSearchParams(maxFlips = 10_000, randomSeed = 13)).take(80).toList()
-        // Verify every sampled assignment is feasible under opt-aware all-different.
         for (sample in samples) {
             val pa = compiled.decode(s.a.present, sample)
             val pb = compiled.decode(s.b.present, sample)
@@ -312,11 +309,7 @@ class OptCumulativeTest {
             for (i in 0..2) {
                 if (ps[i]) {
                     for (t in vs[i].toInt() until vs[i].toInt() + 2) {
-                        if (t in
-                            usage.indices
-                        ) {
-                            usage[t]++
-                        }
+                        if (t in usage.indices) usage[t]++
                     }
                 }
             }

@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Factor
@@ -39,34 +38,21 @@ class SortInvariantTest {
     }
 
     @Test
-    fun `violated when ys is not sorted xs`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // xs=[2,0,1], sorted=[0,1,2], ys=[0,2,1] — mismatch at position 1 and 2
-        state.assignment.setInt(0, 2)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 1)
-        state.assignment.setInt(3, 0)
-        state.assignment.setInt(4, 2)
-        state.assignment.setInt(5, 1)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        assertEquals(2, state.factors[0].violationDegree(state, 0))
-    }
-
-    @Test
-    fun `degree counts mismatched positions`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // xs=[1,2,3], sorted=[1,2,3], ys=[3,2,1] — all 3 positions wrong
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 3)
-        state.assignment.setInt(3, 3)
-        state.assignment.setInt(4, 2)
-        state.assignment.setInt(5, 1)
-        state.recompute()
-        assertEquals(2, state.factors[0].violationDegree(state, 0))
+    fun `violated when ys is not sorted xs with degree counting mismatched positions`() {
+        val cases = listOf(
+            // sorted(xs)=[0,1,2], ys differs at positions 1 and 2.
+            Triple(listOf(2L, 0L, 1L), listOf(0L, 2L, 1L), 2),
+            // sorted(xs)=[1,2,3], ys differs at positions 0 and 2.
+            Triple(listOf(1L, 2L, 3L), listOf(3L, 2L, 1L), 2),
+        )
+        for ((xs, ys, degree) in cases) {
+            val state = LocalSearchState(problem(), Random(0))
+            for (i in 0..2) state.assignment.setInt(i, xs[i])
+            for (i in 0..2) state.assignment.setInt(3 + i, ys[i])
+            state.recompute()
+            assertTrue(state.factors[0].isViolated(state, 0), "xs=$xs ys=$ys must violate sort")
+            assertEquals(degree, state.factors[0].violationDegree(state, 0), "xs=$xs ys=$ys")
+        }
     }
 
     @Test

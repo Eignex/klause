@@ -64,7 +64,7 @@ class FlatZincSearchAnnotationTest {
         val program = parseFlatZinc(src)
         val varH = tieredVar(program)
         assertEquals(TierVarSelect.MaxRegret, varH.tiers[0].varSelect)
-        // indomain_median is its own heuristic now, no longer conflated with indomain_middle.
+        // indomain_median is its own heuristic, distinct from indomain_middle.
         assertEquals(IndomainMedian, varH.tiers[0].valueSelector)
     }
 
@@ -93,7 +93,7 @@ class FlatZincSearchAnnotationTest {
     }
 
     @Test
-    fun `smallest and largest map to the bound heuristics`() {
+    fun `smallest maps to the lower-bound heuristic`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);

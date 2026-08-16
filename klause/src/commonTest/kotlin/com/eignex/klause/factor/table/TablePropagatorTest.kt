@@ -2,7 +2,6 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.propagation.PropagationState
@@ -159,7 +158,7 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `propagation tightens domain to support set`() {
+    fun `solving returns one of the allowed tuples`() {
         // 3 vars ∈ [0..9]; tuples = [(1,2,3), (1,4,5), (7,8,9)].
         // After propagation: col 0 ⊆ {1, 7}; col 1 ⊆ {2, 4, 8}; col 2 ⊆ {3, 5, 9}.
         val problem = Problem(
@@ -272,7 +271,7 @@ class TablePropagatorTest {
         val flat = rel.toLongArray()
         val cache = TableGroupCache()
         fun mk(v0: Int, v1: Int): Table = Table(xs = intArrayOf(v0, v1), tuples = flat).also { it.groupCache = cache }
-        for ((idx, h0) in listOf(4, 1).withIndex()) {
+        for ((idx, h0) in listOf(3, 1).withIndex()) {
             cache.noopMins = null
             cache.noopMaxs = null
             val brute = HashSet<List<Int>>()

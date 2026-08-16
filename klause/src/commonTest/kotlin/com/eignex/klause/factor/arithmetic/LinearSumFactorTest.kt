@@ -22,8 +22,7 @@ class LinearSumFactorTest {
     @Test
     fun `coalescing coefficients past Int range keeps the exact Long sum`() {
         // Two terms on the same variable whose coefficients sum beyond Int.MAX must coalesce to the
-        // exact Long total, not throw — the SMT cut-lemma / dense-affine-fold overflow that used to
-        // crash the compiler at the coalescer's Int-narrowing step.
+        // exact Long total: the coalescer may not narrow the running sum to Int.
         val big = Int.MAX_VALUE.toLong()
         val linear = Linear(longArrayOf(big, big), intArrayOf(0, 0), LinearOp.LE, 5L)
         assertTrue(linear.coeffs.contentEquals(longArrayOf(2 * big)))

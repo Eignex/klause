@@ -140,17 +140,6 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `var times var emits product factor`() {
-        class S : VariableSchema() {
-            val x by intVar(min = 0, max = 4)
-            val y by intVar(min = 0, max = 4)
-            val cap by constraint { (x * y) le 6 }
-        }
-        val compiled = S().compile()
-        assertTrue(compiled.problem.factors.any { it is Product })
-    }
-
-    @Test
     fun `multiplication constraint holds in samples`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
@@ -159,6 +148,7 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
+        assertTrue(compiled.problem.factors.any { it is Product })
         val solver = LocalSearchSolver(
             compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
@@ -338,18 +328,6 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `two int vars disequality compiles via reified linear`() {
-        class S : VariableSchema() {
-            val x by intVar(min = 0, max = 5)
-            val y by intVar(min = 0, max = 5)
-            val differ by constraint { x ne y }
-        }
-        val compiled = S().compile()
-
-        assertTrue(compiled.problem.factors.any { it is ReifiedLinear })
-    }
-
-    @Test
     fun `two int vars disequality holds in samples`() {
         class S : VariableSchema() {
             val x by intVar(min = 0, max = 4)
@@ -358,6 +336,7 @@ class IntOperatorsTest {
         }
         val schema = S()
         val compiled = schema.compile()
+        assertTrue(compiled.problem.factors.any { it is ReifiedLinear })
         val solver =
             LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500))
         val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 31)).take(10).toList()
@@ -392,7 +371,7 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `product converges on tighly factored target`() {
+    fun `product converges on a tightly factored target`() {
         class S : VariableSchema() {
             val x by intVar(min = 1, max = 10)
             val y by intVar(min = 1, max = 10)
@@ -448,7 +427,7 @@ class IntOperatorsTest {
     @Test
     fun `strict less-than excludes the exact boundary bucket`() {
         // #83: 0.5 is exactly bucket 10 (21 buckets over [0,1], step 0.05). `rate < 0.5` must
-        // exclude it; before the strict-lowering fix LT was solved as LE and 0.5 leaked in.
+        // exclude it; lowering LT as LE would let 0.5 leak in.
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
 
@@ -541,9 +520,8 @@ class IntOperatorsTest {
 
     @Test
     fun `threshold above max is unsat at solve time`() {
-        // `rate ge 5.0` with rate in [0, 1] is unsatisfiable. The old schema-level
-        // bucketing path caught this at compile-time; the new native-float path
-        // leaves it for the solver / propagator to surface.
+        // `rate ge 5.0` with rate in [0, 1] is unsatisfiable. The native-float path leaves this for
+        // the solver / propagator to surface rather than rejecting it at compile time.
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate ge 5.0 }
@@ -556,9 +534,8 @@ class IntOperatorsTest {
 
     @Test
     fun `tautological float constraint emits a factor that the solver trivially satisfies`() {
-        // `rate le 5.0` with rate in [0, 1] is trivially true. The old schema-level
-        // path emitted zero factors; the new native-float path emits one FloatLinear
-        // which the solver simply finds satisfied.
+        // `rate le 5.0` with rate in [0, 1] is trivially true. The native-float path still emits one
+        // FloatLinear rather than folding it away, and the solver finds it satisfied.
         class S : VariableSchema() {
             val rate by floatVar(min = 0.0, max = 1.0)
             val c by constraint { rate le 5.0 }

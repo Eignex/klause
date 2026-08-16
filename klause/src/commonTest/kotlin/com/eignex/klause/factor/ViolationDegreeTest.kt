@@ -23,19 +23,19 @@ class ViolationDegreeTest {
     }
 
     @Test
-    fun nonPositiveResidualIsZero() {
+    fun `non-positive residual compresses to zero`() {
         assertEquals(0, compressViolation(0L, 16))
         assertEquals(0, compressViolation(-5L, 16))
     }
 
     @Test
-    fun atOrBelowCapPassesThrough() {
+    fun `residual at or below the soft cap passes through verbatim`() {
         assertEquals(1, compressViolation(1L, 16))
         assertEquals(16, compressViolation(16L, 16))
     }
 
     @Test
-    fun aboveCapMatchesLogLoopReference() {
+    fun `residual above the soft cap matches the log loop reference`() {
         val cap = 16
         for (raw in longArrayOf(17, 18, 31, 32, 33, 100, 1000, 1 shl 20, Long.MAX_VALUE)) {
             val expected = cap + bitLengthByLoop(raw - cap)
@@ -44,7 +44,7 @@ class ViolationDegreeTest {
     }
 
     @Test
-    fun zeroCapIsPureLogScale() {
+    fun `zero soft cap gives a pure log scale`() {
         for (raw in longArrayOf(1, 2, 3, 4, 7, 8, 1024)) {
             assertEquals(bitLengthByLoop(raw), compressViolation(raw, 0), "raw=$raw")
         }

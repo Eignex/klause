@@ -19,7 +19,7 @@ class IntHashSetTest {
     }
 
     @Test
-    fun `never-populated set works without allocating backing`() {
+    fun `every query on a never-populated set is safe and it stays usable after`() {
         // Exercises the lazy-backing size-0 fast paths: every query must be safe before the first
         // add (the backing arrays are still zero-length).
         val s = IntHashSet()
@@ -30,7 +30,7 @@ class IntHashSetTest {
         var visits = 0
         s.forEach { visits++ }
         assertEquals(0, visits)
-        s.clear() // clearing a never-populated set is a no-op
+        s.clear()
         assertTrue(s.isEmpty())
         // After all that, the set is still fully functional.
         assertTrue(s.add(7))

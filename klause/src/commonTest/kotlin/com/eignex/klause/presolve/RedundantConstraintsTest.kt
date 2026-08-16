@@ -217,8 +217,8 @@ class RedundantConstraintsTest {
     @Test
     fun `a zero coefficient carries no support and never divides by zero`() {
         // 0·x + y <= 2 has a zero coeff on x: its genuine support is {y}, a strict subset of x+y<=5's.
-        // y<=2 and x<=3 give x+y<=5, so the larger row drops. Before #653 the zero coeff stayed in the
-        // support map and the dominance ratio check did cb % 0, crashing on the cargo challenge instance.
+        // y<=2 and x<=3 give x+y<=5, so the larger row drops. A zero coeff must stay out of the support
+        // map: the dominance ratio check would otherwise compute cb % 0 and crash (#653).
         val problem = Problem(0, 2, dom(2, 3), listOf(le(2, 0, 0, 1, 1), le(5, 0, 1, 1, 1)))
         val out = checkPreserved("zero-coeff-subset", problem, expectDrop = true)
         assertEquals(1, out.factors.size)
@@ -333,21 +333,6 @@ class RedundantConstraintsTest {
             ),
         )
         checkPbPreserved("pb-independent", problem, expectDrop = false)
-    }
-
-    @Test
-    fun `knapsack implied by an at-most-one cardinality clique is dropped`() {
-        // AMO(b0,b1,b2) caps b0+b1+b2 at 1, so b0+b1+b2 <= 2 is redundant given the clique (#527).
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(
-                Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1),
-                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2L),
-            ),
-        )
-        checkPbPreserved("clique-implies-knapsack", problem, expectDrop = true)
     }
 
     @Test

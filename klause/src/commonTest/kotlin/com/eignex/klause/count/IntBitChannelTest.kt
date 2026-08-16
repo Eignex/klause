@@ -86,8 +86,8 @@ class IntBitChannelTest {
 
     @Test
     fun `multi variable channel enumerates the full product`() {
-        // Regression for issue 737: enumerate must yield every channel combo (it used to drop
-        // models on the channel-augmented multi-int problem). Fixed seed keeps it deterministic.
+        // Regression for issue 737: enumerate must yield every channel combo on the
+        // channel-augmented multi-int problem. Fixed seed keeps it deterministic.
         val base = ints(List(4) { IntDomain(0, 3) }) // 4^4 = 256 combos
         val ch = IntBitChannel.channel(base, intArrayOf(0, 1, 2, 3))
         val params = BacktrackParams(maxDecisions = 10_000_000L, randomSeed = 1L)

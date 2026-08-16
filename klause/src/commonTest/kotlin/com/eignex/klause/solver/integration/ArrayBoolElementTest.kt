@@ -11,7 +11,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
- * `array_bool_element` / `array_var_bool_element` now route through the native int [Element]
+ * `array_bool_element` / `array_var_bool_element` route through the native int [Element]
  * factor (Boolean operands channeled to `[0,1]` ints) — issue #45. These pin the ingest:
  * the program carries an [Element] factor and the channeled `result = arr[idx]` semantics hold.
  */

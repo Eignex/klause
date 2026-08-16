@@ -28,8 +28,8 @@ import kotlin.test.assertTrue
 /**
  * Coverage for the **atom-var** paths of [ConflictAnalyzer] — the `levelOf` / `uipLit` /
  * `antecedentsOf` branches that dispatch on `variable >= numBoolVars`. Every case in
- * [ConflictAnalyzerTest] is pure-bool, so these branches (and the trail-resident atom-level /
- * conflict-level soundness fixes #76 / #77 that lean on them) had zero direct coverage.
+ * [ConflictAnalyzerTest] is pure-bool, so these branches — and the trail-resident atom-level /
+ * conflict-level soundness invariants #76 / #77 that lean on them — are covered only here.
  *
  * The bound-consistent propagators (Linear back-clamp, AllDifferent Hall sets) eagerly
  * cap every variable the moment a related bound moves, so a genuine *multi-level* atom

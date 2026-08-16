@@ -23,15 +23,15 @@ class IndexedMaxHeapTest {
     }
 
     @Test
-    fun `updateKey sifts up when increased and down when decreased`() {
+    fun `updateKey moves an entry to and from the max position`() {
         val h = IndexedMaxHeap(3)
         h.insert(0, 1.0)
         h.insert(1, 2.0)
         h.insert(2, 3.0)
         assertEquals(2, h.peekMax())
-        h.updateKey(0, 10.0) // bump id 0 to the top
+        h.updateKey(0, 10.0)
         assertEquals(0, h.peekMax())
-        h.updateKey(0, 0.5) // drop it back down
+        h.updateKey(0, 0.5)
         assertEquals(2, h.peekMax())
         assertEquals(0.5, h.keyOf(0))
     }

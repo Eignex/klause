@@ -272,36 +272,20 @@ class StructuralReductionTest {
     }
 
     @Test
-    fun `a unit-weight at-most-k pseudo-boolean becomes a cardinality`() {
-        val out = checkUnitPbBecomesCardinality(
-            3,
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 2),
-        )
-        val card = theCardinality(out)
-        assertEquals(0, card.min)
-        assertEquals(2, card.max)
-    }
-
-    @Test
-    fun `a unit-weight at-least-k pseudo-boolean becomes a cardinality`() {
-        val out = checkUnitPbBecomesCardinality(
-            3,
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.GE, 2),
-        )
-        val card = theCardinality(out)
-        assertEquals(2, card.min)
-        assertEquals(3, card.max)
-    }
-
-    @Test
-    fun `a unit-weight equality pseudo-boolean becomes an exactly-k cardinality`() {
-        val out = checkUnitPbBecomesCardinality(
-            3,
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.EQ, 1),
-        )
-        val card = theCardinality(out)
-        assertEquals(1, card.min)
-        assertEquals(1, card.max)
+    fun `a unit-weight pseudo-boolean becomes the equivalent cardinality`() {
+        listOf(
+            Triple(PbOp.LE, 2L, 0 to 2),
+            Triple(PbOp.GE, 2L, 2 to 3),
+            Triple(PbOp.EQ, 1L, 1 to 1),
+        ).forEach { (op, bound, expected) ->
+            val out = checkUnitPbBecomesCardinality(
+                3,
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(pos(0), pos(1), pos(2)), op, bound),
+            )
+            val card = theCardinality(out)
+            assertEquals(expected.first, card.min, "$op $bound: cardinality min")
+            assertEquals(expected.second, card.max, "$op $bound: cardinality max")
+        }
     }
 
     @Test

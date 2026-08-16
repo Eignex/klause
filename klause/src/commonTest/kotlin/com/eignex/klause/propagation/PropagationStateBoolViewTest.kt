@@ -52,7 +52,7 @@ class PropagationStateBoolViewTest {
     }
 
     @Test
-    fun `flipping assigned value updates without clearing assigned bit`() {
+    fun `flipping an assigned value keeps it assigned at the new value`() {
         val s = newState(2)
         s.boolValues[0] = true
         s.boolValues[0] = false
@@ -62,7 +62,7 @@ class PropagationStateBoolViewTest {
     }
 
     @Test
-    fun `bit-boundary indices isolated`() {
+    fun `indices across a word boundary stay independent`() {
         // 130 vars crosses two LongArray word boundaries; verify no bleed.
         val s = newState(130)
         s.boolValues[63] = true

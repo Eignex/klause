@@ -353,16 +353,9 @@ class ConflictAnalyzerFactorConflictReasonTest {
         val session = PropagationSession(problem)
         val r = session.pinBool(0, true)
         assertIs<PropagationResult.Implied>(r)
-        val ant = problem.factors.let {
-            val s = PropagationState(
-                problem,
-                Assumptions.None,
-            )
-            s.pinBoolAsDecision(0, true)
-            val confl = s.runToFixpoint(allFactors = false)
-            assertTrue(confl == null, "unexpected conflict at level 1")
-            s
-        }
+        val ant = PropagationState(problem, Assumptions.None)
+        ant.pinBoolAsDecision(0, true)
+        assertTrue(ant.runToFixpoint(allFactors = false) == null, "unexpected conflict at level 1")
         assertTrue(
             ant.intMinAntecedents[0] != null,
             "v0.min antecedents should be set by ReifiedLinear A's body propagation",
@@ -372,7 +365,7 @@ class ConflictAnalyzerFactorConflictReasonTest {
             xLit in ant.intMinAntecedents[0]!!.toSet(),
             "v0.min antecedents should contain ¬x, got ${ant.intMinAntecedents[0]!!.toList()}",
         )
-        // z (bool var 1) implied true; its boolAntecedents now contain the *atom-lit*
+        // z (bool var 1) implied true; its boolAntecedents contain the *atom-lit*
         // form ¬[v0≥5] and ¬[v0≤5] — the per-bound premise atoms — rather than the
         // coarser ¬x union. Resolution through these atoms still traces back to ¬x via
         // their own antecedents = intMin/MaxAntecedents[v0] = [¬x].
@@ -401,7 +394,7 @@ class ConflictAnalyzerFactorConflictReasonTest {
         //   - C sees v0=[5,5], GE 4, alwaysHolds → pins z=true at level 1 with antecedents [¬x].
         //
         // Now decide y=true at level 2 → decision-level conflict (y already pinned false).
-        // The new `analyzeDecisionConflict` path seeds from y's prior antecedents [¬x]
+        // The `analyzeDecisionConflict` path seeds from y's prior antecedents [¬x]
         // plus the just-decided lit y, runs 1UIP and minimization.
         //
         // Without LCG plumbing: y's antecedents would be null (no factor records the

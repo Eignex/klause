@@ -74,12 +74,12 @@ class BacktrackRecipeSpaceTest {
     fun `the restart axis selects each pluggable schedule`() {
         val recipes = BacktrackRecipeSpace().all()
         val adaptive = recipes.first { it.label.contains("/adaptive/") }.build(1L)
-        assertTrue(adaptive.adaptiveRestart, "the adaptive option enables the Glucose schedule")
+        assertTrue(adaptive.adaptiveRestart, "the adaptive option enables the LBD-driven schedule")
         assertNull(adaptive.lubyRestartBase, "the adaptive option leaves no Luby base")
 
         val ema = recipes.first { it.label.contains("/ema/") }.build(1L)
         assertTrue(ema.emaRestart, "the ema option enables the EMA schedule")
-        assertFalse(ema.adaptiveRestart, "the ema option leaves Glucose adaptive off")
+        assertFalse(ema.adaptiveRestart, "the ema option leaves the LBD-driven schedule off")
         assertNull(ema.lubyRestartBase, "the ema option leaves no Luby base")
 
         val modeSwitch = recipes.first { it.label.contains("/mode-switch/") }.build(1L)

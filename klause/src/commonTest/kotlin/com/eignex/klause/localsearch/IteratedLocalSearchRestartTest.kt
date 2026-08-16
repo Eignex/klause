@@ -1,32 +1,38 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.CrossoverBias.BetterBiased
-import com.eignex.klause.localsearch.IteratedLocalSearchRestart
-import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IteratedLocalSearchRestartTest {
 
     @Test
-    fun `acceptance criteria semantics`() {
+    fun `Improving accepts only a strictly better candidate`() {
         val rng = Random(0)
-        assertTrue(AcceptanceCriterion.Improving.accept(1.0, 2.0, rng))
-        assertTrue(!AcceptanceCriterion.Improving.accept(2.0, 2.0, rng))
-        assertTrue(!AcceptanceCriterion.Improving.accept(3.0, 2.0, rng))
+        assertTrue(AcceptanceCriterion.Improving.accept(1.0, 2.0, rng), "better must be accepted")
+        assertFalse(AcceptanceCriterion.Improving.accept(2.0, 2.0, rng), "equal must be rejected")
+        assertFalse(AcceptanceCriterion.Improving.accept(3.0, 2.0, rng), "worse must be rejected")
+    }
 
-        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(1.0, 2.0, rng))
-        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(2.0, 2.0, rng))
-        assertTrue(!AcceptanceCriterion.BetterOrEqual.accept(3.0, 2.0, rng))
+    @Test
+    fun `BetterOrEqual also accepts a tied candidate`() {
+        val rng = Random(0)
+        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(1.0, 2.0, rng), "better must be accepted")
+        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(2.0, 2.0, rng), "equal must be accepted")
+        assertFalse(AcceptanceCriterion.BetterOrEqual.accept(3.0, 2.0, rng), "worse must be rejected")
+    }
 
-        assertTrue(AcceptanceCriterion.RandomWalk.accept(1.0, 2.0, rng))
-        assertTrue(AcceptanceCriterion.RandomWalk.accept(2.0, 2.0, rng))
-        assertTrue(AcceptanceCriterion.RandomWalk.accept(3.0, 2.0, rng))
+    @Test
+    fun `RandomWalk accepts any candidate`() {
+        val rng = Random(0)
+        for (candidate in listOf(1.0, 2.0, 3.0)) {
+            assertTrue(AcceptanceCriterion.RandomWalk.accept(candidate, 2.0, rng), "candidate $candidate")
+        }
     }
 
     @Test
@@ -114,22 +120,21 @@ class IteratedLocalSearchRestartTest {
 
         val policy = IteratedLocalSearchRestart(
             populationSize = 3,
-            acceptance = com.eignex.klause.localsearch.AcceptanceCriterion.BetterOrEqual,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val s = { obj: Double -> Sample(booleanArrayOf(true, false), longArrayOf()) to obj }
-        policy.onLocalOptimum(state, s(10.0).first, 10.0)
-        policy.onLocalOptimum(state, s(8.0).first, 8.0)
-        policy.onLocalOptimum(state, s(12.0).first, 12.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 10.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 8.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 12.0)
         assertEquals(3, policy.incumbents.size, "population should be at capacity")
         assertEquals(8.0, policy.incumbents[0].objective)
         assertEquals(12.0, policy.incumbents.last().objective)
 
-        policy.onLocalOptimum(state, s(5.0).first, 5.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 5.0)
         assertEquals(3, policy.incumbents.size, "size capped")
         assertEquals(5.0, policy.incumbents[0].objective, "5.0 should be new best")
         assertEquals(10.0, policy.incumbents.last().objective, "12.0 should have been evicted")
 
-        policy.onLocalOptimum(state, s(11.0).first, 11.0)
+        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, false), longArrayOf()), 11.0)
         assertEquals(3, policy.incumbents.size)
         assertEquals(10.0, policy.incumbents.last().objective, "population unchanged on reject")
     }
@@ -158,7 +163,7 @@ class IteratedLocalSearchRestartTest {
         val policy = IteratedLocalSearchRestart(
             populationSize = 2,
             crossoverRate = 1.0,
-            acceptance = com.eignex.klause.localsearch.AcceptanceCriterion.BetterOrEqual,
+            acceptance = AcceptanceCriterion.BetterOrEqual,
         )
         policy.onLocalOptimum(state, Sample(BooleanArray(8) { true }, LongArray(0)), 10.0)
         policy.onLocalOptimum(state, Sample(BooleanArray(8) { false }, LongArray(0)), 12.0)
@@ -207,7 +212,7 @@ class IteratedLocalSearchRestartTest {
 
     @Test
     fun `Uniform crossover ignores objective`() {
-        val bias = com.eignex.klause.localsearch.CrossoverBias.Uniform
+        val bias = CrossoverBias.Uniform
         assertEquals(0.5, bias.probParentA(1.0, 100.0))
         assertEquals(0.5, bias.probParentA(100.0, 1.0))
     }

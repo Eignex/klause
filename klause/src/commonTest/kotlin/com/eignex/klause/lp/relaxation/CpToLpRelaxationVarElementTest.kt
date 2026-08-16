@@ -49,18 +49,13 @@ class CpToLpRelaxationVarElementTest {
 
     @Test
     fun `var-array hull is exact when the index is fixed`() {
-        // idx pinned to position 1 ⇒ result = arr[1] ∈ [2,8]; single selector is integral, so LP min = 2.
-        val sol = minResult(IntDomain(1, 1), IntDomain(4, 10), IntDomain(2, 8))
-        assertEquals(LpStatus.OPTIMAL, sol.status)
-        assertEquals(2.0, sol.objectiveValue, eps)
-    }
-
-    @Test
-    fun `var-array hull is exact for the other fixed index`() {
-        // idx pinned to position 0 ⇒ result = arr[0] ∈ [4,10]; LP min = 4.
-        val sol = minResult(IntDomain(0, 0), IntDomain(4, 10), IntDomain(2, 8))
-        assertEquals(LpStatus.OPTIMAL, sol.status)
-        assertEquals(4.0, sol.objectiveValue, eps)
+        // arr[0] ∈ [4,10], arr[1] ∈ [2,8]. Pinning idx leaves a single integral selector, so the LP min
+        // is exactly the pinned entry's own minimum.
+        listOf(0 to 4.0, 1 to 2.0).forEach { (position, expected) ->
+            val sol = minResult(IntDomain(position.toLong(), position.toLong()), IntDomain(4, 10), IntDomain(2, 8))
+            assertEquals(LpStatus.OPTIMAL, sol.status, "idx=$position: status")
+            assertEquals(expected, sol.objectiveValue, eps, "idx=$position: LP min is arr[$position]'s minimum")
+        }
     }
 
     @Test

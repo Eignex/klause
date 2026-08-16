@@ -65,7 +65,7 @@ class NativeSatForgetTest {
     }
 
     @Test
-    fun `native lane engages only for an eligible problem`() {
+    fun `an eligible problem runs on the native lane`() {
         val eligible = PropagationSession(
             Problem(
                 numBoolVars = 2,

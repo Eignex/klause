@@ -293,8 +293,8 @@ class LpLargeRelaxationTest {
     @Test
     fun `an unbudgeted root LP still captures the root bound`() {
         // The complement of the starvation guard: rootBudgetFraction = 0 disables the cap, so the root
-        // relaxation bound is captured (finite) exactly as before the #31 budget. A feasible-and-bounded
-        // small minimize has a finite LP relaxation, so a finite rootLpBound proves the root solve ran.
+        // relaxation bound is captured. A feasible-and-bounded small minimize has a finite LP
+        // relaxation, so a finite rootLpBound proves the root solve ran.
         val saved = KlauseConfig.current
         try {
             KlauseConfig.current = saved.copy(lpMaxTableauCells = Long.MAX_VALUE)

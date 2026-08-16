@@ -85,8 +85,7 @@ class SetSubsetTest {
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem.bake())
         val samples = solver.enumerate(BacktrackParams()).take(100).toList()
-        // 2^3 * 2^3 = 64 raw assignments; sub-set pairs: |{A: A⊆B}| over each B is 2^|B|;
-        // total = Σ_B 2^|B| = (1+1)^3 * ... actually total subsets-of-b summed = 3^3 = 27.
+        // Over a 2^3 universe the subset pairs number Σ_B 2^|B| = 3^3 = 27.
         assertEquals(27, samples.size, "expected 3^3 = 27 (A ⊆ B) pairs over 2^3 universe")
         for (sample in samples) {
             val av = compiled.decode(schema.a, sample)
@@ -129,7 +128,7 @@ class SetUnionIntersectTest {
     }
 
     @Test
-    fun `union is computed correctly`() {
+    fun `u equals the union of a and b in every solution`() {
         val schema = Sch()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem.bake())
@@ -151,7 +150,7 @@ class SetUnionIntersectTest {
     }
 
     @Test
-    fun `intersect is computed correctly`() {
+    fun `i equals the intersection of a and b in every solution`() {
         val schema = IntersectS()
         val compiled = schema.compile()
         val solver = BacktrackSolver(compiled.problem.bake())

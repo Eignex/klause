@@ -59,7 +59,7 @@ class BranchAndBoundTest {
     }
 
     @Test
-    fun `branch-and-bound prunes — minimizing within a budget that full enumeration would blow`() {
+    fun `branch-and-bound reaches the optimum within a budget full enumeration would blow`() {
         // 16 independent bool vars: 2^16 = 65,536 leaves. Full enumeration would exceed
         // a 200-decision budget. With B&B + a positive linear objective + value-ordering
         // that prefers false first (the smallest contribution), the very first leaf

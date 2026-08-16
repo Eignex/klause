@@ -52,12 +52,11 @@ class SetPredicateTest {
 
     @Test
     fun `set_in over a hole domain skips hole values and stays satisfiable`() {
-        // Regression: set_in(x, lo..hi) lowers to one ReifiedLinear(chan = x==v) per value v
-        // in the range, OR-ed via atLeastOne. Values that are interior holes of x's domain
-        // can never satisfy x==v and must contribute no chan. They used to be emitted anyway
-        // (only out-of-[min,max] values were skipped); accumulating those forced-false
-        // reifications across several vars wrongly drove the engine to UNSAT — a false UNSAT
-        // on the MiniZinc Challenge `is/1YHXeG1xYs` instance. Each var below is independently
+        // set_in(x, lo..hi) lowers to one ReifiedLinear(chan = x==v) per value v in the range,
+        // OR-ed via atLeastOne. Values that are interior holes of x's domain can never satisfy
+        // x==v and must contribute no chan: emitting them accumulates forced-false reifications
+        // that drive the engine to a false UNSAT once several vars are involved (observed on the
+        // MiniZinc Challenge `is/1YHXeG1xYs` instance). Each var below is independently
         // satisfiable (only 31 lies in both the domain {0,31,32,33,34} and the range 1..31),
         // so the conjunction is trivially SAT with every var = 31.
         val decls = (0 until 6).joinToString("\n") { "var {0,31,32,33,34}: a$it;" }

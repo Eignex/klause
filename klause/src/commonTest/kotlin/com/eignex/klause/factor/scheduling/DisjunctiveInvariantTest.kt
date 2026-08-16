@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver

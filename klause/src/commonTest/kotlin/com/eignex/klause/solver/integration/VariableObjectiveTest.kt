@@ -90,7 +90,7 @@ class VariableObjectiveTest {
     }
 
     @Test
-    fun `bounds checking on factories`() {
+    fun `objective factories reject an out-of-range variable id`() {
         val intsOnly = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -115,11 +115,8 @@ class VariableObjectiveTest {
         }
         val schema = S()
         val compiled = schema.compile()
-        // Float objectives optimise the integer bucket index (a strictly increasing affine
-        // map of the real value), so the objective is integer and the real value is recovered
-        // by decode. Minimising the bucket index lands at the minimum real value ≈ -10.
-        // The float is an LP-only continuous column (issue #1232), so the objective is a real objective the
-        // simplex resolves; backtrack minimises it to the real minimum ≈ -10.
+        // The float is an LP-only continuous column (issue #1232), so the objective is a real
+        // objective the simplex resolves; backtrack minimises it to the real minimum ≈ -10.
         val objective = compiled.minimize(schema.temp)
         val r = BacktrackSolver(compiled.problem.bake()).minimize(objective, BacktrackParams(randomSeed = 0L))
         val sample = assertIs<MinimizeResult.WithSample>(r).sample

@@ -67,7 +67,7 @@ class MznLibPassthroughTest {
     @Test
     fun `native globals survive compilation instead of decomposing`() {
         if (!minizincOnPath()) {
-            println("[mzn-passthrough] minizinc not on PATH — skipping")
+            println("[skip] minizinc not on PATH")
             return
         }
         val root = CorpusFetcher.workspaceRoot()

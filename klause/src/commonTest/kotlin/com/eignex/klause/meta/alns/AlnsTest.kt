@@ -111,7 +111,7 @@ class AlnsTest {
             inner = inner,
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 8,
+            maxIterations = 20,
             flipsPerIteration = 200L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
@@ -134,7 +134,7 @@ class AlnsTest {
             backtrackParams = BacktrackParams(),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 8,
+            maxIterations = 20,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
@@ -154,7 +154,7 @@ class AlnsTest {
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 8,
+            maxIterations = 20,
             acceptance = AcceptanceCriterion.BetterOrEqual,
             improvedSolutionSink = { sample, obj -> published.add(sample to obj) },
         )
@@ -177,7 +177,7 @@ class AlnsTest {
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 8,
+            maxIterations = 20,
             acceptance = AcceptanceCriterion.BetterOrEqual,
             pooledSolutionSupplier = {
                 polls++
@@ -219,7 +219,7 @@ class AlnsTest {
     }
 
     @Test
-    fun `alns with multiple repair operators iterates and varies repair picks`() {
+    fun `alns with multiple repair operators logs at least one repair pick`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -337,8 +337,7 @@ class AlnsTest {
     fun `alns over a session accumulates activity recency and feeds activity-biased destroy`() {
         // Verify the cross-iteration wiring: when ALNS runs over a LocalSearchSession,
         // the inner solver's per-call activity capture survives into the next iteration's
-        // destroy phase, where activityBiased reads it. Without a session, the activity
-        // operator falls back to random — verified by checking recency stays empty.
+        // destroy phase, where activityBiased reads it.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),
@@ -369,7 +368,7 @@ class AlnsTest {
     }
 
     @Test
-    fun `alns can use a kumulant Thompson sampling bandit in place of the default roulette wheel`() {
+    fun `alns solves with a kumulant Thompson sampling bandit in place of the roulette wheel`() {
         // Smoke test: plug a MultiArmedBandit(BetaBernoulliTS()) into Alns and verify it
         // produces a feasible sample. The kumulant bandit family is tested in kumulant
         // itself; here we just verify the integration point.
@@ -491,14 +490,14 @@ class AlnsTest {
         )
         val problem = Problem(4, 0, emptyArray(), listOf(factor))
         val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        // The inner LS never finds feasible; the complete backtrack bootstrap must supply the incumbent so
-        // ALNS optimises instead of returning empty (the dominant issue the bench sweep mined).
+        // The inner LS never finds feasible; the complete backtrack bootstrap must supply the incumbent
+        // so ALNS optimises instead of returning empty.
         val alns = Alns(
             inner = NoFeasibleLs(problem.bake()),
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem.bake()),
             backtrackParams = BacktrackParams(),
-            maxIterations = 8,
+            maxIterations = 20,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment

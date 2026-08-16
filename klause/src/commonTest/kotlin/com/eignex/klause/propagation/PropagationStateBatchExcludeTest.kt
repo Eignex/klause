@@ -67,7 +67,7 @@ class PropagationStateBatchExcludeTest {
     }
 
     @Test
-    fun batchExcludeMatchesSequentialEndState() {
+    fun `batch exclude reaches the same state as sequential excludes`() {
         val hi = 14
         val rng = Random(0xBA7C4)
         repeat(600) { trial ->
@@ -93,7 +93,7 @@ class PropagationStateBatchExcludeTest {
     }
 
     @Test
-    fun batchExcludeReportsEmptyDomainAsConflict() {
+    fun `batch exclude of every remaining value reports a conflict`() {
         val s = freshState(1, 4)
         materializeAllAtoms(s, 1, 4)
         enterLevel(s, 0)
@@ -101,7 +101,7 @@ class PropagationStateBatchExcludeTest {
     }
 
     @Test
-    fun batchExcludeAbsentValuesIsNoOp() {
+    fun `batch exclude of absent values leaves the domain unchanged`() {
         val s = freshState(1, 4)
         materializeAllAtoms(s, 1, 4)
         enterLevel(s, 0)
@@ -119,7 +119,7 @@ class PropagationStateBatchExcludeTest {
      * record (interior eq atoms reset on pop) against the range-limited bound-literal reset.
      */
     @Test
-    fun batchExcludeSoundAcrossPushAndPop() {
+    fun `batch exclude keeps atom truth consistent across push and pop`() {
         val numVars = 3
         val hi = 9
         val rng = Random(0x5eed5)

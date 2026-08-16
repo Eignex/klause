@@ -20,7 +20,7 @@ class FlatZincCompilerArrayAccessTest {
 
     @Test
     fun `an out-of-range array length is rejected rather than crashing with a negative array size`() {
-        // hi overflows Int, so the old hi.toInt() produced a negative length and a
+        // hi overflows Int, so narrowing it with toInt() yields a negative length and a
         // NegativeArraySizeException downstream.
         val src = "array[1..3000000000] of var int: a;\nsolve satisfy;"
         assertFailsWith<IllegalArgumentException> { parseFlatZinc(src) }

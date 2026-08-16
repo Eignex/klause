@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.table
 
-import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver

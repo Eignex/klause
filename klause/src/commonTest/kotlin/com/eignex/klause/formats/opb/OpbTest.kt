@@ -206,15 +206,11 @@ class OpbTest {
     }
 
     @Test
-    fun `rejects missing terminator`() {
-        val text = "+1 x1 >= 1"
-        assertTrue(runCatching { Opb.parse(text) }.isFailure)
-    }
-
-    @Test
-    fun `rejects missing operator`() {
-        val text = "+1 x1 1 ;"
-        assertTrue(runCatching { Opb.parse(text) }.isFailure)
+    fun `rejects a constraint statement missing its terminator or operator`() {
+        val malformed = listOf("+1 x1 >= 1", "+1 x1 1 ;")
+        for (text in malformed) {
+            assertTrue(runCatching { Opb.parse(text) }.isFailure, text)
+        }
     }
 
     @Test
@@ -245,7 +241,7 @@ class OpbTest {
     }
 
     @Test
-    fun `still reports a non-numeric coefficient as not an integer`() {
+    fun `reports a non-numeric coefficient as not an integer`() {
         assertTrue("not an integer" in parseError("abc x1 >= 1 ;"))
     }
 

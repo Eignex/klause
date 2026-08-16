@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class PropagationSessionTest {
 
     @Test
-    fun `push pins agree with one-shot propagate`() {
+    fun `pushed pins imply the same values a one-shot propagate does`() {
         val p = Problem(
             numBoolVars = 3,
             numIntVars = 0,

@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Factor
@@ -37,30 +36,20 @@ class NValueInvariantTest {
     }
 
     @Test
-    fun `violated when distinct count differs from n`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // n=3, xs=[0,0,1] → 2 distinct values, n=3 → degree = |3-2| = 1
-        state.assignment.setInt(0, 3)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 1)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        assertEquals(1, state.factors[0].violationDegree(state, 0))
-    }
-
-    @Test
-    fun `degree equals magnitude of mismatch`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // n=3, xs=[0,0,0] → 1 distinct, degree = |3-1| = 2
-        state.assignment.setInt(0, 3)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 0)
-        state.recompute()
-        assertEquals(2, state.factors[0].violationDegree(state, 0))
+    fun `violated when distinct count differs from n by the size of the mismatch`() {
+        // n=3 throughout; degree = |n - distinct(xs)|.
+        val cases = listOf(
+            listOf(0L, 0L, 1L) to 1,
+            listOf(0L, 0L, 0L) to 2,
+        )
+        for ((xs, degree) in cases) {
+            val state = LocalSearchState(problem(), Random(0))
+            state.assignment.setInt(0, 3)
+            for (i in 0..2) state.assignment.setInt(1 + i, xs[i])
+            state.recompute()
+            assertTrue(state.factors[0].isViolated(state, 0), "xs=$xs must violate nvalue")
+            assertEquals(degree, state.factors[0].violationDegree(state, 0), "xs=$xs")
+        }
     }
 
     @Test

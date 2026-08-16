@@ -40,7 +40,6 @@ class SolveStatsTest {
         val q4 by intVar(0, 5)
         val q5 by intVar(0, 5)
 
-        // All-different rows + diagonals via aux abs-difference checks for a tiny n=6.
         val rows by constraint { allDifferent(q0, q1, q2, q3, q4, q5) }
     }
 

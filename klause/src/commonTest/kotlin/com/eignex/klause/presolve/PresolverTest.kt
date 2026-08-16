@@ -374,7 +374,7 @@ class PresolverTest {
         // x0 = x1 + 1 (a unit-pivot definition) and x0 also sits in AllDifferent(x0, x2, x4). With
         // dom(x0)=[1,2], dom(x2)=[5,6], dom(x4)=[9,10] pairwise disjoint that all-different is vacuous,
         // so subsumption drops it (#553); x0 is then contained in just its defining equality, and the
-        // affine pass projects it out — implied-free elimination the global previously blocked. x1 sits
+        // affine pass projects it out — implied-free elimination the global would otherwise block. x1 sits
         // in a *real* AllDifferent(x1, x3, x5) over [0,2], which stays. Three-variable all-differents
         // are used so the structural-reduction pass (two-var → binary disequality) leaves them alone.
         val problem = Problem(

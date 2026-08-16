@@ -3,9 +3,6 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.localsearch.FixedCadenceRestart
-import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.*

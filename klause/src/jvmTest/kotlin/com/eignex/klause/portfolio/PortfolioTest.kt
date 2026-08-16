@@ -268,11 +268,10 @@ class PortfolioTest {
 
     @Test
     fun `budget-capped workers never upgrade the incumbent to a false optimal`() {
-        // minimize x over x ∈ [0..1000] with no constraints: the optimum is 0, but every
+        // minimize x over x in [0..1000] with no constraints: the optimum is 0, but every
         // worker is decision-capped so none can exhaust its space. A pool of BestFound
-        // verdicts under BudgetExhausted proves nothing about better solutions — the fold
-        // must report BestFound, not Optimal (a portfolio over budget-capped workers
-        // previously manufactured an optimality proof from timed-out incumbents).
+        // verdicts under BudgetExhausted proves nothing about better solutions, so the fold
+        // must report BestFound, never Optimal.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 1,
@@ -286,10 +285,9 @@ class PortfolioTest {
                 i,
                 BacktrackSolver(problem.bake()).session(),
                 // Worker 0 walks down from 1000, worker 1 from the domain middle, so both hold real
-                // incumbents when the tiny decision cap lands — but neither can bisect all the way
-                // to (and prove) the optimum at 0 in so few decisions (which, with real-thread
-                // parallelism, would be a *legitimate* Optimal). A pool of capped BestFound verdicts
-                // is the exact shape that was upgraded falsely.
+                // incumbents when the tiny decision cap lands, yet neither can bisect all the way
+                // to (and prove) the optimum at 0 in so few decisions, which with real-thread
+                // parallelism would be a legitimate Optimal.
                 BacktrackParams(
                     randomSeed = i.toLong(),
                     maxDecisions = 4,
@@ -313,10 +311,9 @@ class PortfolioTest {
 
     @Test
     fun `minimize returns a sample consistent with the reported bound`() {
-        // #81 regression: the reported objectiveValue and the returned sample must agree. The fix
-        // swaps (bound, sample) in one CAS so they can never desync under a worker race; here we
-        // race several workers on a problem with multiple improving steps and verify the returned
-        // sample actually realises the reported bound (x + 2y, optimum 3 at x=3,y=0).
+        // The reported objectiveValue and the returned sample must never desync under a worker
+        // race: several workers race on a problem with multiple improving steps, and the returned
+        // sample must realise the reported bound (x + 2y, optimum 3 at x=3,y=0).
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 2,
@@ -557,7 +554,7 @@ class PortfolioTest {
     }
 
     @Test
-    fun `a scenario with fewer arms than cores no longer throws`() {
+    fun `a scenario keeps an arm count below its core count`() {
         val scenario = PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
         assertEquals(2, scenario.arms)
         assertEquals(6, scenario.cores)

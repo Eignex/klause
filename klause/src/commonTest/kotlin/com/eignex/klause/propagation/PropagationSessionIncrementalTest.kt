@@ -118,8 +118,7 @@ class PropagationSessionIncrementalTest {
     }
 
     @Test
-    fun `deep push-pop chain does not accumulate state`() {
-        // Many push/pop cycles — verify the trail and snapshots don't grow without bound.
+    fun `a deep push-pop chain returns to the base level and assumption set`() {
         val p = Problem(10, 0, emptyArray(), emptyList())
         val s = PropagationSession(p)
         s.seed(Assumptions.None)

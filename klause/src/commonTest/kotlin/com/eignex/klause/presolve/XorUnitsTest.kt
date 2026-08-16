@@ -123,6 +123,5 @@ class XorUnitsTest {
             factors = listOf(Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false)))),
         )
         assertTrue(Presolve.deriveXorUnits(problem).isEmpty, "no xor factors is the pass's no-op signal")
-        assertTrue(problem.factors.none { it is Xor }, "still no xor factors")
     }
 }

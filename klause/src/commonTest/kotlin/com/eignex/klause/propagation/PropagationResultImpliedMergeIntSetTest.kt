@@ -5,8 +5,8 @@ import kotlin.test.assertEquals
 
 /**
  * [PropagationResult.Implied] must carry set-restrictions (`v ∈ {survivors}`) through merge and the
- * single-set builders — previously build() dropped the intSet CSR, silently discarding the wide-sparse
- * survivor-set reduction whenever root-bake probing seeded a merge.
+ * single-set builders. Dropping the intSet CSR in build() would silently discard the wide-sparse
+ * survivor-set reduction whenever root-bake probing seeds a merge.
  */
 class PropagationResultImpliedMergeIntSetTest {
 

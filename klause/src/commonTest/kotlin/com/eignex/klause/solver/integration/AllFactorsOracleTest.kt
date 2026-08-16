@@ -383,8 +383,8 @@ class AllFactorsOracleTest {
         check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
     }
 
-    // `cumulatives` is no longer a native factor (#209) — it decomposes at the FlatZinc emit
-    // site into per-machine `Cumulative` (capacity) or a time-indexed reified ≥ (min-load),
+    // `cumulatives` is not a native factor (#209): it decomposes at the FlatZinc emit site into
+    // per-machine `Cumulative` (capacity) or a time-indexed reified ≥ (min-load), so it is
     // covered by FznCumulativesIngestTest rather than the factor oracle here.
 
     @Test fun `diffn passes the brute-force propagation and repair oracles`() {

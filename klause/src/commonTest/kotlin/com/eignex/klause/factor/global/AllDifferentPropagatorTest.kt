@@ -4,11 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.FactorPropagationOracle
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.global.GlobalCardinality
-import com.eignex.klause.factor.global.LexLess
-import com.eignex.klause.factor.global.Sort
-import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.factor.global.internals.computeBoundsAllDifferent
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.IntEvent
@@ -33,7 +28,7 @@ import kotlin.test.assertTrue
 
 class AllDifferentPropagatorTest {
 
-    // ── AllDifferentBoundsEventTest ──────────────────────────────────────────
+    // ── Bounds-consistent event subscription ─────────────────────────────────
 
     /** When [src] is fixed, carve its value out of [dst] — used to punch interior holes into the
      *  bounds-AllDifferent's variables mid-search. Plain occurrence-list wakeup (no event
@@ -144,7 +139,7 @@ class AllDifferentPropagatorTest {
         }
     }
 
-    // ── AllDifferentExceptTest ───────────────────────────────────────────────
+    // ── Except sets ──────────────────────────────────────────────────────────
 
     private fun allDiffExcept(ranges: List<Pair<Int, Int>>, except: IntArray): Problem {
         val lo = ranges.minOf { it.first }
@@ -205,7 +200,7 @@ class AllDifferentPropagatorTest {
         assertTrue(BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L)) is SolveResult.Unsat)
     }
 
-    // ── AllDifferentTest (CP tests) ──────────────────────────────────────────
+    // ── Hall-interval filtering ──────────────────────────────────────────────
 
     @Test
     fun `backtrack learning enumerates exactly the brute-force solution set`() {
@@ -395,7 +390,7 @@ class AllDifferentPropagatorTest {
         }
     }
 
-    // ── BoundsAllDifferentTest ───────────────────────────────────────────────
+    // ── Bounds filtering vs brute force ──────────────────────────────────────
 
     /** True iff vars can be assigned pairwise-distinct values, each within [lo[i], hi[i]]. */
     private fun hasMatching(lo: IntArray, hi: IntArray): Boolean {
@@ -449,13 +444,13 @@ class AllDifferentPropagatorTest {
     }
 
     @Test
-    fun `matches brute force on random small instances`() {
+    fun `bounds filtering matches brute force on random small instances`() {
         val rng = Random(20260614)
         var feasibleCases = 0
         var prunedCases = 0
         repeat(4000) {
             val n = 2 + rng.nextInt(5) // 2..6 vars
-            val span = 0 + rng.nextInt(7) // values within 0..~8
+            val span = rng.nextInt(7) // values within 0..~8
             val lo = IntArray(n)
             val hi = IntArray(n)
             for (i in 0 until n) {
@@ -500,7 +495,7 @@ class AllDifferentPropagatorTest {
         assertTrue(prunedCases > 50, "too few pruning cases: $prunedCases")
     }
 
-    // ── ReginGacTest ────────────────────────────────────────────────────────
+    // ── GAC filtering ────────────────────────────────────────────────────────
 
     private fun stateWithAD(factor: AllDifferent, domains: Array<IntDomain>): PropagationState {
         val problem = Problem(
@@ -684,7 +679,7 @@ class AllDifferentPropagatorTest {
         assertEquals(2, state.intDomains[4].max)
     }
 
-    // ── ReginIncrementalTest ─────────────────────────────────────────────────
+    // ── Incremental fixpoint re-fire ─────────────────────────────────────────
 
     @Test
     fun `re-fire from the GAC fixpoint prunes nothing further`() {
@@ -793,7 +788,7 @@ class AllDifferentPropagatorTest {
         assertTrue(r is PropagationResult.Implied, "first fire should reach fixpoint; got $r")
     }
 
-    // ── SharedFactorConflictReasonTest ───────────────────────────────────────
+    // ── Conflict reasons across sessions ─────────────────────────────────────
 
     private fun problemOf(factor: Factor, vararg domains: IntDomain) = Problem(
         numBoolVars = 0,
@@ -837,7 +832,7 @@ class AllDifferentPropagatorTest {
         )
     }
 
-    // ── SortLexSymDiffBoundsEventTest ────────────────────────────────────────
+    // ── Sort, LexLess and SymmetricAllDifferent bound events ─────────────────
 
     private class ExcludeOnFixWithAntecedent(val src: Int, val dst: Int) :
         Factor,
@@ -885,7 +880,7 @@ class AllDifferentPropagatorTest {
     }
 
     @Test
-    fun `all three subscribe to only bound events`() {
+    fun `sort lexless and symmetric-alldiff subscribe to only bound events`() {
         assertBoundOnly(
             Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)).asPropagator().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),

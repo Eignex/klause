@@ -5,8 +5,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Decision-level moving-average restart (CP-SAT DL): [DecisionLevelRestart] restarts when recent
- * conflict decision levels run above the long-run average, once the recent window has filled.
+ * Decision-level moving-average restart: [DecisionLevelRestart] restarts when recent conflict
+ * decision levels run above the long-run average, once the recent window has filled.
  */
 class DecisionLevelRestartTest {
 

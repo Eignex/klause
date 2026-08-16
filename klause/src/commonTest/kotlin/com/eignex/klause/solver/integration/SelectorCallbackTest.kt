@@ -144,7 +144,7 @@ class SelectorCallbackTest {
     }
 
     @Test
-    fun `default heuristics ignore callbacks without compile errors`() {
+    fun `default heuristics enumerate without any callback hooks`() {
         val problem = Problem(
             numBoolVars = 2,
             numIntVars = 0,

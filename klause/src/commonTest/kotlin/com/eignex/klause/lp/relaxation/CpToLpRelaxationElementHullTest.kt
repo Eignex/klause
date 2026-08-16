@@ -105,9 +105,9 @@ class CpToLpRelaxationElementHullTest {
 
     @Test
     fun `variable array element builds a sound big-M hull`() {
-        // Variable-array Element is now linearized with a big-M selector hull: it adds selector
-        // columns + one-hot/index/big-M rows, and the LP bound on `result` is a sound relaxation
-        // bound — never above the true integer optimum.
+        // Variable-array Element linearizes to a big-M selector hull: it adds selector columns plus
+        // one-hot/index/big-M rows, and the LP bound on `result` is a sound relaxation bound — never
+        // above the true integer optimum.
         // arr = [v0∈[4,6], v1∈[1,2], v2∈[8,9]], idx∈{0,1,2}, minimize result ⇒ integer min = 1 (idx=1).
         val p = Problem(
             numBoolVars = 0,

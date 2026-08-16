@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  * The model-wide definitional sweep built from `:: defines_var` annotations: evaluation order,
  * domain clamping, and the local-search restart integration. The miniature model mirrors the
  * fast-food shape — decision vars feeding an abs → min → linear-sum DAG — which the LS engine
- * previously had to hand-repair move by move.
+ * would otherwise have to hand-repair move by move.
  */
 class FznDefinitionalSweepTest {
 
@@ -137,7 +137,6 @@ class FznDefinitionalSweepTest {
         """.trimIndent()
         val program = parseFlatZinc(src2)
         val sweep = assertNotNull(program.definitionalSweep, "the element definition must yield a sweep")
-        // Threw ArrayIndexOutOfBoundsException before the fix (the literal's var id == numIntVars).
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         assertTrue(net.isDefinedInt(program.intVarsByName.getValue("e")), "e is definitionally determined")
         val solver = LocalSearchSolver(program.problem.bake(), definitionalSweep = sweep)

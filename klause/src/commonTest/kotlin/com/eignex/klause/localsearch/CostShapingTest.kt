@@ -1,7 +1,6 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Lit
@@ -14,6 +13,7 @@ import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -32,7 +32,7 @@ class CostShapingTest {
         val s = CostShaping.linear(lambda = 0.5)
         assertEquals(0.5 * 4.0, s.shape(0, 4.0))
         assertEquals(2.0 + 0.5 * 4.0, s.shape(2, 4.0))
-        assertTrue(!s.feasibilityGated)
+        assertFalse(s.feasibilityGated)
     }
 
     @Test
@@ -52,7 +52,7 @@ class CostShapingTest {
     }
 
     @Test
-    fun `violation penalty types`() {
+    fun `violation penalties convert a raw violation count`() {
         assertEquals(7.0, ViolationPenalty.Identity.of(7))
         assertEquals(5.0, ViolationPenalty.Saturating(5.0).of(100))
         assertEquals(3.0, ViolationPenalty.SquareRoot.of(9))
@@ -74,7 +74,7 @@ class CostShapingTest {
 
     @Test
     fun `shapedBreakScore incorporates linear objective delta when shaping is on`() {
-        // Both flips resolve cost 1 → 0, so they tie on break score; with weights 100 vs 1
+        // Both flips resolve cost 1 to 0, so they tie on break score; with weights 100 vs 1
         // and lambda 1.0 the shaped scores differ exactly by the weight gap of 99.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
@@ -118,7 +118,7 @@ class CostShapingTest {
 
     @Test
     fun `incremental objective drives shaped delta for non-linear objectives`() {
-        // |2·b0 - b1 - 1|: a piecewise-linear objective LinearObjective can't express, folded
+        // |2*b0 - b1 - 1|: a piecewise-linear objective LinearObjective can't express, folded
         // into shaped descent via IncrementalObjective.
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
@@ -154,8 +154,8 @@ class CostShapingTest {
         state.shaping.objective = abs
         state.shaping.shapingLambda = 1.0
         // Current (b0=F, b1=F): |0 - 0 - 1| = 1.
-        // Flip b0 → T: |2 - 0 - 1| = 1, delta = 0.
-        // Flip b1 → T: |0 - 1 - 1| = 2, delta = +1.
+        // Flip b0 to true: |2 - 0 - 1| = 1, delta = 0.
+        // Flip b1 to true: |0 - 1 - 1| = 2, delta = +1.
         assertEquals(0.0, state.shapedObjectiveDelta(Move.BoolFlip(0)), 1e-9)
         assertEquals(1.0, state.shapedObjectiveDelta(Move.BoolFlip(1)), 1e-9)
     }

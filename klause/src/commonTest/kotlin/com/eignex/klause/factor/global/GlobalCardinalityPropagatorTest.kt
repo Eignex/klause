@@ -5,7 +5,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -183,7 +182,7 @@ class GlobalCardinalityPropagatorTest {
     }
 
     @Test
-    fun `gcc with count vars`() {
+    fun `count vars equal the number of xs taking each cover value`() {
         // xs ∈ [0..2]^5, cover = [0,1,2], count vars are last 3 vars. Each count must equal
         // the # of xs taking that cover value.
         val problem = Problem(
@@ -208,7 +207,7 @@ class GlobalCardinalityPropagatorTest {
     }
 
     @Test
-    fun `gcc low_up enforces bounds`() {
+    fun `every cover value count lands inside its low-up bounds`() {
         // 6 xs ∈ [0..2], cover = [0,1,2], lo=[1,1,1], up=[3,3,3].
         // Every value must appear ≥ 1 and ≤ 3 times.
         val problem = Problem(

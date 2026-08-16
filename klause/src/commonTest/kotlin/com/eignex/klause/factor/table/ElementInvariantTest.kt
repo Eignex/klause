@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.table
 
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

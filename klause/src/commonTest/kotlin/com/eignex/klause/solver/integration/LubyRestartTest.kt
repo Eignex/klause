@@ -124,8 +124,7 @@ class LubyRestartTest {
 
     @Test
     fun `phase-saving without restarts does not change enumerate output set`() {
-        // Phase-saving only re-orders within a DFS — the *set* of yielded models is
-        // identical. Verify that on a small instance enumerate returns all 4 models.
+        // Phase-saving only re-orders within a DFS — the *set* of yielded models is identical.
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),

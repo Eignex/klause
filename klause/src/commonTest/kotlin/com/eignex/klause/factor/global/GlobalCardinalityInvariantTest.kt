@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -86,8 +85,7 @@ class GlobalCardinalityInvariantTest {
     fun `violated when count falls below lower bound`() {
         val p = problem(intArrayOf(0, 1, 2), intArrayOf(3), intArrayOf(2), intArrayOf(3))
         val state = LocalSearchState(p, Random(0))
-        // xs = [3, 3, 0]: count(3)=2, needs at least 2 — actually count=2 is exactly 2, no violation
-        // Let's use count(3)=1 < lo=2
+        // xs = [3, 0, 0]: count(3)=1, one short of lo=2
         state.assignment.setInt(0, 3)
         state.assignment.setInt(1, 0)
         state.assignment.setInt(2, 0)

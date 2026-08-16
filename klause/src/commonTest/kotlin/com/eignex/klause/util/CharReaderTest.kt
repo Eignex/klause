@@ -55,7 +55,7 @@ class CharReaderTest {
     }
 
     @Test
-    fun `reading stays correct past the compaction threshold`() {
+    fun `reading stays correct over an input far larger than the buffer`() {
         val n = (1 shl 16) * 3
         val reader = CharReader(ChunkedCharSource(List(n) { "a" }))
         var count = 0

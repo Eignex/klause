@@ -63,7 +63,7 @@ class PropagationStateHoleEqAtomStaleReasonTest {
     }
 
     @Test
-    fun holeEqAtomKeepsCarveReasonAfterBoundMoveWidensBack() {
+    fun `a hole eq atom keeps its carve reason after a bound move widens back`() {
         val s = freshState(numVars = 2, hi = 6)
         val eq2 = s.atomVarEq(0, 2)
         val eqId = eq2 - s.problem.numBoolVars
