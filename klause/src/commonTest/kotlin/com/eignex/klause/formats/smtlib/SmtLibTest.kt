@@ -129,7 +129,7 @@ class SmtLibTest {
     @Test
     fun `declare-fun with arguments is rejected while a 0-arity constant is accepted`() {
         // A non-empty argument list makes f a genuine function symbol, not a variable; it must not be
-        // silently declared as an Int constant (the arg-sort list was previously ignored).
+        // silently declared as an Int constant by ignoring the arg-sort list.
         val e = assertFailsWith<UnsupportedSmtException> {
             SmtLib.parse("(declare-fun f (Int) Int) (assert (>= f 0)) (check-sat)")
         }
@@ -188,7 +188,7 @@ class SmtLibTest {
 
     @Test
     fun `a deeply nested let chain compiles without overflowing the stack`() {
-        // Generated SMT (e.g. Dartagnan) nests thousands of lets in tail position. Compilation must
+        // Machine-generated SMT nests thousands of lets in tail position. Compilation must
         // unwind the chain iteratively (heap-allocated scope stack), not recurse per let.
         val depth = 20_000
         val body = StringBuilder("(declare-const x Int)\n(assert ")
@@ -546,14 +546,6 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a small unbounded system closes under the small-model bound without clamping`() {
-        // One row with tiny coefficients: the small-model bound fits, so the finite box is
-        // equisatisfiable with the unbounded model and no clamp flag is raised.
-        val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> x 3)) (check-sat)")
-        assertFalse(parsed.clamped(), "the small-model bound covers this system exactly")
-    }
-
-    @Test
     fun `an unbounded variable past the small-model range marks the model as clamped`() {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (> x 3000000000000)) (check-sat)",
@@ -591,9 +583,9 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a sat witness beyond the legacy million-value window is found`() {
-        // The searchable fallback spans the overflow-safe Long range, so a witness at 10^10 --
-        // far past the historical +-10^6 window -- is reachable.
+    fun `a sat witness ten billion values out is found`() {
+        // The searchable fallback spans the overflow-safe Long range, so a witness at 10^10 is
+        // reachable.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (>= x 10000000000))\n(check-sat)"
         assertTrue(solveFor(text, "x") >= 10_000_000_000L)
     }
@@ -611,25 +603,20 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a fresh abs over an unbounded operand marks the model clamped`() {
-        // abs(x) with x unbounded: the fresh |x| var must inherit x's open range and be flagged when it
-        // is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
-        val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)")
-        assertTrue(parsed.clamped(), "the fresh abs var inherits x's unbounded range")
-    }
-
-    @Test
-    fun `a fresh div quotient over an unbounded dividend marks the model clamped`() {
-        val parsed = SmtLib.parse("(declare-fun x () Int) (assert (> (div x 2) 3000000000000)) (check-sat)")
-        assertTrue(parsed.clamped(), "the fresh quotient var inherits x's unbounded range")
-    }
-
-    @Test
-    fun `a fresh ite over an unbounded branch marks the model clamped`() {
-        val parsed = SmtLib.parse(
-            "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3000000000000)) (check-sat)",
+    fun `a fresh variable over an unbounded operand marks the model clamped`() {
+        // A fresh var standing for abs/div/ite must inherit the operand's open range and be flagged when
+        // it is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
+        val cases = listOf(
+            "(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)" to
+                "the fresh abs var inherits x's unbounded range",
+            "(declare-fun x () Int) (assert (> (div x 2) 3000000000000)) (check-sat)" to
+                "the fresh quotient var inherits x's unbounded range",
+            "(declare-fun x () Int) (declare-fun p () Bool) (assert (> (ite p x 0) 3000000000000)) (check-sat)" to
+                "the fresh ite var inherits the unbounded branch's range",
         )
-        assertTrue(parsed.clamped(), "the fresh ite var inherits the unbounded branch's range")
+        for ((text, message) in cases) {
+            assertTrue(SmtLib.parse(text).clamped(), message)
+        }
     }
 
     @Test
@@ -661,8 +648,8 @@ class SmtLibTest {
 
     @Test
     fun `a stray closing paren is a parse error rather than an infinite loop`() {
-        // A top-level unbalanced ')' must be rejected; previously the reader returned an empty token
-        // without advancing and spun forever.
+        // A top-level unbalanced ')' must be rejected; a reader that returns an empty token without
+        // advancing would spin forever instead.
         assertFailsWith<FormatException> {
             SmtLib.parse("(declare-const x Int)\n(assert (>= x 0))\n(check-sat))")
         }

@@ -382,8 +382,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `an extension table builds rather than being refused by a row cap`() {
-        // The former row cap is gone: a support table builds its factor instead of throwing.
+    fun `a multi-row extension table builds its factor with no row limit`() {
         val xml = """
             <instance type="CSP"><variables><var id="a"> 0..9 </var></variables>
             <constraints><extension><list> a </list><supports> 0 1 2 3 4 5 </supports></extension></constraints></instance>
@@ -470,7 +469,7 @@ class Xcsp3Test {
     }
 
     @Test
-    fun `instantiation ordered and allEqual constrain the listed variables`() {
+    fun `instantiation pins each listed variable to its value`() {
         val inst = sat(
             """
             <instance type="CSP"><variables><array id="x" size="[3]"> 0..9 </array></variables>
@@ -478,6 +477,10 @@ class Xcsp3Test {
             """.trimIndent(),
         )
         assertEquals(listOf(5, 3, 8), inst.take(3))
+    }
+
+    @Test
+    fun `ordered with lt makes the listed variables strictly increasing`() {
         val ord = sat(
             """
             <instance type="CSP"><variables><array id="x" size="[3]"> 0..9 </array></variables>
@@ -515,8 +518,8 @@ class Xcsp3Test {
         )
         assertEquals(listOf(4, 4, 4), v.take(3))
 
-        // An inequality on the tail operand makes the all-equal chain UNSAT — proving z is constrained,
-        // which the old first-pair-only truncation (x = y, z free) would have missed.
+        // An inequality on the tail operand makes the all-equal chain UNSAT, proving z is constrained
+        // and not left free by a first-pair-only reading.
         val bad =
             """
             <instance type="CSP"><variables>
@@ -984,7 +987,7 @@ class Xcsp3Test {
     @Test
     fun `channel with unequal lengths is a one-way implication`() {
         // |X| < |Y| (Semantics 32): x_i=j ⇒ y_j=i, but y entries beyond X's range stay free.
-        // Pinning y[2]=0 is satisfiable; the previous biconditional wrongly forced x[0]=2 → UNSAT.
+        // Pinning y[2]=0 must stay satisfiable; a biconditional would force x[0]=2 and make it UNSAT.
         val v = sat(
             """
             <instance type="CSP">
@@ -1004,7 +1007,7 @@ class Xcsp3Test {
 
     @Test
     fun `cardinality closed forbids values outside the cover`() {
-        // closed=true forces x ∈ {0,1}; x fixed to 2 ⇒ UNSAT. The open (buggy) form accepted it.
+        // closed=true forces x ∈ {0,1}; x fixed to 2 ⇒ UNSAT. The open form would accept it.
         val r = BacktrackSolver(
             Xcsp3.parse(
                 """
@@ -1019,7 +1022,7 @@ class Xcsp3Test {
 
     @Test
     fun `nValues excludes the except values from the count`() {
-        // z=[0,0,3,5]; distinct excluding {0} = {3,5} = 2. Counting 0 (the bug) gives 3 ≠ 2 → UNSAT.
+        // z=[0,0,3,5]; distinct excluding {0} = {3,5} = 2. Counting 0 as well would give 3 ≠ 2 → UNSAT.
         val v = sat(
             """
             <instance type="CSP"><variables><array id="z" size="[4]"> 0..5 </array></variables>

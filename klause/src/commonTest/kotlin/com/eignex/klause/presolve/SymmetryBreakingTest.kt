@@ -206,36 +206,23 @@ class SymmetryBreakingTest {
     fun `value precedence fires on graph coloring with binary disequalities`() {
         // `col[a] != col[b]` compiles to a binary Linear with op NE — a pure disequality, which is
         // value-anonymous (#501): the colors are interchangeable. A triangle over 3 colors has 3!=6
-        // proper colorings (all distinct); precedence keeps the single canonical labeling 0,1,2.
+        // proper colorings (all distinct); precedence keeps the single canonical labeling. The orbit is
+        // built over the full Long value space, so a base past 2^31 collapses just as far.
         val edges = listOf(0 to 1, 0 to 2, 1 to 2)
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            edges.map { (a, b) -> Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.NE, 0) },
-        )
-        assertEquals(6, countFeasible(problem))
-        assertEquals(
-            1,
-            countFeasible(precedence(problem)),
-            "coloring value symmetry should collapse to one labeling",
-        )
-    }
-
-    @Test
-    fun `value precedence fires on colors beyond Int range`() {
-        // The same triangle coloring but over colors b, b+1, b+2 past 2^31: the value-symmetry orbit is
-        // built and ordered over the full Long value space, collapsing the 6 labelings to one.
-        val b = 5_000_000_000L
-        val edges = listOf(0 to 1, 0 to 2, 1 to 2)
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(b, b + 2) },
-            edges.map { (a, c) -> Linear(intArrayOf(1, -1), intArrayOf(a, c), LinearOp.NE, 0) },
-        )
-        assertEquals(6, countFeasible(problem))
-        assertEquals(1, countFeasible(precedence(problem)), "wide-color value symmetry should collapse to one labeling")
+        listOf(0L, 5_000_000_000L).forEach { base ->
+            val problem = Problem(
+                0,
+                3,
+                Array(3) { IntDomain(base, base + 2) },
+                edges.map { (a, b) -> Linear(intArrayOf(1, -1), intArrayOf(a, b), LinearOp.NE, 0) },
+            )
+            assertEquals(6, countFeasible(problem), "base $base: proper colorings")
+            assertEquals(
+                1,
+                countFeasible(precedence(problem)),
+                "base $base: coloring value symmetry should collapse to one labeling",
+            )
+        }
     }
 
     @Test
@@ -471,9 +458,9 @@ class SymmetryBreakingTest {
 
     @Test
     fun `isomorphic inverse factors are block-ordered`() {
-        // Two inverse constraints over disjoint var blocks are interchangeable as blocks; the new
-        // inverse structuralKey enables verified detection (and the brute gate guards the key's
-        // soundness — a too-coarse key would let a false swap through and ADD solutions).
+        // Two inverse constraints over disjoint var blocks are interchangeable as blocks; the inverse
+        // structuralKey enables verified detection (and the brute gate guards the key's soundness —
+        // a too-coarse key would let a false swap through and ADD solutions).
         val problem = Problem(
             0,
             8,
@@ -644,7 +631,7 @@ class SymmetryBreakingTest {
     @Test
     fun `isomorphic nvalue factors are block-ordered`() {
         // Two nvalue(count, xs) blocks over disjoint, equal-domain variables are interchangeable; the
-        // new nvalue structuralKey lets verified block detection order them. The count vars get domain
+        // nvalue structuralKey lets verified block detection order them. The count vars get domain
         // [1,2] (the distinct count of two binary vars) so the blocks aren't degenerate. The brute gate
         // guards the key's soundness — a too-coarse key would let a false swap through and add solutions.
         val problem = Problem(

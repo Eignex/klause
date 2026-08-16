@@ -37,7 +37,6 @@ class VizierTunerTest {
 
                 val second = study.suggest(3)
                 assertTrue(second.isNotEmpty(), "the bandit must keep suggesting after tell")
-                println("[vizier] round-trip ok: first=${first.map { s -> s.values }}, second=${second.size} more")
             }
         }
     }

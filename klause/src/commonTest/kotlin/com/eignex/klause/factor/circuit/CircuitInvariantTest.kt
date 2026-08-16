@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.circuit
 
-import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
@@ -18,8 +17,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class CircuitInvariantTest {
-
-    // --- from CircuitTest (LS tests) ---
 
     /** Build a 4-var Circuit problem; succ var ids are 0..3, each with domain [0..3]. */
     private fun fourNodeProblem(): Problem {
@@ -69,7 +66,7 @@ class CircuitInvariantTest {
     }
 
     @Test
-    fun `circuit propagation rejects unbounded domain`() {
+    fun `LS sample on an oversized successor domain forms a valid tour`() {
         val factor = Circuit(succ = intArrayOf(0, 1, 2))
         val problem = Problem(
             numBoolVars = 0,
@@ -117,7 +114,7 @@ class CircuitInvariantTest {
     }
 
     @Test
-    fun `cached cost matches recomputed after applying a move`() {
+    fun `applying a move that breaks the cycle raises the cost`() {
         val problem = fourNodeProblem()
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setInt(0, 1)
@@ -189,8 +186,6 @@ class CircuitInvariantTest {
         }
         assertTrue(maxParts > 3, "reversals must emit compounds longer than a 3-edge swap, got max $maxParts")
     }
-
-    // --- from SubcircuitTest (LS tests) ---
 
     private fun fourNodeSubcircuitProblem(): Problem {
         val factor = Circuit(succ = intArrayOf(0, 1, 2, 3), subcircuit = true)

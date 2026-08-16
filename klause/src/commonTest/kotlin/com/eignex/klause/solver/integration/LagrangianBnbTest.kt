@@ -72,7 +72,7 @@ class LagrangianBnbTest {
     }
 
     @Test
-    fun `no-op when there is no all-different`() {
+    fun `lagrangian bounding is a no-op when there is no all-different`() {
         val p = Problem(
             0,
             2,

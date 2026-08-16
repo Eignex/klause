@@ -365,7 +365,7 @@ class FactorPropertyTest {
                         )
                     }
 
-                    is Move.Compound -> { /* no factor proposes Compound today; covered by CompoundMoveTest */ }
+                    is Move.Compound -> { /* no factor proposes Compound; covered by CompoundMoveTest */ }
                 }
 
                 val sibling = LocalSearchState(problem, Random(iter.toLong()))

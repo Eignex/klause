@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Factor
@@ -23,28 +22,18 @@ class ValuePrecedeInvariantTest {
     )
 
     @Test
-    fun `not violated when s appears before t`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // xs=[0,1,2]: first s=1 at index 1, first t=2 at index 2 → satisfied
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 2)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
-    }
-
-    @Test
-    fun `not violated when t does not appear at all`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // xs=[0,0,0]: neither s=1 nor t=2 → satisfied
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 0)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
+    fun `not violated when no t precedes the first s`() {
+        val cases = listOf(
+            listOf(0L, 1L, 2L), // first s=1 at index 1, first t=2 at index 2
+            listOf(0L, 0L, 0L), // neither s nor t occurs
+        )
+        for (xs in cases) {
+            val state = LocalSearchState(problem(), Random(0))
+            for (i in 0..2) state.assignment.setInt(i, xs[i])
+            state.recompute()
+            assertFalse(state.factors[0].isViolated(state, 0), "xs=$xs must satisfy value_precede")
+            assertEquals(0, state.factors[0].violationDegree(state, 0), "xs=$xs")
+        }
     }
 
     @Test
@@ -70,7 +59,7 @@ class ValuePrecedeInvariantTest {
         state.assignment.setInt(2, 1)
         state.recompute()
         val before = state.factors[0].violationDegree(state, 0)
-        // Change xs[0]=2 → xs[0]=1 (s now at front, no bad t's)
+        // Change xs[0]=2 → xs[0]=1, putting s at the front with no bad t's before it
         val delta = state.factors[0].deltaIfIntSet(state, 0, 0, 1)
         state.apply(Move.IntSet(0, 1))
         val after = state.factors[0].violationDegree(state, 0)

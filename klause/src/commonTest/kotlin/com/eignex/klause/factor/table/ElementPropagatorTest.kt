@@ -5,8 +5,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.factor.table.Element
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
@@ -25,13 +23,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * #651: [Element] now overrides [Factor.conflictReason] with the hole-aware Hall-style nogood of
- * every read int var ([collectHoleAndBoundAntecedents] over [Element.intVars]), like [AllDifferent].
- * The variable-array path cites `idx`, `result`, and the position vars; the constant-array path
- * cites only `idx`/`result`. Previously the failure fell through to the coarse default bool-pins
- * reason, suppressed once an int decision is on the trail. Tests: (1) the reason is a sound
- * non-empty witness — every literal false at conflict time; (2) full enumeration under CDCL learning
- * matches brute force for both the variable and constant array paths.
+ * [Element] explains a failure with a hole-aware nogood over every int var it reads: the
+ * variable-array path cites `idx`, `result`, and the position vars; the constant-array path cites
+ * only `idx` and `result`. The coarse default bool-pins reason is suppressed once an int decision
+ * is on the trail, so an unsound or empty nogood here surfaces as a dropped solution.
  */
 class ElementPropagatorTest {
 
@@ -125,8 +120,8 @@ class ElementPropagatorTest {
         // result to a single value via the batched GAC exclusion; that exclusion must raise the bound
         // events so the Linear — which subscribes to LB_RAISED/UB_LOWERED and is dropped from each
         // result's occurrence-list wakeup — fires and rejects a sum over 60. A batched exclusion that
-        // marked the var dirty without the event kind under-set the wake, so backtrack reached leaves
-        // with r1 + r2 = 100 and emitted them as solutions (#865).
+        // marks the var dirty without the event kind under-sets the wake, letting backtrack reach
+        // leaves with r1 + r2 = 100 and emit them as solutions.
         val arr = longArrayOf(50, 10)
         val problem = Problem(
             numBoolVars = 0,
@@ -194,8 +189,11 @@ class ElementPropagatorTest {
             )
         }
         assertEquals(setOf(0, 1, 2, 3), byVar.keys, "all of idx/result/array vars subscribed")
+    }
 
-        // The constant-array path keeps occurrence wakeup (its own reversible domRef fast path).
+    @Test
+    fun `constant-array element keeps occurrence wakeup`() {
+        // The constant-array path has its own reversible domRef fast path, so it takes no delta.
         val constArr = Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 0)
         val constArrProp = constArr.asPropagator() as ElementPropagator
         assertNull(constArrProp.initialIntEventWatches)

@@ -4,8 +4,6 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test

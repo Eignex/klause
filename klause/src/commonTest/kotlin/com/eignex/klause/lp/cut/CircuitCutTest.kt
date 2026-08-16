@@ -128,8 +128,7 @@ class CircuitCutTest {
     }
 
     @Test
-    fun `arc relaxation scales past the old 24-node cap`() {
-        // The old model was hard-capped at 24 nodes; the sparse model gates on candidate-arc count.
+    fun `arc relaxation is gated on candidate-arc count not node count`() {
         // n=30 (30·29 = 870 arcs ≤ MAX_CIRCUIT_ARCS) builds; n=40 (1560 arcs) exceeds the cap and is
         // skipped, so the gate works both ways (#431).
         fun fullCircuit(n: Int): LpRelaxation {

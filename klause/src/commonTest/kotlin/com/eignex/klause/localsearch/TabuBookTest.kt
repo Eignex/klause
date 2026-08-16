@@ -1,7 +1,5 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test

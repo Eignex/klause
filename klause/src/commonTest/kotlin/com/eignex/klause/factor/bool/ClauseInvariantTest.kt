@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.bool
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink

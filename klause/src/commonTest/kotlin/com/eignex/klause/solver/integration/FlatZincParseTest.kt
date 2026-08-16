@@ -67,10 +67,10 @@ class FlatZincParseTest {
 
     @Test
     fun `scalar var alias is bound to its target not left a free var`() {
-        // `var T: name = <var>;` aliases name to another var. The compiler used to drop the
-        // binding and allocate a fresh, disconnected var — so an aliased objective output var
-        // floated at its domain minimum regardless of the real objective (#478). Here `obj`
-        // aliases the int_max output `m`; after solving, both must hold the same value.
+        // `var T: name = <var>;` aliases name to another var. Dropping the binding and allocating
+        // a fresh, disconnected var would let an aliased objective output var float at its domain
+        // minimum regardless of the real objective (#478). Here `obj` aliases the int_max output
+        // `m`; after solving, both must hold the same value.
         val src = """
             var 0..100: a;
             var 0..100: b;
@@ -174,7 +174,7 @@ class FlatZincParseTest {
     }
 
     @Test
-    fun `all_different_int`() {
+    fun `all_different_int forces distinct values`() {
         val src = """
             array [1..3] of var 0..2: xs;
             constraint all_different_int(xs);
@@ -189,7 +189,8 @@ class FlatZincParseTest {
 
     @Test
     fun `fzn_all_different_int is recognized`() {
-        // Gecode flattening emits the fzn_-prefixed builtin; it must map to the same AllDifferent.
+        // Some FlatZinc flatteners emit the fzn_-prefixed builtin; it must map to the same
+        // AllDifferent as the unprefixed name.
         val src = """
             array [1..3] of var 0..2: xs;
             constraint fzn_all_different_int(xs);
@@ -365,7 +366,7 @@ class FlatZincParseTest {
     }
 
     @Test
-    fun `int_eq with constant`() {
+    fun `int_eq with a constant pins the variable`() {
         val src = """
             var 0..5: x;
             constraint int_eq(x, 3);

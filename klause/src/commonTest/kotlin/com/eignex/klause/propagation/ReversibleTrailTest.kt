@@ -66,7 +66,7 @@ class ReversibleTrailTest {
     }
 
     @Test
-    fun `no-op writes do not grow the trail or change rollback`() {
+    fun `a write of the same value does not change what rollback restores`() {
         val s = freshState()
         val r = RevInt(s, 5)
         val m0 = s.mark()

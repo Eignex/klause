@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
@@ -87,18 +86,19 @@ class InverseInvariantTest {
 
     @Test
     fun `not violated when f and g are a true inverse pair`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // f = [1, 2, 0], g = [2, 0, 1]: f[i]=j ↔ g[j]=i
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 2)
-        state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 2)
-        state.assignment.setInt(4, 0)
-        state.assignment.setInt(5, 1)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
+        // f[i]=j ↔ g[j]=i, for a 3-cycle and for the identity (its own inverse).
+        val pairs = listOf(
+            listOf(1L, 2L, 0L) to listOf(2L, 0L, 1L),
+            listOf(0L, 1L, 2L) to listOf(0L, 1L, 2L),
+        )
+        for ((fValues, gValues) in pairs) {
+            val state = LocalSearchState(problem(), Random(0))
+            for (i in 0..2) state.assignment.setInt(i, fValues[i])
+            for (i in 0..2) state.assignment.setInt(3 + i, gValues[i])
+            state.recompute()
+            assertFalse(state.factors[0].isViolated(state, 0), "f=$fValues g=$gValues must satisfy inverse")
+            assertEquals(0, state.factors[0].violationDegree(state, 0), "f=$fValues g=$gValues")
+        }
     }
 
     @Test
@@ -114,17 +114,6 @@ class InverseInvariantTest {
         state.assignment.setInt(5, 2)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
-    }
-
-    @Test
-    fun `not violated for identity permutation`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // f = [0,1,2], g = [0,1,2]: identity is its own inverse
-        for (i in 0..2) state.assignment.setInt(i, i.toLong())
-        for (i in 0..2) state.assignment.setInt(3 + i, i.toLong())
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
     }
 
     @Test

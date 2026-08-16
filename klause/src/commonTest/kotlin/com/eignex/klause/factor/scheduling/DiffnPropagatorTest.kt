@@ -4,7 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
-import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
@@ -116,7 +115,7 @@ class DiffnPropagatorTest {
     }
 
     @Test
-    fun `non-overlapping packing exists`() {
+    fun `two 2x2 rectangles with origins in a unit range have no packing`() {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,

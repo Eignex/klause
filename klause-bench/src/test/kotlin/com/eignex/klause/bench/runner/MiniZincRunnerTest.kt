@@ -25,7 +25,7 @@ class MiniZincRunnerTest {
     @Test
     fun `klause solves the minizinc smoke set`() {
         if (!minizincOnPath()) {
-            println("[mzn-runner] minizinc not on PATH — skipping")
+            println("[skip] minizinc not on PATH")
             return
         }
         val runner = MiniZincRunner()

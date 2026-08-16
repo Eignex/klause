@@ -33,7 +33,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The byte-identity gate for the [com.eignex.klause.solver.KeySink] migration: a factor's
+ * The byte-identity gate for [com.eignex.klause.solver.KeySink]: a factor's
  * allocation-free [Factor.remapStructuralHash] must equal `remap(maps).structuralKey().hashCode()`
  * exactly — that equality is what keeps symmetry colouring (and the symmetries found) unchanged.
  * A non-monotonic permutation is used so `sortedIntVars` / `pairsByVarKey` sort-by-image genuinely
@@ -50,7 +50,7 @@ class FactorRemapKeySinkInvariantTest {
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
 
-    private val migrated: List<Pair<String, Factor>> = listOf(
+    private val factors: List<Pair<String, Factor>> = listOf(
         "Increasing" to Increasing(intArrayOf(3, 1, 5), strict = true),
         "Sort" to Sort(intArrayOf(4, 0, 2), intArrayOf(6, 1, 7)),
         "Inverse" to Inverse(intArrayOf(5, 0, 3), intArrayOf(2, 7, 4), fOffset = 1, gOffset = 0),
@@ -126,8 +126,8 @@ class FactorRemapKeySinkInvariantTest {
     )
 
     @Test
-    fun `remapStructuralHash equals the remapped key hash for every migrated factor`() {
-        for ((name, f) in migrated) {
+    fun `remapStructuralHash equals the remapped key hash for every factor`() {
+        for ((name, f) in factors) {
             assertEquals(
                 f.remap(boolMap, intMap).structuralKey().hashCode(),
                 f.remapStructuralHash(boolMap, intMap),
@@ -138,7 +138,7 @@ class FactorRemapKeySinkInvariantTest {
 
     @Test
     fun `remapStructuralHash under the identity map equals the plain key hash`() {
-        for ((name, f) in migrated) {
+        for ((name, f) in factors) {
             assertEquals(
                 f.structuralKey().hashCode(),
                 f.remapStructuralHash(identity, identity),

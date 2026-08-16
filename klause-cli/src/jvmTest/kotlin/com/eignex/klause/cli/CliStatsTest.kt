@@ -84,7 +84,7 @@ class CliStatsTest {
         assertEquals("8", m["lpSolves"])
         assertEquals("5", m["lpPruned"])
         assertEquals("2", m["lpInfeasible"])
-        assertEquals("3", m["lpBoundPruned"]) // 5 − 2
+        assertEquals("3", m["lpBoundPruned"]) // 5 - 2
         assertEquals("0.625", m["lpPruneRate"]) // 5 / 8
         assertEquals("2.5", m["lpPivotsPerSolve"]) // 20 / 8
         assertEquals("12.5", m["lpRootBound"])

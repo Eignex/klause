@@ -282,7 +282,7 @@ class PropagationTest {
             ),
         )
         val r = implied(p.propagate(Assumptions(bools = mapOf(1 to true, 2 to true))))
-        assertEquals(true, r.bools[0] == false)
+        assertEquals(false, r.bools[0])
     }
 
     @Test
@@ -362,7 +362,7 @@ class PropagationTest {
     }
 
     @Test
-    fun `PseudoBoolean GE forces literals true when slack tight`() {
+    fun `PseudoBoolean GE is Unsat when the free literals cannot reach the bound`() {
         // 1*x0 + 5*x1 ≥ 5: with x1 pinned false, x0 alone can't reach 5 → Unsat
         val p = Problem(
             numBoolVars = 2,

@@ -108,8 +108,8 @@ class CatalogTest {
         // Pure feasibility: three integer columns.
         assertEquals(3, InProcessRunner.resolve(ref("mps-core", "feasible-tiny")).problem.numIntVars)
 
-        // A bounded float column is now an LP-only continuous variable (issue #1232): no integer column,
-        // one real column the simplex resolves.
+        // A bounded float column is an LP-only continuous variable: no integer column, one real
+        // column the simplex resolves.
         val floatTiny = InProcessRunner.resolve(ref("mps-core", "float-tiny")).problem
         assertEquals(0, floatTiny.numIntVars)
         assertEquals(1, floatTiny.numRealVars)

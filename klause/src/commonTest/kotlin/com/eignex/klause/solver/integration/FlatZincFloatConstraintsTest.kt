@@ -210,7 +210,8 @@ class FlatZincFloatConstraintsTest {
 
     @Test
     fun `a false float constant comparison is unsatisfiable not a crash`() {
-        // Previously posted an empty Clause, which threw IllegalArgumentException at compile time.
+        // The lowering must report the contradiction itself, not post an empty Clause (which the
+        // Clause factor rejects with IllegalArgumentException at compile time).
         val src = """
             constraint float_le(5.0, 3.0);
             solve satisfy;

@@ -5,7 +5,6 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
-import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
@@ -94,7 +93,7 @@ class CircuitPropagatorTest {
         }
     }
 
-    // --- from CircuitBruteTest ---
+    // --- Brute-force satisfiability oracle ---
 
     /** Is `next` (length n, each in [0,n)) a single Hamiltonian cycle? */
     private fun isHamiltonian(next: IntArray): Boolean {
@@ -135,7 +134,6 @@ class CircuitPropagatorTest {
     @Test
     fun `BacktrackSolver matches brute oracle on restricted-domain circuits`() {
         val rng = Random(20260603)
-        var checked = 0
         repeat(4000) {
             val n = rng.nextInt(3, 6) // 3..5 nodes
             val los = IntArray(n)
@@ -155,7 +153,6 @@ class CircuitPropagatorTest {
                 factors = arrayOf<Factor>(Circuit(succ = IntArray(n) { v -> v })),
             )
             val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 1L))
-            checked++
 
             if (brute > 0) {
                 assertTrue(
@@ -171,10 +168,9 @@ class CircuitPropagatorTest {
                 )
             }
         }
-        assertTrue(checked > 0)
     }
 
-    // --- from CircuitConflictReasonTest ---
+    // --- Conflict reasons ---
 
     @Test
     fun `circuit sub-tour conflict reason is a sound nonempty witness`() {
@@ -274,7 +270,7 @@ class CircuitPropagatorTest {
         return r
     }
 
-    // --- from CircuitTest (CP tests) ---
+    // --- Circuit propagation ---
 
     /** Build a 4-var Circuit problem; succ var ids are 0..3, each with domain [0..3]. */
     private fun fourNodeProblem(): Problem {
@@ -374,7 +370,7 @@ class CircuitPropagatorTest {
         assertEquals(0, result.ints[4], "succ[4] should be forced to 0 to close the cycle; got ${result.ints}")
     }
 
-    // --- from SubcircuitTest (CP tests) ---
+    // --- Subcircuit propagation ---
 
     private fun fourNodeSubcircuitProblem(): Problem {
         val factor = Circuit(succ = intArrayOf(0, 1, 2, 3), subcircuit = true)
@@ -388,7 +384,7 @@ class CircuitPropagatorTest {
 
     @Test
     fun `propagation rejects a successor pointing to a pinned-excluded node`() {
-        // #90: succ[0] = 2 but node 2 is pinned excluded (succ[2] = 2). An excluded node has no
+        // succ[0] = 2 but node 2 is pinned excluded (succ[2] = 2). An excluded node has no
         // predecessor in the cycle, so this is a propagated conflict.
         val problem = fourNodeSubcircuitProblem()
         val result = problem.propagate(Assumptions(ints = mapOf(0 to 2, 2 to 2)))
@@ -397,7 +393,7 @@ class CircuitPropagatorTest {
 
     @Test
     fun `propagation rejects a premature closed sub-cycle that strands an included node`() {
-        // #90: 0↔1 is a closed 2-cycle of fixed edges; node 2 is pinned to a non-self successor so
+        // 0↔1 is a closed 2-cycle of fixed edges; node 2 is pinned to a non-self successor so
         // it must be on the cycle, but the cycle is already sealed — infeasible.
         val problem = fourNodeSubcircuitProblem()
         val result = problem.propagate(Assumptions(ints = mapOf(0 to 1, 1 to 0, 2 to 3)))
@@ -406,7 +402,7 @@ class CircuitPropagatorTest {
 
     @Test
     fun `propagation forbids closing a chain that would strand included nodes`() {
-        // #90 chain-walk: fixed edges 0→1 and 2→3 make nodes 0 and 2 included. For succ[1],
+        // Chain-walk: fixed edges 0→1 and 2→3 make nodes 0 and 2 included. For succ[1],
         // pigeonhole removes 1 (claimed by node 0) and 3 (claimed by node 2), self-looping to 1 is
         // already excluded, and the chain-walk forbids 0 (closing the {0,1} sub-cycle would strand
         // the other included nodes) — leaving 2 as the only option, so succ[1] is forced to 2.

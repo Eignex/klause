@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Factor
@@ -23,28 +22,15 @@ class SymmetricAllDifferentInvariantTest {
     )
 
     @Test
-    fun `not violated for identity permutation`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // xs=[0,1,2]: xs[xs[i]]=i for all i
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 2)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        assertEquals(0, state.factors[0].violationDegree(state, 0))
-    }
-
-    @Test
-    fun `not violated for 2-cycle involution`() {
-        val p = problem()
-        val state = LocalSearchState(p, Random(0))
-        // xs=[1,0,2]: xs[1]=0, xs[0]=1 ✓; xs[2]=2 ✓
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 2)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
+    fun `not violated for an involution`() {
+        // xs[xs[i]]=i holds for the identity and for a 2-cycle with one fixed point.
+        for (xs in listOf(listOf(0L, 1L, 2L), listOf(1L, 0L, 2L))) {
+            val state = LocalSearchState(problem(), Random(0))
+            for (i in 0..2) state.assignment.setInt(i, xs[i])
+            state.recompute()
+            assertFalse(state.factors[0].isViolated(state, 0), "xs=$xs is an involution")
+            assertEquals(0, state.factors[0].violationDegree(state, 0), "xs=$xs")
+        }
     }
 
     @Test

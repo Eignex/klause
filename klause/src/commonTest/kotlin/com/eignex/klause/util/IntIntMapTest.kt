@@ -19,7 +19,7 @@ class IntIntMapTest {
     }
 
     @Test
-    fun `dense backing resolves present and absent keys`() {
+    fun `a compact key range resolves present and absent keys`() {
         // Range 4 over 4 entries ⇒ dense (range ≤ 4×count).
         val m = IntIntMap.build(intArrayOf(10, 11, 12, 13), intArrayOf(100, 110, 120, 130), absent = -1)
         assertEquals(100, m[10])
@@ -31,7 +31,7 @@ class IntIntMapTest {
     }
 
     @Test
-    fun `sparse keys fall back to the hash backing`() {
+    fun `a sparse key range resolves present and absent keys`() {
         // Range 1_000_001 over 2 entries ⇒ hash backing.
         val m = IntIntMap.build(intArrayOf(0, 1_000_000), intArrayOf(7, 9), absent = -1)
         assertEquals(7, m[0])
@@ -42,7 +42,7 @@ class IntIntMapTest {
     }
 
     @Test
-    fun `extreme key range does not overflow and uses the hash backing`() {
+    fun `an extreme key range resolves without overflow`() {
         val m = IntIntMap.build(intArrayOf(Int.MIN_VALUE, Int.MAX_VALUE), intArrayOf(1, 2), absent = 0)
         assertEquals(1, m[Int.MIN_VALUE])
         assertEquals(2, m[Int.MAX_VALUE])

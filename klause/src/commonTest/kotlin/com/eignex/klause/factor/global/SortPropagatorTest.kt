@@ -3,7 +3,6 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.FactorPropagationOracle
-import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor

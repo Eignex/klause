@@ -2,7 +2,6 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.random.Random
@@ -10,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * `value_precede(s, t, xs)` (#432). The non-negotiable property is **soundness**: the native
+ * `value_precede(s, t, xs)`. The non-negotiable property is **soundness**: the native
  * propagator must accept exactly the assignments where the first occurrence of `s` precedes the
  * first occurrence of `t` (or `t` is absent). Each test enumerates the whole assignment space via
  * the engine and compares it to the brute-force feasible set.

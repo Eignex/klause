@@ -26,7 +26,7 @@ private class CircuitReifiedSchema : VariableSchema() {
 class OperatorsTest {
 
     @Test
-    fun `at most three at top level emits cardinality`() {
+    fun `at most at top level emits a cardinality bounded by the given max`() {
         class S : VariableSchema() {
             val a by boolVar()
             val b by boolVar()

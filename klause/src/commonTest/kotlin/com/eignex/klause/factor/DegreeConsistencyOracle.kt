@@ -29,7 +29,7 @@ object DegreeConsistencyOracle {
      * `exactProbe`: when true, additionally require `netDelta(move)` (the summed
      *   `deltaIf*` probe used by the CBLS gradient) to *exactly* predict the cost change —
      *   i.e. the probe is graded-exact, not a best-effort approximation. Turn this on for
-     *   factors migrated to graded violation (their gradient must be accurate); leave off for
+     *   factors with graded violation (their gradient must be accurate); leave off for
      *   factors whose probe is approximate by design (cost-tracking via `apply*` is still
      *   verified for them).
      */

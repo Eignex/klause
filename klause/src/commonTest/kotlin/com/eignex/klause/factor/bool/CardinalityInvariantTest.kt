@@ -4,9 +4,6 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
-import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.BoolFlip
@@ -140,10 +137,8 @@ class CardinalityInvariantTest {
         assertEquals(1, state.cost)
     }
 
-    // IncrementalBreakMakeTest tests below
-
-    private fun assertConsistent(problem: Problem, seed: Long = 0L) {
-        val state = LocalSearchState(problem, Random(seed))
+    private fun assertConsistent(label: String, problem: Problem) {
+        val state = LocalSearchState(problem, Random(0))
         for (v in 0 until problem.numBoolVars) state.assignment.setBool(v, v and 1 == 0)
         state.recompute()
         for (v in 0 until problem.numBoolVars) {
@@ -154,194 +149,224 @@ class CardinalityInvariantTest {
             assertEquals(
                 incBreak.toList(),
                 state.boolBreakCountSnapshot().toList(),
-                "boolBreakCount mismatch after flipping var=$v",
+                "$label: boolBreakCount mismatch after flipping var=$v",
             )
             assertEquals(
                 incMake.toList(),
                 state.boolMakeCountSnapshot().toList(),
-                "boolMakeCount mismatch after flipping var=$v",
+                "$label: boolMakeCount mismatch after flipping var=$v",
             )
         }
     }
 
     @Test
-    fun `cardinality at most one stays consistent across flips`() {
-        val lits = IntArray(5) { Lit.make(it, positive = true) }
-        val factor = Cardinality.atMostOne(lits)
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `cardinality exactly one stays consistent`() {
-        val lits = IntArray(4) { Lit.make(it, positive = true) }
-        val factor = Cardinality.exactlyOne(lits)
-        assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `cardinality bounded range with mixed polarity`() {
-        val lits = intArrayOf(
-            Lit.make(0, true),
-            Lit.make(1, false),
-            Lit.make(2, true),
-            Lit.make(3, false),
-            Lit.make(4, true),
-            Lit.make(5, true),
-        )
-        val factor = Cardinality(lits, min = 2, max = 4)
-        assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `cardinality with repeated vars and cancelling polarities`() {
-        // var 0 appears twice positive (signed = +2); var 1 once pos + once neg (signed = 0).
-        val lits = intArrayOf(
-            Lit.make(0, true),
-            Lit.make(0, true),
-            Lit.make(1, true),
-            Lit.make(1, false),
-            Lit.make(2, true),
-            Lit.make(3, false),
-        )
-        val factor = Cardinality(lits, min = 1, max = 3)
-        assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `xor odd target stays consistent`() {
-        val lits = IntArray(5) { Lit.make(it, positive = true) }
-        val factor = Xor(lits, targetParity = 1)
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `xor even target stays consistent`() {
-        val lits = intArrayOf(
-            Lit.make(0, true),
-            Lit.make(1, false),
-            Lit.make(2, true),
-            Lit.make(3, false),
-        )
-        val factor = Xor(lits, targetParity = 0)
-        assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `pseudo boolean LE stays consistent`() {
-        val factor = PseudoBoolean(
-            weights = longArrayOf(3, 2, 1, 5, 4),
-            literals = IntArray(5) { Lit.make(it, positive = true) },
-            op = PbOp.LE,
-            bound = 7L,
-        )
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `pseudo boolean GE with negative literals stays consistent`() {
-        val factor = PseudoBoolean(
-            weights = longArrayOf(2, 4, 3, 1),
-            literals = intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, false),
-                Lit.make(2, true),
-                Lit.make(3, false),
+    fun `incremental break and make counts match recompute after every bool flip`() {
+        val cases = listOf(
+            "cardinality at most one" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(Cardinality.atMostOne(IntArray(5) { Lit.make(it, positive = true) })),
             ),
-            op = PbOp.GE,
-            bound = 5L,
-        )
-        assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `pseudo boolean EQ stays consistent`() {
-        val factor = PseudoBoolean(
-            weights = longArrayOf(1, 1, 1, 1, 1),
-            literals = IntArray(5) { Lit.make(it, positive = true) },
-            op = PbOp.EQ,
-            bound = 3L,
-        )
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `pseudo boolean with negative weights stays consistent`() {
-        val factor = PseudoBoolean(
-            weights = longArrayOf(2, -3, 4, -1),
-            literals = IntArray(4) { Lit.make(it, positive = true) },
-            op = PbOp.LE,
-            bound = 1L,
-        )
-        assertConsistent(Problem(4, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `reified cardinality body satisfied stays consistent`() {
-        // aux is var 5; literals over vars 0..4.
-        val factor = ReifiedCardinality(
-            auxBoolVar = 5,
-            literals = IntArray(5) { Lit.make(it, positive = true) },
-            min = 2,
-            max = 3,
-        )
-        assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `reified cardinality with mixed polarity stays consistent`() {
-        val factor = ReifiedCardinality(
-            auxBoolVar = 4,
-            literals = intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, false),
-                Lit.make(2, true),
-                Lit.make(3, false),
+            "cardinality exactly one" to Problem(
+                4,
+                0,
+                emptyArray(),
+                listOf(Cardinality.exactlyOne(IntArray(4) { Lit.make(it, positive = true) })),
             ),
-            min = 1,
-            max = 2,
-        )
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `reified pseudo boolean LE stays consistent`() {
-        val factor = ReifiedPseudoBoolean(
-            auxBoolVar = 5,
-            weights = longArrayOf(2, 3, 1, 4, 2),
-            literals = IntArray(5) { Lit.make(it, positive = true) },
-            op = PbOp.LE,
-            bound = 6L,
-        )
-        assertConsistent(Problem(6, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `reified pseudo boolean GE with negative literals stays consistent`() {
-        val factor = ReifiedPseudoBoolean(
-            auxBoolVar = 4,
-            weights = longArrayOf(3, 2, 4, 1),
-            literals = intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, false),
-                Lit.make(2, true),
-                Lit.make(3, false),
+            "cardinality bounded range, mixed polarity" to Problem(
+                6,
+                0,
+                emptyArray(),
+                listOf(
+                    Cardinality(
+                        intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, false),
+                            Lit.make(2, true),
+                            Lit.make(3, false),
+                            Lit.make(4, true),
+                            Lit.make(5, true),
+                        ),
+                        min = 2,
+                        max = 4,
+                    ),
+                ),
             ),
-            op = PbOp.GE,
-            bound = 5L,
+            // var 0 appears twice positive (signed = +2); var 1 once pos + once neg (signed = 0).
+            "cardinality with repeated vars and cancelling polarities" to Problem(
+                4,
+                0,
+                emptyArray(),
+                listOf(
+                    Cardinality(
+                        intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(0, true),
+                            Lit.make(1, true),
+                            Lit.make(1, false),
+                            Lit.make(2, true),
+                            Lit.make(3, false),
+                        ),
+                        min = 1,
+                        max = 3,
+                    ),
+                ),
+            ),
+            "xor odd target" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(Xor(IntArray(5) { Lit.make(it, positive = true) }, targetParity = 1)),
+            ),
+            "xor even target" to Problem(
+                4,
+                0,
+                emptyArray(),
+                listOf(
+                    Xor(
+                        intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true), Lit.make(3, false)),
+                        targetParity = 0,
+                    ),
+                ),
+            ),
+            "pseudo boolean LE" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(
+                    PseudoBoolean(
+                        weights = longArrayOf(3, 2, 1, 5, 4),
+                        literals = IntArray(5) { Lit.make(it, positive = true) },
+                        op = PbOp.LE,
+                        bound = 7L,
+                    ),
+                ),
+            ),
+            "pseudo boolean GE with negative literals" to Problem(
+                4,
+                0,
+                emptyArray(),
+                listOf(
+                    PseudoBoolean(
+                        weights = longArrayOf(2, 4, 3, 1),
+                        literals = intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, false),
+                            Lit.make(2, true),
+                            Lit.make(3, false),
+                        ),
+                        op = PbOp.GE,
+                        bound = 5L,
+                    ),
+                ),
+            ),
+            "pseudo boolean EQ" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(
+                    PseudoBoolean(
+                        weights = longArrayOf(1, 1, 1, 1, 1),
+                        literals = IntArray(5) { Lit.make(it, positive = true) },
+                        op = PbOp.EQ,
+                        bound = 3L,
+                    ),
+                ),
+            ),
+            "pseudo boolean with negative weights" to Problem(
+                4,
+                0,
+                emptyArray(),
+                listOf(
+                    PseudoBoolean(
+                        weights = longArrayOf(2, -3, 4, -1),
+                        literals = IntArray(4) { Lit.make(it, positive = true) },
+                        op = PbOp.LE,
+                        bound = 1L,
+                    ),
+                ),
+            ),
+            "reified cardinality, body satisfiable" to Problem(
+                6,
+                0,
+                emptyArray(),
+                listOf(
+                    ReifiedCardinality(
+                        auxBoolVar = 5,
+                        literals = IntArray(5) { Lit.make(it, positive = true) },
+                        min = 2,
+                        max = 3,
+                    ),
+                ),
+            ),
+            "reified cardinality, mixed polarity" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(
+                    ReifiedCardinality(
+                        auxBoolVar = 4,
+                        literals = intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, false),
+                            Lit.make(2, true),
+                            Lit.make(3, false),
+                        ),
+                        min = 1,
+                        max = 2,
+                    ),
+                ),
+            ),
+            "reified pseudo boolean LE" to Problem(
+                6,
+                0,
+                emptyArray(),
+                listOf(
+                    ReifiedPseudoBoolean(
+                        auxBoolVar = 5,
+                        weights = longArrayOf(2, 3, 1, 4, 2),
+                        literals = IntArray(5) { Lit.make(it, positive = true) },
+                        op = PbOp.LE,
+                        bound = 6L,
+                    ),
+                ),
+            ),
+            "reified pseudo boolean GE with negative literals" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(
+                    ReifiedPseudoBoolean(
+                        auxBoolVar = 4,
+                        weights = longArrayOf(3, 2, 4, 1),
+                        literals = intArrayOf(
+                            Lit.make(0, true),
+                            Lit.make(1, false),
+                            Lit.make(2, true),
+                            Lit.make(3, false),
+                        ),
+                        op = PbOp.GE,
+                        bound = 5L,
+                    ),
+                ),
+            ),
+            "reified pseudo boolean EQ" to Problem(
+                5,
+                0,
+                emptyArray(),
+                listOf(
+                    ReifiedPseudoBoolean(
+                        auxBoolVar = 4,
+                        weights = longArrayOf(1, 1, 1, 1),
+                        literals = IntArray(4) { Lit.make(it, positive = true) },
+                        op = PbOp.EQ,
+                        bound = 2L,
+                    ),
+                ),
+            ),
         )
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
-    }
-
-    @Test
-    fun `reified pseudo boolean EQ stays consistent`() {
-        val factor = ReifiedPseudoBoolean(
-            auxBoolVar = 4,
-            weights = longArrayOf(1, 1, 1, 1),
-            literals = IntArray(4) { Lit.make(it, positive = true) },
-            op = PbOp.EQ,
-            bound = 2L,
-        )
-        assertConsistent(Problem(5, 0, emptyArray(), listOf(factor)))
+        for ((label, problem) in cases) assertConsistent(label, problem)
     }
 
     @Test
@@ -406,8 +431,7 @@ class CardinalityInvariantTest {
     }
 
     @Test
-    fun `multiple factors of different kinds compose correctly`() {
-        // Combined problem with all three factor kinds touching overlapping variables.
+    fun `break and make counts stay consistent when factor kinds share variables`() {
         val card = Cardinality(
             literals = intArrayOf(
                 Lit.make(0, true),
@@ -437,7 +461,7 @@ class CardinalityInvariantTest {
             op = PbOp.LE,
             bound = 4L,
         )
-        assertConsistent(Problem(6, 0, emptyArray(), listOf<Factor>(card, xor, pb)))
+        assertConsistent("card + xor + pb over shared vars", Problem(6, 0, emptyArray(), listOf<Factor>(card, xor, pb)))
     }
 }
 

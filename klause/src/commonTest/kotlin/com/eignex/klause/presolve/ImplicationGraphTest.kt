@@ -49,7 +49,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun two_variables_in_a_mutual_implication_cycle_collapse_to_one() {
+    fun `two variables in a mutual implication cycle collapse to one`() {
         // (!b0 | b1) and (!b1 | b0) make b0 <-> b1: pinning b0 propagates b1 and vice versa, a cycle.
         // The pass merges b1 into b0, so b1 stops appearing in the substituted factors.
         val problem = Problem(
@@ -66,7 +66,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun an_equivalence_chain_collapses_to_a_single_representative() {
+    fun `an equivalence chain collapses to a single representative`() {
         // b0 <-> b1 <-> b2 via three mutual-implication pairs: all three share one SCC, so b1 and b2
         // both merge into the smallest id b0.
         val problem = Problem(
@@ -85,7 +85,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun anti_equivalent_variables_are_not_merged() {
+    fun `anti-equivalent variables are not merged`() {
         // (!b0 | !b1) and (b0 | b1) make b0 <-> !b1. Substitution preserves polarity and cannot express
         // the flip, so neither variable is merged and both still appear in the factors.
         val problem = Problem(
@@ -101,7 +101,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun a_transitively_redundant_binary_is_dropped() {
+    fun `a transitively redundant binary is dropped`() {
         // a -> b, b -> c, a -> c as three binary clauses. The direct a -> c is entailed by the chain
         // a -> b -> c, so the pass drops it; the two chain clauses survive.
         val problem = Problem(
@@ -119,7 +119,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun a_non_redundant_binary_is_kept() {
+    fun `a non-redundant binary is kept`() {
         // a -> b and b -> c with no a -> c edge: every binary carries information the others don't, so
         // none is redundant and all survive.
         val problem = Problem(
@@ -136,7 +136,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun an_objective_variable_is_never_merged() {
+    fun `an objective variable is never merged`() {
         // b0 <-> b1, but b1 is read by the objective: it must keep a constrained variable, so the pass
         // leaves both untouched even though they are equivalent.
         val problem = Problem(
@@ -155,7 +155,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun a_problem_with_nothing_to_derive_is_returned_unchanged() {
+    fun `a problem with nothing to derive is returned unchanged`() {
         // Two independent free booleans with one disjunction: no mutual implication, no redundant
         // binary, so the pass returns its input unchanged.
         val problem = Problem(
@@ -168,7 +168,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun the_builder_records_the_forward_implication_edge_of_a_binary_clause() {
+    fun `the builder records the forward implication edge of a binary clause`() {
         // (!b0 | b1) is the implication b0 -> b1: pinning b0 = true propagates b1 = true, so the
         // literal-indexed adjacency carries the edge from b0+ to b1+.
         val problem = Problem(
@@ -182,7 +182,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun the_builder_records_the_contrapositive_implication_edge_of_a_binary_clause() {
+    fun `the builder records the contrapositive implication edge of a binary clause`() {
         // The same (!b0 | b1) is also b1 -> b0 contrapositively: pinning b1 = false propagates
         // b0 = false, so the adjacency carries the edge from b1- to b0-.
         val problem = Problem(
@@ -196,7 +196,7 @@ class ImplicationGraphTest {
     }
 
     @Test
-    fun the_builder_yields_all_empty_lists_when_no_binary_implication_exists() {
+    fun `the builder yields an empty adjacency per literal when no binary implication exists`() {
         // A single ternary disjunction: pinning either polarity of any variable leaves a non-unit
         // clause, so propagation forces nothing and every adjacency list is empty over the
         // 2*numBoolVars nodes.

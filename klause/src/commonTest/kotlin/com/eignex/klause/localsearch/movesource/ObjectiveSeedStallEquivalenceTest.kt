@@ -52,7 +52,7 @@ class ObjectiveSeedStallEquivalenceTest {
 
     /** The reference `Cbls.seedObjectiveMoves` body (sans the cost gate, which stays in the
      *  strategy). */
-    private fun oldSeedObjective(state: LocalSearchState, sink: MoveSink) {
+    private fun referenceSeedObjective(state: LocalSearchState, sink: MoveSink) {
         val obj = state.shaping.objective ?: return
         if (obj is LinearObjective) {
             for (v in obj.boolWeights.indices) {
@@ -70,7 +70,7 @@ class ObjectiveSeedStallEquivalenceTest {
     }
 
     /** The reference `Cbls.sampleStallSwaps`. */
-    private fun oldStallSwaps(state: LocalSearchState, sink: MoveSink) {
+    private fun referenceStallSwaps(state: LocalSearchState, sink: MoveSink) {
         if (swapCap <= 0 || state.violated.isEmpty()) return
         val rng = state.rng
         val problem = state.problem
@@ -105,7 +105,7 @@ class ObjectiveSeedStallEquivalenceTest {
     }
 
     /** The reference `Cbls.sampleStallChains`. */
-    private fun oldStallChains(state: LocalSearchState, sink: MoveSink) {
+    private fun referenceStallChains(state: LocalSearchState, sink: MoveSink) {
         if (chainCap <= 0 || state.violated.isEmpty()) return
         var budget = chainCap
         repeat(minOf(chainCap, state.violated.size)) {
@@ -116,14 +116,14 @@ class ObjectiveSeedStallEquivalenceTest {
     }
 
     @Test
-    fun `ObjectiveSeed matches the old seedObjectiveMoves`() {
+    fun `ObjectiveSeed emits the same move multiset as the reference objective seeding`() {
         for (seed in longArrayOf(1L, 7L, 42L)) {
             assertSourceMatchesGenerator(
                 ::objectiveProblem,
                 seed,
                 ObjectiveSeed(),
                 prepare = { it.shaping.objective = objective },
-            ) { state, sink -> oldSeedObjective(state, sink) }
+            ) { state, sink -> referenceSeedObjective(state, sink) }
         }
     }
 
@@ -135,19 +135,19 @@ class ObjectiveSeedStallEquivalenceTest {
     }
 
     @Test
-    fun `StallSwaps matches the old sampleStallSwaps`() {
+    fun `StallSwaps emits the same move multiset as the reference stall swap sampler`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::ringProblem, seed, StallSwaps(swapCap)) { state, sink ->
-                oldStallSwaps(state, sink)
+                referenceStallSwaps(state, sink)
             }
         }
     }
 
     @Test
-    fun `EjectionChains matches the old sampleStallChains`() {
+    fun `EjectionChains emits the same move multiset as the reference chain sampler`() {
         for (seed in longArrayOf(1L, 7L, 42L, 1234L, 99999L)) {
             assertSourceMatchesGenerator(::ringProblem, seed, EjectionChains(chainCap, chainDepth)) { state, sink ->
-                oldStallChains(state, sink)
+                referenceStallChains(state, sink)
             }
         }
     }

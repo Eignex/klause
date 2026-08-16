@@ -161,10 +161,9 @@ class FznDecomposedGlobalsTest {
     }
 
     @Test
-    fun `among matches brute force`() {
-        // fzn_among(n, x, v): n = #{i : x(i) in v}, constant value set v, count var n.
-        val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], {1, 2});\nsolve satisfy;"
-        val found = enumerate(src, names + "n")
+    fun `among matches brute force for every value-set literal form`() {
+        // fzn_among(n, x, v): n = #{i : x(i) in v}, constant value set v, count var n. MiniZinc
+        // emits a contiguous set either enumerated or as a range literal; both must resolve alike.
         val expected = HashSet<List<Int>>()
         for (a in 0..2) {
             for (b in 0..2) {
@@ -173,24 +172,10 @@ class FznDecomposedGlobalsTest {
                 }
             }
         }
-        assertEquals(expected, found)
-    }
-
-    @Test
-    fun `among over a range set matches brute force`() {
-        // MiniZinc emits a contiguous value set as a range literal (e.g. 1..2), which the set
-        // resolver must accept just like {1, 2}.
-        val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], 1..2);\nsolve satisfy;"
-        val found = enumerate(src, names + "n")
-        val expected = HashSet<List<Int>>()
-        for (a in 0..2) {
-            for (b in 0..2) {
-                for (d in 0..2) {
-                    expected.add(listOf(a, b, d, listOf(a, b, d).count { it == 1 || it == 2 }))
-                }
-            }
+        for (valueSet in listOf("{1, 2}", "1..2")) {
+            val src = decl(2) + "var 0..3: n;\nconstraint fzn_among(n, [x1, x2, x3], $valueSet);\nsolve satisfy;"
+            assertEquals(expected, enumerate(src, names + "n"), "among over $valueSet")
         }
-        assertEquals(expected, found)
     }
 
     @Test
@@ -216,10 +201,10 @@ class FznDecomposedGlobalsTest {
 
     @Test
     fun `inverse with a restricted first element is not falsely unsat`() {
-        // f1 is declared 2..3, so its domain min (2) differs from the 1-based array index base.
-        // emitInverse used to infer the channel offset from `intDomains[f[0]].min`, yielding 2,
-        // which over-pruned to a root false-UNSAT (the elitserien/handball failure). The offset is
-        // structurally 1 for FlatZinc index sets. Enumerate against the inverse predicate directly.
+        // f1 is declared 2..3, so its domain min (2) differs from the 1-based array index base. The
+        // channel offset is structurally 1 for FlatZinc index sets; inferring it from
+        // `intDomains[f[0]].min` yields 2 here and over-prunes to a root false-UNSAT (the
+        // elitserien/handball failure). Enumerate against the inverse predicate directly.
         val src = "var 2..3: f1; var 1..3: f2; var 1..3: f3;\n" +
             "var 1..3: g1; var 1..3: g2; var 1..3: g3;\n" +
             "constraint fzn_inverse([f1, f2, f3], [g1, g2, g3]);\nsolve satisfy;"
@@ -232,7 +217,7 @@ class FznDecomposedGlobalsTest {
                 (1..3).all { i -> g[f[i - 1] - 1] == i } && (1..3).all { j -> f[g[j - 1] - 1] == j }
         }
         assertEquals(expected, found)
-        assertEquals(true, found.isNotEmpty(), "inverse must be satisfiable, not falsely UNSAT")
+        assertTrue(found.isNotEmpty(), "inverse must be satisfiable, not falsely UNSAT")
     }
 
     @Test
@@ -246,7 +231,7 @@ class FznDecomposedGlobalsTest {
             t[0] >= 2 && (1..4).all { i -> t[t[i - 1] - 1] == i }
         }
         assertEquals(expected, found)
-        assertEquals(true, found.isNotEmpty(), "symmetric_all_different must be satisfiable, not falsely UNSAT")
+        assertTrue(found.isNotEmpty(), "symmetric_all_different must be satisfiable, not falsely UNSAT")
     }
 
     /** Brute-force tuples of arity [arity] over the 1-based value range `1..hi` satisfying [pred]. */

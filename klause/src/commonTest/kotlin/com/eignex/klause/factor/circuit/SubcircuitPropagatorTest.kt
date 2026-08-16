@@ -2,7 +2,6 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat

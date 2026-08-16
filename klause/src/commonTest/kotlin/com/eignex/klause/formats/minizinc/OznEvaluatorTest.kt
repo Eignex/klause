@@ -18,23 +18,23 @@ class OznEvaluatorTest {
     @Test
     fun `range binds looser than arithmetic in a generator source`() {
         // `1..1+2` is `1..3` in MiniZinc (arithmetic binds tighter than `..`), so the comprehension spans
-        // 1, 2, 3. The old ladder parsed `(1..1)+2`, which is not evaluable.
+        // 1, 2, 3. A ladder that binds `..` tighter would parse `(1..1)+2`, which is not evaluable.
         val out = render("output [show([i | i in 1..1+2])];")
         assertTrue("[1, 2, 3]" in out, out)
     }
 
     @Test
     fun `conjunction binds tighter than disjunction`() {
-        // `true \/ false /\ false` is `true \/ (false /\ false)` = true in MiniZinc; the old flat,
-        // left-associative parse gave `(true \/ false) /\ false` = false.
+        // `true \/ false /\ false` is `true \/ (false /\ false)` = true in MiniZinc; a flat,
+        // left-associative parse would give `(true \/ false) /\ false` = false.
         val out = render("output [show(true \\/ false /\\ false)];")
         assertTrue("true" in out, out)
     }
 
     @Test
     fun `a multi-name array comprehension is a cartesian product`() {
-        // `[i + j | i, j in [10, 20]]` ranges i and j independently: 10+10, 10+20, 20+10, 20+20. The old
-        // diagonal bound both to the same element, giving only 20 and 40.
+        // `[i + j | i, j in [10, 20]]` ranges i and j independently: 10+10, 10+20, 20+10, 20+20. A
+        // diagonal reading would bind both names to the same element, giving only 20 and 40.
         val out = render("output [show([i + j | i, j in [10, 20]])];")
         assertTrue("[20, 30, 30, 40]" in out, out)
     }

@@ -148,7 +148,6 @@ class ArithmeticPropagatorReifiedTest {
         )
         val session = PropagationSession(problem)
         assertIs<PropagationResult.Implied>(session.pinBool(2, false))
-        // Expect v0 and v1 forced false.
         assertEquals(false, session.boolValue(0), "v0 should be forced false")
         assertEquals(false, session.boolValue(1), "v1 should be forced false")
     }
@@ -179,8 +178,7 @@ class ArithmeticPropagatorReifiedTest {
     }
 
     @Test
-    fun `aux true unchanged - boundary forcing still fires`() {
-        // Sanity: the aux=true case still pins all unassigned to !pos when trueCount == max.
+    fun `aux true pins every unassigned literal false once trueCount reaches max`() {
         val problem = Problem(
             numBoolVars = 4,
             numIntVars = 0,
@@ -255,7 +253,6 @@ class ArithmeticPropagatorReifiedTest {
         val bake = p.propagate(Assumptions.None)
         val impl = assertIs<PropagationResult.Implied>(bake)
         assertEquals(true, impl.bools[0])
-        // Now pin aux=false explicitly: should be Unsat.
         val r = p.propagate(Assumptions(bools = mapOf(0 to false)))
         assertIs<PropagationResult.Unsat>(r)
     }

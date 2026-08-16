@@ -13,7 +13,7 @@ class SharedVarBoundsTest {
     fun `unset bounds are the open interval`() {
         val vb = SharedVarBounds(numIntVars = 2)
         assertEquals(Long.MIN_VALUE, vb.lowerOf(0))
-        assertEquals(Long.MAX_VALUE, vb.lowerOf(0).let { vb.upperOf(0) })
+        assertEquals(Long.MAX_VALUE, vb.upperOf(0))
     }
 
     @Test

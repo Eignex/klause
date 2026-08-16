@@ -92,9 +92,9 @@ class LinearSubSumAggregationTest {
 
     @Test
     fun `a zero-coefficient partner does not divide by zero`() {
-        // `s + 0·x − w = 0` keeps its zero term (coalescing preserves it). The old matchMultiplier did
-        // `c % 0` on that term and crashed; a zero coefficient is now treated as no partner, leaving a
-        // single-partner "definition" that is no sub-sum — so the pass declines cleanly rather than throwing.
+        // `s + 0·x − w = 0` keeps its zero term (coalescing preserves it). Multiplier matching must not
+        // take `c % 0` on that term: a zero coefficient counts as no partner, leaving a single-partner
+        // "definition" that is no sub-sum — so the pass declines cleanly rather than throwing.
         val p = Problem(
             0,
             4,

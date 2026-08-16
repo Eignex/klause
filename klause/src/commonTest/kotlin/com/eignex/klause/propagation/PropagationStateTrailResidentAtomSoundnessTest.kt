@@ -24,7 +24,7 @@ import kotlin.test.assertEquals
  * cleared) breaks this and silently corrupts truth → unsound search. This drives a [PropagationState]
  * directly through randomized decision pushes (min/max tightens, interior carves) and undos, checking
  * the invariant after every operation across the full atom space. The same stale-truth class is what
- * surfaced (via the brute-force enumeration suites) as the eq-at-hole bug during development.
+ * the brute-force enumeration suites surface as the eq-at-hole failure.
  */
 class PropagationStateTrailResidentAtomSoundnessTest {
 
@@ -39,7 +39,7 @@ class PropagationStateTrailResidentAtomSoundnessTest {
     }
 
     /** Materialize every bound and value order literal for every var, so the invariant check
-     *  covers GE/LE/EQ at every threshold (incl. the now-hole-bearing interior eq atoms). */
+     *  covers GE/LE/EQ at every threshold, including the hole-bearing interior eq atoms. */
     private fun materializeAllAtoms(s: PropagationState, numVars: Int, hi: Int) {
         for (v in 0 until numVars) {
             for (k in 0..hi) {
@@ -95,7 +95,7 @@ class PropagationStateTrailResidentAtomSoundnessTest {
     }
 
     @Test
-    fun storedAtomTruthMatchesDomainAcrossPushAndPop() {
+    fun `stored atom truth matches the live domain across push and pop`() {
         val numVars = 3
         val hi = 6
         val rng = Random(0x5eed)

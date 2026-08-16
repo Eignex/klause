@@ -39,7 +39,7 @@ class ComparisonClauseTest {
 
     /** Enumerate every solution of a single [ComparisonClause] over [domains] and assert it equals the
      *  brute-force allowed set (a tuple is allowed iff at least one literal holds). */
-    private fun checkAgainstBrute(domains: Array<IntDomain>, lits: List<Triple<Int, LinearOp, Long>>) {
+    private fun checkAgainstBrute(name: String, domains: Array<IntDomain>, lits: List<Triple<Int, LinearOp, Long>>) {
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = domains.size,
@@ -67,50 +67,33 @@ class ComparisonClauseTest {
             assertEquals(
                 brute,
                 enumerate(problem, seed),
-                "seed=$seed: $lits over ${domains.map { "${it.min}..${it.max}" }}",
+                "$name (seed=$seed): $lits over ${domains.map { "${it.min}..${it.max}" }}",
             )
         }
     }
 
     @Test
-    fun `disjunction of two LE comparisons matches brute force`() {
-        checkAgainstBrute(arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(le(0, 1), le(1, 1)))
-    }
-
-    @Test
-    fun `implication of GT then LT lowered as an LE disjunction matches brute force`() {
-        // imp(x > 1, y < 2) == (x <= 1) v (y <= 1)
-        checkAgainstBrute(arrayOf(IntDomain(0, 4), IntDomain(0, 4)), listOf(le(0, 1), le(1, 1)))
-    }
-
-    @Test
-    fun `disjunction of GE and LE matches brute force`() {
-        checkAgainstBrute(arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(ge(0, 3), le(1, 0)))
-    }
-
-    @Test
-    fun `disjunction of EQ and EQ matches brute force`() {
-        checkAgainstBrute(arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(eq(0, 1), eq(1, 2)))
-    }
-
-    @Test
-    fun `implication of EQ then EQ lowered as NE-or-EQ matches brute force`() {
-        // imp(x == 1, y == 2) == (x != 1) v (y == 2)
-        checkAgainstBrute(arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(ne(0, 1), eq(1, 2)))
-    }
-
-    @Test
-    fun `three-literal disjunction matches brute force`() {
-        checkAgainstBrute(
-            arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            listOf(eq(0, 0), le(1, 0), ge(2, 2)),
+    fun `enumeration matches brute force across clause shapes`() {
+        val cases = listOf(
+            Triple("two LE", arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(le(0, 1), le(1, 1))),
+            // imp(x > 1, y < 2) == (x <= 1) v (y <= 1)
+            Triple("GT-then-LT implication", arrayOf(IntDomain(0, 4), IntDomain(0, 4)), listOf(le(0, 1), le(1, 1))),
+            Triple("GE or LE", arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(ge(0, 3), le(1, 0))),
+            Triple("EQ or EQ", arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(eq(0, 1), eq(1, 2))),
+            // imp(x == 1, y == 2) == (x != 1) v (y == 2)
+            Triple("EQ-then-EQ implication", arrayOf(IntDomain(0, 3), IntDomain(0, 3)), listOf(ne(0, 1), eq(1, 2))),
+            Triple(
+                "three literals",
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+                listOf(eq(0, 0), le(1, 0), ge(2, 2)),
+            ),
+            Triple(
+                "hole domain",
+                arrayOf(IntDomain(0, 4).excludeValue(2), IntDomain(0, 3)),
+                listOf(eq(0, 2), ne(1, 1)),
+            ),
         )
-    }
-
-    @Test
-    fun `EQ and NE over a hole domain match brute force`() {
-        val holed = IntDomain(0, 4).excludeValue(2)
-        checkAgainstBrute(arrayOf(holed, IntDomain(0, 3)), listOf(eq(0, 2), ne(1, 1)))
+        for ((name, domains, lits) in cases) checkAgainstBrute(name, domains, lits)
     }
 
     @Test

@@ -106,7 +106,7 @@ class RestartPolicyTest {
     }
 
     @Test
-    fun `luby sequence matches knuth`() {
+    fun `luby cadence emits the doubling restart sequence`() {
         val p = LubyRestart(unit = 1)
         val problem = Problem(1, 0, emptyArray(), emptyList())
         val state = LocalSearchState(problem, Random(0))
@@ -146,7 +146,7 @@ class RestartPolicyTest {
         p.observe(round(5.0)) // no improvement: 1
         p.observe(round(5.0)) // no improvement: 2
         assertFalse(p.shouldRestart(0), "must not restart before patience elapses")
-        p.observe(round(5.0)) // no improvement: 3 → trigger
+        p.observe(round(5.0)) // no improvement: 3, which triggers
         assertTrue(p.shouldRestart(0), "patience consecutive flat rounds must trigger a restart")
     }
 

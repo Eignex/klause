@@ -38,7 +38,7 @@ class IteratedLocalSearchSolveTest {
         policy.onLocalOptimum(seedState, Sample(BooleanArray(0), LongArray(0)), 12.0)
         assertEquals(2, policy.incumbents.size, "seeded stale incumbents")
 
-        // Reusing the same policy on an 8-bool problem: before the fix, the first restart's crossover
+        // Reusing the same policy on an 8-bool problem: without a reset the first restart's crossover
         // sizes the child from a zero-length stale parent and indexes it against 8 bool vars → AIOOBE.
         val problem = Problem(
             8,
@@ -53,9 +53,9 @@ class IteratedLocalSearchSolveTest {
 
     @Test
     fun `engine resets a reused policy on the minimize path so a stale incumbent cannot leak`() {
-        // The minimize (COP) path builds its state via newMinimizeState, which — before the fix — took
-        // its first restart without resetting a reused policy, anchoring a prior solve's stale (wrong-
-        // arity) incumbent and indexing it against this problem.
+        // The minimize (COP) path builds its state via newMinimizeState; taking its first restart
+        // without resetting a reused policy would anchor a prior solve's stale (wrong-arity)
+        // incumbent and index it against this problem.
         val policy = IteratedLocalSearchRestart(populationSize = 2, maxFlipsBeforeRestart = 5)
         val seedProblem = Problem(
             numBoolVars = 0,

@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
  * order is not.
  *
  * Each side is built from a freshly-constructed LocalSearchState seeded identically, so both runs
- * draw the same RNG sequence — the precondition that makes "same draws ⇒ same multiset" the actual
+ * draw the same RNG sequence — the precondition that makes "same draws -> same multiset" the actual
  * equivalence being asserted rather than an accident of ordering.
  */
 
@@ -78,9 +78,9 @@ fun captureFromSink(state: LocalSearchState, fill: (MoveSink) -> Unit): MoveMult
 }
 
 /**
- * Assert that running [source] over a fresh state equals running [reference] (the old generator)
- * over a separate, identically-seeded fresh state. [build] reconstructs the problem for each side
- * so neither run observes the other's RNG advance or sink mutations.
+ * Assert that running [source] over a fresh state equals running [reference] over a separate,
+ * identically-seeded fresh state. [build] reconstructs the problem for each side so neither run
+ * observes the other's RNG advance or sink mutations.
  */
 fun assertSourceMatchesGenerator(
     build: () -> Problem,

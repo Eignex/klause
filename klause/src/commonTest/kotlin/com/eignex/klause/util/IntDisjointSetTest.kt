@@ -45,7 +45,7 @@ class IntDisjointSetTest {
     }
 
     @Test
-    fun `repeated find is idempotent under path compression`() {
+    fun `repeated find returns a stable representative for a merged component`() {
         val ds = IntDisjointSet(4)
         ds.union(0, 1)
         ds.union(2, 3)

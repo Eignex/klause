@@ -34,7 +34,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Coverage of Factor.remap (#332). The generic invariant — every variable id in the rewritten
+ * Coverage of Factor.remap. The generic invariant — every variable id in the rewritten
  * factor is its image under the maps, and no others — catches any variable-bearing field a remap
  * forgot to rewrite (boolVars/intVars are derived from those fields). Targeted cases then pin the
  * footguns: constants and offsets must NOT move, Lit polarity is preserved, and sentinels survive.

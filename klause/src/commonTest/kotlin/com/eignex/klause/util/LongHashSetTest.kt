@@ -19,7 +19,7 @@ class LongHashSetTest {
     }
 
     @Test
-    fun `never-populated set works without allocating backing`() {
+    fun `every query on a never-populated set is safe and it stays usable after`() {
         val s = LongHashSet()
         assertFalse(s.contains(0L))
         assertFalse(s.contains(Long.MIN_VALUE))
@@ -28,7 +28,7 @@ class LongHashSetTest {
         var visits = 0
         s.forEach { visits++ }
         assertEquals(0, visits)
-        s.clear() // clearing a never-populated set is a no-op
+        s.clear()
         assertTrue(s.isEmpty())
         assertTrue(s.add(7L))
         assertTrue(s.contains(7L))

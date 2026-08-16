@@ -3,7 +3,6 @@ package com.eignex.klause.factor.table
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
-import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.internals.MddIncrementalState
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.propagation.PropagationResult
@@ -45,7 +44,7 @@ class MddPropagatorTest {
         )
         val r1 = problem.propagate(Assumptions.None)
         assertTrue(r1 is PropagationResult.Implied, "first fire should reach fixpoint; got $r1")
-        // Pinning seq[0] = 1 narrows domain; re-propagate — must still succeed and prune nothing further.
+        // Pinning seq[0] = 1 narrows a domain; re-propagating must still reach fixpoint.
         val r2 = problem.propagate(Assumptions(ints = mapOf(0 to 1)))
         assertTrue(r2 is PropagationResult.Implied, "second fire with pin should still propagate; got $r2")
     }
@@ -146,7 +145,7 @@ class MddPropagatorTest {
     }
 
     @Test
-    fun `MDD factors sharing one transition index reuse the root snapshot and enumerate as brute force`() {
+    fun `MDD factors sharing one transition index enumerate exactly the brute-force set`() {
         // Two factors over disjoint variable pairs bind ONE shared transition index — exactly the `<group>`
         // shape. The first factor's full-domain root rebuild caches the structural reachability snapshot;
         // the others reuse it instead of re-scanning the diagram. Enumeration under the CDCL backtracker

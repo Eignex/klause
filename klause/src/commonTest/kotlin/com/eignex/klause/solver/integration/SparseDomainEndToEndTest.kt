@@ -24,7 +24,7 @@ class SparseDomainEndToEndTest {
     @Test
     fun `BacktrackSolver finds model with mid-search sparse domain via AllDifferent`() {
         // v0 ∈ [1, 5]; v1, v2 are singletons pinning values 3 and 5 respectively.
-        // AllDifferent propagation punches 3 and 5 out of v0's domain via the new
+        // AllDifferent propagation punches 3 and 5 out of v0's domain via the
         // sparse-aware singleton path → v0 must be 1, 2, or 4.
         val problem = Problem(
             numBoolVars = 0,
@@ -92,7 +92,6 @@ class SparseDomainEndToEndTest {
                 ),
             ),
         )
-        // Enumerate all models, verify none has x = 3.
         val models = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).toList()
         assertEquals(4, models.size, "expected 4 models (x ∈ {1, 2, 4, 5}); got ${models.map { it.ints.toList() }}")
         for (m in models) {
@@ -105,7 +104,7 @@ class SparseDomainEndToEndTest {
 
     @Test
     fun `LocalSearchSolver finds model when AllDifferent punches sparse holes`() {
-        // Same problem as the first test. LS should reach a satisfying assignment.
+        // Same problem as the first test.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,
@@ -117,7 +116,6 @@ class SparseDomainEndToEndTest {
         val solver = LocalSearchSolver(problem.bake())
         val r = solver.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 7L))
         val sat = assertIs<SolveResult.Sat>(r)
-        // Verify legal assignment: all-different, and (v1, v2) at their singletons.
         assertEquals(3, sat.assignment.ints[1])
         assertEquals(5, sat.assignment.ints[2])
         assertTrue(
@@ -129,8 +127,7 @@ class SparseDomainEndToEndTest {
     @Test
     fun `LocalSearchSolver random restart uses sparse-aware value picks`() {
         // Drive many restarts on a sparse-domain problem; if the random-value picker
-        // ignored holes, the cost would oscillate around an invalid baseline. Here we
-        // just verify it terminates correctly across multiple restarts.
+        // ignored holes, the cost would oscillate around an invalid baseline.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 4,
@@ -147,7 +144,6 @@ class SparseDomainEndToEndTest {
         val solver = LocalSearchSolver(problem.bake())
         val r = solver.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 42L))
         val sat = assertIs<SolveResult.Sat>(r)
-        // v0 must not be 3, 5, or 7.
         val v0 = sat.assignment.ints[0]
         assertTrue(
             v0 !in setOf(3L, 5L, 7L),

@@ -6,8 +6,6 @@ import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.IntEvent
@@ -29,7 +27,7 @@ import kotlin.test.assertTrue
 
 class CumulativePropagatorTest {
 
-    // --- Energetic reasoning (#4) ---
+    // --- Energetic reasoning ---
 
     @Test
     fun `energetic reasoning caps a resource height that cannot fit the shared window`() {
@@ -97,8 +95,7 @@ class CumulativePropagatorTest {
     @Test
     fun `cumulative with variable heights never over-prunes`() {
         // Brute-force oracle over small random instances with variable resource demands — the regime
-        // the old propagator skipped entirely (it needed a fully-fixed snapshot). Kept under the
-        // BruteForceSolver 2^18 cap.
+        // where no fully-fixed height snapshot exists. Kept under the BruteForceSolver 2^18 cap.
         val rng = Random(0xC0FFEE)
         repeat(300) { iter ->
             val tasks = 2 + rng.nextInt(2) // 2 or 3 tasks
@@ -128,7 +125,7 @@ class CumulativePropagatorTest {
         }
     }
 
-    // --- From CumulativeConflictReasonTest ---
+    // --- Conflict reasons ---
 
     @Test
     fun `profile-overload reason is a sound witness that omits non-covering tasks`() {
@@ -259,7 +256,7 @@ class CumulativePropagatorTest {
         }
     }
 
-    // --- From CumulativeTest (CP tests) ---
+    // --- Time-tabling, overload and edge-finding ---
 
     @Test
     fun `overload check detects energy infeasibility that time-tabling misses`() {
@@ -562,7 +559,7 @@ class CumulativePropagatorTest {
         assertTrue(problem.propagate() is PropagationResult.Unsat)
     }
 
-    // --- From CumulativeThetaTreeTest ---
+    // --- Theta-tree envelopes ---
 
     @Test fun `empty tree returns no envelope`() {
         val t = CumulativeThetaTree(n = 4, capacity = 3)
@@ -654,7 +651,7 @@ class CumulativePropagatorTest {
         swapped.setLeafOrder(intArrayOf(1, 0))
         swapped.activate(0, aEst, aE)
         swapped.activate(1, bEst, bE)
-        // Now L holds b (est=5, e=4), R holds a (est=0, e=10).
+        // Swapped: L holds b (est=5, e=4), R holds a (est=0, e=10).
         // env = max((1*5+4) + 10, (1*0+10)) = max(19, 10) = 19
         // Different — and wrong as a cumulative envelope. Documenting the contract:
         // setLeafOrder is the caller's responsibility.
@@ -686,9 +683,9 @@ class CumulativePropagatorTest {
         val t = CumulativeThetaTree(n = 2, capacity = 1)
         t.setLeafOrder(intArrayOf(0, 1))
         t.activate(0, est = 0, taskEnergy = 100L)
-        t.activate(0, est = 10, taskEnergy = 1L) // overwrite — was the same id
+        t.activate(0, est = 10, taskEnergy = 1L)
         t.activate(1, est = 20, taskEnergy = 1L)
-        // Now: task 0 est=10 e=1, task 1 est=20 e=1.
+        // After the reactivation: task 0 est=10 e=1, task 1 est=20 e=1.
         // env(0) = 10 + 1 = 11; env(1) = 20 + 1 = 21; env(theta) = max(11 + 1, 21) = 21.
         assertEquals(21L, t.envOfTheta())
         assertEquals(2L, t.energyOfTheta())
@@ -763,7 +760,7 @@ class CumulativePropagatorTest {
         }
     }
 
-    // --- From SchedulingBoundsEventTest ---
+    // --- Bound-event subscription ---
 
     private class ExcludeOnFix(val src: Int, val dst: Int) :
         Factor,

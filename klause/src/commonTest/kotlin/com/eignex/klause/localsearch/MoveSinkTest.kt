@@ -1,6 +1,5 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals

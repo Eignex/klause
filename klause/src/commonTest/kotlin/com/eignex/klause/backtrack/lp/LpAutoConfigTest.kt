@@ -241,7 +241,7 @@ class LpAutoConfigTest {
 
         val aggressive = LpAutoConfig.resolve(p, LpConfig(LpEmphasis.AGGRESSIVE))
         assertTrue(aggressive.bounding && aggressive.cuts)
-        // AGGRESSIVE reproduces the historical structural recommend (every applicable technique on).
+        // AGGRESSIVE matches the ungated structural recommend (every applicable technique on).
         val rec = LpAutoConfig.recommend(p)
         assertEquals(rec.bounding, aggressive.bounding)
         assertEquals(rec.cuts, aggressive.cuts)
@@ -377,14 +377,14 @@ class LpAutoConfigTest {
     }
 
     @Test
-    fun `aggressive enables the new parity techniques`() {
-        // ArrayMinMax ⇒ lin-max tight face. (The simplex always uses Devex / Harris / scaling /
-        // bound-flip internally — they are no longer plan knobs.)
+    fun `array min-max and product structures enable their tight relaxations`() {
+        // ArrayMinMax enables the lin-max tight face. Pricing, ratio test, scaling and bound flipping
+        // are internal to the simplex rather than plan knobs.
         val mm = LpAutoConfig.recommend(problem(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = true)))
         assertTrue(mm.bounding)
         assertTrue(mm.linMaxTightFace)
 
-        // Product ⇒ McCormick envelope.
+        // Product enables the McCormick envelope.
         val prod = LpAutoConfig.recommend(problem(Product(a = 0, b = 1, result = 2)))
         assertTrue(prod.bounding)
         assertTrue(prod.productMcCormick)
@@ -398,7 +398,7 @@ class LpAutoConfigTest {
         assertTrue(constArr.bounding)
         assertTrue(constArr.element)
 
-        // Variable arrays now also enable the element hull — they route to the big-M form.
+        // Variable arrays also enable the element hull — they route to the big-M form.
         val varArr = LpAutoConfig.recommend(
             problem(Element(idx = 0, result = 1, arr = longArrayOf(2), arrIsVars = true, indexOffset = 0)),
         )

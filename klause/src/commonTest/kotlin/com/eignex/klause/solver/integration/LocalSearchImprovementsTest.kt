@@ -126,7 +126,7 @@ class LocalSearchImprovementsTest {
     }
 
     @Test
-    fun `improvements is lazy — consumer can take just the first event`() {
+    fun `improvements is lazy so a consumer can take just the first event`() {
         val factor = Cardinality.exactlyOne(
             intArrayOf(
                 Lit.make(0, true),

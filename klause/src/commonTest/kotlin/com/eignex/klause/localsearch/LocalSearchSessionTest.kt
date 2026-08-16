@@ -20,10 +20,10 @@ import kotlin.test.assertTrue
 class LocalSearchSessionTest {
 
     private fun weightLearningProblem(): Problem {
-        // 6 bool vars; an odd-cycle of three exactlyOne cardinality factors over vars 0–2
-        // ({0,1}, {1,2}, {0,2}). Since 2·(x0+x1+x2)=3 has no integer solution the problem is UNSAT,
+        // 6 bool vars; an odd-cycle of three exactlyOne cardinality factors over vars 0-2
+        // ({0,1}, {1,2}, {0,2}). Since 2*(x0+x1+x2)=3 has no integer solution the problem is UNSAT,
         // so a weight-learning strategy never reaches cost 0 and keeps scaling factor weights off
-        // their defaults — the learned state the session must capture. Vars 3–5 are unconstrained so
+        // their defaults — the learned state the session must capture. Vars 3-5 are unconstrained so
         // the variable-activity assertions still see all 6 slots.
         return Problem(
             numBoolVars = 6,
@@ -60,7 +60,7 @@ class LocalSearchSessionTest {
         val solver = LocalSearchSolver(problem.bake(), strategy = Cbls())
         val session = LocalSearchSession(solver)
         assertNull(session.warmState.factorWeights)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
         val captured = session.warmState.factorWeights
         assertNotNull(captured, "session should capture factorWeights")
         assertEquals(problem.numFactors, captured.size)
@@ -71,7 +71,7 @@ class LocalSearchSessionTest {
     fun `reset clears warm state`() {
         val problem = weightLearningProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem.bake(), strategy = Cbls()))
-        session.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 2L)).assignment
+        session.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 2L))
         assertNotNull(session.warmState.factorWeights)
         session.reset()
         assertNull(session.warmState.factorWeights)
@@ -82,9 +82,9 @@ class LocalSearchSessionTest {
         val problem = weightLearningProblem()
         val session = LocalSearchSession(LocalSearchSolver(problem.bake(), strategy = Cbls()))
         val obj = LinearObjective(boolWeights = LongArray(6) { 1L })
-        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L)).assignment
+        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 5L))
         val firstWeights = session.warmState.factorWeights!!.copyOf()
-        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 6L)).assignment
+        session.minimize(obj, LocalSearchParams(maxFlips = 1_000L, randomSeed = 6L))
         val secondWeights = session.warmState.factorWeights!!
         val allOnes = DoubleArray(problem.numFactors) { 1.0 }
         assertTrue(
@@ -113,7 +113,7 @@ class LocalSearchSessionTest {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake())
         val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L)).assignment
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 7L))
         val touches = session.warmStateView.activityTouches()
         assertEquals(6, touches.size, "touches should cover all (bool + int) var slots")
         assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
@@ -124,14 +124,14 @@ class LocalSearchSessionTest {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake())
         val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L))
         val firstWatermark = session.warmStateView.bestCostSeen()
         assertTrue(
             firstWatermark < Int.MAX_VALUE,
             "expected watermark after first call, got $firstWatermark",
         )
 
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L)).assignment
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 2L))
         val secondWatermark = session.warmStateView.bestCostSeen()
         assertTrue(
             secondWatermark <= firstWatermark,
@@ -144,7 +144,7 @@ class LocalSearchSessionTest {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake())
         val session = LocalSearchSession(solver)
-        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L)).assignment
+        session.sample(LocalSearchParams(maxFlips = 2_000L, randomSeed = 3L))
         assertTrue(session.warmStateView.bestCostSeen() < Long.MAX_VALUE)
         session.reset()
         assertEquals(
@@ -160,7 +160,7 @@ class LocalSearchSessionTest {
         // baseWeight, so after the same flip budget the smoothed run's peak weight is strictly lower.
         fun peakWeightAfterRun(strategy: SourceDrivenStrategy): Double {
             val session = LocalSearchSession(LocalSearchSolver(weightLearningProblem().bake(), strategy = strategy))
-            session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L)).assignment
+            session.sample(LocalSearchParams(maxFlips = 3_000L, randomSeed = 4L))
             return session.warmState.factorWeights!!.max()
         }
         val bumpOnlyPeak = peakWeightAfterRun(Cbls())
@@ -194,7 +194,7 @@ class LocalSearchSessionTest {
         val problem = weightLearningProblem()
         val solver = LocalSearchSolver(problem.bake(), strategy = Cbls())
         val session = LocalSearchSession(solver)
-        solver.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 9L)).assignment
+        solver.sample(LocalSearchParams(maxFlips = 1_000L, randomSeed = 9L))
         assertNull(session.warmState.factorWeights, "bare solver call must not write to session warm state")
     }
 }

@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.IntDomain

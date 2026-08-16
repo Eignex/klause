@@ -24,17 +24,15 @@ class IncreasingPropagatorTest {
     )
 
     @Test
-    fun `non-decreasing propagation is sound and GAC`() {
-        val problem = chain(strict = false)
-        FactorPropagationOracle.assertSound(problem, "increasing")
-        FactorPropagationOracle.assertGac(problem, "increasing")
-    }
-
-    @Test
-    fun `strictly increasing propagation is sound and GAC`() {
-        val problem = chain(strict = true, hi = 4)
-        FactorPropagationOracle.assertSound(problem, "strictly_increasing")
-        FactorPropagationOracle.assertGac(problem, "strictly_increasing")
+    fun `propagation is sound and GAC in both strictness modes`() {
+        val cases = listOf(
+            "increasing" to chain(strict = false),
+            "strictly_increasing" to chain(strict = true, hi = 4),
+        )
+        for ((label, problem) in cases) {
+            FactorPropagationOracle.assertSound(problem, label)
+            FactorPropagationOracle.assertGac(problem, label)
+        }
     }
 
     @Test

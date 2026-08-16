@@ -96,8 +96,7 @@ class CliModeTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // Every exposed selector must construct and solve — guards the enum→selector mappings,
-        // including the newly added ones (largest-domain, median, split, …).
+        // Every exposed selector must construct and solve, guarding the enum-to-selector mappings.
         for (v in VarSelectorKind.entries) {
             val out = capture {
                 main(arrayOf("-e", "cp", "--param", "var-selector=${v.id}", "-t", "5000", fzn.absolutePath))
@@ -179,9 +178,8 @@ class CliModeTest {
 
     @Test
     fun `core config env overrides install for non-MiniZinc front-ends too`() {
-        // The install happens once in main, before the front-end is picked — so an XCSP3 run picks
-        // up KLAUSE_* overrides just like MiniZinc does (regression: it used to install only on the
-        // MiniZinc load path, leaving XCSP3/SMT-LIB on built-in defaults).
+        // The install happens once in main, before the front-end is picked, so every front-end
+        // (XCSP3, SMT-LIB, MiniZinc) sees the KLAUSE_* overrides rather than built-in defaults.
         val saved = KlauseConfig.current
         val xml = File.createTempFile("cli", ".xml").apply {
             writeText(
@@ -197,16 +195,6 @@ class CliModeTest {
             System.clearProperty("klause.float.scale")
             KlauseConfig.current = saved
         }
-    }
-
-    @Test
-    fun `-p2 attached form drives the parallel portfolio matching the documented spelling`() {
-        val fzn = File.createTempFile("cli", ".fzn").apply {
-            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
-            deleteOnExit()
-        }
-        val out = capture { main(arrayOf("-f", "-p2", "-t", "10000", fzn.absolutePath)) }
-        assertTrue("x = " in out, out)
     }
 
     @Test
@@ -483,14 +471,19 @@ class CliModeTest {
     }
 
     @Test
-    fun `minizinc standard -f -p routes to a parallel portfolio`() {
+    fun `minizinc standard -f -p routes to a parallel portfolio in both -p spellings`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // `-f -p2` ⇒ free (cp alias) parallel pool sized to 2. `-e ls -p2` ⇒ pure-LS pool. (Bare
-        // `-p2` would be the single-core `fixed` engine and is rejected — that's by design.)
-        for (engineArgs in listOf(arrayOf("-f", "-p", "2"), arrayOf("-e", "ls", "-p", "2"))) {
+        // `-f -p2` is the free (cp alias) parallel pool sized to 2, in the attached and the
+        // separated spelling; `-e ls -p 2` is the pure-LS pool. Bare `-p2` selects the single-core
+        // `fixed` engine and is rejected by design.
+        for (engineArgs in listOf(
+            arrayOf("-f", "-p2"),
+            arrayOf("-f", "-p", "2"),
+            arrayOf("-e", "ls", "-p", "2"),
+        )) {
             val out = capture { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
             assertTrue("x = " in out, out)
         }

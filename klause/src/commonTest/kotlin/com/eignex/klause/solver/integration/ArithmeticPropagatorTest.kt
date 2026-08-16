@@ -263,7 +263,7 @@ class ArithmeticPropagatorTest {
     @Test
     fun `wide constraints use the shared start-bound reason and still enumerate exactly`() {
         // Arity > LINEAR_SHARED_REASON_ARITY (32) switches Linear onto the shared start-of-call
-        // reason built from the contribution snapshot — now the *only* path that materialises
+        // reason built from the contribution snapshot — the only path that materialises
         // rLo/rHi. Pad the constraint with fixed singleton vars (1..1) so the arity is wide while
         // the free space stays small enough to brute-force; the propagated tightenings on the free
         // vars then exercise the wide reason builder (and the NE case exercises the recomputed
@@ -432,42 +432,22 @@ class ArithmeticPropagatorTest {
     }
 
     @Test
-    fun `singleton-b with singleton-result forces a`() {
-        // a * 5 = 15 → a = 3.
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 100), IntDomain(5, 5), IntDomain(15, 15)),
-            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
+    fun `a singleton operand and a singleton result force the remaining operand`() {
+        val cases = listOf(
+            Triple(arrayOf(IntDomain(0, 100), IntDomain(5, 5), IntDomain(15, 15)), 0, "a * 5 = 15"),
+            Triple(arrayOf(IntDomain(4, 4), IntDomain(0, 100), IntDomain(12, 12)), 1, "4 * b = 12"),
+            Triple(arrayOf(IntDomain(-10, 10), IntDomain(-2, -2), IntDomain(-6, -6)), 0, "a * -2 = -6"),
         )
-        val r = assertIs<PropagationResult.Implied>(p.propagate())
-        assertEquals(3, r.ints[0])
-    }
-
-    @Test
-    fun `singleton-a with singleton-result forces b`() {
-        // 4 * b = 12 → b = 3.
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(4, 4), IntDomain(0, 100), IntDomain(12, 12)),
-            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
-        )
-        val r = assertIs<PropagationResult.Implied>(p.propagate())
-        assertEquals(3, r.ints[1])
-    }
-
-    @Test
-    fun `singleton-b negative narrows a correctly`() {
-        // a * -2 = -6 → a = 3.
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(-10, 10), IntDomain(-2, -2), IntDomain(-6, -6)),
-            factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
-        )
-        val r = assertIs<PropagationResult.Implied>(p.propagate())
-        assertEquals(3, r.ints[0])
+        for ((doms, free, label) in cases) {
+            val p = Problem(
+                numBoolVars = 0,
+                numIntVars = 3,
+                intDomains = doms,
+                factors = arrayOf<Factor>(Product(a = 0, b = 1, result = 2)),
+            )
+            val r = assertIs<PropagationResult.Implied>(p.propagate())
+            assertEquals(3, r.ints[free], "$label must force the free operand to 3")
+        }
     }
 
     @Test

@@ -1,13 +1,13 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.strategy.WalkSat
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -131,14 +131,11 @@ class TabuFilterTest {
 
     @Test
     fun `Probabilistic aspiration rejects out-of-range rate at construction`() {
-        try {
-            AspirationCriterion.Probabilistic(rate = -0.1)
-            error("should have thrown")
-        } catch (_: IllegalArgumentException) {}
-        try {
-            AspirationCriterion.Probabilistic(rate = 1.5)
-            error("should have thrown")
-        } catch (_: IllegalArgumentException) {}
+        for (rate in listOf(-0.1, 1.5)) {
+            assertFailsWith<IllegalArgumentException>("rate $rate must be rejected") {
+                AspirationCriterion.Probabilistic(rate = rate)
+            }
+        }
     }
 
     @Test

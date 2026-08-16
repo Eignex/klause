@@ -455,19 +455,6 @@ class BuildersTest {
     }
 
     @Test
-    fun `xor emits odd parity factor`() {
-        class S : VariableSchema() {
-            val a by boolVar()
-            val b by boolVar()
-            val c by boolVar()
-            val parity by constraint { xor(a, b, c) }
-        }
-        val compiled = S().compile()
-        val xf = compiled.problem.factors.single { it is Xor } as Xor
-        assertTrue(xf.targetParity == 1)
-    }
-
-    @Test
     fun `xor odd parity holds in samples`() {
         class S : VariableSchema() {
             val a by boolVar()
@@ -477,6 +464,8 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
+        val xf = compiled.problem.factors.single { it is Xor } as Xor
+        assertTrue(xf.targetParity == 1)
         val solver = LocalSearchSolver(
             compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
@@ -512,18 +501,6 @@ class BuildersTest {
     }
 
     @Test
-    fun `pb at most emits factor at top level`() {
-        class S : VariableSchema() {
-            val a by boolVar()
-            val b by boolVar()
-            val c by boolVar()
-            val cap by constraint { pbAtMost(listOf(3, 2, 5), listOf(a, b, c), 4) }
-        }
-        val compiled = S().compile()
-        assertTrue(compiled.problem.factors.any { it is PseudoBoolean })
-    }
-
-    @Test
     fun `pb at most holds in samples`() {
         class S : VariableSchema() {
             val a by boolVar()
@@ -535,6 +512,7 @@ class BuildersTest {
         }
         val schema = S()
         val compiled = schema.compile()
+        assertTrue(compiled.problem.factors.any { it is PseudoBoolean })
         val solver = LocalSearchSolver(
             compiled.problem.bake(),
             restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),

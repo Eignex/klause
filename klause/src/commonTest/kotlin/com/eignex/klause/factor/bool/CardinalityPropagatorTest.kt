@@ -57,42 +57,25 @@ class CardinalityPropagatorTest {
     }
 
     @Test
-    fun `enumerate matches brute force for at-least 2 of 4`() {
-        for (seed in 1L..3L) {
-            val problem = Problem(
-                numBoolVars = 4,
-                numIntVars = 0,
-                intDomains = emptyArray(),
-                factors = arrayOf<Factor>(Cardinality(IntArray(4) { Lit.make(it, true) }, min = 2, max = 4)),
-            )
-            val brute = (0 until 16)
-                .filter { mask -> (0..3).count { (mask shr it) and 1 == 1 } >= 2 }
-                .map { mask -> (0..3).map { (mask shr it) and 1 == 1 } }
-                .toHashSet()
-            val found = BacktrackSolver(problem.bake())
-                .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100).map { it.bools.toList() }.toHashSet()
-            assertEquals(brute, found, "seed=$seed: at-least-2-of-4 must match brute force")
-        }
-    }
-
-    @Test
-    fun `enumerate matches brute force for exactly 1 of 3`() {
-        for (seed in 1L..3L) {
-            val problem = Problem(
-                numBoolVars = 3,
-                numIntVars = 0,
-                intDomains = emptyArray(),
-                factors = arrayOf<Factor>(Cardinality(IntArray(3) { Lit.make(it, true) }, min = 1, max = 1)),
-            )
-            val brute = (0 until 8)
-                .filter { mask -> (0..2).count { (mask shr it) and 1 == 1 } == 1 }
-                .map { mask -> (0..2).map { (mask shr it) and 1 == 1 } }
-                .toHashSet()
-            val found = BacktrackSolver(problem.bake())
-                .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
-                .take(100).map { it.bools.toList() }.toHashSet()
-            assertEquals(brute, found, "seed=$seed: exactly-1-of-3 must match brute force")
+    fun `enumerate matches brute force for cardinality windows`() {
+        val cases = listOf(Triple(4, 2, 4), Triple(3, 1, 1))
+        for ((n, min, max) in cases) {
+            for (seed in 1L..3L) {
+                val problem = Problem(
+                    numBoolVars = n,
+                    numIntVars = 0,
+                    intDomains = emptyArray(),
+                    factors = arrayOf<Factor>(Cardinality(IntArray(n) { Lit.make(it, true) }, min = min, max = max)),
+                )
+                val brute = (0 until (1 shl n))
+                    .filter { mask -> (0 until n).count { (mask shr it) and 1 == 1 } in min..max }
+                    .map { mask -> (0 until n).map { (mask shr it) and 1 == 1 } }
+                    .toHashSet()
+                val found = BacktrackSolver(problem.bake())
+                    .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+                    .take(100).map { it.bools.toList() }.toHashSet()
+                assertEquals(brute, found, "seed=$seed: min=$min max=$max of $n must match brute force")
+            }
         }
     }
 }

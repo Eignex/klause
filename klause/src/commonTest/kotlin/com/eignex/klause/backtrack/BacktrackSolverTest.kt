@@ -8,7 +8,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
@@ -61,13 +60,13 @@ class BacktrackSolverTest {
 
     @Test
     fun `tight cumulative packing solves without overflowing conflict-clause minimization`() {
-        // Regression for #118 / #119: a tight unary-resource cumulative drives many conflicts
-        // whose atom antecedents form deep (and occasionally cyclic) implication chains. The
-        // self-subsuming-resolution minimization used to recurse over them — overflowing the
-        // stack on deep chains and indexing past the atom-antecedent array. Six duration-2
-        // tasks at capacity 1 must pack back-to-back into the horizon [0, 12); the start
-        // domains [0, 10] just admit the even-slot schedule, so the search is forced through
-        // heavy conflict analysis. It must return a valid non-overlapping witness, not crash.
+        // A tight unary-resource cumulative drives many conflicts whose atom antecedents form
+        // deep (and occasionally cyclic) implication chains, so self-subsuming-resolution
+        // minimization must walk them without recursing off the stack or indexing past the
+        // atom-antecedent array. Six duration-2 tasks at capacity 1 must pack back-to-back into
+        // the horizon [0, 12); the start domains [0, 10] just admit the even-slot schedule, so
+        // the search is forced through heavy conflict analysis. It must return a valid
+        // non-overlapping witness, not crash.
         val n = 6
         val factor = Cumulative(
             starts = IntArray(n) { it },
@@ -116,9 +115,9 @@ class BacktrackSolverTest {
 
     @Test
     fun `unsat core captures chained propagation through intermediate factors`() {
-        // Four clauses chained: x0 → x1 → x2 → ¬x2. Bake-time propagation forces
-        // x0 = true (unit clause), then x1 = true (clause says ¬x0 ∨ x1), then x2 = true,
-        // then the final clause requires x2 = false → contradiction. All four factors
+        // Four clauses chained: x0 -> x1 -> x2 -> not x2. Bake-time propagation forces
+        // x0 = true (unit clause), then x1 = true (clause says not x0 or x1), then x2 = true,
+        // then the final clause requires x2 = false, a contradiction. All four factors
         // are load-bearing — the BFS through reason-arrays must collect every one.
         val p = Problem(
             numBoolVars = 3,
@@ -142,7 +141,7 @@ class BacktrackSolverTest {
 
     @Test
     fun `watcher index routes wakeups only on the false-going literal`() {
-        // Clause `+v0 ∨ +v1 ∨ +v2`. Initial watches are on v0 and v1. After
+        // Clause `+v0 or +v1 or +v2`. Initial watches are on v0 and v1. After
         // construction, the per-literal watcher index should list the clause at
         // Lit.make(0,true) and Lit.make(1,true) — and nowhere else, including
         // *negative* polarities of those vars and either polarity of v2 (which is
@@ -179,8 +178,8 @@ class BacktrackSolverTest {
 
     @Test
     fun `cardinality watched literals propagate at-least-K under pin pressure`() {
-        // AtLeast-2 over 8 vars. Pin 5 of them to false → only 3 positive literals are
-        // non-false; need 2 true. Pin a 6th to false → only 2 non-false remain; both
+        // AtLeast-2 over 8 vars. Pin 5 of them to false: only 3 positive literals are
+        // non-false; need 2 true. Pin a 6th to false and only 2 non-false remain; both
         // must be unit-pinned true. The watched-literal scheme (3 at-least watches,
         // 0 at-most watches since max == n) drives this exactly.
         val problem = Problem(
@@ -209,7 +208,7 @@ class BacktrackSolverTest {
 
     @Test
     fun `cardinality watched literals propagate at-most-K when count saturates`() {
-        // AtMost-2 over 8 vars. Pin 2 of them to true → no more can be true; the
+        // AtMost-2 over 8 vars. Pin 2 of them to true and no more can be true; the
         // remaining 6 must be forced false. Watched-literal at-most side detects this
         // when its (n - max + 1) = 7 watches can't find a non-true replacement.
         val problem = Problem(
@@ -235,14 +234,14 @@ class BacktrackSolverTest {
             assertEquals(
                 false,
                 sat.assignment.bools[v],
-                "v$v should be unit-forced false to keep count ≤ 2, got ${sat.assignment.bools[v]}",
+                "v$v should be unit-forced false to keep count <= 2, got ${sat.assignment.bools[v]}",
             )
         }
     }
 
     @Test
     fun `cardinality bilateral exactly-one detects unsat under conflicting pins`() {
-        // ExactlyOne over 4 vars with two of them pinned true → contradiction.
+        // ExactlyOne over 4 vars with two of them pinned true is a contradiction.
         // The watched scheme has both at-least (2 watches) and at-most (4 watches);
         // the at-most side should fire and detect the over-budget condition.
         val problem = Problem(
@@ -263,7 +262,7 @@ class BacktrackSolverTest {
     fun `watched literals propagate wide unit clauses correctly`() {
         // A 50-literal clause: at least one of v0..v49 must be true. Bake-time
         // propagation can't pin anything (50 unassigned). After pinning v0..v48 to
-        // false via assumptions, the clause becomes unit on v49 → propagation pins
+        // false via assumptions, the clause becomes unit on v49, so propagation pins
         // v49 = true. This exercises the watched-literal scheme on a clause where
         // most literals are false at propagation time; the per-fire walk has to find
         // the one remaining non-false literal as a replacement watch and detect unit.
@@ -293,7 +292,7 @@ class BacktrackSolverTest {
 
     @Test
     fun `unsat core handles two-sided int narrowing`() {
-        // Two linear constraints: 1·x >= 5 and 1·x <= 3. Each individually is fine on
+        // Two linear constraints: x >= 5 and x <= 3. Each individually is fine on
         // domain [0,10]; together they empty the domain. Both factors must appear in
         // the core — the separate intMinReason / intMaxReason tracking is what catches
         // this (a single-reason scheme would lose whichever side was set first).
@@ -319,7 +318,7 @@ class BacktrackSolverTest {
     fun `maxInstructions tightens budget vs maxDecisions when smaller`() {
         // 10 unconstrained bools — DFS needs to pin all 10 to reach a SAT leaf since
         // there are no propagators to collapse the tree. maxInstructions = 2 hits the
-        // cap after 2 decisions → Unknown. A generous budget reaches SAT.
+        // cap after 2 decisions, giving Unknown. A generous budget reaches SAT.
         val p = Problem(
             numBoolVars = 10,
             numIntVars = 0,
@@ -559,7 +558,7 @@ class BacktrackSolverTest {
 
     @Test
     fun `a deadline firing inside propagation yields Unknown rather than a solution`() {
-        // Satisfiable (x0 ∨ x1). With cancelFloor 0 a fired deadline cuts the very first fixpoint
+        // Satisfiable (x0 or x1). With cancelFloor 0 a fired deadline cuts the very first fixpoint
         // short, leaving an under-propagated state the search must not report as SAT — the honest
         // verdict is Unknown, never a solution built on a cut-short fixpoint.
         val p = Problem(

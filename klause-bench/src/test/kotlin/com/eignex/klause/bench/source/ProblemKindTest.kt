@@ -14,8 +14,7 @@ class ProblemKindTest {
     @Test
     fun `multi-line solve item with search annotation is COP`() {
         // The shape of most annotated MiniZinc Challenge models (routing, scheduling): the
-        // objective sits several lines below `solve`, past the search annotation. The old
-        // line-by-line scan missed these and misclassified them as CSP.
+        // objective sits several lines below `solve`, past the search annotation.
         val model = """
             constraint forall(i in 1..n)(x[i] >= 0);
             solve
