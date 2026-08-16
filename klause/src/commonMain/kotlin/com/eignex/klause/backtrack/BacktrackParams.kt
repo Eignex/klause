@@ -71,14 +71,14 @@ data class BacktrackParams(
      */
     val lubyRestartBase: Long? = null,
     /**
-     * Glucose-style adaptive restarts (Audemard-Simon) for the pure-Boolean search path.
+     * LBD-adaptive restarts for the pure-Boolean search path.
      * When true, the engine restarts based on learned-clause quality — a short window of
      * recent LBD running hotter than the long-run average forces a re-pick — with trail-size
      * blocking that suppresses the restart when the solver is driving deep toward a model.
      * See [GlucoseRestart]. Selectable *alongside* [lubyRestartBase] rather than replacing it:
      * when adaptive restarts are on the Luby budget is ignored, so SAT-heavy configs opt into
      * data-driven restarts while the CP optimization path keeps Luby. Disabled by default. On
-     * larger random instances near the phase transition (see #117) this usually beats Luby.
+     * larger random instances near the phase transition this usually beats Luby.
      */
     val adaptiveRestart: Boolean = false,
     /**
@@ -142,35 +142,34 @@ data class BacktrackParams(
     /**
      * Glue threshold for [maxLearnedClauses] — clauses with LBD ≤ this are always
      * retained, since they typically capture cross-cutting "high-leverage" constraints.
-     * MiniSAT / Glucose default is 2.
      */
     val lbdGlueThreshold: Int = 2,
     /**
-     * Three-tier learned-clause database (#201). When true (and [maxLearnedClauses] is set),
+     * Three-tier learned-clause database. When true (and [maxLearnedClauses] is set),
      * the restart-driven reduction replaces the binary glue split with three tiers: a
      * permanent core (LBD ≤ [lbdGlueThreshold]), a mid tier (LBD ≤ [midLbdThreshold]) kept
      * across reductions but demoted when idle, and a local tier deleted aggressively. Clauses
      * that participate in a later conflict (detect it or force a unit) are promoted on the
      * next reduction; mid-tier clauses idle across a reduction are demoted. This gives more
-     * selective deletion than the binary glue split and helps proof-search families (#117)
+     * selective deletion than the binary glue split and helps proof-search families
      * where useful clauses are otherwise forgotten. Disabled by default.
      */
     val tieredLearnedDb: Boolean = false,
     /**
      * Mid-tier LBD threshold for [tieredLearnedDb]: a freshly learned clause with
      * `lbdGlueThreshold < LBD ≤ midLbdThreshold` starts in the mid tier, higher LBD in the
-     * local tier. Glucose's "Tier2" cutoff is 6.
+     * local tier.
      */
     val midLbdThreshold: Int = 6,
     /**
-     * Clause vivification (#203) as an inprocessing pass. When true the engine periodically
+     * Clause vivification as an inprocessing pass. When true the engine periodically
      * — at restart boundaries, where the trail is at root and assumptions are clean — walks a
      * bounded slice of the learned-clause database and strengthens each clause by tentatively
      * asserting the negations of its literals under propagation: a remaining literal already
      * falsified is dropped; one forced true (or a conflict) shortens the clause to the
      * literals tried so far. Pure-Boolean; atom-literal clauses are skipped. Disabled by
      * default. One of the highest-value inprocessing techniques on hard UNSAT instances like
-     * the pigeonhole family in #117. Only honoured when [assumptions] is empty.
+     * the pigeonhole family. Only honoured when [assumptions] is empty.
      */
     val vivification: Boolean = false,
     /**
@@ -180,7 +179,7 @@ data class BacktrackParams(
      */
     val vivifyBatch: Int = 256,
     /**
-     * Clause subsumption and self-subsuming resolution (#1252) as an inprocessing pass. When true
+     * Clause subsumption and self-subsuming resolution as an inprocessing pass. When true
      * the engine periodically — at restart boundaries, alongside [vivification] — walks a bounded
      * slice of the learned-clause database, drops each clause another learned clause subsumes, and
      * strengthens each clause a self-subsuming resolution shortens. Pure-Boolean; atom-literal
@@ -193,7 +192,7 @@ data class BacktrackParams(
      */
     val subsumeBatch: Int = 1024,
     /**
-     * Run the scheduled inprocessing loop every Nth restart (#1252). The passes' root probing
+     * Run the scheduled inprocessing loop every Nth restart. The passes' root probing
      * competes with conflict throughput, and restart-heavy configurations hit the boundary often —
      * a cadence above 1 buys the simplification at a fraction of the per-restart cost. Only
      * meaningful when at least one pass (e.g. [vivification]) is enabled. Must be positive.
@@ -263,12 +262,12 @@ data class BacktrackParams(
     /** Companion of [globalVarLowerSupplier] for the shared upper bounds. */
     val globalVarUpperSupplier: ((varId: Int) -> Long)? = null,
     /**
-     * The emphasis-driven LP-relaxation selector (#429): an [LpEmphasis] cost ceiling + per-technique
+     * The emphasis-driven LP-relaxation selector: an [LpEmphasis] cost ceiling + per-technique
      * overrides (see [LpConfig]), resolved against the problem's structure by [LpAutoConfig.resolve]
      * at `minimize`/`improvements`. `null` (the raw default) uses the explicit per-technique flags
      * below verbatim — no LP unless one is set; the user-facing entry points (`--lp`, the portfolio
      * arms) supply an [LpConfig] so LP is on by default with the emphasis level as the only dial.
-     * `LpConfig.AGGRESSIVE` reproduces the old structural "enable everything applicable" auto-config.
+     * `LpConfig.AGGRESSIVE` enables every structurally-applicable technique.
      * Resolved flags are OR-ed onto any explicit ones, so an explicit flag is never turned off.
      */
     val lpConfig: LpConfig? = null,
@@ -287,8 +286,7 @@ data class BacktrackParams(
      * Total wall-clock solve budget in milliseconds, when the caller knows it (the `-t` deadline).
      * Advisory only — the hard stop remains [cancellation]; this just lets the LP subsystem size its
      * wall-clock sub-budgets as a fraction of the whole (the one-shot root-LP cap and the per-node LP
-     * circuit breaker). `null` (default, no deadline) leaves those caps off, so a solve with no
-     * budget behaves exactly as before.
+     * circuit breaker). `null` (default, no deadline) leaves those caps off.
      */
     val solveBudgetMillis: Long? = null,
     /**
@@ -314,7 +312,7 @@ data class BacktrackParams(
     val cutExchange: CutExchange? = null,
     /**
      * Whether to route an eligible pure-Boolean problem (no integer variables, all clause factors)
-     * through the native-SAT BCP lane (#1119 Phase 1): arena-packed two-watched-literal propagation with
+     * through the native-SAT BCP lane: arena-packed two-watched-literal propagation with
      * no atom store or factor-queue overhead. `null` (default) auto-dispatches — the lane is selected
      * exactly when the baked problem is [com.eignex.klause.solver.Problem.isNativeSatEligible]. `true`
      * requests it (still a no-op on an ineligible problem); `false` forces the general LCG path.
@@ -322,7 +320,7 @@ data class BacktrackParams(
     val nativeSat: Boolean? = null,
     /**
      * Whether to learn pseudo-Boolean cutting-planes nogoods on conflicts over pseudo-Boolean / cardinality
-     * constraints (#1119 Phase 3): conflict analysis runs a RoundingSat-style division resolvent seeded
+     * constraints: conflict analysis runs a division-based resolvent seeded
      * from the violated bound, with a clause-resolvent fallback, and stores learned PB constraints
      * alongside clauses. `null` (default) auto-dispatches — on for pure-Boolean problems, where it is a
      * decisive win on counting structure (pigeonhole: polynomial vs the exponential a clause solver

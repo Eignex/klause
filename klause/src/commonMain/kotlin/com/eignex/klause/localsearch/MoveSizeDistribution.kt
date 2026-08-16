@@ -6,8 +6,8 @@ import kotlin.random.Random
  * A frequency-restoring sampler over move sizes — how many variables a structural move should touch.
  * Sizes `minSize, minSize+1, …` are drawn in proportion to [weights], but *without replacement within
  * a cycle*: each size is handed out its weighted share before any size repeats, so a short run of
- * draws matches the target mix instead of drifting the way independent weighted draws can (yuck's
- * FrequencyRestorer over its move-size Distribution). When the cycle empties it refills.
+ * draws matches the target mix instead of drifting the way independent weighted draws can. When the
+ * cycle empties it refills.
  *
  * Shared, engine-side, and deterministic — all randomness comes from the caller's [Random]. A source
  * that wants a tunable move-size mix (rather than a fixed count) draws from one of these.

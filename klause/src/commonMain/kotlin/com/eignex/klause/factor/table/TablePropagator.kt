@@ -22,7 +22,7 @@ internal class TablePropagator(
     /** Per-cell upper bound for a short-support table (see [com.eignex.klause.factor.table.Table.hi]);
      *  null when every cell is a point (a ground table). */
     private val hi: LongArray?,
-    /** Shared across a `<group>`'s rows over one relation (#1302 follow-up): caches the "sweep prunes
+    /** Shared across a `<group>`'s rows over one relation: caches the "sweep prunes
      *  nothing" verdict so later rows with the same column bounds skip re-sweeping the shared table.
      *  Null for a lone table — then every fire sweeps. */
     private val groupCache: TableGroupCache? = null,
@@ -34,9 +34,9 @@ internal class TablePropagator(
     private fun cellLo(row: Int, col: Int): Long = tuples[row * arity + col]
     private fun cellHi(row: Int, col: Int): Long = hi?.get(row * arity + col) ?: tuples[row * arity + col]
 
-    /** Advisor subscription (#623): STR2 is hole-aware GAC (tuple feasibility tests membership, the
+    /** Advisor subscription: STR2 is hole-aware GAC (tuple feasibility tests membership, the
      *  prune drops interior values), so subscribe to every kind on every column variable and consume
-     *  the dirty-variable delta (#624) — a fire re-sweeps only when a column actually changed, instead
+     *  the dirty-variable delta — a fire re-sweeps only when a column actually changed, instead
      *  of the per-fire O(arity) domain-ref scan. */
     override val initialIntEventWatches: IntArray = allEventWatches(xs)
 
@@ -46,7 +46,7 @@ internal class TablePropagator(
         collectHoleAndBoundAntecedents(state, xs)
 
     /**
-     * STR2 (Lecoutre 2011). The propagator maintains a sparse set of currently-feasible
+     * Simple tabular reduction, STR2 (Lecoutre 2011). The propagator maintains a sparse set of currently-feasible
      * tuple indices in [TableStr2State] across propagator calls; on each fire it sweeps only
      * the live prefix to drop newly-infeasible tuples and gather column supports.
      * Backtrack correctness comes from [TableStr2State.numValid] being a reversible cell on the engine's

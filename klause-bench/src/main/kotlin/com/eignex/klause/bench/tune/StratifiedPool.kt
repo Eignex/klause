@@ -8,10 +8,10 @@ import com.eignex.klause.bench.runner.Runners
 import kotlin.random.Random
 
 /**
- * A large sampling pool backed by the reference tables (#35). Each candidate ref that has a reference row is
+ * A large sampling pool backed by the reference tables. Each candidate ref that has a reference row is
  * bucketed into a **stratum = (sizeTier, structure)**: `sizeTier` ∈ {S,M,L,XL} splits the pool's cp-sat
- * `elapsedMs` (the difficulty proxy) at its quartiles, and `structure` is the classified column from
- * #40. [sample] draws round-robin across strata and resolves **only** the drawn refs — the whole pool
+ * `elapsedMs` (the difficulty proxy) at its quartiles, and `structure` is the classified structure
+ * column. [sample] draws round-robin across strata and resolves **only** the drawn refs — the whole pool
  * is never resolved, so a huge corpus stays memory-safe — and a batch always spans sizes/structures, so
  * every stratum stays covered as batches accumulate. That is what keeps the stratum-frontier residual
  * meaningful regardless of pool size. Candidates with no reference row are dropped (no oracle → no COP

@@ -29,9 +29,7 @@ import com.eignex.klause.util.IntArrayList
  * a reified context raises an error.
  */
 
-// ----------------------------------------------------------------------------
-//  MDD / cost_mdd / cost_regular — table-based state-channel decompositions
-// ----------------------------------------------------------------------------
+// MDD / cost_mdd / cost_regular — table-based state-channel decompositions
 
 /** Helper: build the [Mdd] factor and emit it when
  *  `seq` is all bare IntRefs. Falls back to the table-based decomposition. */
@@ -90,9 +88,7 @@ internal fun Lowering.assertMddDecomposed(expr: MddExpr) {
         IntRef(newAuxIntVar(IntDomain(0L, (ns - 1).toLong())))
     }
 
-    // state[0] = initial.
     assertExpr(IntCompare(stateRefs[0], IntCmpOp.EQ, IntLit(expr.initial)))
-    // state[n] ∈ accepting.
     if (expr.accepting.isEmpty()) {
         assertExpr(IntCompare(IntLit(0), IntCmpOp.EQ, IntLit(1))) // UNSAT
     } else {

@@ -9,7 +9,7 @@ package com.eignex.klause.bench.tune
 internal data class Suggestion(val handle: String, val values: Map<String, Any>)
 
 /**
- * A backend-agnostic hyperparameter tuner — the seam between the ask-tell loop (task #24) and whatever
+ * A backend-agnostic hyperparameter tuner — the seam between the ask-tell loop and whatever
  * optimizer sits behind it (OSS Vizier today via [VizierTuner]; a local random/grid fallback or another
  * service later). The loop, [ConfigSpace]s, and eval depend only on this interface and [TuningStudy] /
  * [Suggestion] — no gRPC / protobuf / Vizier type crosses it — so replacing the backend is one new impl.

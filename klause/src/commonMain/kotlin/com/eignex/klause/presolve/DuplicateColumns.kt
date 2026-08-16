@@ -85,9 +85,9 @@ internal object DuplicateColumns {
         }
         val maxClassSize = classes.values.maxOfOrNull { it.size } ?: 0
         if (maxClassSize < 2) return PassDelta()
-        // Reproduce the former per-round fold order exactly: round k folds the k-th duplicate of every class
-        // into its representative (one fold per representative per round), widening the aggregate's domain to
-        // the running Minkowski sum. Batches undo last-first, so the reconstruction split is unchanged.
+        // Fold in per-round batches: round k folds the k-th duplicate of every class into its representative
+        // (one fold per representative per round), widening the aggregate's domain to the running Minkowski
+        // sum. Batches undo last-first, which is what makes the reconstruction split exact.
         val keepOf = IntArray(n) { it } // drop → its aggregate representative
         val batches = ArrayList<List<ColumnMerge>>() // in application order; reconstruction undoes them last-first
         for (k in 1 until maxClassSize) {

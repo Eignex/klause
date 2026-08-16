@@ -26,7 +26,7 @@ import com.eignex.klause.util.EmptyIntArray
  * variable). Conflicts and forced pins are explained sharply: every row carries a reason
  * bitset of the assigned variables feeding it, xor-combined through each elimination step,
  * so even-occurrence variables cancel and a derived row's reason is exactly its
- * odd-occurrence assigned support — the minimal sufficient set (#174).
+ * odd-occurrence assigned support — the minimal sufficient set.
  *
  * This factor is **propagation-only**: it inherits the [Factor] local-search defaults
  * (always-satisfied, zero deltas). The Gaussian system is redundant with the per-row [Xor]

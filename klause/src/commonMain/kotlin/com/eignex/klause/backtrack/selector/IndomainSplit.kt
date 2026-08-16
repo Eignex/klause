@@ -6,7 +6,7 @@ import kotlin.random.Random
 /**
  * Domain bisection (`indomain_split`): branch `v ≤ mid` first, then `v ≥ mid+1`, with
  * `mid` the floor midpoint of the current interval. The engine's int decisions are bound
- * splits around the heuristic's first value (see `BacktrackSolver.IntNode`), so yielding
+ * splits around the heuristic's first value (see `IntNode`), so yielding
  * the midpoint produces exactly the dichotomic search the annotation asks for — log-depth
  * on wide domains where value enumeration is linear.
  */

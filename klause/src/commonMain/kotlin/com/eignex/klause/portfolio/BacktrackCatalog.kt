@@ -24,7 +24,7 @@ import com.eignex.klause.util.ArmCatalog
  * per-[Kind] pool. [BacktrackWorkerConfig] wraps these recipes into runnable portfolio arms; a caller
  * outside `klause` (the CLI) resolves named backtrack pools through here into `PortfolioScenario.btPool`.
  *
- * **Per-kind ranking** ([ranked]): SAT-optimized first (the #117 pigeonhole guard), the conflict-driven
+ * **Per-kind ranking** ([ranked]): SAT-optimized first (the pigeonhole guard), the conflict-driven
  * workhorse, the LP-intensity spread, LinUCB routing, the free engine, and — kept last, pending a credit
  * pass — the restart-level selector portfolio and the dom-wdeg / first-fail / activity heuristic arms. On
  * a CSP the LP arms and LinUCB drop out (LP lives on the minimisation path; LinUCB has no bound to exploit).
@@ -32,7 +32,7 @@ import com.eignex.klause.util.ArmCatalog
 object BacktrackCatalog {
 
     /** The strong CDCL/SAT stack (adaptive restarts, target phasing, 3-tier learned DB, vivification);
-     *  the #117 guard. Kept at rank 0 for both kinds. */
+     *  the pigeonhole guard. Kept at rank 0 for both kinds. */
     private fun satOptimized() = BacktrackRecipe("satOptimized") { seed, onEvent ->
         BacktrackPresets.satOptimized(randomSeed = seed, onEvent = onEvent)
     }
@@ -97,7 +97,7 @@ object BacktrackCatalog {
         )
     }
 
-    /** An LP arm: the conflict-driven core with the LP-relaxation family resolved at [emphasis] (#429).
+    /** An LP arm: the conflict-driven core with the LP-relaxation family resolved at [emphasis].
      *  `AGGRESSIVE` is the whole structurally-applicable family (cuts + hulls + probe); `DEFAULT` is
      *  simplex bounding + objective propagation without the expensive cut machinery; `CONSERVATIVE` is
      *  the cheap combinatorial bounds only. A no-op on models with no LP-applicable structure. */
@@ -113,7 +113,7 @@ object BacktrackCatalog {
         base.copy(lpConfig = LpConfig(LpEmphasis.DEFAULT), lpPlan = base.lpPlan.copy(lbTreeSearch = true))
     }
 
-    /** A restart-level selector portfolio (#765): one arm that switches its (variable, value) heuristic
+    /** A restart-level selector portfolio: one arm that switches its (variable, value) heuristic
      *  at every Luby restart under a UCB1 bandit — VSIDS / dom-wdeg / activity / conflict-ordering paired
      *  with min / impact / solution-guided values — so the arm learns per instance which complete-search
      *  heuristic suits it. A fresh portfolio per worker (it holds mutable bandit state). */
@@ -135,7 +135,7 @@ object BacktrackCatalog {
         )
     }
 
-    /** The conflict-driven workhorse with objective-guided value selection (#33): dive toward each
+    /** The conflict-driven workhorse with objective-guided value selection: dive toward each
      *  variable's cost-minimising polarity first, so the incumbent improves fast. A no-op on a CSP (no
      *  objective) — a COP-only diversity arm distinct from the cost-agnostic value orders above. */
     private fun objectiveGuided() = BacktrackRecipe("objective-guided") { seed, onEvent ->
@@ -169,13 +169,13 @@ object BacktrackCatalog {
         BacktrackArm.LpConservative,
         BacktrackArm.LinUcb,
         BacktrackArm.Free,
-        // Restart-level selector portfolio (#765) + latent-axis heuristic arms: kept last pending their
+        // Restart-level selector portfolio + latent-axis heuristic arms: kept last pending their
         // cross-seed credit pass, so the tuned diverse(N) prefix is unchanged.
         BacktrackArm.SelectorSwitch,
         BacktrackArm.DomWdeg,
         BacktrackArm.FirstFail,
         BacktrackArm.Activity,
-        // Objective-guided value diving (#33): last lever, COP-only, pending its cross-seed credit pass.
+        // Objective-guided value diving: last lever, COP-only, pending its cross-seed credit pass.
         BacktrackArm.ObjectiveGuided,
     )
     private val cspOrder = listOf(

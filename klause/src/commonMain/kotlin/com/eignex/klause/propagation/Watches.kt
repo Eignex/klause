@@ -20,8 +20,8 @@ internal fun PropagationState.moveBoolWatcher(factorId: Int, oldLit: Int, newLit
     } else {
         atoms.watchersByLit[atomLitWatchIndex(oldLit)]?.removeValue(factorId)
     }
-    // Install on new, carrying the blocking literal supplied by the watcher-using factor
-    // (#200). Defaults to NO_BLOCKER for factors that don't track blockers.
+    // Install on new, carrying the blocking literal supplied by the watcher-using factor.
+    // Defaults to NO_BLOCKER for factors that don't track blockers.
     installLitWatch(newLit, factorId, blocker)
 }
 

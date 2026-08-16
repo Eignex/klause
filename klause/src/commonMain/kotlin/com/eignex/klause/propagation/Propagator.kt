@@ -29,7 +29,7 @@ interface Propagator {
      * [com.eignex.klause.propagation.moveBoolWatcher].
      *
      * Used by [com.eignex.klause.factor.bool.Clause] to implement two-watched-literal
-     * propagation (Zhang–Stickel / MiniSAT): only the two watched literals trigger
+     * propagation (Zhang–Stickel): only the two watched literals trigger
      * wakeups, so a 50-literal clause fires on 2/50 var changes instead of 50/50. The
      * same scheme generalises to Cardinality with k+1 watched literals — a future
      * factor can adopt this contract without engine changes.
@@ -44,14 +44,13 @@ interface Propagator {
      * `i` is a literal that, if currently true, *proves this factor already satisfied*, so
      * the propagation engine can skip waking the factor when watcher `i`'s literal goes
      * false (see `PropagationState.watches.blockersByLit`). The standard two-watched-literal
-     * BCP speedup (MiniSAT): the blocker is typically the other watched literal of the same
+     * BCP speedup: the blocker is typically the other watched literal of the same
      * clause, and a stale blocker only ever costs a missed skip — never correctness.
      *
      * Only meaningful for factors satisfied by *any* single true literal (disjunctions /
      * [com.eignex.klause.factor.bool.Clause]). Must stay `null` for factors where one true
      * literal does not imply satisfaction — e.g. cardinality, where a blocker would be
-     * unsound. `null` (default) means "no blocking literals": every watcher always fires,
-     * preserving the prior behaviour exactly.
+     * unsound. `null` (default) means "no blocking literals": every watcher always fires.
      */
     val initialBoolWatcherBlockers: IntArray? get() = null
 
@@ -66,7 +65,7 @@ interface Propagator {
      * factor fires only when a kind it subscribed to actually occurs on that variable.
      *
      * This is the int-side analog of [initialBoolWatchers] and the scheduling substrate for
-     * incremental propagators (epic #619): a bounds-consistent factor can subscribe to only
+     * incremental propagators: a bounds-consistent factor can subscribe to only
      * [com.eignex.klause.propagation.IntEvent.LB_RAISED] / `UB_LOWERED` and skip waking on
      * interior value removals it cannot act on; a factor that only reacts to assignment can
      * subscribe to `FIXED` alone. A variable named here is removed from this factor's
@@ -81,7 +80,7 @@ interface Propagator {
     val initialIntEventWatches: IntArray? get() = null
 
     /**
-     * Whether this factor consumes the engine-maintained **dirty-variable delta** (#624): the set of
+     * Whether this factor consumes the engine-maintained **dirty-variable delta**: the set of
      * its subscribed variables that changed since it last drained, retrieved on a fire via
      * [com.eignex.klause.propagation.PropagationState.drainIntEventDirtyVars]. A
      * domain-sensitive incremental propagator (Régin/GCC/Table/…) sets this `true` so it can scope
@@ -128,7 +127,7 @@ interface Propagator {
 
 /**
  * The absence of a deductive role. A factor whose [Factor.asPropagator] returns this is
- * **invariant-only** (#896): it participates in local search but never filters domains. The CP
+ * **invariant-only**: it participates in local search but never filters domains. The CP
  * engine skips such factors entirely — they are dropped from the deductive occurrence lists
  * ([Problem.boolOccurrences] / [Problem.intOccurrences]) so propagation never wakes them. All
  * methods keep the no-op [Propagator] defaults (propagate is a no-op, no watches, no reason).

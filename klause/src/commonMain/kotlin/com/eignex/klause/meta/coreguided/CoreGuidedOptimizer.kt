@@ -126,7 +126,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
         }
 
         // Original softs in the shared cost vocabulary, used to verify/recover the final
-        // sample's true cost (#80). Weights are split across cores below, so the genuine
+        // sample's true cost. Weights are split across cores below, so the genuine
         // per-soft cost can only be measured against these originals, not the workings.
         val costSofts = softs.map { Oll.Soft(it.lit, it.weight) }
         var nextBoolId = baseProblem.numBoolVars
@@ -298,7 +298,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
     }
 
     /** Wrap a terminal SAT witness as [Result.Optimal] after recovering a sample whose
-     *  *true* soft cost equals [lb] (#80): a spent soft can be relaxed for free by another
+     *  *true* soft cost equals [lb]: a spent soft can be relaxed for free by another
      *  core's blocker, leaving the raw witness over-relaxed relative to the bound. */
     private fun optimal(
         sample: Sample,

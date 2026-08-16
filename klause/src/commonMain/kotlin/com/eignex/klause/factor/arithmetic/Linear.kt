@@ -332,7 +332,7 @@ class Linear private constructor(
 
     override fun isValueAnonymous(): Boolean = isBinaryValueRelation()
 
-    // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself (#501).
+    // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself.
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (isBinaryValueRelation()) this else null
 
     override val boolVars: IntArray = EmptyIntArray

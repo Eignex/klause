@@ -38,7 +38,7 @@ internal interface NoiseSchedule : AdaptivePolicy {
  * its `cb` exponent down, DDFW scales `increment` up. Level 0 = baseline (most greedy);
  * level toward 1 = more diversification.
  *
- * The constants follow the original paper (phi=0.2); [theta] is exposed directly so callers can tune.
+ * phi defaults to 0.2; [theta] is exposed directly so callers can tune.
  */
 internal class NoiseController(
     initial: Double,

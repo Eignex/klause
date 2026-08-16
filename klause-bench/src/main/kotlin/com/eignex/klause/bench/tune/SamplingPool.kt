@@ -8,7 +8,7 @@ import kotlin.random.Random
 internal fun instanceKey(p: ResolvedProblem): String = "${ReferenceStore.suiteOf(p.ref)}/${p.name}"
 
 /**
- * The sampling universe the BO draws mini-batches from (#35). [sample] yields a handful of resolved
+ * The sampling universe the BO draws mini-batches from. [sample] yields a handful of resolved
  * problems per call — the pool may be far larger than any batch, and a [StratifiedPool] resolves only
  * the drawn refs (lazy, so a huge pool is never materialised). [stratumOf] buckets an instance for the
  * coverage frontier, which is what keeps the residual signal alive on a large pool: with a per-instance
@@ -27,7 +27,7 @@ internal interface SamplingPool {
 }
 
 /** A materialised pool sampled uniformly, each instance its own stratum — so the frontier is
- *  per-instance (the pre-#35 behaviour), used by the tests and as a fallback. */
+ *  per-instance. Used by the tests and as a fallback. */
 internal class UniformPool(private val instances: List<ResolvedProblem>) : SamplingPool {
     override fun sample(size: Int, rng: Random): List<ResolvedProblem> =
         if (instances.size <= size) instances else instances.indices.shuffled(rng).take(size).map { instances[it] }

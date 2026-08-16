@@ -17,7 +17,7 @@ internal class LexLessPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): lexicographic propagation is bound-only (see [propagate], which
+     * Advisor subscription: lexicographic propagation is bound-only (see [propagate], which
      * reasons from `min`/`max` at the deciding position). An interior hole moves no bound, so the
      * factor subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] per variable and skips
      * interior `VALUE_REMOVED` wakes.
@@ -44,7 +44,8 @@ internal class LexLessPropagator(
 
     /**
      * Frisch–Hnich–Kiziltan–Miguel–Walsh lexicographic filtering ("Global Constraints for
-     * Lexicographic Orderings"). Each call recomputes the two pointers from the current domains:
+     * Lexicographic Orderings"). Each call recomputes the two pointers from the current
+     * domains:
      *
      *  - `α` (`a`): the deciding index — the first position whose `(x, y)` pair is not yet pinned
      *    to a common value, so every earlier position is fixed-equal and the relation hinges here.

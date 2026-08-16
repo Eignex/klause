@@ -41,21 +41,21 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Cumulative / Disjunctive energetic over-subscription feasibility check. */
     ENERGETIC("energetic", LpTiming.FAST),
 
-    /** Cumulative / Disjunctive preemptive max-flow feasibility bound (#454). */
+    /** Cumulative / Disjunctive preemptive max-flow feasibility bound. */
     CUMULATIVE_FLOW("cumulative-flow", LpTiming.FAST),
 
-    /** Subgradient Lagrangian bound for an AllDifferent (#23). */
+    /** Subgradient Lagrangian bound for an AllDifferent. */
     LAGRANGIAN("lagrangian", LpTiming.FAST),
 
     /** The per-node dual-simplex relaxation bound + objective propagation + Farkas learning +
      *  LP↔propagation fixpoint + rounding probe (the bounding stack), and the cumulative energetic
-     *  makespan row (#430), which is one row in that relaxation. */
+     *  makespan row, which is one row in that relaxation. */
     BOUNDING("bounding", LpTiming.MEDIUM),
 
-    /** Structural + Gomory/MIR cut separation rounds and the persistent root pool (#22). */
+    /** Structural + Gomory/MIR cut separation rounds and the persistent root pool. */
     CUTS("cuts", LpTiming.EXHAUSTIVE),
 
-    /** Circuit / subcircuit arc-model + subtour-elimination cuts (#22 / #431). */
+    /** Circuit / subcircuit arc-model + subtour-elimination cuts. */
     CIRCUIT("circuit", LpTiming.EXHAUSTIVE),
 
     /** Constant-array Element convex-hull columns. */
@@ -64,22 +64,22 @@ enum class LpTechnique(val id: String, val timing: LpTiming) {
     /** Table convex-hull columns. */
     TABLE("table", LpTiming.EXHAUSTIVE),
 
-    /** NValue one-hot value-hull columns (#435). */
+    /** NValue one-hot value-hull columns. */
     NVALUE("nvalue", LpTiming.EXHAUSTIVE),
 
-    /** Regular layer-expanded DFA flow-hull columns (#655). */
+    /** Regular layer-expanded DFA flow-hull columns. */
     REGULAR("regular", LpTiming.EXHAUSTIVE),
 
-    /** Mdd layered flow-hull columns (#655). */
+    /** Mdd layered flow-hull columns. */
     MDD("mdd", LpTiming.EXHAUSTIVE),
 
-    /** Count-variable GlobalCardinality one-hot count-hull columns (#655). */
+    /** Count-variable GlobalCardinality one-hot count-hull columns. */
     GCC_COUNT("gcc-count", LpTiming.EXHAUSTIVE),
 
-    /** Diffn per-axis cumulative energetic / area makespan rows (#655). */
+    /** Diffn per-axis cumulative energetic / area makespan rows. */
     DIFFN("diffn", LpTiming.EXHAUSTIVE),
 
-    /** Cumulative / Disjunctive time-indexed `x_{i,t}` reformulation over a bounded horizon (#453). */
+    /** Cumulative / Disjunctive time-indexed `x_{i,t}` reformulation over a bounded horizon. */
     CUMULATIVE_TIME_INDEXED("cumulative-time-indexed", LpTiming.EXHAUSTIVE),
 
     /** ArrayMinMax Anderson big-M tight face on top of the envelope. */
@@ -156,7 +156,7 @@ enum class LpEmphasis(
 
 /**
  * An LP configuration: an [emphasis] cost ceiling plus per-technique [overrides] (force a single
- * technique on or off regardless of the level — the benchmarking toggle #429 drives). The LP analogue
+ * technique on or off regardless of the level — what the benchmarking toggle drives). The LP analogue
  * of [com.eignex.klause.presolve.PresolveConfig]; [resolved] answers whether a technique is
  * *permitted* by the config (an override wins, else the emphasis tier rule), and [LpAutoConfig.resolve]
  * combines that with structural applicability and the dense-tableau size guard.

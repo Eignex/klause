@@ -40,7 +40,7 @@ internal fun FlatZincCompiler.emitBoolXor(c: FznConstraint) {
     factors.add(Xor(lits, targetParity = 0))
 }
 
-/** Shared lowering for `array_bool_or` and `array_bool_and`: reify the reduction onto `r`. */
+// Shared lowering for `array_bool_or` and `array_bool_and`: reify the reduction onto `r`.
 private fun FlatZincCompiler.emitArrayBoolReduction(c: FznConstraint, isOr: Boolean) {
     expectArity(c, 2)
     val lits = evalBoolVarArray(c.args[0]).toList()

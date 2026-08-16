@@ -13,17 +13,17 @@ import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 
 /**
- * Bake-time root probing, moved out of the kernel [Problem] into the presolve lane.
+ * Bake-time root probing, owned by the presolve lane rather than the kernel [Problem].
  *
  * A [Problem] only ever performs the cheap unconditional *base bake* (one `propagate(Assumptions.None)`
  * folded into its domains). The heavier failed-literal / SAC probing tiers — which are only ever enabled
  * by the compile / presolve layers — live here so the kernel never depends on `presolve` (the
  * `solver → presolve → solver` cycle the package split exists to prevent).
  *
- * [bake] runs the probing fixpoint against an already-base-baked [Problem] (probing calls
- * `problem.propagate(assumptions)` exactly as the kernel used to) and returns the accumulated
- * deductions. The pipeline feeds that back as [Problem]'s `seedDeductions`, so the rebuilt problem's
- * [Problem.baked] carries the probing pins / bound tightenings / holes.
+ * [bake] runs the probing fixpoint against an already-base-baked [Problem] via
+ * `problem.propagate(assumptions)` and returns the accumulated deductions. The pipeline feeds that
+ * back as [Problem]'s `seedDeductions`, so the rebuilt problem's [Problem.baked] carries the probing
+ * pins / bound tightenings / holes.
  */
 object RootBaker {
 

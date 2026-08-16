@@ -390,7 +390,7 @@ private fun FunctionalObjective.Node.inputs(): List<Operand> = when (this) {
 private fun nodeInputVarIds(node: FunctionalObjective.Node): List<Int> =
     node.inputs().filter { it.varId >= 0 }.map { it.varId }
 
-/** Translate one `defines_var` constraint into an evaluable node, or null on an unhandled shape. */
+// Translate one `defines_var` constraint into an evaluable node, or null on an unhandled shape.
 private fun FlatZincCompiler.buildObjNode(c: FznConstraint, definedId: Int): FunctionalObjective.Node? {
     return when (c.name) {
         "int_abs" -> FunctionalObjective.Abs(definedId, operandOf(c.args[0]) ?: return null)

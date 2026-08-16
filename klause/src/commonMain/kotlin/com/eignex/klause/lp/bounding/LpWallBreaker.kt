@@ -18,7 +18,7 @@ package com.eignex.klause.lp.bounding
  *
  * Kept off [LpEngine] as a small value so the trip logic is deterministic and unit-testable (the
  * wall-clock measurement lives at the call site); `budgetMillis <= 0` disables it, so a solve with no
- * known time budget behaves exactly as before.
+ * known time budget never trips.
  */
 internal class LpWallBreaker(private val budgetMillis: Long, private val warmupSolves: Int) {
     private var spentMillis = 0L

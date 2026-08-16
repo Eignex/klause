@@ -23,7 +23,7 @@ private inline fun dimacsRequire(cond: Boolean, msg: () -> String) {
     if (!cond) throw DimacsFormatException(msg())
 }
 
-/** Parse a 32-bit [role] count, distinguishing a value that exceeds the range from a non-integer. */
+// Parse a 32-bit [role] count, distinguishing a value that exceeds the range from a non-integer.
 private fun dimacsInt(token: String, role: String): Int = token.toIntOrNull() ?: dimacsError(
     if (token.toLongOrNull() != null) {
         "DIMACS $role exceeds the 32-bit integer range: '$token'"
@@ -35,7 +35,7 @@ private fun dimacsInt(token: String, role: String): Int = token.toIntOrNull() ?:
 /** DIMACS CNF/WCNF parser. */
 object Dimacs {
 
-    /** Hard-clause sentinel when `top` is absent in `.wcnf`. */
+    // Hard-clause sentinel when `top` is absent in `.wcnf`.
     private const val HARD_WEIGHT_SENTINEL: Long = Long.MAX_VALUE
 
     /** Parse DIMACS CNF/WCNF [text] into a [Problem]. */

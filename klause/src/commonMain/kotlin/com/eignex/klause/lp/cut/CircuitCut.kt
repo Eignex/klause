@@ -14,7 +14,7 @@ import com.eignex.klause.util.LongHashSet
  *
  * Arcs are stored **sparsely** — parallel per-arc arrays, one entry per candidate arc — so the model
  * is O(arcs), not O(n²). That lets the relaxation scale to large but sparse routing graphs (small
- * per-node successor domains) instead of being capped at a small node count (#431).
+ * per-node successor domains) instead of being capped at a small node count.
  */
 internal class CircuitArcModel(
     /** Number of nodes. */
@@ -43,7 +43,7 @@ internal class CircuitArcModel(
  *
  * Max-flow runs over the **sparse** fractional support (paired-adjacency residual graph; the reverse
  * of edge `e` is `e xor 1`), so separation cost scales with the number of fractional arcs rather than
- * n² — the relaxation is no longer limited to a small node count (#431).
+ * n².
  */
 internal class CircuitSeparator : CutSeparator {
     override fun separate(ctx: CutContext): List<Cut> {

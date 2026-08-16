@@ -51,8 +51,8 @@ internal class RegularInvariant(
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         if (state.assignment.intValue(intVar) == oldValue) return 0
-        // Apply is once per accepted move; rebuild both layers (O(n·Q·Σ), the order the old full
-        // recompute already cost) so the per-candidate delta stays O(Q·Σ).
+        // Apply runs once per accepted move, so it can afford a full two-layer rebuild (O(n·Q·Σ)); that
+        // keeps the per-candidate delta at O(Q·Σ).
         val before = state.factorDegree[factorId]
         val rebuilt = buildState(state)
         state.refPayload[factorId] = rebuilt

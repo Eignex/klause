@@ -20,12 +20,12 @@ internal class LinearInvariant(
 ) : Invariant {
 
     // Move scoring asks for one coefficient per candidate per containing row; O(1) here keeps a
-    // wide row's move pick linear instead of quadratic (#1442).
+    // wide row's move pick linear instead of quadratic.
     private val coeffIndex = LinearCoeffIndex(coeffs, vars)
 
     // Term indices in ascending |coeff| (zeros excluded, ties by position): the first entry whose
     // coefficient divides a drift IS the lowest-|coeff| divider, so the channeling partner scan
-    // stops at its first hit instead of walking the whole row per proposed move (#1442) — on the
+    // stops at its first hit instead of walking the whole row per proposed move — on the
     // unit-coefficient rows of set-covering decompositions that is the first unpinned term.
     private val byAbsCoeff: IntArray by lazy {
         val nonZero = (0 until vars.size).filter { coeffs[it] != 0L }
@@ -94,7 +94,7 @@ internal class LinearInvariant(
     }
 
     /** Visit every term index on a narrow row, or a fresh [REPAIR_SAMPLE_CAP]-sized random sample on a
-     *  wide one (#1442): a full wide-row enumeration floods one pick with tens of thousands of
+     *  wide one: a full wide-row enumeration floods one pick with tens of thousands of
      *  candidates whose scoring outlives the deadline, while a per-pick sample keeps the repair
      *  pressure and lets successive picks cover different slices of the row. */
     private inline fun forEachRepairTerm(state: LocalSearchState, action: (Int) -> Unit) {
@@ -259,7 +259,7 @@ internal class LinearInvariant(
          *  shape (sum-of-bools = constant) without dominating descent step cost. */
         const val PAIR_SAMPLE_CAP: Int = 32
 
-        /** Per-pick cap on repair proposals from one wide row (#1442): past this arity the terms are
+        /** Per-pick cap on repair proposals from one wide row: past this arity the terms are
          *  sampled fresh each pick instead of enumerated, so a violated tens-of-thousands-wide row
          *  can't flood a single pick with more candidates than the deadline can score, while
          *  successive picks still cover different slices of the row. */

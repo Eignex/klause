@@ -35,7 +35,7 @@ internal object RedundantConstraints {
      * Subsumption entry point. On the fresh path (no [incremental]) it recomputes from scratch. Given a
      * [SubsumeIncremental] it maintains the phase-1/2 indices across rounds in [SubsumeIncremental.memo],
      * reprocessing only the factors added / dropped since the pass last ran — the whole-set rescan of a
-     * fruitless re-run (the ma-path-finding #937 cost) becomes O(delta). Phases 3–5 run over the phase-2
+     * fruitless re-run becomes O(delta). Phases 3–5 run over the phase-2
      * survivor list either way.
      */
     fun removeRedundantConstraints(
@@ -66,7 +66,7 @@ internal object RedundantConstraints {
     }
 
     /**
-     * Constraint subsumption / redundant-constraint removal (#447): drop a constraint implied by
+     * Constraint subsumption / redundant-constraint removal: drop a constraint implied by
      * another retained one, preserving the feasible set exactly. Two mechanisms:
      *
      *  1. **Exact duplicates** — any factor whose [Factor.structuralKey] equals an earlier kept one is
@@ -77,7 +77,7 @@ internal object RedundantConstraints {
      *     a reduced coefficient vector are comparable: the tightest (smallest `≤` bound) implies the
      *     rest, so only it is kept. An `=` over the same vector contributes its bound to *both*
      *     directions and implies (drops) any looser `≤` / `≥`, but is itself never dropped here.
-     *  3. **Variable-subset / proportional domination** ([dropSubsetDominated], #466) — a `≤`-row whose
+     *  3. **Variable-subset / proportional domination** ([dropSubsetDominated]) — a `≤`-row whose
      *     support is a strict subset of another's, with coefficients a positive multiple of it on the
      *     shared variables and a bound that implies the larger row's (after charging the extra terms
      *     their maximal activity), drops the larger row across *different* supports.
@@ -166,11 +166,11 @@ internal object RedundantConstraints {
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta {
         val factors = problem.factors
-        // Phase 3: variable-subset / proportional domination across different supports (#466).
+        // Phase 3: variable-subset / proportional domination across different supports.
         val out3 = dropSubsetDominated(problem, out, cancellation)
-        // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques (#527).
+        // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques.
         val out4 = dropCliqueImpliedKnapsacks(out3)
-        // Phase 5: drop globals the current domains make vacuously satisfied (#553); removing one frees
+        // Phase 5: drop globals the current domains make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
         val out5 = out4.filterNot { isVacuousGlobal(it, problem.intDomains) }
         if (out5.size == factors.size) return PassDelta()
@@ -417,7 +417,7 @@ internal object RedundantConstraints {
     }
 
     /** Whether [factor] is a global constraint that the current [domains] make *vacuously* satisfied —
-     *  it can never prune, so dropping it preserves the feasible set exactly (#553). Currently detects
+     *  it can never prune, so dropping it preserves the feasible set exactly. Currently detects
      *  an [AllDifferent] whose variables have pairwise-disjoint domains (no two can ever be equal, so
      *  distinctness always holds — for the plain, opt, and `_except` variants alike, since absence and
      *  excepted values only relax the constraint). Disjointness is tested on the `[min, max]` intervals
@@ -472,7 +472,7 @@ internal object RedundantConstraints {
     }
 
     /**
-     * Variable-subset / proportional constraint domination (#466). Drop a `≤`-row `B` when another
+     * Variable-subset / proportional constraint domination. Drop a `≤`-row `B` when another
      * `≤`-row `A` has a support that is a strict subset of `B`'s with coefficients a positive integer
      * multiple `k` of `B`'s on the shared variables, and `k·boundA + maxActivity(B-only terms) ≤
      * boundB`. Then `A ⟹ B`: from `Σ_S a·x ≤ boundA` we get `Σ_S k·a·x ≤ k·boundA`, and adding the
@@ -555,7 +555,7 @@ internal object RedundantConstraints {
     }
 
     /**
-     * Clique-aware redundancy (#527). An at-most-one (AMO) clique over a set of literals — at most one
+     * Clique-aware redundancy. An at-most-one (AMO) clique over a set of literals — at most one
      * is satisfied — caps the contribution of those literals to a `≤` pseudo-Boolean knapsack at the
      * single largest weight. So if covering a knapsack `Σ wⱼ·lⱼ ≤ b` (positive weights) with the
      * model's AMO cliques brings its clique-aware maximal activity to `≤ b`, the knapsack holds for
@@ -632,7 +632,7 @@ internal object RedundantConstraints {
      * and a Boolean constraint never share a bucket with no extra discriminator. A `≥` folds to `≤` by
      * negating, an `=` carries its opposite direction. `null` for a `≠` row or a pure clause
      * `Σ literals ≥ 1` — the clause is kept out of the buckets so a clause-heavy SAT model stays a
-     * phase-2 no-op (clause subsumption is BVE's job, #24).
+     * phase-2 no-op (clause subsumption is BVE's job).
      */
     private fun rowForm(row: LinearRow): IneqForm? {
         if (isPureClause(row)) return null
@@ -663,7 +663,7 @@ internal object RedundantConstraints {
 
     /** A `≤`-form `Σ coeffs·refs ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and `2x+2y ≤ 4`)
      *  share a bucket even when [CoefficientStrengthening.strengthenCoefficients] hasn't normalised them
-     *  first (#466). Dividing by the coefficient GCD `g` and flooring the bound is exact: the left side is
+     *  first. Dividing by the coefficient GCD `g` and flooring the bound is exact: the left side is
      *  a multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`. */
     private fun reducedIneq(refs: IntArray, coeffs: LongArray, bound: Long, fromEq: Boolean): IneqForm {
         val g = PresolveShared.gcdOf(coeffs)
@@ -676,7 +676,7 @@ internal object RedundantConstraints {
 
     /** A `≤`-normal-form bucket key: the `(ref, coeff)` pairs sorted by ref. Disjoint integer/Boolean ref
      *  tags keep the two constraint kinds apart, and a literal's polarity is baked into its ref, so `x`
-     *  and `¬x` never share a term (#465). */
+     *  and `¬x` never share a term. */
     private data class TermKey(val terms: List<Long>)
 
     private fun refKey(refs: IntArray, coeffs: LongArray): TermKey {

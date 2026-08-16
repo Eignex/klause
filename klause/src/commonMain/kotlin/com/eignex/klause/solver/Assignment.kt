@@ -66,7 +66,7 @@ data class Sample(
     /** Integer values indexed by int var id. May exceed 32-bit range. */
     val ints: LongArray,
     /** Values of the LP-only continuous (real) variables, indexed by real var id; empty for the
-     *  integer/Boolean core. Populated at a search leaf from the residual LP solution (issue #1232), so a
+     *  integer/Boolean core. Populated at a search leaf from the residual LP solution, so a
      *  hybrid MIP/CP solution carries its continuous part. */
     val reals: DoubleArray = EmptyDoubleArray,
 ) {

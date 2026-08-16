@@ -19,7 +19,7 @@ import com.eignex.klause.util.IntArrayList
 internal object CoefficientStrengthening {
 
     /**
-     * GCD coefficient strengthening (#319) for [Linear] and [PseudoBoolean] constraints. If the
+     * GCD coefficient strengthening for [Linear] and [PseudoBoolean] constraints. If the
      * coefficients of an integer linear (or pseudo-Boolean) constraint share a common divisor
      * `g > 1`, dividing through by `g` shrinks the coefficients and, because the left-hand side
      * is then a multiple of `g`, lets the bound be tightened by flooring/ceiling:
@@ -161,7 +161,7 @@ internal object CoefficientStrengthening {
     }
 
     /**
-     * Coefficient lifting (#365 / #372) for an inequality [Linear] over bounded-integer variables
+     * Coefficient lifting for an inequality [Linear] over bounded-integer variables
      * `xⱼ ∈ [lⱼ, uⱼ]` — the MIP coefficient-tightening of Savelsbergh / Achterberg, which
      * generalises the 0/1 cover-dual clamp of [liftKnapsack] to `uⱼ > 1`.
      *
@@ -193,7 +193,7 @@ internal object CoefficientStrengthening {
     }
 
     private fun liftLinearExact(l: Linear, domains: Array<IntDomain>): Factor? {
-        // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound (#365).
+        // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound.
         val coeffs: LongArray
         val bound: Long
         when (l.op) {
@@ -277,13 +277,13 @@ internal object CoefficientStrengthening {
     }
 
     /**
-     * Knapsack coefficient lifting (#333) for a `≤` pseudo-Boolean `Σ wⱼ lⱼ ≤ b`. After normalising
+     * Knapsack coefficient lifting for a `≤` pseudo-Boolean `Σ wⱼ lⱼ ≤ b`. After normalising
      * to positive weights (a negative `wⱼ` becomes `|wⱼ|·¬lⱼ` with the bound raised by `|wⱼ|`), the
      * dual `Σ wⱼ(1−lⱼ) ≥ d` with `d = Σwⱼ − b` is a cover: any weight exceeding `d` contributes no
      * more than `d` to covering it, so each `wⱼ` clamps to `min(wⱼ, d)` and the bound becomes
      * `Σ min(wⱼ,d) − d`. Exact (feasible-set-preserving), and it both shrinks coefficients and
      * tightens the relaxation beyond what GCD reduction reaches. `d ≤ 0` ⟹ the constraint is always
-     * satisfied (dropped). A `≥` constraint is first complemented to `≤` (#365); an `=` constraint
+     * satisfied (dropped). A `≥` constraint is first complemented to `≤`; an `=` constraint
      * can't be lifted by clamping (it ties both directions) and is left untouched, as are
      * out-of-Int-range slacks.
      */

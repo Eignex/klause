@@ -15,7 +15,7 @@ import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * Contextual-bandit variable heuristic (issue #8): a kumulant [RegressionContextualBandit]
+ * Contextual-bandit variable heuristic: a kumulant [RegressionContextualBandit]
  * (LinUCB over a Bayesian linear-regression posterior) learns, **per session**, a value function
  * over per-variable branching features and picks the unassigned variable with the highest LinUCB
  * score. It is a learned generalisation of the hand-tuned heuristics: where [Vsids] attributes
@@ -57,7 +57,7 @@ class RegressionVariableSelector private constructor(
     // heuristic). Slot-indexed: bool var v → v, int var v → numBoolVars + v. Allocated lazily on
     // the first pick (problem size isn't known at construction). With these as features the linear
     // model can express VSIDS (weight on activity) and LastConflict (weight on recency) as well as
-    // fail-first, so it can learn the right family per instance (#8).
+    // fail-first, so it can learn the right family per instance.
     private var activity: DoubleArray? = null
     private var lastConflict: LongArray? = null
     private var numBoolVars: Int = 0

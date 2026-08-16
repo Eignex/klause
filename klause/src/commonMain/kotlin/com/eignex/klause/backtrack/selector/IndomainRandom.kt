@@ -47,7 +47,7 @@ object IndomainRandom : ValueSelector {
                     // Lazy Fisher-Yates over domain indices: emit a uniform random permutation
                     // doing O(consumed) work, not O(n). Branch nodes typically read only the first
                     // value (IntNode bound-splits around it), so eagerly shuffling a large domain
-                    // was almost pure waste — it dominated large-domain CSP profiles (e.g. gbac at
+                    // is almost pure waste — it dominates large-domain CSP profiles (e.g. gbac at
                     // ~77%). `swap` records only the touched index slots (≈ O(consumed)).
                     val swap = MutableIntIntMap()
                     for (k in 0 until n) {

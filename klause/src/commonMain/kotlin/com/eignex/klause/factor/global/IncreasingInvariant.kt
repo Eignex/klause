@@ -9,7 +9,7 @@ import com.eignex.klause.localsearch.MoveSink
 /**
  * LS invariant for [Increasing]. Violation degree is the summed overshoot `Σ max(0, xs(i)+gap −
  * xs(i+1))`, so a move that flattens a steep inversion scores a real improvement. The repair
- * neighbourhood is the point of keeping the chain whole (#896): besides local snaps at the first
+ * neighbourhood is the point of keeping the chain whole: besides local snaps at the first
  * inversion, it offers two *cascading* compounds that re-monotonise the entire chain in one move —
  * pushing the suffix up or the prefix down — which single-variable moves on a decomposition cannot
  * express.

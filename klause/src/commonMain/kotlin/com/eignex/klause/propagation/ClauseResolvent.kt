@@ -32,7 +32,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     private var seen = EmptyBooleanArray
 
     // Variables already resolved out as a pivot this analysis. Order literals established on the
-    // current path carry a real trail position (#708) and resolve in reverse-assignment order like
+    // current path carry a real trail position and resolve in reverse-assignment order like
     // bools, but one materialised *mid-analysis* (an opposing bound a reason cites, never woken) has
     // no trail position and its derived antecedents can present a same-level cycle (A's reason
     // mentions B and vice-versa). Once a var has been resolved we must never re-ingest it, or the
@@ -41,8 +41,8 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     private var resolved = EmptyBooleanArray
 
     // Variables encountered (resolved through or kept) during the most recent analysis —
-    // the canonical CDCL VSIDS bump set (MiniSAT/Glucose bump every var seen while walking
-    // the implication graph, not just the decision vars at the conflict levels). Recorded
+    // the canonical CDCL VSIDS bump set (every var seen while walking the implication
+    // graph, not just the decision vars at the conflict levels). Recorded
     // as a side effect of [resolve]; bool-var ids in [bumpBoolVars], underlying int-var
     // ids (decoded from touched atoms) in [bumpIntVars]. Reused across analyses to avoid
     // per-conflict allocation; the engine reads them after [analyze] when a clause is learned.
@@ -169,7 +169,7 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
             val lvl = graph.levelOf(v)
             if (lvl <= 0) continue
             seen[v] = true
-            // Record for the VSIDS bump set (every conflict-side var, MiniSAT-style).
+            // Record for the VSIDS bump set (every conflict-side var).
             if (v < numBoolVars) {
                 bumpBoolVars.add(v)
             } else {
@@ -219,8 +219,8 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         val levels = distinctLevelsOf(minimized)
         // A proper 1UIP clause carries exactly one literal at the conflict level; that lone
         // literal becomes the unit-asserting literal after the backjump. A conflict that genuinely
-        // rests on several literals at the conflict level (rare since order literals became
-        // trail-resident, #708) leaves more than one — such a clause is not unit after any
+        // rests on several literals at the conflict level (rare while order literals are
+        // trail-resident) leaves more than one — such a clause is not unit after any
         // backjump, so the engine must not try to assert it.
         var atConflictLevel = 0
         for (i in 0 until minimized.size) {

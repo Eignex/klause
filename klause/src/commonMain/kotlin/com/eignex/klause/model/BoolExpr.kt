@@ -596,9 +596,6 @@ data class PseudoBooleanExpr(
     }
 }
 
-// -----------------------------------------------------------------------------------
-//  Set variables
-// -----------------------------------------------------------------------------------
 // Set variables ship as a `(universe, indicator-bool array)` pair. The compiler allocates
 // one Boolean variable per universe element; the schema-level [SetSpec] carries the
 // universe so callers can later materialise unions / intersections / set literals over the

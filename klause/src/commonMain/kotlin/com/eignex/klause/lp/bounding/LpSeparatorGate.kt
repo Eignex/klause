@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.bounding
 
 /**
- * Per-technique cut-separator activity gate (#59), the per-family analogue of the whole-simplex
+ * Per-technique cut-separator activity gate, the per-family analogue of the whole-simplex
  * [LpEffortLadder]. The ladder demotes the entire [LpEffort.CUTS] rung when during-search separation as a
  * whole stops paying; this gate instead attributes reward to **each** separator family independently, so a
  * single unhelpful family (an AllDifferent Hall cut, a knapsack cover, the implied-bound or flow-cover

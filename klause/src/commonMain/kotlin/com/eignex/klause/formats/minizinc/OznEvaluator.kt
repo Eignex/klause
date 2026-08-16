@@ -4,12 +4,10 @@ import kotlin.math.abs
 
 /** Evaluates `.ozn` expressions against solver bindings and renders output text. */
 internal class OznEvaluator(items: List<OznItem>) {
-    /** Top-level variable declarations by name. */
     private val decls: Map<String, OznItem.VarDecl> = items
         .filterIsInstance<OznItem.VarDecl>()
         .associateBy { it.name }
 
-    /** The unique output item, if present. */
     private val output: OznItem.Output? = items.filterIsInstance<OznItem.Output>().singleOrNull()
 
     fun render(bindings: Map<String, OznValue>): String {
@@ -31,7 +29,6 @@ internal class OznEvaluator(items: List<OznItem>) {
         return sb.toString()
     }
 
-    /** Evaluation frame containing bindings and local scope. */
     private class Context(val bindings: Map<String, OznValue>, val locals: HashMap<String, OznValue>)
 
     private fun resolveDecl(decl: OznItem.VarDecl, ctx: Context): OznValue? {
@@ -462,7 +459,7 @@ internal sealed interface OznValue {
     data class Array3dV(val elements: List<OznValue>, val r1: RangeV, val r2: RangeV, val r3: RangeV) : OznValue
 }
 
-/** Render a value as it appears inside `show()` — MZN's textual form. */
+// Render a value as it appears inside `show()` — MZN's textual form.
 private fun stringifyForShow(v: OznValue): String = when (v) {
     is OznValue.IntV -> v.value.toString()
 
@@ -506,7 +503,7 @@ private fun stringify3d(v: OznValue): String {
     return a.elements.joinToString(", ", "[", "]") { stringifyForShow(it) }
 }
 
-/** Render a value in top-level `output [...]` context. */
+// Render a value in top-level `output [...]` context.
 private fun stringifyForOutput(v: OznValue): String = when (v) {
     is OznValue.StringV -> v.value
     is OznValue.ArrayV -> v.elements.joinToString("") { stringifyForOutput(it) }

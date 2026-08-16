@@ -10,7 +10,7 @@ import kotlin.random.Random
  * log-product of remaining domain sizes. **Larger residual product = more solutions still
  * supported = try first** (the dual ordering of [Impact]).
  *
- * The Pesant intuition is that values which leave the constraint network *richer* are more
+ * The intuition is that values which leave the constraint network *richer* are more
  * likely to be on a path to a solution; values which immediately collapse domains are more
  * likely to lead to a dead-end. Same probing machinery and infeasible-value drop as
  * [Impact], with sorting reversed. Both compose with `LastConflict` and any variable

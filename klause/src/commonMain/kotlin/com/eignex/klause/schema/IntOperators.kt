@@ -137,7 +137,7 @@ private fun scale(coeff: Int, expr: IntExpr): IntExpr {
 }
 
 /** Narrow a constant-fold result to `Int`, failing loudly on overflow rather than wrapping
- *  a wide product into a garbage literal/coefficient (issue #73). */
+ *  a wide product into a garbage literal/coefficient. */
 private fun checkedIntFold(value: Long, what: () -> String): Int {
     require(value in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
         "Int expression overflows Int: ${what()} = $value"

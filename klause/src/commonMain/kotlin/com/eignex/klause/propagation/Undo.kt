@@ -172,8 +172,8 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     // Restore atom truths recorded since the mark (the reversible atom trail): replay top-down so
     // an atom whose truth changed several times since the mark lands on its mark-time value. This
     // is the atoms' own assignment trail — an atom-lit forced directly by a channeling / learned
-    // clause (pinAtomLit) is undone here even when its bound never moved, which the former
-    // domain-driven reconcile could not do. Independent of the int/bool cells above (disjoint
+    // clause (pinAtomLit) is undone here even when its bound never moved, which a domain-driven
+    // reconcile could not do. Independent of the int/bool cells above (disjoint
     // state), so the replay order between the two groups is immaterial.
     var a = atoms.undoAtomId.size - 1
     while (a >= mark.atomUndoSize) {

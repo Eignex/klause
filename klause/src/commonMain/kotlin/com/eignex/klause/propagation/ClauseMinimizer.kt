@@ -23,7 +23,7 @@ internal interface ReasonGraph {
 }
 
 /**
- * Learned-clause minimization: self-subsuming resolution ([minimize]) followed by Glucose-style
+ * Learned-clause minimization: self-subsuming resolution ([minimize]) followed by
  * binary-resolution minimization ([binaryMinimize]), applied by [ConflictAnalyzer] to every 1UIP
  * clause before it is emitted. Clause in, shorter implied clause out — dropping a redundant
  * literal always yields a strictly stronger clause, so the result stays an implied, asserting
@@ -67,8 +67,8 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
      * [isRedundant], which walks antecedents recursively with a per-call cache to keep
      * the cost linear in the implication graph reached.
      *
-     * Standard CDCL polish (MiniSAT, Glucose). Shrinks learned clauses by 10-30% on
-     * typical SAT-style instances, with knock-on improvements to watcher-list traversal
+     * Standard CDCL polish. Shrinks learned clauses by 10-30% on typical
+     * SAT-style instances, with knock-on improvements to watcher-list traversal
      * cost during future propagation.
      */
     private fun minimize(learned: IntArrayList, currentLevel: Int): IntArrayList {
@@ -105,9 +105,9 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
     }
 
     /**
-     * Binary-resolution minimization (#202) — Glucose's "minimisation with binary clauses",
-     * run as a second stage after [minimize]. For the kept asserting (UIP) literal `u`, every
-     * binary clause `(u ∨ x)` lets us drop the clause literal `¬x` by one resolution step:
+     * Binary-resolution minimization, run as a second stage after [minimize]. For the kept
+     * asserting (UIP) literal `u`, every binary clause `(u ∨ x)` lets us drop the clause literal
+     * `¬x` by one resolution step:
      *   `C ⊗ (u ∨ x)` on `var(x)` = `(C \ {¬x}) ∪ {u}` = `C \ {¬x}`   (since `u ∈ C`).
      * Because every removal is justified by the single, never-removed UIP literal, the
      * removals can't interact, so the result stays an implied, asserting clause however many
@@ -182,8 +182,8 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             cache.put(root, 0)
             return false
         }
-        // Iterative post-order DFS over the implication graph, replacing the former recursion
-        // (which overflowed the stack on deep graphs — #118). The stack holds the root-to-current
+        // Iterative post-order DFS over the implication graph — recursion overflows the call
+        // stack on deep graphs. The stack holds the root-to-current
         // path; a node is redundant iff all its antecedents are redundant / in-clause / level-0.
         redVarStack.clear()
         redIdxStack.clear()

@@ -41,7 +41,7 @@ internal class IntIntMap private constructor(private val backing: Backing, priva
             }
             // Widen before subtracting: `hi - lo` in Int overflows for spans ≥ 2^31 (e.g. keys
             // straddling Int.MIN_VALUE / Int.MAX_VALUE), yielding a bogus tiny range and a dense
-            // backing sized to garbage (#104).
+            // backing sized to garbage.
             val range = hi.toLong() - lo.toLong() + 1
             return if (range <= denseThreshold.toLong() * keys.size) {
                 val arr = IntArray(range.toInt()) { absent }

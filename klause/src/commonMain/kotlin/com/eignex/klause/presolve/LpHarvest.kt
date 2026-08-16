@@ -19,7 +19,7 @@ import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.SolveStatsSink
 
 /**
- * Fold the LP relaxation's proven domain tightenings into [problem] permanently (#10) — the
+ * Fold the LP relaxation's proven domain tightenings into [problem] permanently — the
  * relaxation-harvest idea in the one place it pays off in klause. Two harvests share the one root-LP
  * build:
  *  - [LpEngine.shaveVariableBounds] proves, by LP + propagation infeasibility, that some integer

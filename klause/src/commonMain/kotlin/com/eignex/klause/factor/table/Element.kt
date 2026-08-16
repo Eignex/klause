@@ -108,7 +108,7 @@ class Element private constructor(
         words(arrKey())
     }
 
-    // No remapValues override (value symmetry stays blocked when an Element is present, #536): the
+    // No remapValues override (value symmetry stays blocked when an Element is present): the
     // value-symmetry verifier relabels a factor's value *constants* and compares keys, but `idx` is a
     // *variable* whose value selects which constant is read. A swap of two idx positions leaves the
     // constant array unchanged, so the verifier would (wrongly) accept it as a value symmetry. Since

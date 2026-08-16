@@ -43,7 +43,7 @@ internal fun IntComb.isConstant(): Boolean = when (this) {
 /**
  * Sum of [combs], with every element after the first negated when [negateTail] (the n-ary `-` fold).
  * One mutable accumulator instead of a per-operand map copy, so a wide sum costs linear work in its
- * operand count — the miplib-style set-covering constraints sum tens of thousands of terms (#1432).
+ * operand count — the miplib-style set-covering constraints sum tens of thousands of terms.
  * A `Long` overflow anywhere re-runs the whole sum in arbitrary precision.
  */
 internal fun sumIntCombs(combs: List<IntComb>, negateTail: Boolean = false): IntComb {

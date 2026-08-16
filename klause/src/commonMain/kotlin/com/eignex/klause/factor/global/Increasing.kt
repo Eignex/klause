@@ -23,7 +23,7 @@ import com.eignex.klause.util.EmptyIntArray
  * represents the ascending orientation.
  *
  * Deduction is a Berge-acyclic chain, so the propagator's pairwise bounds sweep already achieves full
- * bounds-consistency — no global algorithm is stronger (#896). Keeping it one factor (rather than
+ * bounds-consistency — no global algorithm is stronger. Keeping it one factor (rather than
  * decomposing to pairwise [com.eignex.klause.factor.arithmetic.Linear]) buys the local-search
  * invariant, which re-monotonises the whole chain in one cascading step. The exact pairwise rows in
  * [linearRows] are still surfaced to presolve and, via the [Factor.linearize] default, to the LP

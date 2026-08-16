@@ -42,10 +42,10 @@ class PropagationSession(
     private val cancellation: Cancellation = Cancellation.Never,
     /** Per-call fire floor before the deadline poll engages; see [PROPAGATION_CANCEL_FLOOR]. */
     propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
-    /** Opt into the native-SAT BCP lane for an eligible pure-Boolean problem (#1119 Phase 1);
+    /** Opt into the native-SAT BCP lane for an eligible pure-Boolean problem;
      *  ignored when the problem has integer variables or non-clause factors. */
     nativeSat: Boolean = false,
-    /** Opt into pseudo-Boolean cutting-planes conflict learning (#1119 Phase 3); ignored on problems
+    /** Opt into pseudo-Boolean cutting-planes conflict learning; ignored on problems
      *  with integer variables. */
     pbLearning: Boolean = false,
 ) {
@@ -81,8 +81,8 @@ class PropagationSession(
         levelTop = 1
     }
 
-    // Decision pins, primitive-encoded to avoid the boxing the old LinkedHashMap<Int,*> and
-    // ArrayDeque<Pair> paid on every push. [boolPinned] holds -1 (free) / 0 (false) / 1
+    // Decision pins, primitive-encoded to keep a push allocation- and boxing-free.
+    // [boolPinned] holds -1 (free) / 0 (false) / 1
     // (true) per bool var; [intPinnedSet] + [intPinnedVal] hold the int decisions. Only
     // *decision* pins live here — propagation-implied facts are read from [state]. [trail]
     // is the decision stack used as a LIFO, each entry encoded as `v` (bool) or
@@ -108,7 +108,7 @@ class PropagationSession(
     }
 
     /** Literal `x_v ≥ threshold` ([positive]) or its negation — for LP/energetic explanation
-     *  clauses (#247), whose reason atoms are absolute variable bounds. */
+     *  clauses, whose reason atoms are absolute variable bounds. */
     fun boundGeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarGe(v, threshold), positive)
 
     /** Literal `x_v ≤ threshold` ([positive]) or its negation. See [boundGeLit]. */
@@ -313,7 +313,7 @@ class PropagationSession(
         registerAndPropagate(base = state.undoTop) { state.addLearnedClause(clause, lbd, permanent) }
 
     /**
-     * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` (#1119 Phase 3) and
+     * Register a learned pseudo-Boolean constraint `Σ weightsᵢ·literalsᵢ ≥ degree` and
      * immediately propagate it, exactly as [addLearnedClause] does for a clause. Used by the engine's
      * cutting-planes backjump to make the learned PB constraint stick and force its asserting literal.
      */
@@ -361,7 +361,7 @@ class PropagationSession(
 
     /**
      * Apply a domain reduction inferred at the **current** decision level — for LP reduced-cost
-     * fixing (#21). Like [addLearnedClause] and unlike the `pin*` decisions, this opens **no** new
+     * fixing. Like [addLearnedClause] and unlike the `pin*` decisions, this opens **no** new
      * level: the tightening is folded into the current level's baseline (re-snapshotted mark), so
      * [popLast] of that level undoes it. That is exactly right for a subtree-local inference, which
      * is valid only under this node's bounds and the current incumbent and must vanish on backtrack.
@@ -381,8 +381,8 @@ class PropagationSession(
 
     /**
      * Like [implyIntAtLeast]/[implyIntAtMost], but records [reason] as the antecedent of the new bound
-     * atom so conflict analysis can resolve *through* the tightening instead of treating it as a leaf
-     * (#281/#282). [reason] is a set of currently-false literals — the negated seated bounds whose
+     * atom so conflict analysis can resolve *through* the tightening instead of treating it as a leaf.
+     * [reason] is a set of currently-false literals — the negated seated bounds whose
      * conjunction (with the always-valid constraints) implies the bound — so the implicit reason clause
      * `(new bound atom) ∨ reason` is globally valid. The antecedent is journaled and undone on
      * backtrack like any other; the tightening itself still folds into the current level.
@@ -416,7 +416,7 @@ class PropagationSession(
     fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
 
     /** Run 1UIP conflict analysis from an externally supplied all-false conflict clause (e.g. an LP
-     *  Farkas certificate, #280) to obtain a learned clause and backjump level. See
+     *  Farkas certificate) to obtain a learned clause and backjump level. See
      *  [ConflictAnalyzer.analyzeConflictClause]. */
     internal fun analyzeConflictClause(conflictClause: IntArray): ConflictAnalyzer.AnalysisResult =
         state.conflictAnalyzer.analyzeConflictClause(conflictClause)
@@ -435,10 +435,10 @@ class PropagationSession(
     /** True iff learned clause [learnedIndex] survives every forgetting pass. */
     fun learnedClausePermanent(learnedIndex: Int): Boolean = state.learnedClausePermanent(learnedIndex)
 
-    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass (#203) and the
+    /** The learned clause at [learnedIndex]. Read by the engine's vivification pass and the
      *  glue-clause export, both clause-only. Fails loudly on a non-clause learned constraint rather than
-     *  through a bare cast: when PB learning lands (#1119) those passes must gain a clause filter, and this
-     *  message points at the site that needs it instead of surfacing an opaque ClassCastException. */
+     *  through a bare cast, so a pseudo-Boolean nogood reaching a clause-only pass names the site that
+     *  needs a clause filter instead of surfacing an opaque ClassCastException. */
     internal fun learnedClauseAt(learnedIndex: Int): ClausePropagator =
         state.learnedClauses[learnedIndex] as? ClausePropagator
             ?: error(
@@ -456,7 +456,7 @@ class PropagationSession(
     internal fun isLearnedClause(learnedIndex: Int): Boolean =
         state.nativeEngine != null || state.learnedClauses[learnedIndex] is ClausePropagator
 
-    /** Three-tier (#201) DB tier of learned clause [learnedIndex]. */
+    /** Three-tier DB tier of learned clause [learnedIndex]. */
     internal fun learnedClauseTier(learnedIndex: Int): ClauseTier = state.learnedClauseTier(learnedIndex)
 
     /** Set the three-tier DB tier of learned clause [learnedIndex]. */
@@ -483,7 +483,7 @@ class PropagationSession(
             // (assertObjectiveBound) and blocking nogoods — not globally-valid resolvents. A caller
             // learning under assumptions/incumbent (LNS repair) must skip them or it poisons peers.
             if (skipPermanent && learnedClausePermanent(i)) continue
-            if (!isLearnedClause(i)) continue // pseudo-Boolean nogoods aren't clause-portable (#1119)
+            if (!isLearnedClause(i)) continue // pseudo-Boolean nogoods aren't clause-portable
             val lbd = learnedClauseLbd(i)
             if (lbd > maxLbd) continue
             val lits = learnedClauseLiterals(i)
@@ -719,10 +719,9 @@ class PropagationSession(
     /**
      * Newly-implied facts of a push (its "diff"): the variables mutated since undo position
      * [base] that are now *determined* (bool assigned / int domain singleton) and aren't
-     * themselves decision pins. This is exactly the set the old `computeImplied` +
-     * `diffAgainst` produced, but read straight off the state's undo log in O(changes)
-     * rather than scanning every variable. Keys come out sorted ascending (matching the old
-     * ascending-id build), as [PropagationResult.Implied]'s binary-search lookups require.
+     * themselves decision pins. Read straight off the state's undo log in O(changes) rather
+     * than scanning every variable. Keys come out sorted ascending, as
+     * [PropagationResult.Implied]'s binary-search lookups require.
      */
     private fun impliedSince(base: Int): PropagationResult.Implied {
         val top = state.undoTop

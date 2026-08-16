@@ -13,8 +13,8 @@ import com.eignex.klause.solver.result.MinimizeResult
 
 /** Outcome of a single-solver evaluation. COP: [feasible] with [objective] (minimised orientation) and
  *  whether optimality was [proven]. CSP: [feasible] (SAT) with [firstFeasibleMs] (time to the witness,
- *  the CSP metric), or [proven] = a proven UNSAT. The BO (#24) turns this into a reward per problem
- *  kind — gap-to-optimum for COP (with the reference table #26), time-to-first-feasible for CSP. */
+ *  the CSP metric), or [proven] = a proven UNSAT. The BO turns this into a reward per problem
+ *  kind — gap-to-optimum for COP (against the reference table), time-to-first-feasible for CSP. */
 internal data class EvalResult(
     val feasible: Boolean,
     val objective: Double?,
@@ -23,7 +23,7 @@ internal data class EvalResult(
 )
 
 /**
- * In-process single-solver evaluation for the BO config search (#22). Runs one config DIRECTLY on the
+ * In-process single-solver evaluation for the BO config search. Runs one config DIRECTLY on the
  * engine — [LocalSearchSolver] / [BacktrackSolver] — never through the portfolio, so the measurement is
  * a genuine single solver (no bandit warmup / segment / re-seed artifacts) and every knob is set in
  * Kotlin (no CLI `--param` exposure needed; the CLI stays portfolio-only). A COP instance (with an

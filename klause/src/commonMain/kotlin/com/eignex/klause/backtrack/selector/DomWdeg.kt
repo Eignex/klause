@@ -9,9 +9,10 @@ import kotlin.random.Random
 
 /**
  * Domain-over-weighted-degree (Boussemart-Hemery-Lecoutre-Sais 2004). Maintains a
- * per-factor *failure weight* that's bumped every time the factor participates in a
- * conflict — read off [PropagationResult.Unsat.conflictFactors], which carries the full
- * propagation-graph attribution shipped earlier. The variable score is then
+ * per-factor *failure weight* that's bumped every
+ * time the factor participates in a conflict — read off
+ * [PropagationResult.Unsat.conflictFactors], which carries the full propagation-graph
+ * attribution. The variable score is then
  *     wdeg(v) / dom(v)
  * where `wdeg(v) = Σ factor_weights[f]` over every factor mentioning `v`. Pick the
  * variable with the highest score; first-fail with a conflict-driven prior on which

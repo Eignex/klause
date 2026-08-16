@@ -8,7 +8,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Bounded variable elimination (BVE, Eén–Biere) over the pure-SAT part of the model (#24). A Boolean
+ * Bounded variable elimination (BVE, Eén–Biere) over the pure-SAT part of the model. A Boolean
  * variable `v` is eliminated by resolving every clause containing `v` against every clause containing
  * `¬v` and replacing all of them with the (non-tautological) resolvents — the projection of `v` out of
  * the clause set — but only when that does not increase the clause count (the *bounded* rule). A
@@ -18,7 +18,7 @@ import com.eignex.klause.util.IntHashSet
  * Operates on the shared [SatClauseDb], so a variable is eliminable only when [SatClauseDb.eligible] —
  * objective-free and appearing solely in clean all-Boolean clauses. The eliminated `v` is left
  * unconstrained in the reduced problem, so this is **not** solution-set preserving (a complete
- * enumerator over-counts, #507); its value is recovered from the removed clauses by [BveReconstruct].
+ * enumerator over-counts); its value is recovered from the removed clauses by [BveReconstruct].
  */
 internal object BoundedVariableElimination {
 
@@ -51,7 +51,6 @@ internal object BoundedVariableElimination {
         return db.toDelta(if (eliminations.isEmpty()) null else BveReconstruct(eliminations)::reconstruct)
     }
 
-    /** Try to eliminate [v] against the live clause database. */
     private fun eliminateVar(v: Int, db: SatClauseDb, eliminations: ArrayList<VarElim>) {
         val posSlots = IntArrayList()
         val negSlots = IntArrayList()

@@ -382,7 +382,7 @@ internal class LpBuilder {
     val varCount: Int get() = lo.size
 
     /** Number of rows added so far; valid row indices are `0 until rowCount`. Lets a caller record
-     *  which rows a given producer emitted (#564 relaxation cache). */
+     *  which rows a given producer emitted (the relaxation cache). */
     val rowCount: Int get() = rows.size
 
     /**

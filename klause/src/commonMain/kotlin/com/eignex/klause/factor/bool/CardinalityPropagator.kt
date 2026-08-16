@@ -102,7 +102,7 @@ internal class CardinalityPropagator(
 
     /**
      * Load the constraint into [acc] as a coefficient-carrying `≥` reason for cutting-planes conflict
-     * analysis (#1119 Phase 3). A cardinality is two unit-weight bounds; the relevant half is chosen by
+     * analysis. A cardinality is two unit-weight bounds; the relevant half is chosen by
      * [forcedLit] when resolving a pivot (forced-true own-literal ⇒ at-least side `Σ ℓ ≥ min`; forced-false
      * ⇒ at-most side `Σ ℓ ≤ max` ⇒ `Σ ¬ℓ ≥ n − max`). For a *seed* (`forcedLit == 0`, the conflicting
      * constraint) the violated side is detected from [state]: too many true literals ⇒ at-most, too few
@@ -284,8 +284,8 @@ internal class CardinalityPropagator(
     /**
      * Fallback scanner — O(n) per fire, used when the constraint shape can't be watched
      * (`min == n` "all must be true", `max == 0` "none can be true", or the trivial
-     * `min == 0 && max == n`). Kept verbatim from the pre-watched-literal implementation
-     * since these shapes typically have small or degenerate [literals].
+     * `min == 0 && max == n`). The plain scan suffices because these shapes typically have
+     * small or degenerate [literals].
      */
     private fun propagateScanning(state: PropagationState): Boolean {
         var trueCount = 0

@@ -56,9 +56,9 @@ data class SolveStats(
     val run: RunStats = RunStats(),
     /** Core tree-search counters (nodes, fails, restarts, propagations, learned clauses, depth). See [SearchStats]. */
     val search: SearchStats = SearchStats(),
-    /** Conflict-analysis gate breakdown (#588). See [ConflictAnalysisStats]. */
+    /** Conflict-analysis gate breakdown. See [ConflictAnalysisStats]. */
     val ca: ConflictAnalysisStats = ConflictAnalysisStats(),
-    /** LP-relaxation bounding counters (#20-#280). See [LpStats]. */
+    /** LP-relaxation bounding counters. See [LpStats]. */
     val lp: LpStats = LpStats(),
     /** Scheduling bound prunes (Lagrangian / energetic). See [SchedulingStats]. */
     val scheduling: SchedulingStats = SchedulingStats(),

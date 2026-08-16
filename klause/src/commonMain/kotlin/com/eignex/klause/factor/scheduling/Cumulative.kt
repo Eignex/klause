@@ -146,7 +146,7 @@ class Cumulative(
 
     /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all
      *  constants — durations/resources/capacity and the var/const split — so two non-equivalent
-     *  cumulatives never collide (#531). */
+     *  cumulatives never collide. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CUMULATIVE, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
@@ -204,8 +204,8 @@ class Cumulative(
 
     /** Whether every task's energy (`duration · resource`) and the capacity are compile-time
      *  constants, i.e. the only citable variables this factor reads are the start times. Lets
-     *  edge-finding emit a reason scoped to the active set Θ_τ (the standard Schutt edge-finding
-     *  explanation, which depends only on the in-window tasks' start bounds) instead of the
+     *  edge-finding emit a reason scoped to the active set Θ_τ (which depends only on the in-window
+     *  tasks' start bounds) instead of the
      *  constraint-wide all-starts reason; the energy / capacity premises a variable-arg instance
      *  would also need are vacuous here. The common RCPSP shape (`cumulative(starts, d, r, C)`). */
     val constantEnergyAndCap: Boolean =

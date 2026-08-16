@@ -23,8 +23,8 @@ class MoveSink(private var assumptions: Assumptions = Assumptions.None) {
     private val lane = LongArrayList(INITIAL_CAPACITY)
 
     /** Parallel value lane: `valueLane[i]` is the `IntSet` target value for `lane[i]` (unused for a
-     *  `BoolFlip`, padded 0). Kept apart from the key lane because a domain value now spans the full
-     *  [Long] range and no longer fits the packed key word. */
+     *  `BoolFlip`, padded 0). Kept apart from the key lane because a domain value spans the full
+     *  [Long] range and does not fit the packed key word. */
     private val valueLane = LongArrayList(INITIAL_CAPACITY)
 
     @Suppress("DoubleMutabilityForCollection") // lazily allocated on first compound move

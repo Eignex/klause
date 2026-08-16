@@ -8,7 +8,7 @@ package com.eignex.klause.lp.bounding
  */
 data class LpPlan(
     /**
-     * Native LP-relaxation bounding for branch-and-bound minimisation (#20). When true, scheduled
+     * Native LP-relaxation bounding for branch-and-bound minimisation. When true, scheduled
      * nodes solve an exact integer LP relaxation of the live problem and prune when the relaxation
      * is infeasible or its objective bound, rounded up to the next integer, is `≥` the incumbent.
      * This strictly dominates the cheap per-term lower bound (which still runs first as a fast
@@ -38,7 +38,7 @@ data class LpPlan(
      */
     val warmStart: Boolean = true,
     /**
-     * LP-guided branching (#246): when the per-node LP has solved (requires [bounding]), steer each
+     * LP-guided branching: when the per-node LP has solved (requires [bounding]), steer each
      * branch variable by its fresh fractional LP value — an int var splits `x ≤ floor(lp)` (the
      * dichotomy separating the fractional LP point), an integral value dives round-toward-LP. Pure
      * search-order guidance — it changes which solutions are found first, never the optimum or
@@ -47,7 +47,7 @@ data class LpPlan(
      */
     val branching: Boolean = false,
     /**
-     * LP-rounding primal heuristic (#287): before search, solve the root LP and try to round its
+     * LP-rounding primal heuristic: before search, solve the root LP and try to round its
      * fractional point into a feasible assignment by pinning each variable toward its LP value and
      * propagating. A complete conflict-free pass is a feasible incumbent (propagation enforces every
      * factor, so the result is sound by construction); it seeds the branch-and-bound bound so pruning
@@ -56,13 +56,13 @@ data class LpPlan(
      */
     val probe: Boolean = false,
     /**
-     * Cut generation (#22): at a scheduled node, after the LP solve, run separators that add valid
+     * Cut generation: at a scheduled node, after the LP solve, run separators that add valid
      * linear cuts the fractional LP point violates (AllDifferent Hall-set cuts, Gomory integrality
      * cuts), re-solving to tighten the bound. Requires [bounding]; off by default.
      */
     val cuts: Boolean = false,
     /**
-     * During-search cut separation depth (#41): when [cuts] holds, the structural separators also run
+     * During-search cut separation depth: when [cuts] holds, the structural separators also run
      * at search nodes whose decision level is at most this, not only at the root. Each such node, after
      * its LP solve, separates the violated cuts from its LP point and re-solves for a tighter bound;
      * globally-valid cuts join the persistent pool so descendants inherit them, while node-local cuts
@@ -86,7 +86,7 @@ data class LpPlan(
      */
     val mir: Boolean = true,
     /**
-     * Genuine subtour-elimination cuts for Circuit globals (#22). When true and [bounding] holds,
+     * Genuine subtour-elimination cuts for Circuit globals. When true and [bounding] holds,
      * each Circuit gets an arc-indicator relaxation (degree + channelling rows) and a max-flow
      * separator adds the directed cutset inequalities that fractional/subtour LP points violate.
      * Adds O(n²) columns per circuit (skipped above a node-count cap), so it is opt-in and off by
@@ -94,7 +94,7 @@ data class LpPlan(
      */
     val circuit: Boolean = false,
     /**
-     * Linearize constant-array Element globals with a one-hot selector model (#22). When true and
+     * Linearize constant-array Element globals with a one-hot selector model. When true and
      * [bounding] holds, each Element over a constant table gets selector columns and channelling
      * rows — its exact convex hull `result = Σ arr[p]·[idx=p]` — so the LP sees `result`'s dependence
      * on `idx`. Adds O(len) columns per Element (skipped above a length cap), so it is opt-in and off
@@ -102,7 +102,7 @@ data class LpPlan(
      */
     val element: Boolean = false,
     /**
-     * Linearize Table globals with their convex hull (#22). When true and [bounding] holds, each
+     * Linearize Table globals with their convex hull. When true and [bounding] holds, each
      * Table gets one selector column per allowed tuple with `Σ y_t = 1` and per-column channels
      * `xs[j] = Σ tuple_t[j]·y_t`, so the LP sees the exact convex hull of the allowed tuples. Adds
      * O(numTuples) columns per Table (skipped above a tuple-count cap), so it is opt-in and off by
@@ -110,13 +110,13 @@ data class LpPlan(
      */
     val table: Boolean = false,
     /**
-     * One-hot NValue value hull (#435). When true and [bounding] holds, each NValue contributes a
+     * One-hot NValue value hull. When true and [bounding] holds, each NValue contributes a
      * per-value "used"-indicator model so the distinct-count target gets an LP bound (a real lower
      * bound under minimisation). Sound by construction; off by default; a no-op when no NValue exists.
      */
     val nValue: Boolean = false,
     /**
-     * Regular DFA flow hull (#655). When true and [bounding] holds, each Regular contributes the
+     * Regular DFA flow hull. When true and [bounding] holds, each Regular contributes the
      * layer-expanded automaton flow model (arc vars + flow-conservation + channel rows) — the exact
      * convex hull of its accepting strings, so an objective over the sequence gets a tight LP bound.
      * Sound by construction; off by default; a no-op when no Regular exists or the unfolding exceeds
@@ -124,7 +124,7 @@ data class LpPlan(
      */
     val regular: Boolean = false,
     /**
-     * Mdd layered flow hull (#655). When true and [bounding] holds, each Mdd contributes the layered
+     * Mdd layered flow hull. When true and [bounding] holds, each Mdd contributes the layered
      * flow model (arc vars + flow-conservation + value channel + cost channel) — the exact convex hull
      * of its accepting paths, so an objective over the sequence (or a cost-MDD's cost var) gets a tight
      * LP bound. Sound by construction; off by default; a no-op when no Mdd exists or the unfolding
@@ -132,7 +132,7 @@ data class LpPlan(
      */
     val mdd: Boolean = false,
     /**
-     * Count-variable GlobalCardinality count hull (#655). When true and [bounding] holds, each
+     * Count-variable GlobalCardinality count hull. When true and [bounding] holds, each
      * count-variable GCC contributes a one-hot selector model (`Σ_v z_iv = 1`, channel
      * `Σ_v v·z_iv = xs(i)`, and `Σ_i z_{i,cover(k)} = counts(k)` per cover value) so a count variable
      * in the objective gets an exact LP bound. Sound by construction; off by default; a no-op when no
@@ -140,7 +140,7 @@ data class LpPlan(
      */
     val gccCount: Boolean = false,
     /**
-     * Objective-cone / precedence-only sub-relaxation (#571). When true and [bounding] holds, the
+     * Objective-cone / precedence-only sub-relaxation. When true and [bounding] holds, the
      * per-node LP is built over **only** the variables and rows transitively connected to the
      * objective, with every big-M [com.eignex.klause.factor.arithmetic.ReifiedLinear] disjunctive row
      * dropped — for scheduling, the critical-path / longest-path bound (precedence + objective). The
@@ -159,14 +159,14 @@ data class LpPlan(
      */
     val realResidual: Boolean = false,
     /**
-     * Whether the adaptive LP auto-off (#614) may **re-probe** a disabled per-node LP on exponential
+     * Whether the adaptive LP auto-off may **re-probe** a disabled per-node LP on exponential
      * backoff to recover subtrees where the relaxation becomes useful again. `true` is the adaptive
-     * default; `false` makes a disable irreversible — the static-one-shot behaviour of #562, kept as a
+     * default; `false` makes a disable irreversible — a static one-shot behaviour, kept as a
      * toggle for measuring the re-probe's value. No effect when [bounding] is off.
      */
     val autoOffReprobe: Boolean = true,
     /**
-     * Wall-clock budget for the one-shot pre-search root LP work (#31): the cut harvest, the root
+     * Wall-clock budget for the one-shot pre-search root LP work: the cut harvest, the root
      * relaxation-bound capture, and the LP-rounding [probe] all share one deadline so a pathological
      * root relaxation cannot consume the whole time budget before branch-and-bound gets its first node
      * (the liner-sf failure mode). The budget is [rootBudgetFraction] of the time remaining when search
@@ -203,7 +203,7 @@ data class LpPlan(
      */
     val lpWallBudgetMillis: Long = 5_000,
     /**
-     * Energetic makespan lower-bound row for the scheduling globals (#430). When true and
+     * Energetic makespan lower-bound row for the scheduling globals. When true and
      * [bounding] holds, each Cumulative / Disjunctive whose makespan variable `M` can be verified
      * (`M ≥ startᵢ + durᵢ` from the actual linear / array-max links) contributes one row
      * `capacity·M ≥ cap·t1 + Σ energy-after(t1)` — the energetic / area objective bound the
@@ -213,7 +213,7 @@ data class LpPlan(
      */
     val cumulative: Boolean = false,
     /**
-     * Diffn per-axis cumulative makespan bound (#655). When true and [bounding] holds, each
+     * Diffn per-axis cumulative makespan bound. When true and [bounding] holds, each
      * constant-size Diffn is projected onto both axes as a cumulative (capacity = the maximum
      * perpendicular extent) and contributes the same energetic makespan row as [cumulative] — a
      * sound lower bound on a strip-length / extent variable (its `t1 = min-est` case is the area bound
@@ -222,7 +222,7 @@ data class LpPlan(
      */
     val diffn: Boolean = false,
     /**
-     * Time-indexed LP reformulation of the scheduling globals (#453). When true and [bounding]
+     * Time-indexed LP reformulation of the scheduling globals. When true and [bounding]
      * holds, each Cumulative / Disjunctive over a bounded horizon gets binary `x_{i,t}` start
      * columns with assignment, start-channel and per-time-point resource rows — the resource–time
      * coupling the start-variable LP lacks, so the LP bound is far tighter than the energetic row
@@ -231,7 +231,7 @@ data class LpPlan(
      */
     val cumulativeTimeIndexed: Boolean = false,
     /**
-     * Preemptive min-cost-flow feasibility / makespan bound for the scheduling globals (#454). When
+     * Preemptive min-cost-flow feasibility / makespan bound for the scheduling globals. When
      * true, a node is pruned if the tasks' energy cannot be preemptively packed into their release /
      * deadline windows at capacity (an exact max-flow feasibility test, strictly stronger than the
      * pairwise-window [energeticReasoning] scan and horizon-independent — it keys off
@@ -244,7 +244,7 @@ data class LpPlan(
      *  pruning checks, mirroring [energeticEvery]. Must be positive. */
     val cumulativeFlowEvery: Int = 1,
     /**
-     * 0/1 multi-knapsack subgradient Lagrangian bounding (#632). When true and the objective is a
+     * 0/1 multi-knapsack subgradient Lagrangian bounding. When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound for
      * problems with several `PseudoBoolean` capacity rows: one capacity row is kept and solved **exactly**
      * by 0/1-knapsack DP while the rest are dualized, so the bound captures integrality the monolithic LP
@@ -260,7 +260,7 @@ data class LpPlan(
      */
     val componentSplit: Boolean = true,
     /**
-     * Subgradient Lagrangian bounding for structured globals (#23). When true and the objective is a
+     * Subgradient Lagrangian bounding for structured globals. When true and the objective is a
      * [com.eignex.klause.solver.objective.LinearObjective], a node also computes a Lagrangian bound from an
      * AllDifferent global (its variables solved exactly as a min-cost assignment, with the linear
      * constraints over them dualized) and prunes when that bound — rounded up — reaches the incumbent.
@@ -287,13 +287,13 @@ data class LpPlan(
      */
     val energeticEvery: Int = 1,
     /**
-     * Learn a clause from an infeasible node (#247). When true, an infeasibility proof is turned into
+     * Learn a clause from an infeasible node. When true, an infeasibility proof is turned into
      * a nogood over absolute variable-bound atoms — a globally valid clause implied by the original
      * constraints — and registered at the next restart (where its literals are no longer all-false),
      * so the dead region is pruned in sibling subtrees. Two sources: the node LP's Farkas
      * infeasibility certificate (requires [bounding]) and the energetic over-subscription window
      * (requires [energeticReasoning]). When the certificate resolves to an asserting
-     * 1UIP clause the engine backjumps and learns immediately (#280), so this now helps even with
+     * 1UIP clause the engine backjumps and learns immediately, so this helps even with
      * restarts off; non-asserting certificates still fall back to restart-time registration. A
      * certificate leaning on a live-big-M reified row cites the bounds that justify the M alongside its
      * column seats; one leaning on a node-local cut is not expressible as a globally valid bound-atom

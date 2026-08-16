@@ -3,7 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.Sample
 
 /**
- * Cross-engine solution flow (#644): pulls the best assignment any arm has published and hands it back
+ * Cross-engine solution flow: pulls the best assignment any arm has published and hands it back
  * only when it is *fresh* (not already imported) and strictly better than the caller's current best.
  * Identity-gated so an unchanged pool costs nothing; inert without a [supplier] or when [enabled] is
  * false — the run carries assumption pins a foreign full assignment could violate. The caller adopts the

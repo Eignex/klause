@@ -12,11 +12,10 @@ import com.eignex.klause.util.PermutationGroup
 import com.eignex.klause.util.toSortedIntArray
 
 /**
- * Whole-group symmetry handling as a single propagator-only factor (#896): it carries the verified
+ * Whole-group symmetry handling as a single propagator-only factor: it carries the verified
  * automorphism [generators] and defers all filtering to [SymmetryPropagator], which enforces every
- * generator's lex-leader at each search node. Replacing the static enumeration of one [Factor] per
- * group element with one factor that consults the generators dynamically keeps full-group coverage
- * without materialising hundreds of lex constraints.
+ * generator's lex-leader at each search node. Consulting the generators dynamically gives full-group
+ * coverage without materialising one lex [Factor] per group element.
  *
  * Each generator is a kind-preserving permutation given as `(intImage, boolImage)` over the current
  * variable ids (`intImage[i]` / `boolImage[b]` is the image of integer / Boolean variable `i` / `b`;
@@ -57,7 +56,7 @@ class SymmetryHandling(
     override fun asPropagator(): Propagator {
         // Expand the raw generators with stabiliser-chain Schreier generators (still genuine group
         // elements, so every lex-leader stays sound) for fuller group coverage than the generators
-        // alone — the dynamic, single-propagator replacement for a static lex closure.
+        // alone, without materialising a static lex closure.
         val unified = generators.map { toUnified(it) }
         val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, STRONG_GENERATOR_CAP)
         return SymmetryPropagator(strong.map { toSequence(it) }, strong, nInt)

@@ -34,7 +34,7 @@ import com.eignex.klause.util.MutableLongIntMap
  * validates.
  *
  * Propagation: count-bound tightening (definite/possible matchers per cover value) plus
- * Régin-style max-flow GAC. The flow has lower bounds on `cover_k → sink` (matching the
+ * max-flow GAC. The flow has lower bounds on `cover_k → sink` (matching the
  * cover lo/hi or current `countVars(k)` domain), is reduced to standard max-flow via the
  * super-source/super-sink trick, solved by Edmonds-Karp, then the residual graph is
  * SCC'd. Any `xᵢ → cover_k` edge with zero flow whose endpoints sit in different SCCs
@@ -102,7 +102,7 @@ class GlobalCardinality(
         }
     }
 
-    /** Relabel the cover values (#374). Only the constant-count form is value-relabelable: with count
+    /** Relabel the cover values. Only the constant-count form is value-relabelable: with count
      *  *variables* the counts live in a second value universe that one map can't relabel, so that form
      *  blocks value symmetry (returns `null`). A value transposition is a bijection, so the relabeled
      *  cover stays distinct. */

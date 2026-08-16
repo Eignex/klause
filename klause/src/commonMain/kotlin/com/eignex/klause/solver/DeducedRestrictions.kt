@@ -216,8 +216,7 @@ class DeducedRestrictions internal constructor(
     /**
      * Merge `this` with [other] under the merged exact-pin set [pinned]: mins take the max, maxes take
      * the min, holes union, set-restrictions take [other] on overlap (last-write) — and every deduction
-     * whose var is in [pinned] is dropped, since the exact pin subsumes it. Byte-identical to the
-     * deduction half of the former `Assumptions.mergedWith`.
+     * whose var is in [pinned] is dropped, since the exact pin subsumes it.
      */
     internal fun mergedWith(other: DeducedRestrictions, pinned: IntHashSet): DeducedRestrictions {
         val minMap = MutableIntLongMap()

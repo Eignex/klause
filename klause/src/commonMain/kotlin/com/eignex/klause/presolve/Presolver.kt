@@ -57,8 +57,7 @@ data class PresolveContext(
     /** Root-bake probing policy the round engine threads into the materialization of the transformed
      *  [Problem] — the fresh path's [PresolveShared.withPassDelta] rebuild and the incremental
      *  [PresolveSession] — so [RootBaker] re-derives the failed-literal / SAC deductions over the final
-     *  factor set. The relocation of the kernel's former `probe*` flags into the presolve lane;
-     *  [BakeConfig.NONE] (the default) leaves the bake a plain base bake. */
+     *  factor set. [BakeConfig.NONE] (the default) leaves the bake a plain base bake. */
     val bakeConfig: BakeConfig = BakeConfig.NONE,
     /** The session-maintained int-variable occurrence index over the current pass input, threaded in by
      *  the incremental round engine so the affine / dup-columns candidate search reads it instead of
@@ -162,7 +161,7 @@ data class PresolveContext(
 }
 
 /**
- * Cost tier of a presolve pass, mirroring SCIP's FAST / MEDIUM / EXHAUSTIVE timing classes. A
+ * Cost tier of a presolve pass. A
  * [PresolveEmphasis] enables a set of tiers, so the level dial is "how expensive a pass may be".
  */
 enum class PresolveTiming {
@@ -187,7 +186,7 @@ private const val UNDERDETERMINED_RATIO = 8
 /** Bake-time SAC probe budgets (the only EXHAUSTIVE-tier work). The unit is a `propagate` call.
  *  The capped tier bounds an EXHAUSTIVE pass turned on by an explicit override under a non-aggressive
  *  level so it can't dominate presolve time; the aggressive tier is larger but still bounded so a big
- *  instance with wide domains terminates. SCIP analog: per-presolver work limits. Tuned by #461. */
+ *  instance with wide domains terminates. */
 private const val CAPPED_PROBE_BUDGET_PER_VAR = 256
 private const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
 private const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
@@ -204,7 +203,7 @@ private const val PROBE_PASS_MAX_CANDIDATES = 2_048
  *  outgoing implications, so this bounds the pass on a Boolean-heavy model. */
 private const val IMPLICATION_GRAPH_MAX_CANDIDATES = 2_048
 
-/** Diminishing-returns abort threshold (SCIP `abortfac`): a round that reduces the problem by less
+/** Diminishing-returns abort threshold: a round that reduces the problem by less
  *  than this fraction ends the loop. Tiny, so it only trips on marginal spinning, never real work. */
 private const val PRESOLVE_ABORT_FRACTION = 0.001
 
@@ -280,7 +279,7 @@ enum class PresolvePass(
     val autoEligible: Boolean,
     val skipAfterEmpty: Boolean = false,
 ) {
-    /** GCD + bounded-integer coefficient strengthening (#319 / #372). */
+    /** GCD + bounded-integer coefficient strengthening. */
     STRENGTHEN_COEFFICIENTS("strengthen", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
         override fun apply(problem: Problem, ctx: PresolveContext) =
             Presolve.strengthenCoefficients(problem, ctx.cancellation)
@@ -318,10 +317,10 @@ enum class PresolvePass(
         override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.fuseLinearBounds(problem)
     },
 
-    /** Affine singleton elimination (#318) — reconstructs the eliminated variable. The eliminated
+    /** Affine singleton elimination — reconstructs the eliminated variable. The eliminated
      *  variable is left unconstrained in the presolved problem (its value is rebuilt from its partner
      *  on the way back), so a complete enumerator would branch over its domain and over-count each
-     *  real solution (#507). Hence solution-set-sensitive (`preservesSolutionSet = false`): gated off
+     *  real solution. Hence solution-set-sensitive (`preservesSolutionSet = false`): gated off
      *  under `-a` / `-n N>1`, while solve/optimize still benefit. */
     ELIMINATE_AFFINE_SINGLETONS(
         "affine",
@@ -355,7 +354,7 @@ enum class PresolvePass(
         override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.aggregateSubSums(problem)
     },
 
-    /** Constraint subsumption / redundant-constraint removal (#447) — drops duplicate factors and
+    /** Constraint subsumption / redundant-constraint removal — drops duplicate factors and
      *  dominated linear inequalities. Runs after the simplifying passes so proportional rows are
      *  already GCD-normalised. */
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, PresolveTiming.FAST, true, autoEligible = true) {
@@ -425,7 +424,7 @@ enum class PresolvePass(
             Presolve.projectSingletonInequalities(problem, ctx.objectiveIntVars)
     },
 
-    /** Interchangeable-variable / block / value symmetry breaking (#317 / #367 / #373 / #366). */
+    /** Interchangeable-variable / block / value symmetry breaking. */
     BREAK_SYMMETRIES(
         "symmetry",
         Stage.PROBLEM,
@@ -442,7 +441,7 @@ enum class PresolvePass(
         )
     },
 
-    /** Law–Lee value precedence (#374 / #432) — the strong value-symmetry break. Opt-in: stacking it
+    /** Law–Lee value precedence — the strong value-symmetry break. Opt-in: stacking it
      *  with [BREAK_SYMMETRIES] interacts (each pass's added factors disable the other's detection), so
      *  it is enabled only by an explicit override, as an alternative to the single-variable value pin. */
     VALUE_PRECEDENCE(
@@ -456,7 +455,7 @@ enum class PresolvePass(
             Presolve.breakValuePrecedence(problem, ctx.objectiveIntVars)
     },
 
-    /** Dual fixing / dominated-variable reductions (#448) — pins a variable to a bound when the
+    /** Dual fixing / dominated-variable reductions — pins a variable to a bound when the
      *  objective and constraint structure guarantee an optimum there. Solution-set altering, so
      *  auto-disabled for solution-set-sensitive queries. */
     DUAL_FIX("dual-fix", Stage.PROBLEM, PresolveTiming.MEDIUM, preservesSolutionSet = false, autoEligible = true) {
@@ -464,7 +463,7 @@ enum class PresolvePass(
             Presolve.fixDominatedVariables(problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs)
     },
 
-    /** Construction-time failed-literal SAC (#146): folded into `Problem.baked` at build, read via
+    /** Construction-time failed-literal SAC: folded into `Problem.baked` at build, read via
      *  [PresolveConfig.resolved] — a [Stage.CONSTRUCTION] pass with no engine [apply]. */
     PROBE_FAILED_LITERALS(
         "probe-failed-literals",
@@ -492,7 +491,7 @@ enum class PresolvePass(
      *  same-polarity equivalent literals (mutual-implication cycles) to one representative, and drop
      *  transitively-redundant binary clauses. Substitution leaves a merged variable unconstrained and
      *  rebuilds it on reconstruct, so — like affine elimination — it inflates a complete enumerator's
-     *  count (#507) and is marked solution-set-sensitive. */
+     *  count and is marked solution-set-sensitive. */
     IMPLICATION_GRAPH(
         "impl-graph",
         Stage.PROBLEM,
@@ -508,10 +507,10 @@ enum class PresolvePass(
         )
     },
 
-    /** Bounded variable elimination over the pure-SAT part (#24): resolve out a Boolean variable that
+    /** Bounded variable elimination over the pure-SAT part: resolve out a Boolean variable that
      *  occurs only in all-Boolean clauses when doing so does not grow the clause count. The eliminated
      *  variable is left unconstrained and rebuilt on reconstruct, so — like implication-graph merges —
-     *  it inflates a complete enumerator's count (#507) and is solution-set-sensitive. */
+     *  it inflates a complete enumerator's count and is solution-set-sensitive. */
     ELIMINATE_BOOL_VARS(
         "bve",
         Stage.PROBLEM,
@@ -523,9 +522,9 @@ enum class PresolvePass(
             Presolve.eliminateBoolVars(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
-    /** Blocked-clause elimination over the pure-SAT part (#24): drop a clause blocked on an eligible
+    /** Blocked-clause elimination over the pure-SAT part: drop a clause blocked on an eligible
      *  literal (every opposite clause clashes elsewhere). The clause is satisfiability-redundant and
-     *  rebuilt on reconstruct, so like BVE it is solution-set-sensitive (#507). */
+     *  rebuilt on reconstruct, so like BVE it is solution-set-sensitive. */
     ELIMINATE_BLOCKED_CLAUSES(
         "bce",
         Stage.PROBLEM,
@@ -537,7 +536,7 @@ enum class PresolvePass(
             Presolve.eliminateBlockedClauses(problem, ctx.objectiveBoolVars, ctx.cancellation)
     },
 
-    /** At-most-one clique merging (#17): grow the pairwise exclusion constraints into maximal cliques and
+    /** At-most-one clique merging: grow the pairwise exclusion constraints into maximal cliques and
      *  materialise each as one `Cardinality(max = 1)`, dropping the binary clauses / smaller at-most-ones
      *  it subsumes. Solution-set exact (the clique at-most-one equals the pairwise exclusions). */
     MERGE_AMO_CLIQUES(
@@ -599,8 +598,7 @@ enum class PresolvePass(
 }
 
 /**
- * Preset effort levels, mirroring SCIP's presolving emphases / the Gurobi `Presolve 0/1/2` dial.
- * Each level is just a bundle: which [PresolveTiming] tiers run, and how many round-to-fixpoint
+ * Preset effort levels. Each level is just a bundle: which [PresolveTiming] tiers run, and how many round-to-fixpoint
  * iterations the engine may take (1 = a single pass, no iteration). Per-pass overrides on
  * [PresolveConfig] sit on top of the level.
  */
@@ -715,7 +713,7 @@ class PresolveConfig(
      *  fixing) — for a pure local-search engine, where the ordering constraints they add fight the
      *  search and it gains nothing from collapsing symmetric solutions. The cheap solution-preserving
      *  reductions (strengthening, substitution, probing) stay on; affine substitution counts as one
-     *  here — it only *inflates* the count for a complete enumerator (#507), which LS never does, so
+     *  here — it only *inflates* the count for a complete enumerator, which LS never does, so
      *  it stays on and keeps shrinking the problem. */
     fun forLocalSearch(): PresolveConfig = PresolveConfig(
         emphasis,
@@ -781,13 +779,13 @@ class PresolveConfig(
 
 /**
  * The presolve engine. Runs the enabled [PresolvePass.Stage.PROBLEM] passes in **rounds to a
- * fixpoint** (SCIP-style): each round applies, in priority order, every pass that hasn't already run
+ * fixpoint**: each round applies, in priority order, every pass that hasn't already run
  * since the problem last changed; when a pass changes the problem the others become eligible again.
  * This captures cross-pass synergy (e.g. an affine elimination exposing a new GCD) instead of a
  * single linear sweep. The per-pass reconstructs are composed in reverse so [Presolved.reconstruct]
  * maps a final-problem solution all the way back to the original.
  *
- * [PresolveEmphasis.maxRounds] caps the iteration (`1` = the old single-pass behaviour, used by
+ * [PresolveEmphasis.maxRounds] caps the iteration (`1` = a single non-iterating pass, used by
  * [PresolveEmphasis.CONSERVATIVE]); the version-stamp skip below means a clean fixpoint usually stops
  * earlier.
  */
@@ -987,12 +985,12 @@ object Presolver {
     private class RoundResult(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>)
 
     /**
-     * The SCIP-style fixpoint scheduler shared by [run] and [runIncremental], order-identical for
+     * The fixpoint scheduler shared by [run] and [runIncremental], order-identical for
      * both hosts by construction. A monotone "problem version" is bumped on every change; a pass
      * that already ran at the current version is skipped until some other pass changes the problem —
      * the fixpoint/delay scheme. A [PresolvePass.skipAfterEmpty] pass that ran and changed nothing is
      * parked so the engine does not re-run its expensive, overwhelmingly fruitless search after every
-     * later reduction. The effectiveness-based abort (SCIP `abortfac`) stops when a round simplified
+     * later reduction. The effectiveness-based abort stops when a round simplified
      * the problem by less than [PRESOLVE_ABORT_FRACTION] of it — a round that grew the problem
      * (e.g. symmetry adding ordering constraints) or left it unchanged is left to the fixpoint check.
      */

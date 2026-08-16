@@ -318,7 +318,6 @@ internal object ImplicationGraph {
         return component
     }
 
-    /** A directed edge `first -> second` between literal nodes. */
     private data class Edge(val first: Int, val second: Int)
 
     /** Adjacency list over literal nodes `0 until [nodeCount]`, built incrementally. Parallel

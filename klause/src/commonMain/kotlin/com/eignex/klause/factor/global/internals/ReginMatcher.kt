@@ -15,16 +15,16 @@ import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
 
 /**
- * Shared Régin domain-consistency filtering for the alldifferent family — `AllDifferent`
+ * Shared domain-consistency filtering for the alldifferent family — `AllDifferent`
  * routes its matching pass through
- * here, so the bipartite matching / reverse-graph free-value reachability / Tarjan SCC / Hall
+ * here, so the bipartite matching / reverse-graph free-value reachability / SCC / Hall
  * pruning machinery lives once rather than being copy-pasted (and drifting) per variant.
  *
  * The graph: variables on the left, distinct in-domain values on the right (matched
  * value→var, unmatched var→value). A value with no support after matching is pruned from the
  * variable's domain. Reachability is walked over the **reverse** graph from free (unmatched)
  * values — a free value is a sink in the forward orientation, so a forward walk would reach
- * nothing and wrongly prune every slack edge (this was the historical false-UNSAT defect).
+ * nothing and wrongly prune every slack edge (a false-UNSAT trap).
  *
  * `alldifferent_except`: each value in [exceptSet] may be shared by any number of variables.
  * It is modelled as `n` capacity-1 copies (distinct value-ids over the same value), turning
@@ -59,7 +59,7 @@ internal fun reginFilter(
     // i.e. pruned to a GAC fixpoint) and no var's domain has changed since, that fixpoint still
     // holds and there is nothing to prune — skip the matching/SCC rebuild entirely. Sound to drift:
     // the refs only ever *miss* after a backtrack restores a different IntDomain (never falsely
-    // match), so no reversible/snapshot is needed (cf. GCC #584, Table #580, Element #581).
+    // match), so no reversible/snapshot is needed.
     if (cache != null && cache.fixpointHolds(state, filteredVars)) return null
 
     // Incremental path: plain alldifferent (no excepted values) with a cache carries reversible
@@ -104,13 +104,13 @@ internal fun reginFilter(
     // inflate numValues to ≥ n, so this only fires when no excepted value is available.)
     if (numValues < n) return filteredVars
 
-    // ---- Maximum bipartite matching: warm-started seed completed by Hopcroft-Karp, O(|E|·√n). ----
+    // Maximum bipartite matching: warm-started seed completed by Hopcroft-Karp, O(|E|·√n).
     val matchVar = IntArray(n) { -1 }
     val matchVal = IntArray(numValues) { -1 }
     val visited = BooleanArray(numValues)
-    // Warm start (#96): reuse the previous matching for edges still valid after domain
+    // Warm start: reuse the previous matching for edges still valid after domain
     // shrinkage; only the now-unmatched vars need augmenting. The completed matching is still
-    // maximum and Régin pruning is matching-independent, so this changes speed, not results.
+    // maximum and the pruning is matching-independent, so this changes speed, not results.
     if (cache != null) {
         for (i in 0 until n) {
             if (!cache.matchedValue.containsKey(filteredVars[i])) continue
@@ -153,7 +153,7 @@ internal fun reginFilter(
         }
     }
 
-    // ---- Oriented graph: matched value→var, unmatched var→value (vars 0..n-1, values after). ----
+    // Oriented graph: matched value→var, unmatched var→value (vars 0..n-1, values after).
     val total = n + numValues
     // Reuse the per-session adjacency buffers (cleared to `total`) instead of allocating
     // 2·total fresh IntArrayLists every fire; fall back to fresh arrays when no cache is supplied.
@@ -171,7 +171,7 @@ internal fun reginFilter(
         }
     }
 
-    // ---- Reachability from free (unmatched) values over the REVERSE graph. ----
+    // Reachability from free (unmatched) values over the REVERSE graph.
     val reachedFromFree = BooleanArray(total)
     val queue = IntArray(total)
     var qHead = 0
@@ -196,10 +196,10 @@ internal fun reginFilter(
 
     val sccId = reginTarjanScc(adj, total)
 
-    // ---- Prune: a non-matched var→value edge with no support (different SCC and not reachable
+    // Prune: a non-matched var→value edge with no support (different SCC and not reachable
     // from a free value) cannot extend to a feasible matching. Except values are never pruned
     // (their copies always leave slack). Antecedents cite the sharp Hall set forward-reachable
-    // from the value-node (memoised per value-SCC), hole-aware. ----
+    // from the value-node (memoised per value-SCC), hole-aware.
     val sccHallVars = MutableIntObjectMap<IntArray>()
     fun hallVarsFor(valNode: Int): IntArray = sccHallVars.getOrPut(sccId[valNode]) {
         val vis = BooleanArray(total)
@@ -259,7 +259,7 @@ internal fun reginFilter(
  *  the current domains and completes to a maximum matching, so a stale cache never affects
  *  correctness, only the number of augmenting searches. It therefore needs no backtrack snapshot:
  *  the cache simply **drifts** across push/pop (a stale post-backtrack matching just costs a few
- *  more augmenting searches), like CDCL watches — no longer a [PropagationState.SnapshottablePayload]. */
+ *  more augmenting searches). */
 internal class ReginCache {
     val matchedValue = MutableIntLongMap()
 
@@ -286,10 +286,10 @@ internal class ReginCache {
         for (i in vars.indices) lastDoms[i] = state.intDomains[vars[i]]
     }
 
-    // ---- Incremental Régin: a persistent grow-only value universe + the reversible matching/SCC
-    //      state, used by [reginIncremental] for the no-except, stable-var-set path. The universe
-    //      gives values stable node ids across fires (the per-fire compaction in [reginFilter] does
-    //      not), which is the prerequisite for carrying reversible graph state across fires. ----
+    // Incremental path: a persistent grow-only value universe + the reversible matching/SCC
+    // state, used by [reginIncremental] for the no-except, stable-var-set path. The universe
+    // gives values stable node ids across fires (the per-fire compaction in [reginFilter] does
+    // not), which is the prerequisite for carrying reversible graph state across fires.
     private val idOfValue = MutableLongIntMap()
     val valueOfId = LongArrayList()
 
@@ -345,12 +345,12 @@ internal class ReginCache {
     /** The Hall violator behind the most recent propagate failure on this session — written
      *  at the failing point, read immediately afterwards by the analyzer via the factor's
      *  conflictReason. Lives here (per-session payload) rather than on the factor object so
-     *  portfolio workers sharing one Problem never read another session's reason (#182).
+     *  portfolio workers sharing one Problem never read another session's reason.
      *  Propagate-to-analysis transient; never needs to survive a backtrack. */
     var conflictVars: IntArray? = null
 }
 
-/** Reversible, delta-driven incremental-Régin state for one stable variable set (plain
+/** Reversible, delta-driven matching/SCC state for one stable variable set (plain
  *  alldifferent), driven by [reginIncremental]. The maximum matching and canonical SCC labels ride
  *  the engine undo trail, so a backtrack restores them in O(changes); [valid] (also reversible)
  *  drops to 0 when a backtrack lands above the level that seeded the state, forcing a fresh rebuild.
@@ -379,10 +379,11 @@ internal class ReginIncrementalState(state: PropagationState, val vars: IntArray
 
 /**
  * Complete the bipartite matching from a (possibly partial, warm-started) seed to a maximum matching
- * using Hopcroft-Karp: O(|E|·√n) instead of the O(n·|E|) one-var-at-a-time augmenting search — the
- * dominant cost when a large `alldifferent` is matched from scratch at the root bake (a 2700-var
- * permutation matching went from seconds to milliseconds). Any maximum matching prunes identically
- * (Régin filtering is matching-independent), so this changes speed, not results.
+ * using Hopcroft-Karp: O(|E|·√n) instead of the O(n·|E|)
+ * one-var-at-a-time augmenting search — the dominant cost when a large `alldifferent` is matched from
+ * scratch at the root bake (milliseconds rather than seconds on a 2700-var permutation). Any maximum
+ * matching prunes identically (the filtering is matching-independent), so this changes speed, not
+ * results.
  *
  * [matchVar] / [matchVal] are updated in place (var→value-id and value-id→var, `-1` = free). Returns
  * `true` iff the completed matching saturates every variable; on `false` the caller runs one
@@ -490,10 +491,10 @@ internal fun reginTryAugment(
     return false
 }
 
-/** Iterative Tarjan SCC over [adj] (adjacency lists on `0 until total`). Returns per-vertex
+/** Iterative index/lowlink SCC over [adj] (adjacency lists on `0 until total`). Returns per-vertex
  *  component id. Iterative to avoid recursion-depth blowup on large graphs. SCC membership is
  *  reversal-invariant, so the forward orientation is used here. Shared with `GlobalCardinality`,
- *  which materialises its residual graph and delegates here (#99). */
+ *  which materialises its residual graph and delegates here. */
 internal fun reginTarjanScc(adj: Array<IntArrayList>, total: Int): IntArray {
     val sccId = IntArray(total) { -1 }
     val index = IntArray(total) { -1 }

@@ -15,9 +15,9 @@ internal class ValuePrecedePropagator(
     private val xs: IntArray,
 ) : Propagator {
 
-    /** Advisor subscription (#623): membership-sensitive (the prefix scan tests `s ∈ dom` and
+    /** Advisor subscription: membership-sensitive (the prefix scan tests `s ∈ dom` and
      *  forced-`t`), so subscribe to every kind on every sequence variable and consume the dirty-
-     *  variable delta (#624). The reversible `α`/`prunedUpTo` state ([VpState]) advances only over the
+     *  variable delta. The reversible `α`/`prunedUpTo` state ([VpState]) advances only over the
      *  changed prefix instead of rescanning the whole sequence each fire. */
     override val initialIntEventWatches: IntArray = run {
         val distinct = xs.toHashSet()

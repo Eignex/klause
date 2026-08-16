@@ -38,7 +38,7 @@ internal class WideReifiedLinearPropagator(
         val extraLit = auxValue?.let { Lit.make(auxBoolVar, !it) } ?: 0
         val includeExtraLit = auxValue != null
         // A single-term equality body can be infeasible because its target is an interior hole; use the
-        // hole-aware collector there so the carved value's eq-atom joins the reason (mirrors #121).
+        // hole-aware collector there so the carved value's eq-atom joins the reason.
         return if (op == LinearOp.EQ && vars.size == 1) {
             collectHoleAndBoundAntecedents(state, vars, extraLit = extraLit, includeExtraLit = includeExtraLit)
         } else {

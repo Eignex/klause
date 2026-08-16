@@ -62,7 +62,7 @@ class Diffn(
     )
 
     /** Position-faithful (rectangle i is fixed by index): keeps the coordinate arrays in order and
-     *  folds in the constant sizes, the var-size split, and the [nonStrict] flag (#531). */
+     *  folds in the constant sizes, the var-size split, and the [nonStrict] flag. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.DIFFN, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =

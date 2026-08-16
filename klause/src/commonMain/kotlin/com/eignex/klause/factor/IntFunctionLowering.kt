@@ -11,8 +11,8 @@ import com.eignex.klause.solver.Lit
 import kotlin.math.abs
 
 // Single source of truth for int_abs, int_min/max, int_div/mod: the schema and FlatZinc compilers
-// used to encode these independently and could drift. Truncated-toward-zero throughout (MiniZinc
-// semantics); nothing in the supported front-ends requires Euclidean.
+// share this lowering so their encodings cannot drift apart. Truncated-toward-zero throughout
+// (MiniZinc semantics); nothing in the supported front-ends requires Euclidean.
 internal object IntFunctionLowering {
 
     // result = |operand|: operand ≤ result ∧ −operand ≤ result ∧ (result = operand ∨ result = −operand).

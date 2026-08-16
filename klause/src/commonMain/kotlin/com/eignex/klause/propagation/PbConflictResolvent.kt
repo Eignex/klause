@@ -8,7 +8,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Pseudo-Boolean cutting-planes conflict resolvent (#1119 Phase 3) — the second [ConflictResolvent]
+ * Pseudo-Boolean cutting-planes conflict resolvent — the second [ConflictResolvent]
  * implementation the Phase 0 seam anticipated. The accumulating nogood is a [PbAccumulator] `≥`
  * constraint rather than a clause, and `resolve` is generalized resolution (coefficient cancellation)
  * followed by saturation and Chvátal-Gomory rounding, so the learned constraint can be strictly
@@ -139,7 +139,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
         val absA = if (a < 0L) -a else a
         val absB = if (b < 0L) -b else b
-        // Selective RoundingSat reduction: weaken away only the reason's non-falsified literals whose
+        // Selective reduction: weaken away only the reason's non-falsified literals whose
         // coefficient is not divisible by the pivot coefficient — the ones the rounding below would
         // inflate into spurious slack. Falsified and divisible literals are kept, so unit-weight
         // (cardinality) reasons are untouched (pivot coefficient 1 divides everything) and the pigeonhole

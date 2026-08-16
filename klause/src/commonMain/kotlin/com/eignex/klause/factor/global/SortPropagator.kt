@@ -14,8 +14,8 @@ import com.eignex.klause.propagation.Propagator
  * matchings `f` / `f'` between sorted positions and the `xs` (smallest-upper-bound and
  * largest-lower-bound greedy matchings) to tighten each `ys` bound, then (c) condenses the
  * `xy`-intersection graph into strongly connected components and tightens each `xs` bound to the
- * range its component's `ys` can take. Steps (a)/(b) alone subsume the previous endpoint-only
- * reasoning; the SCC step (c) is what lets a middle `xs` learn bounds from its sorted position.
+ * range its component's `ys` can take. Steps (a)/(b) alone subsume endpoint-only reasoning; the SCC
+ * step (c) is what lets a middle `xs` learn bounds from its sorted position.
  *
  * The propagator itself holds only the immutable constraint scope. All per-search working state —
  * the matchings, the SCC scratch, the priority queue and the two stacks — lives in a [SortWork]
@@ -33,7 +33,7 @@ internal class SortPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): the sort propagator reads only each variable's `min`/`max` and
+     * Advisor subscription: the sort propagator reads only each variable's `min`/`max` and
      * never inspects interior holes, so it subscribes to [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED]
      * per variable and skips interior `VALUE_REMOVED` wakes.
      */
@@ -97,7 +97,7 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         this.state = state
         // A single coarse-but-sound antecedent for every narrowing this pass emits: the whole pass
         // is a deterministic consequence of the pre-pass domains, so citing their tightened bounds
-        // justifies each deduction. Reason minimization is a separate concern (issue #7).
+        // justifies each deduction. Reason minimization is a separate concern.
         val ant = state.composeIntVarAtomAntecedents(intVars)
 
         for (i in 0 until n) {
@@ -363,7 +363,7 @@ internal class SortWork(private val xs: IntArray, private val ys: IntArray, priv
         fun pop(): Int = data[--size]
     }
 
-    /** Stack of tentative SCCs as `(root, rightMost, maxX)` triples (Mehlhorn–Thiel). */
+    /** Stack of tentative SCCs as `(root, rightMost, maxX)` triples. */
     private class Stack2(capacity: Int) {
         private val roots = IntArray(capacity)
         private val rightMosts = IntArray(capacity)

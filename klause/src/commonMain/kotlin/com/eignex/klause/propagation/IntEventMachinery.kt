@@ -8,7 +8,7 @@ import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Typed int-event wakeup machinery for [PropagationState]: the per-`(intVar, kind)` advisor index,
- * the per-var pending-kind masks, and the per-factor dirty-variable delta accumulators (#624).
+ * the per-var pending-kind masks, and the per-factor dirty-variable delta accumulators.
  * All four structures are empty when no factor opts in, so the common case allocates nothing;
  * [incremental] mode forces them live so a mid-life factor subscribing to typed events (or
  * consuming the delta) wakes correctly even when the initial problem had none.
@@ -91,7 +91,7 @@ internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
     val dirtyKinds: IntArray = if (on) IntArray(problem.numIntVars) else EmptyIntArray
 
     /**
-     * Per-factor dirty-variable delta accumulator (#624): for each factor with
+     * Per-factor dirty-variable delta accumulator: for each factor with
      * [Propagator.consumesIntEventDelta], the subscribed variables that fired since the consumer
      * last drained. `enqueueForIntChange` appends a variable when it wakes the consumer via the
      * advisor index ([dirtyMark] deduplicates), and `drainIntEventDirtyVars` returns and clears

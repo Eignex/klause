@@ -31,7 +31,7 @@ internal class BtValOption(val label: String, val make: () -> ValueSelector)
 /**
  * A named restart-schedule axis option — the sweep counterpart of a [RestartSchedule] choice, applied
  * through [BacktrackParams]. A [lubyBase] selects the Luby schedule at that base; [adaptive] selects the
- * Glucose adaptive schedule; [ema] selects the EMA-based adaptive schedule; [modeSwitching] selects the
+ * LBD/trail-size adaptive schedule; [ema] selects the EMA-based adaptive schedule; [modeSwitching] selects the
  * stable/focused mode-switching schedule; all left unset is the single-unbounded-run (no-restart)
  * schedule.
  */
@@ -46,7 +46,7 @@ internal class BtRestartOption(
 /** A named LP-emphasis axis option; [emphasis] `OFF` leaves the recipe with no LP relaxation. */
 internal class BtLpOption(val label: String, val emphasis: LpEmphasis)
 
-/** A named objective-guided-value axis option (#33): [enabled] dives toward each variable's
+/** A named objective-guided-value axis option: [enabled] dives toward each variable's
  *  cost-minimising polarity first (a no-op on a satisfaction problem). */
 internal class BtObjGuidedOption(val label: String, val enabled: Boolean)
 

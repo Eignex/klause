@@ -30,8 +30,8 @@ fun interface IntConsumer {
  *    alternating "comb", where a run list would cost ~2 ints per survivor.
  *
  * The run and survivor reps together keep both storage and the hot paths **independent of the
- * declared span**: the former "sorted hole list" (complement) rep degenerated to O(span) storage
- * and cache-thrashing binary searches once a wide domain was carved down to a small reachable set —
+ * declared span**: a "sorted hole list" (complement) rep degenerates to O(span) storage and
+ * cache-thrashing binary searches once a wide domain is carved down to a small reachable set —
  * a pathological throughput cliff. Between them every wide shape stays O(min(holes, survivors)).
  *
  * **Representation choice** — construct via the factories (`IntDomain(min, max)` for the contiguous
@@ -182,8 +182,7 @@ interface IntDomain {
     /** Factory for [IntDomain]; the bitset/wide-rep cutoff is
      *  [com.eignex.klause.config.KlauseConfig.bitsetThreshold]. */
     companion object {
-        /** Construct the contiguous domain `(min..max)`. Source-compatible with the former class
-         *  constructor, so existing `IntDomain(min, max)` call sites are unchanged. */
+        /** Construct the contiguous domain `(min..max)`. */
         operator fun invoke(min: Long, max: Long): IntDomain = ContiguousDomain(min, max)
     }
 }

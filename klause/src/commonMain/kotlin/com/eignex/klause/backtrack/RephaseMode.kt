@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack
 
 /**
- * Polarity source for a fresh decision's first-tried value (#204). The B&B stepper rotates
+ * Polarity source for a fresh decision's first-tried value. The B&B stepper rotates
  * through these every `rephaseInterval` conflicts via [next], so search periodically samples
  * a different phase bias without popping to root.
  */

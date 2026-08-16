@@ -4,7 +4,7 @@ import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.SumResult
 
 /**
- * Conflict-analysis gate breakdown (#588 diagnostic): conflicts whose 1UIP analysis produced no
+ * Conflict-analysis gate breakdown: conflicts whose 1UIP analysis produced no
  * usable learned clause. The sum of these three with [SearchStats.learnedClauses] approximates the
  * conflicts that reached analysis. See [SolveStats].
  */

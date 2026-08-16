@@ -236,7 +236,7 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      *    (search ended without proving anything, no feasible found).
      *
      * Lets long-running optimizations report progress without callbacks or polling.
-     * `solver.minimize(obj, p)` is now equivalent to `solver.improvements(obj, p).last()`.
+     * `solver.minimize(obj, p)` is equivalent to `solver.improvements(obj, p).last()`.
      *
      * Default implementation: a single-element sequence wrapping [minimize]. Backends
      * with an inner anytime loop ([BacktrackSolver], `LocalSearchSolver`) override to

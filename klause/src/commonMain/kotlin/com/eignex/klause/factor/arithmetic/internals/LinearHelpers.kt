@@ -20,7 +20,7 @@ internal fun initLinearSum(state: LocalSearchState, factorId: Int, coeffs: LongA
  * O(1) coefficient lookup over `vars`/`coeffs` for the LS linear invariants: a var→index map built
  * once per invariant. Move scoring queries a coefficient per candidate move per containing row, so
  * a per-query row scan turns ultra-wide rows (tens of thousands of terms) into deadline-starving
- * move picks (#1442); the map makes each query constant work. A variable outside the row yields 0,
+ * move picks; the map makes each query constant work. A variable outside the row yields 0,
  * so callers may ask about any variable.
  */
 internal class LinearCoeffIndex(private val coeffs: LongArray, vars: IntArray) {
@@ -112,7 +112,7 @@ internal fun collectHoleAndBoundAntecedents(
  *
  * Only the literals on the driving side are cited (and only when tighter than the original
  * domain — root-level bounds are global facts the analyzer minimises out). Sharper than
- * [collectLinearTightenAntecedents] (which cited both bounds of every var), so learned clauses
+ * [collectLinearTightenAntecedents] (which cites both bounds of every var), so learned clauses
  * generalise and prune across more of the search.
  */
 internal fun collectLinearDirAntecedents(
@@ -363,8 +363,8 @@ internal fun propagateLinearBounds(
     // conflict analysis runs only above the root, and it drops level-0 literals by their level rather
     // than resolving through their reason. Collecting the reason there is pure waste — and on a wide
     // domain a slow-converging linear bound narrows ~1 per round for O(span) rounds, each round citing
-    // (and materializing) a fresh order atom whose sorted-index insert is O(n): O(span²) overall, the
-    // #18 root-bake hang. Skip it at the root, leaving the actual bound tightening untouched.
+    // (and materializing) a fresh order atom whose sorted-index insert is O(n): O(span²) overall, which
+    // hangs the root bake. Skip it at the root, leaving the actual bound tightening untouched.
     val rootFact = state.currentLevel == 0
     if (op == LinearOp.NE) {
         if (loOverflow || hiOverflow) return true

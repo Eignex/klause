@@ -84,7 +84,7 @@ object WalkSat {
 }
 
 /**
- * probSAT factory (Balint & Schöning 2012). `ProbSat(...)` builds the fixed-`cb` recipe; [adaptive] /
+ * probSAT factory (Balint and Schöning 2012). `ProbSat(...)` builds the fixed-`cb` recipe; [adaptive] /
  * [bandit] build the variants whose break exponent is steered each pick by a noise / bandit schedule
  * on the schedule axis. Configuration checking is opt-in on all (probSAT + CC is a strong combo on
  * structured instances).

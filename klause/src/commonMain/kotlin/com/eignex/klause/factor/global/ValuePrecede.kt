@@ -12,13 +12,13 @@ import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * `value_precede(s, t, xs)` (#432): value [t] may appear in [xs] only at a position after value [s]
+ * `value_precede(s, t, xs)`: value [t] may appear in [xs] only at a position after value [s]
  * has appeared — i.e. the first occurrence of [s] precedes the first occurrence of [t] (or [t] never
  * occurs). The building block of `value_precede_chain` (one per consecutive value pair) and of the
- * Law–Lee value-symmetry break (#374).
+ * interchangeable-value symmetry break.
  *
- * Native GAC propagator, replacing the per-index reified-equality + clause prefix-OR decomposition
- * (which was only sub-GAC). The constraint is "no [t] before the first feasible [s]", so GAC is an
+ * Native GAC propagator; the per-index reified-equality + clause prefix-OR decomposition it stands in
+ * for is only sub-GAC. The constraint is "no [t] before the first feasible [s]", so GAC is an
  * O(n) scan:
  *  - **Prune [t] early.** Let `α` be the first index where [s] is still possible. No position `≤ α`
  *    can be [t] (nothing before it can be [s]); prune [t] there. If [s] is impossible everywhere,
@@ -49,7 +49,7 @@ class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
         sink.intVars(xs)
     }
 
-    /** Relabel the two named values (#374 value-symmetry verification): `value_precede(s,t)` maps to
+    /** Relabel the two named values (value-symmetry verification): `value_precede(s,t)` maps to
      *  `value_precede(π(s), π(t))` under a value permutation π. */
     override fun remapValues(valueMap: (Long) -> Long): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
 

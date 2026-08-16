@@ -143,7 +143,7 @@ internal object SolverInvocation {
                 // Emit `_objective = <value>;` per solution (parity with the reference path's
                 // `minizinc --output-objective`). The objective var is usually not in the model's
                 // `output` section, so without this the parser records objective=null even when
-                // klause proves the optimum (#477).
+                // klause proves the optimum.
                 add("--output-objective")
             }
             // No -f for klause: the engine enum encodes free vs fixed (cp/mixed/ls = free,

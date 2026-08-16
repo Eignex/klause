@@ -18,7 +18,7 @@ internal class ProductPropagator(
 ) : Propagator {
 
     /**
-     * Advisor subscription (#623): `propagate` derives everything from the corner products and
+     * Advisor subscription: `propagate` derives everything from the corner products and
      * corner divisions of the `[min, max]` intervals of `a`, `b`, and `result` — it reads only
      * `min`/`max`. An interior hole can change none of those, so the propagator subscribes to
      * [IntEvent.LB_RAISED] / [IntEvent.UB_LOWERED] on each variable and skips interior

@@ -31,7 +31,7 @@ internal class AtomStore(numIntVars: Int) {
     val threshold: LongArrayList = LongArrayList()
 
     /** Stored truth of this order literal — a BCP-cheap forward cache that avoids re-deriving it
-     *  from the int domains on every clause touch (the #588 profile's dominant cost). 0 =
+     *  from the int domains on every clause touch (the dominant cost in BCP profiles). 0 =
      *  uncached / undetermined, 1 = true, 2 = false. Filled the instant a bound move crosses the
      *  threshold (`wakeAtom`) or a clause forces the literal (`pinAtomLit`); restored on backtrack
      *  by the reversible atom trail ([undoAtomId]). A 0 slot is not proof of "undetermined": an atom

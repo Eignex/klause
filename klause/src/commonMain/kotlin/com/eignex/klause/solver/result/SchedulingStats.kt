@@ -4,13 +4,13 @@ import com.eignex.kumulant.stat.summary.CountStat
 import com.eignex.kumulant.stat.summary.SumResult
 
 /**
- * Scheduling-specific bound prunes: nodes cut by the Lagrangian bound (#23) or by the Cumulative
- * energetic-reasoning check (#22/#23). Zero outside scheduling models. See [SolveStats].
+ * Scheduling-specific bound prunes: nodes cut by the Lagrangian bound or by the Cumulative
+ * energetic-reasoning check. Zero outside scheduling models. See [SolveStats].
  */
 data class SchedulingStats(
-    /** Nodes pruned by the Lagrangian bound (#23). */
+    /** Nodes pruned by the Lagrangian bound. */
     val lagrangianPruned: SumResult = ZERO_COUNT,
-    /** Nodes pruned by the Cumulative energetic-reasoning check (#22/#23). */
+    /** Nodes pruned by the Cumulative energetic-reasoning check. */
     val energeticPruned: SumResult = ZERO_COUNT,
 ) {
     /** Combine two workers' scheduling prune counts (additive). */

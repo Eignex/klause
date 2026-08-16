@@ -86,8 +86,8 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
 
     // Reverse indices (id → name), kept in lock-step with the two forward maps via
     // [bindIntName] / [bindBoolName]. They turn the per-node/per-edge reverse lookups in the
-    // global/set lowering from O(n) entry scans into O(1), so that lowering is no longer
-    // O(n²) in model size (#97).
+    // global/set lowering from O(n) entry scans into O(1), keeping that lowering linear rather
+    // than O(n²) in model size.
     val idToIntName = MutableIntObjectMap<String>()
     val idToBoolName = MutableIntObjectMap<String>()
     val intDomains = mutableListOf<IntDomain>()
@@ -103,7 +103,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     val floatMetaBuckets = IntArrayList()
     val floatVarIdByName = mutableMapOf<String, Int>() // float-id (metadata index) by name
 
-    // LP-only continuous columns (issue #1232): when [schemaFloatsLpOnly] holds, every schema float is a
+    // LP-only continuous columns: when [schemaFloatsLpOnly] holds, every schema float is a
     // real variable (the simplex resolves it) rather than a bucket-index int, and float-linear rows lower
     // to real [com.eignex.klause.factor.arithmetic.Linear]. `realVarIdByName` maps a float name to its real
     // var id; parallel real bounds by real var id.
@@ -142,7 +142,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     }
 
     /** Register `name → id` for an int/float var and the reverse `id → name`. Every write to
-     *  [intVarIdByName] must go through here so [idToIntName] stays consistent (#97). */
+     *  [intVarIdByName] must go through here so [idToIntName] stays consistent. */
     fun bindIntName(name: String, id: Int): Int {
         intVarIdByName[name] = id
         idToIntName.put(id, name)
@@ -150,7 +150,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     }
 
     /** Register `name → id` for a bool var and the reverse `id → name`. Every write to
-     *  [boolVarIdByName] must go through here so [idToBoolName] stays consistent (#97). */
+     *  [boolVarIdByName] must go through here so [idToBoolName] stays consistent. */
     fun bindBoolName(name: String, id: Int): Int {
         boolVarIdByName[name] = id
         idToBoolName.put(id, name)
@@ -424,7 +424,7 @@ fun VariableSchema.compile(config: KlauseConfig = KlauseConfig.current): Compile
 // engine itself stays free of any SchemaDef / schema-shape dependency.
 
 /**
- * Whether every schema float can be an LP-only continuous variable (issue #1232): the model declares a
+ * Whether every schema float can be an LP-only continuous variable: the model declares a
  * float, and every constraint is either a top-level non-strict, non-`ne` [FloatLinearConstraint] or a
  * constraint that could not hide a float-linear. Conservatively declines (keeps bucketing) on any
  * compound Boolean top-level constraint (`And`/`Or`/`Not`/`Implies`/`Iff`), which could reify or nest a
@@ -491,7 +491,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
             is FloatSpec -> {
                 floatDecoders[name] = entry
                 if (schemaFloatsLpOnly) {
-                    // LP-only continuous column: a real variable the simplex resolves (issue #1232), no
+                    // LP-only continuous column: a real variable the simplex resolves, no
                     // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
                     val rid = realLo.size
                     realVarIdByName[name] = rid
@@ -524,7 +524,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     if (config.pinAbsentOptVars) emitOptVarPins(def)
 
     // The compiler builds a plain base-baked [Problem]; the SAC / failed-literal probing tiers, resolved
-    // from the presolve config, now run in the presolve lane via [RootBaker] (kernel → presolve would
+    // from the presolve config, run in the presolve lane via [RootBaker] (kernel → presolve would
     // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
     return CompiledSchema(
         problem = Problem(

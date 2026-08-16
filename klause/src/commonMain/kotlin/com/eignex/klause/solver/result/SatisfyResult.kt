@@ -159,8 +159,8 @@ private fun satisfyUnderAssumptionsBacktrack(
  *
  * O(|assumptions| × solve_cost) — opt-in via the `minimizeCore` flag on
  * [satisfyUnderAssumptions]. Recommended only when callers can tolerate the extra
- * solve calls in exchange for tighter cores (typically off-line MUS extraction; OLL/RC2
- * loops should leave it off and rely on the seed-time projection alone).
+ * solve calls in exchange for tighter cores (typically off-line MUS extraction; core-guided
+ * MaxSAT loops should leave it off and rely on the seed-time projection alone).
  */
 private fun <P : SolverParams> deletionMinimize(solver: Solver<P>, assumptions: Assumptions, params: P): Assumptions {
     // Walk both bool and int pins. We iterate over snapshots of the key arrays so the

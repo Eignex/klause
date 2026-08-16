@@ -26,8 +26,7 @@ import kotlin.random.Random
 /**
  * Complete depth-first search over a [Problem]'s assignment space, driven by propagation
  * via [PropagationSession]. Variable selection and value selection are plug-in heuristics
- * via [BacktrackParams.variableSelector] / [BacktrackParams.valueSelector] — same split
- * MiniZinc uses for `solve :: int_search(vars, var_strategy, value_strategy, complete)`.
+ * via [BacktrackParams.variableSelector] / [BacktrackParams.valueSelector].
  *
  *  - [solve] — first witness as [SolveResult.Sat], [SolveResult.Unsat] when the tree is
  *    fully explored, [SolveResult.Unknown] on [BacktrackParams.maxDecisions] exhaustion.
@@ -65,7 +64,7 @@ class BacktrackSolver(override val problem: BakedProblem) :
     /** Optimise against [objective] under the hard constraints. */
     fun minimize(objective: LinearObjective): MinimizeResult = minimize(objective, BacktrackParams())
 
-    /** Open an explicit-state, pausable branch-and-bound over [objective] (#381). See [ResumableSearch].
+    /** Open an explicit-state, pausable branch-and-bound over [objective]. See [ResumableSearch].
      *  The handle reuses this solver's search primitives; [params] should carry the
      *  [BacktrackParams.objectiveBoundSupplier] for external bound sharing (its [BacktrackParams.cancellation]
      *  is superseded per slice). */
@@ -73,7 +72,7 @@ class BacktrackSolver(override val problem: BakedProblem) :
         ResumableMinimize(this, objective, params)
 
     /**
-     * Open a reusable [RepairSearch] for the LNS destroy/repair loop (#644): one persistent
+     * Open a reusable [RepairSearch] for the LNS destroy/repair loop: one persistent
      * [ResumableMinimize] whose session (learned-clause DB) and LP relaxation are re-seeded per fragment
      * via [ResumableMinimize.rebind] instead of rebuilt. The per-fragment objective cutoff is threaded
      * through the [BacktrackParams.objectiveBoundSupplier] so it prunes against best-known; the caller
@@ -288,7 +287,7 @@ class BacktrackSolver(override val problem: BakedProblem) :
 
 /** Ceiling on the adaptive cancellation cadence (nodes between deadline polls). Fast instances
  *  settle here — a few microseconds per check at worst; slow ones adapt below it. See
- *  `ResumableMinimize.adaptCancelInterval`. */
+ *  [DeadlinePoller]. */
 internal const val CANCEL_CHECK_INTERVAL: Int = 256
 
 /** Target wall-clock gap (ms) between deadline polls; the adaptive cadence steers toward it so `-t`

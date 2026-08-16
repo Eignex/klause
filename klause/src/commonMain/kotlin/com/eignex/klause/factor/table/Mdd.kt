@@ -88,7 +88,7 @@ class Mdd(
 
     /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
      *  diagram — per-layer state counts, layer offsets, the transition records, the initial and
-     *  accepting states, the record stride, and the cost var (#531). */
+     *  accepting states, the record stride, and the cost var. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.MDD, structuralKeyWeight, ::buildKey)
 
     // The key splices the whole diagram, so the arity-derived default would under-size the builder by
@@ -112,7 +112,7 @@ class Mdd(
         sink.intVars(seq)
     }
 
-    /** Symbol relabeling (#536): each transition record is `(fromState, symbol, toState[, cost])`, so a
+    /** Symbol relabeling: each transition record is `(fromState, symbol, toState[, cost])`, so a
      *  value permutation maps the symbol field of every record. Sound — the `seq` values are the
      *  symbols and there is no positional-variable/constant coupling (unlike Element). No bijection
      *  check is needed: records carry the symbol explicitly, so any map yields a valid diagram and the
@@ -270,7 +270,7 @@ class Mdd(
         val starts = layerStarts
 
         // States are layer-local dense ids in `[0, numStatesPerLayer(layer))`, so the per-layer
-        // state→arc-columns maps are arrays indexed straight by the state id (#678).
+        // state→arc-columns maps are arrays indexed straight by the state id.
         val nspl = numStatesPerLayer
         val outCols = Array(n) { arrayOfNulls<IntArrayList>(nspl[it]) }
         val inCols = Array(n + 1) { arrayOfNulls<IntArrayList>(nspl[it]) }

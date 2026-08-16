@@ -4,7 +4,7 @@ import com.eignex.klause.solver.Lit
 
 /**
  * A pseudo-Boolean constraint in signed-per-variable cutting-planes form, used as the accumulating
- * nogood of [PbConflictResolvent] (#1119 Phase 3). The constraint is
+ * nogood of [PbConflictResolvent]. The constraint is
  *
  *     Σ_v coef(v) · x_v  ≥  rhs        (x_v ∈ {0, 1}, coef(v) may be negative)
  *
@@ -146,7 +146,7 @@ internal class PbAccumulator {
     }
 
     /**
-     * Selective RoundingSat reduction before dividing by [divisor]: weaken away (drop, reducing the degree
+     * Selective reduction before dividing by [divisor]: weaken away (drop, reducing the degree
      * by its weight) every literal — except [keepVar] — that is **not currently false** and whose
      * coefficient is **not divisible** by [divisor]. Those are exactly the literals a subsequent
      * [divideRoundUp] would round up into spurious slack, so dropping them first keeps the divided

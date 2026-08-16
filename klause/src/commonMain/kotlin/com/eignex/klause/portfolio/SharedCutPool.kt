@@ -9,7 +9,7 @@ import com.eignex.kumulant.stream.lock
 
 /**
  * An append-only, de-duplicated pool of portfolio-portable [SharedCut]s shared across the LP-bearing
- * arms of one [com.eignex.klause.solver.Problem] — the cut analogue of [SharedClausePool] (#809). Every
+ * arms of one [com.eignex.klause.solver.Problem] — the cut analogue of [SharedClausePool]. Every
  * pooled cut is globally valid, so an arm may fold any of them into its relaxation soundly; arms publish
  * the global cuts they harvest and pull others' via a per-arm cursor ([PoolCutExchange]), so a cut one
  * arm finds tightens every arm.

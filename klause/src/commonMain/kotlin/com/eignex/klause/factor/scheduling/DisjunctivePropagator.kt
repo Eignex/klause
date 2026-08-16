@@ -14,7 +14,7 @@ import kotlin.math.max
 /**
  * CP propagator for the no-overlap case of [com.eignex.klause.factor.scheduling.Cumulative]
  * (`unary = true`, built via [com.eignex.klause.factor.scheduling.Cumulative.unary]) and provides
- * time-tabling, detectable precedences, and Vilím Θ-tree edge-finding for the unary case.
+ * time-tabling, detectable precedences, and Θ-tree edge-finding for the unary case.
  */
 internal class DisjunctivePropagator(
     val intVars: IntArray,

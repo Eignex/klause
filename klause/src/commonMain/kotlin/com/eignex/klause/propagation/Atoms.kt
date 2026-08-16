@@ -282,8 +282,8 @@ private fun channelToAtom(frontierVar: Int): IntArray = intArrayOf(Lit.make(fron
  * For a threshold strictly past the endpoint this attributes the endpoint's (possibly later)
  * establishment level rather than the exact level the atom's truth was first fixed — sound (a true
  * antecedent cited at its real level), and since the atom resolves against this reason in the 1UIP
- * loop it never lingers as a mis-levelled leaf. The earlier complementary-atom citation kept the
- * level tight but reintroduced the fatal cycle; avoiding the cycle wins.
+ * loop it never lingers as a mis-levelled leaf. Citing the complementary atom instead would keep
+ * the level tight but reintroduce a fatal reason cycle; avoiding the cycle wins.
  */
 internal fun PropagationState.endpointReason(v: Int, viaMax: Boolean): IntArray? =
     if (viaMax) intMaxAntecedents[v] else intMinAntecedents[v]
@@ -394,7 +394,7 @@ internal fun PropagationState.propagateAtomsForVar(
     // by the requested bound alone gets [antNear]; one that needs the further snap gets [antFar].
     // Critically the requested-bound atom itself ([v ≥ reqMin] / [v ≤ reqMax]) takes [antNear],
     // which does NOT list that atom — [antFar] does (via [antecedentsAcrossHoles]), so giving it
-    // [antFar] would be the same-var cycle 1UIP cannot collapse (#671).
+    // [antFar] would be the same-var cycle 1UIP cannot collapse.
     val idx = atoms.byIntVar[v] ?: return
     val d = intDomains[v]
     val newMin = d.min
@@ -498,7 +498,7 @@ internal fun PropagationState.propagateAtomsForSetRestriction(
     }
 }
 
-/** Record an eq atom's carve reason at its first death during a bound move (#671). A value killed in
+/** Record an eq atom's carve reason at its first death during a bound move. A value killed in
  *  the move's NEAR region — below the raised min / above the lowered max *requested* bound — is ruled
  *  out by that requested bound alone, whose reason [antNear] cites other variables: a sound, acyclic
  *  per-value reason (`antNear ⟹ v ≥ reqMin ⟹ v ≠ k` for `k < reqMin`, symmetric for the max side).
@@ -540,7 +540,7 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
     // at the later move would mis-date the literal (a hole carved at level 3 then swept at level 5
     // is false since level 3) and append a second, out-of-order trail entry, both of which break
     // the reverse-assignment-order resolution the unified trail relies on. Watchers still fire so
-    // dependent factors re-examine the re-crossed literal. (#612 trail residency.)
+    // dependent factors re-examine the re-crossed literal.
     if (atoms.truth[atomId] == targetState) {
         val ww = atoms.watchersByLit[(atomId shl 1) or (if (!newT) 0 else 1)] ?: return
         for (j in 0 until ww.size) atoms.dirtyFactors.addLast(ww[j])
@@ -555,7 +555,7 @@ internal fun PropagationState.wakeAtom(atomId: Int, newT: Boolean) {
     // rests on why its value was excluded — its per-value carve reason ([holeReasonFor]), which
     // cites other variables. The bound move's reason ([AtomStore.pendingMoveAnt]) lists this very eq-atom
     // when it snapped across the hole ([antecedentsAcrossHoles]); citing it back would form the
-    // same-var cycle 1UIP cannot collapse (#671). Every other crossed literal rests on the move.
+    // same-var cycle 1UIP cannot collapse. Every other crossed literal rests on the move.
     atoms.ant[atomId] = when {
         newT && atoms.kind[atomId] == AtomKind.EQ ->
             composeIntVarAtomAntecedents(intArrayOf(atoms.intVar[atomId]))

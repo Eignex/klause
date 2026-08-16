@@ -54,8 +54,8 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
  * actually ran — keyed off `backend == "ls"` (a pure-LS solve) or `moves > 0` (an LS arm inside a
  * `"mixed"` portfolio), so complete-only solves print nothing here.
  *
- * yuck emits no runtime LS counters of its own (only the MiniZinc flattener's `flat*` keys), so these
- * mirror no upstream schema — they're the engine's own progress fingerprint. The headline pair is
+ * The MiniZinc statistics schema standardises no runtime LS counters, so these mirror nothing upstream
+ * — they are the engine's own progress fingerprint. The headline pair is
  * `lsMoves` against `lsMovesPerSec` (raw throughput) and `lsTimeToBest` against `solveTime` (the anytime
  * profile: how early the best incumbent landed). `lsStalls` over `lsRestarts` shows how much of the
  * search was plateau-thrashing. `lsIncumbentViolation` is 0 once feasible, else the lowest residual cost

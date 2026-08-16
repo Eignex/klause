@@ -65,7 +65,6 @@ internal fun FlatZincCompiler.searchBlocksOf(a: FznAnnotation): List<FznAnnotati
     else -> emptyList()
 }
 
-/** Build one [SearchTier] from one search block. */
 private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
     if (a.args.size < 3) return null
     val bools = IntArrayList()
@@ -83,7 +82,7 @@ private fun FlatZincCompiler.compileSearchBlock(a: FznAnnotation): SearchTier? {
     )
 }
 
-/** Resolve a search variable expression to bool/int ids in the listed order. */
+// Resolve a search variable expression to bool/int ids in the listed order.
 private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, ints: IntArrayList) {
     when (e) {
         is FznExpr.Ident -> {

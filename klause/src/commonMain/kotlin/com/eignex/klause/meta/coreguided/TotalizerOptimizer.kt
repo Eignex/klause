@@ -147,7 +147,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
      * `aux_{lb+1} = false` (cost ≤ lb) and bumps `lb` by the core's min weight each unsat.
      * Termination: SAT under the current threshold-bit assumption.
      *
-     * **Lazy thresholds (#91).** Only the `aux_{lb+1}` the loop actually assumes are
+     * **Lazy thresholds.** Only the `aux_{lb+1}` the loop actually assumes are
      * materialised — one per OLL round as `lb` rises, so `O(#cores)` reifications rather
      * than the `O(totalWeight)` up-front bake the chain would otherwise need. The solver is
      * rebuilt when a fresh threshold is added (lb advances monotonically, so each round
@@ -176,7 +176,7 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
         val selectors = IntArray(n) { nextBoolId++ }
 
         // Fixed factors: hard constraints + one relaxer clause per soft. Threshold
-        // reifications are appended lazily below as `lb` rises (#91).
+        // reifications are appended lazily below as `lb` rises.
         val baseFactors = ArrayList<Factor>(baseProblem.factors.size + n)
         for (f in baseProblem.factors) baseFactors.add(f)
         for (i in 0 until n) baseFactors.add(Oll.relaxerClause(softs[i].lit, selectors[i]))
@@ -247,7 +247,6 @@ internal class TotalizerOptimizer(val baseProblem: Problem) {
                 is SatisfyResult.Unknown -> return Result.Unknown(r.reason, lb)
 
                 is SatisfyResult.UnsatUnderAssumptions -> {
-                    // Project the assumption core back to soft indices.
                     val coreSofts = Oll.projectCoreToSofts(r.core, selectorToSoft)
                     if (coreSofts.isEmpty()) {
                         // Core involves only the threshold bit — bump lb by 1 (we

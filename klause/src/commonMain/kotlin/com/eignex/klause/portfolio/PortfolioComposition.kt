@@ -33,13 +33,13 @@ enum class EngineMix {
     /** Both — LS streams incumbents while backtrack tightens/proves the bound. */
     MIXED,
 
-    /** Hybrid ALNS arms only — a large-neighbourhood destroy/repair loop with CP repair (#644). */
+    /** Hybrid ALNS arms only — a large-neighbourhood destroy/repair loop with CP repair. */
     ALNS,
 }
 
 /**
  * A point in the portfolio configuration space. Its axes are **cores** (compute width) and **arms**
- * (pool size) — kept separate so they don't conflate (#406) — plus **kind** (COP vs CSP) and
+ * (pool size) — kept separate so they don't conflate — plus **kind** (COP vs CSP) and
  * **engine** (LS / backtrack / mixed). [PortfolioComposition.compose] turns a scenario into an ordered
  * arm list of size [arms], and [PortfolioBuilder.build] materialises it into runnable
  * [PortfolioWorker]s — so every scenario flows through one construction path.
@@ -66,7 +66,7 @@ data class PortfolioScenario(
     val seed: Long = 0L,
     /** Objective-shaping λ for the LS workers' optimize phase (mirrors the CLI's CBLS λ=1.0). */
     val lsLambda: Double = 1.0,
-    /** The LP ceiling for the backtrack arms (#429, the `--lp` parameter): each LP arm is capped under
+    /** The LP ceiling for the backtrack arms (the `--lp` parameter): each LP arm is capped under
      *  this — its emphasis lowered to the ceiling's and the ceiling's per-technique overrides applied.
      *  `LpConfig.AGGRESSIVE` (default, no overrides) leaves the arms uncapped — the pool spreads the
      *  LP-intensity itself; an `OFF` emphasis disables LP, and overrides force individual techniques. */
@@ -79,12 +79,12 @@ data class PortfolioScenario(
      *  recipe per slot, wrapping past the pool size), the exact backtrack analogue of [lsPool]. `null`
      *  uses the curated [BacktrackWorkerConfig] pool. */
     val btPool: List<() -> BacktrackRecipe>? = null,
-    /** Optional model search-annotation arm (#512): the [BacktrackParams] compiled from the model's
+    /** Optional model search-annotation arm: the [BacktrackParams] compiled from the model's
      *  `int_search(...)` annotations. When present (and the pool carries ≥ 2 backtrack arms), it takes
      *  the last backtrack slot so the free CP portfolio also follows the model's own search order,
-     *  while the #117 `satOptimized` guard keeps slot 0. Ignored when [btPool] overrides the pool. */
+     *  while the `satOptimized` guard keeps slot 0. Ignored when [btPool] overrides the pool. */
     val annotationArm: BacktrackParams? = null,
-    /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool] (#809), the
+    /** Whether the backtrack arms share globally-valid LP cuts through a [SharedCutPool], the
      *  cut analogue of the always-on learned-clause pool. On by default; sound either way (only global
      *  cuts cross arms, so it never changes any arm's optimum). */
     val shareCuts: Boolean = true,
@@ -209,8 +209,8 @@ internal object PortfolioComposition {
         }
 
     /** The [count] backtrack arms. [btPool] (when set) overrides the pool with injected templates.
-     *  Otherwise the curated pool, with the model's [annotationArm] (#512) taking the last slot when
-     *  present and there are ≥ 2 slots (so the #117 `satOptimized` guard keeps slot 0). */
+     *  Otherwise the curated pool, with the model's [annotationArm] taking the last slot when
+     *  present and there are ≥ 2 slots (so the `satOptimized` guard keeps slot 0). */
     private fun btArms(
         kind: Kind,
         count: Int,
@@ -237,7 +237,7 @@ internal object PortfolioComposition {
         if (btCount > 0) {
             arms += btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
         }
-        // Hybrid ALNS with CP repair (#644): a mixed LS+backtrack engine, added last (lowest priority,
+        // Hybrid ALNS with CP repair: a mixed LS+backtrack engine, added last (lowest priority,
         // pending its credit pass). COP only — it optimises an incumbent, so a CSP has nothing for it.
         if (scenario.kind == Kind.COP) arms += AlnsWorkerConfig()
         return arms

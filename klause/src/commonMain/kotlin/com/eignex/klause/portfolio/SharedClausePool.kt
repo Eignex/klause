@@ -145,7 +145,7 @@ internal class PoolClauseExchange(
         // Fresh session (a single-threaded portfolio rebuilds the arm's session every segment): its
         // learned DB is empty, so re-import the whole pool — including this arm's own clauses from
         // earlier segments, which the persistent-session `seen`/`cursor` would otherwise suppress.
-        // Resetting both makes the import unconditional; the pool de-dups any re-export by key (#381).
+        // Resetting both makes the import unconditional; the pool de-dups any re-export by key.
         cursor = 0L
         seen.clear()
         onRestart(session)

@@ -85,7 +85,7 @@ internal fun tightenOpenIntBounds(
         return work // cannot relax; leave every open side to the caller's clamp
     }
 
-    // Past the full-model row cap (#1425), each probe restricts to the row-capped neighborhood of its
+    // Past the full-model row cap, each probe restricts to the row-capped neighborhood of its
     // column pair instead: the initial factorization of the full basis is one uninterruptible call
     // whose cost grows superlinearly with the row count, while a whole-row subset is a pure relaxation
     // — every neighborhood bound is valid on the full model, so large instances keep their locally
@@ -212,7 +212,7 @@ private fun addRealColumns(
  *  re-solve refactorizes on a large model — sides past the cap stay open for the caller's clamp. */
 private const val OBBT_MAX_SIDE_SOLVES = 128
 
-/** Row cap for the full-model LP pass (#1425): above this the initial factorization alone is an
+/** Row cap for the full-model LP pass: above this the initial factorization alone is an
  *  uninterruptible multi-minute call, so the pass switches to per-probe neighborhood sub-models
  *  ([tightenByNeighborhoodProbes]) instead of paying it. */
 private const val OBBT_MAX_LP_ROWS = 5_000
@@ -271,7 +271,7 @@ private fun fbbtTightenOpenIntBounds(
     var pass = 0
     var changed = true
     // A pass is O(Σ row width), so on a wide model a single one outruns the budget and a per-pass poll
-    // never gets to fire (#1414); the stride below bounds the overrun by a row batch instead. Stopping
+    // never gets to fire; the stride below bounds the overrun by a row batch instead. Stopping
     // early keeps the tightenings made so far — sound, since a looser bound removes no solution.
     var polled = 0
     var spent = false

@@ -144,8 +144,8 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     private val droppedFactorLog = ArrayList<Factor>()
 
     // Bumped whenever a reseed rebuilds the stable-id space from scratch ([reseedFromDelta]); a
-    // [ChangeMark] taken before it can no longer be replayed (its ids name different factors now), so a
-    // pass holding a stale mark must fall back to a full scan.
+    // [ChangeMark] taken before a reseed cannot be replayed (its ids name different factors afterwards),
+    // so a pass holding a stale mark must fall back to a full scan.
     private var reseedEpoch = 0
 
     /** A read position into the change logs: the counts of adds and drops seen so far. A pass saves one
@@ -434,7 +434,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      *  computed by the solver at solve time, not inside the presolve window — the session's own [infeasible]
      *  flag surfaces the infeasibility to the caller without forcing that bake. When probing *is* enabled it
      *  must be re-derived over the final factor set (a [RootBaker.reseed] the already-folded view would skip),
-     *  so the eager rebuild path is taken, exactly as before. */
+     *  so the eager rebuild path is taken. */
     fun materialize(): Problem {
         val domains = if (infeasible) lastFeasibleDomains else Array(base.numIntVars) { state.intDomains[it] }
         if (bakeConfig.anyEnabled) {

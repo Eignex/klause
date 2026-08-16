@@ -37,7 +37,7 @@ internal enum class Engine(
     /** Mixed backtrack + local-search portfolio. */
     MIXED("mixed", mix = EngineMix.MIXED, aliases = listOf("portfolio", "pf")),
 
-    /** Hybrid ALNS portfolio — large-neighbourhood destroy/repair with CP repair (#644). `lns` is the
+    /** Hybrid ALNS portfolio — large-neighbourhood destroy/repair with CP repair. `lns` is the
      *  short alias. Not `pureLs`: its CP repair wants the full presolve. */
     ALNS("alns", mix = EngineMix.ALNS, aliases = listOf("lns", "hybrid-lns")),
     ;

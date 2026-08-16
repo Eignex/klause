@@ -3,7 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.PropagationSession
 
 /**
- * One scheduled in-search simplification pass over the live constraint database (#1252). Passes run
+ * One scheduled in-search simplification pass over the live constraint database. Passes run
  * per arm at the restart boundary, after the DFS trail is popped, with the session at the post-seed
  * root; each call works a bounded slice so a single restart never stalls on a full database sweep.
  *
@@ -24,7 +24,7 @@ internal interface InprocessingPass {
     fun reset()
 }
 
-/** Clause vivification (#203) behind the inprocessing seam: a round-robin cursor over the learned
+/** Clause vivification behind the inprocessing seam: a round-robin cursor over the learned
  *  database, one [BacktrackParams.vivifyBatch]-sized slice per scheduled run. */
 internal class VivificationPass(private val solver: BacktrackSolver) : InprocessingPass {
     override val preservesVariables: Boolean get() = true
@@ -39,7 +39,7 @@ internal class VivificationPass(private val solver: BacktrackSolver) : Inprocess
     }
 }
 
-/** Clause subsumption + self-subsuming resolution (#1252) behind the inprocessing seam: a
+/** Clause subsumption + self-subsuming resolution behind the inprocessing seam: a
  *  round-robin cursor over the learned database, one [BacktrackParams.subsumeBatch]-sized slice per
  *  scheduled run. */
 internal class SubsumptionPass(private val solver: BacktrackSolver) : InprocessingPass {
@@ -56,7 +56,7 @@ internal class SubsumptionPass(private val solver: BacktrackSolver) : Inprocessi
 }
 
 /**
- * The scheduled per-arm inprocessing loop (#1252): runs its passes in order at every
+ * The scheduled per-arm inprocessing loop: runs its passes in order at every
  * [BacktrackParams.inprocessingCadence]-th restart. The cadence exists because the passes' probing
  * cost competes with conflict throughput — restart-heavy configurations pay it often — so it is the
  * portfolio's per-arm tuning lever for how much simplification an arm buys.

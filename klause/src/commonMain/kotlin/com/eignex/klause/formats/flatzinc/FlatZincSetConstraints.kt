@@ -32,7 +32,6 @@ internal fun FlatZincCompiler.resolveSetVar(e: FznExpr): SetVarLayout = when (e)
     else -> failHere("expected a set var reference, got ${e::class.simpleName}")
 }
 
-/** Lift a set literal into a pinned [SetVarLayout]. */
 private fun FlatZincCompiler.materialisePinnedSetLayout(name: String, members: IntArray): SetVarLayout {
     val universe = if (members.isEmpty()) intArrayOf(0) else members
     val indicatorIds = IntArray(universe.size) { i ->

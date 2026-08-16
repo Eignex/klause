@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationSession
 
 /**
  * A Lagrangian dual relaxation bound with a persistent multiplier vector warm-started across nodes.
- * Implemented by [LagrangianBound] (#429) and [KnapsackLagrangianBound]; the backtrack LP prune
+ * Implemented by [LagrangianBound] and [KnapsackLagrangianBound]; the backtrack LP prune
  * cascade drives both through one arm that threads the multipliers.
  */
 internal interface LagrangianDualBound {

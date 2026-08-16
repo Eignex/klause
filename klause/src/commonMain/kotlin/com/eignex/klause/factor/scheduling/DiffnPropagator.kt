@@ -62,7 +62,7 @@ internal class DiffnPropagator(
 
     /**
      * Pairwise compulsory-parts / disjunctive propagation (constant-size only). When any
-     * dimension is variable the size-dependent bound reasoning no longer holds, so we fall
+     * dimension is variable the size-dependent bound reasoning does not hold, so we fall
      * back to the sound check: with the *minimum* possible sizes, if a pair must still overlap
      * on both axes the constraint is infeasible; otherwise no pruning. This keeps propagation
      * sound (never removes a feasible value) while LS does the heavy lifting on var-size diffn.

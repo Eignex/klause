@@ -47,7 +47,7 @@ internal object MiniZincMode : CliMode {
 
         override fun load(path: String, common: CommonOptions): Solvable {
             // The ambient config was installed once in `main`. Unbounded `var int` resolution:
-            // CLI flag → KlauseConfig → built-in default (matches Gecode/Chuffed).
+            // CLI flag → KlauseConfig → built-in default.
             val config = KlauseConfig.current
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
@@ -142,7 +142,7 @@ internal class MiniZincOutput : OutputProtocol {
     }
 
     /**
-     * `-s`: MiniZinc-standard `%%%mzn-stat: key=value` lines closed by `%%%mzn-stat-end` (#141).
+     * `-s`: MiniZinc-standard `%%%mzn-stat: key=value` lines closed by `%%%mzn-stat-end`.
      * [stats] is [SolveStats.EMPTY] when the verdict reports no engine counters (enumeration /
      * portfolio); the CLI-side time and solution count are always available.
      */

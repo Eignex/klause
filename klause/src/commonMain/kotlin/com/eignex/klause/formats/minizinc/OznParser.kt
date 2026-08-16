@@ -405,7 +405,6 @@ internal class OznParser(private val tokens: List<OznToken>) {
         return parseCommaSeparated(parseExpr()) { parseExpr() }
     }
 
-    /** Parse a non-empty comma-separated list. */
     private fun <T> parseCommaSeparated(first: T, parseItem: () -> T): MutableList<T> {
         val list = ArrayList<T>()
         list.add(first)

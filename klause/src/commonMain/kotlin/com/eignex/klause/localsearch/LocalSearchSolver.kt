@@ -440,7 +440,7 @@ class LocalSearchSolver(
         val maxFlips = minOf(params.maxFlips, params.maxInstructions ?: Long.MAX_VALUE)
         var cancelled = false
 
-        // Cross-engine solution flow (#644): before a restart, adopt a fresher-and-better pooled assignment
+        // Cross-engine solution flow: before a restart, adopt a fresher-and-better pooled assignment
         // as the incumbent so the restart anchors on a peer arm's solution. Purely heuristic — the anchor
         // only seeds the next descent — and skipped under assumption pins a foreign assignment may violate.
         val pooledImporter = PooledSolutionImporter(
@@ -501,7 +501,7 @@ class LocalSearchSolver(
                     .coerceIn(1L, CANCEL_CHECK_INTERVAL.toLong()).toInt()
                 lastCheckMs = nowMs
             } else if ((cancelCountdown and (CANCEL_CLOCK_STRIDE - 1)) == 0) {
-                // Mid-window escape hatch (#1442): the window is tuned on the *previous* window's
+                // Mid-window escape hatch: the window is tuned on the *previous* window's
                 // cost, so a step mix that suddenly turns expensive — an ultra-wide row entering the
                 // violated repair pool — would otherwise grind out up to a full window of monster
                 // steps before the next poll. A clock glance every [CANCEL_CLOCK_STRIDE] steps costs

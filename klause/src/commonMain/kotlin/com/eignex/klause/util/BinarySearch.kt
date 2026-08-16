@@ -15,9 +15,8 @@ package com.eignex.klause.util
  * entirely. The narrowing phase does ONE comparison per step (`this[mid] < element`) and
  * never branches on equality — the equality test happens once, in the linear tail. This is
  * the hottest primitive in the solver (`IntDomain.contains` and every sorted-array probe ride
- * on it), and the common caller path is membership that returns "not found", which never hit
- * the old loop's early-match exit anyway, so the saved second comparison per step is a net
- * win (#612).
+ * on it), and the common caller path is membership that returns "not found", which an
+ * early-match exit never helps, so dropping the second comparison per step is a net win.
  *
  * Assumes [this] is sorted ascending in `[fromIndex, toIndex)`.
  */

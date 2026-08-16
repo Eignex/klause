@@ -12,7 +12,7 @@ internal sealed interface EngineConfig {
 }
 
 /**
- * The unified config space for the evidence-based MIXED search (#34): a top-level `engine` ∈ {ls, bt}
+ * The unified config space for the evidence-based MIXED search: a top-level `engine` ∈ {ls, bt}
  * over the whole [LocalSearchConfigSpace] and [BacktrackConfigSpace] cross-product. One residual-round
  * campaign over this space searches both engines together, so the mixed palette's LS/BT ratio *emerges*
  * from coverage rather than a hardcoded split — and the same run's cache projects to pure per-engine

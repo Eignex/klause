@@ -114,9 +114,9 @@ class OccurrenceIndex(
         // Per factor, the set of int vars it subscribes to an event on — built once in O(Σ watches).
         // The per-`(var, factor)` exclusion below is then an O(1) membership test, not a linear scan of
         // the factor's whole watch list: a single wide factor (a linear over thousands of vars watches
-        // every one of them) appears in each of its vars' occurrence lists, so the naive scan was
-        // O(arity²) per such factor — the construction-time wedge that dominated presolve's repeated
-        // problem rebuilds on wide-linear instances.
+        // every one of them) appears in each of its vars' occurrence lists, so a naive scan costs
+        // O(arity²) per such factor — a construction-time wedge on presolve's repeated problem
+        // rebuilds over wide-linear instances.
         val watchedVarsByFactor = arrayOfNulls<IntHashSet>(factors.size)
         for (fid in propagators.indices) {
             val watches = propagators[fid].initialIntEventWatches ?: continue

@@ -38,7 +38,7 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
         ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
 
     /** `Cardinality.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
-     *  disjoint from a bare cardinality's key (#443). */
+     *  disjoint from a bare cardinality's key. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_CARDINALITY, ::buildKey)
 
     override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =

@@ -16,7 +16,7 @@ data class LpStats(
     /** Node LP-bounding passes that built and solved a relaxation — the denominator for the prune /
      *  fix / pivot rates. [pruned] alone is meaningless without knowing how many solves it took. */
     val solves: SumResult = ZERO_COUNT,
-    /** Nodes pruned by the LP-relaxation bound (#20): infeasible relaxation or bound ≥ incumbent.
+    /** Nodes pruned by the LP-relaxation bound: infeasible relaxation or bound ≥ incumbent.
      *  Split into [infeasible] (relaxation infeasible) and the remainder (bound dominated). */
     val pruned: SumResult = ZERO_COUNT,
     /** Subset of [pruned] where the relaxation itself was infeasible (a feasibility filter, not a
@@ -27,17 +27,17 @@ data class LpStats(
     val rootBound: Double = Double.NaN,
     /** Wall time (ms) spent inside LP bounding — the cost side of the LP ROI (benefit = prunes/fixes). */
     val ms: Long = 0L,
-    /** Domain reductions applied by LP reduced-cost fixing (#21). */
+    /** Domain reductions applied by LP reduced-cost fixing. */
     val fixed: SumResult = ZERO_COUNT,
     /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
     val pivots: SumResult = ZERO_COUNT,
-    /** Max sparse-LU fill ratio `(nnz L+U)/nnz B` over all factorizations (#27); >1 = fill-in growth. */
+    /** Max sparse-LU fill ratio `(nnz L+U)/nnz B` over all factorizations; >1 = fill-in growth. */
     val luMaxFill: MaxResult = NO_MAX,
     /** Max sparse-LU density `(nnz L+U)/m²`; approaching 1.0 means the LU filled in to effectively dense. */
     val luMaxDensity: MaxResult = NO_MAX,
-    /** LP cuts added by separators (#22). */
+    /** LP cuts added by separators. */
     val cuts: SumResult = ZERO_COUNT,
-    /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate (#280). */
+    /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate. */
     val backjumps: SumResult = ZERO_COUNT,
     /** Node LP solves that started from a seeded tableau (the cheapest warm start) instead of a basis
      *  reload or cold start — the hot-tableau hit rate. */
@@ -83,7 +83,7 @@ internal class LpStatsSink {
         solves.update(1.0)
     }
 
-    /** A node whose subtree was cut by the LP-relaxation bound (#20) because its bound dominated the
+    /** A node whose subtree was cut by the LP-relaxation bound because its bound dominated the
      *  incumbent (or an LP-derived deduction emptied a domain). */
     fun observePrune() {
         pruned.update(1.0)
@@ -112,7 +112,7 @@ internal class LpStatsSink {
         clock = null
     }
 
-    /** One domain reduction applied by LP reduced-cost fixing (#21). */
+    /** One domain reduction applied by LP reduced-cost fixing. */
     fun observeFix() {
         fixed.update(1.0)
     }
@@ -122,18 +122,18 @@ internal class LpStatsSink {
         repeat(count) { pivots.update(1.0) }
     }
 
-    /** Record one node LP solve's sparse-LU fill ratio and density (#27 sparsity audit). */
+    /** Record one node LP solve's sparse-LU fill ratio and density. */
     fun observeLuFill(fill: Double, density: Double) {
         if (fill > 0.0) luMaxFill.update(fill)
         if (density > 0.0) luMaxDensity.update(density)
     }
 
-    /** Record [count] cuts added by separators (#22). */
+    /** Record [count] cuts added by separators. */
     fun observeCuts(count: Int) {
         repeat(count) { cuts.update(1.0) }
     }
 
-    /** A non-chronological backjump driven by an LP infeasibility certificate (#280). */
+    /** A non-chronological backjump driven by an LP infeasibility certificate. */
     fun observeBackjump() {
         backjumps.update(1.0)
     }

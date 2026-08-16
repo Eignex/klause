@@ -123,7 +123,7 @@ internal fun PropagationState.pinBoolImpl(v: Int, value: Boolean, antecedents: I
     boolAssigned.set(v)
     boolLevel[v] = currentLevel
     boolReason[v] = currentFactor
-    noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused (#201)
+    noteLearnedUse(currentFactor) // a learned clause that forces a unit counts as reused
     boolAntecedents[v] = antecedents
     boolPinOrder.add(v)
     bumpObjectiveBoolBound(v, value)
@@ -261,7 +261,7 @@ private inline fun PropagationState.tightenBoundImpl(
     // (`antecedents == null`): a decision to set `v ≥ bound` has no factor reason, so its sole
     // representation in conflict analysis is that atom. A *propagation* supplies `antecedents` that
     // already imply the bound, so citing the atom too is redundant — and since the atom resolves
-    // back to this very bound it would be a same-var cycle 1UIP cannot collapse (#671).
+    // back to this very bound it would be a same-var cycle 1UIP cannot collapse.
     val snapped = if (isMin) newDomain.min > bound else newDomain.max < bound
     val ant = if (snapped) {
         val priorLit = Lit.make(if (isMin) atomVarGe(v, bound) else atomVarLe(v, bound), false)
@@ -428,7 +428,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
     // Cite the search-carved holes crossed in the range: values absent from [prior] but inside the
     // root domain (a value still present in [prior] is one this batch excludes, covered by [base]).
     // Enumerate the smaller side — a survivor set over a wide span has span-many holes but few members,
-    // so walking holes would be O(span); iterate the root's members instead. Identical cited set. (#612)
+    // so walking holes would be O(span); iterate the root's members instead. Identical cited set.
     val lo = maxOf(from, prior.min)
     val hi = minOf(until - 1, prior.max)
     if (root.size.toLong() <= prior.holeCount) {
@@ -447,7 +447,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
  * Exclude every value in [values] (sorted ascending, distinct) from int var [v] in a single
  * pass — the batched form of [excludeIntValueImpl]. Element's constant-array GAC prunes a wide
  * result domain down to a small reachable set; doing that one value at a time rebuilds the hole
- * array per value (O(domain^2), the #599 bake wedge), whereas [IntDomain.excludeValues] merges them
+ * array per value (O(domain^2)), whereas [IntDomain.excludeValues] merges them
  * in O(domain).
  *
  * Reasoning matches the single-value path: the two endpoints that may move each cite the prior
@@ -543,7 +543,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
 
 internal fun PropagationState.seedConflictFactor(fid: Int) {
     if (fid < 0) return
-    noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused (#201)
+    noteLearnedUse(fid) // a learned clause that detects a conflict counts as reused
     conflictSeedFactors.add(fid)
 }
 

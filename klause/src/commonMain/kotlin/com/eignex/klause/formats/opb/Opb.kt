@@ -43,7 +43,7 @@ private inline fun opbRequire(cond: Boolean, msg: () -> String) {
  * start/end offsets. A `List<String>` costs on the order of 72 bytes per token once the String header,
  * its backing array and the list slot are counted, and every token stays live until the last factor is
  * built; the packed form holds the same tokens at ~9 bytes each, so ingesting a hundreds-of-MB instance
- * no longer allocates multiples of the problem it produces.
+ * does not allocate multiples of the problem it produces.
  *
  * Tokens are addressed by index and read in place: a real [String] is materialized only for an error
  * message or an over-Int64 literal, never per token on the parsing path.

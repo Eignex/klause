@@ -39,7 +39,7 @@ import com.eignex.klause.util.MutableIntObjectMap
  * ```
  *
  * is valid at every integer solution. With `t1 = min estᵢ` (all energy counts) this is the plain
- * area / energy bound the issue starts from; sweeping `t1` over the task earliest-starts adds the
+ * area / energy bound; sweeping `t1` over the task earliest-starts adds the
  * energetic windowing on top (the strongest left edge wins). Because the row is a single column over
  * `M`, only the strongest `t1` is ever binding, so each `(global, M)` pair emits exactly **one** row
  * carrying the best edge — and that keeps the row count structural (warm-start safe).
@@ -65,9 +65,9 @@ import com.eignex.klause.util.MutableIntObjectMap
  */
 internal class CumulativeRelaxation(
     private val problem: Problem,
-    /** Project [Cumulative] factors into makespan plans (the original behaviour). */
+    /** Project [Cumulative] factors into makespan plans. */
     private val includeCumulative: Boolean = true,
-    /** Also project each constant-size [Diffn] onto both axes as a cumulative (#655 Tranche C): the
+    /** Also project each constant-size [Diffn] onto both axes as a cumulative: the
      *  x-axis is `start = xs, dur = widths, res = heights, cap = the max y-extent`, and symmetrically
      *  for the y-axis. A non-overlapping packing keeps the per-slice perpendicular demand within the
      *  bounding-box extent, so the energetic row (whose `t1 = min-est` case is the area bound
@@ -198,7 +198,7 @@ internal class CumulativeRelaxation(
         return LpRowPremises(pv.toIntArray(), BooleanArray(count) { false }, pt.toLongArray())
     }
 
-    // ----- structural plan construction (once, at problem load) -----
+    // Structural plan construction: once, at problem load.
 
     private fun buildPlans(): List<AreaPlan> {
         val scheds = schedulingFactors()

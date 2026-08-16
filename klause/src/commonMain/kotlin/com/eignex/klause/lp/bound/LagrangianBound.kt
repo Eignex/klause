@@ -19,8 +19,8 @@ import com.eignex.klause.util.MutableLongIntMap
 import kotlin.math.ceil
 
 /**
- * Subgradient Lagrangian bound for a constraint-coupling decomposition over AllDifferent globals
- * (#23, generalised to multiple blocks in #572). For
+ * Subgradient Lagrangian bound for a constraint-coupling decomposition over one or more
+ * AllDifferent globals. For
  * `minimize Σ cᵢ·xᵢ s.t. AllDifferent(V₁) ∧ … ∧ AllDifferent(V_k) ∧ (linear linking constraints)`,
  * dualize the linking constraints with multipliers λ and keep the AllDifferents as **independent
  * subproblems** — each an exact min-cost assignment ([MinCostAssignment]). For any valid-sign λ,
@@ -35,7 +35,7 @@ import kotlin.math.ceil
  * ## Blocks
  * The chosen blocks are pairwise variable-disjoint AllDifferents (each of size `2..`[MAX_VARS], up to
  * [MAX_TOTAL_VARS] variables total), so the residual problem after dualizing the linking constraints
- * separates exactly into one assignment per block. The single-block case (#23) is just `k = 1`.
+ * separates exactly into one assignment per block. The single-block case is just `k = 1`.
  *
  * ## Exactness
  * Multipliers are kept as integers `p_r` over a fixed denominator [Q] (`λ_r = p_r / Q`). The adjusted

@@ -8,7 +8,7 @@ import com.eignex.klause.solver.Problem
  * literal lives contiguously in one [lits] array; clause `c` occupies the half-open range
  * `[start(c), end(c))`. This replaces the per-clause [com.eignex.klause.factor.bool.ClausePropagator]
  * heap objects (each with its own literal array and out-of-line watch state) with a single
- * cache-friendly buffer, so the native-SAT BCP loop (#1119 Phase 1) can walk clauses without a
+ * cache-friendly buffer, so the native-SAT BCP loop can walk clauses without a
  * per-fire virtual dispatch, object dereference, or payload cast.
  *
  * Built only for a [Problem.isNativeSatEligible] problem: no integer variables and every factor a

@@ -148,9 +148,9 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
             out.add(runs[(i shl 1) + 1])
         }
         when {
+            // A singleton run vanishes entirely: emit nothing for it.
             rlo == rhi -> Unit
 
-            // singleton run vanishes
             value == rlo -> {
                 out.add(rlo + 1)
                 out.add(rhi)

@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Blocked-clause elimination (BCE, Järvisalo–Biere–Heule) over the pure-SAT part of the model (#24). A
+ * Blocked-clause elimination (BCE, Järvisalo–Biere–Heule) over the pure-SAT part of the model. A
  * clause `C` is *blocked* on one of its literals `ℓ` when, for every clause `D` containing `¬ℓ`, the
  * resolvent of `C` and `D` on `var(ℓ)` is a tautology (i.e. `C` and `D` clash on some other variable).
  * A blocked clause is satisfiability-redundant and removed; if a solution of the reduced problem
@@ -17,7 +17,7 @@ import com.eignex.klause.util.IntHashSet
  * Operates on the shared [SatClauseDb]. The blocking literal's variable must be [SatClauseDb.eligible]
  * — objective-free and appearing solely in clean all-Boolean clauses — so flipping it during
  * reconstruction affects nothing but this database and cannot change the objective. Like BVE this is
- * satisfiability-preserving but **not** solution-set preserving (#507).
+ * satisfiability-preserving but **not** solution-set preserving.
  */
 internal object BlockedClauseElimination {
 

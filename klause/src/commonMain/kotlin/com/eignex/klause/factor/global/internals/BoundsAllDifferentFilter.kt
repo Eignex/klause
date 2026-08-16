@@ -5,9 +5,9 @@ import com.eignex.klause.propagation.PropagationState
 
 /**
  * Bounds-consistency filtering for `all_different ::bounds`. This is the López-Ortiz / Quimper /
- * van Beek / Tremblay / Marchand "fast and simple" algorithm (CP-AI-OR 2003): two O(n log n)
- * sweeps over the variable bounds that raise lower bounds and lower upper bounds to the edges of
- * Hall intervals.
+ * van Beek / Tremblay / Marchand "fast and simple" algorithm (CP-AI-OR 2003): two O(n log n) sweeps
+ * over the variable bounds (the second on the negated bounds) that raise lower bounds and lower
+ * upper bounds to the edges of Hall intervals, using union-find chains over the sorted endpoints.
  *
  * Returns the involved variables as a conflict reason when a Hall interval is over-full, or `null`
  * when filtering succeeds.

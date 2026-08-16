@@ -117,8 +117,8 @@ internal object PresolveShared {
      * The conflict graph of a set of at-most-one [cliques], held as *clique membership* rather than as
      * an adjacency list. Two literals conflict exactly when some clique contains both, so membership
      * answers the same queries in `Σ|clique|` space where an explicit adjacency needs `Σ|clique|²` — one
-     * at-most-one over 5632 literals is 32 M neighbour entries, and materializing that is what used to
-     * exhaust the heap on a large pseudo-Boolean model.
+     * at-most-one over 5632 literals is 32 M neighbour entries, and materializing that exhausts the
+     * heap on a large pseudo-Boolean model.
      *
      * Literals are Lit-encoded and arbitrarily sparse, so they are mapped once to dense positions and
      * everything below is flat primitive arrays, held as a CSR whose per-literal slice lists the

@@ -150,7 +150,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     }
 
     /**
-     * Dominator-based arc removal (choco `PropCircuit_ArboFiltering`). Split node 0 into a virtual
+     * Dominator-based arc removal. Split node 0 into a virtual
      * source whose out-arcs are node 0's candidate successors, and compute that source's dominator
      * tree over the candidate digraph. If value `y` dominates node `x` — every path from the source
      * to `x` passes through `y` — then `succ(x) = y` would close a loop `y ⇝ x → y` that bypasses

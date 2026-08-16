@@ -87,7 +87,7 @@ internal class Alns(
      *  Required to make `DestroyOperator.activityBiased(session)` useful — without a
      *  session it falls back to random. Pass `solver.session() as LocalSearchSession`. */
     val session: LocalSearchSession? = null,
-    /** Optional backtrack LCG+LP engine and base params for CP repair ([BacktrackRepair], #644). When
+    /** Optional backtrack LCG+LP engine and base params for CP repair ([BacktrackRepair]). When
      *  set, a repair operator can solve each freed fragment with full propagation + clause learning +
      *  LP bounding under the pin assumptions. Null on a pure-LS ALNS. */
     val backtrack: Optimizer<BacktrackParams>? = null,
@@ -155,7 +155,7 @@ internal class Alns(
         // Build the acceptance policy once the initial objective is known, so a simulated-annealing
         // temperature can be scaled to the problem (see [acceptanceFor]); else use the fixed policy.
         val acceptancePolicy = acceptanceFor?.invoke(bestObj) ?: acceptance
-        // Cross-engine solution flow (#644): adopt a fresher-and-better pooled assignment as the incumbent
+        // Cross-engine solution flow: adopt a fresher-and-better pooled assignment as the incumbent
         // before destroying, so the next neighbourhood searches around the globally-best assignment.
         val pooledImporter = PooledSolutionImporter(
             supplier = pooledSolutionSupplier,
@@ -169,7 +169,7 @@ internal class Alns(
             // inner solver draw its own per-call seed.
             randomSeed = null,
         )
-        // Persistent CP-repair handle (#644): one session + LP reused across fragments, re-seeded per
+        // Persistent CP-repair handle: one session + LP reused across fragments, re-seeded per
         // neighbourhood, so learned clauses and the LP warm start carry between repairs. Only when a
         // backtrack engine is supplied; closed at the end of the run.
         val repairSearch = (backtrack as? BacktrackSolver)?.let { bt ->
@@ -315,7 +315,7 @@ internal class Alns(
 
     private companion object {
         /** Budget slice ([com.eignex.klause.solver.Cancellation.shorten]) the complete-engine bootstrap may
-         *  use before yielding to destroy/repair. Calibration knob (#5). */
+         *  use before yielding to destroy/repair. Calibration knob. */
         const val BT_BOOTSTRAP_FRACTION = 0.5
 
         /** Decision-count safeguard on the complete-engine bootstrap for a deadline-free run, where

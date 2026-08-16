@@ -268,7 +268,7 @@ internal object Suites {
         )
     }
 
-    // --- Slack all_different (Hall-prone; for explanation / clause-learning A/B) ---
+    // Slack all_different (Hall-prone; for explanation / clause-learning A/B).
 
     /**
      * Golomb-ruler feasibility built directly as a [Problem]: marks 0 = m0 < m1 < ... < m,
@@ -287,11 +287,11 @@ internal object Suites {
             when {
                 idx == 0 -> IntDomain(0, 0)
 
-                // mark[0] pinned to 0
+                // Remaining marks; mark[0] is pinned to 0 above to break translation symmetry.
                 idx < m -> IntDomain(0, maxLen.toLong())
 
-                // marks
-                else -> IntDomain(1, maxLen.toLong()) // differences
+                // Pairwise differences, strictly positive.
+                else -> IntDomain(1, maxLen.toLong())
             }
         }
         val factors = ArrayList<Factor>()
@@ -316,7 +316,7 @@ internal object Suites {
         }
     }
 
-    // --- In-code SAT/CSP ---
+    // In-code SAT/CSP.
 
     private val handwrittenCore = suite("handwritten-core", "Small hand-built SAT/CSP instances") {
         license = "internal"
@@ -551,7 +551,7 @@ internal object Suites {
         }
     }
 
-    // --- Vendored smoke-corpus suites (klause-bench/smoke-corpus/) ---
+    // Vendored smoke-corpus suites (klause-bench/smoke-corpus/).
 
     private val dimacsCore = suite("dimacs-core", "Curated small DIMACS CNF (SAT + UNSAT)") {
         format = Format.DIMACS
@@ -644,7 +644,7 @@ internal object Suites {
         vendored("infeasible-tiny", Category.UNSAT, Expected.Unsat)
     }
 
-    // --- External SAT collection (auto-fetched SATLIB tarball) ---
+    // External SAT collection (auto-fetched SATLIB tarball).
 
     private val satlibUf20 = suite("satlib-uf20", "SATLIB uf20-91 SAT instances (auto-fetched sample)") {
         // The full set is 1000 instances; reference a small, stable sample so the suite is
@@ -657,7 +657,7 @@ internal object Suites {
         }
     }
 
-    // --- SAT performance datasets ---
+    // SAT performance datasets.
 
     /** SATLIB random-3SAT phase-transition ladder (uf=SAT, uuf=UNSAT), V=50…250 — labelled
      *  instances at increasing size for measuring CDCL scaling. A small sample per family
@@ -777,7 +777,7 @@ internal object ExternalCollections {
 
     val all = listOf(minizincBenchmarks, libminizincTests, hakank, satlibUf20, satlibUuf50)
 
-    // --- XCSP3 competition library (instance archives, xcsp.org / CRIL) ---
+    // XCSP3 competition library (instance archives, xcsp.org / CRIL).
     // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
     // coverage tool decompresses them on the fly. Per-year full archives cover 2017–2019 (no
     // competition in 2020–2021); the 2022–2025 range is taken from the two curated main-track

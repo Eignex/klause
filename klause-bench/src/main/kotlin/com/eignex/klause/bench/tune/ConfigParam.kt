@@ -7,7 +7,7 @@ import kotlin.random.Random
  * One tunable dimension of a solver config space: a name, a domain, a random draw, and an
  * [activeWhen] predicate over the choices made so far (conditional / child parameters — e.g. a
  * CBLS-only knob is inactive unless `family == cbls`). The declaration doubles as the source for a
- * Vizier `StudySpec` parameter (task #24): categorical → CATEGORICAL, int → INTEGER, double → DOUBLE.
+ * Vizier `StudySpec` parameter: categorical → CATEGORICAL, int → INTEGER, double → DOUBLE.
  *
  * The space is never materialized — [ConfigSpace.sample] draws points lazily and a decoder turns a
  * point (a `Map<name, value>`) into a solver recipe. This is the search space the BO optimizes over,

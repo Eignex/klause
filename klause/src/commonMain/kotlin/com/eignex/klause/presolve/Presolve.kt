@@ -127,21 +127,21 @@ object Presolve {
         cancellation: Cancellation = Cancellation.Never,
     ): Array<IntArray> = ImplicationGraph.implicationGraph(problem, maxCandidates, cancellation)
 
-    /** Bounded variable elimination over the pure-SAT part (#24). See [BoundedVariableElimination]. */
+    /** Bounded variable elimination over the pure-SAT part. See [BoundedVariableElimination]. */
     fun eliminateBoolVars(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = BoundedVariableElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
-    /** Blocked-clause elimination over the pure-SAT part (#24). See [BlockedClauseElimination]. */
+    /** Blocked-clause elimination over the pure-SAT part. See [BlockedClauseElimination]. */
     fun eliminateBlockedClauses(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: Cancellation = Cancellation.Never,
     ): PassDelta = BlockedClauseElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
-    /** At-most-one clique merging (#17). See [AmoCliqueMerge]. */
+    /** At-most-one clique merging. See [AmoCliqueMerge]. */
     fun mergeAmoCliques(problem: Problem): PassDelta = AmoCliqueMerge.mergeAmoCliques(problem)
 
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =

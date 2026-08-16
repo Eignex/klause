@@ -20,7 +20,7 @@ import com.eignex.klause.util.LongHashSet
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
 internal const val NO_CARVE: Long = Long.MIN_VALUE
 
-/** Blocking-literal slot with no blocker (#200): the watcher always fires. Lit ids are
+/** Blocking-literal slot with no blocker: the watcher always fires. Lit ids are
  *  non-negative ([Lit.make] = `var shl 1 | sign`), so −1 is a safe sentinel. */
 internal const val NO_BLOCKER: Int = -1
 
@@ -49,8 +49,8 @@ internal const val PROPAGATION_CANCEL_FLOOR: Int = 1 shl 20
  *  - On contradiction, the set of decision levels touched by the failing factor is what the
  *    driver reports as [PropagationResult.Unsat.conflictLevels].
  *
- *  Factors don't see the level machinery directly — they keep calling `pinBool` /
- *  `tightenIntMin` / `tightenIntMax` / `setInt` as before. The driver sets `currentLevel`
+ *  Factors don't see the level machinery directly — they only call `pinBool` /
+ *  `tightenIntMin` / `tightenIntMax` / `setInt`. The driver sets `currentLevel`
  *  to the inherited level before each factor invocation; mutators read it.
  */
 class PropagationState(
@@ -63,19 +63,18 @@ class PropagationState(
      * [tombstoneFactor] instead of rebuilding a fresh [Problem] each pass. The int-event
      * machinery is forced on so a mid-life factor that subscribes to typed events wakes correctly even
      * when the initial problem had no such factor. Defaults to `false`: a search state never adds
-     * presolve factors, so every allocation and branch below reduces to the exact prior behaviour.
+     * presolve factors, so every allocation and branch below drops out.
      */
     internal val incremental: Boolean = false,
     /**
-     * Opt into the native-SAT BCP lane (#1119 Phase 1). When `true` and the problem is
+     * Opt into the native-SAT BCP lane. When `true` and the problem is
      * [com.eignex.klause.solver.Problem.isNativeSatEligible], propagation runs through [NativeSatState]
      * — an arena-packed two-watched-literal loop — instead of the general factor-queue fixpoint, and
-     * the general per-literal / occurrence watch indices are left unregistered. Defaults to `false`,
-     * so every non-opted state builds and propagates exactly as before.
+     * the general per-literal / occurrence watch indices are left unregistered. Defaults to `false`.
      */
     internal val nativeSat: Boolean = false,
     /**
-     * Opt into pseudo-Boolean cutting-planes conflict learning (#1119 Phase 3). When `true` and the
+     * Opt into pseudo-Boolean cutting-planes conflict learning. When `true` and the
      * problem is pure-Boolean, [ConflictAnalyzer] runs a [PbConflictResolvent] (with a clause-resolvent
      * fallback) so conflicts on pseudo-Boolean constraints learn PB nogoods, not just clauses. Defaults
      * to `false`; ignored on problems with integer variables (order-literal atoms have no PB reason).
@@ -84,7 +83,7 @@ class PropagationState(
 ) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
-     *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than the old `Array<Boolean?>`
+     *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than an `Array<Boolean?>`
      *  and one less pointer indirection per read (no boxed `Boolean`). */
     internal val boolAssigned: Bits = Bits(problem.numBoolVars)
     internal val boolValueBits: Bits = Bits(problem.numBoolVars)
@@ -135,9 +134,7 @@ class PropagationState(
      *  see [IntEventMachinery]. Empty when no factor opts in; forced live in [incremental] mode. */
     internal val intEvents: IntEventMachinery = IntEventMachinery(problem, incremental)
 
-    // -------- Reusable propagation worklist (was allocated fresh per runToFixpoint) --------
-    //
-    // [propQueue] is the factor worklist; [propStamp] is a per-factor "currently queued"
+    // [propQueue] is the reusable factor worklist; [propStamp] is a per-factor "currently queued"
     // membership set encoded as a generation stamp so resetting between propagation runs is
     // O(1) (just bump [propGen]) instead of zeroing a `BooleanArray(factorCount)` on every
     // pin. A factor is queued iff `propStamp[fid] == propGen`; dequeuing writes `propGen - 1`
@@ -176,7 +173,7 @@ class PropagationState(
     var seeded: Boolean = true
         private set
 
-    // Decision-level plumbing. ---------------------------------------------------------------
+    // Decision-level plumbing.
 
     /** Decision level when each bool was first pinned (-1 = unpinned). */
     val boolLevel: IntArray = IntArray(problem.numBoolVars) { -1 }
@@ -187,15 +184,15 @@ class PropagationState(
     // Per-side split of [intLevel]: the decision level at which the *current* lower (resp. upper)
     // bound was established. [intLevel] is the max of the two. Lets a current-bound order literal
     // `[v ≥ d.min]` / `[v ≤ d.max]` reconstruct its exact (often shallower) level from a single
-    // slot — the trail-resident replacement for the bound-history binary search inside
-    // [atomLevelForConflict], so that function can become a plain stored-slot read. -1 = the bound
+    // slot, which is why [atomLevelForConflict] is a plain stored-slot read rather than a
+    // bound-history search. -1 = the bound
     // is still at its root value (a level-0 global fact). Logged/restored by the undo trail.
     internal val intMinLevel: IntArray = IntArray(problem.numIntVars) { -1 }
     internal val intMaxLevel: IntArray = IntArray(problem.numIntVars) { -1 }
 
     // Per-int-var interior-hole carve history: the (value, level, reason) at which each
-    // search-time interior carve happened — the surviving per-var history (the bound histories
-    // are gone; order literals carry their own level/reason now). An eq atom ruled out by an
+    // search-time interior carve happened. Bound moves need no such history — order literals carry
+    // their own level/reason on their trail slots. An eq atom ruled out by an
     // interior hole materialized after the carve reads its level/reason from here. Lazily
     // allocated, maintained while [undoLogging], truncated on backtrack via the undo log.
     internal val holeHistAnt: Array<ArrayList<IntArray?>?> = arrayOfNulls(problem.numIntVars)
@@ -379,7 +376,7 @@ class PropagationState(
     internal val baseFactors: Array<out Propagator> = problem.propagators
     internal val baseFactorCount: Int = problem.factors.size
 
-    // Occurrence-list wakeup arrays cached off [problem] once at construction: they are now lazily
+    // Occurrence-list wakeup arrays cached off [problem] once at construction: they are lazily
     // built on [Problem] (deferred entirely for a presolve pass-view), so read them here — where a
     // state is always over a fully-baked problem — to force them once instead of paying a delegated
     // lazy access on every wakeup in the BCP hot loop.
@@ -399,7 +396,7 @@ class PropagationState(
      *  when iterating or sizing per-factor scratch in the engine. */
     val totalFactorCount: Int get() = problem.numFactors + learned.size + midlife.store.size
 
-    /** Per-literal bool watcher index (watch lists, #200 blockers, #42 back-pointers) —
+    /** Per-literal bool watcher index (watch lists, blockers, back-pointers) —
      *  see [BoolWatcherIndex]. Mutated by `Watches.kt` and the [forgetLearnedClauses] compaction. */
     internal val watches: BoolWatcherIndex = BoolWatcherIndex(problem.numBoolVars)
 
@@ -620,7 +617,7 @@ class PropagationState(
      *  first push. */
     var undoLogging: Boolean = false
 
-    // --- Incremental objective lower bound (the always-on trivial bound, kept O(1) per node). ---
+    // Incremental objective lower bound: the always-on trivial bound, kept O(1) per node.
     // The trivial lower bound on a `Σ boolWeights·x` objective under the current partial assignment is
     //   objective.constant + Σ_b contribution(b) + <integer part>, where
     //   contribution(b) = pinned ? (value ? w : 0) : min(w, 0).
@@ -876,9 +873,9 @@ class PropagationState(
      * Lightweight per-level marker. Records only the *positions* a pop must rewind to: the
      * undo-log size and the three append-only stacks' sizes, plus snapshot copies of any
      * [SnapshottablePayload]s (the rare factors — Mdd / Table — whose incremental state
-     * isn't recomputed from scratch on each `propagate`). Replaces the old `Snapshot`,
-     * which copied ~12 numVars-sized arrays per level; [undoTo] instead replays the undo
-     * log in O(changes-since-mark).
+     * isn't recomputed from scratch on each `propagate`). Copying whole per-level state would
+     * cost ~12 numVars-sized arrays per level; [undoTo] instead replays the undo log in
+     * O(changes-since-mark).
      */
     class LevelMark internal constructor(
         internal val undoSize: Int,
@@ -928,7 +925,7 @@ class PropagationState(
         propBegin(factorCount)
         val pollable = cancellation !== Cancellation.Never
         // Full propagation (bakes) is one-shot, not in the per-node BCP loop or a resumable slice, so
-        // it polls from the first fire like the original design. Only the incremental per-node path
+        // it polls from the first fire. Only the incremental per-node path
         // defers the poll past the fire floor, so a normal small fixpoint — and resumable slicing,
         // which pauses at decision granularity — is never cut mid-propagation.
         val floor = if (allFactors) 0 else cancelFloor
@@ -953,7 +950,7 @@ class PropagationState(
             // over a Long-wide domain, millions of fires deep — needs the deadline *inside*
             // propagation. A normal per-node fixpoint is tiny and pauses cleanly at the engine's
             // between-decision poll, so the fire floor leaves that path (and resumable slicing, which
-            // pauses at decision granularity) byte-identical: the poll is never even consulted there.
+            // pauses at decision granularity) untouched: the poll is never even consulted there.
             if (pollable) {
                 if (fireCount >= floor && (fireCount and CANCEL_POLL_MASK) == 0 && cancellation()) {
                     runCancelled = true
@@ -1023,7 +1020,7 @@ class PropagationState(
             maxLevelForClause(f.literals)
         }
 
-        // A learned non-clause constraint (a cutting-planes pseudo-Boolean nogood, #1119 Phase 3) lives in
+        // A learned non-clause constraint (a cutting-planes pseudo-Boolean nogood) lives in
         // the learned store, not [problem.factors] / [MidlifeFactors.factors]; read its var footprint off
         // the propagator itself.
         fid >= baseFactorCount && !incremental && f is LearnedPropagator -> maxLevelForVars(f.boolVars, f.intVars)
@@ -1057,10 +1054,10 @@ class PropagationState(
         val watchers = watches.byLit[falseLit]
         val blockers = watches.blockersByLit[falseLit]
         for (i in 0 until watchers.size) {
-            // Blocking-literal short-cut (#200): if the cached blocker for this watch is
+            // Blocking-literal short-cut: if the cached blocker for this watch is
             // already true, the factor is satisfied and waking it would be a no-op — skip
             // the enqueue and the clause dereference entirely. NO_BLOCKER falls through and
-            // always fires, so factors without blockers behave exactly as before.
+            // always fires, so factors without blockers keep their unconditional wakeup.
             val blocker = blockers[i]
             if (blocker != NO_BLOCKER && litTrue(blocker)) continue
             propEnq(watchers[i])

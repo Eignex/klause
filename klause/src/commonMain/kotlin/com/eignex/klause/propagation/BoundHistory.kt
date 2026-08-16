@@ -22,7 +22,7 @@ internal fun PropagationState.holeReasonFor(v: Int, k: Long): IntArray? {
  *  a hit means `k` is excluded *and* was carved as a pure-interior hole on the current
  *  path — so [holeReasonFor] / [holeLevelFor] hold its real (other-variable) reason and carve
  *  level. Lets the conflict derivation prefer that over the same-var complementary-bound citation
- *  that otherwise cycles for a value far from the live bound (#671). */
+ *  that otherwise cycles for a value far from the live bound. */
 internal fun PropagationState.holeHistHas(v: Int, k: Long): Boolean {
     val vals = holeHistVal[v] ?: return false
     for (i in 0 until vals.size) if (vals[i] == k) return true

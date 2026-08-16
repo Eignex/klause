@@ -107,7 +107,7 @@ internal object SolveCore {
             return
         }
 
-        // `-p N` is MiniZinc-standard parallelism = the **core** count (#406). The portfolio engines
+        // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
         // engine (fixed) is inherently single-core.
         val cores = common.parallel ?: 1
@@ -122,7 +122,7 @@ internal object SolveCore {
             // The parallel-capable portfolio engines: their mix is carried on the enum. `ls` resolves
             // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); `cp`
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
-            // single resolved arm runs as a one-arm pool, subsuming the former naked single engines.
+            // single resolved arm runs as a one-arm pool.
             Engine.CP, Engine.LS, Engine.MIXED, Engine.ALNS ->
                 runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel)
         }
@@ -182,8 +182,6 @@ internal object SolveCore {
         val cap = solveDeadline?.let { minOf(it, presolveDeadline) } ?: presolveDeadline
         return Cancellation { nowMillis() > cap } to PresolveBudget { cap - nowMillis() }
     }
-
-    // --- single-engine paths ---
 
     /** Naked single backtrack solve for the `fixed`/FD engine: follows the model's `solve :: *_search`
      *  annotation. Per-solver `var-selector`/`val-selector` --params are rejected (the annotation
@@ -280,7 +278,7 @@ internal object SolveCore {
     ) {
         val passes = stats?.passes.orEmpty()
         errPrintln("presolve dry-run:")
-        // Heap after ingest, which is the quantity an OOM at `-Xmx` is about (#1415). Retained is what
+        // Heap after ingest, which is the quantity an OOM at `-Xmx` is about. Retained is what
         // the built problem holds; peak includes the transients the build passed through, so a large gap
         // points at a structure that is materialized and dropped rather than one that is kept.
         sampleHeap()?.let { heap ->
@@ -389,9 +387,9 @@ internal object SolveCore {
         mix: EngineMix,
         cancel: Cancellation,
     ) {
-        // Default arm-pool size: an env override, else auto-tuned from the core count (#406).
+        // Default arm-pool size: an env override, else auto-tuned from the core count.
         val defaultArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull() ?: autoArms(cores)
-        // #429: `--lp CEILING` caps the portfolio's LP emphasis; the flag wins, then the `klause.lp`
+        // `--lp CEILING` caps the portfolio's LP emphasis; the flag wins, then the `klause.lp`
         // env default, else AGGRESSIVE (uncapped — the pool spreads the LP intensity itself); `off`
         // disables LP across the pool.
         val lpCeiling = (common.lp ?: defaultLp())?.let {
@@ -431,7 +429,7 @@ internal object SolveCore {
             lpCeiling = lpCeiling,
             lsPool = lsResolution.pool,
             btPool = btPool,
-            // #512: include the model's search-annotation arm in the backtrack pool when the model
+            // Include the model's search-annotation arm in the backtrack pool when the model
             // carries one (a no-op for a pure-LS pool, which has no backtrack slot).
             annotationArm = solvable.annotatedBacktrackParams,
         )
@@ -533,8 +531,6 @@ internal object SolveCore {
         }
         stats(common, output, solvable, withModelObjective(r.stats, solvable, best), nowMillis() - t0, produced)
     }
-
-    // --- generic per-engine satisfy / optimize ---
 
     private fun <P : SolverParams> runGeneric(
         solver: Solver<P>,
@@ -703,8 +699,6 @@ internal object SolveCore {
         stats(common, output, solvable, SolveStats.EMPTY, nowMillis() - t0, if (best == null) 0L else 1L)
     }
 
-    // --- helpers ---
-
     private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample) {
         output.onSolution(solvable.render(sample), solvable.objectiveValue?.invoke(sample))
     }
@@ -733,8 +727,6 @@ internal object SolveCore {
         return s.copy(ls = s.ls.copy(incumbentObjective = objectiveValue(sample).toDouble()))
     }
 }
-
-// --- verbose listeners (shared by every mode) ---
 
 /** Render one [SearchEvent] as a `-v` line; [worker] tags portfolio workers. */
 internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): String {
