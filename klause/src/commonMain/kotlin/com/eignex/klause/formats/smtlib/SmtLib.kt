@@ -136,6 +136,17 @@ object SmtLib {
             var lin: IntComb? = null
             var lit: Int? = null
             var real: RealComb? = null
+
+            /**
+             * A Bool binding's source term while it is still uncompiled.
+             *
+             * Compiling it on sight costs the reified form even where the value is only ever forced true:
+             * a `distinct` over n operands reifies to n(n-1)/2 auxiliary literals and as many reified
+             * rows, where asserting the same term posts plain disequalities and allocates nothing. So the
+             * term is kept until something asks for its literal, which lets [assert] recognise a binding
+             * it can post directly.
+             */
+            var srcBool: SExpr? = null
         }
 
         // Let scoping as a heap-allocated stack, not recursion. `bindingStacks` maps each name to its
@@ -145,6 +156,16 @@ object SmtLib {
         private val bindingStacks = HashMap<String, ArrayDeque<Binding>>()
         private val scopeNames = ArrayDeque<List<String>>()
         internal fun lookup(name: String): Binding? = bindingStacks[name]?.lastOrNull()
+
+        /** The literal for a Bool binding, compiling its held term on the first ask. */
+        internal fun boolLit(b: Binding): Int {
+            b.lit?.let { return it }
+            val src = b.srcBool ?: throw UnsupportedSmtException("Bool binding has no value")
+            return compileBool(src).also {
+                b.lit = it
+                b.srcBool = null
+            }
+        }
 
         /** Compile one `let`'s bindings (in parallel — their values don't see each other) and push them
          *  as a new scope. */
@@ -157,7 +178,7 @@ object SmtLib {
                     val expr = p.argAt(1, "let binding value")
                     val b = Binding(isBool = isBoolExpr(expr), isReal = !isBoolExpr(expr) && isRealExpr(expr))
                     when {
-                        b.isBool -> b.lit = compileBool(expr)
+                        b.isBool -> b.srcBool = expr
                         b.isReal -> b.real = realTerm(expr)
                         else -> b.lin = linearTerm(expr)
                     }

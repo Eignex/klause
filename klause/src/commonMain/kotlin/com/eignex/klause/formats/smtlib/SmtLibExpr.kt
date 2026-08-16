@@ -7,6 +7,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.formats.reifyLinear
+import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
 import com.eignex.klause.formats.tseitinOr
 import com.eignex.klause.solver.Lit
@@ -33,6 +34,20 @@ internal fun SmtLib.Builder.assert(top: SExpr) {
         }
         // Pop markers go under the conjuncts, so the scope stays active while they are processed.
         repeat(lets) { work.addLast(null) }
+        // A `let`-bound Bool that nothing has asked for a literal yet can be asserted rather than
+        // reified: substituting its term here sends it back through this loop, where `and`, the
+        // comparisons and `distinct` each have a direct posting that allocates no auxiliary literal.
+        // Once its literal exists the binding is shared as before, so a name used elsewhere is unaffected.
+        if (node is SExpr.Atom) {
+            val bound = lookup(node.text)
+            val src = bound?.takeIf { it.isBool && it.lit == null }?.srcBool
+            if (src != null) {
+                bound.srcBool = null
+                bound.lit = trueLit()
+                work.addLast(src)
+                continue
+            }
+        }
         if (node is SExpr.SList && node.items.isNotEmpty()) {
             val h = (node.items[0] as? SExpr.Atom)?.text
             val args = node.items.drop(1)
@@ -77,7 +92,7 @@ internal fun SmtLib.Builder.compileBool(t: SExpr): Int = (evalTerm(t, Sort.BOOL)
 
 internal fun SmtLib.Builder.boolBinding(name: String, b: SmtLib.Builder.Binding): Int {
     if (!b.isBool) throw UnsupportedSmtException("'$name' used as Bool but bound to an Int term")
-    return b.lit ?: throw UnsupportedSmtException("'$name' has no compiled Bool value")
+    return boolLit(b)
 }
 
 /** Reify boolean ite as `(c and x) or (!c and y)`. */
