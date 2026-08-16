@@ -12,7 +12,7 @@ Run `./gradlew check lintDocs`.
 
 ## Tests
 
-- Test names within backticks, `x should y` style, plain ascii.
+- Test names within backticks, plain ascii, describing the behavior under test.
 - Class almost always named after the file under test (`<FileUnderTest>Test`).
 - One observable behavior per test; assert behavior, not implementation. Follow arrange → act → assert.
 - Mirror existing tests' framework, layout, and assertion style.
