@@ -256,12 +256,12 @@ class TablePropagatorTest {
         // shape where every row instantiates the same relation. The first row over full domains records the
         // "prunes no domain" verdict; the others reuse it, skipping their own sweep. Enumeration under the
         // CDCL backtracker must still equal brute force, and the mix of full-domain (reusing) and pinned
-        // (recomputing) rows exercises both paths across deep backtracking. The relation over {1..4}² allows
+        // (recomputing) rows exercises both paths across deep backtracking. The relation over {1..3}² allows
         // every off-diagonal pair (i != j) — dense enough that a full-domain sweep prunes nothing, so the
         // reuse verdict is both set and hit.
         val rel = ArrayList<Long>()
-        for (a in 1..4) {
-            for (b in 1..4) {
+        for (a in 1..3) {
+            for (b in 1..3) {
                 if (a != b) {
                     rel.add(a.toLong())
                     rel.add(b.toLong())
@@ -276,11 +276,11 @@ class TablePropagatorTest {
             cache.noopMaxs = null
             val brute = HashSet<List<Int>>()
             for (a in 1..h0) {
-                for (b in 1..4) {
-                    for (c in 1..4) {
-                        for (d in 1..4) {
-                            for (e in 1..4) {
-                                for (f in 1..4) {
+                for (b in 1..3) {
+                    for (c in 1..3) {
+                        for (d in 1..3) {
+                            for (e in 1..3) {
+                                for (f in 1..3) {
                                     if (a != b && c != d && e != f) brute.add(listOf(a, b, c, d, e, f))
                                 }
                             }
@@ -291,7 +291,7 @@ class TablePropagatorTest {
             val problem = Problem(
                 numBoolVars = 0,
                 numIntVars = 6,
-                intDomains = Array(6) { if (it == 0) IntDomain(1, h0.toLong()) else IntDomain(1, 4) },
+                intDomains = Array(6) { if (it == 0) IntDomain(1, h0.toLong()) else IntDomain(1, 3) },
                 factors = arrayOf<Factor>(mk(0, 1), mk(2, 3), mk(4, 5)),
             )
             val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L))

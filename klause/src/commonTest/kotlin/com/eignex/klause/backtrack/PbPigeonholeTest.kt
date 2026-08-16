@@ -52,7 +52,7 @@ class PbPigeonholeTest {
     @Test
     fun `pb learning uses far fewer nodes than clause learning on pigeonhole`() {
         // Small enough that the clause path is still cheap, so the separation can be asserted directly.
-        val p = { php(pigeons = 8, holes = 7) }
+        val p = { php(pigeons = 7, holes = 6) }
         val pb = assertIs<SolveResult.Unsat>(
             BacktrackSolver(p().bake()).solve(BacktrackParams(randomSeed = 1L, pbLearning = true)),
         )

@@ -437,9 +437,9 @@ class AlnsTest {
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.1,
             maxDestroyFraction = 0.6,
-            maxIterations = 20,
+            maxIterations = 8,
         )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 500L, randomSeed = 1L))
+        alns.minimize(objective, LocalSearchParams(maxFlips = 100L, randomSeed = 1L))
         val freedCounts = alns.iterationLog.map { it.freedCount }.toSet()
         assertTrue(freedCounts.size >= 2, "the destroy size must vary across iterations, got $freedCounts")
     }

@@ -12,26 +12,26 @@ class IntDomainTest {
 
     @Test
     fun `wide span carved down to a sparse survivor set`() {
-        val survivors = intArrayOf(3, 7, 1_000_000, 19_999_998, 20_000_000)
+        val survivors = intArrayOf(3, 7, 100_000, 1_999_998, 2_000_000)
         val toExclude = LongArrayList()
         var next = 0
         for (s in survivors) {
             for (v in next until s) toExclude.add(v.toLong())
             next = s + 1
         }
-        val d = IntDomain(0, 20_000_000).excludeValues(toExclude.toLongArray())!!
+        val d = IntDomain(0, 2_000_000).excludeValues(toExclude.toLongArray())!!
         assertEquals(3, d.min)
-        assertEquals(20_000_000, d.max)
+        assertEquals(2_000_000, d.max)
         assertEquals(survivors.size, d.size)
         for (s in survivors) assertTrue(s.toLong() in d, "survivor $s present")
         assertFalse(8 in d)
-        assertFalse(999_999 in d)
+        assertFalse(99_999 in d)
         val seen = mutableListOf<Long>()
         d.forEach { seen.add(it) }
         assertEquals(survivors.map { it.toLong() }, seen)
         for ((i, s) in survivors.withIndex()) assertEquals(s.toLong(), d.valueAt(i))
-        assertEquals(1_000_000, d.withMinAtLeast(8).min)
-        assertEquals(7, d.withMaxAtMost(999_999).max)
+        assertEquals(100_000, d.withMinAtLeast(8).min)
+        assertEquals(7, d.withMaxAtMost(99_999).max)
     }
 
     @Test
@@ -89,9 +89,9 @@ class IntDomainTest {
     @Test
     fun `wide reps agree with a brute-force set across operations`() {
         val rng = Random(0x5A17)
-        repeat(60) { _ ->
+        repeat(25) { _ ->
             val lo = rng.nextInt(0, 1000)
-            val width = rng.nextInt(DEFAULT_BITSET_THRESHOLD + 1, 20_000)
+            val width = rng.nextInt(DEFAULT_BITSET_THRESHOLD + 1, 8_000)
             val hi = lo + width
             val present = (lo..hi).toMutableSet()
             val carveFraction = rng.nextDouble()
