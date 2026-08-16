@@ -110,7 +110,7 @@ internal object Suites {
             ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfIdl,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_IDL", "smt2"),
+                    CorpusSelection.Layout.Flat("QF_IDL", "smt2"),
                     sel,
                     Category.CSP,
                     format = Format.SMTLIB,
@@ -123,7 +123,7 @@ internal object Suites {
             ) { sel ->
                 CorpusSelection.select(
                     ExternalCollections.smtlibQfRdl,
-                    CorpusSelection.Layout.Flat("non-incremental/QF_RDL", "smt2"),
+                    CorpusSelection.Layout.Flat("QF_RDL", "smt2"),
                     sel,
                     Category.CSP,
                     format = Format.SMTLIB,

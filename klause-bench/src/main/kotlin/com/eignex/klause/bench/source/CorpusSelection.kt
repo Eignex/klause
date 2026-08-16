@@ -155,7 +155,16 @@ internal object CorpusSelection {
         expected: (File) -> Expected = { Expected.Unknown },
     ): List<ProblemRef> {
         val root = CorpusFetcher.ensure(collection)
-        val chosen = applySelection(layout.discover(root), selection)
+        val discovered = layout.discover(root)
+        // A layout prefix that does not match what the archive actually unpacks finds nothing, and an
+        // empty suite is indistinguishable downstream from a suite that ran and changed nothing - the
+        // failure mode that makes a measurement read as a clean negative result. Fail where the cause is
+        // still visible.
+        require(discovered.isNotEmpty()) {
+            "corpus '${collection.id}' yielded no instances under '$layout' in $root: " +
+                "the layout prefix does not match the fetched tree"
+        }
+        val chosen = applySelection(discovered, selection)
         return chosen.map { d ->
             ProblemRef(
                 name = d.name,
