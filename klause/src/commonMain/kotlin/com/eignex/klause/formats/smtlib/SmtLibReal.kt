@@ -108,11 +108,18 @@ internal fun parseRealLiteral(s: String): BigFraction? {
     return BigFraction.of(num, den)
 }
 
-/** Post a top-level real relation `(op a b)` as a hard LP-only row; strictness rides through to the
- *  delta-rational deciders. `distinct` needs the real-atom machinery and rejects. */
+/** Post a top-level real relation as hard LP-only rows; strictness rides through to the delta-rational
+ *  deciders. An n-ary chain `(op a1 … an)` posts its n−1 consecutive relations. `distinct` needs the
+ *  real-atom machinery and rejects. */
 internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
     val op = node.atomAt(0, "relation operator")
-    requireBinaryRelation(node, op)
+    requireChainableRelation(node, op)
+    val terms = (1 until node.items.size).map { realTerm(node.items[it]) }
+    for (i in 0 until terms.size - 1) assertRealRelation(op, terms[i], terms[i + 1])
+}
+
+/** Post one real relation `a ⟨op⟩ b`, resolving a variable-free comparison to trivially true or unsat. */
+private fun SmtLib.Builder.assertRealRelation(op: String, a: RealComb, b: RealComb) {
     val (linOp, strict) = when (op) {
         "<=" -> LinearOp.LE to false
         ">=" -> LinearOp.GE to false
@@ -121,8 +128,6 @@ internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
         "=" -> LinearOp.EQ to false
         else -> smtUnsupported("real relation '$op'")
     }
-    val a = realTerm(node.items[1])
-    val b = realTerm(node.items[2])
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
     if (d.isConstant) {
         val sign = d.constant.signum()

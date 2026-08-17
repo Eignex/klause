@@ -62,7 +62,7 @@ internal fun SmtLib.Builder.assert(top: SExpr) {
                     continue
                 }
 
-                h == "=" && isArithmeticRelation(node) && args.size == 2 -> {
+                h == "=" && isArithmeticRelation(node) && args.size >= 2 -> {
                     if (isRealRelation(node)) assertRealLinear(node) else assertLinear(node)
                     continue
                 }

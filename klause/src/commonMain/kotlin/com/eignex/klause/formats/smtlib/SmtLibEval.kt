@@ -289,8 +289,9 @@ private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: Li
     }
 
     "<=", "<", ">=", ">" -> if (args.any { it is Res.R }) {
-        requireBinaryRelation(node, head)
-        Res.B(reifyRealRel(head, args[0].asReal(), args[1].asReal()))
+        requireChainableRelation(node, head)
+        val terms = args.map { it.asReal() }
+        Res.B(chainReified(terms.size) { i -> reifyRealRel(head, terms[i], terms[i + 1]) })
     } else {
         Res.B(reifyRelArgs(node, head, args))
     }
@@ -480,11 +481,19 @@ private fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     return lo to hi
 }
 
-/** Reify a two-operand arithmetic relation from its folded operands (wide when a value exceeds 64 bits). */
+/** Reify an arithmetic relation from its folded operands (wide when a value exceeds 64 bits); an n-ary
+ *  chain reifies as the conjunction of its n−1 consecutive pairs. */
 private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
-    requireBinaryRelation(node, op)
-    return reifyRelation(op, args[0].asIntComb(), args[1].asIntComb())
+    requireChainableRelation(node, op)
+    val terms = args.map { it.asIntComb() }
+    return chainReified(terms.size) { i -> reifyRelation(op, terms[i], terms[i + 1]) }
 }
+
+/** The literal for a chainable relation over [n] operands: the single pair, or the conjunction of the
+ *  n−1 consecutive pairs. The native chain factor is hard-only (no reified form), so a chain under
+ *  boolean structure stays a conjunction of reified pairs. */
+private inline fun SmtLib.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
+    if (n == 2) reifyPair(0) else tseitinAnd((0 until n - 1).map(reifyPair))
 
 /** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
  *  witness encoding where every operand is a bare finite-domain variable, else pairwise `!=`. */
