@@ -60,6 +60,39 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `pins nonbasic columns at their upper bound to satisfy an equality`() {
+        // x + y + z = 3 over [0, 1] boxes holds only with every variable at its upper bound.
+        val b = LpBuilder()
+        val cols = IntArray(3) { b.addRealVar(0.0, 1.0, cost = 0.0) }
+        b.addRealRow(cols, DoubleArray(3) { 1.0 }, Relation.EQ, 3.0)
+        val outcome = rationalOutcome(b.build(Sense.MINIMIZE))
+        assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
+        val w = outcome.witness!!
+        assertTrue(cols.all { w[it] == 1.0 }, "witness ${w.toList()} must sit at every upper bound")
+    }
+
+    @Test
+    fun `refutes an equality just past the sum of the upper bounds`() {
+        val b = LpBuilder()
+        val cols = IntArray(3) { b.addRealVar(0.0, 1.0, cost = 0.0) }
+        b.addRealRow(cols, DoubleArray(3) { 1.0 }, Relation.EQ, 3.5)
+        assertEquals(RationalFeasibility.INFEASIBLE, rationalFeasible(b.build(Sense.MINIMIZE)))
+    }
+
+    @Test
+    fun `decides a sparse system far larger than a dense tableau would fit`() {
+        // 4000 rows x 4000 columns with two nonzeros each: a dense tableau is 32M entries, the
+        // sparse one 12k. Feasible at the origin, so the cost is the tableau alone.
+        val size = 4000
+        val b = LpBuilder()
+        val cols = IntArray(size) { b.addRealVar(0.0, 1.0, cost = 0.0) }
+        for (i in 0 until size) {
+            b.addRealRow(intArrayOf(cols[i], cols[(i + 1) % size]), doubleArrayOf(1.0, 1.0), Relation.LE, 1.0)
+        }
+        assertEquals(RationalFeasibility.FEASIBLE, rationalFeasible(b.build(Sense.MINIMIZE)))
+    }
+
+    @Test
     fun `a zero pivot budget reports unknown`() {
         val b = LpBuilder()
         val x = b.addRealVar(0.0, 1.0, cost = 0.0)
