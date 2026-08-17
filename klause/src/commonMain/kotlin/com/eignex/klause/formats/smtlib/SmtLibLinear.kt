@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.LinRelation
@@ -25,11 +26,37 @@ internal fun SmtLib.Builder.isArithmeticRelation(t: SExpr.SList): Boolean {
 }
 
 /** Assert a linear relation; when all terms cancel to a constant it is trivially true (post
- *  nothing) or false (post the false literal ⇒ unsat) rather than an empty [Linear]. */
+ *  nothing) or false (post the false literal ⇒ unsat) rather than an empty [Linear]. An n-ary chain
+ *  `(op a1 … an)` is the conjunction of its n−1 consecutive relations, per the SMT-LIB chainable
+ *  semantics — `a1 op a2 ∧ … ∧ a(n−1) op an`, with no direct relation between non-adjacent operands. */
 internal fun SmtLib.Builder.assertLinear(t: SExpr.SList) {
     val op = t.atomAt(0, "relation operator")
-    requireBinaryRelation(t, op)
-    assertRelation(op, linearTerm(t.items[1]), linearTerm(t.items[2]))
+    requireChainableRelation(t, op)
+    // Fold each operand once: a term with a side-effecting subterm (`ite`, `div`, …) allocates fresh
+    // variables and clauses per fold, and an interior operand takes part in two consecutive relations.
+    val terms = (1 until t.items.size).map { linearTerm(t.items[it]) }
+    if (postOrderChain(op, terms)) return
+    for (i in 0 until terms.size - 1) assertRelation(op, terms[i], terms[i + 1])
+}
+
+/** Post an order chain over three or more bare integer variables as one [Increasing], returning whether
+ *  it applied. A two-operand relation is already a single exact row, and a repeated variable would make
+ *  the chain propagate one unit per wake, so both decline to the pairwise [Linear] rows. */
+private fun SmtLib.Builder.postOrderChain(op: String, terms: List<IntComb>): Boolean {
+    if (terms.size < 3) return false
+    val descending = when (op) {
+        "<", "<=" -> false
+        ">", ">=" -> true
+        else -> return false
+    }
+    val vars = IntArray(terms.size) { i ->
+        val narrow = terms[i] as? IntComb.Narrow ?: return false
+        narrow.lin.asSimpleVar() ?: return false
+    }
+    if (vars.toHashSet().size != vars.size) return false
+    // `a ≥ b ≥ c` is the ascending chain over the reversed sequence; [Increasing] only represents ascending.
+    factors.add(Increasing(if (descending) vars.reversedArray() else vars, strict = strictDelta(op) != 0))
+    return true
 }
 
 /** Post a linear row, or resolve a variable-free relation to trivially-true (post nothing) or
@@ -73,23 +100,25 @@ internal fun SmtLib.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): I
     }
 }
 
-/** Require a relation node to have exactly two operands (`(op a b)`), else reject as unsupported. */
-internal fun requireBinaryRelation(node: SExpr.SList, op: String) {
-    if (node.items.size != 3) {
-        throw UnsupportedSmtException(
-            "$op with ${node.items.size - 1} operands not supported as a single linear relation",
-        )
+/** Require a chainable relation node to have at least two operands (`(op a b …)`), else reject. */
+internal fun requireChainableRelation(node: SExpr.SList, op: String) {
+    if (node.items.size < 3) {
+        throw UnsupportedSmtException("$op with ${node.items.size - 1} operands is not a relation")
     }
 }
 
-/** Lower `(op lhs rhs)` to one 64-bit linear relation for OBBT bound inference, or `null` when either
- *  operand is wide (a wide relation is enforced by its factor, not used to tighten bounds). */
-internal fun SmtLib.Builder.relationToLinear(t: SExpr.SList): Rel? {
+/** Collect the 64-bit linear relations of `(op a1 … an)` — one per consecutive pair — for OBBT bound
+ *  inference, skipping a pair with a wide operand (a wide relation is enforced by its factor, not used
+ *  to tighten bounds). */
+internal fun SmtLib.Builder.relationToLinear(t: SExpr.SList, out: MutableList<Rel>) {
     val op = t.atomAt(0, "relation operator")
-    requireBinaryRelation(t, op)
-    val a = linearTerm(t.items[1])
-    val b = linearTerm(t.items[2])
-    return if (a is IntComb.Narrow && b is IntComb.Narrow) relFromOperands(op, a.lin, b.lin) else null
+    requireChainableRelation(t, op)
+    val terms = (1 until t.items.size).map { linearTerm(t.items[it]) }
+    for (i in 0 until terms.size - 1) {
+        val a = terms[i]
+        val b = terms[i + 1]
+        if (a is IntComb.Narrow && b is IntComb.Narrow) out.add(relFromOperands(op, a.lin, b.lin))
+    }
 }
 
 /** Build a linear relation `a op b` (as `Σ coeffs·vars ⟨op⟩ bound`) from two folded operands. */
