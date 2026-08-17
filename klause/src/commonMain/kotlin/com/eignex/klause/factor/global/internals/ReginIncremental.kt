@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global.internals
 
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -22,10 +21,15 @@ import com.eignex.klause.util.MutableIntObjectMap
 
 /** Incremental matching GAC for [vars] (plain alldifferent). Returns `null` after pruning to the GAC
  *  fixpoint, or the Hall-violator variable ids on infeasibility — same contract as [reginFilter]. */
-internal fun reginIncremental(state: PropagationState, vars: IntArray, cache: ReginCache): IntArray? {
+internal fun reginIncremental(
+    state: PropagationState,
+    vars: IntArray,
+    cache: ReginCache,
+    premises: IntArray,
+): IntArray? {
     val inc = cache.incremental(state, vars)
-    if (inc.valid.value == 0) return reginRebuild(state, vars, cache, inc)
-    return reginDelta(state, vars, cache, inc)
+    if (inc.valid.value == 0) return reginRebuild(state, vars, cache, inc, premises)
+    return reginDelta(state, vars, cache, inc, premises)
 }
 
 /** Full rebuild: re-seed the matching (warm-started from the reversible matching), recompute SCC
@@ -36,6 +40,7 @@ private fun reginRebuild(
     vars: IntArray,
     cache: ReginCache,
     inc: ReginIncrementalState,
+    premises: IntArray,
 ): IntArray? {
     val n = inc.n
     val cap = inc.valueCap
@@ -82,7 +87,7 @@ private fun reginRebuild(
     for (i in 0 until n) inc.matchVar[i] = matchVar[i]
     for (j in 0 until cap) inc.matchVal[j] = matchVal[j]
 
-    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels = null)
+    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels = null, premises = premises)
     if (conflict != null) return conflict
     inc.valid.set(1)
     for (i in 0 until n) inc.domRef[i].set(state.intDomains[vars[i]])
@@ -98,18 +103,19 @@ private fun reginDelta(
     vars: IntArray,
     cache: ReginCache,
     inc: ReginIncrementalState,
+    premises: IntArray,
 ): IntArray? {
     val n = inc.n
     // Dirty SCC labels: an SCC can split only when an *intra-component* edge is deleted. Deleting a
     // cross-component edge (which carries no cycle) leaves every SCC intact, so it is ignored here.
     val dirtyLabels = IntHashSet()
     for (i in 0 until n) {
-        val prev = inc.domRef[i].value ?: return reginRebuild(state, vars, cache, inc)
+        val prev = inc.domRef[i].value ?: return reginRebuild(state, vars, cache, inc, premises)
         val cur = state.intDomains[vars[i]]
         if (cur === prev) continue
         var widened = false
         cur.forEach { v -> if (v !in prev) widened = true }
-        if (widened) return reginRebuild(state, vars, cache, inc) // not deletions-only → rebuild
+        if (widened) return reginRebuild(state, vars, cache, inc, premises) // not deletions-only → rebuild
         val matchedId = inc.matchVar[i]
         // Values that left var i since the last fire (deletions only — widening ruled out above).
         var brokeMatch = false
@@ -123,11 +129,11 @@ private fun reginDelta(
                 }
             }
         }
-        if (brokeMatch) return reginRebuild(state, vars, cache, inc)
+        if (brokeMatch) return reginRebuild(state, vars, cache, inc, premises)
     }
     // Matching still maximum (no matched edge lost): patch the dirty components and re-prune.
     val valuesPerVar = buildValuesPerVar(state, vars, cache, n)
-    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels)
+    val conflict = reginSccReachPrune(state, vars, cache, inc, valuesPerVar, dirtyLabels, premises)
     if (conflict != null) return conflict
     for (i in 0 until n) inc.domRef[i].set(state.intDomains[vars[i]])
     cache.recordFixpoint(state, vars)
@@ -159,6 +165,7 @@ private fun reginSccReachPrune(
     inc: ReginIncrementalState,
     valuesPerVar: Array<IntArray>,
     dirtyLabels: IntHashSet?,
+    premises: IntArray,
 ): IntArray? {
     val n = inc.n
     val total = inc.total
@@ -219,7 +226,7 @@ private fun reginSccReachPrune(
             if (inc.sccId[i] == inc.sccId[vNode]) continue
             if (reached[vNode]) continue
             val hall = sccHallVars.getOrPut(inc.sccId[vNode]) { hallVarsFrom(vNode, adj, n, vars) }
-            val ant = collectHoleAndBoundAntecedents(state, hall)
+            val ant = antecedentsWithPremises(state, hall, premises)
             if (!state.excludeIntValue(vars[i], cache.valueOfId[vid], ant)) {
                 val withI = hall.copyOf(hall.size + 1)
                 withI[hall.size] = vars[i]

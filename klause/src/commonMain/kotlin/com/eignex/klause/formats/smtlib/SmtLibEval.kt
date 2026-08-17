@@ -4,11 +4,14 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.ALL_DIFFERENT_WITNESS_MIN_ARITY
 import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.WideLinComb
+import com.eignex.klause.formats.allDifferentWindowSize
 import com.eignex.klause.formats.constProduct
 import com.eignex.klause.formats.isConstant
+import com.eignex.klause.formats.reifyAllDifferentWitness
 import com.eignex.klause.formats.scaleByConst
 import com.eignex.klause.formats.scaleIntComb
 import com.eignex.klause.formats.sumIntCombs
@@ -483,17 +486,39 @@ private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: Lis
     return reifyRelation(op, args[0].asIntComb(), args[1].asIntComb())
 }
 
-/** Pairwise `!=` over folded distinct operands (bool operands channelled to a 0/1 int term). */
+/** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
+ *  witness encoding where every operand is a bare finite-domain variable, else pairwise `!=`. */
 private fun SmtLib.Builder.distinctFromArgs(args: List<Res>): Int {
     if (args.size < 2) return trueLit()
     val terms = args.map {
         if (it is Res.B) IntComb.Narrow(litToIntTerm(it.lit)) else it.asIntComb()
     }
+    witnessDistinct(terms)?.let { return it }
     val neLits = ArrayList<Int>()
     for (i in terms.indices) {
         for (j in i + 1 until terms.size) neLits.add(reifyRelation("distinct", terms[i], terms[j]))
     }
     return tseitinAnd(neLits)
+}
+
+/** The witness reification of `distinct`, or null when an operand is not a bare variable, repeats another,
+ *  or carries an open domain — the same gate the asserted form uses to reach the native global. */
+private fun SmtLib.Builder.witnessDistinct(terms: List<IntComb>): Int? {
+    if (terms.size < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
+    val vars = IntArray(terms.size) { i ->
+        val narrow = terms[i] as? IntComb.Narrow ?: return null
+        narrow.lin.asSimpleVar() ?: return null
+    }
+    if (vars.toHashSet().size != vars.size) return null
+    var lo = Long.MAX_VALUE
+    var hi = Long.MIN_VALUE
+    for (v in vars) {
+        val d = intDomains[v] as? PresolveDomain.Finite ?: return null
+        if (d.domain.min < lo) lo = d.domain.min
+        if (d.domain.max > hi) hi = d.domain.max
+    }
+    val size = allDifferentWindowSize(lo, hi) ?: return null
+    return reifyAllDifferentWitness(vars, lo, size) { min, max -> newInt(min, max) }
 }
 
 /** Fold an atom to a boolean literal, integer term, or real term. */

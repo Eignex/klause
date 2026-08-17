@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.global.internals
 
-import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Bounds-consistency filtering for `all_different ::bounds`. This is the López-Ortiz / Quimper /
@@ -12,7 +12,11 @@ import com.eignex.klause.propagation.PropagationState
  * Returns the involved variables as a conflict reason when a Hall interval is over-full, or `null`
  * when filtering succeeds.
  */
-internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): IntArray? {
+internal fun boundsAllDifferentFilter(
+    state: PropagationState,
+    vars: IntArray,
+    premises: IntArray = EmptyIntArray,
+): IntArray? {
     val n = vars.size
     if (n < 2) return null
 
@@ -26,7 +30,7 @@ internal fun boundsAllDifferentFilter(state: PropagationState, vars: IntArray): 
     var changed = false
     for (i in 0 until n) if (newLo[i] != lo[i] || newHi[i] != hi[i]) changed = true
     if (!changed) return null
-    val ant = collectHoleAndBoundAntecedents(state, vars)
+    val ant = antecedentsWithPremises(state, vars, premises)
     for (i in 0 until n) {
         if (newLo[i] > lo[i] && !state.tightenIntMin(vars[i], newLo[i], ant)) return vars
         if (newHi[i] < hi[i] && !state.tightenIntMax(vars[i], newHi[i], ant)) return vars

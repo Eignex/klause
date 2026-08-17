@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
@@ -44,6 +45,7 @@ internal fun reginFilter(
     filteredVars: IntArray,
     exceptSet: LongHashSet,
     cache: ReginCache? = null,
+    premises: IntArray = EmptyIntArray,
 ): IntArray? {
     val n = filteredVars.size
     if (n < 2) return null
@@ -52,7 +54,7 @@ internal fun reginFilter(
     // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
     // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
     if (filteredVars.any { state.intDomains[it].sizeLong > DEFAULT_DOMAIN_WALK_CAP }) {
-        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars) else null
+        return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises) else null
     }
 
     // Unchanged-domains fast path: if the previous fire on this var set succeeded (returned null,
@@ -66,7 +68,7 @@ internal fun reginFilter(
     // matching + SCC state across fires (stable value-id universe), patching only the components
     // touched by the values that left since the last fire. The except/no-cache cases keep the
     // full per-fire rebuild below.
-    if (cache != null && exceptSet.isEmpty()) return reginIncremental(state, filteredVars, cache)
+    if (cache != null && exceptSet.isEmpty()) return reginIncremental(state, filteredVars, cache, premises)
 
     // Compact value-id mapping + per-var value-id lists (hole-aware). Non-except values get one
     // id; each except value gets `n` capacity-1 copies (contiguous ids) so up to n vars share it.
@@ -232,7 +234,7 @@ internal fun reginFilter(
             if (sccId[i] == sccId[valNode]) continue
             if (reachedFromFree[valNode]) continue
             val hall = hallVarsFor(valNode)
-            val ant = collectHoleAndBoundAntecedents(state, hall)
+            val ant = antecedentsWithPremises(state, hall, premises)
             if (!state.excludeIntValue(filteredVars[i], value, ant)) {
                 // Excluding the value emptied var i's domain: the Hall set forced out i's last
                 // feasible value. Reason = the Hall set plus i.
