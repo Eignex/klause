@@ -118,6 +118,7 @@ internal class ResumableMinimize(
     private val sink = SolveStatsSink(backend = "backtrack")
     private var lastObjBoundAsserted: Long? = null
     private var lastBoolCutoffRhs: Long? = null
+    private var lastOpenCutoff: Long? = null
 
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
@@ -192,6 +193,7 @@ internal class ResumableMinimize(
         objVarBest = null
         lastObjBoundAsserted = null
         lastBoolCutoffRhs = null
+        lastOpenCutoff = null
         done = null
     }
 
@@ -254,6 +256,31 @@ internal class ResumableMinimize(
         if (threshold == lastObjBoundAsserted) return false
         lastObjBoundAsserted = threshold
         return session.assertObjectiveBound(objectiveVar, threshold, atMost = ascending) is PropagationResult.Unsat
+    }
+
+    /**
+     * Close the integer columns the front-end could only bound by inventing a box, now that an incumbent
+     * prices them: see [objectiveCutoffBounds]. Fired at the root alongside the objective bound, so the
+     * tightening is level-0 permanent and the branching that follows sees a real range instead of the
+     * box; re-run only once the incumbent improves. Returns true iff it empties the root — nothing beats
+     * the incumbent, so the optimum is proven.
+     *
+     * The bound cuts everything that is not *better* than the incumbent, which is sound for proving an
+     * optimum and wrong for enumeration. This driver is the branch-and-bound optimize path, which only
+     * ever surfaces strictly-improving solutions ([recordIfImproving]); an all-solutions run enumerates
+     * through a different search entirely and never reaches here.
+     */
+    private fun tightenOpenColumnsAtRoot(): Boolean {
+        if (problem.openIntHi == null || !bestObj.isFinite()) return false
+        val value = bestObj.toLong()
+        if (value.toDouble() != bestObj) return false // non-integral incumbent: no exact integer cutoff
+        val last = lastOpenCutoff
+        if (last != null && value >= last) return false
+        lastOpenCutoff = value
+        for (b in objectiveCutoffBounds(problem, objective, value)) {
+            if (session.implyIntAtMost(b.varId, b.hi) is PropagationResult.Unsat) return true
+        }
+        return false
     }
 
     /**
@@ -511,7 +538,8 @@ internal class ResumableMinimize(
             // so the always-on linear bound is O(1) per node instead of an O(numBoolVars) rescan. Idempotent
             // — a no-op once installed; the baseline captures the never-undone level-0 assignment.
             session.installObjectiveBoolBound(objective.boolWeights)
-            return this@ResumableMinimize.assertObjectiveBoundAtRoot()
+            if (this@ResumableMinimize.assertObjectiveBoundAtRoot()) return true
+            return tightenOpenColumnsAtRoot()
         }
 
         override fun drainLpNogoodsAtRestart(session: PropagationSession): Boolean = drainLpNogoods()

@@ -274,6 +274,13 @@ internal object PresolveShared {
             numRealVars = problem.numRealVars,
             realLower = problem.realLower,
             realUpper = problem.realUpper,
+            // No pass renumbers the integer namespace, so the marks recording which sides the front-end
+            // invented still address the same columns. A side a pass has since tightened only leaves the
+            // LP column wider than it need be — the relaxation stays a superset of the model, so every
+            // bound read off it is still sound. Dropping them instead would cost the LP its open-range
+            // reasoning and the search its objective-cutoff bound on exactly those columns.
+            openIntLo = problem.openIntLo,
+            openIntHi = problem.openIntHi,
         )
         // An already-folded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs

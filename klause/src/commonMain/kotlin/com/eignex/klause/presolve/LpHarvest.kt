@@ -98,6 +98,9 @@ fun lpRootBounds(
         numIntVars = problem.numIntVars,
         intDomains = domains,
         factors = problem.factors,
+        // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
+        openIntLo = problem.openIntLo,
+        openIntHi = problem.openIntHi,
     )
 }
 
@@ -191,6 +194,9 @@ fun lpHarvestReporting(
             numIntVars = problem.numIntVars,
             intDomains = domains,
             factors = factors,
+            // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
+            openIntLo = problem.openIntLo,
+            openIntHi = problem.openIntHi,
         ),
         bakeConfig,
     )
