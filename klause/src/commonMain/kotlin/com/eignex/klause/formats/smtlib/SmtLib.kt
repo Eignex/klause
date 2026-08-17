@@ -123,6 +123,10 @@ object SmtLib {
         /** The auxiliary real pinned to 1 that absorbs a wide row's oversized constant, or -1. */
         internal var realOneVar = -1
         internal val intDomains = ArrayList<PresolveDomain>()
+
+        /** Open `ite`-on-equality chains and the equality atoms their conditions are read from. */
+        internal val iteChains = IteChainTable()
+
         override val factors = ArrayList<Factor>()
         internal val asserts = ArrayList<SExpr>()
         internal var objectiveSpec: Pair<SExpr, Boolean>? = null // (term, negate)
@@ -192,6 +196,9 @@ object SmtLib {
         internal fun pushScopeBindings(bound: List<Pair<String, Binding>>) {
             val names = ArrayList<String>(bound.size)
             for ((name, b) in bound) {
+                // A value reachable by name can be referenced any number of times, so an `ite` chain it
+                // holds is finished: nothing can extend it any more, and it must define its variable.
+                (b.lin as? IntComb.Narrow)?.lin?.asSimpleVar()?.let { closeIteChain(it) }
                 bindingStacks.getOrPut(name) { ArrayDeque() }.addLast(b)
                 names.add(name)
             }
@@ -290,6 +297,7 @@ object SmtLib {
         fun build(): SmtLibProblem {
             inferBounds()
             for (a in asserts) assert(a)
+            lowerOpenIteChains()
             val inventedLo = BooleanArray(nextInt)
             val inventedHi = BooleanArray(nextInt)
             val deferred = prepareDeferredBounds(inventedLo, inventedHi)
@@ -307,6 +315,8 @@ object SmtLib {
             val objective = objectiveSpec?.let { (t, neg) ->
                 if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
             }
+            lowerOpenIteChains() // an objective term can open chains of its own
+
             // The single search seam: every domain must be Finite by now (prepareDeferredBounds closes
             // every Open one to the fallback box). An Open here would be a bug, but the sealed type kept
             // it from flowing anywhere a searchable IntDomain was expected, so this cast is the only place
