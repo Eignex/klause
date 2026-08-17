@@ -143,7 +143,10 @@ object PresolvePipeline {
             reduced
         }
         if ((current === problem || onlyBaseBake) && !infeasible && posted === reduced) {
-            return PresolveOutcome(problem, reconstruct, PresolveStats(), changed = false)
+            // The step-0 bake still ran, and reporting it as zero leaves its cost folded into the phase
+            // total. That mis-attribution lands on exactly the runs anyone would investigate, since
+            // "presolve changed nothing" is what makes a run interesting in the first place.
+            return PresolveOutcome(problem, reconstruct, PresolveStats(bakeElapsed = bakeElapsed), changed = false)
         }
 
         // Terse presolve summary for `-s`: which passes fired (+ `lp-harvest` when the LP tightened anything)
