@@ -148,6 +148,7 @@ object Mps {
         var objectiveRow: Row? = null
         var section = Section.NONE
         var inIntegerMarker = false
+        var hasObjective = false
 
         for (rawLine in source.lineSequence()) {
             // Comments start with `*`; blank lines are skipped. A line with no leading whitespace and a
@@ -173,7 +174,8 @@ object Mps {
                 // A lazy constraint is a constraint of the model; a solver may hold it back as an
                 // efficiency choice, but dropping it would admit points the model forbids. Posted as an
                 // ordinary row, which is correct and merely forgoes the lazy scheme.
-                Section.ROWS, Section.LAZYCONS -> readRow(fields, rows, rowByName)
+                Section.ROWS, Section.LAZYCONS ->
+                    hasObjective = readRow(fields, rows, rowByName, hasObjective)
 
                 // A user cut is redundant by construction - it cuts no integer solution - so skipping it
                 // loses only a tightening, never a solution.
@@ -218,7 +220,16 @@ object Mps {
         token != null && (token.equals("MAX", true) || token.equals("MAXIMIZE", true))
 
     /** A ROWS data line: `<type> <name>`, type in `N`(free/objective) `L`(≤) `G`(≥) `E`(=). */
-    private fun readRow(fields: List<String>, rows: MutableList<Row>, rowByName: MutableMap<String, Row>) {
+
+    // Returns whether an objective row exists once this line has been read. The flag is carried by the
+    // caller rather than re-derived: only the FIRST free row is the objective, and rescanning every row
+    // parsed so far to learn that costs O(rows) per free row, which is quadratic on a free-row-heavy file.
+    private fun readRow(
+        fields: List<String>,
+        rows: MutableList<Row>,
+        rowByName: MutableMap<String, Row>,
+        hasObjective: Boolean,
+    ): Boolean {
         if (fields.size < 2) {
             throw MpsFormatException(
                 "ROWS line needs a type and a name: '${fields.joinToString(" ")}'",
@@ -226,7 +237,7 @@ object Mps {
         }
         // The first free (`N`) row is the objective; any further `N` rows are ignored non-constraint rows.
         val type = when (fields[0].uppercase()) {
-            "N" -> if (rows.none { it.type == RowType.OBJECTIVE }) RowType.OBJECTIVE else RowType.FREE
+            "N" -> if (!hasObjective) RowType.OBJECTIVE else RowType.FREE
             "L" -> RowType.LE
             "G" -> RowType.GE
             "E" -> RowType.EQ
@@ -235,6 +246,7 @@ object Mps {
         val row = Row(fields[1], type)
         rows.add(row)
         rowByName[fields[1]] = row
+        return hasObjective || type == RowType.OBJECTIVE
     }
 
     /** A COLUMNS data line: either a `MARKER`/`INTORG`/`INTEND` integer-section toggle (returns the new
