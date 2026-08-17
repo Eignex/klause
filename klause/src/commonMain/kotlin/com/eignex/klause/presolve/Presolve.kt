@@ -142,7 +142,8 @@ object Presolve {
     ): PassDelta = BlockedClauseElimination.eliminate(problem, objectiveBoolVars, cancellation)
 
     /** At-most-one clique merging. See [AmoCliqueMerge]. */
-    fun mergeAmoCliques(problem: Problem): PassDelta = AmoCliqueMerge.mergeAmoCliques(problem)
+    fun mergeAmoCliques(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
+        AmoCliqueMerge.mergeAmoCliques(problem, cancellation)
 
     internal fun refineColoursForTest(problem: Problem): Pair<IntArray, IntArray> =
         SymmetryBreaking.refineColoursForTest(problem)

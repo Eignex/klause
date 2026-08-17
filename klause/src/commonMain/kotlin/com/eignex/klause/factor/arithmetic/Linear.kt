@@ -407,7 +407,7 @@ class Linear private constructor(
         // A value past the `Double` range has no finite double to round outward to. The row is still
         // enforced exactly by its wide propagator, and a relaxation is only ever a bound, so leaving this
         // one out weakens the LP and nothing else.
-        if (!wideFitsDouble()) return
+        val rounded = wideRounding() ?: return
         // A sign-straddling variable cannot be single-rounded to weaken both signs, so split it into
         // nonnegative parts `x = x⁺ − x⁻` (each roundable like a nonnegative variable). Decline only the
         // pathological var whose negative extent `−min` overflows Long — then leave the whole row CP-only.
@@ -435,15 +435,35 @@ class Linear private constructor(
                 minusCol[i] = cm
             }
         }
-        emitWideOuterRow(builder, ge = false, plusCol, minusCol)
-        if (op == LinearOp.EQ) emitWideOuterRow(builder, ge = true, plusCol, minusCol)
+        emitWideOuterRow(builder, rounded, ge = false, plusCol, minusCol)
+        if (op == LinearOp.EQ) emitWideOuterRow(builder, rounded, ge = true, plusCol, minusCol)
     }
 
-    /** Whether every wide value of this row has a finite `Double` — the precondition for rounding one
-     *  outward into a relaxation row. */
-    private fun wideFitsDouble(): Boolean {
-        if (!checkNotNull(wideBound).doubleValue(exactRequired = false).isFinite()) return false
-        return checkNotNull(wideCoeffs).all { it.doubleValue(exactRequired = false).isFinite() }
+    private var wideRoundingMemo: WideRounding? = null
+
+    /** Set once [wideRounding] has found a value with no finite `Double`, which no later call can change. */
+    private var wideExceedsDouble = false
+
+    /** The outward-rounded double form of this row's wide values, or `null` when one of them has no finite
+     *  `Double` to round to. Both the verdict and the rounded values are functions of the row's immutable
+     *  wide coefficients, while a relaxation is rebuilt per node, so they are computed once: an
+     *  arbitrary-precision conversion costs a pass over the whole magnitude and there are two per
+     *  coefficient. */
+    private fun wideRounding(): WideRounding? {
+        if (wideExceedsDouble) return null
+        wideRoundingMemo?.let { return it }
+        val bound = checkNotNull(wideBound)
+        val coeffs = checkNotNull(wideCoeffs)
+        if (!fitsDouble(bound) || !coeffs.all { fitsDouble(it) }) {
+            wideExceedsDouble = true
+            return null
+        }
+        return WideRounding(
+            DoubleArray(coeffs.size) { floorToDouble(coeffs[it]) },
+            DoubleArray(coeffs.size) { ceilToDouble(coeffs[it]) },
+            floorToDouble(bound),
+            ceilToDouble(bound),
+        ).also { wideRoundingMemo = it }
     }
 
     /**
@@ -455,8 +475,13 @@ class Linear private constructor(
      * negation, each rounded like a nonnegative term. Uses the *declared* domain: the coefficient is fixed,
      * so the row must stay a valid relaxation at every node, not only the current one.
      */
-    private fun emitWideOuterRow(builder: RelaxationBuilder, ge: Boolean, plusCol: IntArray, minusCol: IntArray) {
-        val wc = checkNotNull(wideCoeffs)
+    private fun emitWideOuterRow(
+        builder: RelaxationBuilder,
+        rounded: WideRounding,
+        ge: Boolean,
+        plusCol: IntArray,
+        minusCol: IntArray,
+    ) {
         var straddle = 0
         for (i in vars.indices) if (plusCol[i] >= 0) straddle++
         val cols = IntArray(vars.size + straddle)
@@ -467,21 +492,21 @@ class Linear private constructor(
                 // x⁺ (nonnegative, coefficient wc) and x⁻ (nonnegative, coefficient −wc), each rounded to
                 // weaken: floor a nonnegative term for `≤`, ceil for `≥`.
                 cols[w] = plusCol[i]
-                dcoeffs[w] = if (ge) ceilToDouble(wc[i]) else floorToDouble(wc[i])
+                dcoeffs[w] = if (ge) rounded.ceilCoeffs[i] else rounded.floorCoeffs[i]
                 w++
                 cols[w] = minusCol[i]
-                dcoeffs[w] = if (ge) -floorToDouble(wc[i]) else -ceilToDouble(wc[i])
+                dcoeffs[w] = if (ge) -rounded.floorCoeffs[i] else -rounded.ceilCoeffs[i]
                 w++
             } else {
                 val dom = builder.declaredDomain(vars[i])
                 // floor for (≤ & nonneg) or (≥ & nonpositive); ceil otherwise.
                 val roundDown = (dom.min >= 0L) != ge
                 cols[w] = builder.intColumn(vars[i])
-                dcoeffs[w] = if (roundDown) floorToDouble(wc[i]) else ceilToDouble(wc[i])
+                dcoeffs[w] = if (roundDown) rounded.floorCoeffs[i] else rounded.ceilCoeffs[i]
                 w++
             }
         }
-        val rhs = if (ge) floorToDouble(checkNotNull(wideBound)) else ceilToDouble(checkNotNull(wideBound))
+        val rhs = if (ge) rounded.floorBound else rounded.ceilBound
         builder.realRow(cols, dcoeffs, if (ge) LinearOp.GE else LinearOp.LE, rhs, strict = false)
     }
 }
@@ -499,6 +524,34 @@ private class LinearLpExtra(
     val wideCoeffs: Array<BigInteger>?,
     val wideBound: BigInteger?,
 )
+
+/** A wide row's coefficients and bound rounded outward, index-aligned with `Linear.wideCoeffs`: the
+ *  direction each term needs is only known per emitted row, so both are kept. */
+private class WideRounding(
+    val floorCoeffs: DoubleArray,
+    val ceilCoeffs: DoubleArray,
+    val floorBound: Double,
+    val ceilBound: Double,
+)
+
+/** Magnitudes strictly below `2^DOUBLE_CERTAIN_FINITE_BITS` always have a finite `Double`; see [fitsDouble]. */
+private const val DOUBLE_CERTAIN_FINITE_BITS = 1023
+
+/**
+ * Whether [x] converts to a finite `Double`. A conversion is a shift/subtract loop over the whole
+ * magnitude, so the verdict is read off the bit length instead: `bitLength` is the 1-based position of
+ * the leading bit, a magnitude under `2^1023` is far inside the double range and one at or above `2^1024`
+ * is past its largest finite value `2^1024 − 2^971`. Only the single exponent band in between straddles
+ * the round-to-infinity threshold, so only there is the conversion actually needed.
+ */
+private fun fitsDouble(x: BigInteger): Boolean {
+    val bits = x.bitLength()
+    return when {
+        bits <= DOUBLE_CERTAIN_FINITE_BITS -> true
+        bits > DOUBLE_CERTAIN_FINITE_BITS + 1 -> false
+        else -> x.doubleValue(exactRequired = false).isFinite()
+    }
+}
 
 /** The largest `Double` that is `≤ x`. `doubleValue` rounds to nearest; step one ULP down when that
  *  landed above `x` so the result is a sound lower bound for outward relaxation. */

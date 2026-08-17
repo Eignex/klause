@@ -117,6 +117,29 @@ class WideLinearLpTest {
     }
 
     @Test
+    fun `a coefficient in the top Double exponent band still emits a row when it is finite`() {
+        // 2^1023 shares its bit length with values that overflow, so the finiteness test cannot stop at
+        // the exponent — this one converts and must be relaxed like any other wide coefficient.
+        val big = BigInteger.ONE.shl(1023)
+        val row = Linear(intArrayOf(0), arrayOf(big), LinearOp.LE, big)
+        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
+        row.linearize(b, factorId = 0)
+        assertEquals(1, b.realRows.size)
+        assertTrue(b.realRows[0].coeffs.all { it.isFinite() }, "the emitted coefficients are finite")
+    }
+
+    @Test
+    fun `a coefficient in the top Double exponent band emits no row when it rounds to infinity`() {
+        // 2^1024 − 2^969 is past the largest finite Double 2^1024 − 2^971 yet has the same bit length as
+        // it, so only the conversion separates the two.
+        val overflowing = BigInteger.ONE.shl(1024) - BigInteger.ONE.shl(969)
+        val row = Linear(intArrayOf(0), arrayOf(overflowing), LinearOp.LE, overflowing)
+        val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
+        row.linearize(b, factorId = 0)
+        assertEquals(0, b.realRows.size, "no row is emitted for values the LP cannot represent")
+    }
+
+    @Test
     fun `a wide equality emits a bracketing pair of outer rows`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))

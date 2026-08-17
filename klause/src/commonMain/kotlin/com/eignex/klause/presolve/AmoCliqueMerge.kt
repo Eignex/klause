@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -33,9 +34,10 @@ internal object AmoCliqueMerge {
     /** A clique of at least this size is worth materialising; size 2 is already a single binary clause. */
     private const val MIN_CLIQUE_SIZE = 3
 
-    fun mergeAmoCliques(problem: Problem): PassDelta {
+    fun mergeAmoCliques(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val factors = problem.factors
-        val cliques = PresolveShared.maximalPersistentAmoCliques(factors.asList()).filter { it.size >= MIN_CLIQUE_SIZE }
+        val cliques = PresolveShared.maximalPersistentAmoCliques(factors.asList(), cancellation)
+            .filter { it.size >= MIN_CLIQUE_SIZE }
         if (cliques.isEmpty()) return PassDelta()
 
         // Index cliques by member literal so each factor is matched only against the cliques that could

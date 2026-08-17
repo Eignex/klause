@@ -176,6 +176,16 @@ class PresolveSharedTest {
     }
 
     @Test
+    fun `a cancelled merge returns the base cliques unextended`() {
+        // The triangle would collapse to one size-3 clique; cancelling forgoes the growth but every
+        // returned clique is still a valid at-most-one.
+        val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2))
+        val merged = PresolveShared.mergeCliques(base) { true }
+
+        assertEquals(base.toSet(), merged.toSet())
+    }
+
+    @Test
     fun `negative literals merge like positive ones`() {
         // Lit encoding makes members arbitrary ints, including negative ones, so the conflict graph
         // cannot assume dense non-negative keys.

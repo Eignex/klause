@@ -546,7 +546,7 @@ enum class PresolvePass(
         preservesSolutionSet = true,
         autoEligible = true,
     ) {
-        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.mergeAmoCliques(problem)
+        override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.mergeAmoCliques(problem, ctx.cancellation)
     },
 
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
