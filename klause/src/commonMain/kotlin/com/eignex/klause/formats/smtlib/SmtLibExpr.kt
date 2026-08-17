@@ -57,6 +57,15 @@ internal fun SmtLib.Builder.assert(top: SExpr) {
                     continue
                 }
 
+                // An asserted disjunction *is* a clause. Reifying it would allocate an auxiliary literal,
+                // the implication clauses that define it and a unit clause forcing it true, where posting
+                // the disjuncts directly states the same thing. The disjuncts themselves still reify as
+                // needed; only the top node is saved. Empty `(or)` is false and left to the general path.
+                h == "or" && args.isNotEmpty() -> {
+                    factors.add(Clause(IntArray(args.size) { compileBool(args[it]) }))
+                    continue
+                }
+
                 h == "<=" || h == "<" || h == ">=" || h == ">" -> {
                     if (isRealRelation(node)) assertRealLinear(node) else assertLinear(node)
                     continue
