@@ -1,5 +1,12 @@
 package com.eignex.klause.lp
 
+import com.ionspin.kotlin.bignum.integer.BigInteger
+
+/** The rows of a small dense matrix as [SparseIntRow]s, for the exact-integer reductions. */
+@Suppress("ArrayPrimitive")
+internal fun sparseRows(vararg rows: LongArray): List<SparseIntRow> =
+    rows.map { r -> sparseIntRow(r.indices.associateWith { BigInteger.fromLong(r[it]) }) }
+
 /**
  * Test oracle for the LP relaxation: solve with the float [RevisedSimplex] and read its objective, the
  * FULL optimum (it already folds in [LpModel.objConstant]). Float-accurate — tests compare it with a
