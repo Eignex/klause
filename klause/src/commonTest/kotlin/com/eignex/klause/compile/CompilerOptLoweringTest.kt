@@ -1,11 +1,24 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.model.AllDifferent
+import com.eignex.klause.model.AllDifferentOpt
+import com.eignex.klause.model.BoolRef
+import com.eignex.klause.model.BoolSpec
+import com.eignex.klause.model.Iff
+import com.eignex.klause.model.IntRef
+import com.eignex.klause.model.IntSpec
+import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.Not
 import com.eignex.klause.schema.VariableSchema
+import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -130,6 +143,109 @@ class CompilerOptLoweringTest {
             "pinning should add a constraint (pinned=${pinned.problem.factors.size}, " +
                 "unpinned=${unpinned.problem.factors.size})",
         )
+    }
+
+    /** `b ↔ all_different(x0 … x{n-1})` over `[0, n - 1]`. */
+    private class ReifiedAllDiff(n: Int) : VariableSchema() {
+        init {
+            for (i in 0 until n) add("x$i", IntSpec(0, n - 1))
+            add("b", BoolSpec)
+            add("c", NamedConstraint(Iff(BoolRef("b"), AllDifferent((0 until n).map { IntRef("x$it") }))))
+        }
+    }
+
+    /** `b ↔ all_different_opt(x0 … x{n-1})` over `[0, 1]` with free presence bits. */
+    private class ReifiedAllDiffOpt(n: Int) : VariableSchema() {
+        init {
+            for (i in 0 until n) add("x$i", IntSpec(0, 1))
+            for (i in 0 until n) add("p$i", BoolSpec)
+            add("b", BoolSpec)
+            add(
+                "c",
+                NamedConstraint(
+                    Iff(
+                        BoolRef("b"),
+                        AllDifferentOpt(
+                            (0 until n).map { IntRef("x$it") },
+                            (0 until n).map { BoolRef("p$it") },
+                        ),
+                    ),
+                ),
+            )
+        }
+    }
+
+    /** Whether `b = [flag]` is satisfiable with every term pinned to [terms] and every presence bit to
+     *  [presents] — one complete solve per combination, so both `Unsat` and `Sat` are conclusive. */
+    private fun satisfiable(
+        compiled: CompiledSchema,
+        baked: BakedProblem,
+        terms: List<Long>,
+        presents: List<Boolean>,
+        flag: Boolean,
+    ): Boolean {
+        val ints = terms.indices.associate { compiled.intVarIdByName.getValue("x$it") to terms[it] }
+        val bools = presents.indices.associate { compiled.boolVarIdByName.getValue("p$it") to presents[it] } +
+            (compiled.boolVarIdByName.getValue("b") to flag)
+        val params = BacktrackParams(assumptions = Assumptions(ints = ints, bools = bools))
+        return BacktrackSolver(baked).solve(params) is SolveResult.Sat
+    }
+
+    private fun tuples(n: Int, values: Int): List<List<Long>> = (0 until n).fold(listOf(emptyList())) { acc, _ ->
+        acc.flatMap { prefix -> (0 until values).map { prefix + it.toLong() } }
+    }
+
+    @Test
+    fun `reified all different holds exactly when the terms are distinct`() {
+        val n = 4
+        val compiled = ReifiedAllDiff(n).compile()
+        val baked = compiled.problem.bake()
+        for (terms in tuples(n, n)) {
+            val distinct = terms.toSet().size == n
+            assertTrue(
+                satisfiable(compiled, baked, terms, emptyList(), distinct),
+                "no model with the reified literal $distinct for $terms",
+            )
+            assertTrue(
+                !satisfiable(compiled, baked, terms, emptyList(), !distinct),
+                "a model accepts the reified literal ${!distinct} for $terms",
+            )
+        }
+    }
+
+    @Test
+    fun `reified opt all different holds exactly when the present terms are distinct`() {
+        val n = 4
+        val compiled = ReifiedAllDiffOpt(n).compile()
+        val baked = compiled.problem.bake()
+        for (terms in tuples(n, 2)) {
+            for (mask in 0 until (1 shl n)) {
+                val presents = (0 until n).map { (mask shr it) and 1 == 1 }
+                val shown = terms.indices.filter { presents[it] }.map { terms[it] }
+                val distinct = shown.toSet().size == shown.size
+                assertTrue(
+                    satisfiable(compiled, baked, terms, presents, distinct),
+                    "no model with the reified literal $distinct for $terms presents $presents",
+                )
+                assertTrue(
+                    !satisfiable(compiled, baked, terms, presents, !distinct),
+                    "a model accepts the reified literal ${!distinct} for $terms presents $presents",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `reified all different encoding size stops growing with the term count`() {
+        val sizes = (4..8).map { ReifiedAllDiff(it).compile().problem.factors.size }
+        assertEquals(setOf(sizes.first()), sizes.toSet(), "encoding size varies with arity: $sizes")
+    }
+
+    @Test
+    fun `reified all different stays pairwise below the witness threshold`() {
+        val three = ReifiedAllDiff(3).compile().problem.factors.size
+        val four = ReifiedAllDiff(4).compile().problem.factors.size
+        assertTrue(three > four, "three pairwise terms ($three) should not undercut four witness terms ($four)")
     }
 
     @Test

@@ -4,6 +4,8 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.IntHashSet
 
 // presents is a parallel array of presence literals; empty = every entry unconditionally present.
 // isDefinitelyPresent/Absent use pinned propagation state (conservative); isPresentInAssignment
@@ -35,10 +37,17 @@ internal object OptPresence {
     }
 
     // Factor constructors call this to extend boolVars so the propagation engine wakes on presence changes.
+    // Deduplicated in first-occurrence order: boolVars is a variable *scope*, and positions sharing one
+    // presence variable would otherwise enter every occurrence list once per position and be flipped once
+    // per position by the moves that walk a factor's scope (an even count cancelling out to no move).
     fun presenceVarIds(presents: IntArray): IntArray {
         if (presents.isEmpty()) return EmptyIntArray
-        val out = IntArray(presents.size)
-        for (i in presents.indices) out[i] = Lit.variable(presents[i])
-        return out
+        val seen = IntHashSet(presents.size)
+        val out = IntArrayList(presents.size)
+        for (lit in presents) {
+            val v = Lit.variable(lit)
+            if (seen.add(v)) out.add(v)
+        }
+        return out.toIntArray()
     }
 }

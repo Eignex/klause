@@ -218,6 +218,41 @@ class SmtLibTest {
         assertEquals(setOf(1L, 2L, 3L), listOf(ints[0], ints[1], ints[2]).toSet())
     }
 
+    /** `k` bounded integers over `[0, k - 1]`, with [tail] appended as the closing assertions. */
+    private fun boundedInts(k: Int, tail: String): String {
+        val decls = (0 until k).joinToString("\n") {
+            "(declare-const x$it Int) (assert (>= x$it 0)) (assert (<= x$it ${k - 1}))"
+        }
+        return "$decls\n$tail\n(check-sat)"
+    }
+
+    private fun names(k: Int): String = (0 until k).joinToString(" ") { "x$it" }
+
+    @Test
+    fun `a reified distinct over bounded ints costs a constant number of literals`() {
+        val small = SmtLib.parse(boundedInts(6, "(declare-const p Bool) (assert (or p (distinct ${names(6)})))"))
+        val large = SmtLib.parse(boundedInts(40, "(declare-const p Bool) (assert (or p (distinct ${names(40)})))"))
+        assertEquals(
+            small.problem.numBoolVars,
+            large.problem.numBoolVars,
+            "reified distinct allocated literals per operand pair",
+        )
+    }
+
+    @Test
+    fun `a negated distinct over bounded ints forces a repeated value`() {
+        val ints = solve(boundedInts(4, "(assert (not (distinct ${names(4)})))"))
+        val terms = (0 until 4).map { ints[it] }
+        assertTrue(terms.toSet().size < 4, "expected a repeated value, got $terms")
+    }
+
+    @Test
+    fun `a reified distinct held true over bounded ints yields distinct values`() {
+        val ints = solve(boundedInts(4, "(assert (or false (distinct ${names(4)})))"))
+        val terms = (0 until 4).map { ints[it] }
+        assertEquals(4, terms.toSet().size, "expected distinct values, got $terms")
+    }
+
     @Test
     fun `distinct over bools forces inequality`() {
         val text = """

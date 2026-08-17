@@ -1,5 +1,9 @@
 package com.eignex.klause.compile
 
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.ALL_DIFFERENT_WITNESS_MIN_ARITY
+import com.eignex.klause.formats.allDifferentWindowSize
+import com.eignex.klause.formats.reifyAllDifferentWitness
 import com.eignex.klause.model.AllDifferentOpt
 import com.eignex.klause.model.And
 import com.eignex.klause.model.BoolExpr
@@ -23,6 +27,7 @@ import com.eignex.klause.model.Not
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.LongHashSet
 
 /*
@@ -49,8 +54,10 @@ import com.eignex.klause.util.LongHashSet
  *  affine-lift turns this into an aux int + reified equalities. */
 private fun indicatorInt(cond: BoolExpr): IntExpr = IntIfThenElse(cond, IntLit(1), IntLit(0))
 
-/** `b ↔ AllDifferent(terms)` (non-opt). Pairwise NE conjuncted via Tseitin. */
+/** `b ↔ AllDifferent(terms)` (non-opt). The linear-size witness encoding where the operands are bare
+ *  variables over a finite value window, else pairwise NE conjuncted via Tseitin. */
 internal fun Lowering.reifyAllDifferent(terms: List<IntExpr>): Int {
+    witnessAllDifferent(terms)?.let { return it }
     val pairs = mutableListOf<BoolExpr>()
     for (i in terms.indices) {
         for (j in i + 1 until terms.size) {
@@ -60,22 +67,90 @@ internal fun Lowering.reifyAllDifferent(terms: List<IntExpr>): Int {
     return tseitinAnd(pairs)
 }
 
-/** `b ↔ AllDifferentOpt`. Each pair guarded by both presence bits. */
+/** `b ↔ AllDifferentOpt`. The witness encoding over presence-substituted operands, else pairwise NE with
+ *  each pair guarded by both presence bits. */
 internal fun Lowering.reifyAllDifferentOpt(expr: AllDifferentOpt): Int {
+    val terms = expr.terms.map { lift(it) }
+    val presentLits = IntArray(expr.presents.size) { lowerToLit(expr.presents[it]) }
+    witnessAllDifferentOpt(terms, presentLits)?.let { return it }
     val pairs = mutableListOf<BoolExpr>()
-    for (i in expr.terms.indices) {
-        for (j in i + 1 until expr.terms.size) {
+    for (i in terms.indices) {
+        for (j in i + 1 until terms.size) {
             // (p_i ∧ p_j) → x_i ≠ x_j  ≡  ¬p_i ∨ ¬p_j ∨ x_i ≠ x_j.
             pairs += Or(
                 listOf(
                     Not(expr.presents[i]),
                     Not(expr.presents[j]),
-                    IntCompare(expr.terms[i], IntCmpOp.NE, expr.terms[j]),
+                    IntCompare(terms[i], IntCmpOp.NE, terms[j]),
                 ),
             )
         }
     }
     return tseitinAnd(pairs)
+}
+
+/** The witness reification over [terms], or null when this lowering cannot supply what the global needs:
+ *  bare variable operands (an arithmetic residual has no var id to index), no repeated operand (the
+ *  matching filter assumes distinct columns), and a value window the global can index. */
+private fun Lowering.witnessAllDifferent(terms: List<IntExpr>): Int? {
+    if (terms.size < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
+    if (!terms.all { it is IntRef }) return null
+    val ids = IntArray(terms.size) { intVarOf((terms[it] as IntRef).name) }
+    if (ids.toHashSet().size != ids.size) return null
+    var lo = Long.MAX_VALUE
+    var hi = Long.MIN_VALUE
+    for (id in ids) {
+        val d = intDomains[id]
+        if (d.min < lo) lo = d.min
+        if (d.max > hi) hi = d.max
+    }
+    val size = allDifferentWindowSize(lo, hi) ?: return null
+    return reifyAllDifferentWitness(ids, lo, size) { min, max -> newIntVar(IntDomain(min, max)) }
+}
+
+/**
+ * The witness reification over presence-gated [terms]. Presence is folded into the *value* rather than
+ * into the global's presence literals, which the reification has already claimed: each position gets a
+ * variable equal to its term when present and to a position-unique sentinel above the shared window when
+ * absent. Distinct sentinels never collide, so all-different over the substituted variables is exactly
+ * all-different over the present terms — and the witness pair then reports a duplicate only between two
+ * genuinely present positions.
+ */
+private fun Lowering.witnessAllDifferentOpt(terms: List<IntExpr>, presentLits: IntArray): Int? {
+    val n = terms.size
+    if (n < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
+    var lo = Long.MAX_VALUE
+    var hi = Long.MIN_VALUE
+    for (t in terms) {
+        val d = domainOf(t)
+        if (d.min < lo) lo = d.min
+        if (d.max > hi) hi = d.max
+    }
+    // Sentinels sit in [hi + 1, hi + n]; they are compared against as [IntLit], so the window must stay
+    // inside Int for the substitution rows to be expressible at all.
+    if (hi > Int.MAX_VALUE - n.toLong() || lo < Int.MIN_VALUE.toLong()) return null
+    val size = allDifferentWindowSize(lo, hi + n) ?: return null
+    val ids = IntArray(n) { i -> presenceSubstituted(terms[i], presentLits[i], lo, hi + n, (hi + 1 + i).toInt()) }
+    return reifyAllDifferentWitness(ids, lo, size) { min, max -> newIntVar(IntDomain(min, max)) }
+}
+
+/** A fresh variable equal to [term] when [presentLit] holds and to [sentinel] otherwise, over
+ *  `[windowLo, windowHi]`. Both directions are pinned: leaving the absent case free would let two absent
+ *  positions meet on a shared value and fake a duplicate. */
+private fun Lowering.presenceSubstituted(
+    term: IntExpr,
+    presentLit: Int,
+    windowLo: Long,
+    windowHi: Long,
+    sentinel: Int,
+): Int {
+    val name = newAuxIntVar(IntDomain(windowLo, windowHi))
+    val ref = IntRef(name)
+    val isTerm = reifyIntCompare(IntCompare(ref, IntCmpOp.EQ, term))
+    val isSentinel = reifyIntCompare(IntCompare(ref, IntCmpOp.EQ, IntLit(sentinel)))
+    factors += Clause(intArrayOf(Lit.negate(presentLit), isTerm))
+    factors += Clause(intArrayOf(presentLit, isSentinel))
+    return intVarOf(name)
 }
 
 /** `b ↔ nvalue(n, xs, mode)` over a presence-gated subset. Enumerate the union domain;
