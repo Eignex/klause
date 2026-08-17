@@ -383,6 +383,9 @@ private fun SmtLib.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean):
  */
 private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     if (a is IntComb.Narrow && b is IntComb.Narrow) {
+        // A chain of equality tests on one selector defines the same quantity, and defers its lowering
+        // until the chain's extent is known.
+        chainIte(cond, a.lin, b.lin)?.let { return narrowRes(it) }
         val (aLo, aHi) = linCombRange(a.lin)
         val (bLo, bHi) = linCombRange(b.lin)
         val loU = if (aLo == null || bLo == null) null else minOf(aLo, bLo)
@@ -402,7 +405,7 @@ private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
 
 /** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
  *  (posting the false literal when it cannot hold) rather than an empty [Linear] row. */
-private fun SmtLib.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
+internal fun SmtLib.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
     val (vars, coeffs, bound) = diff(a, b)
     assertLinearRow(coeffs, vars, op, bound)
 }
@@ -450,7 +453,7 @@ private fun absHi(lo: Long?, hi: Long?): Long? {
 
 /** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
  *  unbounded (an open domain or an arithmetic overflow) — infinity is structural, no `±Long/4`. */
-private fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
+internal fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     var lo: Long? = lin.constant
     var hi: Long? = lin.constant
     for ((v, c) in lin.coeffs) {

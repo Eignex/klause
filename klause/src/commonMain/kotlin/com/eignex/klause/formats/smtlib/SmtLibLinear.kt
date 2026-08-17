@@ -90,7 +90,9 @@ internal fun SmtLib.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
 internal fun SmtLib.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): Int {
     val linOp = relLinearOp(op)
     return when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
-        is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound)
+        is LinRelation.LongRel -> reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound).also {
+            noteEqAtom(it, linOp, rel.coeffs, rel.vars, rel.bound)
+        }
 
         is LinRelation.WideRel -> if (rel.vars.isEmpty()) {
             if (wideConstHolds(linOp, rel.bound)) trueLit() else Lit.negate(trueLit())
@@ -98,6 +100,17 @@ internal fun SmtLib.Builder.reifyRelation(op: String, a: IntComb, b: IntComb): I
             reifyLinear(rel.coeffs, rel.vars, linOp, rel.bound)
         }
     }
+}
+
+/** Record `lit ⇔ variable = value` when the reified row is exactly that, so an `ite` chain can read its
+ *  condition back off the literal. Only a finite-domain variable is recorded: a chain selector needs a
+ *  known index range, and an open one could never index an array. */
+private fun SmtLib.Builder.noteEqAtom(lit: Int, op: LinearOp, coeffs: LongArray, vars: IntArray, bound: Long) {
+    if (op != LinearOp.EQ || vars.size != 1) return
+    val c = coeffs[0]
+    if (c != 1L && c != -1L) return
+    if (intDomains[vars[0]] !is PresolveDomain.Finite) return
+    iteChains.noteAtom(lit, vars[0], bound * c)
 }
 
 /** Require a chainable relation node to have at least two operands (`(op a b …)`), else reject. */
