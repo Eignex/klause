@@ -574,6 +574,8 @@ class BakedProblem internal constructor(
         numRealVars: Int = 0,
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
+        openIntLo: BooleanArray? = null,
+        openIntHi: BooleanArray? = null,
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
     ) : this(
@@ -587,6 +589,8 @@ class BakedProblem internal constructor(
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,
+        openIntLo = openIntLo,
+        openIntHi = openIntHi,
         cancellation = cancellation,
         alreadyFolded = alreadyFolded,
     )
