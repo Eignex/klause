@@ -223,22 +223,23 @@ private fun structuralBounds(numVars: Int, constraints: List<Linear>, cancellati
     if (numVars == 0) return null
     val eqRows = constraints.filter { it.op == LinearOp.EQ && it.isIntegerCore }
     if (eqRows.isEmpty()) return null
-    val eq = Array(eqRows.size) { r ->
-        val row = Array(numVars) { BigInteger.ZERO }
-        val f = eqRows[r]
+    // Built sparse: an equality block of a real model carries a handful of terms per row against tens of
+    // thousands of columns, and the dense form of it does not fit in memory at all.
+    val eq = eqRows.map { f ->
+        val entries = HashMap<Int, BigInteger>(f.vars.size)
         for (k in f.vars.indices) {
             val v = f.vars[k]
-            if (v < numVars) row[v] = row[v] + BigInteger.fromLong(f.coeff(k))
+            if (v < numVars) entries[v] = (entries[v] ?: BigInteger.ZERO) + BigInteger.fromLong(f.coeff(k))
         }
-        row
+        sparseIntRow(entries)
     }
     val rhsIn = Array(eqRows.size) { BigInteger.fromLong(eqRows[it].bound) }
-    val mixed = mixedEchelonHermite(eq, emptyArray(), numVars, rhsIn, cancellation)
+    val mixed = mixedEchelonHermite(eq, emptyList(), numVars, rhsIn, cancellation)
     if (mixed.equalities.isEmpty() || mixed.equalityRhs.size != mixed.equalities.size) return null
     // The reduced rows carry the reduced right-hand sides: pairing them with the *input* rows' bounds
     // would attach a bound to whichever row a swap happened to move into that slot.
     val rhs = Array<BigInteger?>(mixed.equalities.size) { mixed.equalityRhs[it] }
-    val y = triangularBounds(mixed.equalities, rhs, rhs)
+    val y = triangularBounds(mixed.equalities, numVars, rhs, rhs)
     return mixed.originalBounds(y.lo, y.hi)
 }
 

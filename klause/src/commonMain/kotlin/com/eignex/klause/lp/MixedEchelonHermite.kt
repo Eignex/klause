@@ -16,11 +16,11 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  */
 internal class MixedEchelonHermite(
     /** The equality rows in the new variables, in echelon form. */
-    val equalities: Array<Array<BigInteger>>,
+    val equalities: List<SparseIntRow>,
     /** The inequality rows in the new variables, in the same column order. */
-    val inequalities: Array<Array<BigInteger>>,
-    /** The unimodular `V` of `x = V·y`, row-major and `cols × cols`. */
-    val transform: Array<Array<BigInteger>>,
+    val inequalities: List<SparseIntRow>,
+    /** The unimodular `V` of `x = V·y`, column-major over `cols` columns. */
+    val transform: UnimodularTransform,
     /** The equality right-hand sides after the same elimination, index-aligned with [equalities]; empty
      *  when the caller did not supply them. The Hermite step is a *column* operation, so it leaves these
      *  untouched — only the echelon step recombines them. */
@@ -29,10 +29,10 @@ internal class MixedEchelonHermite(
     val inconsistent: Boolean = false,
 ) {
     /** The original point `x = V·y` for a solution [y] of the rewritten system. */
-    fun recover(y: Array<BigInteger>): Array<BigInteger> = Array(transform.size) { i ->
-        var acc = BigInteger.ZERO
-        for (j in transform[i].indices) acc += transform[i][j] * y[j]
-        acc
+    fun recover(y: Array<BigInteger>): Array<BigInteger> {
+        val x = Array(transform.size) { BigInteger.ZERO }
+        transform.forEachEntry { row, col, value -> x[row] += value * y[col] }
+        return x
     }
 }
 
@@ -52,45 +52,49 @@ internal class MixedEchelonHermite(
  *
  * The equality block is first reduced to echelon form ([bareissEchelon]) so that dependent equalities are
  * dropped: they constrain nothing, and carrying them would enlarge the Hermite step, which is the
- * expensive half.
+ * expensive half. A reduction cut short by [cancellation] comes back with no equalities and the identity
+ * transform, which is the honest "the structure implied nothing here".
  */
 internal fun mixedEchelonHermite(
-    equalities: Array<Array<BigInteger>>,
-    inequalities: Array<Array<BigInteger>>,
+    equalities: List<SparseIntRow>,
+    inequalities: List<SparseIntRow>,
     cols: Int,
     equalityRhs: Array<BigInteger>? = null,
     cancellation: Cancellation = Cancellation.Never,
 ): MixedEchelonHermite {
     if (cols == 0) {
-        return MixedEchelonHermite(emptyArray(), inequalities, emptyArray())
+        return MixedEchelonHermite(emptyList(), inequalities, UnimodularTransform(0))
     }
     // Independent equalities only; a dependent one adds nothing and would widen the Hermite step. The
     // right-hand sides ride along through the elimination, since row swaps and combinations reorder and
     // recombine them exactly as they do the coefficients.
-    val echelon = if (equalities.isEmpty()) null else bareissEchelon(equalities, equalityRhs, cancellation)
-    val independent = echelon?.rows ?: emptyArray()
-    val v: Array<Array<BigInteger>>
-    val eq: Array<Array<BigInteger>>
-    if (independent.isEmpty()) {
-        // No equalities to choose a basis: the identity leaves the system as it stands.
-        v = Array(cols) { i -> Array(cols) { j -> if (i == j) BigInteger.ONE else BigInteger.ZERO } }
-        eq = emptyArray()
-    } else {
-        val hnf = hermiteNormalForm(independent)
-        v = hnf.v
-        eq = hnf.h
-    }
-    val ineq = Array(inequalities.size) { i -> applyTransform(inequalities[i], v, cols) }
-    return MixedEchelonHermite(eq, ineq, v, echelon?.rhs ?: emptyArray(), echelon?.inconsistent == true)
+    val echelon = if (equalities.isEmpty()) null else bareissEchelon(equalities, cols, equalityRhs, cancellation)
+    val independent = echelon?.rows ?: emptyList()
+    // No equalities to choose a basis, or none survived the budget: the identity leaves the system as it
+    // stands, which costs nothing to carry because an untouched transform column is never materialised.
+    val hnf = if (independent.isEmpty()) null else hermiteNormalForm(independent, cols, cancellation)
+    val v = hnf?.v ?: UnimodularTransform(cols)
+    val eq = hnf?.h ?: emptyList()
+    val ineq = inequalities.map { applyTransform(it, v) }
+    val rhs = if (hnf == null) emptyArray() else echelon?.rhs ?: emptyArray()
+    return MixedEchelonHermite(eq, ineq, v, rhs, echelon?.inconsistent == true)
 }
 
-/** One row in the new variables: `(a·V)ⱼ = Σₖ aₖ·V[k][j]`. */
-private fun applyTransform(row: Array<BigInteger>, v: Array<Array<BigInteger>>, cols: Int): Array<BigInteger> =
-    Array(cols) { j ->
-        var acc = BigInteger.ZERO
-        for (k in row.indices) if (k < v.size) acc += row[k] * v[k][j]
-        acc
+/**
+ * One row in the new variables: `(a·V)ⱼ = Σₖ aₖ·V(k, j)`.
+ *
+ * Column-major `V` makes this a scatter over the transform's non-zeros rather than a lookup per column,
+ * which matters because the row is sparse and `V` is mostly the identity. Only inequalities go through
+ * here; the equalities come out of the Hermite step already transformed.
+ */
+private fun applyTransform(row: SparseIntRow, v: UnimodularTransform): SparseIntRow {
+    val acc = HashMap<Int, BigInteger>()
+    v.forEachEntry { k, j, value ->
+        val a = row[k]
+        if (!a.isZero()) acc[j] = (acc[j] ?: BigInteger.ZERO) + a * value
     }
+    return sparseIntRow(acc)
+}
 
 /**
  * Ranges for the ORIGINAL variables implied by ranges for the rewritten ones, through `x = V·y`.
@@ -107,19 +111,24 @@ internal fun MixedEchelonHermite.originalBounds(yLo: Array<BigInteger?>, yHi: Ar
     val n = transform.size
     val lo = arrayOfNulls<BigInteger>(n)
     val hi = arrayOfNulls<BigInteger>(n)
+    // A row with no term at all reads as pinned to zero, which is what an all-zero row of V would mean;
+    // V is unimodular so no such row exists, and every row starts the sweep at the empty sum.
+    val open = BooleanArray(n)
+    val openHigh = BooleanArray(n)
     for (i in 0 until n) {
-        var accLo: BigInteger? = BigInteger.ZERO
-        var accHi: BigInteger? = BigInteger.ZERO
-        for (j in transform[i].indices) {
-            val c = transform[i][j]
-            if (c.isZero()) continue
-            val termLo = if (c > BigInteger.ZERO) yLo.getOrNull(j)?.times(c) else yHi.getOrNull(j)?.times(c)
-            val termHi = if (c > BigInteger.ZERO) yHi.getOrNull(j)?.times(c) else yLo.getOrNull(j)?.times(c)
-            accLo = if (termLo == null || accLo == null) null else accLo + termLo
-            accHi = if (termHi == null || accHi == null) null else accHi + termHi
-        }
-        lo[i] = accLo
-        hi[i] = accHi
+        lo[i] = BigInteger.ZERO
+        hi[i] = BigInteger.ZERO
+    }
+    transform.forEachEntry { row, col, c ->
+        val positive = c > BigInteger.ZERO
+        val termLo = if (positive) yLo.getOrNull(col)?.times(c) else yHi.getOrNull(col)?.times(c)
+        val termHi = if (positive) yHi.getOrNull(col)?.times(c) else yLo.getOrNull(col)?.times(c)
+        if (termLo == null) open[row] = true else lo[row] = lo[row]?.plus(termLo)
+        if (termHi == null) openHigh[row] = true else hi[row] = hi[row]?.plus(termHi)
+    }
+    for (i in 0 until n) {
+        if (open[i]) lo[i] = null
+        if (openHigh[i]) hi[i] = null
     }
     return TriangularBounds(lo, hi)
 }

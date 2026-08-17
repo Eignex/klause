@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.solver.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -10,14 +11,12 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * A matrix in column Hermite normal form together with the column operations that produced it:
  * `H = A · V`, where [v] is unimodular (integer, determinant ±1) and therefore a bijection of the
  * integer lattice — so `Ax ⋛ b` and `Hy ⋛ b` have the same integer solutions, related by `x = Vy`.
- *
- * [h] and [v] are row-major: `h[i][j]` is row `i`, column `j`.
  */
-internal class HermiteForm(val h: Array<Array<BigInteger>>, val v: Array<Array<BigInteger>>)
+internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform)
 
 /**
- * Column Hermite normal form of [a] (row-major, `rows × cols`), with the unimodular column transform
- * that produces it.
+ * Column Hermite normal form of [a] over [cols] columns, with the unimodular column transform that
+ * produces it, or null when [cancellation] fired before the reduction finished.
  *
  * The form is lower triangular: reading rows top to bottom, each pivot sits strictly to the right of
  * nothing — every entry to the right of a row's pivot is zero — which is what makes a variable's bound
@@ -29,12 +28,19 @@ internal class HermiteForm(val h: Array<Array<BigInteger>>, val v: Array<Array<B
  * another — each of which is unimodular, so their product [HermiteForm.v] is too. Entries are
  * [BigInteger] because the intermediate coefficients of an integer elimination grow well past `Long` even
  * when the input and the result both fit comfortably.
+ *
+ * A partial reduction is not usable: its `H` is not yet triangular, so forward substitution over it would
+ * bound the wrong column. Cancellation therefore reports nothing rather than a prefix.
  */
-internal fun hermiteNormalForm(a: Array<Array<BigInteger>>): HermiteForm {
+@Suppress("NestedBlockDepth", "ReturnCount")
+internal fun hermiteNormalForm(
+    a: List<SparseIntRow>,
+    cols: Int,
+    cancellation: Cancellation = Cancellation.Never,
+): HermiteForm? {
     val rows = a.size
-    val cols = if (rows == 0) 0 else a[0].size
-    val h = Array(rows) { i -> Array(cols) { j -> a[i][j] } }
-    val v = Array(cols) { i -> Array(cols) { j -> if (i == j) BigInteger.ONE else BigInteger.ZERO } }
+    val h = SparseIntColumns(rows, cols, a)
+    val v = UnimodularTransform(cols)
 
     var pivot = 0
     for (row in 0 until rows) {
@@ -43,68 +49,76 @@ internal fun hermiteNormalForm(a: Array<Array<BigInteger>>): HermiteForm {
         // smallest non-zero entry and subtract multiples of it from the others, which is the Euclidean
         // algorithm run across columns and terminates for the same reason.
         while (true) {
+            if (cancellation()) return null
             var minCol = -1
+            var minAbs = BigInteger.ZERO
             var nonZero = 0
-            for (j in pivot until cols) {
-                if (h[row][j].isZero()) continue
+            // The row view holds exactly the columns this row is non-zero in, so the search costs the
+            // row's own support rather than the column count. Ties go to the lower column so that the
+            // reduction does not depend on the hash order of the view.
+            for (j in h.rowSupport[row]) {
+                if (j < pivot) continue
                 nonZero++
-                if (minCol < 0 || h[row][j].abs() < h[row][minCol].abs()) minCol = j
+                val abs = h[row, j].abs()
+                if (minCol < 0 || abs < minAbs || (abs == minAbs && j < minCol)) {
+                    minAbs = abs
+                    minCol = j
+                }
             }
             if (nonZero <= 1) {
-                if (minCol >= 0 && minCol != pivot) {
-                    swapColumns(h, v, pivot, minCol)
-                }
+                if (minCol >= 0 && minCol != pivot) swapColumns(h, v, pivot, minCol)
                 break
             }
             swapColumns(h, v, pivot, minCol)
-            for (j in pivot + 1 until cols) {
-                if (h[row][j].isZero()) continue
-                val q = h[row][j] / h[row][pivot]
+            val p = h[row, pivot]
+            for (j in ascendingSupport(h, row)) {
+                if (j <= pivot) continue
+                val e = h[row, j]
+                if (e.isZero()) continue
+                val q = e / p
                 if (!q.isZero()) addMultipleOfColumn(h, v, target = j, source = pivot, factor = -q)
             }
         }
-        if (h[row][pivot].isZero()) continue // the whole row is zero from `pivot` right; no pivot here
-        if (h[row][pivot].signum() < 0) negateColumn(h, v, pivot)
+        if (h[row, pivot].isZero()) continue // the whole row is zero from `pivot` right; no pivot here
+        if (h[row, pivot].signum() < 0) negateColumn(h, v, pivot)
         // Reduce the entries left of the pivot into `[0, pivot)`, the canonical form's uniqueness rule.
-        for (j in 0 until pivot) {
-            val d = h[row][pivot]
-            if (d.isZero()) continue
-            var q = h[row][j] / d
-            if (h[row][j] - q * d < BigInteger.ZERO) q -= BigInteger.ONE // floor, so the residue is ≥ 0
+        val d = h[row, pivot]
+        for (j in ascendingSupport(h, row)) {
+            if (j >= pivot) continue
+            var q = h[row, j] / d
+            if (h[row, j] - q * d < BigInteger.ZERO) q -= BigInteger.ONE // floor, so the residue is >= 0
             if (!q.isZero()) addMultipleOfColumn(h, v, target = j, source = pivot, factor = -q)
         }
         pivot++
     }
-    return HermiteForm(h, v)
+    return HermiteForm(h.toRows(), v)
 }
 
-private fun swapColumns(h: Array<Array<BigInteger>>, v: Array<Array<BigInteger>>, x: Int, y: Int) {
-    if (x == y) return
-    for (row in h) {
-        val t = row[x]
-        row[x] = row[y]
-        row[y] = t
-    }
-    for (row in v) {
-        val t = row[x]
-        row[x] = row[y]
-        row[y] = t
-    }
+/** The row's non-zero columns in ascending order, snapshotted so the column operations may mutate it. */
+private fun ascendingSupport(h: SparseIntColumns, row: Int): IntArray {
+    val cs = h.rowSupport[row].toIntArray()
+    cs.sort()
+    return cs
 }
 
-private fun negateColumn(h: Array<Array<BigInteger>>, v: Array<Array<BigInteger>>, col: Int) {
-    for (row in h) row[col] = -row[col]
-    for (row in v) row[col] = -row[col]
+private fun swapColumns(h: SparseIntColumns, v: UnimodularTransform, x: Int, y: Int) {
+    h.swap(x, y)
+    v.swap(x, y)
+}
+
+private fun negateColumn(h: SparseIntColumns, v: UnimodularTransform, col: Int) {
+    h.negate(col)
+    v.negate(col)
 }
 
 /** `column[target] += factor · column[source]`, applied to the matrix and to the transform alike. */
 private fun addMultipleOfColumn(
-    h: Array<Array<BigInteger>>,
-    v: Array<Array<BigInteger>>,
+    h: SparseIntColumns,
+    v: UnimodularTransform,
     target: Int,
     source: Int,
     factor: BigInteger,
 ) {
-    for (row in h) row[target] += factor * row[source]
-    for (row in v) row[target] += factor * row[source]
+    h.addMultiple(target, source, factor)
+    v.addMultiple(target, source, factor)
 }

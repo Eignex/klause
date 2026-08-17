@@ -13,16 +13,12 @@ import kotlin.test.assertTrue
  */
 class BareissRhsTest {
 
-    @Suppress("ArrayPrimitive")
-    private fun mat(vararg rows: LongArray): Array<Array<BigInteger>> =
-        Array(rows.size) { i -> Array(rows[i].size) { j -> BigInteger.fromLong(rows[i][j]) } }
-
     private fun vec(vararg v: Long) = Array(v.size) { BigInteger.fromLong(v[it]) }
 
     @Test
     fun `a row swap carries its right-hand side along`() {
         // Column 0 is zero in the first row, so elimination swaps the rows; the bounds must swap too.
-        val e = bareissEchelon(mat(longArrayOf(0, 1), longArrayOf(1, 0)), vec(3, 5))
+        val e = bareissEchelon(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), 2, vec(3, 5))
         assertEquals(BigInteger.fromLong(5), e.rhs[0], "row now holding `x = 5` must carry 5, not 3")
         assertEquals(BigInteger.fromLong(3), e.rhs[1])
     }
@@ -30,7 +26,7 @@ class BareissRhsTest {
     @Test
     fun `an elimination combines right-hand sides the same way it combines rows`() {
         // x + y = 4 and 2x + 2y = 8 are dependent; the second reduces to 0 = 0.
-        val e = bareissEchelon(mat(longArrayOf(1, 1), longArrayOf(2, 2)), vec(4, 8))
+        val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 8))
         assertEquals(1, e.rows.size, "the dependent row drops out")
         assertEquals(BigInteger.fromLong(4), e.rhs[0])
         assertFalse(e.inconsistent, "8 = 2*4, so the pair is consistent")
@@ -39,13 +35,13 @@ class BareissRhsTest {
     @Test
     fun `a dependent row with a mismatched bound is reported inconsistent`() {
         // x + y = 4 and 2x + 2y = 9 reduce to 0 = 1: the equalities alone have no solution.
-        val e = bareissEchelon(mat(longArrayOf(1, 1), longArrayOf(2, 2)), vec(4, 9))
+        val e = bareissEchelon(sparseRows(longArrayOf(1, 1), longArrayOf(2, 2)), 2, vec(4, 9))
         assertTrue(e.inconsistent, "0 = 1 refutes the system")
     }
 
     @Test
     fun `coefficients alone still reduce with no right-hand side claimed`() {
-        val e = bareissEchelon(mat(longArrayOf(0, 1), longArrayOf(1, 0)))
+        val e = bareissEchelon(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), 2)
         assertEquals(2, e.rows.size)
         assertEquals(0, e.rhs.size, "nothing is claimed about bounds that were never supplied")
         assertFalse(e.inconsistent, "inconsistency cannot be seen without the bounds")
@@ -53,7 +49,7 @@ class BareissRhsTest {
 
     @Test
     fun `the transformation exposes the reduced right-hand sides`() {
-        val m = mixedEchelonHermite(mat(longArrayOf(0, 1), longArrayOf(1, 0)), emptyArray(), 2, vec(3, 5))
+        val m = mixedEchelonHermite(sparseRows(longArrayOf(0, 1), longArrayOf(1, 0)), emptyList(), 2, vec(3, 5))
         assertEquals(m.equalities.size, m.equalityRhs.size, "one bound per reduced row")
     }
 }
