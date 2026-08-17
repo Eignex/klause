@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -14,6 +15,7 @@ import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** Small math and problem-rebuild helpers shared across the presolve passes. */
 internal object PresolveShared {
@@ -73,43 +75,103 @@ internal object PresolveShared {
         return null
     }
 
-    /** Cap on cliques fed to [mergeCliques]; above it the structural merge is skipped (sound — it only
-     *  means fewer / smaller cliques) so the greedy extension can't go quadratic on a huge model. */
-    private const val CLIQUE_MERGE_CAP = 4096
+    /**
+     * Budget for [mergeCliques], counted in conflict-graph neighbour visits — the quantity the greedy
+     * extension actually spends, which is `Σ_clique Σ_member Σ_{base clique ∋ member} |base clique|` and
+     * so grows with how densely the cliques overlap rather than with how many there are. A clique count
+     * bounds neither: a handful of wide, heavily overlapping at-most-ones costs more than a hundred
+     * thousand disjoint binary ones.
+     */
+    private const val CLIQUE_MERGE_WORK_BUDGET = 20_000_000L
+
+    /** Poll the cancellation once per this many base cliques in the extension loop. */
+    private const val CLIQUE_MERGE_CANCEL_POLL_MASK = 0x3F
 
     /** The [amoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
-    fun maximalAmoCliques(factors: List<Factor>): List<Set<Int>> = mergeCliques(amoCliques(factors))
+    fun maximalAmoCliques(factors: List<Factor>, cancellation: Cancellation = Cancellation.Never): List<Set<Int>> =
+        mergeCliques(amoCliques(factors), cancellation)
 
     /** The [persistentAmoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
-    fun maximalPersistentAmoCliques(factors: List<Factor>): List<Set<Int>> = mergeCliques(persistentAmoCliques(factors))
+    fun maximalPersistentAmoCliques(
+        factors: List<Factor>,
+        cancellation: Cancellation = Cancellation.Never,
+    ): List<Set<Int>> = mergeCliques(persistentAmoCliques(factors), cancellation)
 
     /**
      * Merge a set of at-most-one [cliques] into maximal ones. Every unordered pair *within* a base
      * clique is a sound exclusion edge, so their union is a conflict graph (see [ConflictGraph]);
      * greedily extending each base clique with literals adjacent to all its members yields larger
      * at-most-one cliques (e.g. three binary clauses forming a triangle collapse to one size-3 clique).
-     * Cliques that end up a subset of another are dropped. Deterministic (literals processed in id
-     * order) and bounded by [CLIQUE_MERGE_CAP]; sound because a literal joins only when it conflicts with
-     * every current member.
+     * Cliques that end up a subset of another are dropped. Deterministic (cliques in input order,
+     * literals in id order) and sound because a literal joins only when it conflicts with every current
+     * member.
+     *
+     * Extension is metered against [CLIQUE_MERGE_WORK_BUDGET] and stops on [cancellation]: a clique
+     * whose own extension would overrun what is left is kept as it came in. That only forgoes further
+     * growth — every returned clique is still a valid at-most-one — so the result degrades in strength,
+     * never in soundness.
      */
-    fun mergeCliques(cliques: List<Set<Int>>): List<Set<Int>> {
-        if (cliques.size < 2 || cliques.size > CLIQUE_MERGE_CAP) return cliques
+    fun mergeCliques(cliques: List<Set<Int>>, cancellation: Cancellation = Cancellation.Never): List<Set<Int>> {
+        if (cliques.size < 2) return cliques
+        var budget = CLIQUE_MERGE_WORK_BUDGET
         val graph = ConflictGraph(cliques)
         val grown = ArrayList<Set<Int>>(cliques.size)
-        for (clique in cliques) {
+        var stopped = false
+        for (i in cliques.indices) {
+            val clique = cliques[i]
+            if (!stopped && (i and CLIQUE_MERGE_CANCEL_POLL_MASK) == 0 && cancellation()) stopped = true
+            val cost = if (stopped) Long.MAX_VALUE else graph.extensionCost(clique)
+            if (cost > budget) {
+                grown.add(clique)
+                continue
+            }
+            budget -= cost
             val members = clique.toHashSet()
             // Candidates: lits adjacent to every base member, taken in id order for determinism. Each
             // one is then re-checked against the members added before it, which the candidate set of the
             // *base* clique does not account for.
-            for (c in graph.commonNeighbours(clique)) {
+            val candidates = graph.commonNeighbours(clique)
+            budget -= candidates.size.toLong() * clique.size
+            for (c in candidates) {
                 if (members.all { it == c || graph.adjacent(it, c) }) members.add(c)
             }
             grown.add(members)
         }
-        // Drop any clique that is a subset of a strictly larger kept one; dedup equals.
+        return dropSubsumedCliques(grown)
+    }
+
+    /**
+     * Drop every clique of [grown] that is a strict subset of another, and dedup equals. Taking them in
+     * descending size means any strict superset of a clique is already kept — a superset dropped as a
+     * subset of a third clique leaves that third one a superset too — and a superset must contain *every*
+     * member, so only the kept cliques indexed under the member with the fewest of them can be one. That
+     * probe is what keeps this off the all-pairs `O(K²·|clique|)` scan.
+     */
+    private fun dropSubsumedCliques(grown: List<Set<Int>>): List<Set<Int>> {
         val sorted = grown.distinct().sortedByDescending { it.size }
         val kept = ArrayList<Set<Int>>(sorted.size)
-        for (c in sorted) if (kept.none { it.size > c.size && it.containsAll(c) }) kept.add(c)
+        val keptWith = MutableIntObjectMap<IntArrayList>()
+        for (c in sorted) {
+            var probe: IntArrayList? = null
+            var unheld = false
+            for (l in c) {
+                val here = keptWith[l]
+                if (here == null) {
+                    unheld = true
+                    break
+                }
+                if (probe == null || here.size < probe.size) probe = here
+            }
+            val holder = if (unheld) null else probe
+            val subsumed = holder != null && (0 until holder.size).any {
+                val k = kept[holder[it]]
+                k.size > c.size && k.containsAll(c)
+            }
+            if (subsumed) continue
+            val id = kept.size
+            kept.add(c)
+            for (l in c) keptWith.getOrPut(l) { IntArrayList() }.add(id)
+        }
         return kept
     }
 
@@ -136,6 +198,10 @@ internal object PresolveShared {
         private val countedFor: IntArray
         private var stamp = 0
 
+        /** Per literal, the neighbour visits one [forEachNeighbour] sweep of it costs — the summed size
+         *  of the base cliques containing it. The unit [mergeCliques] budgets in. */
+        private val visitCost: LongArray
+
         init {
             var next = 0
             for (clique in cliques) for (u in clique) if (!positionOf.containsKey(u)) positionOf.put(u, next++)
@@ -148,6 +214,19 @@ internal object PresolveShared {
             for (id in cliques.indices) for (u in cliques[id]) cliquesOf[fill[positionOf.getOrDefault(u, 0)]++] = id
             adjacentCount = IntArray(litCount)
             countedFor = IntArray(litCount) { -1 }
+            visitCost = LongArray(litCount)
+            for (clique in cliques) for (u in clique) visitCost[positionOf.getOrDefault(u, 0)] += clique.size
+        }
+
+        /** The neighbour visits [commonNeighbours] spends on [clique] — two sweeps over every member's
+         *  containing cliques. */
+        fun extensionCost(clique: Set<Int>): Long {
+            var cost = 0L
+            for (u in clique) {
+                val pu = positionOf.getOrDefault(u, -1)
+                if (pu >= 0) cost += 2 * visitCost[pu]
+            }
+            return cost
         }
 
         /** Whether [u] and [v] are pairwise exclusive — i.e. co-members of some base clique. Both slices

@@ -169,7 +169,7 @@ internal object RedundantConstraints {
         // Phase 3: variable-subset / proportional domination across different supports.
         val out3 = dropSubsetDominated(problem, out, cancellation)
         // Phase 4: clique-aware redundancy — a 0/1 knapsack implied by at-most-one cliques.
-        val out4 = dropCliqueImpliedKnapsacks(out3)
+        val out4 = dropCliqueImpliedKnapsacks(out3, cancellation)
         // Phase 5: drop globals the current domains make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
         val out5 = out4.filterNot { isVacuousGlobal(it, problem.intDomains) }
@@ -570,8 +570,8 @@ internal object RedundantConstraints {
      * Only redundancy is done here: clique-based coefficient *lifting* (GUB cover lifting) is subtle —
      * the naive clamp to the clique-reduced slack is unsound — and is left to a follow-up.
      */
-    private fun dropCliqueImpliedKnapsacks(factors: List<Factor>): List<Factor> {
-        val cliques = PresolveShared.maximalPersistentAmoCliques(factors)
+    private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: Cancellation): List<Factor> {
+        val cliques = PresolveShared.maximalPersistentAmoCliques(factors, cancellation)
         if (cliques.isEmpty()) return factors
         val out = ArrayList<Factor>(factors.size)
         for (f in factors) {

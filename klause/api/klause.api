@@ -6752,7 +6752,8 @@ public final class com/eignex/klause/presolve/Presolve {
 	public final fun implicationGraph (Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/solver/Cancellation;)[[I
 	public static synthetic fun implicationGraph$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)[[I
 	public final fun maxIntSpan (Lcom/eignex/klause/solver/Problem;)J
-	public final fun mergeAmoCliques (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun mergeAmoCliques (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun mergeAmoCliques$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun mergeDuplicateColumns (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/presolve/SharedIntOccurrence;[I)Lcom/eignex/klause/presolve/PassDelta;
 	public static synthetic fun mergeDuplicateColumns$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/presolve/SharedIntOccurrence;[IILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun probe (Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
