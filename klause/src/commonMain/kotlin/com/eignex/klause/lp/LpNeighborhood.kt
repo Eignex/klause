@@ -148,10 +148,15 @@ internal fun LpModel.restrictTo(
     takenRows: IntArrayList,
     colMap: IntArray?,
     copyCosts: Boolean,
+    /** Scratch row-index map of length `m`, reusable across calls. A caller that restricts the same model
+     *  once per component pays `O(components × m)` in allocation alone otherwise, which on a model with
+     *  many small components dwarfs the restriction itself. Cleared for the rows it touches on the way
+     *  out, so the buffer comes back all `-1` and the next call cannot see this one's rows. */
+    rowMapScratch: IntArray? = null,
 ): LpNeighborhood {
     val subN = takenCols.size
     val subM = takenRows.size
-    val rowMap = IntArray(m) { -1 }
+    val rowMap = rowMapScratch ?: IntArray(m) { -1 }
     for (r in 0 until subM) rowMap[takenRows[r]] = r
 
     // CSC restricted to the taken columns × taken rows (a taken column's entries in dropped rows
@@ -277,5 +282,7 @@ internal fun LpModel.restrictTo(
         flippedRhs = flippedOut, probeClampedLo = clampLo, probeClampedHi = clampHi,
         colContinuous = continuous, doubleView = dv,
     )
+    // Hand a borrowed buffer back in the state it arrived in.
+    if (rowMapScratch != null) for (r in 0 until subM) rowMap[takenRows[r]] = -1
     return LpNeighborhood(model, colMap, takenRows.toIntArray(), takenCols.toIntArray())
 }

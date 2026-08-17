@@ -155,8 +155,16 @@ internal fun componentLpSolverOrNull(
     for (j in 0 until n) if (!inRow[j]) isolated.add(j)
 
     val parts = ArrayList<LpNeighborhood>(blocks)
+    // One scratch buffer for the whole split: a fresh IntArray(m) per component makes the split alone
+    // O(components x m), which on a model with many small components outweighs every restriction it
+    // performs. Polled per component too - without it a long split never observes the deadline, since
+    // the budget is only checked once a solver exists.
+    val rowMapScratch = IntArray(model.m) { -1 }
     for (b in 0 until blocks) {
-        parts.add(model.restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true))
+        if (cancellation()) return null
+        parts.add(
+            model.restrictTo(blockCols[b], blockRows[b], colMap = null, copyCosts = true, rowMapScratch),
+        )
     }
     val solvers = parts.map { engine(it.model, cancellation) }
     return ComponentLpSolver(model, parts, solvers, isolated.toIntArray())
