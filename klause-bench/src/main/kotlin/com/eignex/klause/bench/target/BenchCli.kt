@@ -210,13 +210,16 @@ object BenchCli {
         }
         val cores = f["p"]?.toIntOrNull()?.coerceAtLeast(1) ?: 8
         val budget = f["timeout"]?.toLongOrNull()?.let { Budget(it) } ?: Budget()
+        // `param=` is repeatable, so it is collected from the raw args rather than the dedup'd map;
+        // `p=1 param=strategy=sweep` is the bandit-scheduled recipe sweep.
+        val params = filterArgs.filter { it.startsWith("param=") }.map { it.substringAfter('=') }
         val entries = BenchLoad.resolveRefs(refs)
         println("=== calibrate ($engine, -p$cores): ${entries.size} instance(s), ${budget.timeoutMillis}ms ===")
         val dir = SolveMetric.run(
             entries,
             budget,
             SolverInvocation.KLAUSE,
-            KlauseSearch(engine = engine, processors = cores),
+            KlauseSearch(engine = engine, processors = cores, params = params),
         ) ?: return
         val (arms, won) = portfolioWinners(dir)
         if (won.isEmpty()) {

@@ -452,7 +452,9 @@ internal object SolveCore {
             cores = cores,
             kind = kind,
             defaultEngine = mix,
-            defaultArms = defaultArms,
+            // `strategy=sweep` pins the worker count to the full recipe cross-product so the bandit
+            // schedules every recipe; otherwise the env override or the auto-tuned default.
+            defaultArms = lsResolution.forceArms ?: defaultArms,
             lpCeiling = lpCeiling,
             lsPool = lsResolution.pool,
             btPool = btPool,

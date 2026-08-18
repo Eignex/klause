@@ -6542,6 +6542,11 @@ public final class com/eignex/klause/portfolio/LocalSearchCatalog {
 	public final fun ranked (Lcom/eignex/klause/portfolio/Kind;)Ljava/util/List;
 }
 
+public final class com/eignex/klause/portfolio/LsRecipeSweep {
+	public static final field INSTANCE Lcom/eignex/klause/portfolio/LsRecipeSweep;
+	public final fun pool ()Ljava/util/List;
+}
+
 public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/PortfolioStrategy;)V
 	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/PortfolioStrategy;ILkotlin/jvm/internal/DefaultConstructorMarker;)V

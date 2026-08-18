@@ -5,7 +5,9 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Core/arm decoupling (#406): `-p N` is the core count (drives sequential-vs-parallel), the arm pool
@@ -72,5 +74,22 @@ class EngineParamsPortfolioScenarioTest {
         val ls = scenario(cores = 1, params = listOf("ls=4", "bt=0"))
         assertEquals(EngineMix.LOCAL_SEARCH, ls.engine)
         assertEquals(4, ls.arms)
+    }
+
+    @Test
+    fun `strategy sweep resolves a pool and pins the worker count to all of it`() {
+        val res = resolveLocalSearchRecipes(EngineParams(mutableListOf("strategy=sweep")))
+        val pool = assertNotNull(res.pool, "sweep resolves an explicit pool rather than the curated default")
+        assertTrue(pool.size > 1, "the cross-product is more than one recipe: ${pool.size}")
+        assertEquals(pool.size, res.forceArms, "every recipe must get its own arm or the sweep is a prefix")
+        assertTrue(pool.all { it().label.startsWith("recipe/") }, "every arm comes from the recipe space")
+    }
+
+    @Test
+    fun `strategy sweep rejects edits that would contradict the whole space`() {
+        for (extra in listOf("arm=fjump", "sources=all", "acceptance=metropolis")) {
+            val e = runCatching { resolveLocalSearchRecipes(EngineParams(mutableListOf("strategy=sweep", extra))) }
+            assertTrue(e.isFailure, "strategy=sweep with $extra must be rejected")
+        }
     }
 }
