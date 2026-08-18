@@ -18,11 +18,7 @@ import com.eignex.klause.solver.Lit
  * decides that literal, which is how a reified row participates. An endpoint of [ZERO] is the constant 0,
  * so a one-variable row is a difference like any other.
  */
-internal class DifferenceFragment(
-    val edges: List<DifferenceEdge>,
-    /** Factors whose whole content became edges, so a consumer knows what the graph already covers. */
-    val absorbedFactors: IntArray,
-) {
+internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     /** The integer variables the edges mention, ascending. [ZERO] is not among them. */
     val nodes: IntArray = run {
         val seen = HashSet<Int>()
@@ -89,14 +85,11 @@ internal fun differenceFragmentOf(
 ): DifferenceFragment? {
     val zero = DifferenceFragment.ZERO
     val edges = ArrayList<DifferenceEdge>()
-    val absorbed = ArrayList<Int>()
-    factors.forEachIndexed { id, f ->
+    factors.forEach { f ->
         when (f) {
             is Linear ->
-                if (f.isIntegerCore &&
+                if (f.isIntegerCore) {
                     appendDifferenceEdges(f.vars, f::coeff, f.op, f.bound, zero, DifferenceEdge.ALWAYS, edges)
-                ) {
-                    absorbed.add(id)
                 }
 
             is ReifiedLinear ->
@@ -131,5 +124,5 @@ internal fun differenceFragmentOf(
         if (d.max != Long.MAX_VALUE) edges.add(DifferenceEdge(zero, v, d.max))
         if (d.min != Long.MIN_VALUE) edges.add(DifferenceEdge(v, zero, -d.min))
     }
-    return DifferenceFragment(edges, absorbed.toIntArray())
+    return DifferenceFragment(edges)
 }
