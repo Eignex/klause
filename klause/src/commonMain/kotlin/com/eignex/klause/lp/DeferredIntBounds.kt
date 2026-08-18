@@ -50,16 +50,7 @@ class DeferredIntBounds internal constructor(
         // Refute over the genuinely open ranges first. A certificate there rules out the unbounded model
         // itself, so the verdict needs no clamp caveat — where an `unsat` found inside the fallback box
         // would only ever be reportable as `unknown`.
-        if (lossy && unboundedlyInfeasible(openBounds, intConstraints, cancellation)) {
-            val domains = Array(openBounds.size) { IntDomain(0L, 0L) }
-            return BoundedIntDomains(
-                domains,
-                clamped = false,
-                openLo = BooleanArray(openBounds.size),
-                openHi = BooleanArray(openBounds.size),
-                openlyInfeasible = true,
-            )
-        }
+        if (lossy && unboundedlyInfeasible(openBounds, intConstraints, cancellation)) return refutedOverOpenRanges()
         val tightened = tightenOpenIntBounds(
             openBounds,
             intConstraints,
@@ -68,6 +59,10 @@ class DeferredIntBounds internal constructor(
             realLower = declaredRealLower(),
             realUpper = declaredRealUpper(),
         )
+        // The tightening crossed a variable's own bounds. It reads the declared domains and the model's
+        // unconditional rows, so an empty domain there is the model's, derived over its genuinely open
+        // ranges — the same global refutation, reached by propagation instead of by a dual ray.
+        if (tightened.refuted) return refutedOverOpenRanges()
         // Where OBBT leaves a side open, the model's own structure may still bound it: the equality rows
         // drive a unimodular change of variables whose triangular block bounds its pivots by forward
         // substitution, and those ranges push back onto the original variables. A bound obtained that way
@@ -77,11 +72,11 @@ class DeferredIntBounds internal constructor(
         val openLo = BooleanArray(openBounds.size)
         val openHi = BooleanArray(openBounds.size)
         val domains = Array(openBounds.size) { v ->
-            val lo = tightened[v].lo ?: structural?.lo?.getOrNull(v)?.longOrNull() ?: fallbackLo.also {
+            val lo = tightened.bounds[v].lo ?: structural?.lo?.getOrNull(v)?.longOrNull() ?: fallbackLo.also {
                 openLo[v] = true
                 if (lossy) clamped = true
             }
-            val hi = tightened[v].hi ?: structural?.hi?.getOrNull(v)?.longOrNull() ?: fallbackHi.also {
+            val hi = tightened.bounds[v].hi ?: structural?.hi?.getOrNull(v)?.longOrNull() ?: fallbackHi.also {
                 openHi[v] = true
                 if (lossy) clamped = true
             }
@@ -96,6 +91,16 @@ class DeferredIntBounds internal constructor(
         }
         return BoundedIntDomains(domains, clamped, openLo, openHi, openSolution = solution)
     }
+
+    /** The model has no solution over its genuinely open ranges, so the verdict carries no clamp caveat and
+     *  the domains are a placeholder the caller never searches. */
+    private fun refutedOverOpenRanges(): BoundedIntDomains = BoundedIntDomains(
+        Array(openBounds.size) { IntDomain(0L, 0L) },
+        clamped = false,
+        openLo = BooleanArray(openBounds.size),
+        openHi = BooleanArray(openBounds.size),
+        openlyInfeasible = true,
+    )
 
     /**
      * Whether nothing anywhere improves on [value] — the certificate that turns an optimum proved inside

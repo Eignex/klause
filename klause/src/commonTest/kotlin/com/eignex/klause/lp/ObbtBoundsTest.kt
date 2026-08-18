@@ -4,7 +4,9 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ObbtBoundsTest {
 
@@ -12,13 +14,13 @@ class ObbtBoundsTest {
     fun `closes an open upper side a constraint bounds to the exact bound`() {
         val rows = listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), rows)
-        assertEquals(5L, out[0].hi) // exact certification tightens the free-column bound to the true max
+        assertEquals(5L, out.bounds[0].hi) // exact certification tightens the free-column bound to the true max
     }
 
     @Test
     fun `leaves a side open when no constraint bounds it`() {
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList())
-        assertNull(out[0].hi)
+        assertNull(out.bounds[0].hi)
     }
 
     @Test
@@ -32,7 +34,7 @@ class ObbtBoundsTest {
             realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 7.0),
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList(), realConstraints = rows)
-        assertEquals(7L, out[0].hi)
+        assertEquals(7L, out.bounds[0].hi)
     }
 
     @Test
@@ -43,7 +45,7 @@ class ObbtBoundsTest {
             realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.GE, -7.0),
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(null, 0L)), emptyList(), realConstraints = rows)
-        assertEquals(-7L, out[0].lo)
+        assertEquals(-7L, out.bounds[0].lo)
     }
 
     @Test
@@ -56,7 +58,7 @@ class ObbtBoundsTest {
             realRow(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, 1.0), LinearOp.LE, 6.6),
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), emptyList(), realConstraints = rows)
-        assertEquals(6L, out[0].hi)
+        assertEquals(6L, out.bounds[0].hi)
     }
 
     @Test
@@ -67,8 +69,8 @@ class ObbtBoundsTest {
             Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.EQ, 0),
         )
         val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, null)), rows)
-        assertEquals(4L, out[0].hi)
-        assertEquals(4L, out[1].hi)
+        assertEquals(4L, out.bounds[0].hi)
+        assertEquals(4L, out.bounds[1].hi)
     }
 
     @Test
@@ -85,7 +87,28 @@ class ObbtBoundsTest {
         val padding = List(5001) { i -> Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 1_000 + i) }
         val bounds = arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, 10L))
         val out = tightenOpenIntBounds(bounds, padding, realConstraints = lpOnly)
-        assertEquals(7L, out[0].hi, "the neighborhood probe closes the locally derivable bound")
+        assertEquals(7L, out.bounds[0].hi, "the neighborhood probe closes the locally derivable bound")
+    }
+
+    @Test
+    fun `refutes a system whose rows cross a variable's own bounds`() {
+        // x <= 3 and x >= 5.
+        val rows = listOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5),
+        )
+        val out = tightenOpenIntBounds(arrayOf(OpenIntBounds(0L, null)), rows)
+        assertTrue(out.refuted)
+    }
+
+    @Test
+    fun `a crossing reached through a real row bounds without refuting`() {
+        // x <= -1 through the outward-rounded real arithmetic, whose margin may bound but not assert unsat.
+        val rows = listOf(realRow(longArrayOf(1), intArrayOf(0), doubleArrayOf(0.0, 0.0), LinearOp.LE, -1.0))
+        val bounds = arrayOf(OpenIntBounds(0L, null), OpenIntBounds(0L, null))
+        val out = tightenOpenIntBounds(bounds, emptyList(), realConstraints = rows)
+        assertFalse(out.refuted)
+        assertEquals(0L, out.bounds[0].hi, "collapsed to where the sides met, never handed over crossed")
     }
 
     /** A row over int variable terms plus the two free reals `r1`/`r2` (ids 0 and 1). */
