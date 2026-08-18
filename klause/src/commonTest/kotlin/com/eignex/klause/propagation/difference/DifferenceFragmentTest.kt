@@ -71,8 +71,8 @@ class DifferenceFragmentTest {
     fun `a general linear row is left out but the differences are still collected`() {
         val general = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         val f = assertNotNull(frag(listOf(general, diff(0, 1, LinearOp.LE, 3)), 2))
-        assertEquals(1, f.absorbedFactors.size, "only the difference row is absorbed")
-        assertEquals(1, f.absorbedFactors[0], "and it is the one at index 1")
+        assertEquals(1, f.edges.size, "the general row contributes no edge and the difference row one")
+        assertEquals(3L, f.edges.single().bound, "the edge is the difference row's")
     }
 
     @Test
