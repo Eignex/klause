@@ -36,22 +36,39 @@ internal class Recipe(
     /** Stable, unique-by-construction telemetry label. */
     val label: String get() = "${sources.name}|${scoring.name.lowercase()}|${acceptance.name}|${restart.name}"
 
-    /** A fresh portfolio worker for this recipe. `optimizeStrategy` is left null so the engine's
+    /** A fresh [LocalSearchRecipe] for this spec. `optimizeStrategy` is left null so the engine's
      *  built-in objective descent owns the optimize phase (the recipe drives the feasibility fight),
-     *  matching how the SAT-family / fjump arms are registered. */
-    fun toWorkerConfig(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        LocalSearchRecipe(
-            "recipe/$label",
-            SourceDrivenStrategy(
-                MoveSourceCatalog.parse(sources.spec),
-                scoring,
-                acceptance.build(),
-                schedule = ScheduleBundle(temperature = acceptance.temperature?.invoke(), restart = restart.build()),
-                tabu = tabu,
-                feasibleDescent = FeasibleDescent.RatchetAsConstraint,
-            ),
+     *  matching how the SAT-family / fjump arms are registered. Every call builds its own stateful
+     *  instances, which the portfolio's no-shared-state rule requires of an arm factory. */
+    fun toRecipe(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchRecipe = LocalSearchRecipe(
+        "recipe/$label",
+        SourceDrivenStrategy(
+            MoveSourceCatalog.parse(sources.spec),
+            scoring,
+            acceptance.build(),
+            schedule = ScheduleBundle(temperature = acceptance.temperature?.invoke(), restart = restart.build()),
+            tabu = tabu,
+            feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         ),
     )
+
+    /** A fresh portfolio worker wrapping [toRecipe]. */
+    fun toWorkerConfig(tabu: TabuFilter = TabuFilter.Disabled): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(toRecipe(tabu))
+}
+
+/**
+ * The whole local-search recipe cross-product as an arm pool, for the `strategy=sweep` campaign.
+ *
+ * The public seam over the recipe machinery, as [LocalSearchCatalog] is for the curated arms. A pool
+ * this wide is a measuring instrument rather than a production portfolio: it exists so a campaign can
+ * score every recipe against a corpus and re-derive the curated arms from the result. Running it as the
+ * production pool would spread the search across every point of the space at once.
+ */
+object LsRecipeSweep {
+    /** One fresh recipe factory per point of the cross-product, in recipe-space order. Each call builds
+     *  its own stateful instances, which the portfolio's no-shared-state rule requires of an arm. */
+    fun pool(): List<() -> LocalSearchRecipe> = RecipeSpace().all().map { recipe -> { recipe.toRecipe() } }
 }
 
 /** A named source-set, resolved through [MoveSourceCatalog] (the sources axis). */
