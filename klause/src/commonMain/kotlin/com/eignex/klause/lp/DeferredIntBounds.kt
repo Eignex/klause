@@ -44,9 +44,21 @@ class DeferredIntBounds internal constructor(
     /** Declared upper bounds of the real columns; see [realLower]. */
     private val realUpper: DoubleArray = EmptyDoubleArray,
 ) {
+    /**
+     * A declared pair that already crosses, which refutes the model before a single row is read.
+     *
+     * Checked ahead of every relaxation rather than left to the propagation: a column whose `min` exceeds
+     * its `max` is not expressible as an LP column at all, so a crossed pair reaching one aborts the solve
+     * instead of answering it. A front-end reaches here only with the bounds its source declared, so an
+     * empty one among them is the source's own contradiction.
+     */
+    private val declaredEmpty: Boolean =
+        openBounds.any { it.lo != null && it.hi != null && it.lo > it.hi }
+
     /** Run the deferred OBBT under [cancellation] (the solve deadline) and produce the final finite domains
      *  plus whether any side fell back to a lossy clamp. */
     fun run(cancellation: Cancellation): BoundedIntDomains {
+        if (declaredEmpty) return refutedOverOpenRanges()
         // Refute over the genuinely open ranges first. A certificate there rules out the unbounded model
         // itself, so the verdict needs no clamp caveat — where an `unsat` found inside the fallback box
         // would only ever be reportable as `unknown`.
@@ -125,6 +137,7 @@ class DeferredIntBounds internal constructor(
         value: Long,
         cancellation: Cancellation = Cancellation.Never,
     ): Boolean {
+        if (declaredEmpty) return false
         val vars = intCoefficients.indices.filter { intCoefficients[it] != 0L }
         if (vars.isEmpty()) return false
         // Coefficients and the objective are integral, so "strictly better" is better by a whole unit.
@@ -155,7 +168,7 @@ class DeferredIntBounds internal constructor(
         maximize: Boolean,
         value: Long,
         cancellation: Cancellation = Cancellation.Never,
-    ): Boolean = nothingBeatsOverOpenRanges(
+    ): Boolean = !declaredEmpty && nothingBeatsOverOpenRanges(
         openBounds,
         intConstraints,
         realConstraints,

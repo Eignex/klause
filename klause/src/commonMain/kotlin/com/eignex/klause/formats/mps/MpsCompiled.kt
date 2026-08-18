@@ -176,10 +176,19 @@ fun MpsModel.toProblem(
     } else {
         null
     }
+    // A declared pair that crosses states an empty domain, and an [IntDomain] cannot hold one. Collapsing
+    // it to a point would drop the bound the file states — unlike a derived crossing, a declared bound is
+    // not also a row, so nothing else in the model carries it and the search would answer over a column
+    // the file excluded. Restating the upper bound as a row keeps the model saying what the file says.
     val domains = Array(numInt) { j ->
         val lo = openBounds[j].lo ?: -box
         val hi = openBounds[j].hi ?: box
-        if (lo <= hi) IntDomain(lo, hi) else IntDomain(lo, lo)
+        if (lo <= hi) {
+            IntDomain(lo, hi)
+        } else {
+            factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, hi))
+            IntDomain(lo, lo)
+        }
     }
 
     val objScale = objScaleForCost
