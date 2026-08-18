@@ -91,4 +91,40 @@ class MpsSolveTest {
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(m.toProblem().problem.bake()).solve(BacktrackParams()))
     }
+
+    @Test
+    fun `a declared empty integer domain refutes the model over its open ranges`() {
+        // x declared 5 <= x <= 3 alongside an open column y.
+        val m = MpsModel(
+            name = "empty",
+            sense = ObjectiveSense.MINIMIZE,
+            objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
+            variables = listOf(
+                MpsVar("x", integer = true, lower = 5.0, upper = 3.0),
+                MpsVar("y", integer = true, lower = 0.0, upper = null),
+            ),
+            constraints = listOf(MpsConstraint("C1", intArrayOf(1), doubleArrayOf(1.0), lower = null, upper = 10.0)),
+        )
+        val deferred = assertNotNull(m.toProblem().deferredBounds)
+        val bounded = deferred.run(Cancellation.Never)
+        assertTrue(bounded.openlyInfeasible)
+        assertFalse(bounded.clamped, "an empty declared domain refutes without the clamp caveat")
+    }
+
+    @Test
+    fun `a declared empty integer domain is unsat with nothing left open`() {
+        // Every column finite, so no deferred bounding runs and only the model itself carries the bound.
+        val m = MpsModel(
+            name = "emptyclosed",
+            sense = ObjectiveSense.MINIMIZE,
+            objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
+            variables = listOf(
+                MpsVar("x", integer = true, lower = 5.0, upper = 3.0),
+                MpsVar("y", integer = true, lower = 0.0, upper = 8.0),
+            ),
+            constraints = listOf(MpsConstraint("C1", intArrayOf(1), doubleArrayOf(1.0), lower = null, upper = 10.0)),
+        )
+        val compiled = m.toProblem()
+        assertIs<SolveResult.Unsat>(BacktrackSolver(compiled.problem.bake()).solve(BacktrackParams()))
+    }
 }
