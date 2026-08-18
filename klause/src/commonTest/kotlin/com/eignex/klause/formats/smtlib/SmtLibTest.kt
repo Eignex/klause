@@ -589,6 +589,19 @@ class SmtLibTest {
     }
 
     @Test
+    fun `rows that cross an unbounded variable's own bounds refute the model outright`() {
+        // y >= 5 leaves y open above, so single-variable inference sees no contradiction; propagating
+        // x + y = 0 against x in [0, 10] puts y at 0, crossing its own lower bound.
+        val parsed = SmtLib.parse(
+            "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
+                "(assert (>= x 0))\n(assert (<= x 10))\n(assert (= (+ x y) 0))\n(assert (>= y 5))\n(check-sat)",
+        )
+        val bounds = parsed.deferredBounds?.run(Cancellation.Never)
+        assertTrue(bounds != null && bounds.openlyInfeasible, "propagation crossed y's bounds")
+        assertFalse(parsed.clamped(), "a refutation over the open range carries no clamp caveat")
+    }
+
+    @Test
     fun `a fully bounded model is not clamped`() {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
