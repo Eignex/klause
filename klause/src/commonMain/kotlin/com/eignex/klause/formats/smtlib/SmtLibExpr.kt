@@ -66,6 +66,17 @@ internal fun SmtLib.Builder.assert(top: SExpr) {
                     continue
                 }
 
+                // `=>` is n-ary and right-associative: `(=> a1 .. an)` is `a1 -> (.. -> an)`, which holds
+                // exactly when some antecedent fails or the consequent holds. Asserting that is the clause
+                // `!a1 or .. or !a(n-1) or an`, where reifying it would build the implication chain first
+                // and then force its literal true. A one-argument `=>` is just its argument.
+                h == "=>" && args.size >= 2 -> {
+                    val lits = IntArray(args.size) { compileBool(args[it]) }
+                    for (k in 0 until lits.size - 1) lits[k] = Lit.negate(lits[k])
+                    factors.add(Clause(lits))
+                    continue
+                }
+
                 h == "<=" || h == "<" || h == ">=" || h == ">" -> {
                     if (isRealRelation(node)) assertRealLinear(node) else assertLinear(node)
                     continue
