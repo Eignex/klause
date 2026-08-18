@@ -383,6 +383,29 @@ class CliModeTest {
     }
 
     @Test
+    fun `dry-run-presolve counts the open columns the span line cannot distinguish`() {
+        // One open column and one bounded column. The span saturates to the same word either way so the
+        // count is the only thing that separates a mostly-bounded model from a wholly open one.
+        val smt = File.createTempFile("cli", ".smt2").apply {
+            writeText(
+                "(set-logic QF_LIA)\n" +
+                    "(declare-const a Int)\n(declare-const b Int)\n" +
+                    "(assert (>= b 0))\n(assert (<= b 7))\n" +
+                    "(assert (>= (+ a b) 0))\n" +
+                    "(check-sat)\n",
+            )
+            deleteOnExit()
+        }
+        val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
+
+        val line = out.lineSequence().first { "open columns:" in it }
+        val before = line.substringAfter("open columns:").substringBefore("->").trim()
+        val total = before.substringAfter(" of ").trim().toInt()
+        val open = before.substringBefore(" of ").trim().toInt()
+        assertTrue(open in 1 until total, "b is bounded and a is not so the count sits strictly inside: $line")
+    }
+
+    @Test
     fun `the lp-harvest presolve pass reports its contribution when enabled`() {
         // x+y<=3, y+z<=3, x+z<=3 imply x+y+z<=5 (LP max 4.5), so the lp-harvest pass drops it. The pass is
         // opt-in, so it fires only with the +lp-harvest delta; the dry-run must then report the removal.

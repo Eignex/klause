@@ -305,12 +305,13 @@ internal object SolveCore {
         errPrintln("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
         errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
         errPrintln("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
+        errPrintln("  open columns: ${openText(original)} -> ${openText(presolved)}")
         val before = factorHistogram(original)
         val after = factorHistogram(presolved)
         for (kind in (before.keys + after.keys).sorted()) {
             val b = before[kind] ?: 0
             val a = after[kind] ?: 0
-            if (b != a) errPrintln("  $kind: $b -> $a")
+            errPrintln("  $kind: $b -> $a")
         }
         // The LP harvest's own contribution, isolated from the combinatorial passes whose net effect the
         // counts above conflate — the point of inspecting the LP presolve specifically.
@@ -355,6 +356,26 @@ internal object SolveCore {
         return span
     }
 
+    /**
+     * How many integer columns carry no usable bound, as `<open> of <total>`.
+     *
+     * [spanText] saturates on the first column it cannot sum, so one open column and ten thousand read
+     * identically as "unbounded" - which is what makes an open-domain model look like a wall presolve
+     * cannot touch when it may be nothing of the sort. This is the count that line hides.
+     *
+     * A column counts as open when its width overflows `Long` or exceeds [OPEN_WIDTH]. The exact cut is
+     * not load-bearing: real models put their columns either at the clamp or well under a million, so
+     * nothing observed lands near it.
+     */
+    private fun openText(problem: Problem): String {
+        var open = 0
+        for (d in problem.intDomains) {
+            val width = d.max - d.min
+            if (width < 0L || width > OPEN_WIDTH) open++
+        }
+        return "$open of ${problem.intDomains.size}"
+    }
+
     /** [domainSpan] for the dry-run readout, naming the saturated case instead of printing a number
      *  that would read as an exact total. */
     private fun spanText(problem: Problem): String =
@@ -378,6 +399,9 @@ internal object SolveCore {
     }
 
     private const val AFFINE_PIVOT_ORDER_KEY = "affine-pivot-order"
+
+    /** Width above which [openText] reads a column as carrying no usable bound. */
+    private const val OPEN_WIDTH = 1L shl 40
 
     private fun factorHistogram(problem: Problem): Map<String, Int> =
         problem.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
