@@ -198,6 +198,18 @@ class DominatedVariablesTest {
     }
 
     @Test
+    fun `a boolean no factor mentions is not fixed`() {
+        // b1 occurs nowhere: an earlier pass can fold a variable's defining factor away and leave it
+        // referenced by nothing while its value stays tied to the model, so absence is not freedom.
+        val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(pos(0)))))
+        val delta = Presolve.fixDominatedVariables(problem, emptyMap(), emptyMap())
+        assertTrue(
+            delta.addedFactors.none { f -> f.boolVars.contains(1) },
+            "expected no pin for the unreferenced bool",
+        )
+    }
+
+    @Test
     fun `booleans in a two-sided cardinality are excluded`() {
         // Exactly-one (min == max == 1, both sides active) is not monotone in a single literal: both
         // satisfying and unsatisfying a literal can violate it ⇒ its bools can't be dual-fixed.

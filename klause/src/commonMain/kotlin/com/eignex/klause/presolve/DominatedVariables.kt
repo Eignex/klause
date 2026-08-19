@@ -56,8 +56,16 @@ internal object DominatedVariables {
         val trueSafe = BooleanArray(nb) { true } // b = true never violates a constraint
         val falseSafe = BooleanArray(nb) { true } // b = false never violates a constraint
         val boolEligible = BooleanArray(nb) { true }
+        // A pin has to be earned by an occurrence the safety scan actually read. A variable no surviving
+        // factor mentions is not thereby free: an earlier pass may have folded its defining factor away —
+        // [ComparisonClauseFold] consumes a sole-use indicator's reified definition together with the
+        // clause using it, leaving the indicator referenced nowhere — while its value stays tied to an
+        // integer column through the bake. Pinning one of those asserts something the model never stated,
+        // and buys nothing: a variable nothing references prunes nothing.
+        val boolSeen = BooleanArray(nb)
         val alreadyPinned = IntHashSet() // bool vars already forced by a unit clause
         for (f in problem.factors) {
+            for (v in f.boolVars) boolSeen[v] = true
             val rows = f.linearRows
             // The integer monotonicity analysis reads the integer side of a row; a row carrying Boolean
             // literals is left to the bool-side [markBoolSafety] (unifying the two is a follow-up).
@@ -103,7 +111,7 @@ internal object DominatedVariables {
         }
         val extra = ArrayList<Factor>()
         for (b in 0 until nb) {
-            if (!boolEligible[b] || b in alreadyPinned) continue
+            if (!boolEligible[b] || !boolSeen[b] || b in alreadyPinned) continue
             val c = objectiveBoolCoeffs[b] ?: 0L
             when {
                 trueSafe[b] && c <= 0L -> extra.add(Clause(intArrayOf(Lit.make(b, true))))
