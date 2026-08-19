@@ -460,6 +460,21 @@ internal enum class Verdict {
 }
 
 /**
+ * Why a run stopped, for the modes that explain a soft verdict.
+ *
+ * `unknown` is emitted for causes that call for completely different responses — a longer budget, a
+ * different pool, or nothing at all — and the verdict alone cannot tell them apart, so the cause
+ * travels alongside it.
+ */
+internal class VerdictContext(
+    /** The wall-clock budget fired before the search finished. */
+    val budgetExhausted: Boolean = false,
+    /** Whether the pool carried an arm that can prove. A pure-local-search pool reports `unknown` at
+     *  every budget, so its `unknown` is structural rather than a matter of time. */
+    val completePool: Boolean = true,
+)
+
+/**
  * How a mode prints solutions and verdicts. The [SolveCore] driver calls these in order:
  * [begin] once, [onSolution] per feasible/improving solution (streamed), [onComplete] once
  * with the terminal [Verdict], and [onStatistics] last when `-s` is set.
@@ -473,6 +488,10 @@ internal interface OutputProtocol {
     fun onSolution(rendered: String, objective: Long?)
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
+
+    /** Record why the run stopped, before [onComplete] renders the verdict. Ignored by default — only
+     *  the modes that report a reason consume it. */
+    fun onVerdictContext(context: VerdictContext) {}
 
     /** `-s` on a portfolio optimize: one line per strict global improvement, naming the arm that
      *  produced it (`-p N` races several). A machine-readable FlatZinc comment — every other output

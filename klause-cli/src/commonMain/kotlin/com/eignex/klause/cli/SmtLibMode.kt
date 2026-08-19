@@ -137,6 +137,17 @@ internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : Buffer
         Verdict.UNKNOWN -> "unknown"
     }
 
+    // The two roads to `unknown` want opposite responses from the caller: a refutation the box blocked is
+    // very likely an unsat waiting on real bounds, while an exhausted budget just wants a longer one.
+    override fun verdictReason(verdict: Verdict): String? = when {
+        verdict == Verdict.UNSATISFIABLE && clamp.clamped && !clamp.refutationIsBoxFree() ->
+            "unknown: refuted inside the clamped search range, not over the model's own"
+
+        verdict == Verdict.UNKNOWN -> "unknown: ${softVerdictCause()}"
+
+        else -> null
+    }
+
     // Deliberately lean block: SMT-LIB comments carry only the headline search counters.
     override fun keepStat(key: String): Boolean = key in SMT_SEARCH_KEYS
 
