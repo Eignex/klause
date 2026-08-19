@@ -6880,8 +6880,10 @@ public final class com/eignex/klause/presolve/PresolveEmphasis$Companion {
 }
 
 public final class com/eignex/klause/presolve/PresolveOutcome {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;Z)V
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;ZLcom/eignex/klause/solver/objective/LinearObjective;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;ZLcom/eignex/klause/solver/objective/LinearObjective;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getChanged ()Z
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
 	public final fun getStats ()Lcom/eignex/klause/solver/result/PresolveStats;
@@ -6912,6 +6914,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field REDUCE_STRUCTURAL Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field REMOVE_REDUNDANT Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field STRENGTHEN_COEFFICIENTS Lcom/eignex/klause/presolve/PresolvePass;
+	public static final field SUBSTITUTE_BINARY_COLUMNS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field VALUE_PRECEDENCE Lcom/eignex/klause/presolve/PresolvePass;
 	public fun apply (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/PresolveContext;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun getAutoEligible ()Z
