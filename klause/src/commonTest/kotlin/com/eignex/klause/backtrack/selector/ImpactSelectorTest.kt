@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -18,6 +19,21 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ImpactSelectorTest {
+
+    @Test
+    fun `a fired deadline stops probing without dropping any value`() {
+        // Each probe is a full propagation fixpoint, so the loop has to be able to stop mid-way. Whatever
+        // it did not reach must still be offered, or the search would skip values the domain holds.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 5)),
+            factors = arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem, Cancellation { true })
+        val values = Impact(maxProbes = 8).values(session, VarRef.IntVar(0), Random(0L)).toList()
+        assertEquals((0L..5L).toSet(), values.toSet(), "every value must still be offered; got $values")
+    }
 
     @Test
     fun `impact drops infeasible probe values from the returned order`() {

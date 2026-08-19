@@ -114,6 +114,11 @@ class PropagationSession(
     /** Literal `x_v ≤ threshold` ([positive]) or its negation. See [boundGeLit]. */
     fun boundLeLit(v: Int, threshold: Long, positive: Boolean): Int = Lit.make(state.atomVarLe(v, threshold), positive)
 
+    /** Whether the deadline token has fired. Read by the heuristics that run propagation *inside* one
+     *  decision — see [com.eignex.klause.backtrack.selector.probeAndOrder], which spends a fixpoint per
+     *  candidate value — since the engine only polls between nodes and cannot see past them. */
+    internal val cancelRequested: Boolean get() = cancellation()
+
     /** True once a fixpoint was cut short by the [cancellation] deadline (sticky). The engine must
      *  then abort to `BudgetCapped` rather than read the partial state as a solved leaf. */
     val fixpointCancelled: Boolean get() = state.runCancelled

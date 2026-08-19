@@ -4,6 +4,7 @@ import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.LongHashSet
 import kotlin.math.ln
 import kotlin.random.Random
@@ -135,34 +136,44 @@ internal fun probeAndOrder(
         }
     }
     val scored = ArrayList<Pair<Long, Double>>(candidates.size)
+    // Every candidate a probe actually reached: ordered when it survived, dropped when the probe refuted
+    // it (no assignment needs to revisit those). Kept apart from the ones left unprobed below.
+    val settled = LongHashSet(candidates.size * 2)
+    var probed = 0
     for (v in candidates) {
+        // Each probe is a whole propagation fixpoint, so one decision over a wide domain spends
+        // [maxProbes] of them. The engine polls between nodes and so cannot see inside this loop: without
+        // this the deadline goes unnoticed until the node finishes, however long the probes take.
+        if (session.cancelRequested) break
+        probed++
         val r = when (varRef) {
             is VarRef.Bool -> session.pinBool(varRef.varId, v != 0L)
             is VarRef.IntVar -> session.pinInt(varRef.varId, v)
         }
+        settled.add(v)
         if (r is Unsat) continue
         val post = logRemainingDomainProduct(session)
         session.popLast()
         scored.add(v to post)
     }
+    // Whatever the probes did not reach still has to be offered, or the search would silently skip
+    // values the domain holds and could report unsat over a region it never entered.
+    val unprobed = if (probed < candidates.size) candidates.copyOfRange(probed, candidates.size) else EmptyLongArray
     if (ascending) scored.sortBy { it.second } else scored.sortByDescending { it.second }
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)
         if (candidates.size < d.size) {
-            val probed = LongHashSet(candidates.size * 2).apply {
-                for ((p, _) in scored) add(p)
-                for (c in candidates) add(c)
-            }
+            // Already offered (ordered) or deliberately dropped; everything else in the domain follows.
             val ordered = scored.asSequence().map { it.first }
             return ordered + sequence {
                 for (i in 0 until d.size) {
                     val v = d.valueAt(i)
-                    if (v !in probed) yield(v)
+                    if (v !in settled) yield(v)
                 }
             }
         }
     }
-    return scored.asSequence().map { it.first }
+    return scored.asSequence().map { it.first } + unprobed.toList().asSequence()
 }
 
 /** Sum of `ln(size)` over every unpinned variable (bools count as `ln 2` when free). Log-
