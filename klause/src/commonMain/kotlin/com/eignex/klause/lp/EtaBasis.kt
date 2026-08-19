@@ -39,7 +39,7 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
      * Solve `B x = b`, or `Bᵀ x = b` when [transpose], into a fresh result.
      *
      * Spelled `solve` rather than `ftran`/`btran` so the sparse and dense halves share one vocabulary:
-     * this is what `Lapack.solve` and [SparseFactorization.solve] do, with the same transpose flag. The
+     * this is what `Lapack.solve` and `SparseFactorization.solve` do, with the same transpose flag. The
      * FTRAN and BTRAN names survive on the private halves below, where they name which sweep runs rather
      * than standing in for "solve".
      */
@@ -53,7 +53,7 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
         if (transpose) btranInto(b, out) else ftranInto(b, out)
 
     /** The forward sweep: base LU solve, then forward through the eta chain in update order. Each eta
-     *  applies over the two contiguous runs around the pivot via [com.eignex.koblas.dense.VectorKernels.axpy]. */
+     *  applies over the two contiguous runs around the pivot via `VectorKernels.axpy`. */
     private fun ftranInto(b: DoubleArray, out: DoubleArray): DoubleArray {
         val x = base.solveInto(b, out, transpose = false, workspace = scratch)
         for (j in etaSpike.indices) {
@@ -70,7 +70,7 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
     }
 
     /** The transposed sweep: the eta chain transposed in reverse update order, then the base LU. Each eta
-     *  gathers over the two contiguous runs around the pivot via [com.eignex.koblas.dense.VectorKernels.dot]. */
+     *  gathers over the two contiguous runs around the pivot via `VectorKernels.dot`. */
     private fun btranInto(b: DoubleArray, out: DoubleArray): DoubleArray {
         require(b.size == m) { "solve: b size ${b.size} != $m" }
         // The eta chain transposed, applied to a working copy, then the base solve into out.
