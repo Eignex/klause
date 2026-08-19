@@ -90,7 +90,7 @@ internal fun saturatingMul(a: Long, b: Long): Long = when {
 
 /**
  * Shared probing core for [Impact] and [MaxSd]. For each candidate value of `varRef`:
- *   - push a real propagation pin via [PropagationSession.pinBool] / `pinInt`;
+ *   - push a real propagation pin via [PropagationSession.probeBool] / `probeInt`;
  *   - score by the log of the remaining-domain product;
  *   - revert with [PropagationSession.popLast] (Unsat probes self-revert, are dropped).
  *
@@ -142,14 +142,19 @@ internal fun probeAndOrder(
     var probed = 0
     for (v in candidates) {
         // Each probe is a whole propagation fixpoint, so one decision over a wide domain spends
-        // [maxProbes] of them. The engine polls between nodes and so cannot see inside this loop: without
-        // this the deadline goes unnoticed until the node finishes, however long the probes take.
-        if (session.cancelRequested) break
-        probed++
-        val r = when (varRef) {
-            is VarRef.Bool -> session.pinBool(varRef.varId, v != 0L)
-            is VarRef.IntVar -> session.pinInt(varRef.varId, v)
+        // [maxProbes] of them, and one such fixpoint alone can run seconds long. The engine polls between
+        // nodes and cannot see inside this loop, so the deadline is read here and inside every probe (which
+        // yields null when cut, leaving its value unprobed for the tail below). Either sighting stops the
+        // engine at this node — the ranking is worth nothing once the time is gone.
+        if (session.cancelRequested) {
+            session.probeCancelled = true
+            break
         }
+        val r = when (varRef) {
+            is VarRef.Bool -> session.probeBool(varRef.varId, v != 0L)
+            is VarRef.IntVar -> session.probeInt(varRef.varId, v)
+        } ?: break
+        probed++
         settled.add(v)
         if (r is Unsat) continue
         val post = logRemainingDomainProduct(session)

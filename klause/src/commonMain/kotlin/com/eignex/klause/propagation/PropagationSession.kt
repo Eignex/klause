@@ -123,6 +123,12 @@ class PropagationSession(
      *  then abort to `BudgetCapped` rather than read the partial state as a solved leaf. */
     val fixpointCancelled: Boolean get() = state.runCancelled
 
+    /** Set when a value probe saw the deadline fire (see [probeFixpoint] and
+     *  [com.eignex.klause.backtrack.selector.probeAndOrder]). The engine reads and clears it per node and
+     *  stops there: a decision made now would spend its own multi-second fixpoint past the deadline.
+     *  Not sticky — a probe leaves no partial state behind, so a paused arm resumes on this session. */
+    internal var probeCancelled: Boolean = false
+
     /** Set non-null when bake-time propagation proved Unsat with no caller pins involved.
      *  All session operations short-circuit to this result. */
     private var bakedUnsat: PropagationResult.Unsat? = null
@@ -270,6 +276,40 @@ class PropagationSession(
     fun pinInt(v: Int, value: Long): PropagationResult {
         bakedUnsat?.let { return it }
         return pushInt(v, value)
+    }
+
+    /** [pinBool] as a probe — see [probeFixpoint]. */
+    internal fun probeBool(v: Int, value: Boolean): PropagationResult? = probeFixpoint { pushBool(v, value) }
+
+    /** [pinInt] as a probe — see [probeFixpoint]. */
+    internal fun probeInt(v: Int, value: Long): PropagationResult? = probeFixpoint { pushInt(v, value) }
+
+    /**
+     * One probe pin: the fixpoint polls the deadline from its first fire (no [PROPAGATION_CANCEL_FLOOR]
+     * wait, since a probe over a wide domain is exactly the runaway that floor hides), and a cut fixpoint
+     * reverts the pin and yields `null`.
+     *
+     * The revert lands on the previous level's *complete* fixpoint, so — unlike a cut search pin — no
+     * under-propagated state survives the call and [fixpointCancelled] stays clear: the session is left
+     * usable and a paused arm can resume on it. [probeCancelled] carries the deadline sighting instead.
+     */
+    private inline fun probeFixpoint(push: () -> PropagationResult): PropagationResult? {
+        bakedUnsat?.let { return it }
+        if (state.runCancelled) return null
+        val floor = state.cancelFloor
+        state.cancelFloor = 0
+        val r = try {
+            push()
+        } finally {
+            state.cancelFloor = floor
+        }
+        if (!state.runCancelled) return r
+        state.runCancelled = false
+        probeCancelled = true
+        // A cut fixpoint reports no conflict, so the probe's pin is standing on a partial state; an Unsat
+        // one already reverted itself.
+        if (r !is PropagationResult.Unsat) popLast()
+        return null
     }
 
     /**
