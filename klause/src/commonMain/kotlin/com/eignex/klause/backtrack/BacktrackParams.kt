@@ -329,6 +329,18 @@ data class BacktrackParams(
      */
     val pbLearning: Boolean? = null,
     /**
+     * Whether a Boolean premise that recurs in a reason after already being resolved out keeps its literal
+     * in the nogood instead of being skipped. Skipping it assumes the Boolean implication graph is acyclic,
+     * which order-literal reasons break (they are derived, not trail-ordered), and the dropped literal
+     * strengthens the nogood past what was derived — an unsound refutation (see #1540). Keeping it is sound
+     * but leaves the clause with a second conflict-level literal, so it never asserts and the search falls
+     * back to chronological backtracking; that costs far more than it is worth in general search.
+     *
+     * **Off by default**, so general search is unchanged. Turn it on where a refutation must be trustworthy
+     * and "no refutation reached" is an acceptable answer.
+     */
+    val keepRecurringPremises: Boolean = false,
+    /**
      * Enforce the incumbent as a refutable pseudo-Boolean cutoff for a pure-Boolean weighted objective
      * (no single objective variable): at the root each incumbent `K` posts `Σ boolWeights·x ≤ K − 1` as a
      * permanent constraint, so branch-and-bound prunes against it and cutting-planes conflict analysis can
