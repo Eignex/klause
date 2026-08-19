@@ -308,6 +308,14 @@ internal class DfsEngine<L>(
             return policy.onLeaf(snap, session)?.let { EngineEvent.Solution(it) }
         }
         val values = params.valueSelector.values(session, varRef, rng)
+        // A probing value selector spends a fixpoint per candidate and reports a deadline it saw inside one.
+        // Descending anyway would commit a decision whose own fixpoint runs just as long past the deadline,
+        // so stop here; the probe reverted its pin, leaving the session resumable.
+        if (session.probeCancelled) {
+            session.probeCancelled = false
+            params.clauseExchange?.onSearchEnd(session)
+            return EngineEvent.Cancelled
+        }
         if (phaseManaged) phase.setManagedMode(restart.phaseMode())
         val phased = phase.applyPhase(varRef, values, rng)
         val ordered = policy.orderValues(varRef, phased)

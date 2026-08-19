@@ -36,6 +36,43 @@ class ImpactSelectorTest {
     }
 
     @Test
+    fun `a deadline fired inside a probe fixpoint leaves the value order unranked`() {
+        // `v0 + v1 <= 3` ranks every value of v0 differently, so probes that all run to completion return
+        // the tightest value first. Cut inside the second probe, only the first value is ranked and the
+        // rest keep the domain's own order — truncating the ranking is fine, losing a value is not.
+        val session = probeCancellingSession()
+        val values = Impact(maxProbes = 8).values(session, VarRef.IntVar(0), Random(0L)).toList()
+        assertEquals(listOf(0L, 1L, 2L, 3L), values, "only the probe that completed may be ranked")
+    }
+
+    @Test
+    fun `a deadline fired inside a probe fixpoint leaves the session uncancelled`() {
+        // A cut probe reverts to the previous level's complete fixpoint, so nothing under-propagated
+        // survives it — a paused arm has to be able to resume on this session.
+        val session = probeCancellingSession()
+        Impact(maxProbes = 8).values(session, VarRef.IntVar(0), Random(0L)).toList()
+        assertTrue(!session.fixpointCancelled, "a reverted probe must not leave a cancelled fixpoint behind")
+    }
+
+    /** `v0, v1 in [0, 3]` under `v0 + v1 <= 3`, on a token that fires on its fourth read — the loop poll
+     *  and fixpoint of the first probe, the loop poll of the second, then that second probe's fixpoint. */
+    private fun probeCancellingSession(): PropagationSession {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+            factors = arrayOf<Factor>(
+                Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.LE, bound = 3),
+            ),
+        )
+        var armed = false
+        var polls = 0
+        val session = PropagationSession(problem, Cancellation { armed && polls++ >= 3 })
+        armed = true
+        return session
+    }
+
+    @Test
     fun `impact drops infeasible probe values from the returned order`() {
         // v0 ∈ [0, 3], v1 pinned to 2; AllDifferent forces v0 != 2. Probing v0 = 2 should
         // propagate to Unsat (v1's domain becomes empty) and be dropped entirely.
