@@ -7,6 +7,7 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
@@ -599,6 +600,37 @@ class SmtLibTest {
         val bounds = parsed.deferredBounds?.run(Cancellation.Never)
         assertTrue(bounds != null && bounds.openlyInfeasible, "propagation crossed y's bounds")
         assertFalse(parsed.clamped(), "a refutation over the open range carries no clamp caveat")
+    }
+
+    /** The parsed domain of [name] — what bound inference derived, before any deferred tightening. */
+    private fun domainOf(text: String, name: String): IntDomain {
+        val p = SmtLib.parse(text)
+        return p.problem.intDomains[p.intVarNames.getValue(name)]
+    }
+
+    @Test
+    fun `a single-variable equality disjunction bounds the variable`() {
+        val text = "(set-logic QF_LIA)\n(declare-fun u () Int)\n" +
+            "(assert (or (= u 0) (= u 1) (= u 2) (= u 3) (= u 4)))\n(check-sat)"
+        val d = domainOf(text, "u")
+        assertEquals(0L, d.min)
+        assertEquals(4L, d.max)
+        assertTrue(solve(text)[0] in 0L..4L, "the witness is one of the stated values")
+    }
+
+    @Test
+    fun `a disjunction over two variables bounds neither`() {
+        // Satisfiable with x arbitrarily large, so no side may be read off the constants.
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
+            "(assert (or (= x 1) (= y 2)))\n(check-sat)"
+        assertTrue(domainOf(text, "x").max > 1L, "x is not confined by the other disjunct's value")
+    }
+
+    @Test
+    fun `a disjunction with a non-equality disjunct bounds nothing`() {
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n" +
+            "(assert (or (= x 1) (>= x 100)))\n(check-sat)"
+        assertTrue(domainOf(text, "x").max > 1L, "one wider disjunct voids the bound")
     }
 
     @Test

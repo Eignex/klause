@@ -121,6 +121,8 @@ internal fun SmtLib.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayLi
         when ((t.items[0] as? SExpr.Atom)?.text) {
             "and" -> for (i in 1 until t.items.size) work.addLast(t.items[i])
 
+            "or" -> equalityDisjunctionBounds(t, out)
+
             "<=", "<", ">=", ">", "=" -> if (t.items.size >= 3 && isArithmeticRelation(t) && !hasSideEffectingTerm(t)) {
                 try {
                     relationToLinear(t, out)
@@ -128,6 +130,47 @@ internal fun SmtLib.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayLi
             }
         }
     }
+}
+
+/**
+ * Emit the two bound rows a single-variable equality disjunction states, or nothing when [t] is not one.
+ *
+ * `(or (= x k₁) … (= x kₙ))` confines `x` to `{k₁ … kₙ}`, so the least and greatest constant bound it.
+ * Only the endpoints are stated here — this pass yields intervals, and the holes between the constants
+ * are left to the lowering, which still posts the disjunction itself.
+ *
+ * Every disjunct has to pin the *same* variable to a constant. One disjunct saying anything else — a
+ * second variable, a coefficient, a wider relation — leaves the disjunction satisfiable outside the set,
+ * and a bound read off the rest would not hold.
+ */
+private fun SmtLib.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: ArrayList<Rel>) {
+    if (t.items.size < 2) return
+    var v = -1
+    var min = Long.MAX_VALUE
+    var max = Long.MIN_VALUE
+    for (i in 1 until t.items.size) {
+        val d = t.items[i]
+        if (d !is SExpr.SList || d.items.size < 3) return
+        if ((d.items[0] as? SExpr.Atom)?.text != "=") return
+        if (!isArithmeticRelation(d) || hasSideEffectingTerm(d)) return
+        val eq = ArrayList<Rel>(1)
+        try {
+            relationToLinear(d, eq)
+        } catch (_: UnsupportedSmtException) {
+            return
+        }
+        // A chained `(= x y z)` lowers to several rows; only a lone `x = k` states a value for x.
+        val r = eq.singleOrNull() ?: return
+        if (r.op != LinearOp.EQ || r.vars.size != 1 || r.coeffs[0] != 1L) return
+        if (v == -1) v = r.vars[0] else if (v != r.vars[0]) {
+            return
+        }
+        if (r.bound < min) min = r.bound
+        if (r.bound > max) max = r.bound
+    }
+    if (v == -1) return
+    out.add(Rel(intArrayOf(v), longArrayOf(1L), LinearOp.GE, min))
+    out.add(Rel(intArrayOf(v), longArrayOf(1L), LinearOp.LE, max))
 }
 
 /** Whether [t] contains a subterm whose lowering has side effects (fresh vars and clauses): `ite`,
