@@ -498,13 +498,21 @@ internal object SolveCore {
                 val result = it.minimize(cancel, onImprovement)
                 emitMinimize(result, solvable, common, output, complete, t0, streamedCount = streamed)
             } else {
-                emitSolve(it.solve(cancel), solvable, common, output, t0)
+                emitSolve(it.solve(cancel), solvable, common, output, t0, complete)
             }
         }
     }
 
     /** Emit a satisfaction verdict + the sole model (if any) + stats. */
-    private fun emitSolve(r: SolveResult, solvable: Solvable, common: CommonOptions, output: OutputProtocol, t0: Long) {
+    private fun emitSolve(
+        r: SolveResult,
+        solvable: Solvable,
+        common: CommonOptions,
+        output: OutputProtocol,
+        t0: Long,
+        complete: Boolean = true,
+    ) {
+        output.onVerdictContext(VerdictContext(budgetExhausted = r.stats.run.timedOut, completePool = complete))
         var produced = 0L
         when (r) {
             is SolveResult.Sat -> {
@@ -531,6 +539,7 @@ internal object SolveCore {
         t0: Long,
         streamedCount: Int,
     ) {
+        output.onVerdictContext(VerdictContext(budgetExhausted = r.stats.run.timedOut, completePool = complete))
         val alreadyStreamed = streamedCount > 0
         var produced = 0L
         var best: Sample? = null

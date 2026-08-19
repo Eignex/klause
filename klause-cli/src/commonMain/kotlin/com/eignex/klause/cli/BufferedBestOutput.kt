@@ -28,6 +28,26 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** The incumbent's objective, for a format whose status line depends on it. */
     protected open fun onSolutionObjective(objective: Long?) = Unit
 
+    /** Why the run stopped; see [VerdictContext]. Set before the verdict is rendered. */
+    protected var context: VerdictContext = VerdictContext()
+        private set
+
+    /** The reason to print beside [verdict] as a comment, or null when the verdict speaks for itself.
+     *  Only the formats whose `unknown` has several causes override this. */
+    protected open fun verdictReason(verdict: Verdict): String? = null
+
+    final override fun onVerdictContext(context: VerdictContext) {
+        this.context = context
+    }
+
+    /** The cause shared by every format: a soft verdict is either out of time, out of a pool that could
+     *  have proved anything, or neither — in which case the caller learns only that it was not reached. */
+    protected fun softVerdictCause(): String = when {
+        !context.completePool -> "no arm in the pool can prove a verdict"
+        context.budgetExhausted -> "budget exhausted"
+        else -> "search stopped without a verdict"
+    }
+
     final override fun onSolution(rendered: String, objective: Long?) {
         best = rendered
         onSolutionObjective(objective)
@@ -36,6 +56,9 @@ internal abstract class BufferedBestOutput : OutputProtocol {
 
     final override fun onComplete(verdict: Verdict) {
         println(statusLine(verdict))
+        // A comment, so it rides alongside the status line without touching what either protocol
+        // promises: `;` is an SMT-LIB comment and `c` is one in the competition protocol.
+        verdictReason(verdict)?.let { println("$commentPrefix $it") }
         // The buffered model follows a feasible verdict only; UNSAT / UNKNOWN print the status alone.
         if (verdict == Verdict.SATISFIABLE || verdict == Verdict.OPTIMAL || verdict == Verdict.BEST_FOUND) {
             best?.let { println(it) }
