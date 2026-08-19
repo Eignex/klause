@@ -525,6 +525,20 @@ internal class Solvable(
  *  (after solving), so an `unsat`/optimum over a lossily-clamped box is reported honestly. */
 internal class ClampFlag {
     var clamped: Boolean = false
+
+    /**
+     * Re-derives a refutation over the part of the model no invented bound reaches (see
+     * [refutationIsBoxFree]), or null for a mode that offers no such certificate. Consulted only when a
+     * refutation is about to be downgraded for [clamped], so it can only recover a verdict that would
+     * otherwise be discarded.
+     */
+    var boxFreeRefutation: (() -> Boolean)? = null
+
+    private var boxFree: Boolean? = null
+
+    /** Whether the refutation holds without the invented box. Memoized: it runs a search of its own, and
+     *  the status line is not guaranteed to be built once. */
+    fun refutationIsBoxFree(): Boolean = boxFree ?: (boxFreeRefutation?.invoke() ?: false).also { boxFree = it }
 }
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via

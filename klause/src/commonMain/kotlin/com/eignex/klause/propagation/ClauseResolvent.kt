@@ -151,17 +151,23 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
             }
             if (seen[v]) continue // already in the frontier
             if (resolved[v]) {
-                // Resolved out as a pivot already. The bool implication graph is acyclic, so a
-                // resolved bool never legitimately recurs and is safely skipped. Atom antecedents
-                // have no trail order and can form same-level cycles (see [resolved]); a resolved
-                // atom can recur as a genuine premise — typically the opposite-polarity bound of
-                // the same int var. Skipping it then drops a literal the nogood needs, producing an
-                // unsound clause that prunes feasible solutions and over-proves optimality.
-                // Keep that literal instead (deduped via [litsInLearned]). Re-resolving the atom
-                // would risk the ping-pong the guard prevents; merely adding a literal only weakens
-                // the clause, so it stays sound. A second current-level literal makes the clause
-                // non-asserting, which [finalizeResult] flags so the engine backtracks chronologically.
-                if (v >= numBoolVars && !litsInLearned.contains(lit)) {
+                // Resolved out as a pivot already. Atom antecedents have no trail order and can form
+                // same-level cycles (see [resolved]); a resolved atom can recur as a genuine premise —
+                // typically the opposite-polarity bound of the same int var. Skipping it then drops a
+                // literal the nogood needs, producing an unsound clause that prunes feasible solutions
+                // and over-proves optimality. Keep that literal instead (deduped via [litsInLearned]).
+                // Re-resolving the atom would risk the ping-pong the guard prevents; merely adding a
+                // literal only weakens the clause, so it stays sound. A second current-level literal makes
+                // the clause non-asserting, which [finalizeResult] flags so the engine backtracks
+                // chronologically.
+                //
+                // A resolved *bool* recurs the same way, cited by a derived atom reason, so skipping it is
+                // unsound for the same reason. It is skipped anyway unless
+                // [PropagationState.keepRecurringPremises] asks otherwise: keeping it costs the clause its
+                // assertiveness on every such conflict, which measures far worse in general search than the
+                // rare wrong refutation it avoids. A caller that needs a trustworthy refutation, and can
+                // treat "no refutation" as an answer, turns the flag on.
+                if ((v >= numBoolVars || state.keepRecurringPremises) && !litsInLearned.contains(lit)) {
                     addLearned(lit)
                 }
                 continue

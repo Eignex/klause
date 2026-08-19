@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.IntDigitColumns
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
 
@@ -73,12 +74,29 @@ internal object SmtLibMode : CliMode {
                     // leave the clamp flag clear so the verdict is reported as the `unsat` it is.
                     refutedProblem(parsed.problem)
                 } else {
-                    parsed.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
+                    val boxed = parsed.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
+                    // Offer the status line a way to keep a refutation the box played no part in: the
+                    // certificate is derived over the factors no invented bound reaches, so it can only
+                    // recover the `unsat` that would otherwise be downgraded, never produce one.
+                    if (bounded.clamped) {
+                        clamp.boxFreeRefutation = { refutationIsBoxFree(boxed, certificationBudget(common)) }
+                    }
+                    boxed
                 }
             }
         }
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput(clamp)
+
+        /** Budget for the certification: half of what the run's `-t` deadline still allows, so a residual
+         *  the sound analysis cannot refute quickly cannot spend the rest of the limit either. Never, for a
+         *  run with no limit. */
+        private fun certificationBudget(common: CommonOptions): Cancellation {
+            val deadline = common.deadlineAtMs ?: return Cancellation.Never
+            val now = nowMillis()
+            val stopAt = now + (deadline - now).coerceAtLeast(0L) / 2
+            return Cancellation { nowMillis() >= stopAt }
+        }
     }
 }
 
@@ -108,13 +126,14 @@ private fun intValue(id: Int, s: Sample, intDigits: Map<Int, IntDigitColumns>): 
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. When [clamp] is set
  *  (by the presolve-phase deferred bounding), an `unsat` is only `unsat` within the finite solver range —
- *  the sound verdict for the original (unbounded) problem is `unknown`, so it is reported as such. */
+ *  the sound verdict for the original (unbounded) problem is `unknown`, so it is reported as such, unless
+ *  the refutation can be re-derived without the box ([ClampFlag.refutationIsBoxFree]). */
 internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedBestOutput() {
     override val commentPrefix: String = ";"
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "sat"
-        Verdict.UNSATISFIABLE -> if (clamp.clamped) "unknown" else "unsat"
+        Verdict.UNSATISFIABLE -> if (clamp.clamped && !clamp.refutationIsBoxFree()) "unknown" else "unsat"
         Verdict.UNKNOWN -> "unknown"
     }
 
