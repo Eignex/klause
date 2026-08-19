@@ -338,11 +338,15 @@ internal object PresolveShared {
         factors: List<Factor>,
         intDomains: Array<IntDomain> = problem.intDomains.copyOf(),
         bakeConfig: BakeConfig = BakeConfig.NONE,
+        // Extends the Boolean namespace for the one transform that mints variables
+        // ([BinaryColumnSubstitution]): ids `[problem.numBoolVars, numBoolVars)` are the fresh ones, so
+        // every existing factor still addresses the same variable.
+        numBoolVars: Int = problem.numBoolVars,
     ): Problem {
         // Inherit the pass-view mode: a pass fed a cheap already-folded input returns a cheap already-folded
         // output (the session re-folds via incremental propagation); a fresh-path rebuild stays eager.
         val base = BakedProblem(
-            numBoolVars = problem.numBoolVars,
+            numBoolVars = numBoolVars,
             numIntVars = problem.numIntVars,
             intDomains = intDomains,
             factors = factors,

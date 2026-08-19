@@ -549,6 +549,23 @@ enum class PresolvePass(
         override fun apply(problem: Problem, ctx: PresolveContext) = Presolve.mergeAmoCliques(problem, ctx.cancellation)
     },
 
+    /** Substitute an integer column whose domain is exactly `{0, 1}` for a fresh Boolean literal, rewriting
+     *  the rows over such columns into [com.eignex.klause.factor.bool.Clause] /
+     *  [com.eignex.klause.factor.bool.Cardinality] / [com.eignex.klause.factor.bool.PseudoBoolean] so they
+     *  reach the pseudo-Boolean lane (division-based conflict learning, at-most-one clique merging,
+     *  coefficient strengthening over literals). Run outside this enum's round engine — it mints variables,
+     *  which the incremental session's persistent state, sized once to the input's variable count, cannot
+     *  express — and ahead of it, so every round pass reads the model in the lane it will be solved in.
+     *  Solution-set exact: the substituted column is pinned and its value carried by its literal, so
+     *  solutions map one-to-one. See [BinaryColumnSubstitution]. */
+    SUBSTITUTE_BINARY_COLUMNS(
+        "binary-columns",
+        Stage.EXTERNAL,
+        PresolveTiming.FAST,
+        preservesSolutionSet = true,
+        autoEligible = true,
+    ),
+
     /** LP-relaxation harvest: fold the LP's proven domain tightenings, redundant-row removals, root
      *  infeasibility and implied equalities into the problem. Run outside this enum's round engine (it
      *  needs the backtrack-layer LP engine, which `solver/presolve` may not depend on), so it has no

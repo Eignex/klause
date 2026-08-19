@@ -44,12 +44,15 @@ internal fun interface DestroyOperator {
             val totalVars = problem.numBoolVars + problem.numIntVars
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             val contribs = DoubleArray(totalVars)
+            // A coefficient array need not cover the whole namespace: presolve can extend it (a `{0, 1}`
+            // column substituted for a literal), leaving the tail weightless.
             for (b in 0 until problem.numBoolVars) {
-                contribs[b] = abs(objective.boolWeights[b].toDouble()) * (if (incumbent.bools[b]) 1.0 else 0.0)
+                val w = objective.boolWeights.getOrElse(b) { 0L }
+                contribs[b] = abs(w.toDouble()) * (if (incumbent.bools[b]) 1.0 else 0.0)
             }
             for (i in 0 until problem.numIntVars) {
                 contribs[problem.numBoolVars + i] = abs(
-                    (objective.intCoefficients[i] * incumbent.ints[i]).toDouble(),
+                    (objective.intCoefficients.getOrElse(i) { 0L } * incumbent.ints[i]).toDouble(),
                 )
             }
             val indexed = (0 until totalVars).sortedByDescending { contribs[it] }

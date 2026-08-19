@@ -291,6 +291,7 @@ internal fun Solvable.presolved(
         outcome.stats,
         { sample -> render(outcome.reconstruct(sample)) },
         objectiveValue?.let { ov -> { sample -> ov(outcome.reconstruct(sample)) } },
+        outcome.objective ?: linearObjective,
     )
 }
 
@@ -318,6 +319,7 @@ private fun Solvable.copyWith(
     presolve: PresolveStats?,
     render: (Sample) -> String,
     objectiveValue: ((Sample) -> Long)?,
+    linearObjective: LinearObjective? = this.linearObjective,
 ): Solvable = Solvable(
     problem = problem,
     presolve = presolve,

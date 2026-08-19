@@ -95,6 +95,38 @@ class PresolvePipelineTest {
     }
 
     @Test
+    fun `reconstruct rebuilds a substituted binary column from the literal that replaced it`() {
+        // A triangle of at-least-one rows over three `{0, 1}` columns: the whole model leaves the integer
+        // lane, so the composed reconstruct has to rebuild every column from its literal.
+        val binary = Problem(
+            numBoolVars = 0,
+            numIntVars = 3,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1)),
+            factors = listOf(
+                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ),
+        )
+        val outcome = PresolvePipeline.run(binary, null, PresolveConfig.AUTO, solutionSetSensitive = false)
+        assertTrue(outcome.problem.numBoolVars > 0, "the columns must have become literals for this to test anything")
+
+        val lifted = ArrayList<List<Long>>()
+        for (mask in 0 until (1 shl outcome.problem.numBoolVars)) {
+            val bools = BooleanArray(outcome.problem.numBoolVars) { ((mask shr it) and 1) == 1 }
+            val ints = LongArray(outcome.problem.numIntVars) { outcome.problem.intDomains[it].min }
+            var a = Assumptions.None
+            for (b in bools.indices) a = a.withBool(b, bools[b])
+            for (v in ints.indices) a = a.withInt(v, ints[v])
+            if (outcome.problem.propagate(a) is PropagationResult.Unsat) continue
+            val recon = outcome.reconstruct(Sample(bools, ints))
+            assertTrue(isFeasible(binary, recon.ints), "reconstruct produced ${recon.ints.toList()}, not a solution")
+            lifted.add(recon.ints.toList())
+        }
+        assertTrue(lifted.isNotEmpty(), "the substituted model must keep the original's solutions reachable")
+    }
+
+    @Test
     fun `a disabled presolve hands back the caller's own problem`() {
         val outcome = PresolvePipeline.run(model, null, PresolveConfig.NONE, solutionSetSensitive = false)
         assertFalse(outcome.changed, "no pass ran, so nothing changed")

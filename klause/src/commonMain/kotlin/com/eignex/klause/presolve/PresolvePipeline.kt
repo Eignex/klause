@@ -25,6 +25,14 @@ class PresolveOutcome(
     val reconstruct: (Sample) -> Sample,
     val stats: PresolveStats,
     val changed: Boolean,
+    /**
+     * The caller's objective re-fitted to [problem]'s variable space, or `null` when it needs no change (no
+     * objective, or a transform that left the variable counts alone). Only
+     * [PresolvePass.SUBSTITUTE_BINARY_COLUMNS] moves them: it extends the Boolean namespace, which an
+     * objective's `boolWeights` must span. The new variables carry no objective weight — a column the
+     * objective reads is never substituted — so this is the same objective, zero-extended.
+     */
+    val objective: LinearObjective? = null,
 )
 
 /**
@@ -102,9 +110,26 @@ object PresolvePipeline {
         val baked = if (preBakeInfeasible) problem else prebaked.bake(cancellation)
         val seeded = if (preBakeInfeasible) problem else RootBaker.reseed(baked, bakeConfig)
         val bakeElapsed = bakeStart.elapsedNow()
-        var current = seeded
         val reconstructs = ArrayList<(Sample) -> Sample>() // in application order; round 1 first
         val firedPasses = LinkedHashSet<String>() // pass ids that fired, across all rounds, in first-fire order
+        // Pseudo-Boolean lane substitution: a `{0, 1}` integer column becomes a Boolean literal and the rows
+        // over such columns become clause / cardinality / pseudo-Boolean factors. It runs ahead of the round
+        // engine, on the bake's committed domains — that is what makes the `{0, 1}` columns visible — so
+        // every round pass then reads the model in the lane it will be solved in: the literal-aware
+        // reductions (at-most-one clique merging, coefficient strengthening over literals, bounded variable
+        // elimination, clause subsumption) apply where only the integer-column ones could before. It also
+        // has to precede symmetry breaking, whose added handling factor reads the columns value-wise and
+        // would hold every one of them in the integer lane.
+        val substitution = if (preBakeInfeasible || !config.resolved(PresolvePass.SUBSTITUTE_BINARY_COLUMNS, context)) {
+            null
+        } else {
+            BinaryColumnSubstitution.substitute(seeded, context.objectiveIntVars, bakeConfig)
+        }
+        var current = substitution?.problem ?: seeded
+        substitution?.let {
+            reconstructs.add(it.reconstruct)
+            firedPasses.add(PresolvePass.SUBSTITUTE_BINARY_COLUMNS.id)
+        }
         var harvest = LpHarvestReport() // the LP harvest's own contribution, summed over rounds
         var infeasible = preBakeInfeasible
         var round = 0
@@ -163,8 +188,15 @@ object PresolvePipeline {
             lpHarvest = harvest.takeUnless { it.isEmpty },
             bakeElapsed = bakeElapsed,
         )
-        return PresolveOutcome(posted, reconstruct, stats, changed = true)
+        return PresolveOutcome(posted, reconstruct, stats, changed = true, objective = refit(linearObjective, posted))
     }
+}
+
+/** [objective] zero-extended to cover [problem]'s Boolean namespace, or `null` when it already does (so the
+ *  caller keeps its own). See [PresolveOutcome.objective]. */
+private fun refit(objective: LinearObjective?, problem: Problem): LinearObjective? {
+    if (objective == null || objective.boolWeights.size >= problem.numBoolVars) return null
+    return objective.copy(boolWeights = objective.boolWeights.copyOf(problem.numBoolVars))
 }
 
 /**

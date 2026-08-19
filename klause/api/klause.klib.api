@@ -392,6 +392,7 @@ open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex
     enum entry REDUCE_STRUCTURAL // com.eignex.klause.presolve/PresolvePass.REDUCE_STRUCTURAL|null[0]
     enum entry REMOVE_REDUNDANT // com.eignex.klause.presolve/PresolvePass.REMOVE_REDUNDANT|null[0]
     enum entry STRENGTHEN_COEFFICIENTS // com.eignex.klause.presolve/PresolvePass.STRENGTHEN_COEFFICIENTS|null[0]
+    enum entry SUBSTITUTE_BINARY_COLUMNS // com.eignex.klause.presolve/PresolvePass.SUBSTITUTE_BINARY_COLUMNS|null[0]
     enum entry VALUE_PRECEDENCE // com.eignex.klause.presolve/PresolvePass.VALUE_PRECEDENCE|null[0]
 
     final val autoEligible // com.eignex.klause.presolve/PresolvePass.autoEligible|{}autoEligible[0]
@@ -7664,10 +7665,12 @@ final class com.eignex.klause.presolve/PresolveContext { // com.eignex.klause.pr
 }
 
 final class com.eignex.klause.presolve/PresolveOutcome { // com.eignex.klause.presolve/PresolveOutcome|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats, kotlin/Boolean) // com.eignex.klause.presolve/PresolveOutcome.<init>|<init>(com.eignex.klause.solver.Problem;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats;kotlin.Boolean){}[0]
+    constructor <init>(com.eignex.klause.solver/Problem, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats, kotlin/Boolean, com.eignex.klause.solver.objective/LinearObjective? = ...) // com.eignex.klause.presolve/PresolveOutcome.<init>|<init>(com.eignex.klause.solver.Problem;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats;kotlin.Boolean;com.eignex.klause.solver.objective.LinearObjective?){}[0]
 
     final val changed // com.eignex.klause.presolve/PresolveOutcome.changed|{}changed[0]
         final fun <get-changed>(): kotlin/Boolean // com.eignex.klause.presolve/PresolveOutcome.changed.<get-changed>|<get-changed>(){}[0]
+    final val objective // com.eignex.klause.presolve/PresolveOutcome.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.presolve/PresolveOutcome.objective.<get-objective>|<get-objective>(){}[0]
     final val problem // com.eignex.klause.presolve/PresolveOutcome.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.presolve/PresolveOutcome.problem.<get-problem>|<get-problem>(){}[0]
     final val reconstruct // com.eignex.klause.presolve/PresolveOutcome.reconstruct|{}reconstruct[0]
