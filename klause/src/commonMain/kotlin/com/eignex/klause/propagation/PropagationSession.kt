@@ -48,8 +48,6 @@ class PropagationSession(
     /** Opt into pseudo-Boolean cutting-planes conflict learning; ignored on problems
      *  with integer variables. */
     pbLearning: Boolean = false,
-    /** Keep a Boolean premise that recurs after being resolved out; see [PropagationState.keepRecurringPremises]. */
-    keepRecurringPremises: Boolean = false,
 ) {
     private val state: PropagationState =
         PropagationState(
@@ -57,7 +55,6 @@ class PropagationSession(
             Assumptions.None,
             nativeSat = nativeSat,
             pbLearning = pbLearning,
-            keepRecurringPremises = keepRecurringPremises,
         ).also {
             it.cancelFloor = propagationCancelFloor
         }

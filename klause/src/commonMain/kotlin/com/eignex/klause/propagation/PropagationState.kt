@@ -80,13 +80,6 @@ class PropagationState(
      * to `false`; ignored on problems with integer variables (order-literal atoms have no PB reason).
      */
     internal val pbLearning: Boolean = false,
-    /**
-     * Keep a Boolean premise that recurs in a reason after already being resolved out, rather than skipping
-     * it. Skipping rests on the Boolean implication graph being acyclic, which derived order-literal reasons
-     * break, and the dropped literal strengthens the nogood past what was derived (see #1540). Keeping it is
-     * sound at the cost of a nogood that never asserts. Defaults to `false`.
-     */
-    internal val keepRecurringPremises: Boolean = false,
 ) {
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).

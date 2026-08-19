@@ -128,7 +128,6 @@ internal class DfsEngine<L>(
         // null = auto: PB cutting-planes learning is on for pure-Boolean problems (PropagationState gates
         // it to numIntVars == 0 anyway). An explicit true/false overrides.
         pbLearning = params.pbLearning ?: true,
-        keepRecurringPremises = params.keepRecurringPremises,
     )
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are

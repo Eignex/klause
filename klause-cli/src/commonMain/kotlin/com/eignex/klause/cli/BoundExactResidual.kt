@@ -58,12 +58,7 @@ internal fun refutationIsBoxFree(problem: Problem, cancellation: Cancellation): 
     // satisfiability never depended on their domains — no search needed to say so.
     if (residual.numFactors == problem.numFactors) return true
     if (cancellation()) return false
-    // `keepRecurringPremises` is what makes the refutation trustworthy: the default analysis drops a
-    // resolved Boolean premise that recurs, which can learn a nogood stronger than what was derived and
-    // refute a satisfiable model (#1540). The flag is off in general search because the nogoods it keeps
-    // never assert; here a refutation the weaker nogoods do not reach costs only this certificate, and the
-    // caller reports the clamped verdict it would have reported anyway.
-    val params = BacktrackParams(cancellation = cancellation, keepRecurringPremises = true)
+    val params = BacktrackParams(cancellation = cancellation)
     val result = BacktrackSolver(residual.bake(cancellation)).solve(params)
     return result is SolveResult.Unsat
 }

@@ -31,13 +31,13 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     private var universe = 0
     private var seen = EmptyBooleanArray
 
-    // Variables already resolved out as a pivot this analysis. Order literals established on the
-    // current path carry a real trail position and resolve in reverse-assignment order like
-    // bools, but one materialised *mid-analysis* (an opposing bound a reason cites, never woken) has
-    // no trail position and its derived antecedents can present a same-level cycle (A's reason
-    // mentions B and vice-versa). Once a var has been resolved we must never re-ingest it, or the
-    // 1UIP loop ping-pongs forever (and grows [bumpIntVars] until OOM). In the acyclic bool case
-    // this never triggers.
+    // Variables already resolved out as a pivot this analysis. Every frontier variable at the conflict
+    // level carries a pin trail position and the driver resolves them in reverse-assignment order, so a
+    // resolved variable's own premises all sit below it and it can never recur as a genuine premise. An
+    // order literal with no trail position never joins the frontier at the conflict level: it is either
+    // resolved through where it is cited ([substituteOffTrail]) or kept as a leaf. Re-ingesting a resolved
+    // variable would let the 1UIP loop ping-pong forever (and grow [bumpIntVars] until OOM), so the
+    // guard stays.
     private var resolved = EmptyBooleanArray
 
     // Variables encountered (resolved through or kept) during the most recent analysis —
@@ -56,6 +56,17 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
     // O(total)). A superset of the currently-seen atoms (never pruned), so the scan re-checks
     // [isFrontier]. Cleared per analysis.
     override val offTrailFrontier = IntArrayList()
+
+    // Literals waiting to be folded in. [resolve] pushes the reason here and drains it, so substituting
+    // an order literal for its own premises costs no recursion depth however long the derived-reason
+    // chain gets. Reused across analyses, cleared per call.
+    private val pending = IntArrayList()
+
+    // Order literals already resolved through by substitution this analysis — the [resolved] role for
+    // variables that have no frontier slot. Keyed by var id rather than indexed by [universe] because
+    // building a derived reason materialises atoms, so ids grow past the universe the analysis started
+    // with.
+    private val substituted = IntHashSet()
 
     // O(1) membership index for the leaf-literal dedup in [resolve] / [drainFrontier], replacing
     // per-literal linear scans of `learned` that made analysis quadratic in clause size. Every
@@ -82,6 +93,8 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
         seen = scratch(seen, universe)
         resolved = scratch(resolved, universe)
         offTrailFrontier.clear()
+        pending.clear()
+        substituted.clear()
         litsInLearned.clear()
         bumpBoolVars.clear()
         bumpIntVars.clear()
@@ -131,18 +144,22 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
      * Add each literal in [reason] to either the working `seen` set (if it's at [currentLevel] —
      * resolution will continue through it) or directly to [learned] (lower level — it's part of the
      * final clause). Increments [currentLevelCount] for each new-at-current-level variable so the
-     * driver can track resolution progress.
+     * driver can track resolution progress. An order literal that has no pin trail position is
+     * resolved through here instead of joining the frontier ([substituteOffTrail]).
      */
     override fun resolve(reason: IntArray, currentLevel: Int) {
+        for (lit in reason) pending.add(lit)
         val numBoolVars = state.problem.numBoolVars
-        for (lit in reason) {
+        while (pending.size > 0) {
+            val lit = pending.last()
+            pending.truncateTo(pending.size - 1)
             val v = Lit.variable(lit)
+            if (v >= numBoolVars && substituteOffTrail(v, currentLevel)) continue
             if (v >= universe) {
-                // An atom materialised mid-analysis — derived antecedents allocate the
-                // opposing-bound atoms they cite. It has no frontier slot, so keep the
-                // literal in the clause as a leaf (deduped via [litsInLearned]): adding a
-                // literal only weakens the clause, while dropping it would silently strengthen
-                // the nogood past what was derived.
+                // An order literal materialised mid-analysis that [substituteOffTrail] could not resolve
+                // through. It has no frontier slot, so keep the literal in the clause as a leaf (deduped
+                // via [litsInLearned]): adding a literal only weakens the clause, while dropping it would
+                // silently strengthen the nogood past what was derived.
                 if (!litsInLearned.contains(lit)) {
                     addLearned(lit)
                     if (graph.levelOf(v) == currentLevel) currentLevelCount++
@@ -151,25 +168,14 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
             }
             if (seen[v]) continue // already in the frontier
             if (resolved[v]) {
-                // Resolved out as a pivot already. Atom antecedents have no trail order and can form
-                // same-level cycles (see [resolved]); a resolved atom can recur as a genuine premise —
-                // typically the opposite-polarity bound of the same int var. Skipping it then drops a
-                // literal the nogood needs, producing an unsound clause that prunes feasible solutions
-                // and over-proves optimality. Keep that literal instead (deduped via [litsInLearned]).
-                // Re-resolving the atom would risk the ping-pong the guard prevents; merely adding a
-                // literal only weakens the clause, so it stays sound. A second current-level literal makes
-                // the clause non-asserting, which [finalizeResult] flags so the engine backtracks
-                // chronologically.
-                //
-                // A resolved *bool* recurs the same way, cited by a derived atom reason, so skipping it is
-                // unsound for the same reason. It is skipped anyway unless
-                // [PropagationState.keepRecurringPremises] asks otherwise: keeping it costs the clause its
-                // assertiveness on every such conflict, which measures far worse in general search than the
-                // rare wrong refutation it avoids. A caller that needs a trustworthy refutation, and can
-                // treat "no refutation" as an answer, turns the flag on.
-                if ((v >= numBoolVars || state.keepRecurringPremises) && !litsInLearned.contains(lit)) {
-                    addLearned(lit)
-                }
+                // Reverse establishment order means a resolved variable's premises all sit below it, so it
+                // cannot recur as a genuine premise and this branch is unreachable. Keep the literal
+                // rather than rely on that: dropping one silently strengthens the nogood past what was
+                // derived, which prunes feasible solutions and over-proves optimality, whereas adding one
+                // only weakens the clause. Re-resolving would risk the ping-pong [resolved] prevents. A
+                // second conflict-level literal leaves the clause non-asserting, which [finalizeResult]
+                // flags so the engine backtracks chronologically.
+                if (!litsInLearned.contains(lit)) addLearned(lit)
                 continue
             }
             val lvl = graph.levelOf(v)
@@ -196,6 +202,34 @@ internal class ClauseResolvent(private val state: PropagationState, private val 
                 }
             }
         }
+    }
+
+    /**
+     * Resolve order literal [v] out of the reason where it is cited, pushing its own premises onto
+     * [pending], and report whether it was consumed.
+     *
+     * 1UIP resolves the frontier in reverse establishment order, which the driver reads off the pin
+     * trail. An order literal materialised after its bound had already crossed never went on the trail,
+     * so the driver can only reach it once the whole trail is exhausted — long past the facts its reason
+     * cites, which then recur as already-resolved premises and cost the clause its literals. Resolving it
+     * where it is cited instead puts its premises in the frontier below the citing literal's position,
+     * since they all precede the bound move that established it.
+     *
+     * Only a literal whose threshold is exactly its variable's live endpoint qualifies: that move *is* its
+     * establishment, so both [ReasonGraph.levelOf] and the reason are the real ones. For any looser
+     * threshold [PropagationState.atomAntecedentsDerived] yields no reason and the literal stays a leaf.
+     * Below the conflict level nothing is ever resolved out, so those literals stay leaves too.
+     */
+    private fun substituteOffTrail(v: Int, currentLevel: Int): Boolean {
+        val atomId = v - state.problem.numBoolVars
+        if (atomId >= state.atoms.intVar.size || state.atoms.lvl[atomId] >= 0) return false
+        if (substituted.contains(v)) return true
+        if (graph.levelOf(v) != currentLevel) return false
+        val premises = state.atomAntecedentsDerived(atomId) ?: return false
+        substituted.add(v)
+        bumpIntVars.add(state.atoms.intVar[atomId])
+        for (lit in premises) pending.add(lit)
+        return true
     }
 
     /** Convert every still-seen variable into a literal in [learned], deduped via [litsInLearned]. */

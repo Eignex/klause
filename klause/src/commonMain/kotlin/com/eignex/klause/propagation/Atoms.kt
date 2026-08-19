@@ -51,9 +51,11 @@ internal fun PropagationState.atomLevelForConflict(atomId: Int): Int {
     // on its [AtomStore.lvl] slot (a crossing/clause at level L is the level its truth was decided).
     val stored = atoms.lvl[atomId]
     if (stored >= 0) return stored
-    // Lazy-materialized determined atom (materialized after its bound crossed, at a looser threshold):
-    // channeling view — its level is the establishment level of the live endpoint that fixes its
-    // truth, matching the frontier atom its channeling reason ([atomAntecedentsDerived]) cites.
+    // Lazy-materialized determined atom (materialized after its bound crossed): its level is the
+    // establishment level of the live endpoint that fixes its truth. Exact for a threshold the endpoint
+    // sits on, and that is the only case [atomAntecedentsDerived] explains; for one the endpoint has
+    // overshot this over-states the level (the truth was really fixed by an earlier move), which keeps the
+    // backjump shallow and the literal in the clause — sound, just weaker.
     val v = atoms.intVar[atomId]
     val k = atoms.threshold[atomId]
     val truth = atomCurrentTruth(atomId) ?: return levelToDecisionVar.size
@@ -202,12 +204,18 @@ internal fun PropagationState.flushPendingChanneling() {
 
 /**
  * Antecedents of atom [atomId]: the reason on its trail slot ([AtomStore.ant]) for an atom established on
- * the current path, else derived on demand. The derived cases: a determined bound atom (of any
- * looseness) cites the live endpoint that fixes its truth ([endpointReason], over other variables);
- * a true eq atom cites both endpoint bounds; a bound-excluded eq atom cites the live endpoint; an
- * interior-hole eq atom resolves to the carve's recorded reason ([holeReasonFor]). `null` marks a
- * root/bake fact or an undetermined atom — the analyzer keeps such literals instead of resolving
- * through them.
+ * the current path, else derived on demand. The derived cases: a bound atom sitting exactly *at* the live
+ * endpoint cites that endpoint's own premises ([endpointReason], over other variables); a true eq atom
+ * cites both endpoint bounds; an interior-hole eq atom resolves to the carve's recorded reason
+ * ([holeReasonFor]). `null` marks a root/bake fact, an undetermined atom, or an atom whose threshold the
+ * live endpoint has since overshot — the analyzer keeps such literals instead of resolving through them.
+ *
+ * A threshold the endpoint has overshot deliberately gets no reason. Its truth was established by the
+ * *earlier* move that first crossed the threshold, and only the live endpoint is on record, so any reason
+ * built here would explain the atom by premises established after it — a back edge in the reason graph,
+ * which makes the reverse-establishment resolution order 1UIP relies on unsatisfiable and lets an
+ * already-resolved premise recur. Keeping the literal loses learning strength on that atom and nothing
+ * else.
  */
 internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     // Trail-resident: an atom assigned on the current path (a bound move crossed it — [wakeAtom] —
@@ -218,48 +226,35 @@ internal fun PropagationState.atomAntecedentsDerived(atomId: Int): IntArray? {
     val k = atoms.threshold[atomId]
     val d = intDomains[v]
     val truth = atomCurrentTruth(atomId) ?: return null
-    // Textbook-LCG channeling reasons. A determined atom looser than the live endpoint that fixes
-    // its truth is entailed by that endpoint atom through a monotonicity (or eq<->bound) channeling
-    // clause — cite the single frontier atom, a real registered clause (see [registerChannelingFor]),
-    // rather than the endpoint's own premises. Only the frontier atom (threshold at the live bound)
-    // carries the propagator premises ([endpointReason]); a true eq atom cites its two bound atoms;
-    // a carved eq-false atom cites the cross-variable carve reason. Every reason is thus a valid
-    // standalone clause, so recursive clause minimization resolving through it stays sound — the
-    // atoms of one int var are joined only by these channeling clauses, never by opaque coupling.
+    // Only a threshold the live endpoint sits exactly on can be explained: that endpoint move is the
+    // one that established this atom's truth, so its premises ([endpointReason], over other
+    // variables) are all established before it, and before anything that cites the atom. A true eq
+    // atom is the singleton case and cites its two live endpoint bounds; a carved eq-false atom
+    // cites the cross-variable carve reason. Every reason is a valid standalone clause, so recursive
+    // clause minimization resolving through it stays sound.
     return when (atoms.kind[atomId]) {
         AtomKind.GE ->
             if (truth) {
-                if (k >= d.min) endpointReason(v, viaMax = false) else channelToAtom(atomVarGe(v, d.min))
+                if (k >= d.min) endpointReason(v, viaMax = false) else null
             } else {
-                if (k - 1 <= d.max) endpointReason(v, viaMax = true) else channelToAtom(atomVarLe(v, d.max))
+                if (k - 1 <= d.max) endpointReason(v, viaMax = true) else null
             }
 
         AtomKind.LE ->
             if (truth) {
-                if (k <= d.max) endpointReason(v, viaMax = true) else channelToAtom(atomVarLe(v, d.max))
+                if (k <= d.max) endpointReason(v, viaMax = true) else null
             } else {
-                if (k + 1 >= d.min) endpointReason(v, viaMax = false) else channelToAtom(atomVarGe(v, d.min))
+                if (k + 1 >= d.min) endpointReason(v, viaMax = false) else null
             }
 
         AtomKind.EQ ->
             if (truth) {
                 composeIntVarAtomAntecedents(intArrayOf(v))
             } else {
-                when {
-                    holeHistHas(v, k) -> holeReasonFor(v, k)
-                    k < d.min -> channelToAtom(atomVarGe(v, d.min))
-                    k > d.max -> channelToAtom(atomVarLe(v, d.max))
-                    else -> holeReasonFor(v, k)
-                }
+                if (holeHistHas(v, k) || k in d.min..d.max) holeReasonFor(v, k) else null
             }
     }
 }
-
-/** A one-literal channeling reason: the live frontier atom [frontierVar] entails a looser/derived
- *  atom of the same int var through a registered monotonicity (or eq<->bound) channeling clause;
- *  cite it as the single currently-false literal so the 1UIP loop resolves on to the frontier's own
- *  (propagator) reason. */
-private fun channelToAtom(frontierVar: Int): IntArray = intArrayOf(Lit.make(frontierVar, false))
 
 /**
  * Antecedent of a determined bound atom: the **per-var stored antecedent of the live endpoint** that
@@ -341,7 +336,13 @@ private inline fun PropagationState.wakeMinCrossing(
     eqAction: (atomId: Int) -> Unit,
 ) {
     atoms.pendingMoveAnt = ant
-    idx.ge.visitRange(oldMin + 1, newMin) { id -> wakeAtom(id, true) }
+    // The frontier `[v ≥ newMin]` goes on the trail before the looser thresholds that cite it as their
+    // monotonicity anchor ([channelingReasonAtWake]): 1UIP resolves the trail in reverse establishment
+    // order, so a premise stamped *after* the literal it explains would be resolved out first and then
+    // recur as a genuine premise. The ascending visit reaches the frontier last, hence the explicit wake.
+    val frontier = idx.find(AtomKind.GE, newMin)
+    if (frontier >= 0) wakeAtom(frontier, true)
+    idx.ge.visitRange(oldMin + 1, newMin - 1) { id -> wakeAtom(id, true) }
     idx.le.visitRange(oldMin, newMin - 1) { id -> wakeAtom(id, false) }
     idx.eq.visitRange(oldMin, newMin - 1, eqAction)
 }
