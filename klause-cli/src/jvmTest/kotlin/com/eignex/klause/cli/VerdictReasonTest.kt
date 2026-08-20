@@ -65,6 +65,52 @@ class VerdictReasonTest {
     }
 
     @Test
+    fun `every competition mode names the cause of an unknown`() {
+        // The census of unknowns by cause reads these lines, so a mode without one is a corpus the
+        // census cannot see rather than a corpus with nothing to report.
+        val modes = listOf<Pair<String, () -> BufferedBestOutput>>(
+            "dimacs" to { DimacsOutput() },
+            "opb" to { OpbOutput() },
+            "wcnf" to { WcnfOutput() },
+            "xcsp" to { XcspOutput() },
+            "mps" to { MpsOutput(ClampFlag(), globalOptimum = { true }) },
+            "smtlib" to { SmtLibOutput() },
+        )
+        for ((name, factory) in modes) {
+            val out = capture {
+                factory().apply {
+                    onVerdictContext(VerdictContext(budgetExhausted = true))
+                    onComplete(Verdict.UNKNOWN)
+                }
+            }
+            assertTrue("unknown: budget exhausted" in out, "$name reported no cause: $out")
+        }
+    }
+
+    @Test
+    fun `the flatzinc mode names the cause as a comment beside its terminator`() {
+        val out = capture {
+            MiniZincOutput().apply {
+                onVerdictContext(VerdictContext(budgetExhausted = true))
+                onComplete(Verdict.UNKNOWN)
+            }
+        }
+        assertEquals("=====UNKNOWN=====", out.lineSequence().first())
+        assertTrue("% unknown: budget exhausted" in out, out)
+    }
+
+    @Test
+    fun `the flatzinc mode leaves a decided verdict alone`() {
+        val out = capture {
+            MiniZincOutput().apply {
+                onVerdictContext(VerdictContext(budgetExhausted = true))
+                onComplete(Verdict.SATISFIABLE)
+            }
+        }
+        assertEquals("==========", out.trim())
+    }
+
+    @Test
     fun `an optimum only optimal inside the clamp says so`() {
         val out = capture {
             MpsOutput(ClampFlag().apply { clamped = true }, globalOptimum = { false }).apply {

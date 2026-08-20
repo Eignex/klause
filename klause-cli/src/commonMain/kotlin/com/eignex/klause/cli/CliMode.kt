@@ -475,6 +475,19 @@ internal class VerdictContext(
 )
 
 /**
+ * The cause of a soft verdict: out of time, out of a pool that could have proved anything, or neither —
+ * in which case the caller learns only that it was not reached.
+ *
+ * Every format reports this, so a census of `unknown` by cause covers whatever corpus it is run over
+ * rather than only the formats that happened to implement it.
+ */
+internal fun VerdictContext.softVerdictCause(): String = when {
+    !completePool -> "no arm in the pool can prove a verdict"
+    budgetExhausted -> "budget exhausted"
+    else -> "search stopped without a verdict"
+}
+
+/**
  * How a mode prints solutions and verdicts. The [SolveCore] driver calls these in order:
  * [begin] once, [onSolution] per feasible/improving solution (streamed), [onComplete] once
  * with the terminal [Verdict], and [onStatistics] last when `-s` is set.

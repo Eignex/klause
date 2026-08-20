@@ -33,19 +33,13 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         private set
 
     /** The reason to print beside [verdict] as a comment, or null when the verdict speaks for itself.
-     *  Only the formats whose `unknown` has several causes override this. */
-    protected open fun verdictReason(verdict: Verdict): String? = null
+     *  A format overrides this only to add a cause of its own; the soft-verdict cause every format
+     *  shares is reported without one. */
+    protected open fun verdictReason(verdict: Verdict): String? =
+        if (verdict == Verdict.UNKNOWN) "unknown: ${context.softVerdictCause()}" else null
 
     final override fun onVerdictContext(context: VerdictContext) {
         this.context = context
-    }
-
-    /** The cause shared by every format: a soft verdict is either out of time, out of a pool that could
-     *  have proved anything, or neither — in which case the caller learns only that it was not reached. */
-    protected fun softVerdictCause(): String = when {
-        !context.completePool -> "no arm in the pool can prove a verdict"
-        context.budgetExhausted -> "budget exhausted"
-        else -> "search stopped without a verdict"
     }
 
     final override fun onSolution(rendered: String, objective: Long?) {

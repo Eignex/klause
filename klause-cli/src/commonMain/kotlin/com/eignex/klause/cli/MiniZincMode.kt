@@ -122,6 +122,12 @@ internal object MiniZincMode : CliMode {
 
 /** MiniZinc's standard FZN solution protocol. */
 internal class MiniZincOutput : OutputProtocol {
+    private var context: VerdictContext = VerdictContext()
+
+    override fun onVerdictContext(context: VerdictContext) {
+        this.context = context
+    }
+
     override fun onSolution(rendered: String, objective: Long?) {
         // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
         // `----------` terminator; objective is carried in the rendered text.
@@ -137,7 +143,12 @@ internal class MiniZincOutput : OutputProtocol {
 
             Verdict.UNSATISFIABLE -> println("=====UNSATISFIABLE=====")
 
-            Verdict.UNKNOWN -> println("=====UNKNOWN=====")
+            // A `%` line is a comment to every FlatZinc consumer, so the cause rides alongside the
+            // standard terminator without changing what the protocol promises.
+            Verdict.UNKNOWN -> {
+                println("=====UNKNOWN=====")
+                println("% unknown: ${context.softVerdictCause()}")
+            }
         }
     }
 

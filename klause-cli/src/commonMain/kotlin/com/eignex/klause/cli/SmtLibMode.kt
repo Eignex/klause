@@ -143,9 +143,7 @@ internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : Buffer
         verdict == Verdict.UNSATISFIABLE && clamp.clamped && !clamp.refutationIsBoxFree() ->
             "unknown: refuted inside the clamped search range, not over the model's own"
 
-        verdict == Verdict.UNKNOWN -> "unknown: ${softVerdictCause()}"
-
-        else -> null
+        else -> super.verdictReason(verdict)
     }
 
     // Deliberately lean block: SMT-LIB comments carry only the headline search counters.
