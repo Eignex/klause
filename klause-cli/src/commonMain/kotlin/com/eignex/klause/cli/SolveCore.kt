@@ -127,6 +127,18 @@ internal object SolveCore {
         }
     }
 
+    /**
+     * Whether the `-t` budget is gone by the time a verdict is rendered.
+     *
+     * [backendTimedOut] is the backend's own flag, which not every path sets — a census of corpus
+     * unknowns attributed 26 of 36 miplib instances to "stopped for no stated reason" purely because the
+     * MPS path leaves it false. The deadline itself is the reliable witness: it is anchored once at
+     * process start, so comparing against it here catches every path that ran out of time. Consulted only
+     * to explain a soft verdict, so a decided run finishing exactly on the boundary costs nothing.
+     */
+    private fun budgetSpent(common: CommonOptions, backendTimedOut: Boolean): Boolean =
+        backendTimedOut || common.deadlineAtMs?.let { nowMillis() >= it } == true
+
     /** Reject `-p N>1` for a single-core engine; [alt], when given, is the parallel engine to suggest. */
     private fun rejectParallel(engine: Engine, cores: Int, alt: Engine?) {
         if (cores <= 1) return
@@ -512,7 +524,9 @@ internal object SolveCore {
         t0: Long,
         complete: Boolean = true,
     ) {
-        output.onVerdictContext(VerdictContext(budgetExhausted = r.stats.run.timedOut, completePool = complete))
+        output.onVerdictContext(
+            VerdictContext(budgetExhausted = budgetSpent(common, r.stats.run.timedOut), completePool = complete),
+        )
         var produced = 0L
         when (r) {
             is SolveResult.Sat -> {
@@ -539,7 +553,9 @@ internal object SolveCore {
         t0: Long,
         streamedCount: Int,
     ) {
-        output.onVerdictContext(VerdictContext(budgetExhausted = r.stats.run.timedOut, completePool = complete))
+        output.onVerdictContext(
+            VerdictContext(budgetExhausted = budgetSpent(common, r.stats.run.timedOut), completePool = complete),
+        )
         val alreadyStreamed = streamedCount > 0
         var produced = 0L
         var best: Sample? = null
