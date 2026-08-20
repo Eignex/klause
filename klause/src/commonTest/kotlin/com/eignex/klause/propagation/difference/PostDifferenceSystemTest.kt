@@ -47,6 +47,21 @@ class PostDifferenceSystemTest {
     }
 
     @Test
+    fun `a model whose clamped columns make the system unusable is left alone`() {
+        // An unbounded model invents a ±2^62 range per open column and posts it as a declared range.
+        // A potential cannot be summed over weights that size, so the propagator would decline on every
+        // fire — 320,000 times on one nec-smt instance — and the factor is pure cost.
+        val clamp = 1L shl 62
+        val problem = Problem(
+            numBoolVars = 4,
+            numIntVars = 3,
+            intDomains = Array(3) { IntDomain(-clamp, clamp) },
+            factors = arrayOf<Factor>(reified(0, 1, 0, -1L), reified(1, 2, 1, -1L)),
+        )
+        assertSame(problem, problem.withDifferenceSystem())
+    }
+
+    @Test
     fun `a model with no difference rows is left alone`() {
         val problem = problemOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3))
         assertSame(problem, problem.withDifferenceSystem())

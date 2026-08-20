@@ -91,10 +91,7 @@ internal class IncrementalDifferenceGraph(
             val a = if (w < 0L) -w else w
             if (a > maxAbs) maxAbs = a
         }
-        // A potential is a shortest-path weight, so it stays within `numNodes` edge weights of zero; the
-        // reduced weights and path lengths built on top of it add a further constant factor.
-        val room = Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
-        usable = numNodes > 0 && maxAbs <= room
+        usable = numNodes > 0 && maxAbs <= weightRoom(numNodes)
         for (e in source.indices) adjStart[source[e] + 1]++
         for (v in 1..numNodes) adjStart[v] += adjStart[v - 1]
         val fill = adjStart.copyOf()
@@ -369,6 +366,15 @@ internal class IncrementalDifferenceGraph(
     internal companion object {
         /** [distanceTo] for a vertex no asserted path reaches. */
         const val UNREACHABLE: Long = Long.MAX_VALUE
+
+        /**
+         * The largest edge weight a system over [numNodes] vertices can carry.
+         *
+         * A potential is a shortest-path weight, so it stays within [numNodes] edge weights of zero; the
+         * reduced weights and path lengths built on top of it add a further constant factor. Exposed so
+         * the decision to post the factor at all can be made against the same rule the structure applies.
+         */
+        fun weightRoom(numNodes: Int): Long = Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
     }
 }
 

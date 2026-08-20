@@ -42,6 +42,19 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
      */
     fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
 
+    /**
+     * Whether a graph over these edges could hold a potential, which is what every deduction rests on.
+     * Answers before the factor is built, so a system that could only decline every fire is never posted.
+     */
+    fun carriesAPotential(): Boolean {
+        var maxAbs = 0L
+        for (e in edges) {
+            val a = if (e.bound < 0L) -e.bound else e.bound
+            if (a > maxAbs) maxAbs = a
+        }
+        return numNodes > 0 && maxAbs <= IncrementalDifferenceGraph.weightRoom(numNodes)
+    }
+
     /** A graph over [edges], for a consumer that wants to run a cycle search over the whole set. */
     fun graph(): DifferenceGraph {
         val g = DifferenceGraph(numNodes)

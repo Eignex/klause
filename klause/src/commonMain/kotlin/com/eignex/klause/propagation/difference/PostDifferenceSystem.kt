@@ -12,7 +12,18 @@ import com.eignex.klause.solver.Problem
  * elimination would otherwise substitute away, trading a whole class of reductions for the deduction.
  * After the fixpoint no pass can be blocked, and the search sees the same system either way.
  *
- * The gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
+ * The second gate is arithmetic. A system whose weights cannot be summed once per vertex inside `Long`
+ * holds no potential, so its propagator returns at its first line on every fire — 320,000 times on one
+ * `nec-smt` instance, for nothing. An unbounded model invents a ±2^62 clamp for each open column and
+ * posts it as a declared range, which is exactly such a weight, so the whole family paid for a factor
+ * that could not deduce. Declining to post it is worth ~1.2x there.
+ *
+ * Teaching it to carry those models instead was measured and is a loss: dropping only the over-heavy
+ * edges makes the system usable, and it then explores 5-10x fewer nodes in a fixed budget while deciding
+ * nothing extra across a 10-instance sample. The clamp states nothing a difference system needs — the
+ * fragment is decidable over ℤ without bounds — so the cost buys no deduction.
+ *
+ * The first gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
  * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
  * built only from those repeats work the model already does; it is the reified ones, whose truth the
  * Boolean layer decides, that the joint graph can refute ahead of a decision.
@@ -20,6 +31,7 @@ import com.eignex.klause.solver.Problem
 internal fun Problem.withDifferenceSystem(): Problem {
     val fragment = differenceFragmentOf(factors, numIntVars, intDomains) ?: return this
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
+    if (!fragment.carriesAPotential()) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
     // `alreadyFolded` reuses that fold and `seedDeductions` carries the proven deductions forward.
     return BakedProblem(
