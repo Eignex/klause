@@ -18,10 +18,18 @@ import com.eignex.klause.solver.Problem
  * posts it as a declared range, which is exactly such a weight, so the whole family paid for a factor
  * that could not deduce. Declining to post it is worth ~1.2x there.
  *
- * Teaching it to carry those models instead was measured and is a loss: dropping only the over-heavy
- * edges makes the system usable, and it then explores 5-10x fewer nodes in a fixed budget while deciding
- * nothing extra across a 10-instance sample. The clamp states nothing a difference system needs — the
- * fragment is decidable over ℤ without bounds — so the cost buys no deduction.
+ * This gate is arithmetic, not a cost cap: the graph could not hold a potential, so the factor could not
+ * deduce whatever it was scheduled to do. What is *not* settled is whether those models should be carried
+ * at all. Dropping only the over-heavy edges does make the system usable — the clamp states nothing a
+ * difference system needs, since the fragment is decidable over ℤ without bounds — and that was measured
+ * a loss: 5-10x fewer nodes in a fixed budget, deciding nothing extra over a 10-instance `nec-smt` sample.
+ *
+ * Read that as a fact about *scheduling*, because it was measured under the present arrangement, where
+ * the refutation sweep runs inside the CP fixpoint and searches buckets of open edges on every fire. The
+ * same instrumentation put 320,000 fires on one instance with the sweeps switched off costing only ~1.2x,
+ * so the sweep is the whole cost. Move it to a decision or restart boundary, or trigger it on assertion
+ * rather than sweeping open buckets, and the measurement above no longer applies — at which point
+ * dropping the over-heavy edges is worth re-testing and this gate is what to lift.
  *
  * The first gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
  * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
