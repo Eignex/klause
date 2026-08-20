@@ -141,7 +141,7 @@ internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : Buffer
     // very likely an unsat waiting on real bounds, while an exhausted budget just wants a longer one.
     override fun verdictReason(verdict: Verdict): String? = when {
         verdict == Verdict.UNSATISFIABLE && clamp.clamped && !clamp.refutationIsBoxFree() ->
-            "unknown: refuted inside the clamped search range, not over the model's own"
+            "refuted inside the clamped search range, not over the model's own"
 
         else -> super.verdictReason(verdict)
     }

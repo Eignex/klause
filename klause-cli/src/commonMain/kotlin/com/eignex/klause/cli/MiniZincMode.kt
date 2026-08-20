@@ -147,7 +147,7 @@ internal class MiniZincOutput : OutputProtocol {
             // standard terminator without changing what the protocol promises.
             Verdict.UNKNOWN -> {
                 println("=====UNKNOWN=====")
-                println("% unknown: ${context.softVerdictCause()}")
+                println("% ${context.softVerdictCause()}")
             }
         }
     }
