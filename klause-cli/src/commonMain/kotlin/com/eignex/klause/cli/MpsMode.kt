@@ -143,10 +143,10 @@ internal class MpsOutput(
     // bound is only the box's; say so, alongside the two causes an outright UNKNOWN can have.
     override fun verdictReason(verdict: Verdict): String? = when {
         verdict == Verdict.UNSATISFIABLE && clamp.clamped ->
-            "unknown: refuted inside the clamped search range, not over the model's own"
+            "refuted inside the clamped search range, not over the model's own"
 
         verdict == Verdict.OPTIMAL && clamp.clamped && bestObjective?.let(globalOptimum) != true ->
-            "satisfiable: optimal within the clamped search range only"
+            "optimal within the clamped search range only"
 
         else -> super.verdictReason(verdict)
     }

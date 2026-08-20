@@ -43,7 +43,7 @@ class VerdictReasonTest {
     @Test
     fun `an exhausted budget is named as the cause`() {
         val out = smt(false, false, VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
-        assertTrue("; unknown: budget exhausted" in out, out)
+        assertTrue("; budget exhausted" in out, out)
     }
 
     @Test
@@ -83,7 +83,7 @@ class VerdictReasonTest {
                     onComplete(Verdict.UNKNOWN)
                 }
             }
-            assertTrue("unknown: budget exhausted" in out, "$name reported no cause: $out")
+            assertTrue("budget exhausted" in out, "$name reported no cause: $out")
         }
     }
 
@@ -96,7 +96,14 @@ class VerdictReasonTest {
             }
         }
         assertEquals("=====UNKNOWN=====", out.lineSequence().first())
-        assertTrue("% unknown: budget exhausted" in out, out)
+        assertTrue("% budget exhausted" in out, out)
+    }
+
+    @Test
+    fun `the cause does not repeat the verdict the status line already gave`() {
+        val out = smt(false, false, VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
+        assertEquals("unknown", out.lineSequence().first())
+        assertEquals(1, out.lineSequence().count { "unknown" in it }, "the verdict is named once: $out")
     }
 
     @Test
@@ -119,6 +126,6 @@ class VerdictReasonTest {
                 onComplete(Verdict.OPTIMAL)
             }
         }
-        assertTrue("c satisfiable: optimal within the clamped search range only" in out, out)
+        assertTrue("c optimal within the clamped search range only" in out, out)
     }
 }

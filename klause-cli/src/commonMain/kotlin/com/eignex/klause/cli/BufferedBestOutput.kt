@@ -32,11 +32,11 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     protected var context: VerdictContext = VerdictContext()
         private set
 
-    /** The reason to print beside [verdict] as a comment, or null when the verdict speaks for itself.
-     *  A format overrides this only to add a cause of its own; the soft-verdict cause every format
-     *  shares is reported without one. */
+    /** The cause to print beside [verdict] as a comment, or null when the verdict speaks for itself.
+     *  The status line has already named the verdict, so this carries only what it does not say. A
+     *  format overrides this to add a cause of its own. */
     protected open fun verdictReason(verdict: Verdict): String? =
-        if (verdict == Verdict.UNKNOWN) "unknown: ${context.softVerdictCause()}" else null
+        if (verdict == Verdict.UNKNOWN) context.softVerdictCause() else null
 
     final override fun onVerdictContext(context: VerdictContext) {
         this.context = context
