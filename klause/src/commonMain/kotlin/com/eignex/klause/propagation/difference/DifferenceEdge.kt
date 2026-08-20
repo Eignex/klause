@@ -6,8 +6,20 @@ import com.eignex.klause.factor.arithmetic.LinearOp
  * One difference constraint `target − source ≤ bound`, the edge `source → target` of the constraint
  * graph. [guard] is the Boolean literal that must hold for it to be asserted, or [ALWAYS] when the row is
  * unconditional — a reified row only constrains once the search has decided its aux variable.
+ *
+ * [domainBound] marks an edge that states a declared domain side rather than a row of the model. Both
+ * endpoints of such an edge are the constant node and one variable, so a model whose columns are all
+ * bounded makes that node a hub of degree `2n` and every shortest-path search spans the whole graph. The
+ * propagator therefore keeps these out of the graph and folds them into the distance query instead; see
+ * [com.eignex.klause.propagation.difference.DifferenceSystemPropagator].
  */
-internal class DifferenceEdge(val source: Int, val target: Int, val bound: Long, val guard: Int = ALWAYS) {
+internal class DifferenceEdge(
+    val source: Int,
+    val target: Int,
+    val bound: Long,
+    val guard: Int = ALWAYS,
+    val domainBound: Boolean = false,
+) {
     internal companion object {
         /** [guard] value for a row that holds unconditionally. */
         const val ALWAYS: Int = -1

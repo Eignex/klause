@@ -9,12 +9,12 @@ import com.eignex.klause.util.IntArrayList
 /**
  * Heads a single refutation sweep visits before yielding.
  *
- * A sweep costs one shortest-path search per head, so an exhaustive sweep is quadratic in the vertices of
- * a model whose columns are all bounded: the bound edges let every vertex reach every other through the
- * zero node, so no reachability argument narrows it (see #1529). Visiting a rotating window instead keeps
- * the per-call cost bounded and still reaches every head across successive calls — a refutation is
- * deferred, never dropped, and a deferred one only leaves an edge open that the Boolean layer may still
- * decide, so the verdict is unaffected either way.
+ * A sweep costs one shortest-path search per head. With the declared-domain edges out of the graph the
+ * reachability narrowing in [DifferenceSystemPropagator.headsToSweep] does most of the work, so the
+ * window is insurance against a genuinely dense system rather than the load-bearing bound it was while
+ * the constant node was a hub. Visiting a rotating window still reaches every head across successive
+ * calls — a refutation is deferred, never dropped, and a deferred one only leaves an edge open that the
+ * Boolean layer may still decide, so the verdict is unaffected either way.
  */
 private const val HEAD_SWEEP_BUDGET = 64
 
@@ -32,16 +32,36 @@ private const val HEAD_SWEEP_BUDGET = 64
  * A deduction is explained by the guards on the path (or cycle) that forced it, so the learned clause
  * names exactly the reified rows whose conjunction is contradictory.
  *
+ * **The constant node is measured, not walked.** A bounded column contributes `zero → v` and `v → zero`,
+ * so on a model whose columns are all bounded that node has degree `2n`: the graph is strongly connected,
+ * every shortest-path search spans it, and no reachability argument narrows a sweep (#1529). Those edges
+ * stay in the system — the potential has to remain feasible for them, and a cycle through one is a real
+ * conflict — but a per-head search does not walk them. Instead
+ * [IncrementalDifferenceGraph.refreshZeroDistances] measures the distance to and from that node once per
+ * sweep, and a head reads the route off as `d(y → x) = min(d(y ⇝ x), d(y ⇝ zero) + d(zero ⇝ x))`.
+ *
+ * That is exact, not an approximation. A shortest path visits the node at most once — a second visit
+ * encloses a cycle, which is either negative, and so a conflict, or non-negative, and so removable — so
+ * splitting at that single visit accounts for every route, including the ones that reach it through model
+ * rows rather than straight off an endpoint's own range. Both halves keep their own predecessor chain,
+ * which is what lets a refutation routed that way still name the guards on each segment.
+ *
  * Scott Cotton and Oded Maler, "Fast and Flexible Difference Constraint Propagation for DPLL(T)",
  * SAT 2006, LNCS 4121.
  */
 internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propagator {
 
-    private val guards = IntArray(edges.size)
-    private val tail = IntArray(edges.size)
-    private val head = IntArray(edges.size)
-    private val bound = LongArray(edges.size)
+    private val guards: IntArray
+    private val tail: IntArray
+    private val head: IntArray
+    private val bound: LongArray
     private val numVertices: Int
+
+    /** Which edges state a declared range; the graph keeps them but no per-head search walks them. */
+    private val hub: BooleanArray
+
+    /** The vertex standing for the constant 0, which every declared-range edge is incident to. */
+    private val zeroVertex: Int get() = numVertices - 1
 
     // Guarded edges bucketed by head vertex: every edge in a bucket is refuted or not by the distances
     // out of that one vertex, so a bucket costs a single shortest-path search rather than one per edge.
@@ -61,8 +81,8 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * every fire, and a potential feasible for a set stays feasible for any subset of it, so a backtrack
      * leaves the structure correct without any undo.
      */
-    private class Session(numVertices: Int, tail: IntArray, head: IntArray, bound: LongArray) {
-        val graph = IncrementalDifferenceGraph(numVertices, tail, head, bound)
+    private class Session(numVertices: Int, tail: IntArray, head: IntArray, bound: LongArray, hub: BooleanArray) {
+        val graph = IncrementalDifferenceGraph(numVertices, tail, head, bound, hub)
         val pending = IntArrayList()
         val pendingTails = IntArrayList()
         var reason: IntArray? = null
@@ -103,6 +123,8 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
     }
 
     init {
+        // Numbered over every endpoint, including those only a domain edge mentions, so the vertex space
+        // does not depend on which edges the graph ends up holding.
         val seen = HashSet<Int>()
         for (e in edges) {
             if (e.source != DifferenceFragment.ZERO) seen.add(e.source)
@@ -112,13 +134,20 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         val zeroNode = nodes.size
         fun nodeOf(endpoint: Int) =
             if (endpoint == DifferenceFragment.ZERO) zeroNode else indexOfSorted(nodes, endpoint)
+        numVertices = nodes.size + 1
+
+        guards = IntArray(edges.size)
+        tail = IntArray(edges.size)
+        head = IntArray(edges.size)
+        bound = LongArray(edges.size)
+        hub = BooleanArray(edges.size)
         edges.forEachIndexed { i, e ->
             guards[i] = e.guard
             tail[i] = nodeOf(e.source)
             head[i] = nodeOf(e.target)
             bound[i] = e.bound
+            hub[i] = e.domainBound
         }
-        numVertices = nodes.size + 1
 
         val counts = IntArray(nodes.size + 2)
         var guarded = 0
@@ -180,7 +209,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         val session = (state.refPayload[factorId] as? Session)
-            ?: Session(numVertices, tail, head, bound).also { state.refPayload[factorId] = it }
+            ?: Session(numVertices, tail, head, bound, hub).also { state.refPayload[factorId] = it }
         session.reason = null
         val graph = session.graph
         if (!graph.usable) return true
@@ -208,9 +237,13 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
             session.newTails.clear()
             return true
         }
+        // Refreshed before the heads are chosen: a route through the constant node can shorten for a pair
+        // the row-only reachability below would never reach, so a move there widens the sweep to all of
+        // them. Twice per sweep, against once per head had the node stayed a hub.
+        val hubMoved = graph.refreshZeroDistances(zeroVertex)
         // A backtrack releases the guards earlier sweeps pinned, so every head has to be revisited; a
         // descent only has to revisit the heads the new assertions could have moved.
-        val heads = if (descended) headsToSweep(session) else bucketVertex
+        val heads = if (descended && !hubMoved) headsToSweep(session) else bucketVertex
         session.newTails.clear()
         session.sweptVersion = session.assertVersion
         session.sweptDecisions = state.numDecisions
@@ -240,22 +273,35 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 session.pendingTails.add(tail[e])
             }
             if (session.pending.size == 0) continue
+            // The route through the constant node is already measured, so it refutes without a search and
+            // spares the search from settling that edge's tail at all.
+            var open = false
+            for (k in 0 until session.pending.size) {
+                val e = session.pending[k]
+                if (state.litTruth(guards[e]) != null) continue
+                if (closesNegativeCycle(hubDistance(graph, v, tail[e]), bound[e])) {
+                    val route = graph.pathToZeroFrom(v) + graph.pathFromZeroTo(tail[e])
+                    if (!refute(state, session, e, blockingClause(route))) return false
+                    continue
+                }
+                open = true
+            }
+            if (!open) continue
             graph.shortestPathsFrom(v, session.pendingTails.toIntArray())
             for (k in 0 until session.pending.size) {
                 val e = session.pending[k]
                 if (state.litTruth(guards[e]) != null) continue // an earlier refutation in this sweep decided it
                 val d = graph.distanceTo(tail[e])
-                if (d == IncrementalDifferenceGraph.UNREACHABLE || d + bound[e] >= 0L) continue
-                if (!refute(state, session, e)) return false
+                if (!closesNegativeCycle(d, bound[e])) continue
+                if (!refute(state, session, e, blockingClause(graph.pathTo(tail[e])))) return false
             }
             session.headCursor = if (heads.size == 0) 0 else (session.headCursor + budget) % heads.size
         }
         return true
     }
 
-    /** Pin edge [e]'s guard false, explained by the guards on the path that refutes it. */
-    private fun refute(state: PropagationState, session: Session, e: Int): Boolean {
-        val antecedents = blockingClause(session.graph.pathTo(tail[e]))
+    /** Pin edge [e]'s guard false, explained by [antecedents] — the guards on whatever refuted it. */
+    private fun refute(state: PropagationState, session: Session, e: Int, antecedents: IntArray): Boolean {
         val lit = Lit.negate(guards[e])
         if (state.pinLit(lit, antecedents)) return true
         session.reason = antecedents + lit
@@ -278,6 +324,42 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         return if (lits.isEmpty()) EmptyIntArray else lits.toIntArray()
     }
 
+    /**
+     * Weight of the shortest route `from ⇝ zero ⇝ to`, or [NO_BOUND] when either half is unreachable or
+     * the pair cannot be summed inside [Long].
+     *
+     * The clamp an unbounded model invents is ±2^62, so two of them sum past [Long] — an overflowing pair
+     * is reported as no route at all rather than as a wrapped one.
+     */
+    private fun hubDistance(graph: IncrementalDifferenceGraph, from: Int, to: Int): Long {
+        val a = graph.distanceToZeroFrom(from)
+        val b = graph.distanceFromZeroTo(to)
+        if (a == NO_BOUND || b == NO_BOUND) return NO_BOUND
+        val sum = a + b
+        return if (((a xor sum) and (b xor sum)) < 0L) NO_BOUND else sum
+    }
+
+    /**
+     * Whether an edge of weight [weight] closes a negative cycle against a path of weight [distance],
+     * which is the test that refutes it. An absent or unreachable distance decides nothing, and neither
+     * does a sum that leaves [Long].
+     */
+    private fun closesNegativeCycle(distance: Long, weight: Long): Boolean {
+        if (distance == NO_BOUND) return false
+        val sum = distance + weight
+        if (((distance xor sum) and (weight xor sum)) < 0L) return false
+        return sum < 0L
+    }
+
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         (state.refPayload[factorId] as? Session)?.reason
+
+    private companion object {
+        /**
+         * A column side no declared domain states. Shares its value with
+         * [IncrementalDifferenceGraph.UNREACHABLE] deliberately: both mean "no path of any weight", and
+         * [closesNegativeCycle] rejects the two alike.
+         */
+        const val NO_BOUND: Long = Long.MAX_VALUE
+    }
 }

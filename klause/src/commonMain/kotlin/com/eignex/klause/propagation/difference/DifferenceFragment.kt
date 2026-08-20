@@ -76,7 +76,8 @@ internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
  *
  * A [Linear] row contributes unconditional edges; a [ReifiedLinear] contributes edges guarded by its aux
  * literal, since it constrains exactly when that literal is true. Declared domains enter as differences
- * against the zero node so the graph is never weaker than the model. Any other factor is left alone.
+ * against the zero node, marked [DifferenceEdge.domainBound] so a consumer can tell a stated row from a
+ * column's own range. Any other factor is left alone.
  */
 internal fun differenceFragmentOf(
     factors: Array<Factor>,
@@ -121,8 +122,8 @@ internal fun differenceFragmentOf(
     for (v in mentioned.toIntArray().sortedArray()) {
         if (v >= numIntVars) continue
         val d = intDomains[v]
-        if (d.max != Long.MAX_VALUE) edges.add(DifferenceEdge(zero, v, d.max))
-        if (d.min != Long.MIN_VALUE) edges.add(DifferenceEdge(v, zero, -d.min))
+        if (d.max != Long.MAX_VALUE) edges.add(DifferenceEdge(zero, v, d.max, domainBound = true))
+        if (d.min != Long.MIN_VALUE) edges.add(DifferenceEdge(v, zero, -d.min, domainBound = true))
     }
     return DifferenceFragment(edges)
 }

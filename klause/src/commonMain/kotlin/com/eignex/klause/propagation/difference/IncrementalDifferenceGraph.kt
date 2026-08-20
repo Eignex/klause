@@ -25,6 +25,14 @@ internal class IncrementalDifferenceGraph(
     private val source: IntArray,
     private val target: IntArray,
     private val weight: LongArray,
+    /**
+     * Edges stating a declared range rather than a row, every one of them incident to the constant node.
+     * They stay in the system — the potential has to stay feasible for them, and a cycle through them is
+     * a real conflict — but [shortestPathsFrom] does not walk them, because doing so makes that node a
+     * hub and every search spans the graph (#1529). [refreshZeroDistances] is where they are traversed,
+     * twice per sweep instead of once per head.
+     */
+    private val hub: BooleanArray = BooleanArray(source.size),
 ) {
     val numEdges: Int get() = source.size
 
@@ -59,6 +67,24 @@ internal class IncrementalDifferenceGraph(
     private var stamp = 0
     private var queryOrigin = -1
 
+    // Reverse adjacency, for the search that measures distances *to* the constant node.
+    private val radjStart = IntArray(numNodes + 1)
+    private val radjEdge = IntArray(source.size)
+
+    // Distances to and from the constant node, refreshed once per sweep and read per head. Held apart
+    // from the query scratch above precisely because a per-head search must not clobber them: the
+    // predecessor chains are what recover the guards on a route through that node.
+    private val outDist = LongArray(numNodes)
+    private val outPred = IntArray(numNodes)
+    private val outStamp = IntArray(numNodes)
+    private val inDist = LongArray(numNodes)
+    private val inPred = IntArray(numNodes)
+    private val inStamp = IntArray(numNodes)
+    private var zeroStamp = 0
+    private var zeroNode = -1
+    private val prevOut = LongArray(numNodes) { UNREACHABLE }
+    private val prevIn = LongArray(numNodes) { UNREACHABLE }
+
     init {
         var maxAbs = 0L
         for (w in weight) {
@@ -73,6 +99,10 @@ internal class IncrementalDifferenceGraph(
         for (v in 1..numNodes) adjStart[v] += adjStart[v - 1]
         val fill = adjStart.copyOf()
         for (e in source.indices) adjEdge[fill[source[e]]++] = e
+        for (e in target.indices) radjStart[target[e] + 1]++
+        for (v in 1..numNodes) radjStart[v] += radjStart[v - 1]
+        val rfill = radjStart.copyOf()
+        for (e in target.indices) radjEdge[rfill[target[e]]++] = e
     }
 
     fun isActive(edge: Int): Boolean = active[edge]
@@ -205,7 +235,7 @@ internal class IncrementalDifferenceGraph(
     private fun relaxFrom(s: Int) {
         for (i in adjStart[s] until adjStart[s + 1]) {
             val e = adjEdge[i]
-            if (!active[e]) continue
+            if (!active[e] || hub[e]) continue
             val t = target[e]
             if (settledStamp[t] == stamp) continue
             // Johnson's reduced weight: non-negative because the potential is feasible.
@@ -217,6 +247,104 @@ internal class IncrementalDifferenceGraph(
             distPred[t] = e
             heap.push(t, candidate)
         }
+    }
+
+    /**
+     * Refresh the distances to and from [zero], over the whole system including the declared-range edges.
+     *
+     * Every path this structure can derive either avoids [zero] — in which case [shortestPathsFrom]
+     * already has it — or passes through it exactly once, since a second visit encloses a cycle that is
+     * either negative, and so a conflict, or non-negative, and so removable. Splitting at that single
+     * visit is what makes two searches per sweep enough to keep the deductions exact while every
+     * per-head search stays inside the rows.
+     */
+    fun refreshZeroDistances(zero: Int): Boolean {
+        zeroStamp++
+        zeroNode = zero
+        search(zero, outDist, outPred, outStamp, forward = true)
+        search(zero, inDist, inPred, inStamp, forward = false)
+        // Reported as changed or not so a caller can tell whether a route through this node could have
+        // moved for some pair it is not otherwise revisiting.
+        var changed = false
+        for (v in 0 until numNodes) {
+            val out = distanceFromZeroTo(v)
+            if (out != prevOut[v]) {
+                prevOut[v] = out
+                changed = true
+            }
+            val into = distanceToZeroFrom(v)
+            if (into != prevIn[v]) {
+                prevIn[v] = into
+                changed = true
+            }
+        }
+        return changed
+    }
+
+    /** Dijkstra over Johnson's reduced weights, settling every vertex it can reach. */
+    private fun search(origin: Int, d: LongArray, pred: IntArray, seen: IntArray, forward: Boolean) {
+        heap.clear()
+        d[origin] = 0L
+        pred[origin] = -1
+        seen[origin] = zeroStamp
+        heap.push(origin, 0L)
+        while (!heap.isEmpty()) {
+            val s = heap.pop()
+            val start = if (forward) adjStart[s] else radjStart[s]
+            val end = if (forward) adjStart[s + 1] else radjStart[s + 1]
+            for (i in start until end) {
+                val e = if (forward) adjEdge[i] else radjEdge[i]
+                if (!active[e]) continue
+                val t = if (forward) target[e] else source[e]
+                // Non-negative in either direction of travel: it is a property of the edge, not of the
+                // way the search walks it.
+                val reduced = potential[source[e]] + weight[e] - potential[target[e]]
+                val candidate = d[s] + reduced
+                if (seen[t] == zeroStamp && candidate >= d[t]) continue
+                seen[t] = zeroStamp
+                d[t] = candidate
+                pred[t] = e
+                heap.push(t, candidate)
+            }
+        }
+    }
+
+    /** Weight of the shortest path from [node] to the constant node, or [UNREACHABLE]. */
+    fun distanceToZeroFrom(node: Int): Long {
+        if (inStamp[node] != zeroStamp) return UNREACHABLE
+        return inDist[node] + potential[zeroNode] - potential[node]
+    }
+
+    /** Weight of the shortest path from the constant node to [node], or [UNREACHABLE]. */
+    fun distanceFromZeroTo(node: Int): Long {
+        if (outStamp[node] != zeroStamp) return UNREACHABLE
+        return outDist[node] - potential[zeroNode] + potential[node]
+    }
+
+    /** Edge indices of the shortest path from [node] to the constant node. */
+    fun pathToZeroFrom(node: Int): IntArray {
+        val edges = IntArrayList()
+        var cur = node
+        while (cur != zeroNode) {
+            val e = inPred[cur]
+            if (e < 0 || inStamp[cur] != zeroStamp) break
+            edges.add(e)
+            cur = target[e]
+        }
+        return edges.toIntArray()
+    }
+
+    /** Edge indices of the shortest path from the constant node to [node]. */
+    fun pathFromZeroTo(node: Int): IntArray {
+        val edges = IntArrayList()
+        var cur = node
+        while (cur != zeroNode) {
+            val e = outPred[cur]
+            if (e < 0 || outStamp[cur] != zeroStamp) break
+            edges.add(e)
+            cur = source[e]
+        }
+        return edges.toIntArray()
     }
 
     /** Weight of the shortest path from the last [shortestPathsFrom] origin to [node], or [UNREACHABLE]. */

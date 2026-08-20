@@ -23,6 +23,50 @@ class IncrementalDifferenceGraphTest {
         LongArray(edges.size) { edges[it].third },
     )
 
+    /** The same, with [hubEdges] marked as declared ranges rather than rows. */
+    private fun graphWithHub(numNodes: Int, hubEdges: Set<Int>, vararg edges: Triple<Int, Int, Long>) =
+        IncrementalDifferenceGraph(
+            numNodes,
+            IntArray(edges.size) { edges[it].first },
+            IntArray(edges.size) { edges[it].second },
+            LongArray(edges.size) { edges[it].third },
+            BooleanArray(edges.size) { it in hubEdges },
+        )
+
+    @Test
+    fun `a per-head search does not travel through a declared range`() {
+        // Vertex 2 is the constant node. 0 reaches 1 only by way of it, which is exactly the route that
+        // makes that node a hub: a search out of 0 must not find 1, or every search spans the graph.
+        val g = graphWithHub(3, setOf(0, 1), Triple(0, 2, 1L), Triple(2, 1, 1L))
+        assertNull(g.assertEdge(0))
+        assertNull(g.assertEdge(1))
+        g.shortestPathsFrom(0, intArrayOf(1))
+        assertEquals(IncrementalDifferenceGraph.UNREACHABLE, g.distanceTo(1))
+    }
+
+    @Test
+    fun `the distances through the constant node still measure that route`() {
+        val g = graphWithHub(3, setOf(0, 1), Triple(0, 2, 1L), Triple(2, 1, 1L))
+        assertNull(g.assertEdge(0))
+        assertNull(g.assertEdge(1))
+        g.refreshZeroDistances(2)
+        assertEquals(1L, g.distanceToZeroFrom(0))
+        assertEquals(1L, g.distanceFromZeroTo(1))
+        assertEquals(listOf(0), g.pathToZeroFrom(0).toList())
+        assertEquals(listOf(1), g.pathFromZeroTo(1).toList())
+    }
+
+    @Test
+    fun `a route to the constant node through a row is measured too`() {
+        // 0 reaches the constant node 3 only through the row 0 -> 1 and 1's own declared range.
+        val g = graphWithHub(4, setOf(1), Triple(0, 1, 2L), Triple(1, 3, 5L))
+        assertNull(g.assertEdge(0))
+        assertNull(g.assertEdge(1))
+        g.refreshZeroDistances(3)
+        assertEquals(7L, g.distanceToZeroFrom(0), "the row's weight plus the range's")
+        assertEquals(listOf(0, 1), g.pathToZeroFrom(0).toList().sorted())
+    }
+
     @Test
     fun `a chain of assertions stays consistent`() {
         val g = graph(3, Triple(0, 1, 3L), Triple(1, 2, 4L))
