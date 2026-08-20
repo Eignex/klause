@@ -7,6 +7,18 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 
 /**
+ * Heads a single refutation sweep visits before yielding.
+ *
+ * A sweep costs one shortest-path search per head, so an exhaustive sweep is quadratic in the vertices of
+ * a model whose columns are all bounded: the bound edges let every vertex reach every other through the
+ * zero node, so no reachability argument narrows it (see #1529). Visiting a rotating window instead keeps
+ * the per-call cost bounded and still reaches every head across successive calls — a refutation is
+ * deferred, never dropped, and a deferred one only leaves an edge open that the Boolean layer may still
+ * decide, so the verdict is unaffected either way.
+ */
+private const val HEAD_SWEEP_BUDGET = 64
+
+/**
  * Joint propagation of a [DifferenceSystem] in the DPLL(T) shape: the asserted edges are consistent
  * exactly when their graph admits a potential function, and an unasserted edge whose guard is still open
  * is *refuted* as soon as the asserted edges already carry a path that would close a negative cycle
@@ -65,6 +77,9 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
 
         /** Tails of the edges asserted since the last sweep; see [headsToSweep]. */
         val newTails = IntArrayList()
+
+        /** Rotating start into the head list, so a budgeted sweep covers every head over successive calls. */
+        var headCursor = 0
         private val reached = IntArray(numVertices)
         private val queue = IntArrayList()
         private var stamp = 0
@@ -213,7 +228,9 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      */
     private fun refuteOpenEdges(state: PropagationState, session: Session, heads: IntArray): Boolean {
         val graph = session.graph
-        for (v in heads) {
+        val budget = if (heads.size <= HEAD_SWEEP_BUDGET) heads.size else HEAD_SWEEP_BUDGET
+        for (k in 0 until budget) {
+            val v = heads[(session.headCursor + k) % heads.size]
             session.pending.clear()
             session.pendingTails.clear()
             for (i in bucketStart[v] until bucketStart[v + 1]) {
@@ -231,6 +248,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
                 if (d == IncrementalDifferenceGraph.UNREACHABLE || d + bound[e] >= 0L) continue
                 if (!refute(state, session, e)) return false
             }
+            session.headCursor = if (heads.size == 0) 0 else (session.headCursor + budget) % heads.size
         }
         return true
     }
