@@ -9,12 +9,15 @@ import com.eignex.klause.util.IntArrayList
 /**
  * Heads a single refutation sweep visits before yielding.
  *
- * A sweep costs one shortest-path search per head. With the declared-domain edges out of the graph the
- * reachability narrowing in [DifferenceSystemPropagator.headsToSweep] does most of the work, so the
- * window is insurance against a genuinely dense system rather than the load-bearing bound it was while
- * the constant node was a hub. Visiting a rotating window still reaches every head across successive
- * calls — a refutation is deferred, never dropped, and a deferred one only leaves an edge open that the
- * Boolean layer may still decide, so the verdict is unaffected either way.
+ * A sweep costs one shortest-path search per head, and this window is what bounds that — measured, not
+ * assumed. On a fully bounded model every sweep offers all 1403 heads and every one of 8000 sweeps
+ * exceeded the window, because [DifferenceSystemPropagator.headsToSweep] narrows nothing there: the
+ * distances through the constant node move on each sweep, which widens the head set back to all of them.
+ * Removing the window costs 2.3-2.7x at an identical 4000 nodes.
+ *
+ * Visiting a rotating window still reaches every head across successive calls — a refutation is deferred,
+ * never dropped, and a deferred one only leaves an edge open that the Boolean layer may still decide, so
+ * the verdict is unaffected either way.
  */
 private const val HEAD_SWEEP_BUDGET = 64
 
