@@ -37,6 +37,11 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
     private val bucketStart: IntArray
     private val bucketEdge: IntArray
 
+    // Reverse index over every edge: walked from a vertex it reaches the vertices that can reach it, which
+    // is what narrows a sweep to the heads an assertion could have moved.
+    private val revStart: IntArray
+    private val revEdge: IntArray
+
     /**
      * Per-solve mutable half, kept on [PropagationState.refPayload] rather than on the propagator: one
      * propagator instance backs every arm of a portfolio, so the graph and its explanation cannot live
@@ -52,8 +57,34 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
 
         /** Bumped whenever an edge enters or leaves the graph, so a sweep can tell the system apart. */
         var version: Int = 0
+
+        /** Bumped only when an edge is asserted, which is the one way a path can shorten. */
+        var assertVersion: Int = 0
         var sweptVersion: Int = -1
         var sweptDecisions: Int = -1
+
+        /** Tails of the edges asserted since the last sweep; see [headsToSweep]. */
+        val newTails = IntArrayList()
+        private val reached = IntArray(numVertices)
+        private val queue = IntArrayList()
+        private var stamp = 0
+
+        /** Mark [v] reached in the current traversal, false when it already was. */
+        fun reach(v: Int): Boolean {
+            if (reached[v] == stamp) return false
+            reached[v] = stamp
+            queue.add(v)
+            return true
+        }
+
+        fun beginTraversal() {
+            stamp++
+            queue.clear()
+        }
+
+        fun wasReached(v: Int): Boolean = reached[v] == stamp
+
+        fun traversalQueue(): IntArrayList = queue
     }
 
     init {
@@ -92,6 +123,44 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
         val vertices = IntArrayList()
         for (v in 0..nodes.size) if (bucketStart[v] < bucketStart[v + 1]) vertices.add(v)
         bucketVertex = vertices.toIntArray()
+
+        val revCounts = IntArray(numVertices + 1)
+        for (i in guards.indices) revCounts[head[i] + 1]++
+        for (v in 1 until revCounts.size) revCounts[v] += revCounts[v - 1]
+        revStart = revCounts
+        revEdge = IntArray(guards.size)
+        val revFill = revCounts.copyOf()
+        for (i in guards.indices) revEdge[revFill[head[i]]++] = i
+    }
+
+    /**
+     * The heads a sweep still has to visit after the assertions in [Session.newTails], or [bucketVertex]
+     * when every head has to be revisited.
+     *
+     * Asserting `a -> b` can only shorten a path `y ~> x` that runs through it, which needs `y ~> a`. A
+     * head that reaches no newly-asserted tail therefore cannot have gained a refutation, and searching
+     * from it again would repeat the previous answer.
+     *
+     * Retraction is deliberately not a trigger: it only lengthens paths, so it can retire a refutation but
+     * never create one, and the pins already made stand until the search backtracks past them.
+     */
+    private fun headsToSweep(session: Session): IntArray {
+        if (session.newTails.size == 0) return bucketVertex
+        val graph = session.graph
+        session.beginTraversal()
+        for (i in 0 until session.newTails.size) session.reach(session.newTails[i])
+        val queue = session.traversalQueue()
+        var read = 0
+        while (read < queue.size) {
+            val u = queue[read++]
+            for (i in revStart[u] until revStart[u + 1]) {
+                val e = revEdge[i]
+                if (graph.isActive(e)) session.reach(tail[e])
+            }
+        }
+        val out = IntArrayList()
+        for (v in bucketVertex) if (session.wasReached(v)) out.add(v)
+        return out.toIntArray()
     }
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
@@ -111,16 +180,26 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
             if (graph.isActive(e) || !asserted(state, e)) continue
             val cycle = graph.assertEdge(e)
             session.version++
+            session.assertVersion++
+            session.newTails.add(tail[e])
             if (cycle == null) continue
             session.reason = blockingClause(cycle)
             return false
         }
-        // Nothing to re-derive when neither the graph nor the decision level has moved since the last
-        // sweep: the same asserted edges refute the same open ones, and those pins are still in force.
-        if (session.version == session.sweptVersion && state.numDecisions == session.sweptDecisions) return true
-        session.sweptVersion = session.version
+        // Nothing to re-derive while the asserted system stands as it was swept and the search has only
+        // gone deeper: the same edges refute the same open ones, and those pins are still in force.
+        val descended = state.numDecisions >= session.sweptDecisions
+        if (session.assertVersion == session.sweptVersion && descended) {
+            session.newTails.clear()
+            return true
+        }
+        // A backtrack releases the guards earlier sweeps pinned, so every head has to be revisited; a
+        // descent only has to revisit the heads the new assertions could have moved.
+        val heads = if (descended) headsToSweep(session) else bucketVertex
+        session.newTails.clear()
+        session.sweptVersion = session.assertVersion
         session.sweptDecisions = state.numDecisions
-        return refuteOpenEdges(state, session)
+        return refuteOpenEdges(state, session, heads)
     }
 
     /** Whether edge [e] currently holds, so it belongs in the graph. */
@@ -132,9 +211,9 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * weight `w` closes a negative cycle exactly when the shortest asserted path `y ⇝ x` has weight
      * `d` with `d + w < 0`, so one search out of `y` decides every open edge whose head is `y`.
      */
-    private fun refuteOpenEdges(state: PropagationState, session: Session): Boolean {
+    private fun refuteOpenEdges(state: PropagationState, session: Session, heads: IntArray): Boolean {
         val graph = session.graph
-        for (v in bucketVertex) {
+        for (v in heads) {
             session.pending.clear()
             session.pendingTails.clear()
             for (i in bucketStart[v] until bucketStart[v + 1]) {
