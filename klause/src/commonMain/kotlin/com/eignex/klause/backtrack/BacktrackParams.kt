@@ -29,7 +29,10 @@ import com.eignex.klause.solver.result.SearchEvent
  * Per-call params for [BacktrackSolver].
  *
  *  - [maxDecisions] — abort after this many decisions are pushed (Unknown). `Long.MAX_VALUE`
- *    by default — let the search run to completion.
+ *    by default — let the search run to completion. It bounds one *slice*: a driver that re-enters
+ *    the engine starts a fresh allowance, so it does not bound a solve. [nodeBudget] is the one that
+ *    does, and the two count the same unit.
+ *  - [nodeBudget] — a decision-node cap spanning the whole solve, for measurement; see [NodeBudget].
  *  - [randomSeed] — seeds the engine RNG that's threaded into [variableSelector] and
  *    [valueSelector]. `null` picks a fresh seed per call.
  *  - [assumptions] — variables pinned for the duration of the call.
@@ -46,6 +49,12 @@ import com.eignex.klause.solver.result.SearchEvent
  *    correct for all standard use. Ignored by `solve` / `samples`.
  */
 data class BacktrackParams(
+    /**
+     * Decisions one slice of the search may push before it gives up (Unknown). A restart, a resuming
+     * portfolio arm or an ALNS repair re-enters the engine with the allowance renewed, so this bounds a
+     * slice and not a solve. Reach for [nodeBudget] when the whole solve is what needs bounding, which
+     * is what holding two builds to identical work requires.
+     */
     val maxDecisions: Long = Long.MAX_VALUE,
     /**
      * Wall-clock-independent operation budget across all backends. For [BacktrackSolver]
@@ -55,6 +64,12 @@ data class BacktrackParams(
      * to know its primary-budget field name (LS sees flips, Brute sees steps, etc.).
      */
     val maxInstructions: Long? = null,
+    /**
+     * Solve-spanning cap on decision nodes; see [NodeBudget]. Enforced through [cancellation], so it
+     * stops the search on the same cooperative path a deadline uses rather than through a second exit.
+     * `null` (default) leaves the search bounded by [maxDecisions] and the deadline alone.
+     */
+    val nodeBudget: NodeBudget? = null,
     val randomSeed: Long? = null,
     val assumptions: Assumptions = Assumptions.None,
     val variableSelector: VariableSelector = Vsids(),

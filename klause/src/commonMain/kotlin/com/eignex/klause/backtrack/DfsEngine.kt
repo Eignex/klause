@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedCons
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -115,6 +116,12 @@ internal class DfsEngine<L>(
     private val params: BacktrackParams = params0.copy(
         variableSelector = params0.variableSelector.fresh(),
         valueSelector = params0.valueSelector.fresh(),
+        // Folded into the token so the budget stops this search on its own, without the caller having to
+        // wire anything. A driver that re-enters the engine composes the same budget into the token it
+        // owns, which is what stops it re-entering at all; composing in both places is idempotent.
+        cancellation = params0.nodeBudget
+            ?.let { budget -> params0.cancellation or Cancellation { budget.exhausted() } }
+            ?: params0.cancellation,
     )
     private val problem = solver.problem
 
@@ -327,7 +334,10 @@ internal class DfsEngine<L>(
                 trail.add(node)
                 sink?.search?.observeNode(trail.size)
                 phase.captureTargetIfDeeper(session, trail.size)
-                null
+                // Spent against the same event the node statistic counts, so the cap and the reported
+                // figure are the same number, and checked here rather than at a cancellation poll —
+                // without a deadline the engine may not poll at all.
+                spendNodeBudget()
             }
 
             AdvanceOutcome.Exhausted -> {
@@ -460,6 +470,20 @@ internal class DfsEngine<L>(
             session.popLast()
             trail.removeAt(trail.size - 1)
         }
+    }
+
+    /**
+     * Charge one node to the solve-spanning allowance, returning [EngineEvent.BudgetCapped] when that
+     * exhausts it. A driver re-entering the engine sees the same spent allowance, which is what makes
+     * this a bound on the solve rather than on the slice.
+     */
+    private fun spendNodeBudget(): EngineEvent<L>? {
+        val budget = params.nodeBudget ?: return null
+        budget.spend()
+        if (!budget.exhausted()) return null
+        policy.onBudgetExit(session)
+        descend = false
+        return EngineEvent.BudgetCapped
     }
 
     /** One pin attempt against the session, wiring the budget probe/decrement and conflict callbacks. */

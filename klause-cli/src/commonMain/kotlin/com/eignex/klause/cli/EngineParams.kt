@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.selector.Chb
 import com.eignex.klause.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.backtrack.selector.IndomainMax
@@ -628,6 +629,19 @@ internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> Backtrack
     // Edit every curated arm, exactly as resolveLocalSearchRecipes edits its pool. The edit rebuilds selectors
     // per worker (fresh mutable state), so the wrapped factory stays safe across parallel slots.
     return BacktrackCatalog.factories(kind).map { factory -> { editRecipe(factory(), edit) } }
+}
+
+/** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
+ *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
+internal const val NODE_LIMIT_KEY = "node-limit"
+
+/** [pool], or the curated pool when it is null, with every arm spending [budget]. */
+internal fun withNodeBudget(
+    pool: List<() -> BacktrackRecipe>?,
+    kind: Kind,
+    budget: NodeBudget,
+): List<() -> BacktrackRecipe> = (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
+    { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
 }
 
 /** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector

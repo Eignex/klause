@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
@@ -67,7 +68,12 @@ internal object SolveCore {
         // The `-t` wall-clock deadline is captured once, here, and shared by every phase: presolve, the
         // LP root build/solve inside the engine, and the search loop. Building it per-phase would let
         // each phase restart the clock and blow the limit cumulatively.
-        val (deadline, cancel) = deadlineCancellation(common)
+        // Taken before the token is built, because the allowance has to stop the driver and not only the
+        // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
+        // poll, which burns the whole deadline and overshoots the cap several times over.
+        val nodeBudget = takeNodeBudget(common)
+        val (deadline, deadlineCancel) = deadlineCancellation(common)
+        val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
         val presolveStart = TimeSource.Monotonic.markNow()
         val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
         val solvable = rawSolvable.presolved(
@@ -115,7 +121,7 @@ internal object SolveCore {
             // annotation decides the heuristic, so per-solver selector --params are rejected.
             Engine.FIXED -> {
                 rejectParallel(engine, cores, alt = null)
-                runBacktrack(solvable, common, output, cancel, deadline)
+                runBacktrack(solvable, common, output, cancel, deadline, nodeBudget)
             }
 
             // The parallel-capable portfolio engines: their mix is carried on the enum. `ls` resolves
@@ -123,7 +129,7 @@ internal object SolveCore {
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
             // single resolved arm runs as a one-arm pool.
             Engine.CP, Engine.LS, Engine.MIXED, Engine.ALNS ->
-                runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel)
+                runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel, nodeBudget)
         }
     }
 
@@ -144,6 +150,22 @@ internal object SolveCore {
         if (cores <= 1) return
         val hint = alt?.let { "; use '${it.id}' for a parallel pool" } ?: " (FD track); drop -p"
         usageError("engine '${engine.id}' is single-core$hint")
+    }
+
+    /**
+     * The `node-limit` engine param as a [NodeBudget], **removed** from [CommonOptions.engineParams] as
+     * it is read. One budget per invocation is the whole point — every arm spends the same allowance —
+     * and [EngineParams] consumes keys per instance, so leaving it in place would both build a second
+     * budget downstream and, where it did not, fail validation as an unknown key.
+     */
+    private fun takeNodeBudget(common: CommonOptions): NodeBudget? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("$NODE_LIMIT_KEY=") } ?: return null
+        common.engineParams.remove(entry)
+        val raw = entry.substringAfter('=')
+        val limit = raw.toLongOrNull()
+            ?: usageError("engine param `$NODE_LIMIT_KEY` expects an integer, got `$raw`")
+        if (limit <= 0) usageError("engine param `$NODE_LIMIT_KEY` expects a positive node count, got $limit")
+        return NodeBudget(limit)
     }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {
@@ -203,6 +225,7 @@ internal object SolveCore {
         output: OutputProtocol,
         cancel: Cancellation,
         deadline: Long?,
+        nodeBudget: NodeBudget?,
     ) {
         // XCSP/SMT carry no annotation (null), so the naked engine falls back to the conflict-driven
         // preset base. Seed remains unset unless `-r` (or `--param seed=`) pins one.
@@ -221,6 +244,7 @@ internal object SolveCore {
             base.copy(
                 randomSeed = common.randomSeed ?: base.randomSeed,
                 cancellation = cancel,
+                nodeBudget = nodeBudget,
                 // Advisory total budget so the LP subsystem sizes its wall-clock caps against the real
                 // `-t` deadline on the FD track, not the absolute root-LP ceiling.
                 solveBudgetMillis = common.timeLimitMs,
@@ -425,6 +449,7 @@ internal object SolveCore {
         cores: Int,
         mix: EngineMix,
         cancel: Cancellation,
+        nodeBudget: NodeBudget?,
     ) {
         // Default arm-pool size: an env override, else auto-tuned from the core count.
         val defaultArms = cliProp(CliKnobs.portfolioArms)?.toIntOrNull() ?: autoArms(cores)
@@ -452,7 +477,14 @@ internal object SolveCore {
         val kind = if (solvable.optimize) Kind.COP else Kind.CSP
         // `--param bt-arm=label,label` pins a named backtrack arm pool, or the per-solver override
         // --params (var-/val-selector, luby, …) resolve a one-arm pool (a no-op for a pure-LS pool).
-        val btPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
+        val resolvedBtPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
+        // Every backtrack arm spends the one allowance, so the cap is on the solve rather than on each
+        // arm. A pure-LS pool has no arm to carry it and no nodes to spend.
+        val btPool = if (nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
+            withNodeBudget(resolvedBtPool, kind, nodeBudget)
+        } else {
+            resolvedBtPool
+        }
         // A backtrack-only pool has no LS resolution to carry its dry-run flag, so consume it here.
         if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
             printBtPool(solvable.problem, btPool, kind)
@@ -472,7 +504,7 @@ internal object SolveCore {
             btPool = btPool,
             // Include the model's search-annotation arm in the backtrack pool when the model
             // carries one (a no-op for a pure-LS pool, which has no backtrack slot).
-            annotationArm = solvable.annotatedBacktrackParams,
+            annotationArm = solvable.annotatedBacktrackParams?.copy(nodeBudget = nodeBudget),
         )
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
