@@ -148,9 +148,7 @@ internal class MpsOutput(
         verdict == Verdict.OPTIMAL && clamp.clamped && bestObjective?.let(globalOptimum) != true ->
             "satisfiable: optimal within the clamped search range only"
 
-        verdict == Verdict.UNKNOWN -> "unknown: ${softVerdictCause()}"
-
-        else -> null
+        else -> super.verdictReason(verdict)
     }
 
     override fun keepStat(key: String): Boolean = true
