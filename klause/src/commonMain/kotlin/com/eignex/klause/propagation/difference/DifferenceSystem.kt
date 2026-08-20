@@ -57,11 +57,16 @@ internal class DifferenceSystem(
                 } else {
                     Lit.make(boolMap[Lit.variable(e.guard)], Lit.isPositive(e.guard))
                 },
+                domainBound = e.domainBound,
             )
         },
     )
 
-    /** The system is an order-insensitive set of edges, each keyed by its endpoints, bound, and guard. */
+    /**
+     * The system is an order-insensitive set of edges, each keyed by its endpoints, bound, and guard.
+     * [DifferenceEdge.domainBound] is part of the key because the propagator treats such an edge
+     * differently, so two systems that differ only there are not interchangeable.
+     */
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.DIFFERENCE_SYSTEM) {
         int(edges.size)
         for (e in edges.sortedWith(compareBy({ it.source }, { it.target }, { it.bound }, { it.guard }))) {
@@ -69,6 +74,7 @@ internal class DifferenceSystem(
             int(e.target)
             long(e.bound)
             int(e.guard)
+            int(if (e.domainBound) 1 else 0)
         }
     }
 
