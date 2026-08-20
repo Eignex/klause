@@ -162,7 +162,9 @@ private fun SmtLib.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: ArrayL
         // A chained `(= x y z)` lowers to several rows; only a lone `x = k` states a value for x.
         val r = eq.singleOrNull() ?: return
         if (r.op != LinearOp.EQ || r.vars.size != 1 || r.coeffs[0] != 1L) return
-        if (v == -1) v = r.vars[0] else if (v != r.vars[0]) {
+        if (v == -1) {
+            v = r.vars[0]
+        } else if (v != r.vars[0]) {
             return
         }
         if (r.bound < min) min = r.bound
