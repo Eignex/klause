@@ -240,6 +240,17 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
             session.newTails.clear()
             return true
         }
+        // At most one sweep per decision. The fixpoint wakes this propagator repeatedly as other factors
+        // move domains — roughly twenty times per node on a large SMT model — and each waking that
+        // asserted an edge would otherwise sweep again over a state the rest of the fixpoint has not
+        // finished settling. Deferring to the next decision defers a refutation, never drops one: the
+        // edge stays open and the Boolean layer may decide it in the meantime, which the sweep then reads
+        // off the trail. Assertion and retraction above stay eager, because a negative cycle is a
+        // conflict and must be seen on the trail that produced it.
+        if (state.numDecisions == session.sweptDecisions) {
+            session.newTails.clear()
+            return true
+        }
         // Refreshed before the heads are chosen: a route through the constant node can shorten for a pair
         // the row-only reachability below would never reach, so a move there widens the sweep to all of
         // them. Twice per sweep, against once per head had the node stayed a hub.
