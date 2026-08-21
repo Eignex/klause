@@ -420,19 +420,23 @@ internal object SolveCore {
      *
      * Eligible is not the same as decidable: an MPS model is entirely [Linear] rows and reads as fully
      * eligible, yet its integers still have to be searched until something decides them. The actionable
-     * figure is the second one — a column that is eligible *and* open is one the invented search box is
-     * paying for and buying nothing with.
+     * figure is the second one — a column that is eligible *and* carries an invented bound is one the
+     * search box is paying for and buying nothing with.
+     *
+     * Read from [Problem.openIntLo] / [Problem.openIntHi], which record which *sides* a front-end could
+     * not bound, rather than from the width: a genuinely declared wide domain is not a clamp, and only
+     * the provenance tells the two apart.
      */
     private fun theoryText(problem: Problem): String {
         val partition = problem.variablePartition()
-        var openAndEligible = 0
+        val lo = problem.openIntLo
+        val hi = problem.openIntHi
+        var clampedAndEligible = 0
         for (v in 0 until partition.size) {
             if (!partition.isTheoryEligible(v)) continue
-            val d = problem.intDomains[v]
-            val width = d.max - d.min
-            if (width < 0L || width > OPEN_WIDTH) openAndEligible++
+            if (lo?.getOrNull(v) == true || hi?.getOrNull(v) == true) clampedAndEligible++
         }
-        return "${partition.theoryEligibleCount} of ${partition.size}, $openAndEligible of them open"
+        return "${partition.theoryEligibleCount} of ${partition.size}, $clampedAndEligible of them clamped"
     }
 
     /** [domainSpan] for the dry-run readout, naming the saturated case instead of printing a number
