@@ -954,6 +954,7 @@ public final class com/eignex/klause/factor/ReifiedFactor$DefaultImpls {
 	public static fun getExtendsObjectiveCone (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun getHullFamily (Lcom/eignex/klause/factor/ReifiedFactor;)Lcom/eignex/klause/lp/HullFamily;
 	public static fun getLinearRows (Lcom/eignex/klause/factor/ReifiedFactor;)Ljava/util/List;
+	public static fun getNeedsFiniteDomains (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun getStructuralKeyWeight (Lcom/eignex/klause/factor/ReifiedFactor;)I
 	public static fun hullFamilyEnabled (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/lp/HullFlags;)Z
 	public static fun isValueAnonymous (Lcom/eignex/klause/factor/ReifiedFactor;)Z
@@ -976,6 +977,7 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getMax ()Z
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
@@ -1008,6 +1010,7 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getOps ()[Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getStructuralKeyWeight ()I
 	public final fun getVars ()[I
@@ -1043,6 +1046,7 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getMaxAbsCoeff ()J
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public final fun getRealBound ()D
 	public final fun getRealCoeffs ()[D
@@ -1093,6 +1097,7 @@ public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klau
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
@@ -1118,6 +1123,7 @@ public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/
 	public final fun getIntOperand ()I
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getRealOperand ()I
 	public final fun getRealOperandHi ()D
 	public final fun getRealOperandLo ()D
@@ -1149,6 +1155,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 	public final fun getLiterals ()[I
 	public final fun getMax ()I
 	public final fun getMin ()I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
@@ -1181,6 +1188,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getMaxAbsCoeff ()J
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getStructuralKeyWeight ()I
 	public final fun getVars ()[I
@@ -1214,6 +1222,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
 	public fun getStructuralKeyWeight ()I
 	public final fun getWeights ()[J
@@ -1245,6 +1254,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public final fun getIntCoeffs ()[D
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public final fun getRealCoeffs ()[D
 	public final fun getRealVars ()[I
@@ -1277,6 +1287,7 @@ public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause
 	public final fun getLiterals ()[I
 	public final fun getMax ()I
 	public final fun getMin ()I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
@@ -1310,6 +1321,7 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/lp/L
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getSize ()I
 	public fun getStructuralKeyWeight ()I
@@ -1338,6 +1350,7 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
@@ -1364,6 +1377,7 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
 	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getSize ()I
@@ -1394,6 +1408,7 @@ public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/solver/
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getTargetParity ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
@@ -1420,6 +1435,7 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getN ()I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getSubcircuit ()Z
 	public final fun getSucc ()[I
@@ -1452,6 +1468,7 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getPresents ()[I
 	public fun getStructuralKeyWeight ()I
 	public final fun getVars ()[I
@@ -1486,6 +1503,7 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getPresents ()[I
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
@@ -1512,6 +1530,7 @@ public final class com/eignex/klause/factor/global/Increasing : com/eignex/klaus
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getStrict ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
@@ -1542,6 +1561,7 @@ public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/s
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
@@ -1565,6 +1585,7 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/s
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getStrict ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
@@ -1596,6 +1617,7 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getMode ()Lcom/eignex/klause/factor/global/NValue$Mode;
 	public final fun getN ()I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getPresents ()[I
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
@@ -1631,6 +1653,7 @@ public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/solv
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
 	public final fun getYs ()[I
@@ -1658,6 +1681,7 @@ public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/e
 	public final fun getIndexOffset ()I
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getXs ()[I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
@@ -1682,6 +1706,7 @@ public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/kla
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getS ()J
 	public fun getStructuralKeyWeight ()I
 	public final fun getT ()J
@@ -1719,6 +1744,7 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getN ()I
+	public fun getNeedsFiniteDomains ()Z
 	public fun getPresents ()[I
 	public final fun getResourceVars ()[I
 	public final fun getResources ()[J
@@ -1760,6 +1786,7 @@ public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getN ()I
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getNonStrict ()Z
 	public fun getStructuralKeyWeight ()I
 	public final fun getVarSize ()Z
@@ -1842,6 +1869,7 @@ public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eign
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
@@ -1870,6 +1898,7 @@ public final class com/eignex/klause/factor/table/Element : com/eignex/klause/so
 	public final fun getIndexOffset ()I
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
@@ -1899,6 +1928,7 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/solver
 	public fun getIntVars ()[I
 	public final fun getLayerStarts ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getNumStatesPerLayer ()[I
 	public final fun getRecordStride ()I
 	public final fun getSeq ()[I
@@ -1928,6 +1958,7 @@ public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/so
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getNumStates ()I
 	public final fun getQ0 ()I
 	public final fun getSeq ()[I
@@ -1958,6 +1989,7 @@ public final class com/eignex/klause/factor/table/Table : com/eignex/klause/solv
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public final fun getNumTuples ()I
 	public fun getStructuralKeyWeight ()I
 	public final fun getTuples ()[J
@@ -7643,6 +7675,7 @@ public abstract interface class com/eignex/klause/solver/Factor {
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public abstract fun getIntVars ()[I
 	public fun getLinearRows ()Ljava/util/List;
+	public fun getNeedsFiniteDomains ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
@@ -7661,6 +7694,7 @@ public final class com/eignex/klause/solver/Factor$DefaultImpls {
 	public static fun getExtendsObjectiveCone (Lcom/eignex/klause/solver/Factor;)Z
 	public static fun getHullFamily (Lcom/eignex/klause/solver/Factor;)Lcom/eignex/klause/lp/HullFamily;
 	public static fun getLinearRows (Lcom/eignex/klause/solver/Factor;)Ljava/util/List;
+	public static fun getNeedsFiniteDomains (Lcom/eignex/klause/solver/Factor;)Z
 	public static fun getStructuralKeyWeight (Lcom/eignex/klause/solver/Factor;)I
 	public static fun hullFamilyEnabled (Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/lp/HullFlags;)Z
 	public static fun isValueAnonymous (Lcom/eignex/klause/solver/Factor;)Z
@@ -8000,6 +8034,18 @@ public final class com/eignex/klause/solver/StructuralKey : java/lang/Comparable
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/VariablePartition {
+	public fun <init> ([Z)V
+	public final fun getSize ()I
+	public final fun getTheoryEligibleCount ()I
+	public final fun isSearchVariable (I)Z
+	public final fun isTheoryEligible (I)Z
+}
+
+public final class com/eignex/klause/solver/VariablePartitionKt {
+	public static final fun variablePartition (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/solver/VariablePartition;
 }
 
 public abstract interface class com/eignex/klause/solver/objective/IncrementalObjective : com/eignex/klause/solver/objective/Objective {

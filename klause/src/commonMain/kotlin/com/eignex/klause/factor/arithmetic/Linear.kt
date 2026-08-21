@@ -188,6 +188,9 @@ class Linear private constructor(
 
     override val intVars: IntArray = vars
 
+    /** Interval reasoning over the row's terms; an endpoint it cannot bound simply yields no deduction. */
+    override val needsFiniteDomains: Boolean get() = false
+
     /**
      * `Σ coeffs(i) * vars(i) ⟨op⟩ bound`. Duplicate variables are coalesced (their coefficients
      * summed) so the local-search payload stays consistent regardless of caller.

@@ -30,6 +30,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.variablePartition
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -342,6 +343,7 @@ internal object SolveCore {
         errPrintln("  factors: ${original.factors.size} -> ${presolved.factors.size}")
         errPrintln("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
         errPrintln("  open columns: ${openText(original)} -> ${openText(presolved)}")
+        errPrintln("  theory-eligible columns: ${theoryText(original)} -> ${theoryText(presolved)}")
         val before = factorHistogram(original)
         val after = factorHistogram(presolved)
         for (kind in (before.keys + after.keys).sorted()) {
@@ -403,6 +405,7 @@ internal object SolveCore {
      * not load-bearing: real models put their columns either at the clamp or well under a million, so
      * nothing observed lands near it.
      */
+
     private fun openText(problem: Problem): String {
         var open = 0
         for (d in problem.intDomains) {
@@ -410,6 +413,26 @@ internal object SolveCore {
             if (width < 0L || width > OPEN_WIDTH) open++
         }
         return "$open of ${problem.intDomains.size}"
+    }
+
+    /**
+     * Integer columns no factor needs a finite domain for, so nothing about them has to be enumerated.
+     *
+     * Eligible is not the same as decidable: an MPS model is entirely [Linear] rows and reads as fully
+     * eligible, yet its integers still have to be searched until something decides them. The actionable
+     * figure is the second one — a column that is eligible *and* open is one the invented search box is
+     * paying for and buying nothing with.
+     */
+    private fun theoryText(problem: Problem): String {
+        val partition = problem.variablePartition()
+        var openAndEligible = 0
+        for (v in 0 until partition.size) {
+            if (!partition.isTheoryEligible(v)) continue
+            val d = problem.intDomains[v]
+            val width = d.max - d.min
+            if (width < 0L || width > OPEN_WIDTH) openAndEligible++
+        }
+        return "${partition.theoryEligibleCount} of ${partition.size}, $openAndEligible of them open"
     }
 
     /** [domainSpan] for the dry-run readout, naming the saturated case instead of printing a number

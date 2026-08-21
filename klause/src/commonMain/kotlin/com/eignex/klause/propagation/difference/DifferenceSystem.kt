@@ -31,6 +31,9 @@ internal class DifferenceSystem(
 ) : Factor {
 
     override val intVars: IntArray
+
+    /** The fragment is decidable over ℤ with no bounds at all; that is the point of the graph. */
+    override val needsFiniteDomains: Boolean get() = false
     override val boolVars: IntArray
 
     init {

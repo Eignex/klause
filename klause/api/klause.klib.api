@@ -700,6 +700,8 @@ abstract interface com.eignex.klause.solver/Factor { // com.eignex.klause.solver
         open fun <get-hullFamily>(): com.eignex.klause.lp/HullFamily? // com.eignex.klause.solver/Factor.hullFamily.<get-hullFamily>|<get-hullFamily>(){}[0]
     open val linearRows // com.eignex.klause.solver/Factor.linearRows|{}linearRows[0]
         open fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.solver/Factor.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+    open val needsFiniteDomains // com.eignex.klause.solver/Factor.needsFiniteDomains|{}needsFiniteDomains[0]
+        open fun <get-needsFiniteDomains>(): kotlin/Boolean // com.eignex.klause.solver/Factor.needsFiniteDomains.<get-needsFiniteDomains>|<get-needsFiniteDomains>(){}[0]
     open val structuralKeyWeight // com.eignex.klause.solver/Factor.structuralKeyWeight|{}structuralKeyWeight[0]
         open fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.solver/Factor.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
 
@@ -2659,6 +2661,8 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
         final fun <get-consts>(): kotlin/LongArray // com.eignex.klause.factor.arithmetic/ComparisonClause.consts.<get-consts>|<get-consts>(){}[0]
     final val intVars // com.eignex.klause.factor.arithmetic/ComparisonClause.intVars|{}intVars[0]
         final fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ComparisonClause.intVars.<get-intVars>|<get-intVars>(){}[0]
+    final val needsFiniteDomains // com.eignex.klause.factor.arithmetic/ComparisonClause.needsFiniteDomains|{}needsFiniteDomains[0]
+        final fun <get-needsFiniteDomains>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ComparisonClause.needsFiniteDomains.<get-needsFiniteDomains>|<get-needsFiniteDomains>(){}[0]
     final val ops // com.eignex.klause.factor.arithmetic/ComparisonClause.ops|{}ops[0]
         final fun <get-ops>(): kotlin/Array<com.eignex.klause.factor.arithmetic/LinearOp> // com.eignex.klause.factor.arithmetic/ComparisonClause.ops.<get-ops>|<get-ops>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ComparisonClause.vars|{}vars[0]
@@ -2698,6 +2702,8 @@ final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.lp/Li
         final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.arithmetic/Linear.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val maxAbsCoeff // com.eignex.klause.factor.arithmetic/Linear.maxAbsCoeff|{}maxAbsCoeff[0]
         final fun <get-maxAbsCoeff>(): kotlin/Long // com.eignex.klause.factor.arithmetic/Linear.maxAbsCoeff.<get-maxAbsCoeff>|<get-maxAbsCoeff>(){}[0]
+    final val needsFiniteDomains // com.eignex.klause.factor.arithmetic/Linear.needsFiniteDomains|{}needsFiniteDomains[0]
+        final fun <get-needsFiniteDomains>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/Linear.needsFiniteDomains.<get-needsFiniteDomains>|<get-needsFiniteDomains>(){}[0]
     final val op // com.eignex.klause.factor.arithmetic/Linear.op|{}op[0]
         final fun <get-op>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/Linear.op.<get-op>|<get-op>(){}[0]
     final val realBound // com.eignex.klause.factor.arithmetic/Linear.realBound|{}realBound[0]
@@ -2828,6 +2834,8 @@ final class com.eignex.klause.factor.arithmetic/ReifiedLinear : com.eignex.klaus
         final fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ReifiedLinear.intVars.<get-intVars>|<get-intVars>(){}[0]
     final val maxAbsCoeff // com.eignex.klause.factor.arithmetic/ReifiedLinear.maxAbsCoeff|{}maxAbsCoeff[0]
         final fun <get-maxAbsCoeff>(): kotlin/Long // com.eignex.klause.factor.arithmetic/ReifiedLinear.maxAbsCoeff.<get-maxAbsCoeff>|<get-maxAbsCoeff>(){}[0]
+    final val needsFiniteDomains // com.eignex.klause.factor.arithmetic/ReifiedLinear.needsFiniteDomains|{}needsFiniteDomains[0]
+        final fun <get-needsFiniteDomains>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ReifiedLinear.needsFiniteDomains.<get-needsFiniteDomains>|<get-needsFiniteDomains>(){}[0]
     final val op // com.eignex.klause.factor.arithmetic/ReifiedLinear.op|{}op[0]
         final fun <get-op>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/ReifiedLinear.op.<get-op>|<get-op>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ReifiedLinear.vars|{}vars[0]
@@ -8542,6 +8550,18 @@ final class com.eignex.klause.solver/StructuralKey : kotlin/Comparable<com.eigne
     final fun toString(): kotlin/String // com.eignex.klause.solver/StructuralKey.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver/VariablePartition { // com.eignex.klause.solver/VariablePartition|null[0]
+    constructor <init>(kotlin/BooleanArray) // com.eignex.klause.solver/VariablePartition.<init>|<init>(kotlin.BooleanArray){}[0]
+
+    final val size // com.eignex.klause.solver/VariablePartition.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.solver/VariablePartition.size.<get-size>|<get-size>(){}[0]
+    final val theoryEligibleCount // com.eignex.klause.solver/VariablePartition.theoryEligibleCount|{}theoryEligibleCount[0]
+        final fun <get-theoryEligibleCount>(): kotlin/Int // com.eignex.klause.solver/VariablePartition.theoryEligibleCount.<get-theoryEligibleCount>|<get-theoryEligibleCount>(){}[0]
+
+    final fun isSearchVariable(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/VariablePartition.isSearchVariable|isSearchVariable(kotlin.Int){}[0]
+    final fun isTheoryEligible(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/VariablePartition.isTheoryEligible|isTheoryEligible(kotlin.Int){}[0]
+}
+
 final class com.eignex.klause.util/CharReader { // com.eignex.klause.util/CharReader|null[0]
     constructor <init>(com.eignex.klause.util/CharSource) // com.eignex.klause.util/CharReader.<init>|<init>(com.eignex.klause.util.CharSource){}[0]
 
@@ -9093,6 +9113,7 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMin
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
+final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.Problem(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/minus(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/minus|minus@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]

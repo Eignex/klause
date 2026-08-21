@@ -122,6 +122,9 @@ class ReifiedLinear private constructor(
 
     override val intVars: IntArray = vars
 
+    /** Interval reasoning under a guard, on the same terms as [Linear]; no value set is enumerated. */
+    override val needsFiniteDomains: Boolean get() = false
+
     /**
      * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced
      * (their coefficients summed) so the local-search payload stays consistent regardless of

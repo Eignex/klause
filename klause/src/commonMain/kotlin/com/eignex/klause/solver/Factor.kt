@@ -122,6 +122,20 @@ interface Factor {
     val extendsObjectiveCone: Boolean get() = false
 
     /**
+     * Whether this factor can only reason about an integer variable that has a finite domain.
+     *
+     * A factor that indexes a value set — [com.eignex.klause.factor.global.AllDifferent] is
+     * parameterised by a value window, tables and automata index their columns — cannot act on a
+     * variable whose range it cannot enumerate, so every variable it mentions has to be searched over a
+     * finite domain. A factor that reasons by intervals or by structure needs no such range, and its
+     * variables may instead be decided by a theory over the whole of ℤ.
+     *
+     * The default is `true`, which is the conservative answer: a factor that has not considered the
+     * question keeps its variables in the search set, which is what every factor does today.
+     */
+    val needsFiniteDomains: Boolean get() = true
+
+    /**
      * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
      * (`newValue = valueMap(oldValue)`) — the value analog of [remap]. Relabels things that
      * name domain values: an [com.eignex.klause.factor.global.GlobalCardinality] cover, a
