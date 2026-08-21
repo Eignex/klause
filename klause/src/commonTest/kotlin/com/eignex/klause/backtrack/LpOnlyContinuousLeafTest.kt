@@ -136,6 +136,29 @@ class LpOnlyContinuousLeafTest {
     }
 
     @Test
+    fun `a leaf no theory could decide reports unknown rather than unsat`() {
+        // The contract every later theory rests on: failing to decide a leaf is not a refutation. Here
+        // the residual real model is past RESIDUAL_MAX_ROWS, so the leaf certify declines outright — a
+        // deterministic decline rather than a cancelled one, so the search still exhausts normally and
+        // the verdict comes from the undecided leaf and nothing else.
+        val rows = Array<Factor>(1001) {
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
+        }
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1)),
+            factors = rows,
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(10.0),
+        )
+        val result = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L))
+        val unknown = assertIs<SolveResult.Unknown>(result, "an undecided leaf must never read as UNSAT")
+        assertEquals(TerminationReason.Unsupported, unknown.reason)
+    }
+
+    @Test
     fun `the continuous leaf verdict is the same with LP bounding off and on`() {
         // LP bounding (`--lp off` vs on) is a branch-and-bound search accelerator, not the continuous
         // feasibility decision — that lives in the leaf solve, which runs whenever there are real vars.

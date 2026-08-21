@@ -220,6 +220,18 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
 
     override fun cancelled(): Boolean = params.cancellation()
 
+    /**
+     * The leaf-exact contract, which is general even though the LP is its only client today.
+     *
+     * A leaf pins every search variable, so whatever those pins do not settle has to be *decided* here,
+     * exactly, by whoever owns it. Three outcomes and no fourth: decided feasible completes the sample,
+     * decided infeasible rejects it, and undecided rejects it *and* records that the tree was never
+     * proved empty — [sawIndeterminate] is what turns the terminal verdict into unknown instead of an
+     * unsound UNSAT. A decider that cannot answer exactly must take the third branch rather than guess.
+     *
+     * That contract is what lets a variable be handed to a theory instead of being searched: the theory
+     * owes an exact answer once the search variables are pinned, or it owes an admission that it has none.
+     */
     override fun onLeaf(snap: Sample, session: PropagationSession): Sample? {
         // With LP-only continuous variables, a CP-consistent leaf is a solution only if the residual real
         // LP is feasible — the real rows have no propagator, so CP alone has not enforced them. On success
