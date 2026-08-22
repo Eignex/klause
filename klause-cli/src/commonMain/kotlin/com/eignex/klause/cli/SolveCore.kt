@@ -5,6 +5,8 @@ import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.DifferenceTheorySolver
+import com.eignex.klause.backtrack.ExactLraResult
+import com.eignex.klause.backtrack.ExactLraSolver
 import com.eignex.klause.backtrack.GeneralLiaResult
 import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.backtrack.NodeBudget
@@ -79,48 +81,80 @@ internal object SolveCore {
         val nodeBudget = takeNodeBudget(common)
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
-        rawSolvable.differenceTheoryModel?.let { model ->
-            if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
-                usageError("all-solution enumeration is unavailable for open difference-theory models")
-            }
-            output.begin(optimize = false, maximize = false)
-            val result = DifferenceTheorySolver(model).solve(
-                BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
-            )
-            when (result) {
-                is SolveResult.Sat -> {
-                    output.onSolution(rawSolvable.render(result.assignment), null)
-                    output.onComplete(Verdict.SATISFIABLE)
+        when (val pipeline = rawSolvable.pipeline) {
+            is SolvablePipeline.DifferenceTheory -> {
+                if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
+                    usageError("all-solution enumeration is unavailable for open difference-theory models")
                 }
+                output.begin(optimize = false, maximize = false)
+                val result = DifferenceTheorySolver(pipeline.model).solve(
+                    BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
+                )
+                when (result) {
+                    is SolveResult.Sat -> {
+                        output.onSolution(rawSolvable.render(result.assignment), null)
+                        output.onComplete(Verdict.SATISFIABLE)
+                    }
 
-                is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+                    is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
 
-                is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-            }
-            if (common.statistics) output.onStatistics(result.stats, 0L, if (result is SolveResult.Sat) 1L else 0L)
-            return
-        }
-        rawSolvable.generalLiaModel?.let { model ->
-            if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
-                usageError("all-solution enumeration is unavailable for open General LIA models")
-            }
-            output.begin(optimize = false, maximize = false)
-            val render = requireNotNull(rawSolvable.generalLiaRender)
-            val result = GeneralLiaSolver(model).solve(
-                BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
-            )
-            when (result) {
-                is GeneralLiaResult.Sat -> {
-                    output.onSolution(render(result.assignment), null)
-                    output.onComplete(Verdict.SATISFIABLE)
+                    is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
                 }
-
-                is GeneralLiaResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                is GeneralLiaResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                if (common.statistics) output.onStatistics(result.stats, 0L, if (result is SolveResult.Sat) 1L else 0L)
+                return
             }
-            if (common.statistics) output.onStatistics(result.stats, 0L, if (result is GeneralLiaResult.Sat) 1L else 0L)
-            return
+
+            is SolvablePipeline.GeneralLia -> {
+                if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
+                    usageError("all-solution enumeration is unavailable for open General LIA models")
+                }
+                output.begin(optimize = false, maximize = false)
+                val result = GeneralLiaSolver(pipeline.model).solve(
+                    BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
+                )
+                when (result) {
+                    is GeneralLiaResult.Sat -> {
+                        output.onSolution(pipeline.render(result.assignment), null)
+                        output.onComplete(Verdict.SATISFIABLE)
+                    }
+
+                    is GeneralLiaResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
+                    is GeneralLiaResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                }
+                if (common.statistics) {
+                    output.onStatistics(
+                        result.stats,
+                        0L,
+                        if (result is GeneralLiaResult.Sat) 1L else 0L,
+                    )
+                }
+                return
+            }
+
+            is SolvablePipeline.ExactLra -> {
+                if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
+                    usageError("all-solution enumeration is unavailable for open exact LRA models")
+                }
+                output.begin(optimize = false, maximize = false)
+                val result = ExactLraSolver(pipeline.model).solve(
+                    BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
+                )
+                when (result) {
+                    is ExactLraResult.Sat -> {
+                        output.onSolution(pipeline.render(result.assignment), null)
+                        output.onComplete(Verdict.SATISFIABLE)
+                    }
+
+                    is ExactLraResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
+                    is ExactLraResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                }
+                if (common.statistics) output.onStatistics(result.stats, 0L, if (result is ExactLraResult.Sat) 1L else 0L)
+                return
+            }
+
+            SolvablePipeline.FiniteCp -> Unit
         }
         val presolveStart = TimeSource.Monotonic.markNow()
         val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)

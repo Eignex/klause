@@ -597,13 +597,14 @@ internal object Suites {
         vendored("roster", Category.ASSIGNMENT, Expected.Sat)
     }
 
-    private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA instances") {
+    private val smtlibCore = suite("smtlib-core", "Curated SMT-LIB QF_LIA and QF_LRA instances") {
         format = Format.SMTLIB
         license = "internal"
         vendored("lia-basic", Category.CSP, Expected.Sat)
         vendored("lia-opt", Category.OPTIMIZATION, Expected.Opt(7))
         vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
         vendored("lia-disjunction", Category.CSP, Expected.Sat)
+        vendored("lra-rational", Category.CSP, Expected.Sat)
     }
 
     /** XCSP3 family key: the series prefix before the first `-`. Competition instance names encode

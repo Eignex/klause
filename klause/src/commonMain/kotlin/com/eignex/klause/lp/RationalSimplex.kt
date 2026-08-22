@@ -41,6 +41,10 @@ internal class RationalOutcome(
     val rows: IntArray? = null,
 )
 
+/** Exact feasibility outcome for consumers that must retain a rational witness rather than round it
+ *  back through the floating LP interface. */
+internal class BigRationalOutcome(val feasibility: RationalFeasibility, val witness: List<BigFraction>? = null)
+
 /**
  * An arithmetic level for the exact simplex: a rational number type with exact operations. A
  * fixed-width level signals exhaustion by latching [overflowed] — its results are then void and the
@@ -124,6 +128,34 @@ internal fun rationalOutcome(
         ?: RationalOutcome(RationalFeasibility.UNKNOWN)
 }
 
+/** Decide [model] entirely with arbitrary-precision rationals and retain its structural witness. */
+internal fun bigRationalOutcome(
+    model: LpModel,
+    cancellation: Cancellation = Cancellation.Never,
+    maxPivots: Int = defaultRationalPivotCap(model),
+): BigRationalOutcome {
+    if (model.m == 0) {
+        return BigRationalOutcome(
+            RationalFeasibility.FEASIBLE,
+            List(model.n) { BigFraction.ZERO },
+        )
+    }
+    val state = buildState(BigFracOps, model) ?: return BigRationalOutcome(RationalFeasibility.UNKNOWN)
+    var pivots = 0
+    while (true) {
+        if (cancellation.isCancelled() || pivots >= maxPivots) {
+            return BigRationalOutcome(RationalFeasibility.UNKNOWN)
+        }
+        state.refreshBasicValues()
+        val row = state.selectViolatedRow()
+        if (row < 0) return BigRationalOutcome(RationalFeasibility.FEASIBLE, structuralBigWitness(state))
+        val enter = state.selectEnteringColumn(row)
+        if (enter < 0) return BigRationalOutcome(RationalFeasibility.INFEASIBLE)
+        state.pivot(row, enter)
+        pivots++
+    }
+}
+
 /** One simplex run at arithmetic level [ops]; null when the level cannot carry it (escalate). At the
  *  unbounded level null only arises from a non-finite input coefficient, which no level can carry —
  *  the caller maps that to UNKNOWN. */
@@ -188,13 +220,13 @@ private fun <F> buildState(ops: FracOps<F>, model: LpModel): SimplexState<F>? {
     // A strict row `a·x < b` enters the delta-ordered field as `a·x ≤ b − δ`: the rhs carries a −1
     // delta component, and lexicographic feasibility is exactly strict feasibility of the original.
     // Only the rhs ever carries a delta part, so the tableau itself stays delta-free.
-    val rhsA = fracArray(m) { ops.zero }
-    val rhsD = fracArray(m) { ops.zero }
+    val rhsA = MutableList(m) { ops.zero }
+    val rhsD = MutableList(m) { ops.zero }
     for (i in 0 until m) {
         rhsA[i] = if (dv != null) ops.ofDouble(dv.rhs[i]) ?: return null else ops.ofLong(model.rhs[i])
         if (model.rowStrict[i]) rhsD[i] = ops.minusOne
     }
-    val uppers = fracArrayOfNulls<F>(model.numVars)
+    val uppers = MutableList<F?>(model.numVars) { null }
     for (j in 0 until model.numVars) {
         if (!model.hasUpper[j]) continue
         uppers[j] = if (dv != null) ops.ofDouble(dv.upper[j]) ?: return null else ops.ofLong(model.upper[j])
@@ -208,9 +240,9 @@ private class SimplexState<F>(
     val ops: FracOps<F>,
     val model: LpModel,
     val tab: SparseTableau<F>,
-    val rhsA: Array<F>,
-    val rhsD: Array<F>,
-    val uppers: Array<F?>,
+    val rhsA: MutableList<F>,
+    val rhsD: MutableList<F>,
+    val uppers: MutableList<F?>,
 ) {
     val basis = IntArray(model.m) { model.n + it }
     val inBasisRow = IntArray(model.numVars) { -1 }
@@ -220,7 +252,7 @@ private class SimplexState<F>(
 
     /** Real part of each basic value, as of the last [refreshBasicValues]; the delta part is [rhsD],
      *  since only the right-hand side ever carries one. */
-    val basicA = fracArray(model.m) { ops.zero }
+    val basicA = MutableList(model.m) { ops.zero }
 
     /** The nonbasic columns pinned at a finite upper bound, ascending — the only columns that shift
      *  a basic value off its right-hand side. Empty at the slack basis and grown one pivot at a
@@ -570,12 +602,6 @@ private class SparseTableau<F>(private val ops: FracOps<F>, m: Int, total: Int) 
     }
 }
 
-@Suppress("UNCHECKED_CAST")
-private fun <F> fracArray(size: Int, init: (Int) -> F): Array<F> = Array<Any?>(size) { init(it) } as Array<F>
-
-@Suppress("UNCHECKED_CAST")
-private fun <F> fracArrayOfNulls(size: Int): Array<F?> = arrayOfNulls<Any?>(size) as Array<F?>
-
 /**
  * Concrete structural-column values from a lex-feasible final state, with δ instantiated at a
  * positive rational small enough that every delta-dependent basic value stays inside its box.
@@ -613,13 +639,40 @@ private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): DoubleA
     return out
 }
 
+/** [structuralWitness] without the final lossy conversion for exact-theory clients. */
+private fun structuralBigWitness(st: SimplexState<BigFraction>): List<BigFraction> {
+    var delta = BigFraction.ONE
+    for (i in 0 until st.model.m) {
+        val a = st.basicA[i]
+        val d = st.rhsD[i]
+        if (d.signum() < 0) {
+            val cap = a * (BigFraction.MINUS_ONE * d).reciprocal()
+            if (cap < delta) delta = cap
+        }
+        val upper = st.uppers[st.basis[i]]
+        if (upper != null && d.signum() > 0) {
+            val cap = (upper - a) * d.reciprocal()
+            if (cap < delta) delta = cap
+        }
+    }
+    delta *= BigFraction.of(BigInteger.ONE, BigInteger.TWO)
+    return List(st.model.n) { j ->
+        val row = st.inBasisRow[j]
+        when {
+            row >= 0 -> st.basicA[row] + st.rhsD[row] * delta
+            st.atUpper[j] -> st.uppers[j] ?: BigFraction.ZERO
+            else -> BigFraction.ZERO
+        }
+    }
+}
+
 /** Pivot cap: generous for the small leaf models the fallback targets, tiny relative to a search. */
 internal fun defaultRationalPivotCap(model: LpModel): Int = 200 + 20 * (model.m + model.n)
 
 /** Immutable rational number over the multiplatform big integer, always normalized (gcd 1, positive
  *  denominator). The unbounded second level of the exact rational arithmetic — the 128-bit
  *  fixed-width level ([Frac128Ops]) handles the common case and escalates here on overflow. */
-internal class BigFraction private constructor(val num: BigInteger, val den: BigInteger) {
+class BigFraction private constructor(val num: BigInteger, val den: BigInteger) {
 
     val isZero: Boolean get() = num.isZero()
 

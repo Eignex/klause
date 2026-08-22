@@ -41,6 +41,9 @@ internal object MpsMode : CliMode {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
                     throw MpsFormatException("open integer bounds require supported difference or General LIA coverage")
 
+                ProblemPipeline.EXACT_LRA ->
+                    throw MpsFormatException("open real MPS models require the future mixed-theory pipeline")
+
                 ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
                     if (compiled.objective != null) {
                         val theory = if (pipeline == ProblemPipeline.DIFFERENCE_THEORY) {
