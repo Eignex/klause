@@ -84,7 +84,7 @@ internal object SolveCore {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
                 output.begin(optimize = false, maximize = false)
-                val result = OpenTheorySolver(pipeline.model).solve(
+                val result = OpenTheorySolver(pipeline.model, pipeline.route).solve(
                     TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel),
                 )
                 when (result) {

@@ -8292,7 +8292,7 @@ final class com.eignex.klause.solver.objective/SingleIntObjective { // com.eigne
 }
 
 final class com.eignex.klause.solver.pipeline/OpenTheorySolver { // com.eignex.klause.solver.pipeline/OpenTheorySolver|null[0]
-    constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.solver.pipeline/OpenTheorySolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheorySolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.ProblemPipeline){}[0]
 
     final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheorySolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }

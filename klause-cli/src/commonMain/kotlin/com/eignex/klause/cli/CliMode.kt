@@ -16,6 +16,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -526,6 +527,7 @@ internal sealed interface SolvablePipeline {
     /** A complete open-model theory, selected by the solver-side route builder. */
     data class OpenTheory(
         val model: ProblemSpec,
+        val route: ProblemPipeline,
         val render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
     ) : SolvablePipeline
 }
@@ -541,7 +543,7 @@ internal fun differenceTheorySolvable(model: ProblemSpec, render: (Sample) -> St
     definitionalSweep = null,
     render = render,
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model) { assignment ->
+    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.DIFFERENCE_THEORY) { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
     },
 )
@@ -557,7 +559,7 @@ internal fun generalLiaSolvable(model: ProblemSpec, render: (GeneralLiaAssignmen
     definitionalSweep = null,
     render = { error("General LIA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model) { assignment ->
+    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.GENERAL_LIA) { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
     },
 )
@@ -573,7 +575,7 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     definitionalSweep = null,
     render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model) { assignment ->
+    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LRA) { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment)
     },
 )

@@ -8216,7 +8216,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : co
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheorySolver {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/ProblemPipeline;)V
 	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheorySolver;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }

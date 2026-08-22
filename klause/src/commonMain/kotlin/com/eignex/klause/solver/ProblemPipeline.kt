@@ -26,10 +26,10 @@ enum class ProblemPipeline {
 
 /** Select the only sound pipeline for this source model before CP domains are materialized. */
 fun ProblemSpec.pipeline(): ProblemPipeline {
-    if (supportsExactLra()) return ProblemPipeline.EXACT_LRA
     if ((0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }) {
         return ProblemPipeline.FINITE_CP
     }
+    if (supportsExactLra()) return ProblemPipeline.EXACT_LRA
     if (numRealVars != 0) return ProblemPipeline.UNSUPPORTED_OPEN
     return if (supportsCompleteDifferenceTheory(factors, numIntVars, intBounds)) {
         ProblemPipeline.DIFFERENCE_THEORY
