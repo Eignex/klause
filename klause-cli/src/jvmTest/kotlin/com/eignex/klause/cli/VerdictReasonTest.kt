@@ -20,12 +20,10 @@ class VerdictReasonTest {
         return buf.toString()
     }
 
-    private fun smt(context: VerdictContext, verdict: Verdict): String {
-        return capture {
-            SmtLibOutput().apply {
-                onVerdictContext(context)
-                onComplete(verdict)
-            }
+    private fun smt(context: VerdictContext, verdict: Verdict): String = capture {
+        SmtLibOutput().apply {
+            onVerdictContext(context)
+            onComplete(verdict)
         }
     }
 
@@ -99,5 +97,4 @@ class VerdictReasonTest {
         }
         assertEquals("==========", out.trim())
     }
-
 }

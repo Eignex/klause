@@ -55,6 +55,7 @@ internal object SmtLibMode : CliMode {
                     }
                     return when (parsed.sourcePipeline) {
                         ProblemPipeline.DIFFERENCE_THEORY -> differenceTheorySolvable(parsed.model, render)
+
                         ProblemPipeline.GENERAL_LIA -> generalLiaSolvable(parsed.model) { assignment ->
                             renderGeneralLiaModel(ints, bools, reals, assignment)
                         }
@@ -83,21 +84,17 @@ internal object SmtLibMode : CliMode {
 
 /** Render an SMT-LIB `(get-model)`-style model: one `(define-fun name () Sort value)` per
  *  declared variable. Real values come from the leaf LP solve. */
-internal fun renderModel(
-    ints: Map<String, Int>,
-    bools: Map<String, Int>,
-    reals: Map<String, Int>,
-    s: Sample,
-): String = buildString {
-    append("(\n")
-    for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
-    for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
-    for ((name, id) in reals) {
-        val v = if (id < s.reals.size) s.reals[id] else 0.0
-        append("  (define-fun $name () Real $v)\n")
+internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals: Map<String, Int>, s: Sample): String =
+    buildString {
+        append("(\n")
+        for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
+        for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
+        for ((name, id) in reals) {
+            val v = if (id < s.reals.size) s.reals[id] else 0.0
+            append("  (define-fun $name () Real $v)\n")
+        }
+        append(")")
     }
-    append(")")
-}
 
 /** Render an exact General LIA model without narrowing its integer values to [Long]. */
 internal fun renderGeneralLiaModel(
