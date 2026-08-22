@@ -317,7 +317,8 @@ class SmtLibTest {
     @Test
     fun `to_real and to_int are identity over ints`() {
         val p = SmtLib.parse(
-            "(declare-const x Int) (assert (<= x 5)) (assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
+            "(declare-const x Int) (assert (<= x 5)) " +
+                "(assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
         ).bounded()
         assertEquals(5, p.intDomains[0].min)
         assertEquals(5, p.intDomains[0].max)
