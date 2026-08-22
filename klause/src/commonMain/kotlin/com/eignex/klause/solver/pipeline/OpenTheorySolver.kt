@@ -66,8 +66,7 @@ sealed interface OpenTheoryResult {
  * Route selection happens once from [ProblemSpec.pipeline]. Frontends consume this uniform result
  * rather than importing or dispatching to individual theory implementations.
  */
-class OpenTheorySolver(private val model: ProblemSpec) {
-    private val route = model.pipeline()
+class OpenTheorySolver(private val model: ProblemSpec, private val route: ProblemPipeline) {
 
     init {
         require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {
