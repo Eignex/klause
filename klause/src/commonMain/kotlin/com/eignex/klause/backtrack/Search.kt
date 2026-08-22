@@ -169,7 +169,11 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
  * surfaced, so this only returns the sample. On a budget exit the trailing glue clauses are published
  * for cross-arm import.
  */
-private class SatPolicy(private val params: BacktrackParams, private val problem: Problem) : SearchPolicy<Sample> {
+private class SatPolicy(
+    private val params: BacktrackParams,
+    private val problem: Problem,
+    private val completeLeaf: ((Sample, PropagationSession) -> Sample?)? = null,
+) : SearchPolicy<Sample> {
     /** Set when a leaf's residual continuous LP was neither certified feasible nor infeasible, so the
      *  final Exhausted verdict must degrade to `unknown` rather than UNSAT. */
     var sawIndeterminate = false
@@ -233,6 +237,7 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
      * owes an exact answer once the search variables are pinned, or it owes an admission that it has none.
      */
     override fun onLeaf(snap: Sample, session: PropagationSession): Sample? {
+        completeLeaf?.let { return it(snap, session) }
         // With LP-only continuous variables, a CP-consistent leaf is a solution only if the residual real
         // LP is feasible — the real rows have no propagator, so CP alone has not enforced them. On success
         // the LP's continuous values complete the assignment into a full solution. The engine-owned check
@@ -266,6 +271,7 @@ private class SatPolicy(private val params: BacktrackParams, private val problem
 internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
+    completeLeaf: ((Sample, PropagationSession) -> Sample?)? = null,
 ): Sequence<SearchOutcome> = sequence {
     // Theory lemmas from the residual real LP register at restarts; a real-column model with no
     // restart policy would pool them forever, so give it the Luby default.
@@ -274,7 +280,7 @@ internal fun BacktrackSolver.driveSearch(
     } else {
         params
     }
-    val policy = SatPolicy(runParams, this@driveSearch.problem)
+    val policy = SatPolicy(runParams, this@driveSearch.problem, completeLeaf)
     val engine = DfsEngine(this@driveSearch, runParams, sink, policy)
     while (true) {
         when (val e = engine.runUntilEvent()) {

@@ -10,8 +10,10 @@ import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -28,10 +30,12 @@ internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: Linea
 
 /** A parsed SMT-LIB instance lifted into klause's representation. */
 data class SmtLibProblem(
-    /** Compiled solver problem. */
-    val problem: Problem,
+    /** Compiled model. Open integer sides remain open until a finite-search backend materializes them. */
+    val model: ProblemSpec,
     /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
+    /** Pipeline selected from the source model before any finite digit lowering. */
+    val sourcePipeline: ProblemPipeline = model.pipeline(),
     /** Declared `Int` variable name to int id. */
     val intVarNames: Map<String, Int> = emptyMap(),
     /** Declared `Bool` variable name to bool id. */
@@ -40,10 +44,7 @@ data class SmtLibProblem(
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    /** Deferred integer-domain bounding (OBBT), or `null` when every domain is already finite (nothing to
-     *  close). Parsing closes each open side to a cheap fallback box; the LP tightening runs in the presolve
-     *  phase ([DeferredIntBounds.run]), which also decides whether a side fell back to a lossy clamp — the
-     *  honest-`unknown` signal, known only after that runs. */
+    /** Deferred integer-domain bounding (OBBT), or `null` when every domain is already finite. */
     val deferredBounds: DeferredIntBounds?,
     /** True when the box was invented at parse and no [deferredBounds] run will say so later, so an `unsat`
      *  over it is only `unsat` within the box. */
@@ -75,9 +76,8 @@ data class IntDigitColumns(
  *  `SmtLibExpr.kt`, linear-term / relation / objective lowering in `SmtLibLinear.kt`, and the real
  *  (LRA) lowering in `SmtLibReal.kt`. */
 object SmtLib {
-    /** Parse SMT-LIB linear-arithmetic [text] into an [SmtLibProblem]. A variable with no provable bound (and a
-     *  derived bound past the range) falls back to / is clamped into `[unboundedIntLo, unboundedIntHi]`
-     *  — the same default int range as the FlatZinc front-end ([com.eignex.klause.config.KlauseConfig]). */
+    /** Parse SMT-LIB linear-arithmetic [text] into an [SmtLibProblem]. Source integer sides without a
+     *  provable bound remain open in its [ProblemSpec]. */
     fun parse(
         text: String,
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
@@ -298,17 +298,24 @@ object SmtLib {
             inferBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
+            val sourceBounds = modelIntBounds()
+            val sourceModel = ProblemSpec(
+                numBoolVars = nextBool,
+                intBounds = sourceBounds,
+                factors = factors.toTypedArray(),
+                numRealVars = nextReal,
+                realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
+            )
+            val sourcePipeline = sourceModel.pipeline()
+            val deferred = prepareDeferredBounds()
             val inventedLo = BooleanArray(nextInt)
             val inventedHi = BooleanArray(nextInt)
-            val deferred = prepareDeferredBounds(inventedLo, inventedHi)
-            // A declared variable the model drives past the 64-bit range gets digit columns. Its own rows
-            // are rewritten over them, so the deferred OBBT (which reports domains for the pre-substitution
-            // variables) no longer applies and the clamp verdict is carried directly instead.
-            val digits = if (deferred != null && objectiveSpec == null) {
-                digitizeWideInts(
-                    inventedLo,
-                    inventedHi,
-                )
+            val digits = if (deferred != null && objectiveSpec == null &&
+                sourcePipeline != ProblemPipeline.DIFFERENCE_THEORY
+            ) {
+                closeForDigitization(inventedLo, inventedHi)
+                digitizeWideInts(inventedLo, inventedHi)
             } else {
                 emptyMap()
             }
@@ -317,35 +324,29 @@ object SmtLib {
             }
             lowerOpenIteChains() // an objective term can open chains of its own
 
-            // The single search seam: every domain must be Finite by now (prepareDeferredBounds closes
-            // every Open one to the fallback box). An Open here would be a bug, but the sealed type kept
-            // it from flowing anywhere a searchable IntDomain was expected, so this cast is the only place
-            // it can surface.
-            val domains = Array(intDomains.size) { i ->
-                (intDomains[i] as? PresolveDomain.Finite)?.domain ?: error("open domain reached search")
-            }
+            val model = ProblemSpec(
+                numBoolVars = nextBool,
+                intBounds = if (digits.isEmpty()) sourceBounds else modelIntBounds(),
+                factors = factors.toTypedArray(),
+                numRealVars = nextReal,
+                realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
+                realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
+                // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
+                // integer-infeasible equality (e.g. a divisibility contradiction) would grind O(span)
+                // at construction. Presolve's strengthen pass catches that infeasibility first, at
+                // solve time, before the lazy bake runs.
+            )
             return SmtLibProblem(
-                Problem(
-                    numBoolVars = nextBool,
-                    numIntVars = nextInt,
-                    intDomains = domains,
-                    factors = factors.toTypedArray(),
-                    numRealVars = nextReal,
-                    realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
-                    realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
-                    // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
-                    // integer-infeasible equality (e.g. a divisibility contradiction) would grind O(span)
-                    // at construction. Presolve's strengthen pass catches that infeasibility first, at
-                    // solve time, before the lazy bake runs.
-                ),
-                objective,
+                model,
+                sourcePipeline = sourcePipeline,
+                objective = objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),
                 realVarNames = LinkedHashMap(realNames),
                 sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
                 deferredBounds = if (digits.isEmpty()) deferred else null,
                 clamped = digits.isNotEmpty(),
-                intDigits = digits.mapValues { (_, c) -> IntDigitColumns(c.columns, c.width) },
+                intDigits = digits.mapValues { (_, columns) -> IntDigitColumns(columns.columns, columns.width) },
             )
         }
     }

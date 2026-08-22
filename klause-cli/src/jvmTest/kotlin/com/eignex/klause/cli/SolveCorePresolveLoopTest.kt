@@ -49,7 +49,7 @@ class SolveCorePresolveLoopTest {
         val solvable = solvableOf(problem, probe = { it.ints[1] })
         val presolved = solvable.presolved(PresolveConfig.DEFAULT, false)
         assertTrue(presolved !== solvable, "affine elimination should have transformed the problem")
-        assertTrue(presolved.problem.factors.isEmpty(), "the lone defining equality should be eliminated")
+        assertTrue(presolved.finiteProblem.factors.isEmpty(), "the lone defining equality should be eliminated")
         // y = 2 in the presolved problem (x left free) must reconstruct to x = 5.
         assertEquals(5L, presolved.objectiveValue!!(Sample(BooleanArray(0), longArrayOf(2, 0))))
     }
@@ -88,8 +88,12 @@ class SolveCorePresolveLoopTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         val once = solvableOf(problem, obj).presolved(config, false)
-        assertTrue(once.problem.intDomains[3].min >= 2, "the harvest should have raised the objective floor")
-        val again = solvableOf(once.problem, obj).presolved(config, false)
-        assertSame(again.problem, once.problem, "the harvested problem must already be at the joint fixpoint")
+        assertTrue(once.finiteProblem.intDomains[3].min >= 2, "the harvest should have raised the objective floor")
+        val again = solvableOf(once.finiteProblem, obj).presolved(config, false)
+        assertSame(
+            again.finiteProblem,
+            once.finiteProblem,
+            "the harvested problem must already be at the joint fixpoint",
+        )
     }
 }

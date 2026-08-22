@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.extractConflictBools
 import com.eignex.klause.propagation.extractConflictFactors
 import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -100,15 +101,19 @@ open class Problem(
      * Integer variables whose declared domain is genuinely open on the low side, indexed by int var id;
      * `null` (the common case) means every domain is a real declared bound.
      *
-     * Search needs a finite box, so a front-end that cannot bound a side closes it at
-     * [com.eignex.klause.config.KlauseConfig.unboundedSearchBound] and [intDomains] carries that clamp.
-     * The clamp is an artefact, not a constraint: a refutation that leans on it holds only inside the
-     * box. This records which sides were invented so the LP relaxation can build the column over its
-     * true (open) range — where the simplex reasons soundly — while CP search keeps the finite domain.
+     * A finite-search backend may close an otherwise open source side. The resulting finite endpoint is
+     * an artefact, not a model constraint; this records its provenance so model-level consumers continue
+     * to reason over the true open range rather than the materialized domain.
      */
-    val openIntLo: BooleanArray? = null,
+    openIntLo: BooleanArray? = null,
     /** Integer variables genuinely open on the high side; see [openIntLo]. */
-    val openIntHi: BooleanArray? = null,
+    openIntHi: BooleanArray? = null,
+    /** Packed open lower sides retained across internal problem rebuilds. */
+    packedOpenIntLo: Bits? = null,
+    /** Packed open upper sides retained across internal problem rebuilds. */
+    packedOpenIntHi: Bits? = null,
+    /** Source-model bounds, when this finite problem was materialized from a [ProblemSpec]. */
+    modelBounds: IntBounds? = null,
 ) {
     /**
      * Domain (bounds) of each integer variable, indexed by int var id. On a raw [Problem] these are the
@@ -120,7 +125,24 @@ open class Problem(
      * A [sharedDomains] construction skips the defensive copy: the caller supplies an array that is safe
      * to share (read, never mutated, within one presolve firing), saving an O([numIntVars]) copy.
      */
-    val intDomains: Array<IntDomain> = if (sharedDomains) intDomains else intDomains.copyOf()
+    private val ownedIntDomains: Array<IntDomain> = if (sharedDomains) intDomains else intDomains.copyOf()
+
+    /** Finite domains used by CP and local search. */
+    val intDomains: Array<IntDomain> get() = ownedIntDomains
+
+    /**
+     * Model-level bounds of the integer columns. Unlike [intDomains], either side may be absent when
+     * the finite search domain was closed by an invented fallback bound. Consumers that reason over
+     * the model rather than enumerate its values must read this state, or explicitly decline open
+     * columns, instead of treating the fallback endpoint as a constraint.
+     */
+    val intBounds: IntBounds = modelBounds ?: IntBounds.fromOpenSides(
+        domains = intDomains,
+        openLo = openIntLo,
+        openHi = openIntHi,
+        packedOpenLo = packedOpenIntLo,
+        packedOpenHi = packedOpenIntHi,
+    )
 
     /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
      *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
@@ -141,6 +163,12 @@ open class Problem(
     init {
         require(intDomains.size == numIntVars) {
             "intDomains size ${intDomains.size} != numIntVars $numIntVars"
+        }
+        require(openIntLo == null || openIntLo.size == numIntVars) {
+            "openIntLo size ${openIntLo?.size} != numIntVars $numIntVars"
+        }
+        require(openIntHi == null || openIntHi.size == numIntVars) {
+            "openIntHi size ${openIntHi?.size} != numIntVars $numIntVars"
         }
         require(impliedFactorMask == null || impliedFactorMask.size == factors.size) {
             "impliedFactorMask size ${impliedFactorMask?.size} != factors size ${factors.size}"
@@ -169,6 +197,9 @@ open class Problem(
         realUpper: DoubleArray = EmptyDoubleArray,
         openIntLo: BooleanArray? = null,
         openIntHi: BooleanArray? = null,
+        packedOpenIntLo: Bits? = null,
+        packedOpenIntHi: Bits? = null,
+        modelBounds: IntBounds? = null,
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
@@ -183,10 +214,13 @@ open class Problem(
         realUpper = realUpper,
         openIntLo = openIntLo,
         openIntHi = openIntHi,
+        packedOpenIntLo = packedOpenIntLo,
+        packedOpenIntHi = packedOpenIntHi,
+        modelBounds = modelBounds,
     )
 
     /**
-     * A copy with the integer domains replaced — used when a front-end's deferred bounding tightens the
+     * A copy with the integer domains replaced — used when deferred bounding tightens the
      * open sides after parsing, before the problem flows into presolve. Every other structure (factors,
      * real bounds, implied/symmetry flags) is shared. The result is a raw [Problem] whose root bake is
      * still deferred; must not be called on a [BakedProblem], whose fold this copy would not reproduce.
@@ -199,7 +233,7 @@ open class Problem(
         newOpenLo: BooleanArray? = null,
         newOpenHi: BooleanArray? = null,
     ): Problem {
-        require(this !is BakedProblem) { "withIntDomains is for raw (front-end) problems only" }
+        require(this !is BakedProblem) { "withIntDomains is for raw problems only" }
         return Problem(
             numBoolVars = numBoolVars,
             numIntVars = numIntVars,
@@ -210,8 +244,11 @@ open class Problem(
             numRealVars = numRealVars,
             realLower = realLower,
             realUpper = realUpper,
-            openIntLo = newOpenLo ?: openIntLo,
-            openIntHi = newOpenHi ?: openIntHi,
+            openIntLo = newOpenLo,
+            openIntHi = newOpenHi,
+            packedOpenIntLo = if (newOpenLo == null) intBounds.openLowerBits else null,
+            packedOpenIntHi = if (newOpenHi == null) intBounds.openUpperBits else null,
+            modelBounds = intBounds,
         )
     }
 
@@ -319,8 +356,9 @@ open class Problem(
             numRealVars = numRealVars,
             realLower = realLower,
             realUpper = realUpper,
-            openIntLo = openIntLo,
-            openIntHi = openIntHi,
+            packedOpenIntLo = intBounds.openLowerBits,
+            packedOpenIntHi = intBounds.openUpperBits,
+            modelBounds = intBounds,
         )
     }
 
@@ -530,6 +568,9 @@ class BakedProblem internal constructor(
     realUpper: DoubleArray = EmptyDoubleArray,
     openIntLo: BooleanArray? = null,
     openIntHi: BooleanArray? = null,
+    packedOpenIntLo: Bits? = null,
+    packedOpenIntHi: Bits? = null,
+    modelBounds: IntBounds? = null,
     cancellation: Cancellation = Cancellation.Never,
     /**
      * When `true`, [intDomains] already carry the root-bake fold (an incremental presolve pass view or a
@@ -553,6 +594,9 @@ class BakedProblem internal constructor(
     realUpper = realUpper,
     openIntLo = openIntLo,
     openIntHi = openIntHi,
+    packedOpenIntLo = packedOpenIntLo,
+    packedOpenIntHi = packedOpenIntHi,
+    modelBounds = modelBounds,
 ) {
     init {
         if (!alreadyFolded) {
@@ -576,6 +620,9 @@ class BakedProblem internal constructor(
         realUpper: DoubleArray = EmptyDoubleArray,
         openIntLo: BooleanArray? = null,
         openIntHi: BooleanArray? = null,
+        packedOpenIntLo: Bits? = null,
+        packedOpenIntHi: Bits? = null,
+        modelBounds: IntBounds? = null,
         cancellation: Cancellation = Cancellation.Never,
         alreadyFolded: Boolean = false,
     ) : this(
@@ -591,6 +638,9 @@ class BakedProblem internal constructor(
         realUpper = realUpper,
         openIntLo = openIntLo,
         openIntHi = openIntHi,
+        packedOpenIntLo = packedOpenIntLo,
+        packedOpenIntHi = packedOpenIntHi,
+        modelBounds = modelBounds,
         cancellation = cancellation,
         alreadyFolded = alreadyFolded,
     )

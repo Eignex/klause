@@ -9,17 +9,16 @@ import com.eignex.klause.solver.SolveResult
 /**
  * The part of [problem] that no invented bound reaches: every factor whose integer variables all carry
  * bounds the model itself stated or the bounding derived, dropping every factor that touches a side the
- * search box invented (`Problem.openIntLo` / `openIntHi`).
+ * search box invented ([Problem.intBounds]).
  *
  * The result is a subset of the model's constraints over sound bounds, so it is a relaxation of the
  * unbounded model: refuting it refutes the model outright, with none of the clamp's caveat. Null when
  * there is nothing to gain — no side was invented, or every factor reaches one.
  */
 internal fun boundExactResidual(problem: Problem): Problem? {
-    val openLo = problem.openIntLo
-    val openHi = problem.openIntHi
-    if (openLo == null && openHi == null) return null
-    val open = BooleanArray(problem.numIntVars) { openLo?.get(it) == true || openHi?.get(it) == true }
+    val open = BooleanArray(
+        problem.numIntVars,
+    ) { problem.intBounds.isOpenLower(it) || problem.intBounds.isOpenUpper(it) }
     if (open.none { it }) return null
     val kept = problem.factors.filter { f -> f.intVars.none { open[it] } }
     if (kept.isEmpty()) return null

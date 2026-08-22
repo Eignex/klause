@@ -28,6 +28,8 @@ import com.eignex.klause.solver.StructuralKey
 internal class DifferenceSystem(
     /** Edges over integer variables, with [DifferenceFragment.ZERO] for the constant. */
     val edges: List<DifferenceEdge>,
+    /** Whether this system is hosted by the Boolean difference-theory pipeline rather than CP. */
+    private val theoryOnly: Boolean = false,
 ) : Factor {
 
     override val intVars: IntArray
@@ -45,7 +47,7 @@ internal class DifferenceSystem(
             if (e.target != DifferenceFragment.ZERO) ints.add(e.target)
             if (e.guard != DifferenceEdge.ALWAYS) bools.add(Lit.variable(e.guard))
         }
-        intVars = ints.toIntArray()
+        intVars = if (theoryOnly) IntArray(0) else ints.toIntArray()
         boolVars = bools.toIntArray()
     }
 
@@ -63,6 +65,7 @@ internal class DifferenceSystem(
                 domainBound = e.domainBound,
             )
         },
+        theoryOnly = theoryOnly,
     )
 
     /**

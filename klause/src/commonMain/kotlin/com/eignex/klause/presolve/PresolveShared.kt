@@ -362,8 +362,8 @@ internal object PresolveShared {
             // LP column wider than it need be — the relaxation stays a superset of the model, so every
             // bound read off it is still sound. Dropping them instead would cost the LP its open-range
             // reasoning and the search its objective-cutoff bound on exactly those columns.
-            openIntLo = problem.openIntLo,
-            openIntHi = problem.openIntHi,
+            packedOpenIntLo = problem.intBounds.openLowerBits,
+            packedOpenIntHi = problem.intBounds.openUpperBits,
         )
         // An already-folded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs

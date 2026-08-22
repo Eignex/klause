@@ -12,7 +12,7 @@ internal class CutoffBound(val varId: Int, val hi: Long)
  *
  * A column open on the high side is one no row caps: raising it only ever helps satisfy the rows it
  * appears in, so bound tightening leaves the side open and the front-end closes it at an invented
- * search box ([Problem.openIntHi] records which sides those are). Cost still caps such a column — but
+ * search box ([Problem.intBounds] records which sides those are). Cost still caps such a column — but
  * only against an incumbent, which exists neither at load nor in presolve. Once the search holds one,
  * `Σ c·x + constant ≤ incumbent − 1` is a row like any other, and propagating it bounds column `j` with
  * `c_j > 0` at `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the objective's minimum over the
@@ -33,11 +33,16 @@ internal class CutoffBound(val varId: Int, val hi: Long)
  * about it is a statement about the box rather than about the model.
  */
 internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective, incumbent: Long): List<CutoffBound> {
-    val openHi = problem.openIntHi ?: return emptyList()
-    val openLo = problem.openIntLo
     val coefficients = objective.intCoefficients
     val n = minOf(problem.numIntVars, coefficients.size)
-    if ((0 until n).none { coefficients[it] > 0L && openHi[it] && openLo?.get(it) != true }) return emptyList()
+    if ((0 until n).none {
+            coefficients[it] > 0L && problem.intBounds.isOpenUpper(
+                it,
+            ) && !problem.intBounds.isOpenLower(it)
+        }
+    ) {
+        return emptyList()
+    }
     // L = the objective's minimum over the declared domains: each term at the endpoint its coefficient's
     // sign selects, each free Boolean at whichever polarity costs least.
     val floor = Int128()
@@ -64,7 +69,7 @@ internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective,
     val out = ArrayList<CutoffBound>()
     for (i in 0 until n) {
         val c = coefficients[i]
-        if (c <= 0L || !openHi[i] || openLo?.get(i) == true) continue
+        if (c <= 0L || !problem.intBounds.isOpenUpper(i) || problem.intBounds.isOpenLower(i)) continue
         val d = problem.intDomains[i]
         val steps = slack.floorDivPositive(c) ?: continue
         val hi = addOrNull(d.min, steps) ?: continue

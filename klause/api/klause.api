@@ -154,6 +154,12 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
+public final class com/eignex/klause/backtrack/DifferenceTheorySolver {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/backtrack/DifferenceTheorySolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
+}
+
 public final class com/eignex/klause/backtrack/NodeBudget {
 	public fun <init> (J)V
 	public final fun exhausted ()Z
@@ -2358,24 +2364,24 @@ public final class com/eignex/klause/formats/mps/MpsColumn {
 }
 
 public final class com/eignex/klause/formats/mps/MpsCompiled {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLcom/eignex/klause/lp/DeferredIntBounds;I)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLcom/eignex/klause/lp/DeferredIntBounds;I)V
+	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Z
 	public final fun component4 ()Ljava/util/List;
 	public final fun component5 ()J
 	public final fun component6 ()Lcom/eignex/klause/lp/DeferredIntBounds;
 	public final fun component7 ()I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLcom/eignex/klause/lp/DeferredIntBounds;I)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLcom/eignex/klause/lp/DeferredIntBounds;IILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLcom/eignex/klause/lp/DeferredIntBounds;I)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLcom/eignex/klause/lp/DeferredIntBounds;IILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getColumns ()Ljava/util/List;
 	public final fun getDeferredBounds ()Lcom/eignex/klause/lp/DeferredIntBounds;
 	public final fun getFloatColumns ()I
 	public final fun getMaximize ()Z
+	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getObjectiveScale ()J
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2561,29 +2567,31 @@ public final class com/eignex/klause/formats/smtlib/SmtLib {
 }
 
 public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/ProblemPipeline;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/ProblemPipeline;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun component10 ()Ljava/util/Map;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun component3 ()Ljava/util/Map;
+	public final fun component3 ()Lcom/eignex/klause/solver/ProblemPipeline;
 	public final fun component4 ()Ljava/util/Map;
 	public final fun component5 ()Ljava/util/Map;
-	public final fun component6 ()Lcom/eignex/klause/formats/ObjectiveSense;
-	public final fun component7 ()Lcom/eignex/klause/lp/DeferredIntBounds;
-	public final fun component8 ()Z
-	public final fun component9 ()Ljava/util/Map;
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public final fun component6 ()Ljava/util/Map;
+	public final fun component7 ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun component8 ()Lcom/eignex/klause/lp/DeferredIntBounds;
+	public final fun component9 ()Z
+	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/ProblemPipeline;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/ProblemPipeline;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/lp/DeferredIntBounds;ZLjava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getClamped ()Z
 	public final fun getDeferredBounds ()Lcom/eignex/klause/lp/DeferredIntBounds;
 	public final fun getIntDigits ()Ljava/util/Map;
 	public final fun getIntVarNames ()Ljava/util/Map;
+	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
 	public final fun getRealVarNames ()Ljava/util/Map;
 	public final fun getSense ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun getSourcePipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -7720,6 +7728,22 @@ public final class com/eignex/klause/solver/FactorReduction$Unchanged : com/eign
 	public static final field INSTANCE Lcom/eignex/klause/solver/FactorReduction$Unchanged;
 }
 
+public final class com/eignex/klause/solver/IntBounds {
+	public static final field Companion Lcom/eignex/klause/solver/IntBounds$Companion;
+	public final fun getSize ()I
+	public final fun hasLower (I)Z
+	public final fun hasUpper (I)Z
+	public final fun isOpenLower (I)Z
+	public final fun isOpenUpper (I)Z
+	public final fun lower (I)J
+	public final fun lowerAsBigInteger (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun upper (I)J
+	public final fun upperAsBigInteger (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+}
+
+public final class com/eignex/klause/solver/IntBounds$Companion {
+}
+
 public abstract interface class com/eignex/klause/solver/IntConsumer {
 	public abstract fun accept (J)V
 }
@@ -7797,10 +7821,10 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 }
 
 public class com/eignex/klause/solver/Problem {
-	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZI[D[D[Z[Z)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZI[D[D[Z[ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZZI[D[D[Z[Z)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZZI[D[D[Z[ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/solver/IntBounds;)V
+	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/solver/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/solver/IntBounds;)V
+	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/solver/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun bake (Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/solver/BakedProblem;
 	public static synthetic fun bake$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/BakedProblem;
 	protected final fun foldIntoDomains (Lcom/eignex/klause/propagation/PropagationResult;)V
@@ -7811,6 +7835,7 @@ public class com/eignex/klause/solver/Problem {
 	public final fun getFactors ()[Lcom/eignex/klause/solver/Factor;
 	public final fun getHasSymmetryBreaking ()Z
 	public final fun getImpliedFactorMask ()[Z
+	public final fun getIntBounds ()Lcom/eignex/klause/solver/IntBounds;
 	public final fun getIntDomains ()[Lcom/eignex/klause/solver/IntDomain;
 	public final fun getIntOccurrences ()[[I
 	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
@@ -7823,8 +7848,6 @@ public class com/eignex/klause/solver/Problem {
 	public final fun getNumIntVars ()I
 	public final fun getNumRealVars ()I
 	public final fun getOccurrences ()Lcom/eignex/klause/solver/OccurrenceIndex;
-	public final fun getOpenIntHi ()[Z
-	public final fun getOpenIntLo ()[Z
 	public final fun getPropagators ()[Lcom/eignex/klause/propagation/Propagator;
 	public final fun getRealLower ()[D
 	public final fun getRealUpper ()[D
@@ -7837,6 +7860,37 @@ public class com/eignex/klause/solver/Problem {
 	protected final fun setBakeElapsed-LRDsOJo (J)V
 	public final fun withIntDomains ([Lcom/eignex/klause/solver/IntDomain;[Z[Z)Lcom/eignex/klause/solver/Problem;
 	public static synthetic fun withIntDomains$default (Lcom/eignex/klause/solver/Problem;[Lcom/eignex/klause/solver/IntDomain;[Z[ZILjava/lang/Object;)Lcom/eignex/klause/solver/Problem;
+}
+
+public final class com/eignex/klause/solver/ProblemPipeline : java/lang/Enum {
+	public static final field DIFFERENCE_THEORY Lcom/eignex/klause/solver/ProblemPipeline;
+	public static final field FINITE_CP Lcom/eignex/klause/solver/ProblemPipeline;
+	public static final field UNSUPPORTED_OPEN Lcom/eignex/klause/solver/ProblemPipeline;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/ProblemPipeline;
+	public static fun values ()[Lcom/eignex/klause/solver/ProblemPipeline;
+}
+
+public final class com/eignex/klause/solver/ProblemPipelineKt {
+	public static final fun pipeline (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemPipeline;
+}
+
+public final class com/eignex/klause/solver/ProblemSpec {
+	public fun <init> (ILcom/eignex/klause/solver/IntBounds;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZI[D[D)V
+	public synthetic fun <init> (ILcom/eignex/klause/solver/IntBounds;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/solver/Cancellation;[ZZI[D[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCancellation ()Lcom/eignex/klause/solver/Cancellation;
+	public final fun getFactors ()[Lcom/eignex/klause/solver/Factor;
+	public final fun getHasSymmetryBreaking ()Z
+	public final fun getImpliedFactorMask ()[Z
+	public final fun getIntBounds ()Lcom/eignex/klause/solver/IntBounds;
+	public final fun getNumBoolVars ()I
+	public final fun getNumIntVars ()I
+	public final fun getNumRealVars ()I
+	public final fun getRealLower ()[D
+	public final fun getRealUpper ()[D
+	public final fun getSeedDeductions ()Lcom/eignex/klause/propagation/PropagationResult;
+	public final fun materialize ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/Problem;
+	public final fun materializeFiniteBounds ()Lcom/eignex/klause/solver/Problem;
 }
 
 public abstract interface class com/eignex/klause/solver/ResumableOptimizer : com/eignex/klause/solver/Optimizer {
@@ -8046,6 +8100,7 @@ public final class com/eignex/klause/solver/VariablePartition {
 
 public final class com/eignex/klause/solver/VariablePartitionKt {
 	public static final fun variablePartition (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/solver/VariablePartition;
+	public static final fun variablePartition (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/VariablePartition;
 }
 
 public abstract interface class com/eignex/klause/solver/objective/IncrementalObjective : com/eignex/klause/solver/objective/Objective {
@@ -8581,6 +8636,44 @@ public final class com/eignex/klause/solver/result/UnsatCore$Companion {
 	public final fun getEmpty ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun of (Ljava/util/Collection;)Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun of ([I)Lcom/eignex/klause/solver/result/UnsatCore;
+}
+
+public final class com/eignex/klause/util/Bits {
+	public static final field Companion Lcom/eignex/klause/util/Bits$Companion;
+	public fun <init> (I)V
+	public final fun andInPlace (Lcom/eignex/klause/util/Bits;)V
+	public final fun andNotInPlace (Lcom/eignex/klause/util/Bits;)V
+	public final fun cardinality ()I
+	public final fun clear (I)V
+	public final fun containsAll (Lcom/eignex/klause/util/Bits;)Z
+	public final fun copy ()Lcom/eignex/klause/util/Bits;
+	public final fun copyFrom (Lcom/eignex/klause/util/Bits;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun forEachSet (Lkotlin/jvm/functions/Function1;)V
+	public final fun get (I)Z
+	public final fun getSize ()I
+	public final fun getWords ()[J
+	public fun hashCode ()I
+	public final fun orInPlace (Lcom/eignex/klause/util/Bits;)V
+	public final fun set (I)V
+	public final fun toIntArray ()[I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/util/Bits$Companion {
+	public final fun clear ([JI)V
+	public final fun clearAbove ([JI)V
+	public final fun clearBelow ([JI)V
+	public final fun empty (I)Lcom/eignex/klause/util/Bits;
+	public final fun fillRange ([JII)V
+	public final fun firstSet ([J)I
+	public final fun full (I)Lcom/eignex/klause/util/Bits;
+	public final fun has ([JI)Z
+	public final fun lastSet ([J)I
+	public final fun of (I[I)Lcom/eignex/klause/util/Bits;
+	public final fun popcount ([J)I
+	public final fun set ([JI)V
+	public final fun xorInto ([J[J)V
 }
 
 public final class com/eignex/klause/util/CharReader {

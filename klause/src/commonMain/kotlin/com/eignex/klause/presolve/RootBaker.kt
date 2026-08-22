@@ -52,8 +52,8 @@ object RootBaker {
             realLower = problem.realLower,
             realUpper = problem.realUpper,
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
-            openIntLo = problem.openIntLo,
-            openIntHi = problem.openIntHi,
+            packedOpenIntLo = problem.intBounds.openLowerBits,
+            packedOpenIntHi = problem.intBounds.openUpperBits,
         )
     }
 

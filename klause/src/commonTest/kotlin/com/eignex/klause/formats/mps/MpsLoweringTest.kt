@@ -64,6 +64,8 @@ class MpsLoweringTest {
         // No rows and no objective: any single value is a witness, so the small-model box is
         // equisatisfiable and the model is not flagged clamped.
         val compiled = model(MpsVar("x", integer = true, lower = null, upper = null)).toProblem(searchBound = 1000L)
+        assertTrue(compiled.model.intBounds.isOpenLower(0))
+        assertTrue(compiled.model.intBounds.isOpenUpper(0))
         assertFalse(compiled.bounded().clamped)
 
         // Under an objective the box could truncate an unbounded optimum, so the lossy search

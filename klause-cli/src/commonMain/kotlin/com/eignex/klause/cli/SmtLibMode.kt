@@ -4,8 +4,8 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.IntDigitColumns
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.formats.smtlib.UnsupportedSmtException
+import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 
 /**
@@ -19,15 +19,9 @@ internal object SmtLibMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
-        // Shared with the deferred bounding: set once the presolve-phase OBBT decides whether a side fell
-        // back to a lossy clamp, and read by output() at status-line time (after solving) — so an `unsat`
-        // over a clamped box is reported as `unknown`.
-        private val clamp = ClampFlag()
-
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            // Unbounded SMT ints use the ambient default int range (shared with the FlatZinc front-end).
             val config = KlauseConfig.current
             val parsed = SmtLib.parse(
                 openFileSource(path),
@@ -36,67 +30,35 @@ internal object SmtLibMode : CliMode {
                 searchBound = config.unboundedSearchBound,
             )
             cliLogger(common.verbose).v {
-                "parsed ${fileName(path)}: bool=${parsed.problem.numBoolVars} int=${parsed.problem.numIntVars} " +
-                    "real=${parsed.problem.numRealVars} factors=${parsed.problem.numFactors}"
+                "parsed ${fileName(path)}: bool=${parsed.model.numBoolVars} int=${parsed.model.numIntVars} " +
+                    "real=${parsed.model.numRealVars} factors=${parsed.model.factors.size}"
             }
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s, parsed.intDigits) }
-            val base = linearSolvable(parsed.problem, parsed.objective, parsed.sense == ObjectiveSense.MAXIMIZE, render)
-            // Defer OBBT into the presolve phase: parsing only reads, and the LP tightening runs under the
-            // presolve budget instead of unbounded at load. The run also decides the clamp verdict. Absent
-            // when the model has no open domain (nothing to bound, never clamped).
-            clamp.clamped = parsed.clamped
-            val deferred = parsed.deferredBounds ?: return base
-            // A single witness answers "is it satisfiable"; it answers neither "what are all the solutions"
-            // nor "which is best", so those callers must search as usual.
-            val witnessUsable = parsed.objective == null && !common.allSolutions && common.solutionCap == null
-            return base.withDeferredBounds { cancellation ->
-                val bounded = deferred.run(cancellation)
-                clamp.clamped = bounded.clamped
-                // The digit lowering can add columns after the bounds were captured, leaving the witness
-                // shorter than the problem; it covers only the variables it was derived over.
-                val witness = bounded.openSolution
-                    ?.takeIf { witnessUsable && it.size == parsed.problem.numIntVars }
-                if (witness != null) {
-                    // Verified against every row of the model before it was offered, and the model is
-                    // nothing but those rows — so pinning to it hands the search a solution to confirm,
-                    // where the invented box it would otherwise search may hold none.
-                    parsed.problem.withIntDomains(
-                        Array(witness.size) { IntDomain(witness[it], witness[it]) },
-                        BooleanArray(witness.size),
-                        BooleanArray(witness.size),
-                    )
-                } else if (bounded.openlyInfeasible) {
-                    // Refuted over the genuinely open ranges, so the model has no solution anywhere —
-                    // not merely none in the search box. Hand the search a problem that says so, and
-                    // leave the clamp flag clear so the verdict is reported as the `unsat` it is.
-                    refutedProblem(parsed.problem)
-                } else {
-                    val boxed = parsed.problem.withIntDomains(bounded.domains, bounded.openLo, bounded.openHi)
-                    // Offer the status line a way to keep a refutation the box played no part in: the
-                    // certificate is derived over the factors no invented bound reaches, so it can only
-                    // recover the `unsat` that would otherwise be downgraded, never produce one.
-                    if (bounded.clamped) {
-                        clamp.boxFreeRefutation = { refutationIsBoxFree(boxed, certificationBudget(common)) }
+            when (parsed.sourcePipeline) {
+                ProblemPipeline.UNSUPPORTED_OPEN ->
+                    throw UnsupportedSmtException("open integer bounds require complete difference-theory coverage")
+
+                ProblemPipeline.DIFFERENCE_THEORY -> {
+                    if (parsed.objective != null) {
+                        throw UnsupportedSmtException("open difference-theory optimization is unsupported")
                     }
-                    boxed
+                    return differenceTheorySolvable(parsed.model, render)
                 }
+
+                ProblemPipeline.FINITE_CP -> Unit
             }
+            return linearSolvable(
+                parsed.model.materializeFiniteBounds(),
+                parsed.objective,
+                parsed.sense == ObjectiveSense.MAXIMIZE,
+                render,
+            )
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput(clamp)
-
-        /** Budget for the certification: half of what the run's `-t` deadline still allows, so a residual
-         *  the sound analysis cannot refute quickly cannot spend the rest of the limit either. Never, for a
-         *  run with no limit. */
-        private fun certificationBudget(common: CommonOptions): Cancellation {
-            val deadline = common.deadlineAtMs ?: return Cancellation.Never
-            val now = nowMillis()
-            val stopAt = now + (deadline - now).coerceAtLeast(0L) / 2
-            return Cancellation { nowMillis() >= stopAt }
-        }
+        override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput()
     }
 }
 

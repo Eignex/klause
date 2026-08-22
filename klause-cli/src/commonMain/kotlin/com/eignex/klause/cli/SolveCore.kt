@@ -1,8 +1,10 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.DifferenceTheorySolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
@@ -75,6 +77,27 @@ internal object SolveCore {
         val nodeBudget = takeNodeBudget(common)
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
+        rawSolvable.differenceTheoryModel?.let { model ->
+            if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
+                usageError("all-solution enumeration is unavailable for open difference-theory models")
+            }
+            output.begin(optimize = false, maximize = false)
+            val result = DifferenceTheorySolver(model).solve(
+                BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
+            )
+            when (result) {
+                is SolveResult.Sat -> {
+                    output.onSolution(rawSolvable.render(result.assignment), null)
+                    output.onComplete(Verdict.SATISFIABLE)
+                }
+
+                is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
+                is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+            }
+            if (common.statistics) output.onStatistics(result.stats, 0L, if (result is SolveResult.Sat) 1L else 0L)
+            return
+        }
         val presolveStart = TimeSource.Monotonic.markNow()
         val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
         val solvable = rawSolvable.presolved(
@@ -89,8 +112,8 @@ internal object SolveCore {
         // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
         if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
             printPresolved(
-                rawSolvable.problem,
-                solvable.problem,
+                rawSolvable.problem ?: solvable.finiteProblem,
+                solvable.finiteProblem,
                 solvable.presolve,
                 presolveElapsed,
                 common.loadElapsedMs,
@@ -98,8 +121,8 @@ internal object SolveCore {
             return
         }
         cliLogger(common.verbose).v {
-            val p0 = rawSolvable.problem
-            val p1 = solvable.problem
+            val p0 = rawSolvable.problem ?: solvable.finiteProblem
+            val p1 = solvable.finiteProblem
             "presolve [${engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
                 "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}"
         }
@@ -262,7 +285,7 @@ internal object SolveCore {
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
-        val solver = BacktrackSolver(solvable.problem.bake())
+        val solver = BacktrackSolver(solvable.finiteProblem.bake())
         if (dryRunSolver) {
             errPrintln("solver dry-run:")
             errPrintln(solver.describe(params))
@@ -423,18 +446,16 @@ internal object SolveCore {
      * figure is the second one — a column that is eligible *and* carries an invented bound is one the
      * search box is paying for and buying nothing with.
      *
-     * Read from [Problem.openIntLo] / [Problem.openIntHi], which record which *sides* a front-end could
+     * Read from [Problem.intBounds], which records which *sides* a front-end could
      * not bound, rather than from the width: a genuinely declared wide domain is not a clamp, and only
      * the provenance tells the two apart.
      */
     private fun theoryText(problem: Problem): String {
         val partition = problem.variablePartition()
-        val lo = problem.openIntLo
-        val hi = problem.openIntHi
         var clampedAndEligible = 0
         for (v in 0 until partition.size) {
             if (!partition.isTheoryEligible(v)) continue
-            if (lo?.getOrNull(v) == true || hi?.getOrNull(v) == true) clampedAndEligible++
+            if (problem.intBounds.isOpenLower(v) || problem.intBounds.isOpenUpper(v)) clampedAndEligible++
         }
         return "${partition.theoryEligibleCount} of ${partition.size}, $clampedAndEligible of them clamped"
     }
@@ -514,7 +535,7 @@ internal object SolveCore {
         }
         // A backtrack-only pool has no LS resolution to carry its dry-run flag, so consume it here.
         if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
-            printBtPool(solvable.problem, btPool, kind)
+            printBtPool(solvable.finiteProblem, btPool, kind)
             return
         }
         val scenario = buildPortfolioScenario(
@@ -536,7 +557,7 @@ internal object SolveCore {
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
         val workers = PortfolioBuilder.build(
-            solvable.problem.bake(),
+            solvable.finiteProblem.bake(),
             scenario,
             objective = solvable.linearObjective,
             lsObjective = solvable.lsObjective,

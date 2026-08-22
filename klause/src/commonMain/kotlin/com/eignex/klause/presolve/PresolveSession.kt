@@ -304,8 +304,8 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             realLower = base.realLower,
             realUpper = base.realUpper,
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
-            openIntLo = base.openIntLo,
-            openIntHi = base.openIntHi,
+            packedOpenIntLo = base.intBounds.openLowerBits,
+            packedOpenIntHi = base.intBounds.openUpperBits,
         )
         cachedInput = input
         inputDirty = false
@@ -453,8 +453,8 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
             realLower = base.realLower,
             realUpper = base.realUpper,
             // See PresolveShared.rebuildProblem: the open-side marks address a namespace presolve keeps.
-            openIntLo = base.openIntLo,
-            openIntHi = base.openIntHi,
+            packedOpenIntLo = base.intBounds.openLowerBits,
+            packedOpenIntHi = base.intBounds.openUpperBits,
         )
     }
 }
