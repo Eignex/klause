@@ -38,11 +38,8 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
             val pipeline = compiled.model.pipeline()
             when (pipeline) {
-                ProblemPipeline.UNSUPPORTED_OPEN ->
-                    throw MpsFormatException("open integer bounds require supported difference or General LIA coverage")
-
-                ProblemPipeline.EXACT_LRA ->
-                    throw MpsFormatException("open real MPS models require the future mixed-theory pipeline")
+                ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA ->
+                    throw MpsFormatException("open MPS models require a supported theory pipeline")
 
                 ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
                     if (compiled.objective != null) {
@@ -109,11 +106,8 @@ internal class MpsOutput : BufferedBestOutput() {
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
-
         Verdict.OPTIMAL -> "s OPTIMUM FOUND"
-
         Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
-
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 

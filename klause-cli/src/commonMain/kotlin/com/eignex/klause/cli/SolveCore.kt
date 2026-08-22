@@ -150,7 +150,9 @@ internal object SolveCore {
 
                     is ExactLraResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
                 }
-                if (common.statistics) output.onStatistics(result.stats, 0L, if (result is ExactLraResult.Sat) 1L else 0L)
+                if (common.statistics) {
+                    output.onStatistics(result.stats, 0L, if (result is ExactLraResult.Sat) 1L else 0L)
+                }
                 return
             }
 
