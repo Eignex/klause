@@ -370,6 +370,7 @@ final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum
 
 final enum class com.eignex.klause.solver/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver/ProblemPipeline> { // com.eignex.klause.solver/ProblemPipeline|null[0]
     enum entry DIFFERENCE_THEORY // com.eignex.klause.solver/ProblemPipeline.DIFFERENCE_THEORY|null[0]
+    enum entry EXACT_LRA // com.eignex.klause.solver/ProblemPipeline.EXACT_LRA|null[0]
     enum entry FINITE_CP // com.eignex.klause.solver/ProblemPipeline.FINITE_CP|null[0]
     enum entry GENERAL_LIA // com.eignex.klause.solver/ProblemPipeline.GENERAL_LIA|null[0]
     enum entry UNSUPPORTED_OPEN // com.eignex.klause.solver/ProblemPipeline.UNSUPPORTED_OPEN|null[0]
@@ -811,6 +812,56 @@ sealed interface com.eignex.klause.backtrack.selector/VarRef { // com.eignex.kla
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack.selector/VarRef.IntVar.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.IntVar.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.backtrack.selector/VarRef.IntVar.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.backtrack/ExactLraResult { // com.eignex.klause.backtrack/ExactLraResult|null[0]
+    abstract val stats // com.eignex.klause.backtrack/ExactLraResult.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.stats.<get-stats>|<get-stats>(){}[0]
+
+    final class Sat : com.eignex.klause.backtrack/ExactLraResult { // com.eignex.klause.backtrack/ExactLraResult.Sat|null[0]
+        constructor <init>(com.eignex.klause.backtrack/ExactLraAssignment, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.backtrack/ExactLraResult.Sat.<init>|<init>(com.eignex.klause.backtrack.ExactLraAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val assignment // com.eignex.klause.backtrack/ExactLraResult.Sat.assignment|{}assignment[0]
+            final fun <get-assignment>(): com.eignex.klause.backtrack/ExactLraAssignment // com.eignex.klause.backtrack/ExactLraResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val stats // com.eignex.klause.backtrack/ExactLraResult.Sat.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.backtrack/ExactLraAssignment // com.eignex.klause.backtrack/ExactLraResult.Sat.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.Sat.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.backtrack/ExactLraAssignment = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.backtrack/ExactLraResult.Sat // com.eignex.klause.backtrack/ExactLraResult.Sat.copy|copy(com.eignex.klause.backtrack.ExactLraAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/ExactLraResult.Sat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/ExactLraResult.Sat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.backtrack/ExactLraResult.Sat.toString|toString(){}[0]
+    }
+
+    final class Unknown : com.eignex.klause.backtrack/ExactLraResult { // com.eignex.klause.backtrack/ExactLraResult.Unknown|null[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.backtrack/ExactLraResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val reason // com.eignex.klause.backtrack/ExactLraResult.Unknown.reason|{}reason[0]
+            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.backtrack/ExactLraResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val stats // com.eignex.klause.backtrack/ExactLraResult.Unknown.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.backtrack/ExactLraResult.Unknown.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.Unknown.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.backtrack/ExactLraResult.Unknown // com.eignex.klause.backtrack/ExactLraResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/ExactLraResult.Unknown.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/ExactLraResult.Unknown.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.backtrack/ExactLraResult.Unknown.toString|toString(){}[0]
+    }
+
+    final class Unsat : com.eignex.klause.backtrack/ExactLraResult { // com.eignex.klause.backtrack/ExactLraResult.Unsat|null[0]
+        constructor <init>(com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.backtrack/ExactLraResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val stats // com.eignex.klause.backtrack/ExactLraResult.Unsat.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/ExactLraResult.Unsat.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.backtrack/ExactLraResult.Unsat // com.eignex.klause.backtrack/ExactLraResult.Unsat.copy|copy(com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/ExactLraResult.Unsat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/ExactLraResult.Unsat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.backtrack/ExactLraResult.Unsat.toString|toString(){}[0]
     }
 }
 
@@ -2230,6 +2281,28 @@ final class com.eignex.klause.backtrack/DifferenceTheorySolver { // com.eignex.k
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.backtrack/DifferenceTheorySolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
     final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/DifferenceTheorySolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+}
+
+final class com.eignex.klause.backtrack/ExactLraAssignment { // com.eignex.klause.backtrack/ExactLraAssignment|null[0]
+    constructor <init>(kotlin/BooleanArray, kotlin.collections/List<com.eignex.klause.lp/BigFraction>) // com.eignex.klause.backtrack/ExactLraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.collections.List<com.eignex.klause.lp.BigFraction>){}[0]
+
+    final val bools // com.eignex.klause.backtrack/ExactLraAssignment.bools|{}bools[0]
+        final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.backtrack/ExactLraAssignment.bools.<get-bools>|<get-bools>(){}[0]
+    final val reals // com.eignex.klause.backtrack/ExactLraAssignment.reals|{}reals[0]
+        final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.lp/BigFraction> // com.eignex.klause.backtrack/ExactLraAssignment.reals.<get-reals>|<get-reals>(){}[0]
+
+    final fun component1(): kotlin/BooleanArray // com.eignex.klause.backtrack/ExactLraAssignment.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.eignex.klause.lp/BigFraction> // com.eignex.klause.backtrack/ExactLraAssignment.component2|component2(){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin.collections/List<com.eignex.klause.lp/BigFraction> = ...): com.eignex.klause.backtrack/ExactLraAssignment // com.eignex.klause.backtrack/ExactLraAssignment.copy|copy(kotlin.BooleanArray;kotlin.collections.List<com.eignex.klause.lp.BigFraction>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/ExactLraAssignment.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/ExactLraAssignment.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.backtrack/ExactLraAssignment.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.backtrack/ExactLraSolver { // com.eignex.klause.backtrack/ExactLraSolver|null[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.backtrack/ExactLraSolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
+
+    final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.backtrack/ExactLraResult // com.eignex.klause.backtrack/ExactLraSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
 }
 
 final class com.eignex.klause.backtrack/GeneralLiaAssignment { // com.eignex.klause.backtrack/GeneralLiaAssignment|null[0]
@@ -5334,6 +5407,40 @@ final class com.eignex.klause.lp.bounding/LpPlan { // com.eignex.klause.lp.bound
 }
 
 final class com.eignex.klause.lp.cut/SharedCut // com.eignex.klause.lp.cut/SharedCut|null[0]
+
+final class com.eignex.klause.lp/BigFraction { // com.eignex.klause.lp/BigFraction|null[0]
+    final val den // com.eignex.klause.lp/BigFraction.den|{}den[0]
+        final fun <get-den>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lp/BigFraction.den.<get-den>|<get-den>(){}[0]
+    final val isZero // com.eignex.klause.lp/BigFraction.isZero|{}isZero[0]
+        final fun <get-isZero>(): kotlin/Boolean // com.eignex.klause.lp/BigFraction.isZero.<get-isZero>|<get-isZero>(){}[0]
+    final val num // com.eignex.klause.lp/BigFraction.num|{}num[0]
+        final fun <get-num>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lp/BigFraction.num.<get-num>|<get-num>(){}[0]
+
+    final fun compareTo(com.eignex.klause.lp/BigFraction): kotlin/Int // com.eignex.klause.lp/BigFraction.compareTo|compareTo(com.eignex.klause.lp.BigFraction){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lp/BigFraction.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lp/BigFraction.hashCode|hashCode(){}[0]
+    final fun minus(com.eignex.klause.lp/BigFraction): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.minus|minus(com.eignex.klause.lp.BigFraction){}[0]
+    final fun negated(): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.negated|negated(){}[0]
+    final fun plus(com.eignex.klause.lp/BigFraction): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.plus|plus(com.eignex.klause.lp.BigFraction){}[0]
+    final fun reciprocal(): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.reciprocal|reciprocal(){}[0]
+    final fun signum(): kotlin/Int // com.eignex.klause.lp/BigFraction.signum|signum(){}[0]
+    final fun times(com.eignex.klause.lp/BigFraction): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.times|times(com.eignex.klause.lp.BigFraction){}[0]
+    final fun toDouble(): kotlin/Double // com.eignex.klause.lp/BigFraction.toDouble|toDouble(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lp/BigFraction.toString|toString(){}[0]
+
+    final object Companion { // com.eignex.klause.lp/BigFraction.Companion|null[0]
+        final val MINUS_ONE // com.eignex.klause.lp/BigFraction.Companion.MINUS_ONE|{}MINUS_ONE[0]
+            final fun <get-MINUS_ONE>(): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.Companion.MINUS_ONE.<get-MINUS_ONE>|<get-MINUS_ONE>(){}[0]
+        final val ONE // com.eignex.klause.lp/BigFraction.Companion.ONE|{}ONE[0]
+            final fun <get-ONE>(): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.Companion.ONE.<get-ONE>|<get-ONE>(){}[0]
+        final val ZERO // com.eignex.klause.lp/BigFraction.Companion.ZERO|{}ZERO[0]
+            final fun <get-ZERO>(): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.Companion.ZERO.<get-ZERO>|<get-ZERO>(){}[0]
+
+        final fun of(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.Companion.of|of(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+        final fun ofDouble(kotlin/Double): com.eignex.klause.lp/BigFraction? // com.eignex.klause.lp/BigFraction.Companion.ofDouble|ofDouble(kotlin.Double){}[0]
+        final fun ofLong(kotlin/Long): com.eignex.klause.lp/BigFraction // com.eignex.klause.lp/BigFraction.Companion.ofLong|ofLong(kotlin.Long){}[0]
+    }
+}
 
 final class com.eignex.klause.lp/HullFlags { // com.eignex.klause.lp/HullFlags|null[0]
     constructor <init>(kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean, kotlin/Boolean) // com.eignex.klause.lp/HullFlags.<init>|<init>(kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
