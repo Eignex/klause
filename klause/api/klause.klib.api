@@ -371,6 +371,7 @@ final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum
 final enum class com.eignex.klause.solver/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver/ProblemPipeline> { // com.eignex.klause.solver/ProblemPipeline|null[0]
     enum entry DIFFERENCE_THEORY // com.eignex.klause.solver/ProblemPipeline.DIFFERENCE_THEORY|null[0]
     enum entry FINITE_CP // com.eignex.klause.solver/ProblemPipeline.FINITE_CP|null[0]
+    enum entry GENERAL_LIA // com.eignex.klause.solver/ProblemPipeline.GENERAL_LIA|null[0]
     enum entry UNSUPPORTED_OPEN // com.eignex.klause.solver/ProblemPipeline.UNSUPPORTED_OPEN|null[0]
 
     final val entries // com.eignex.klause.solver/ProblemPipeline.entries|#static{}entries[0]
@@ -810,6 +811,56 @@ sealed interface com.eignex.klause.backtrack.selector/VarRef { // com.eignex.kla
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack.selector/VarRef.IntVar.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack.selector/VarRef.IntVar.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.backtrack.selector/VarRef.IntVar.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.backtrack/GeneralLiaResult { // com.eignex.klause.backtrack/GeneralLiaResult|null[0]
+    abstract val stats // com.eignex.klause.backtrack/GeneralLiaResult.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.stats.<get-stats>|<get-stats>(){}[0]
+
+    final class Sat : com.eignex.klause.backtrack/GeneralLiaResult { // com.eignex.klause.backtrack/GeneralLiaResult.Sat|null[0]
+        constructor <init>(com.eignex.klause.backtrack/GeneralLiaAssignment, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.backtrack/GeneralLiaResult.Sat.<init>|<init>(com.eignex.klause.backtrack.GeneralLiaAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val assignment // com.eignex.klause.backtrack/GeneralLiaResult.Sat.assignment|{}assignment[0]
+            final fun <get-assignment>(): com.eignex.klause.backtrack/GeneralLiaAssignment // com.eignex.klause.backtrack/GeneralLiaResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val stats // com.eignex.klause.backtrack/GeneralLiaResult.Sat.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.backtrack/GeneralLiaAssignment // com.eignex.klause.backtrack/GeneralLiaResult.Sat.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.Sat.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.backtrack/GeneralLiaAssignment = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.backtrack/GeneralLiaResult.Sat // com.eignex.klause.backtrack/GeneralLiaResult.Sat.copy|copy(com.eignex.klause.backtrack.GeneralLiaAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/GeneralLiaResult.Sat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/GeneralLiaResult.Sat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.backtrack/GeneralLiaResult.Sat.toString|toString(){}[0]
+    }
+
+    final class Unknown : com.eignex.klause.backtrack/GeneralLiaResult { // com.eignex.klause.backtrack/GeneralLiaResult.Unknown|null[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val reason // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.reason|{}reason[0]
+            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val stats // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.backtrack/GeneralLiaResult.Unknown // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.backtrack/GeneralLiaResult.Unknown.toString|toString(){}[0]
+    }
+
+    final class Unsat : com.eignex.klause.backtrack/GeneralLiaResult { // com.eignex.klause.backtrack/GeneralLiaResult.Unsat|null[0]
+        constructor <init>(com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val stats // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.backtrack/GeneralLiaResult.Unsat // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.copy|copy(com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.backtrack/GeneralLiaResult.Unsat.toString|toString(){}[0]
     }
 }
 
@@ -2179,6 +2230,28 @@ final class com.eignex.klause.backtrack/DifferenceTheorySolver { // com.eignex.k
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.backtrack/DifferenceTheorySolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
     final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.backtrack/DifferenceTheorySolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+}
+
+final class com.eignex.klause.backtrack/GeneralLiaAssignment { // com.eignex.klause.backtrack/GeneralLiaAssignment|null[0]
+    constructor <init>(kotlin/BooleanArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>) // com.eignex.klause.backtrack/GeneralLiaAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
+
+    final val bools // com.eignex.klause.backtrack/GeneralLiaAssignment.bools|{}bools[0]
+        final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.backtrack/GeneralLiaAssignment.bools.<get-bools>|<get-bools>(){}[0]
+    final val ints // com.eignex.klause.backtrack/GeneralLiaAssignment.ints|{}ints[0]
+        final fun <get-ints>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.backtrack/GeneralLiaAssignment.ints.<get-ints>|<get-ints>(){}[0]
+
+    final fun component1(): kotlin/BooleanArray // com.eignex.klause.backtrack/GeneralLiaAssignment.component1|component1(){}[0]
+    final fun component2(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.backtrack/GeneralLiaAssignment.component2|component2(){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ...): com.eignex.klause.backtrack/GeneralLiaAssignment // com.eignex.klause.backtrack/GeneralLiaAssignment.copy|copy(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.backtrack/GeneralLiaAssignment.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.backtrack/GeneralLiaAssignment.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.backtrack/GeneralLiaAssignment.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.backtrack/GeneralLiaSolver { // com.eignex.klause.backtrack/GeneralLiaSolver|null[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.backtrack/GeneralLiaSolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
+
+    final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.backtrack/GeneralLiaResult // com.eignex.klause.backtrack/GeneralLiaSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
 }
 
 final class com.eignex.klause.backtrack/NodeBudget { // com.eignex.klause.backtrack/NodeBudget|null[0]

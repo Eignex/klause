@@ -2,6 +2,8 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.GeneralLiaResult
+import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.presolve.PresolveConfig
@@ -758,6 +760,11 @@ class SmtLibTest {
     /** The value of the single declared int in [text], read off its digit columns when it has them. */
     private fun soleIntValue(text: String): BigInteger {
         val parsed = SmtLib.parse(text)
+        if (parsed.sourcePipeline == com.eignex.klause.solver.ProblemPipeline.GENERAL_LIA) {
+            val result = GeneralLiaSolver(parsed.model).solve()
+            assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
+            return result.assignment.ints[parsed.intVarNames.values.first()]
+        }
         val r = BacktrackSolver(parsed.problem.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         val id = parsed.intVarNames.values.first()
@@ -795,9 +802,9 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a declared integer the model drives past Long is lowered onto digit columns`() {
-        // e = 4096·a with a ≥ 2^60 forces e past 2^72, so no assignment fits a Long domain and the search
-        // has nothing to find. The digits give e somewhere to live, and the witness reads back off them.
+    fun `a declared integer the model drives past Long stays in General LIA`() {
+        // c = 4096·a with a ≥ 2^60 forces c past 2^72. General LIA keeps its wide rows and witness in
+        // BigInteger rather than rewriting a declared column onto finite Long digits.
         val text = """
             (set-logic QF_LIA)
             (declare-fun a () Int) (declare-fun b () Int) (declare-fun c () Int)
@@ -806,16 +813,11 @@ class SmtLibTest {
             (check-sat)
         """.trimIndent()
         val parsed = SmtLib.parse(text)
-        val digits = parsed.intDigits
-        assertTrue(digits.isNotEmpty(), "c reaches 2^72, so it must be lowered onto digits")
-        assertTrue(parsed.clamped, "the box is still invented, so an unsat over it stays unknown")
-        val r = BacktrackSolver(parsed.problem.bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
-        // The recovered values satisfy the original chain exactly.
-        val values = parsed.intVarNames.mapValues { (_, id) ->
-            digits[id]?.decimalIn(r.assignment.ints)?.let { BigInteger.parseString(it) }
-                ?: BigInteger.fromLong(r.assignment.ints[id])
-        }
+        assertTrue(parsed.intDigits.isEmpty(), "General LIA must not lower declared columns onto digits")
+        assertFalse(parsed.clamped, "General LIA does not invent a Long clamp")
+        val result = GeneralLiaSolver(parsed.model).solve()
+        assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
+        val values = parsed.intVarNames.mapValues { (_, id) -> result.assignment.ints[id] }
         val sixtyFour = BigInteger.fromLong(64)
         assertEquals(values.getValue("b"), values.getValue("a") * sixtyFour, "b = 64a")
         assertEquals(values.getValue("c"), values.getValue("b") * sixtyFour, "c = 64b")

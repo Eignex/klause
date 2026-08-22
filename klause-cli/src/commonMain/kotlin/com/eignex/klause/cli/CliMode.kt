@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.GeneralLiaAssignment
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -557,6 +558,10 @@ internal class Solvable(
     val deferredBounds: ((Cancellation) -> Problem)? = null,
     /** Open integer source model handled by the dedicated difference-theory satisfiability pipeline. */
     val differenceTheoryModel: ProblemSpec? = null,
+    /** Open integer source model handled by the complete General LIA satisfiability pipeline. */
+    val generalLiaModel: ProblemSpec? = null,
+    /** Render an arbitrary-precision General LIA witness. */
+    val generalLiaRender: ((GeneralLiaAssignment) -> String)? = null,
 ) {
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
 }
@@ -573,6 +578,21 @@ internal fun differenceTheorySolvable(model: ProblemSpec, render: (Sample) -> St
     render = render,
     objectiveValue = null,
     differenceTheoryModel = model,
+)
+
+/** Build a satisfiability instance whose open integer rows are decided by General LIA. */
+internal fun generalLiaSolvable(model: ProblemSpec, render: (GeneralLiaAssignment) -> String): Solvable = Solvable(
+    problem = null,
+    optimize = false,
+    maximize = false,
+    lsObjective = null,
+    linearObjective = null,
+    objVarId = null,
+    definitionalSweep = null,
+    render = { error("General LIA witnesses are rendered without narrowing to Sample") },
+    objectiveValue = null,
+    generalLiaModel = model,
+    generalLiaRender = render,
 )
 
 /** Shared mutable cell for a post-presolve clamp verdict: the deferred bounding ([Solvable.deferredBounds])

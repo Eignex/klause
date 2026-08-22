@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.GeneralLiaAssignment
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.IntDigitColumns
@@ -39,13 +40,26 @@ internal object SmtLibMode : CliMode {
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s, parsed.intDigits) }
             when (parsed.sourcePipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
-                    throw UnsupportedSmtException("open integer bounds require complete difference-theory coverage")
+                    throw UnsupportedSmtException(
+                        "open integer bounds require supported difference or General LIA coverage",
+                    )
 
-                ProblemPipeline.DIFFERENCE_THEORY -> {
+                ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
                     if (parsed.objective != null) {
-                        throw UnsupportedSmtException("open difference-theory optimization is unsupported")
+                        val theory = if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                            "difference-theory"
+                        } else {
+                            "General LIA"
+                        }
+                        throw UnsupportedSmtException("open $theory optimization is unsupported")
                     }
-                    return differenceTheorySolvable(parsed.model, render)
+                    return if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                        differenceTheorySolvable(parsed.model, render)
+                    } else {
+                        generalLiaSolvable(parsed.model) { assignment ->
+                            renderGeneralLiaModel(ints, bools, reals, assignment)
+                        }
+                    }
                 }
 
                 ProblemPipeline.FINITE_CP -> Unit
@@ -78,6 +92,20 @@ internal fun renderModel(
         val v = if (id < s.reals.size) s.reals[id] else 0.0
         append("  (define-fun $name () Real $v)\n")
     }
+    append(")")
+}
+
+/** Render an exact General LIA model without narrowing its integer values to [Long]. */
+internal fun renderGeneralLiaModel(
+    ints: Map<String, Int>,
+    bools: Map<String, Int>,
+    reals: Map<String, Int>,
+    assignment: GeneralLiaAssignment,
+): String = buildString {
+    check(reals.isEmpty()) { "General LIA does not admit real variables" }
+    append("(\n")
+    for ((name, id) in ints) append("  (define-fun $name () Int ${assignment.ints[id]})\n")
+    for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.bools[id]})\n")
     append(")")
 }
 
