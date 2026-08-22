@@ -1,6 +1,5 @@
 package com.eignex.klause.theory.lia
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
@@ -8,10 +7,12 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.generalLiaWitnessBound
 import com.eignex.klause.solver.pipeline
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.TheoryParams
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** An exact General LIA assignment, independent of CP's Long-backed Sample. */
@@ -62,7 +63,7 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
     }
 
     /** Decide satisfiability without converting an integer bound, coefficient, or witness to Long. */
-    fun solve(params: BacktrackParams = BacktrackParams()): GeneralLiaResult {
+    fun solve(params: TheoryParams = TheoryParams()): GeneralLiaResult {
         val domains = Array(model.numIntVars) { v ->
             val lo = if (model.intBounds.hasLower(v)) {
                 maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(v)))
@@ -79,7 +80,9 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         if (domains.any { it.lo > it.hi }) return GeneralLiaResult.Unsat()
         val bools = BooleanArray(model.numBoolVars)
         val boolAssigned = BooleanArray(model.numBoolVars)
-        val search = Search(domains, bools, boolAssigned, params)
+        val search = Search(domains, bools, boolAssigned, params.copy(cancellation = Cancellation {
+            params.cancellation() || model.cancellation()
+        }))
         return when (val outcome = search.run()) {
             is GeneralLiaSearchOutcome.Found -> GeneralLiaResult.Sat(
                 GeneralLiaAssignment(bools.copyOf(), outcome.values),
@@ -99,9 +102,9 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         private val domains: Array<BigInterval>,
         private val bools: BooleanArray,
         private val boolAssigned: BooleanArray,
-        private val params: BacktrackParams,
+        private val params: TheoryParams,
     ) {
-        private var instructionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
+        private var leavesLeft = params.maxLeaves
 
         fun run(): GeneralLiaSearchOutcome {
             val stack = ArrayDeque<Frame>()
@@ -147,12 +150,11 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         }
 
         private fun visit(frame: Frame, stack: ArrayDeque<Frame>): GeneralLiaSearchOutcome? {
-            if (instructionsLeft == 0L || params.nodeBudget?.exhausted() == true) {
+            if (leavesLeft == 0L) {
                 return GeneralLiaSearchOutcome.BudgetCapped
             }
             if (params.cancellation()) return GeneralLiaSearchOutcome.Cancelled
-            instructionsLeft--
-            params.nodeBudget?.spend()
+            leavesLeft--
             if (!propagateEqualities()) return GeneralLiaSearchOutcome.Infeasible
             if (!factorsPossible()) return GeneralLiaSearchOutcome.Infeasible
             val bool = boolAssigned.indexOfFirst { !it }

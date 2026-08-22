@@ -8294,7 +8294,7 @@ final class com.eignex.klause.solver.objective/SingleIntObjective { // com.eigne
 final class com.eignex.klause.solver.pipeline/OpenTheorySolver { // com.eignex.klause.solver.pipeline/OpenTheorySolver|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.solver.pipeline/OpenTheorySolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
-    final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheorySolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheorySolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eignex.klause.solver.result/ConflictAnalysisStats|null[0]
@@ -8806,7 +8806,7 @@ final class com.eignex.klause.solver/VariablePartition { // com.eignex.klause.so
 final class com.eignex.klause.theory.difference/DifferenceTheorySolver { // com.eignex.klause.theory.difference/DifferenceTheorySolver|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.theory.difference/DifferenceTheorySolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
-    final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.theory.difference/DifferenceTheorySolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver/SolveResult // com.eignex.klause.theory.difference/DifferenceTheorySolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.theory.lia/GeneralLiaAssignment { // com.eignex.klause.theory.lia/GeneralLiaAssignment|null[0]
@@ -8828,7 +8828,7 @@ final class com.eignex.klause.theory.lia/GeneralLiaAssignment { // com.eignex.kl
 final class com.eignex.klause.theory.lia/GeneralLiaSolver { // com.eignex.klause.theory.lia/GeneralLiaSolver|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.theory.lia/GeneralLiaSolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
-    final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.theory.lia/GeneralLiaResult // com.eignex.klause.theory.lia/GeneralLiaSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.theory.lia/GeneralLiaResult // com.eignex.klause.theory.lia/GeneralLiaSolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.theory.qflra/ExactLraAssignment { // com.eignex.klause.theory.qflra/ExactLraAssignment|null[0]
@@ -8850,7 +8850,23 @@ final class com.eignex.klause.theory.qflra/ExactLraAssignment { // com.eignex.kl
 final class com.eignex.klause.theory.qflra/ExactLraSolver { // com.eignex.klause.theory.qflra/ExactLraSolver|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.theory.qflra/ExactLraSolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
-    final fun solve(com.eignex.klause.backtrack/BacktrackParams = ...): com.eignex.klause.theory.qflra/ExactLraResult // com.eignex.klause.theory.qflra/ExactLraSolver.solve|solve(com.eignex.klause.backtrack.BacktrackParams){}[0]
+    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.theory.qflra/ExactLraResult // com.eignex.klause.theory.qflra/ExactLraSolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
+}
+
+final class com.eignex.klause.theory/TheoryParams { // com.eignex.klause.theory/TheoryParams|null[0]
+    constructor <init>(kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ...) // com.eignex.klause.theory/TheoryParams.<init>|<init>(kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
+
+    final val cancellation // com.eignex.klause.theory/TheoryParams.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.solver/Cancellation // com.eignex.klause.theory/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val maxLeaves // com.eignex.klause.theory/TheoryParams.maxLeaves|{}maxLeaves[0]
+        final fun <get-maxLeaves>(): kotlin/Long // com.eignex.klause.theory/TheoryParams.maxLeaves.<get-maxLeaves>|<get-maxLeaves>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.theory/TheoryParams.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver/Cancellation // com.eignex.klause.theory/TheoryParams.component2|component2(){}[0]
+    final fun copy(kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ...): com.eignex.klause.theory/TheoryParams // com.eignex.klause.theory/TheoryParams.copy|copy(kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryParams.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.util/Bits { // com.eignex.klause.util/Bits|null[0]

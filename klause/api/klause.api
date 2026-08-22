@@ -8217,8 +8217,8 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : co
 
 public final class com/eignex/klause/solver/pipeline/OpenTheorySolver {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheorySolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheorySolver;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
 
 public final class com/eignex/klause/solver/result/ConflictAnalysisStats {
@@ -8697,10 +8697,25 @@ public final class com/eignex/klause/solver/result/UnsatCore$Companion {
 	public final fun of ([I)Lcom/eignex/klause/solver/result/UnsatCore;
 }
 
+public final class com/eignex/klause/theory/TheoryParams {
+	public fun <init> ()V
+	public fun <init> (JLcom/eignex/klause/solver/Cancellation;)V
+	public synthetic fun <init> (JLcom/eignex/klause/solver/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()Lcom/eignex/klause/solver/Cancellation;
+	public final fun copy (JLcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/theory/TheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/TheoryParams;JLcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancellation ()Lcom/eignex/klause/solver/Cancellation;
+	public final fun getMaxLeaves ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/theory/difference/DifferenceTheorySolver {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/theory/difference/DifferenceTheorySolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
+	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/SolveResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/theory/difference/DifferenceTheorySolver;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
 }
 
 public final class com/eignex/klause/theory/lia/GeneralLiaAssignment {
@@ -8763,8 +8778,8 @@ public final class com/eignex/klause/theory/lia/GeneralLiaResult$Unsat : com/eig
 
 public final class com/eignex/klause/theory/lia/GeneralLiaSolver {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/theory/lia/GeneralLiaResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/theory/lia/GeneralLiaSolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaResult;
+	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/lia/GeneralLiaResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/theory/lia/GeneralLiaSolver;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaResult;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
@@ -8827,8 +8842,8 @@ public final class com/eignex/klause/theory/qflra/ExactLraResult$Unsat : com/eig
 
 public final class com/eignex/klause/theory/qflra/ExactLraSolver {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/theory/qflra/ExactLraResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/theory/qflra/ExactLraSolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraResult;
+	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/qflra/ExactLraResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/theory/qflra/ExactLraSolver;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraResult;
 }
 
 public final class com/eignex/klause/util/Bits {

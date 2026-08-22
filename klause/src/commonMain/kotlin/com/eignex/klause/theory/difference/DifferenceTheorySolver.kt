@@ -2,32 +2,22 @@ package com.eignex.klause.theory.difference
 
 import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.arithmetic.difference.potentialSample
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.SearchOutcome
-import com.eignex.klause.backtrack.driveSearch
-import com.eignex.klause.propagation.difference.DifferenceSystem
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.pipeline
-import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.theory.BooleanTheoryResult
+import com.eignex.klause.theory.BooleanTheorySearch
+import com.eignex.klause.theory.TheoryParams
 
 /** Complete DPLL(T) satisfiability search for an open integer difference-logic [ProblemSpec]. */
 class DifferenceTheorySolver(private val model: ProblemSpec) {
     private val fragment = differenceFragmentOf(model.factors, model.numIntVars, model.intBounds)
-    private val searchProblem = Problem(
-        numBoolVars = model.numBoolVars,
-        numIntVars = 0,
-        intDomains = emptyArray(),
-        factors = model.factors.filter { it.intVars.isEmpty() }.toTypedArray() +
-            listOfNotNull(fragment?.let { DifferenceSystem(it.edges, theoryOnly = true) }),
-        seedDeductions = model.seedDeductions,
-        cancellation = model.cancellation,
-    )
+    private val clauses = model.factors.filterIsInstance<Clause>()
 
     init {
         require(model.pipeline() == ProblemPipeline.DIFFERENCE_THEORY) {
@@ -36,30 +26,22 @@ class DifferenceTheorySolver(private val model: ProblemSpec) {
     }
 
     /** Decide satisfiability without materializing integer search bounds. */
-    fun solve(params: BacktrackParams = BacktrackParams()): SolveResult {
-        val sink = SolveStatsSink(backend = "difference")
-        sink.start()
-        val solver = BacktrackSolver(searchProblem.bake())
-        for (outcome in solver.driveSearch(params, sink) { snap, _ -> complete(snap) }) {
-            sink.stop()
-            val stats = sink.snapshot()
-            return when (outcome) {
-                is SearchOutcome.Found -> SolveResult.Sat(outcome.sample, stats)
-                is SearchOutcome.Exhausted -> SolveResult.Unsat(outcome.core, stats)
-                SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted, stats)
-            }
-        }
-        sink.stop()
-        return SolveResult.Unsat(stats = sink.snapshot())
+    fun solve(params: TheoryParams = TheoryParams()): SolveResult = when (
+        val outcome = BooleanTheorySearch(model.numBoolVars, clauses, params.withModelCancellation()).first(::complete)
+    ) {
+        is BooleanTheoryResult.Found -> SolveResult.Sat(outcome.value)
+        BooleanTheoryResult.Exhausted -> SolveResult.Unsat()
+        BooleanTheoryResult.Cancelled -> SolveResult.Unknown(TerminationReason.Cancelled)
+        BooleanTheoryResult.Unknown -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
     }
 
-    private fun complete(snap: Sample): Sample? {
+    private fun complete(bools: BooleanArray): Sample? {
         val values = if (fragment == null) {
             unconstrainedValues()
         } else {
-            fragment.potentialSample(model.numIntVars, snap.bools) ?: return null
+            fragment.potentialSample(model.numIntVars, bools) ?: return null
         }
-        return snap.copy(ints = values)
+        return Sample(bools.copyOf(), values)
     }
 
     private fun unconstrainedValues(): LongArray = LongArray(model.numIntVars) { variable ->
@@ -69,4 +51,8 @@ class DifferenceTheorySolver(private val model: ProblemSpec) {
             else -> 0L
         }
     }
+
+    private fun TheoryParams.withModelCancellation(): TheoryParams = copy(
+        cancellation = Cancellation { this@withModelCancellation.cancellation() || model.cancellation() },
+    )
 }
