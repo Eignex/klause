@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
@@ -27,13 +26,14 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.OpenTheorySolver
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.variablePartition
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.OpenTheorySolver
+import com.eignex.klause.theory.TheoryParams
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -85,7 +85,7 @@ internal object SolveCore {
                 }
                 output.begin(optimize = false, maximize = false)
                 val result = OpenTheorySolver(pipeline.model).solve(
-                    BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
+                    TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel),
                 )
                 when (result) {
                     is OpenTheoryResult.Sat -> {

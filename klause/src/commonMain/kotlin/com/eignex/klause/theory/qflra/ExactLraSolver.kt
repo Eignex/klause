@@ -1,17 +1,16 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.lp.relaxation.CpToLpRelaxation
-import com.eignex.klause.lp.relaxation.RelaxationDomains
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.supportsExactLra
+import com.eignex.klause.theory.TheoryParams
 
 /** An exact QF_LRA assignment, independent of the finite CP [com.eignex.klause.solver.Sample]. */
 data class ExactLraAssignment(
@@ -58,38 +57,36 @@ class ExactLraSolver(private val model: ProblemSpec) {
     }
 
     /** Decides the model subject to the supplied search budgets and cancellation signal. */
-    fun solve(params: BacktrackParams = BacktrackParams()): ExactLraResult {
-        val problem = model.materializeFiniteBounds()
+    fun solve(params: TheoryParams = TheoryParams()): ExactLraResult {
+        val cancellation = Cancellation { params.cancellation() || model.cancellation() }
         val bools = BooleanArray(model.numBoolVars)
-        var instructionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
+        val system = QfLraSystem(model)
+        var leavesLeft = params.maxLeaves
         while (true) {
-            if (instructionsLeft == 0L || params.nodeBudget?.exhausted() == true) {
+            if (leavesLeft == 0L) {
                 return ExactLraResult.Unknown(TerminationReason.BudgetExhausted)
             }
-            if (params.cancellation()) return ExactLraResult.Unknown(TerminationReason.Cancelled)
-            instructionsLeft--
-            params.nodeBudget?.spend()
-            val relaxation = CpToLpRelaxation(problem, null).build(PinnedBools(bools))
+            if (cancellation()) return ExactLraResult.Unknown(TerminationReason.Cancelled)
+            leavesLeft--
+            if (!clausesHold(bools)) {
+                if (!nextAssignment(bools)) return ExactLraResult.Unsat()
+                continue
+            }
+            val relaxation = system.build(bools)
             val outcome = bigRationalOutcome(
                 relaxation.model,
-                Cancellation { params.cancellation() },
+                cancellation,
                 maxPivots = Int.MAX_VALUE,
             )
             when (outcome.feasibility) {
                 RationalFeasibility.FEASIBLE -> return ExactLraResult.Sat(
-                    ExactLraAssignment(bools.copyOf(), reals(problem.numRealVars, relaxation, outcome.witness!!)),
+                    ExactLraAssignment(bools.copyOf(), reals(model.numRealVars, relaxation, outcome.witness!!)),
                 )
 
                 RationalFeasibility.UNKNOWN -> return ExactLraResult.Unknown(TerminationReason.Cancelled)
 
                 RationalFeasibility.INFEASIBLE -> {
-                    var bit = bools.lastIndex
-                    while (bit >= 0 && bools[bit]) {
-                        bools[bit] = false
-                        bit--
-                    }
-                    if (bit < 0) return ExactLraResult.Unsat()
-                    bools[bit] = true
+                    if (!nextAssignment(bools)) return ExactLraResult.Unsat()
                 }
             }
         }
@@ -97,23 +94,30 @@ class ExactLraSolver(private val model: ProblemSpec) {
 
     private fun reals(
         count: Int,
-        relaxation: com.eignex.klause.lp.relaxation.LpRelaxation,
+        relaxation: QfLraLeaf,
         witness: List<BigFraction>,
     ): List<BigFraction> {
         val result = MutableList(count) { BigFraction.ZERO }
-        for (column in relaxation.colRealId.indices) {
-            val real = relaxation.colRealId[column]
-            if (real >= 0) {
-                val value = witness[column]
-                result[real] = if (relaxation.colRealSign[column] > 0) result[real] + value else result[real] - value
-            }
+        for (column in relaxation.realId.indices) {
+            val real = relaxation.realId[column]
+            val value = witness[column]
+            result[real] = if (relaxation.realSign[column] > 0) result[real] + value else result[real] - value
         }
         return result
     }
 
-    private class PinnedBools(private val bools: BooleanArray) : RelaxationDomains {
-        override fun intDomain(varId: Int): IntDomain = error("pure-real exact LRA has no integer domains")
+    private fun clausesHold(bools: BooleanArray): Boolean = model.factors.filterIsInstance<Clause>().all { clause ->
+        clause.literals.any { Lit.evaluate(it, bools[Lit.variable(it)]) }
+    }
 
-        override fun boolValue(varId: Int): Boolean = bools[varId]
+    private fun nextAssignment(bools: BooleanArray): Boolean {
+        var bit = bools.lastIndex
+        while (bit >= 0 && bools[bit]) {
+            bools[bit] = false
+            bit--
+        }
+        if (bit < 0) return false
+        bools[bit] = true
+        return true
     }
 }

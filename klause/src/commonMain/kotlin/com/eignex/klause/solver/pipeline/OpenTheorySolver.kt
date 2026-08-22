@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
@@ -15,6 +14,7 @@ import com.eignex.klause.theory.lia.GeneralLiaSolver
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qflra.ExactLraResult
 import com.eignex.klause.theory.qflra.ExactLraSolver
+import com.eignex.klause.theory.TheoryParams
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -76,7 +76,7 @@ class OpenTheorySolver(private val model: ProblemSpec) {
     }
 
     /** Decide the model with the complete theory selected for its source fragment. */
-    fun solve(params: BacktrackParams = BacktrackParams()): OpenTheoryResult = when (route) {
+    fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult = when (route) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceTheorySolver(model).solve(params).asOpenTheoryResult()
         ProblemPipeline.GENERAL_LIA -> GeneralLiaSolver(model).solve(params).asOpenTheoryResult()
         ProblemPipeline.EXACT_LRA -> ExactLraSolver(model).solve(params).asOpenTheoryResult()
