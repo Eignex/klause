@@ -22,15 +22,25 @@ data class ExactLraAssignment(
 
 /** Result of complete QF_LRA satisfiability search. */
 sealed interface ExactLraResult {
+    /** Statistics gathered while deciding the model. */
     val stats: SolveStats
 
-    data class Sat(val assignment: ExactLraAssignment, override val stats: SolveStats = SolveStats.EMPTY) :
-        ExactLraResult
+    /** A satisfiable result with a rational witness. */
+    data class Sat(
+        /** The satisfying Boolean and real assignment. */
+        val assignment: ExactLraAssignment,
+        override val stats: SolveStats = SolveStats.EMPTY,
+    ) : ExactLraResult
 
+    /** A proof that every Boolean leaf is infeasible. */
     data class Unsat(override val stats: SolveStats = SolveStats.EMPTY) : ExactLraResult
 
-    data class Unknown(val reason: TerminationReason, override val stats: SolveStats = SolveStats.EMPTY) :
-        ExactLraResult
+    /** A search interrupted before it could determine satisfiability. */
+    data class Unknown(
+        /** The condition which stopped the search. */
+        val reason: TerminationReason,
+        override val stats: SolveStats = SolveStats.EMPTY,
+    ) : ExactLraResult
 }
 
 /**
@@ -46,6 +56,7 @@ class ExactLraSolver(private val model: ProblemSpec) {
         }
     }
 
+    /** Decides the model subject to the supplied search budgets and cancellation signal. */
     fun solve(params: BacktrackParams = BacktrackParams()): ExactLraResult {
         val problem = model.materializeFiniteBounds()
         val bools = BooleanArray(model.numBoolVars)

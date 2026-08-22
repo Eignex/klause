@@ -672,27 +672,41 @@ internal fun defaultRationalPivotCap(model: LpModel): Int = 200 + 20 * (model.m 
 /** Immutable rational number over the multiplatform big integer, always normalized (gcd 1, positive
  *  denominator). The unbounded second level of the exact rational arithmetic — the 128-bit
  *  fixed-width level ([Frac128Ops]) handles the common case and escalates here on overflow. */
-class BigFraction private constructor(val num: BigInteger, val den: BigInteger) {
+class BigFraction private constructor(
+    /** The reduced signed numerator. */
+    val num: BigInteger,
+    /** The reduced positive denominator. */
+    val den: BigInteger,
+) {
 
+    /** Whether this fraction is zero. */
     val isZero: Boolean get() = num.isZero()
 
+    /** The sign of this fraction: `-1`, `0`, or `1`. */
     fun signum(): Int = num.signum()
 
+    /** Returns the additive inverse of this fraction. */
     fun negated(): BigFraction = if (isZero) this else BigFraction(-num, den)
 
+    /** Returns this fraction converted to a [Double]. */
     fun toDouble(): Double = num.doubleValue(exactRequired = false) / den.doubleValue(exactRequired = false)
 
+    /** Returns the sum of this fraction and [other]. */
     operator fun plus(other: BigFraction): BigFraction = of(num * other.den + other.num * den, den * other.den)
 
+    /** Returns this fraction minus [other]. */
     operator fun minus(other: BigFraction): BigFraction = of(num * other.den - other.num * den, den * other.den)
 
+    /** Returns the product of this fraction and [other]. */
     operator fun times(other: BigFraction): BigFraction = of(num * other.num, den * other.den)
 
+    /** Returns the multiplicative inverse of this non-zero fraction. */
     fun reciprocal(): BigFraction {
         require(!isZero) { "reciprocal of zero" }
         return of(den, num)
     }
 
+    /** Compares this fraction with [other]. */
     operator fun compareTo(other: BigFraction): Int = (num * other.den).compareTo(other.num * den)
 
     override fun equals(other: Any?): Boolean = other is BigFraction && num == other.num && den == other.den
@@ -701,13 +715,21 @@ class BigFraction private constructor(val num: BigInteger, val den: BigInteger) 
 
     override fun toString(): String = if (den == BigInteger.ONE) "$num" else "$num/$den"
 
+    /** Factories and constants for exact rational values. */
     companion object {
+        /** The additive identity. */
         val ZERO = BigFraction(BigInteger.ZERO, BigInteger.ONE)
+
+        /** The multiplicative identity. */
         val ONE = BigFraction(BigInteger.ONE, BigInteger.ONE)
+
+        /** The additive inverse of [ONE]. */
         val MINUS_ONE = BigFraction(-BigInteger.ONE, BigInteger.ONE)
 
+        /** Returns the integer fraction represented by [v]. */
         fun ofLong(v: Long): BigFraction = if (v == 0L) ZERO else BigFraction(BigInteger.fromLong(v), BigInteger.ONE)
 
+        /** Returns the normalized fraction [num] / [den]. */
         fun of(num: BigInteger, den: BigInteger): BigFraction {
             require(!den.isZero()) { "zero denominator" }
             if (num.isZero()) return ZERO
