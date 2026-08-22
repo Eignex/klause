@@ -203,7 +203,8 @@ class BoundedIntDomains internal constructor(
     /** True when a side fell back to a lossy clamp, so an `unsat` over the box is only `unknown`. */
     val clamped: Boolean,
     /** Sides the box invented rather than derived: `true` where OBBT left the low side genuinely open and
-     *  the domain's `min` is the fallback. Carried into `Problem.openIntLo` so the LP relaxation can build
+     *  the domain's `min` is the fallback. Carried into [com.eignex.klause.solver.Problem.intBounds] so
+     *  the LP relaxation can build
      *  the column over its true range instead of the box. */
     val openLo: BooleanArray,
     /** Sides where the high bound is the fallback; see [openLo]. */

@@ -33,8 +33,9 @@ class SmtLibTest {
 
     // Parse leaves domain bounding (OBBT) deferred; the CLI runs it in presolve before solving. Mirror
     // that here so tests exercise the bounded problem, not the raw wide-fallback one.
-    private fun SmtLibProblem.bounded(): Problem =
-        deferredBounds?.run(Cancellation.Never)?.let { problem.withIntDomains(it.domains) } ?: problem
+    private fun SmtLibProblem.bounded(): Problem = deferredBounds?.run(
+        Cancellation.Never,
+    )?.let { model.materialize(it.domains) } ?: model.materializeFiniteBounds()
 
     @Test
     fun `integer equality over an ite operand is an arithmetic relation`() {
@@ -294,8 +295,8 @@ class SmtLibTest {
 
         val parsed = SmtLib.parse(text)
 
-        assertEquals(0, parsed.problem.intDomains[0].min, "a single-variable row is pinned at parse")
-        assertTrue(parsed.problem.intDomains[0].max > 10, "parse must not derive a bound across terms")
+        assertEquals(0, parsed.model.intBounds.lower(0), "a single-variable row is pinned at parse")
+        assertTrue(parsed.model.intBounds.isOpenUpper(0), "parse must not derive a bound across terms")
         // Nothing is lost by leaving it: the deferred run proves the same bound under the budget.
         assertEquals(10, parsed.bounded().intDomains[0].max)
     }
@@ -586,6 +587,8 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (> x 3000000000000)) (check-sat)",
         )
+        assertFalse(parsed.model.intBounds.isOpenLower(0))
+        assertTrue(parsed.model.intBounds.isOpenUpper(0))
         assertTrue(parsed.clamped(), "the coefficient magnitude pushes the small-model bound past 2^62")
     }
 

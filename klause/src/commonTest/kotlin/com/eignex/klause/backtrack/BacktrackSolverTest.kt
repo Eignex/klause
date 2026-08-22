@@ -17,6 +17,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.random.Random
@@ -27,6 +28,76 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+
+    @Test
+    fun `difference theory solves an open integer row without a finite domain`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)),
+        )
+
+        val result = assertIs<SolveResult.Sat>(DifferenceTheorySolver(model).solve())
+
+        assertTrue(result.assignment.ints[0] >= 5L)
+    }
+
+    @Test
+    fun `difference theory proves contradictory open integer rows unsatisfiable`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1),
+            ),
+        )
+
+        val result = DifferenceTheorySolver(model).solve()
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `difference theory completes a Boolean-guarded open row`() {
+        val bounds = Problem(
+            numBoolVars = 1,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = bounds,
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, true))),
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, -4),
+            ),
+        )
+
+        val result = assertIs<SolveResult.Sat>(DifferenceTheorySolver(model).solve())
+
+        assertTrue(result.assignment.bools[0])
+        assertTrue(result.assignment.ints[0] <= -4L)
+    }
 
     @Test
     fun `solve returns SAT with valid witness on simple clause`() {

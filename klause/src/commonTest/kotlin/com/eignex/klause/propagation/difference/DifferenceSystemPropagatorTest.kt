@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -35,7 +36,14 @@ class DifferenceSystemPropagatorTest {
         rows: List<ReifiedLinear>,
         domains: Array<IntDomain> = Array(numInts) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) },
     ): Problem {
-        val fragment = assertNotNull(differenceFragmentOf(Array<Factor>(rows.size) { rows[it] }, numInts, domains))
+        val bounds = IntBounds.fromOpenSides(
+            domains,
+            BooleanArray(numInts) { domains[it].min == Long.MIN_VALUE },
+            BooleanArray(numInts) { domains[it].max == Long.MAX_VALUE },
+            null,
+            null,
+        )
+        val fragment = assertNotNull(differenceFragmentOf(Array<Factor>(rows.size) { rows[it] }, numInts, bounds))
         val factors = ArrayList<Factor>(rows)
         factors.add(DifferenceSystem(fragment.edges))
         return Problem(

@@ -189,7 +189,7 @@ internal interface RelaxationDomains {
     fun boolValue(varId: Int): Boolean?
 
     /**
-     * Whether a side [Problem.openIntLo] / [Problem.openIntHi] marks as invented should be built as an
+     * Whether a side [Problem.intBounds] marks as invented should be built as an
      * open LP column rather than at the finite clamp. Only the root view may: a bound in a live search
      * state is a decision the node depends on, and cannot be told apart from the clamp it sits on, so
      * relaxing it there would drop the branch's own constraint.
@@ -682,11 +682,10 @@ internal class CpToLpRelaxation(
             var c = intCol[intVar]
             if (c == -1) {
                 val dom = domains.intDomain(intVar)
-                val openHi = domains.honorsOpenSides &&
-                    problem.openIntHi?.get(intVar) == true &&
-                    problem.openIntLo?.get(intVar) != true
+                val intBounds = problem.intBounds
+                val openHi = domains.honorsOpenSides && !intBounds.hasUpper(intVar) && intBounds.hasLower(intVar)
                 c = if (openHi) {
-                    builder.addOpenAboveVar(dom.min, intCost(intVar), tag = intVar)
+                    builder.addOpenAboveVar(intBounds.lower(intVar), intCost(intVar), tag = intVar)
                 } else {
                     builder.addVar(dom.min, dom.max, intCost(intVar), tag = intVar)
                 }

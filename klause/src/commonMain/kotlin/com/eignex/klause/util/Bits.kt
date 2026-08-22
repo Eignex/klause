@@ -6,18 +6,23 @@ package com.eignex.klause.util
  * arrays — every operation we need (membership, set / clear, cardinality, union, intersect,
  * difference, equality, copy) is a one-liner over the packed words.
  *
- * Not exposed beyond the solver package: the surface stays small on purpose.
+ * The representation stays deliberately small: callers use it where a packed mutable bitset is needed.
  */
-internal class Bits(val size: Int) {
+class Bits(size: Int) {
+    /** Number of addressable bits. */
+    val size: Int = size
+
     @PublishedApi internal val words: LongArray = LongArray((size + 63) ushr 6)
 
-    // Single-bit get/set/clear sit on the propagation hot path, so they carry no index checks.
+    /** Return whether bit [i] is set. */
     fun get(i: Int): Boolean = (words[i ushr 6] ushr (i and 63)) and 1L == 1L
 
+    /** Set bit [i]. */
     fun set(i: Int) {
         words[i ushr 6] = words[i ushr 6] or (1L shl (i and 63))
     }
 
+    /** Clear bit [i]. */
     fun clear(i: Int) {
         words[i ushr 6] = words[i ushr 6] and (1L shl (i and 63)).inv()
     }
@@ -34,12 +39,14 @@ internal class Bits(val size: Int) {
         }
     }
 
+    /** Return the number of set bits. */
     fun cardinality(): Int {
         var c = 0
         for (w in words) c += w.countOneBits()
         return c
     }
 
+    /** Return the set-bit indices in ascending order. */
     fun toIntArray(): IntArray {
         val out = IntArray(cardinality())
         var k = 0
@@ -47,6 +54,7 @@ internal class Bits(val size: Int) {
         return out
     }
 
+    /** Return an independent copy. */
     fun copy(): Bits {
         val out = Bits(size)
         for (i in words.indices) out.words[i] = words[i]
@@ -104,13 +112,17 @@ internal class Bits(val size: Int) {
         return sb.toString()
     }
 
+    /** Operations on packed bit arrays. */
     companion object {
+        /** Return whether [bit] is set in [bits]. */
         fun has(bits: LongArray, bit: Int): Boolean = ((bits[bit ushr 6] ushr (bit and 63)) and 1L) != 0L
 
+        /** Set [bit] in [bits]. */
         fun set(bits: LongArray, bit: Int) {
             bits[bit ushr 6] = bits[bit ushr 6] or (1L shl (bit and 63))
         }
 
+        /** Clear [bit] in [bits]. */
         fun clear(bits: LongArray, bit: Int) {
             val w = bit ushr 6
             bits[w] = bits[w] and (1L shl (bit and 63)).inv()
@@ -171,6 +183,7 @@ internal class Bits(val size: Int) {
             return c
         }
 
+        /** Return the lowest set-bit index, or `-1` when [bits] is empty. */
         fun firstSet(bits: LongArray): Int {
             for (w in bits.indices) {
                 if (bits[w] != 0L) return (w shl 6) + bits[w].countTrailingZeroBits()
@@ -178,6 +191,7 @@ internal class Bits(val size: Int) {
             return -1
         }
 
+        /** Return the highest set-bit index, or `-1` when [bits] is empty. */
         fun lastSet(bits: LongArray): Int {
             for (w in bits.indices.reversed()) {
                 if (bits[w] != 0L) return (w shl 6) + (63 - bits[w].countLeadingZeroBits())
@@ -185,8 +199,10 @@ internal class Bits(val size: Int) {
             return -1
         }
 
+        /** Return an empty bitset of [size] bits. */
         fun empty(size: Int): Bits = Bits(size)
 
+        /** Return a bitset with every valid bit set. */
         fun full(size: Int): Bits {
             val b = Bits(size)
             // Set every bit up to size, then zero the tail in the last word.
@@ -198,6 +214,7 @@ internal class Bits(val size: Int) {
             return b
         }
 
+        /** Return a bitset of [size] with [elements] set. */
         fun of(size: Int, elements: IntArray): Bits {
             val b = Bits(size)
             for (e in elements) b.set(e)

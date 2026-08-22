@@ -14,6 +14,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -272,7 +273,7 @@ internal fun Solvable.presolved(
             Cancellation { boundingCancellation() || slice() }
         }
         ?: boundingCancellation
-    val boundedProblem = deferredBounds?.invoke(boundsCancellation) ?: problem
+    val boundedProblem = deferredBounds?.invoke(boundsCancellation) ?: finiteProblem
     val outcome =
         PresolvePipeline.run(
             boundedProblem,
@@ -297,8 +298,11 @@ internal fun Solvable.presolved(
 
 /** A copy of this [Solvable] with a [deferredBounds] closure attached (the OBBT relocated out of parsing
  *  into the presolve phase). Carries every other field through. */
-internal fun Solvable.withDeferredBounds(bounds: (Cancellation) -> Problem): Solvable = Solvable(
-    problem = problem,
+internal fun Solvable.withDeferredBounds(
+    bounds: (Cancellation) -> Problem,
+    unmaterialized: Boolean = false,
+): Solvable = Solvable(
+    problem = if (unmaterialized) null else problem,
     presolve = presolve,
     optimize = optimize,
     maximize = maximize,
@@ -521,7 +525,8 @@ internal interface OutputProtocol {
  * collapse onto this shape.
  */
 internal class Solvable(
-    val problem: Problem,
+    /** Finite CP problem, absent until [deferredBounds] materializes an open model. */
+    val problem: Problem?,
     val optimize: Boolean,
     /** True when the user goal is maximisation (the objectives below already negate for it). */
     val maximize: Boolean,
@@ -550,6 +555,24 @@ internal class Solvable(
      *  the presolve cancellation, it returns a problem with the open integer sides tightened. Null for a
      *  front-end that has no unbounded domains to close (XCSP3 / FlatZinc / DIMACS / OPB). */
     val deferredBounds: ((Cancellation) -> Problem)? = null,
+    /** Open integer source model handled by the dedicated difference-theory satisfiability pipeline. */
+    val differenceTheoryModel: ProblemSpec? = null,
+) {
+    val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
+}
+
+/** Build a satisfiability instance whose open integer rows are decided by difference theory. */
+internal fun differenceTheorySolvable(model: ProblemSpec, render: (Sample) -> String): Solvable = Solvable(
+    problem = null,
+    optimize = false,
+    maximize = false,
+    lsObjective = null,
+    linearObjective = null,
+    objVarId = null,
+    definitionalSweep = null,
+    render = render,
+    objectiveValue = null,
+    differenceTheoryModel = model,
 )
 
 /** Shared mutable cell for a post-presolve clamp verdict: the deferred bounding ([Solvable.deferredBounds])
@@ -626,6 +649,34 @@ internal fun linearSolvable(
         // defined), so LS descends the true objective on the decision vars; else null and LS
         // descends the linear objective directly.
         lsObjective = functionalObjectiveFor(objective, objSweep),
+        linearObjective = objective,
+        objVarId = objective.singleIntObjective()?.varId,
+        definitionalSweep = sweep,
+        render = render,
+        objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
+    )
+}
+
+/** Build a solvable whose source model deliberately has no CP search domains yet. */
+internal fun linearModelSolvable(
+    model: com.eignex.klause.solver.ProblemSpec,
+    objective: LinearObjective?,
+    maximize: Boolean,
+    render: (Sample) -> String,
+): Solvable {
+    val sweep = DefinitionalSweep.infer(model.factors, model.numIntVars, IntArray(0), emptyList())
+    if (objective == null) {
+        return Solvable(
+            problem = null, optimize = false, maximize = false,
+            lsObjective = null, linearObjective = null, objVarId = null,
+            definitionalSweep = sweep, render = render, objectiveValue = null,
+        )
+    }
+    return Solvable(
+        problem = null,
+        optimize = true,
+        maximize = maximize,
+        lsObjective = functionalObjectiveFor(objective, sweep),
         linearObjective = objective,
         objVarId = objective.singleIntObjective()?.varId,
         definitionalSweep = sweep,

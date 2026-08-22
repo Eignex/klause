@@ -37,7 +37,7 @@ import com.eignex.klause.solver.Problem
  * Boolean layer decides, that the joint graph can refute ahead of a decision.
  */
 internal fun Problem.withDifferenceSystem(): Problem {
-    val fragment = differenceFragmentOf(factors, numIntVars, intDomains) ?: return this
+    val fragment = differenceFragmentOf(factors, numIntVars, intBounds) ?: return this
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
     if (!fragment.carriesAPotential()) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:

@@ -51,14 +51,23 @@ class StreamingParityTest {
              UP BND       y              4.0
             ENDATA
         """.trimIndent() + "\n"
-        assertParity("mps", mps) { Mps.parse(it).toProblem().problem }
+        assertParity("mps", mps) { Mps.parse(it).toProblem().model.materializeFiniteBounds() }
     }
 
     @Test
-    fun `smtlib parse is chunk-boundary agnostic`() = assertParity(
-        "smtlib",
-        "(declare-fun x () Int)\n(declare-fun y () Int)\n(assert (<= (+ x y) 5))\n(assert (>= x 0))\n(check-sat)\n",
-    ) { SmtLib.parse(it).problem }
+    fun `smtlib parse is chunk-boundary agnostic`() {
+        val text = """
+            (declare-fun x () Int)
+            (declare-fun y () Int)
+            (assert (<= (+ x y) 5))
+            (assert (>= x 0))
+            (check-sat)
+        """.trimIndent() + "\n"
+        fun shape(source: CharSource) = SmtLib.parse(
+            source,
+        ).model.let { Triple(it.numBoolVars, it.numIntVars, it.factors.size) }
+        assertEquals(shape(StringCharSource(text)), shape(perCharSource(text)))
+    }
 
     @Test
     fun `xcsp3 parse is chunk-boundary agnostic`() = assertParity(

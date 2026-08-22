@@ -17,8 +17,9 @@ import kotlin.test.assertTrue
  */
 class SmtLibAssertedOrTest {
 
-    private fun SmtLibProblem.bounded(): Problem =
-        deferredBounds?.run(Cancellation.Never)?.let { problem.withIntDomains(it.domains) } ?: problem
+    private fun SmtLibProblem.bounded(): Problem = deferredBounds?.run(
+        Cancellation.Never,
+    )?.let { model.materialize(it.domains) } ?: model.materializeFiniteBounds()
 
     private fun parse(text: String): Problem = SmtLib.parse("$text\n(check-sat)").bounded()
 

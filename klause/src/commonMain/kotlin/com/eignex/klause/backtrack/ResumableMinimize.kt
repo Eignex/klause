@@ -271,7 +271,7 @@ internal class ResumableMinimize(
      * through a different search entirely and never reaches here.
      */
     private fun tightenOpenColumnsAtRoot(): Boolean {
-        if (problem.openIntHi == null || !bestObj.isFinite()) return false
+        if (!bestObj.isFinite()) return false
         val value = bestObj.toLong()
         if (value.toDouble() != bestObj) return false // non-integral incumbent: no exact integer cutoff
         val last = lastOpenCutoff

@@ -91,8 +91,8 @@ internal object SmtLibFormat : ProblemFormat {
         // run the deferred bounding here under an ingest budget (a side left un-tightened is clamped, sound).
         val budgetMs = System.getProperty("klause.bench.smtlib.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
         val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
-        val problem = parsed.deferredBounds?.run(cancel)?.let { parsed.problem.withIntDomains(it.domains) }
-            ?: parsed.problem
+        val problem = parsed.deferredBounds?.run(cancel)?.let { parsed.model.materialize(it.domains) }
+            ?: parsed.model.materializeFiniteBounds()
         return Ingested(problem, parsed.objective)
     }
 }
@@ -112,8 +112,8 @@ internal object MpsFormat : ProblemFormat {
         val budgetMs = System.getProperty("klause.bench.mps.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
         val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
         val compiled = Mps.parse(file.readText()).toProblem(searchBound)
-        val problem = compiled.deferredBounds?.run(cancel)?.let { compiled.problem.withIntDomains(it.domains) }
-            ?: compiled.problem
+        val problem = compiled.deferredBounds?.run(cancel)?.let { compiled.model.materialize(it.domains) }
+            ?: compiled.model.materializeFiniteBounds()
         val objective = if (compiled.maximize) compiled.objective?.negated() else compiled.objective
         return Ingested(problem, objective)
     }

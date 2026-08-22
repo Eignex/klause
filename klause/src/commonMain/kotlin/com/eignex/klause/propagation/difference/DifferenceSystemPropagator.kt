@@ -59,6 +59,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
     private val head: IntArray
     private val bound: LongArray
     private val numVertices: Int
+    private val nodes: IntArray
 
     /** Which edges state a declared range; the graph keeps them but no per-head search walks them. */
     private val hub: BooleanArray
@@ -133,7 +134,7 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
             if (e.source != DifferenceFragment.ZERO) seen.add(e.source)
             if (e.target != DifferenceFragment.ZERO) seen.add(e.target)
         }
-        val nodes = seen.toIntArray().sortedArray()
+        nodes = seen.toIntArray().sortedArray()
         val zeroNode = nodes.size
         fun nodeOf(endpoint: Int) =
             if (endpoint == DifferenceFragment.ZERO) zeroNode else indexOfSorted(nodes, endpoint)

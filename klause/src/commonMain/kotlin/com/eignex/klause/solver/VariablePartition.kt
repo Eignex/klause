@@ -4,8 +4,7 @@ package com.eignex.klause.solver
  * Which integer variables the search has to branch on, and which one could hand to a theory instead.
  *
  * A *search variable* is filtered by propagators and enumerated by the search, so it needs a finite
- * domain — which is why an unbounded column is given the invented
- * [com.eignex.klause.config.DEFAULT_UNBOUNDED_SEARCH_BOUND] box before a solve can start.
+ * domain supplied by the backend that chooses to enumerate it.
  * A *theory-eligible* variable is mentioned only by factors that reason over intervals or structure, so
  * nothing about it has to be enumerated and a decision procedure could settle it over the whole of ℤ.
  *
@@ -40,7 +39,12 @@ class VariablePartition(private val searchRequired: BooleanArray) {
  *
  * Continuous columns are outside this: they are already theory-only and are never search variables.
  */
-fun Problem.variablePartition(): VariablePartition {
+fun Problem.variablePartition(): VariablePartition = variablePartition(numIntVars, factors)
+
+/** Classify a source [ProblemSpec] before any finite CP domains are materialized. */
+fun ProblemSpec.variablePartition(): VariablePartition = variablePartition(numIntVars, factors)
+
+private fun variablePartition(numIntVars: Int, factors: Array<Factor>): VariablePartition {
     val searchRequired = BooleanArray(numIntVars)
     for (f in factors) {
         if (!f.needsFiniteDomains) continue

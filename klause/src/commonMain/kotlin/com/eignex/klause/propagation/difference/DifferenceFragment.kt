@@ -3,7 +3,7 @@ package com.eignex.klause.propagation.difference
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.Lit
 
 /**
@@ -90,13 +90,9 @@ internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
  * A [Linear] row contributes unconditional edges; a [ReifiedLinear] contributes edges guarded by its aux
  * literal, since it constrains exactly when that literal is true. Declared domains enter as differences
  * against the zero node, marked [DifferenceEdge.domainBound] so a consumer can tell a stated row from a
- * column's own range. Any other factor is left alone.
+ * column's own range. An open [IntBounds] side contributes no edge. Any other factor is left alone.
  */
-internal fun differenceFragmentOf(
-    factors: Array<Factor>,
-    numIntVars: Int,
-    intDomains: Array<IntDomain>,
-): DifferenceFragment? {
+internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
     val zero = DifferenceFragment.ZERO
     val edges = ArrayList<DifferenceEdge>()
     factors.forEach { f ->
@@ -134,9 +130,88 @@ internal fun differenceFragmentOf(
     }
     for (v in mentioned.toIntArray().sortedArray()) {
         if (v >= numIntVars) continue
-        val d = intDomains[v]
-        if (d.max != Long.MAX_VALUE) edges.add(DifferenceEdge(zero, v, d.max, domainBound = true))
-        if (d.min != Long.MIN_VALUE) edges.add(DifferenceEdge(v, zero, -d.min, domainBound = true))
+        if (intBounds.hasUpper(v)) edges.add(DifferenceEdge(zero, v, intBounds.upper(v), domainBound = true))
+        if (intBounds.hasLower(v)) edges.add(DifferenceEdge(v, zero, -intBounds.lower(v), domainBound = true))
     }
     return DifferenceFragment(edges)
+}
+
+/**
+ * Whether every arithmetic factor over integer columns is representable by the difference theory.
+ *
+ * This is intentionally stricter than [differenceFragmentOf]: finite CP can profit from a partial graph,
+ * while an open model may enter the difference pipeline only when no integer factor is left for CP.
+ * Boolean-only structure is admitted because guards are native theory inputs.
+ */
+internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
+    val scratch = ArrayList<DifferenceEdge>(2)
+    for (factor in factors) {
+        if (factor.intVars.isEmpty()) continue
+        scratch.clear()
+        when (factor) {
+            is Linear -> if (!factor.isIntegerCore || !appendDifferenceEdges(
+                    factor.vars,
+                    factor::coeff,
+                    factor.op,
+                    factor.bound,
+                    DifferenceFragment.ZERO,
+                    DifferenceEdge.ALWAYS,
+                    scratch,
+                )
+            ) {
+                return false
+            }
+
+            is ReifiedLinear -> {
+                if (factor.wide || !appendDifferenceEdges(
+                        factor.vars,
+                        factor::coeff,
+                        factor.op,
+                        factor.bound,
+                        DifferenceFragment.ZERO,
+                        Lit.make(factor.auxBoolVar, true),
+                        scratch,
+                    ) || !appendNegatedDifferenceEdges(
+                        factor.vars,
+                        factor::coeff,
+                        factor.op,
+                        factor.bound,
+                        DifferenceFragment.ZERO,
+                        Lit.make(factor.auxBoolVar, false),
+                        scratch,
+                    )
+                ) {
+                    return false
+                }
+            }
+
+            else -> return false
+        }
+    }
+    return true
+}
+
+/** Whether the complete difference fragment also fits the graph's exact `Long` arithmetic. */
+internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): Boolean =
+    hasCompleteDifferenceCoverage(factors) &&
+        (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)
+
+/** Return a satisfying integer assignment for the edges active under [bools], or `null` on conflict. */
+internal fun DifferenceFragment.potentialSample(numIntVars: Int, bools: BooleanArray): LongArray? {
+    val graph = IncrementalDifferenceGraph(
+        numNodes,
+        IntArray(edges.size) { nodeOf(edges[it].source) },
+        IntArray(edges.size) { nodeOf(edges[it].target) },
+        LongArray(edges.size) { edges[it].bound },
+    )
+    if (!graph.usable) return null
+    for (edge in edges.indices) {
+        val guard = edges[edge].guard
+        if (guard != DifferenceEdge.ALWAYS && bools[Lit.variable(guard)] != Lit.isPositive(guard)) continue
+        if (graph.assertEdge(edge) != null) return null
+    }
+    val zero = graph.potentialOf(zeroNode)
+    return LongArray(numIntVars).also { values ->
+        for (node in nodes.indices) values[nodes[node]] = graph.potentialOf(node) - zero
+    }
 }

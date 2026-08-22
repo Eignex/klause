@@ -15,10 +15,11 @@ import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.smallModelIntBound
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
 import kotlin.math.abs
@@ -34,11 +35,11 @@ data class MpsColumn(
     val id: Int,
 )
 
-/** An [MpsModel] lowered to a klause [Problem], ready to solve. */
+/** An [MpsModel] lowered to a klause model. */
 data class MpsCompiled(
     /** The compiled solver problem — an integer variable per integer MPS column, an LP-only continuous
      *  variable per (bounded or unbounded) float column. */
-    val problem: Problem,
+    val model: ProblemSpec,
     /** Objective, or `null` for a feasibility instance (no `N` row). */
     val objective: LinearObjective?,
     /** True when the objective is a maximise. */
@@ -48,10 +49,7 @@ data class MpsCompiled(
     /** Fixed-point factor the objective was multiplied by (1 when it is already integral); divide the
      *  reported objective by it for the true value. */
     val objectiveScale: Long,
-    /** Deferred integer-domain bounding (OBBT), or `null` when every integer column is already finite.
-     *  Compiling closes each open side to a cheap fallback box; the LP tightening runs in the presolve
-     *  phase ([DeferredIntBounds.run]), which also decides whether a side fell back to a lossy clamp — the
-     *  honest-`unknown`/optimum-only-valid signal, known only after that runs. */
+    /** Deferred integer-domain bounding (OBBT), or `null` when every integer column is already finite. */
     val deferredBounds: DeferredIntBounds?,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
@@ -61,11 +59,9 @@ data class MpsCompiled(
 private const val MPS_INFINITY = 1e20
 
 /**
- * Lower an [MpsModel] to a klause [Problem] for the hybrid MIP/CP engine:
- *  - **integer columns** become integer (CP search) variables; a side left unbounded (or at the `1e30`
- *    marker) is closed to the cheap fallback box now, and the OBBT tightening over the constraint
- *    relaxation is deferred to the presolve phase ([MpsCompiled.deferredBounds]); a side OBBT cannot bound
- *    stays clamped to `±[searchBound]`.
+ * Lower an [MpsModel] to a klause [ProblemSpec] for the hybrid MIP/CP engine:
+ *  - **integer columns** become model integer variables; a side left unbounded (or at the `1e30`
+ *    marker) stays open, while OBBT inputs are retained for a finite-search backend.
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
  *    search; the simplex resolves them at nodes and leaves. Their real bounds carry through directly, so
  *    an unbounded float keeps an open side of `±∞`.
@@ -149,9 +145,8 @@ fun MpsModel.toProblem(
     // honest.
     val box = small ?: minOf(searchBound, objectiveSafeBox(isFloat, intVarOf, numInt, floatScale))
 
-    // Defer OBBT to the presolve phase (compiling only reads): close each open integer side to the cheap
-    // fallback box now, and capture the OBBT inputs so the deferred run can tighten under the solve
-    // deadline. A side the LP cannot bound stays at the fallback, clamped when that box is lossy.
+    // Capture OBBT inputs without closing the model's open sides. A finite-search backend may later choose
+    // a fallback range after it has had a chance to tighten the relaxation.
     @Suppress("UNCHECKED_CAST")
     val declaredBounds = obbtInput as Array<OpenIntBounds>
     // Close what the objective makes pointless to explore before deciding anything is open: a column the
@@ -176,18 +171,22 @@ fun MpsModel.toProblem(
     } else {
         null
     }
-    // A declared pair that crosses states an empty domain, and an [IntDomain] cannot hold one. Collapsing
-    // it to a point would drop the bound the file states — unlike a derived crossing, a declared bound is
-    // not also a row, so nothing else in the model carries it and the search would answer over a column
-    // the file excluded. Restating the upper bound as a row keeps the model saying what the file says.
-    val domains = Array(numInt) { j ->
-        val lo = openBounds[j].lo ?: -box
-        val hi = openBounds[j].hi ?: box
-        if (lo <= hi) {
-            IntDomain(lo, hi)
-        } else {
+    // A declared crossing is infeasible. Keep both stated bounds in the model by restating the upper side
+    // as a row; the canonicalized range only lets the finite-domain representation exist if materialized.
+    val lower = LongArray(numInt)
+    val upper = LongArray(numInt)
+    var openLoBits: Bits? = null
+    var openHiBits: Bits? = null
+    for (j in 0 until numInt) {
+        val lo = openBounds[j].lo
+        val hi = openBounds[j].hi
+        lower[j] = lo ?: 0L
+        upper[j] = hi ?: 0L
+        if (lo == null) (openLoBits ?: Bits(numInt).also { openLoBits = it }).set(j)
+        if (hi == null) (openHiBits ?: Bits(numInt).also { openHiBits = it }).set(j)
+        if (lo != null && hi != null && lo > hi) {
             factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, hi))
-            IntDomain(lo, lo)
+            upper[j] = lo
         }
     }
 
@@ -201,10 +200,9 @@ fun MpsModel.toProblem(
     // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
     // integer-infeasible equality would grind O(span) if baked at construction; presolve's strengthen
     // pass catches that first, at solve time, before the (now-lazy) bake runs.
-    val problem = Problem(
+    val model = ProblemSpec(
         numBoolVars = guards.numBool,
-        numIntVars = numInt,
-        intDomains = domains,
+        intBounds = IntBounds.fromModelBounds(lower, upper, openLoBits, openHiBits),
         factors = factors.toTypedArray(),
         numRealVars = numReal,
         realLower = realLower,
@@ -213,7 +211,7 @@ fun MpsModel.toProblem(
     val columns = variables.mapIndexed { i, v ->
         MpsColumn(v.name, isFloat[i], if (isFloat[i]) realVarOf[i] else intVarOf[i])
     }
-    return MpsCompiled(problem, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, deferredBounds, numReal)
+    return MpsCompiled(model, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, deferredBounds, numReal)
 }
 
 /** Emit a purely-integer row over integer-variable ids, scaling by [floatScale] when a coefficient or

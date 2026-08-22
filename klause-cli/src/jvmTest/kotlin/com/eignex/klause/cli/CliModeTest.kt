@@ -38,6 +38,72 @@ class CliModeTest {
         assertTrue(err.trimStart().startsWith("klause FlatZinc:"), "expected a formatted format diagnostic:\n$err")
     }
 
+    @Test
+    fun `an open SMT difference row is solved without a finite search box`() {
+        val smt = File.createTempFile("clidiff", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (assert (>= x 5))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf(smt.absolutePath)) }
+
+        assertTrue(out.lines().firstOrNull() == "sat", out)
+        assertTrue("(define-fun x () Int 5)" in out, out)
+    }
+
+    @Test
+    fun `an open SMT non-difference model is rejected before finite lowering`() {
+        val smt = File.createTempFile("cliopen", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (declare-const y Int)
+                (assert (<= (+ (* 2 x) y) 3))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf(smt.absolutePath)) }
+
+        assertEquals(2, code, err)
+        assertTrue("complete difference-theory coverage" in err, err)
+    }
+
+    @Test
+    fun `an open MPS difference row is solved without a finite search box`() {
+        val mps = File.createTempFile("clidiff", ".mps").apply {
+            writeText(
+                """
+                NAME          DIFF
+                ROWS
+                 N  COST
+                 G  LOWER
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         LOWER          1.0
+                    MK2       'MARKER'                 'INTEND'
+                RHS
+                    RHS       LOWER          5.0
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf(mps.absolutePath)) }
+
+        assertTrue("s SATISFIABLE" in out, out)
+        assertTrue("X=5" in out, out)
+    }
+
     private fun capture(block: () -> Unit): String {
         val buf = ByteArrayOutputStream()
         val old = System.out

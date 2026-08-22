@@ -24,8 +24,9 @@ class SmtLibChainTest {
         val ORDER_OPS = listOf("<", "<=", ">", ">=")
     }
 
-    private fun SmtLibProblem.bounded(): Problem =
-        deferredBounds?.run(Cancellation.Never)?.let { problem.withIntDomains(it.domains) } ?: problem
+    private fun SmtLibProblem.bounded(): Problem = deferredBounds?.run(
+        Cancellation.Never,
+    )?.let { model.materialize(it.domains) } ?: model.materializeFiniteBounds()
 
     /** `k` integers over `[0, size)`, with [tail] appended as the closing assertions. */
     private fun boundedInts(k: Int, size: Int, tail: String): String {
