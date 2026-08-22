@@ -1,5 +1,7 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.simplex.exact.RationalFeasibility
+import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.solver.Cancellation
 
 /** The certified verdict of an LP over an [LpModel], independent of any search node. */

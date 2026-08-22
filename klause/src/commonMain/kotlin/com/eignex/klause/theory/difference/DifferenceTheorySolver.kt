@@ -1,8 +1,12 @@
-package com.eignex.klause.backtrack
+package com.eignex.klause.theory.difference
 
+import com.eignex.klause.arithmetic.difference.differenceFragmentOf
+import com.eignex.klause.arithmetic.difference.potentialSample
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.SearchOutcome
+import com.eignex.klause.backtrack.driveSearch
 import com.eignex.klause.propagation.difference.DifferenceSystem
-import com.eignex.klause.propagation.difference.differenceFragmentOf
-import com.eignex.klause.propagation.difference.potentialSample
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec

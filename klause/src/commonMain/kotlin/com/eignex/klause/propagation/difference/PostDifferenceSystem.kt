@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation.difference
 
+import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Problem
 

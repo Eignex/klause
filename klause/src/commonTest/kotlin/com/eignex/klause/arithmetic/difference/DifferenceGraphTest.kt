@@ -1,4 +1,4 @@
-package com.eignex.klause.propagation.difference
+package com.eignex.klause.arithmetic.difference
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

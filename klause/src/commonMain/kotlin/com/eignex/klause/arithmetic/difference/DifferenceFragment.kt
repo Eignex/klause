@@ -1,4 +1,4 @@
-package com.eignex.klause.propagation.difference
+package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -52,7 +52,7 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
             val a = if (e.bound < 0L) -e.bound else e.bound
             if (a > maxAbs) maxAbs = a
         }
-        return numNodes > 0 && maxAbs <= IncrementalDifferenceGraph.weightRoom(numNodes)
+        return numNodes > 0 && maxAbs <= Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
     }
 
     /** A graph over [edges], for a consumer that wants to run a cycle search over the whole set. */
@@ -198,20 +198,15 @@ internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars
 
 /** Return a satisfying integer assignment for the edges active under [bools], or `null` on conflict. */
 internal fun DifferenceFragment.potentialSample(numIntVars: Int, bools: BooleanArray): LongArray? {
-    val graph = IncrementalDifferenceGraph(
-        numNodes,
-        IntArray(edges.size) { nodeOf(edges[it].source) },
-        IntArray(edges.size) { nodeOf(edges[it].target) },
-        LongArray(edges.size) { edges[it].bound },
-    )
-    if (!graph.usable) return null
+    val active = BooleanArray(edges.size)
     for (edge in edges.indices) {
         val guard = edges[edge].guard
         if (guard != DifferenceEdge.ALWAYS && bools[Lit.variable(guard)] != Lit.isPositive(guard)) continue
-        if (graph.assertEdge(edge) != null) return null
+        active[edge] = true
     }
-    val zero = graph.potentialOf(zeroNode)
+    val potential = graph().potentials(active) ?: return null
+    val zero = potential[zeroNode]
     return LongArray(numIntVars).also { values ->
-        for (node in nodes.indices) values[nodes[node]] = graph.potentialOf(node) - zero
+        for (node in nodes.indices) values[nodes[node]] = potential[node] - zero
     }
 }

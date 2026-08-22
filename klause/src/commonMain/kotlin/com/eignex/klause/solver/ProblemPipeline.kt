@@ -1,10 +1,10 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.arithmetic.difference.supportsCompleteDifferenceTheory
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.smallModelBigIntBound
-import com.eignex.klause.propagation.difference.supportsCompleteDifferenceTheory
 
 /** The solver pipeline selected once from a source [ProblemSpec]. */
 enum class ProblemPipeline {

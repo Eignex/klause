@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation.difference
 
+import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.Propagator

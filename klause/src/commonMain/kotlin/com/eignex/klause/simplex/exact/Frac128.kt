@@ -1,4 +1,4 @@
-package com.eignex.klause.lp
+package com.eignex.klause.simplex.exact
 
 /**
  * Fixed-width exact rational: a signed 128-bit numerator over a positive 128-bit denominator, always

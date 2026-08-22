@@ -1,5 +1,8 @@
-package com.eignex.klause.lp
+package com.eignex.klause.simplex.exact
 
+import com.eignex.klause.lp.LpBuilder
+import com.eignex.klause.lp.Relation
+import com.eignex.klause.lp.Sense
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

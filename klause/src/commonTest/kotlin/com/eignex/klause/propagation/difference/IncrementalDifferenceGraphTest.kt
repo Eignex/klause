@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation.difference
 
+import com.eignex.klause.arithmetic.difference.DifferenceGraph
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

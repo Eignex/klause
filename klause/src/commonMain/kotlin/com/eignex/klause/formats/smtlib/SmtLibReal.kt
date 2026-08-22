@@ -9,7 +9,7 @@ import com.eignex.klause.formats.isConstant
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.tseitinAnd
-import com.eignex.klause.lp.BigFraction
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
 import com.ionspin.kotlin.bignum.integer.BigInteger

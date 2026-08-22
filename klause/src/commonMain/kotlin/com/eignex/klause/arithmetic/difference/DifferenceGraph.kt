@@ -1,4 +1,4 @@
-package com.eignex.klause.propagation.difference
+package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -74,6 +74,27 @@ internal class DifferenceGraph(val numVars: Int) {
             if (changed == -1) return null // a full pass with no improvement ⇒ no negative cycle
         }
         return extractCycle(changed, predEdge)
+    }
+
+    /** A feasible potential for [active], or null when the asserted edges contain a negative cycle. */
+    fun potentials(active: BooleanArray? = null): LongArray? {
+        val dist = LongArray(numVars)
+        repeat(numVars) {
+            var changed = false
+            for (e in 0 until size) {
+                if (active != null && !active[e]) continue
+                val u = from[e]
+                val v = to[e]
+                if (addOverflows(dist[u], weight[e])) continue
+                val relaxed = dist[u] + weight[e]
+                if (relaxed < dist[v]) {
+                    dist[v] = relaxed
+                    changed = true
+                }
+            }
+            if (!changed) return dist
+        }
+        return null
     }
 
     /** Walk back `numVars` steps to land inside the cycle, then round it once collecting its edges. */

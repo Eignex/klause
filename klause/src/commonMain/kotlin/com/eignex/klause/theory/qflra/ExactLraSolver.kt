@@ -1,10 +1,11 @@
-package com.eignex.klause.backtrack
+package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.lp.BigFraction
-import com.eignex.klause.lp.RationalFeasibility
-import com.eignex.klause.lp.bigRationalOutcome
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RelaxationDomains
+import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.simplex.exact.RationalFeasibility
+import com.eignex.klause.simplex.exact.bigRationalOutcome
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.ProblemSpec
