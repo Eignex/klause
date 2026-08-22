@@ -4,11 +4,6 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.DifferenceTheorySolver
-import com.eignex.klause.backtrack.ExactLraResult
-import com.eignex.klause.backtrack.ExactLraSolver
-import com.eignex.klause.backtrack.GeneralLiaResult
-import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
@@ -37,6 +32,8 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.variablePartition
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.OpenTheorySolver
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -82,77 +79,25 @@ internal object SolveCore {
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
         when (val pipeline = rawSolvable.pipeline) {
-            is SolvablePipeline.DifferenceTheory -> {
+            is SolvablePipeline.OpenTheory -> {
                 if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
-                    usageError("all-solution enumeration is unavailable for open difference-theory models")
+                    usageError("all-solution enumeration is unavailable for open theory models")
                 }
                 output.begin(optimize = false, maximize = false)
-                val result = DifferenceTheorySolver(pipeline.model).solve(
+                val result = OpenTheorySolver(pipeline.model).solve(
                     BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
                 )
                 when (result) {
-                    is SolveResult.Sat -> {
-                        output.onSolution(rawSolvable.render(result.assignment), null)
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                    is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                if (common.statistics) output.onStatistics(result.stats, 0L, if (result is SolveResult.Sat) 1L else 0L)
-                return
-            }
-
-            is SolvablePipeline.GeneralLia -> {
-                if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
-                    usageError("all-solution enumeration is unavailable for open General LIA models")
-                }
-                output.begin(optimize = false, maximize = false)
-                val result = GeneralLiaSolver(pipeline.model).solve(
-                    BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
-                )
-                when (result) {
-                    is GeneralLiaResult.Sat -> {
+                    is OpenTheoryResult.Sat -> {
                         output.onSolution(pipeline.render(result.assignment), null)
                         output.onComplete(Verdict.SATISFIABLE)
                     }
 
-                    is GeneralLiaResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+                    is OpenTheoryResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
 
-                    is GeneralLiaResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+                    is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
                 }
-                if (common.statistics) {
-                    output.onStatistics(
-                        result.stats,
-                        0L,
-                        if (result is GeneralLiaResult.Sat) 1L else 0L,
-                    )
-                }
-                return
-            }
-
-            is SolvablePipeline.ExactLra -> {
-                if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
-                    usageError("all-solution enumeration is unavailable for open exact LRA models")
-                }
-                output.begin(optimize = false, maximize = false)
-                val result = ExactLraSolver(pipeline.model).solve(
-                    BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
-                )
-                when (result) {
-                    is ExactLraResult.Sat -> {
-                        output.onSolution(pipeline.render(result.assignment), null)
-                        output.onComplete(Verdict.SATISFIABLE)
-                    }
-
-                    is ExactLraResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-                    is ExactLraResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-                }
-                if (common.statistics) {
-                    output.onStatistics(result.stats, 0L, if (result is ExactLraResult.Sat) 1L else 0L)
-                }
+                if (common.statistics) output.onStatistics(result.stats, 0L, if (result is OpenTheoryResult.Sat) 1L else 0L)
                 return
             }
 

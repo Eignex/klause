@@ -1,5 +1,6 @@
-package com.eignex.klause.lp
+package com.eignex.klause.simplex.exact
 
+import com.eignex.klause.lp.LpModel
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList

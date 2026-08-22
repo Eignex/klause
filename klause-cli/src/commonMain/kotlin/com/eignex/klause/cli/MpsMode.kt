@@ -1,6 +1,6 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.GeneralLiaAssignment
+import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled

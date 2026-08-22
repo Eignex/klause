@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation.difference
 
+import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.LinearOp

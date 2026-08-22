@@ -41,3 +41,19 @@ Read `klause-bench/README.md` before benchmarking. In short:
 - PR body: follow `.github/pull_request_template.md`, with `Closes #NN` on its own line at the top.
 - Issues: follow `.github/issue_template.md`. Keep them short, a few plain sentences,
   and link code/PRs instead of pasting.
+
+## Solver boundaries
+
+- `propagation` owns finite-domain state, explanations, and incremental propagators. Its difference
+  system follows the trail and can pin literals back into the propagation fixpoint.
+- `arithmetic.difference` owns immutable difference-constraint representation, fragment extraction,
+  and non-incremental graph operations. It must not depend on propagation state.
+- `simplex.exact` owns reusable exact rational arithmetic and feasibility simplex primitives. `lp` owns
+  floating LP, finite-CP bounding, cuts, and relaxation assembly.
+- `theory.difference`, `theory.lia`, and `theory.qflra` decide complete open-model fragments. They must
+  not materialize finite CP domains.
+- `solver.pipeline` selects an open theory once and exposes one verdict surface. Frontends render
+  assignments; they do not select or invoke concrete theories.
+- Dependencies point from policy to mechanism: pipeline and theories may depend on solver model types
+  and arithmetic kernels; propagation may depend on immutable arithmetic representations; arithmetic
+  kernels do not depend on propagation or search.

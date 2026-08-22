@@ -1,8 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.GeneralLiaAssignment
-import com.eignex.klause.backtrack.ExactLraAssignment
+import com.eignex.klause.theory.lia.GeneralLiaAssignment
+import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -523,14 +523,11 @@ internal sealed interface SolvablePipeline {
     /** The ordinary finite-domain CP, LP, and search components. */
     data object FiniteCp : SolvablePipeline
 
-    /** Open integer rows decided by the complete difference theory. */
-    data class DifferenceTheory(val model: ProblemSpec) : SolvablePipeline
-
-    /** Open integer rows decided by the complete General LIA procedure. */
-    data class GeneralLia(val model: ProblemSpec, val render: (GeneralLiaAssignment) -> String) : SolvablePipeline
-
-    /** Open pure-real rows decided by exact rational linear arithmetic. */
-    data class ExactLra(val model: ProblemSpec, val render: (ExactLraAssignment) -> String) : SolvablePipeline
+    /** A complete open-model theory, selected by the solver-side route builder. */
+    data class OpenTheory(
+        val model: ProblemSpec,
+        val render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
+    ) : SolvablePipeline
 }
 
 /** Build a satisfiability instance whose open integer rows are decided by difference theory. */
@@ -544,7 +541,9 @@ internal fun differenceTheorySolvable(model: ProblemSpec, render: (Sample) -> St
     definitionalSweep = null,
     render = render,
     objectiveValue = null,
-    pipeline = SolvablePipeline.DifferenceTheory(model),
+    pipeline = SolvablePipeline.OpenTheory(model) { assignment ->
+        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
+    },
 )
 
 /** Build a satisfiability instance whose open integer rows are decided by General LIA. */
@@ -558,7 +557,9 @@ internal fun generalLiaSolvable(model: ProblemSpec, render: (GeneralLiaAssignmen
     definitionalSweep = null,
     render = { error("General LIA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.GeneralLia(model, render),
+    pipeline = SolvablePipeline.OpenTheory(model) { assignment ->
+        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
+    },
 )
 
 /** Build a satisfiability instance whose open real rows are decided by exact QF_LRA. */
@@ -572,7 +573,9 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     definitionalSweep = null,
     render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.ExactLra(model, render),
+    pipeline = SolvablePipeline.OpenTheory(model) { assignment ->
+        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment)
+    },
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via

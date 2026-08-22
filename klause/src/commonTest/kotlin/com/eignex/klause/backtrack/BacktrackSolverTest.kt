@@ -21,6 +21,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.theory.difference.DifferenceTheorySolver
+import com.eignex.klause.theory.lia.GeneralLiaResult
+import com.eignex.klause.theory.lia.GeneralLiaSolver
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test

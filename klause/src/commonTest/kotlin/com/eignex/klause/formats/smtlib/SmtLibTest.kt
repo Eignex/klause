@@ -2,17 +2,17 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.DifferenceTheorySolver
-import com.eignex.klause.backtrack.ExactLraResult
-import com.eignex.klause.backtrack.ExactLraSolver
-import com.eignex.klause.backtrack.GeneralLiaResult
-import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.theory.difference.DifferenceTheorySolver
+import com.eignex.klause.theory.lia.GeneralLiaResult
+import com.eignex.klause.theory.lia.GeneralLiaSolver
+import com.eignex.klause.theory.qflra.ExactLraResult
+import com.eignex.klause.theory.qflra.ExactLraSolver
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.test.Test

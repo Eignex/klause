@@ -5,7 +5,6 @@ import com.eignex.klause.lp.FloatLpResult
 import com.eignex.klause.lp.IntegerCertificate
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpOverflowException
-import com.eignex.klause.lp.RationalFeasibility
 import com.eignex.klause.lp.RevisedSimplex
 import com.eignex.klause.lp.TableauCutSolver
 import com.eignex.klause.lp.VarStatus
@@ -18,13 +17,14 @@ import com.eignex.klause.lp.integerCertify
 import com.eignex.klause.lp.integerDualLowerBoundCeil
 import com.eignex.klause.lp.integerFarkasRay
 import com.eignex.klause.lp.mulExact
-import com.eignex.klause.lp.rationalOutcome
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.lp.safeObjectiveLowerBound
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.simplex.exact.RationalFeasibility
+import com.eignex.klause.simplex.exact.rationalOutcome
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink

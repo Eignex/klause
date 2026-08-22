@@ -1,5 +1,6 @@
-package com.eignex.klause.backtrack
+package com.eignex.klause.theory.lia
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
