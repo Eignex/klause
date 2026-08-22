@@ -3,6 +3,8 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
+import com.eignex.klause.solver.IntBounds
+import com.eignex.klause.util.Bits
 
 /**
  * The bounds a single scan of the conjunctive relations yields: for each integer variable, the tightest
@@ -12,9 +14,9 @@ import com.eignex.klause.factor.arithmetic.internals.floorDivLong
  *
  * Deliberately NOT a fixpoint. Deducing a bound from a multi-variable row is feasibility-based bound
  * tightening, and running it here would duplicate what the root bake and the deferred
- * [com.eignex.klause.lp.DeferredIntBounds] run already do over the lowered rows — except that parsing has
- * no wall-clock budget to bound it with, which is what hung the Petri-net and concurrency QF_LIA
- * instances. This pass is O(Σ row width) once, the same order as reading the document.
+ * finite CP presolve would do over the lowered rows — except that parsing has no wall-clock budget to
+ * bound it with, which is what hung the Petri-net and concurrency QF_LIA instances. This pass is
+ * O(Σ row width) once, the same order as reading the document.
  *
  * What stays here is only what the *lowering* needs before it can run: an unbounded operand widens an
  * `ite`/`div`/`mod` auxiliary's range and drops `distinct` from an [com.eignex.klause.factor.global.AllDifferent]
@@ -52,10 +54,33 @@ internal fun SmtLib.Builder.inferBounds() {
         if (strictBounds && (provLo == null || provHi == null)) {
             throw UnsupportedSmtException("no provable ${if (provLo == null) "lower" else "upper"} bound for '$name'")
         }
-        // A still-null side stays Open for OBBT; the searchable-fallback clamp (and the `unknown`
-        // downgrade) is owned by finalizeDomains, not here.
+        // A still-null side remains structurally open for pipeline selection.
         intDomains[v] = openOrFinite(provLo, provHi)
     }
+}
+
+/** Snapshot the declared and inferred integer bounds without materializing an open side. */
+internal fun SmtLib.Builder.modelIntBounds(): IntBounds {
+    val lower = LongArray(nextInt)
+    val upper = LongArray(nextInt)
+    var openLo: Bits? = null
+    var openHi: Bits? = null
+    for (v in 0 until nextInt) {
+        when (val domain = intDomains[v]) {
+            is PresolveDomain.Finite -> {
+                lower[v] = domain.domain.min
+                upper[v] = domain.domain.max
+            }
+
+            is PresolveDomain.Open -> {
+                lower[v] = domain.lo ?: 0L
+                upper[v] = domain.hi ?: 0L
+                if (domain.lo == null) (openLo ?: Bits(nextInt).also { openLo = it }).set(v)
+                if (domain.hi == null) (openHi ?: Bits(nextInt).also { openHi = it }).set(v)
+            }
+        }
+    }
+    return IntBounds.fromModelBounds(lower, upper, openLo, openHi)
 }
 
 // lo/hi are nullable (a null slot is ±infinity), so a primitive LongArray cannot represent them.

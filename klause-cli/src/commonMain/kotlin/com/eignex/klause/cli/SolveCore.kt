@@ -128,7 +128,6 @@ internal object SolveCore {
             config,
             solutionSetSensitive,
             presolveCancel,
-            boundingCancellation = cancel,
             presolveBudget = presolveBudget,
         )
         val presolveElapsed = presolveStart.elapsedNow()
@@ -154,7 +153,7 @@ internal object SolveCore {
 
         // Presolve already proved infeasibility (e.g. a gcd-indivisible equality caught by the
         // first-running coefficient-strengthening pass): report it directly rather than invoking a
-        // solver, whose root bake would re-derive it by O(span) bound-narrowing on a wide clamped domain.
+        // solver, whose root bake would re-derive it by O(span) bound-narrowing on a wide domain.
         if (solvable.presolve?.infeasible == true) {
             output.onComplete(Verdict.UNSATISFIABLE)
             return
@@ -449,7 +448,7 @@ internal object SolveCore {
      * cannot touch when it may be nothing of the sort. This is the count that line hides.
      *
      * A column counts as open when its width overflows `Long` or exceeds [OPEN_WIDTH]. The exact cut is
-     * not load-bearing: real models put their columns either at the clamp or well under a million, so
+     * not load-bearing: real models put their columns either near the integer limit or well under a million, so
      * nothing observed lands near it.
      */
 
@@ -467,21 +466,16 @@ internal object SolveCore {
      *
      * Eligible is not the same as decidable: an MPS model is entirely [Linear] rows and reads as fully
      * eligible, yet its integers still have to be searched until something decides them. The actionable
-     * figure is the second one — a column that is eligible *and* carries an invented bound is one the
-     * search box is paying for and buying nothing with.
-     *
-     * Read from [Problem.intBounds], which records which *sides* a front-end could
-     * not bound, rather than from the width: a genuinely declared wide domain is not a clamp, and only
-     * the provenance tells the two apart.
+     * figure is the second one — a theory-eligible column with an open source side.
      */
     private fun theoryText(problem: Problem): String {
         val partition = problem.variablePartition()
-        var clampedAndEligible = 0
+        var openAndEligible = 0
         for (v in 0 until partition.size) {
             if (!partition.isTheoryEligible(v)) continue
-            if (problem.intBounds.isOpenLower(v) || problem.intBounds.isOpenUpper(v)) clampedAndEligible++
+            if (problem.intBounds.isOpenLower(v) || problem.intBounds.isOpenUpper(v)) openAndEligible++
         }
-        return "${partition.theoryEligibleCount} of ${partition.size}, $clampedAndEligible of them clamped"
+        return "${partition.theoryEligibleCount} of ${partition.size}, $openAndEligible of them open"
     }
 
     /** [domainSpan] for the dry-run readout, naming the saturated case instead of printing a number

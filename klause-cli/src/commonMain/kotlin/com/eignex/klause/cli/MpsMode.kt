@@ -29,7 +29,7 @@ internal object MpsMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             val config = KlauseConfig.current
             val compiled = Mps.parse(openFileSource(path))
-                .toProblem(config.unboundedSearchBound, config.floatBuckets, config.floatScale)
+                .toProblem(config.floatBuckets, config.floatScale)
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -93,15 +93,8 @@ internal fun renderMpsGeneralLiaModel(compiled: MpsCompiled, assignment: General
     }
 }
 
-/**
- * MPS output protocol (PB-competition-style `s`/`o`/`v`). When a variable was clamped to the finite
- * search range, a proven optimum is only optimal within the clamp and an `unsat` only holds within it,
- * so both are softened (to `SATISFIABLE` / `UNKNOWN`) — the honest verdict for the unbounded problem.
- */
-internal class MpsOutput(
-    private val clamp: ClampFlag = ClampFlag(),
-    private val globalOptimum: (Long) -> Boolean = { false },
-) : BufferedBestOutput() {
+/** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
+internal class MpsOutput : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
     override fun onSolutionObjective(objective: Long?) {
@@ -114,24 +107,11 @@ internal class MpsOutput(
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
 
-        Verdict.OPTIMAL ->
-            if (!clamp.clamped || bestObjective?.let(globalOptimum) == true) "s OPTIMUM FOUND" else "s SATISFIABLE"
+        Verdict.OPTIMAL -> "s OPTIMUM FOUND"
 
-        Verdict.UNSATISFIABLE -> if (clamp.clamped) "s UNKNOWN" else "s UNSATISFIABLE"
+        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
-    }
-
-    // A clamped optimum is softened to SATISFIABLE, which reads as "found something" and hides that the
-    // bound is only the box's; say so, alongside the two causes an outright UNKNOWN can have.
-    override fun verdictReason(verdict: Verdict): String? = when {
-        verdict == Verdict.UNSATISFIABLE && clamp.clamped ->
-            "refuted inside the clamped search range, not over the model's own"
-
-        verdict == Verdict.OPTIMAL && clamp.clamped && bestObjective?.let(globalOptimum) != true ->
-            "optimal within the clamped search range only"
-
-        else -> super.verdictReason(verdict)
     }
 
     override fun keepStat(key: String): Boolean = true

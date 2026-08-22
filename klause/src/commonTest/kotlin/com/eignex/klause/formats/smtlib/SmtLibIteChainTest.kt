@@ -38,6 +38,7 @@ class SmtLibIteChainTest {
         (declare-const s Int) (declare-const r Int)
         $extraDecls
         (assert (>= s $SEL_LO)) (assert (<= s $SEL_HI))
+        (assert (>= r -10000)) (assert (<= r 10000))
         (assert (= r $body))
         (check-sat)
         """.trimIndent()
@@ -45,7 +46,7 @@ class SmtLibIteChainTest {
     /** The value `r` takes for each `s` in `[SEL_LO, SEL_HI]`, read off a solution with `s` pinned. */
     private fun resultPerSelector(text: String): List<Long> {
         val parsed = SmtLib.parse(text)
-        val problem = parsed.problem
+        val problem = parsed.model.materializeFiniteBounds()
         val s = parsed.intVarNames.getValue("s")
         val r = parsed.intVarNames.getValue("r")
         return (SEL_LO..SEL_HI).map { v ->
@@ -58,7 +59,7 @@ class SmtLibIteChainTest {
         }
     }
 
-    private fun elementCount(text: String): Int = SmtLib.parse(text).problem.factors.count { it is Element }
+    private fun elementCount(text: String): Int = SmtLib.parse(text).model.factors.count { it is Element }
 
     @Test
     fun `a chain of equality tests should collapse to one element factor`() {

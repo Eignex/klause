@@ -8,11 +8,11 @@ import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline
 import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
 
 /** A parsed instance lifted into klause's solver representation, plus an optional objective. */
 internal data class Ingested(val problem: Problem, val objective: LinearObjective? = null)
@@ -84,36 +84,21 @@ internal object SmtLibFormat : ProblemFormat {
     override val format = Format.SMTLIB
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val intBound = System.getProperty("klause.bench.smtlib.intBound")?.toLongOrNull() ?: 100_000L
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
-        val parsed = SmtLib.parse(file.readText(), -intBound, intBound, strict)
-        // OBBT is deferred out of parsing; the bench solves in-process without the CLI presolve phase, so
-        // run the deferred bounding here under an ingest budget (a side left un-tightened is clamped, sound).
-        val budgetMs = System.getProperty("klause.bench.smtlib.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
-        val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
-        val problem = parsed.deferredBounds?.run(cancel)?.let { parsed.model.materialize(it.domains) }
-            ?: parsed.model.materializeFiniteBounds()
-        return Ingested(problem, parsed.objective)
+        val parsed = SmtLib.parse(file.readText(), strictBounds = strict)
+        return Ingested(parsed.model.requireFiniteBenchModel(file), parsed.objective)
     }
 }
 
 /** MPS (MIP) ingest → klause integer model. Parser + lowering live in `com.eignex.klause.formats.mps`;
- *  this wrapper reads the bench-level search-bound knob and normalises to the minimise-canonical
- *  objective the runner expects (an MPS `OBJSENSE MAX` negates every coefficient). */
+ *  this wrapper normalises to the minimise-canonical objective the runner expects (an MPS `OBJSENSE MAX`
+ *  negates every coefficient). */
 internal object MpsFormat : ProblemFormat {
     override val format = Format.MPS
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val searchBound = System.getProperty("klause.bench.mps.searchBound")?.toLongOrNull() ?: 1_000_000L
-        // OBBT is deferred out of parsing (it solves an LP per open-integer variable and can run for many
-        // minutes on a large MPS). The bench solves in-process without the CLI presolve phase, so run the
-        // deferred bounding here under an ingest budget; a side left un-tightened when the budget trips is
-        // clamped to searchBound (sound — the clamp only loosens).
-        val budgetMs = System.getProperty("klause.bench.mps.ingestBudgetMs")?.toLongOrNull() ?: 5_000L
-        val cancel = if (budgetMs > 0) Cancellation.after(budgetMs.milliseconds) else Cancellation.Never
-        val compiled = Mps.parse(file.readText()).toProblem(searchBound)
-        val problem = compiled.deferredBounds?.run(cancel)?.let { compiled.model.materialize(it.domains) }
-            ?: compiled.model.materializeFiniteBounds()
+        val compiled = Mps.parse(file.readText()).toProblem()
+        val problem = compiled.model.requireFiniteBenchModel(file)
         val objective = if (compiled.maximize) compiled.objective?.negated() else compiled.objective
         return Ingested(problem, objective)
     }
@@ -124,6 +109,13 @@ internal object MpsFormat : ProblemFormat {
         intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
         constant = -constant,
     )
+}
+
+private fun com.eignex.klause.solver.ProblemSpec.requireFiniteBenchModel(file: File): Problem {
+    check(pipeline() == ProblemPipeline.FINITE_CP) {
+        "${file.name}: in-process benchmarks require finite integer bounds; use the CLI theory route for open models"
+    }
+    return materializeFiniteBounds()
 }
 
 internal object Formats {

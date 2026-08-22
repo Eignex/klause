@@ -5,19 +5,15 @@ import com.eignex.klause.solver.IntDomain
 /**
  * A per-variable domain **during SMT-LIB presolve**, modelled as a sealed union so that an *open*
  * (as-yet unbounded) integer is simply not representable as a searchable [IntDomain]: the type system —
- * not a runtime guard — enforces that infinity never reaches search. An [Open] domain lives only inside
- * [SmtLib.Builder] between a variable's declaration and [SmtLib.Builder.prepareDeferredBounds];
- * bound inference closes the sides it can and the fallback clamp closes whatever remains, so every entry
- * is [Finite] by the time a [com.eignex.klause.solver.Problem] is built (the OBBT LP tightening is
- * deferred to the presolve phase).
+ * not a runtime guard — enforces that infinity never reaches finite CP search. An [Open] domain lives
+ * inside [SmtLib.Builder] until its bounds are copied to the source model for pipeline selection.
  * Infinity is carried structurally (a `null` bound), never by a `Long.MIN/MAX` or `±Long/4` sentinel.
  */
 internal sealed interface PresolveDomain {
     /** A fully-known finite domain, ready for search. */
     class Finite(val domain: IntDomain) : PresolveDomain
 
-    /** An integer variable still open on at least one side; `lo`/`hi` null = no bound yet that side.
-     *  Not an [IntDomain]: it cannot be handed to a `Problem`/search until closed to a [Finite]. */
+    /** An integer variable still open on at least one side; `lo`/`hi` null = no bound yet that side. */
     class Open(val lo: Long?, val hi: Long?) : PresolveDomain {
         init {
             require(lo == null || hi == null) { "Open needs an open side; use Finite" }

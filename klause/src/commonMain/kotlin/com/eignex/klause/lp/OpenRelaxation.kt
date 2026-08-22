@@ -6,9 +6,7 @@ import com.eignex.klause.util.EmptyDoubleArray
 
 /**
  * The LP relaxation of a system over its **genuinely open** integer ranges, shared by everything that has
- * to reason about a model outside the box the search is given: the bound tightening
- * ([tightenOpenIntBounds]), and the refutations that certify an in-box verdict global
- * ([unboundedlyInfeasible], [nothingBeatsOverOpenRanges]).
+ * to reason about a model with open integer bounds: [tightenOpenIntBounds].
  *
  * A variable open below enters split, `x = x⁺ − x⁻` with both parts non-negative, never as a probe-
  * magnitude lower bound: the double view folds each column's lower bound into the row rhs in doubles, and

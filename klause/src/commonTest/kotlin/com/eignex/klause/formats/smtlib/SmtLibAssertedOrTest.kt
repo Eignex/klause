@@ -3,7 +3,6 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -17,9 +16,7 @@ import kotlin.test.assertTrue
  */
 class SmtLibAssertedOrTest {
 
-    private fun SmtLibProblem.bounded(): Problem = deferredBounds?.run(
-        Cancellation.Never,
-    )?.let { model.materialize(it.domains) } ?: model.materializeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
 
     private fun parse(text: String): Problem = SmtLib.parse("$text\n(check-sat)").bounded()
 

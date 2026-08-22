@@ -3,48 +3,16 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /** End-to-end: an MPS instance with an LP-only continuous column solves through the hybrid engine, and
  *  the continuous variable's value is carried on the solution [com.eignex.klause.solver.Sample.reals]. */
 class MpsSolveTest {
-
-    @Test
-    fun `an optimum over an open column is certified against the model's own ranges`() {
-        // minimize x  s.t.  x >= 3, x integer with no upper bound. The column is genuinely unbounded
-        // above — the relaxation maximises it to infinity — so its upper side can only come from the
-        // fallback box, and the verdict would carry the clamp caveat. Asking whether anything beats the
-        // optimum settles it without the box: `x <= 2` against `x >= 3` has no solution anywhere.
-        val m = MpsModel(
-            name = "openmin",
-            sense = ObjectiveSense.MINIMIZE,
-            objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
-            variables = listOf(MpsVar("x", integer = true, lower = 0.0, upper = null)),
-            constraints = listOf(
-                MpsConstraint("DEMAND", intArrayOf(0), doubleArrayOf(1.0), lower = 3.0, upper = null),
-            ),
-        )
-        val compiled = m.toProblem()
-        val deferred = assertNotNull(compiled.deferredBounds, "an open column defers its bounding")
-        assertTrue(deferred.run(Cancellation.Never).clamped, "nothing bounds the column above")
-        val objective = assertNotNull(compiled.objective)
-        assertTrue(
-            deferred.noBetterThan(objective.intCoefficients, objective.constant, compiled.maximize, 3L),
-            "nothing anywhere beats 3, so the in-box optimum is the model's",
-        )
-        assertFalse(
-            deferred.noBetterThan(objective.intCoefficients, objective.constant, compiled.maximize, 5L),
-            "4 beats 5, so no certificate may be issued there",
-        )
-    }
 
     @Test
     fun `solves a mixed integer-continuous MPS instance and reports the continuous value`() {
@@ -90,25 +58,6 @@ class MpsSolveTest {
             constraints = listOf(MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = 5.0, upper = null)),
         )
         assertIs<SolveResult.Unsat>(BacktrackSolver(m.toProblem().problem.bake()).solve(BacktrackParams()))
-    }
-
-    @Test
-    fun `a declared empty integer domain refutes the model over its open ranges`() {
-        // x declared 5 <= x <= 3 alongside an open column y.
-        val m = MpsModel(
-            name = "empty",
-            sense = ObjectiveSense.MINIMIZE,
-            objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
-            variables = listOf(
-                MpsVar("x", integer = true, lower = 5.0, upper = 3.0),
-                MpsVar("y", integer = true, lower = 0.0, upper = null),
-            ),
-            constraints = listOf(MpsConstraint("C1", intArrayOf(1), doubleArrayOf(1.0), lower = null, upper = 10.0)),
-        )
-        val deferred = assertNotNull(m.toProblem().deferredBounds)
-        val bounded = deferred.run(Cancellation.Never)
-        assertTrue(bounded.openlyInfeasible)
-        assertFalse(bounded.clamped, "an empty declared domain refutes without the clamp caveat")
     }
 
     @Test

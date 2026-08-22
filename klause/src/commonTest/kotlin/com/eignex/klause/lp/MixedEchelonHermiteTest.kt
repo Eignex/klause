@@ -90,9 +90,8 @@ class MixedEchelonHermiteTest {
 
     @Test
     fun `a derived bound never excludes a solution of the original system`() {
-        // The safety property the DeferredIntBounds wiring rests on: a bound derived through the
-        // transformation must CONTAIN every solution, or search inside it would miss models and a
-        // refutation inside it would be a false unsat. Enumerated exhaustively over a small box.
+        // A bound derived through the transformation must contain every solution. Enumerated exhaustively
+        // over a small box.
         val original = sparseRows(longArrayOf(2, -2)) // 2*x0 - 2*x1 = 0, i.e. x0 == x1
         val r = mixedEchelonHermite(original, emptyList(), 2)
         val span = 6L

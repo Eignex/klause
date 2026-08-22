@@ -3,7 +3,6 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.GeneralLiaAssignment
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.formats.smtlib.IntDigitColumns
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.solver.ProblemPipeline
@@ -28,7 +27,6 @@ internal object SmtLibMode : CliMode {
                 openFileSource(path),
                 config.unboundedIntLo,
                 config.unboundedIntHi,
-                searchBound = config.unboundedSearchBound,
             )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: bool=${parsed.model.numBoolVars} int=${parsed.model.numIntVars} " +
@@ -37,7 +35,7 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s, parsed.intDigits) }
+            val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
             when (parsed.sourcePipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
                     throw UnsupportedSmtException(
@@ -83,10 +81,9 @@ internal fun renderModel(
     bools: Map<String, Int>,
     reals: Map<String, Int>,
     s: Sample,
-    intDigits: Map<Int, IntDigitColumns> = emptyMap(),
 ): String = buildString {
     append("(\n")
-    for ((name, id) in ints) append("  (define-fun $name () Int ${intValue(id, s, intDigits)})\n")
+    for ((name, id) in ints) append("  (define-fun $name () Int ${s.ints[id]})\n")
     for ((name, id) in bools) append("  (define-fun $name () Bool ${s.bools[id]})\n")
     for ((name, id) in reals) {
         val v = if (id < s.reals.size) s.reals[id] else 0.0
@@ -109,31 +106,14 @@ internal fun renderGeneralLiaModel(
     append(")")
 }
 
-/** A declared integer's value: off its digit columns when it was lowered onto them, off the variable
- *  otherwise. */
-private fun intValue(id: Int, s: Sample, intDigits: Map<Int, IntDigitColumns>): String =
-    intDigits[id]?.decimalIn(s.ints) ?: s.ints[id].toString()
-
-/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. When [clamp] is set
- *  (by the presolve-phase deferred bounding), an `unsat` is only `unsat` within the finite solver range —
- *  the sound verdict for the original (unbounded) problem is `unknown`, so it is reported as such, unless
- *  the refutation can be re-derived without the box ([ClampFlag.refutationIsBoxFree]). */
-internal class SmtLibOutput(private val clamp: ClampFlag = ClampFlag()) : BufferedBestOutput() {
+/** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
+internal class SmtLibOutput : BufferedBestOutput() {
     override val commentPrefix: String = ";"
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.OPTIMAL, Verdict.BEST_FOUND -> "sat"
-        Verdict.UNSATISFIABLE -> if (clamp.clamped && !clamp.refutationIsBoxFree()) "unknown" else "unsat"
+        Verdict.UNSATISFIABLE -> "unsat"
         Verdict.UNKNOWN -> "unknown"
-    }
-
-    // The two roads to `unknown` want opposite responses from the caller: a refutation the box blocked is
-    // very likely an unsat waiting on real bounds, while an exhausted budget just wants a longer one.
-    override fun verdictReason(verdict: Verdict): String? = when {
-        verdict == Verdict.UNSATISFIABLE && clamp.clamped && !clamp.refutationIsBoxFree() ->
-            "refuted inside the clamped search range, not over the model's own"
-
-        else -> super.verdictReason(verdict)
     }
 
     // Deliberately lean block: SMT-LIB comments carry only the headline search counters.

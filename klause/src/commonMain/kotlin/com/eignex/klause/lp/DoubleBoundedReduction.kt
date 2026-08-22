@@ -24,7 +24,7 @@ import com.eignex.klause.solver.Cancellation
  * *some* solution survives inside the derived box, not that every solution lies there, so a bound taken
  * from it could cut away the optimum or the solutions an enumeration owes its caller — unlike the
  * containment bounds [tightenOpenIntBounds] and the echelon block produce. And it cannot refute; see
- * [unboundedlyInfeasible] for why. What is left is searching the reduced system itself and rebuilding an
+ * an exact open-domain refutation for why. What is left is searching the reduced system itself and rebuilding an
  * original solution by travelling the discarded directions, and that rebuilding is the missing piece.
  *
  * A direction is bounded exactly when the auxiliary variable `z = aᵢᵀx` is, so each candidate row gets

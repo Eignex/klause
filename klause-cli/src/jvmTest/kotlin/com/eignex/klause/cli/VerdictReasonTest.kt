@@ -20,13 +20,9 @@ class VerdictReasonTest {
         return buf.toString()
     }
 
-    private fun smt(clamped: Boolean, boxFree: Boolean, context: VerdictContext, verdict: Verdict): String {
-        val clamp = ClampFlag().apply {
-            this.clamped = clamped
-            boxFreeRefutation = { boxFree }
-        }
+    private fun smt(context: VerdictContext, verdict: Verdict): String {
         return capture {
-            SmtLibOutput(clamp).apply {
+            SmtLibOutput().apply {
                 onVerdictContext(context)
                 onComplete(verdict)
             }
@@ -34,33 +30,20 @@ class VerdictReasonTest {
     }
 
     @Test
-    fun `a refutation the clamp blocked says so rather than reading as a plain unknown`() {
-        val out = smt(clamped = true, boxFree = false, VerdictContext(), Verdict.UNSATISFIABLE)
-        assertEquals("unknown", out.lineSequence().first())
-        assertTrue("clamped search range" in out, out)
-    }
-
-    @Test
     fun `an exhausted budget is named as the cause`() {
-        val out = smt(false, false, VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
+        val out = smt(VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
         assertTrue("; budget exhausted" in out, out)
     }
 
     @Test
     fun `a pool with nothing that can prove is named as the cause`() {
-        val out = smt(false, false, VerdictContext(budgetExhausted = true, completePool = false), Verdict.UNKNOWN)
+        val out = smt(VerdictContext(budgetExhausted = true, completePool = false), Verdict.UNKNOWN)
         assertTrue("no arm in the pool can prove" in out, out)
     }
 
     @Test
-    fun `a refutation that survives without the box reports unsat and no reason`() {
-        val out = smt(clamped = true, boxFree = true, VerdictContext(), Verdict.UNSATISFIABLE)
-        assertEquals("unsat", out.trim())
-    }
-
-    @Test
     fun `a decided verdict carries no reason line`() {
-        val out = smt(false, false, VerdictContext(), Verdict.SATISFIABLE)
+        val out = smt(VerdictContext(), Verdict.SATISFIABLE)
         assertTrue("unknown" !in out, out)
     }
 
@@ -73,7 +56,7 @@ class VerdictReasonTest {
             "opb" to { OpbOutput() },
             "wcnf" to { WcnfOutput() },
             "xcsp" to { XcspOutput() },
-            "mps" to { MpsOutput(ClampFlag(), globalOptimum = { true }) },
+            "mps" to { MpsOutput() },
             "smtlib" to { SmtLibOutput() },
         )
         for ((name, factory) in modes) {
@@ -101,7 +84,7 @@ class VerdictReasonTest {
 
     @Test
     fun `the cause does not repeat the verdict the status line already gave`() {
-        val out = smt(false, false, VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
+        val out = smt(VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
         assertEquals("unknown", out.lineSequence().first())
         assertEquals(1, out.lineSequence().count { "unknown" in it }, "the verdict is named once: $out")
     }
@@ -117,15 +100,4 @@ class VerdictReasonTest {
         assertEquals("==========", out.trim())
     }
 
-    @Test
-    fun `an optimum only optimal inside the clamp says so`() {
-        val out = capture {
-            MpsOutput(ClampFlag().apply { clamped = true }, globalOptimum = { false }).apply {
-                onVerdictContext(VerdictContext())
-                onSolution("v x=1", 7L)
-                onComplete(Verdict.OPTIMAL)
-            }
-        }
-        assertTrue("c optimal within the clamped search range only" in out, out)
-    }
 }

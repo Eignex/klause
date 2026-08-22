@@ -3,7 +3,6 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.Increasing
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
@@ -24,9 +23,7 @@ class SmtLibChainTest {
         val ORDER_OPS = listOf("<", "<=", ">", ">=")
     }
 
-    private fun SmtLibProblem.bounded(): Problem = deferredBounds?.run(
-        Cancellation.Never,
-    )?.let { model.materialize(it.domains) } ?: model.materializeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
 
     /** `k` integers over `[0, size)`, with [tail] appended as the closing assertions. */
     private fun boundedInts(k: Int, size: Int, tail: String): String {
@@ -41,7 +38,7 @@ class SmtLibChainTest {
     /** Every tuple over `[0, SIZE)` for the first [VARS] variables that [text] accepts, found by pinning
      *  each variable to a singleton domain and reading the solver's verdict. */
     private fun accepted(text: String): Set<List<Long>> {
-        val parsed = SmtLib.parse(text).problem
+        val parsed = SmtLib.parse(text).model.materializeFiniteBounds()
         val out = HashSet<List<Long>>()
         for (code in 0 until SIZE * SIZE * SIZE) {
             val tuple = List(VARS) { ((code / pow(SIZE, it)) % SIZE).toLong() }
@@ -120,7 +117,7 @@ class SmtLibChainTest {
     @Test
     fun `an ascending chain over bare variables posts one increasing factor`() {
         val text = boundedInts(VARS, SIZE, "(assert (< ${names(VARS)}))")
-        val factors = SmtLib.parse(text).problem.factors.filterIsInstance<Increasing>()
+        val factors = SmtLib.parse(text).model.factors.filterIsInstance<Increasing>()
         assertEquals(1, factors.size, "expected one Increasing factor")
         assertTrue(factors[0].strict, "'<' is a strict chain")
         assertContentEquals(intArrayOf(0, 1, 2), factors[0].xs, "ascending chain keeps the operand order")
@@ -129,7 +126,7 @@ class SmtLibChainTest {
     @Test
     fun `a descending chain over bare variables reverses the increasing factor`() {
         val text = boundedInts(VARS, SIZE, "(assert (>= ${names(VARS)}))")
-        val factors = SmtLib.parse(text).problem.factors.filterIsInstance<Increasing>()
+        val factors = SmtLib.parse(text).model.factors.filterIsInstance<Increasing>()
         assertEquals(1, factors.size, "expected one Increasing factor")
         assertTrue(!factors[0].strict, "'>=' is a non-strict chain")
         assertContentEquals(intArrayOf(2, 1, 0), factors[0].xs, "descending chain reverses the operand order")

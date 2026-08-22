@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -9,11 +8,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.channelBoolTo01
-import com.eignex.klause.formats.dualFixableBounds
-import com.eignex.klause.formats.rootFixedReifiedRows
-import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.lp.OpenIntBounds
-import com.eignex.klause.lp.smallModelIntBound
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.Lit
@@ -49,8 +44,6 @@ data class MpsCompiled(
     /** Fixed-point factor the objective was multiplied by (1 when it is already integral); divide the
      *  reported objective by it for the true value. */
     val objectiveScale: Long,
-    /** Deferred integer-domain bounding (OBBT), or `null` when every integer column is already finite. */
-    val deferredBounds: DeferredIntBounds?,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
 )
@@ -61,7 +54,7 @@ private const val MPS_INFINITY = 1e20
 /**
  * Lower an [MpsModel] to a klause [ProblemSpec] for the hybrid MIP/CP engine:
  *  - **integer columns** become model integer variables; a side left unbounded (or at the `1e30`
- *    marker) stays open, while OBBT inputs are retained for a finite-search backend.
+ *    marker) stays open for pipeline selection.
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
  *    search; the simplex resolves them at nodes and leaves. Their real bounds carry through directly, so
  *    an unbounded float keeps an open side of `±∞`.
@@ -71,7 +64,6 @@ private const val MPS_INFINITY = 1e20
  *    a purely-integer row with a fractional coefficient is still scaled by [floatScale] to stay integral.
  */
 fun MpsModel.toProblem(
-    searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     @Suppress("UNUSED_PARAMETER") floatBuckets: Int = 0,
     floatScale: Long = DEFAULT_FLOAT_SCALE,
 ): MpsCompiled {
@@ -82,18 +74,17 @@ fun MpsModel.toProblem(
     var numReal = 0
     for (i in variables.indices) if (isFloat[i]) realVarOf[i] = numReal++ else intVarOf[i] = numInt++
 
-    // Real-variable bounds (open sides realised as ±∞). Integer OBBT input keeps true open sides (null)
-    // so OBBT can close the genuine unbounded region before any clamp.
+    // Real-variable bounds use ±∞. Integer source sides remain genuinely open when MPS omits them.
     val realLower = DoubleArray(numReal)
     val realUpper = DoubleArray(numReal)
-    val obbtInput = arrayOfNulls<OpenIntBounds>(numInt)
+    val declaredBounds = arrayOfNulls<OpenIntBounds>(numInt)
     for (i in variables.indices) {
         val v = variables[i]
         if (isFloat[i]) {
             realLower[realVarOf[i]] = openLower(v.lower)
             realUpper[realVarOf[i]] = openUpper(v.upper)
         } else {
-            obbtInput[intVarOf[i]] = OpenIntBounds(intBoundOrNull(v.lower), intBoundOrNull(v.upper))
+            declaredBounds[intVarOf[i]] = OpenIntBounds(intBoundOrNull(v.lower), intBoundOrNull(v.upper))
         }
     }
 
@@ -124,53 +115,6 @@ fun MpsModel.toProblem(
         }
     }
 
-    // OBBT over the purely-integer rows only (a real-bearing Linear carries placeholder integer data).
-    // An indicator row whose literal a unit clause fixes is an ordinary constraint of the model, so it
-    // belongs here too — otherwise a bound the model states through its boolean structure is invisible.
-    val allLinears = factors.filterIsInstance<Linear>() + rootFixedReifiedRows(factors)
-    val intLinears = allLinears.filter { it.isIntegerCore }
-    // A mixed row is context, not noise: on a MIP the rows that bound an integer column usually carry
-    // continuous terms too, so leaving them out leaves OBBT nothing to bound those columns with.
-    val realLinears = allLinears.filter { it.hasReals }
-
-    // A pure-integer feasibility model whose small-model bound ([smallModelIntBound]) fits keeps exact
-    // verdicts: the finite box is equisatisfiable with the unbounded model, so no clamp flag. Never under
-    // an objective (the box could truncate an unbounded optimum into a spurious finite one); mixed models
-    // and oversized bounds fall back to the lossy searchable window.
-    val small = if (numReal == 0 && objective.indices.isEmpty()) smallModelIntBound(numInt, factors) else null
-    // The fallback box is a stand-in, so choose one the objective can still be evaluated over. At the full
-    // searchable range a column reaches ~2^62 and the weighted sum wraps on the first few terms, which is
-    // worse than a narrow box: the search then optimises a wrapped value and is rewarded for driving
-    // columns further out. Narrowing keeps the model clamped either way — it only keeps the arithmetic
-    // honest.
-    val box = small ?: minOf(searchBound, objectiveSafeBox(isFloat, intVarOf, numInt, floatScale))
-
-    // Capture OBBT inputs without closing the model's open sides. A finite-search backend may later choose
-    // a fallback range after it has had a chance to tighten the relaxation.
-    @Suppress("UNCHECKED_CAST")
-    val declaredBounds = obbtInput as Array<OpenIntBounds>
-    // Close what the objective makes pointless to explore before deciding anything is open: a column the
-    // cost only ever pushes toward one end has an optimum there, and a side closed that way is the
-    // model's own, not an invented window. OBBT cannot reach these — the relaxation is genuinely
-    // unbounded in those directions.
-    val objScaleForCost = if (objectiveNeedsScaling(isFloat)) floatScale else 1L
-    val minimiseCost = objectiveIntCoefficients(isFloat, intVarOf, numInt, objScaleForCost, sense)
-    val openBounds = dualFixableBounds(numInt, factors, declaredBounds) { minimiseCost[it] }
-    val deferredBounds = if (openBounds.any { it.lo == null || it.hi == null }) {
-        DeferredIntBounds(
-            openBounds,
-            intLinears,
-            realLinears,
-            numReal,
-            -box,
-            box,
-            small == null,
-            realLower = realLower,
-            realUpper = realUpper,
-        )
-    } else {
-        null
-    }
     // A declared crossing is infeasible. Keep both stated bounds in the model by restating the upper side
     // as a row; the canonicalized range only lets the finite-domain representation exist if materialized.
     val lower = LongArray(numInt)
@@ -178,8 +122,8 @@ fun MpsModel.toProblem(
     var openLoBits: Bits? = null
     var openHiBits: Bits? = null
     for (j in 0 until numInt) {
-        val lo = openBounds[j].lo
-        val hi = openBounds[j].hi
+        val lo = declaredBounds[j]!!.lo
+        val hi = declaredBounds[j]!!.hi
         lower[j] = lo ?: 0L
         upper[j] = hi ?: 0L
         if (lo == null) (openLoBits ?: Bits(numInt).also { openLoBits = it }).set(j)
@@ -190,16 +134,13 @@ fun MpsModel.toProblem(
         }
     }
 
-    val objScale = objScaleForCost
+    val objScale = if (objectiveNeedsScaling(isFloat)) floatScale else 1L
     val objective = if (objective.indices.isEmpty()) {
         null
     } else {
         buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objScale)
     }
 
-    // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
-    // integer-infeasible equality would grind O(span) if baked at construction; presolve's strengthen
-    // pass catches that first, at solve time, before the (now-lazy) bake runs.
     val model = ProblemSpec(
         numBoolVars = guards.numBool,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLoBits, openHiBits),
@@ -211,7 +152,7 @@ fun MpsModel.toProblem(
     val columns = variables.mapIndexed { i, v ->
         MpsColumn(v.name, isFloat[i], if (isFloat[i]) realVarOf[i] else intVarOf[i])
     }
-    return MpsCompiled(model, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, deferredBounds, numReal)
+    return MpsCompiled(model, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, numReal)
 }
 
 /** Emit a purely-integer row over integer-variable ids, scaling by [floatScale] when a coefficient or
@@ -369,39 +310,6 @@ private fun emitIndicatedRealRow(
 private fun MpsModel.objectiveNeedsScaling(isFloat: BooleanArray): Boolean =
     objective.indices.withIndex().any { (k, idx) -> !isFloat[idx] && !isIntegral(objective.coeffs[k]) } ||
         !isIntegral(objective.constant)
-
-/**
- * The widest box over which `constant + Σ c·x` still fits `Long`, or [Long.MAX_VALUE] when the objective
- * places no limit. Deliberately generous — half the range is left as headroom for the accumulation order,
- * which the evaluator is free to choose.
- */
-private fun MpsModel.objectiveSafeBox(isFloat: BooleanArray, intVarOf: IntArray, numInt: Int, scale: Long): Long {
-    var weight = 0L
-    objective.indices.forEachIndexed { k, idx ->
-        if (isFloat[idx] || intVarOf[idx] >= numInt) return@forEachIndexed
-        val c = (objective.coeffs[k] * scale).roundToLong()
-        val magnitude = if (c < 0L) -c else c
-        // Saturate rather than wrap while measuring; a saturated total simply yields the narrowest box.
-        weight = if (weight > Long.MAX_VALUE - magnitude) Long.MAX_VALUE else weight + magnitude
-    }
-    return if (weight <= 1L) Long.MAX_VALUE else (Long.MAX_VALUE / 2L) / weight
-}
-
-/** The objective's integer coefficients oriented for minimisation, whatever the model's sense. */
-private fun MpsModel.objectiveIntCoefficients(
-    isFloat: BooleanArray,
-    intVarOf: IntArray,
-    numInt: Int,
-    scale: Long,
-    sense: ObjectiveSense,
-): LongArray {
-    val out = LongArray(numInt)
-    val flip = if (sense == ObjectiveSense.MAXIMIZE) -1L else 1L
-    objective.indices.forEachIndexed { k, idx ->
-        if (!isFloat[idx]) out[intVarOf[idx]] = flip * (objective.coeffs[k] * scale).roundToLong()
-    }
-    return out
-}
 
 private fun MpsModel.buildObjective(
     isFloat: BooleanArray,
