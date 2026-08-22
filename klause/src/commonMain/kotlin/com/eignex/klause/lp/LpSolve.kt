@@ -18,7 +18,7 @@ internal enum class LpVerdict {
 }
 
 /**
- * The outcome of [solveAndCertify]: a float LP solve plus the exact-arithmetic certification of its
+ * The outcome of a certified LP solve: a float LP solve plus the exact-arithmetic certification of its
  * result. The float engine only guides; the authoritative facts are the [certificate] (a proven
  * optimum lower bound) and the [farkasRay] (a proven infeasibility) — both in 128-bit integer
  * arithmetic. The cheap Neumaier–Shcherbina [safeLowerBound] is a float pruning heuristic and is

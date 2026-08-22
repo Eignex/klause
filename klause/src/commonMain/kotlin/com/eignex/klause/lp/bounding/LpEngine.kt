@@ -385,7 +385,7 @@ internal class LpEngine(
 
     /**
      * Exact residual verdict at a full-assignment leaf, over the relaxation built from the live
-     * [session] — the strict-aware decider ([solveAndCertify]'s delta-rational fallback) with the
+     * [session] — the strict-aware decider with the
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
      * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.OPTIMAL] the returned

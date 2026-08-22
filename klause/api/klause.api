@@ -154,140 +154,6 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
-public final class com/eignex/klause/backtrack/DifferenceTheorySolver {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/backtrack/DifferenceTheorySolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
-}
-
-public final class com/eignex/klause/backtrack/ExactLraAssignment {
-	public fun <init> ([ZLjava/util/List;)V
-	public final fun component1 ()[Z
-	public final fun component2 ()Ljava/util/List;
-	public final fun copy ([ZLjava/util/List;)Lcom/eignex/klause/backtrack/ExactLraAssignment;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/ExactLraAssignment;[ZLjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/ExactLraAssignment;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBools ()[Z
-	public final fun getReals ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class com/eignex/klause/backtrack/ExactLraResult {
-	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-}
-
-public final class com/eignex/klause/backtrack/ExactLraResult$Sat : com/eignex/klause/backtrack/ExactLraResult {
-	public fun <init> (Lcom/eignex/klause/backtrack/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/backtrack/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/backtrack/ExactLraAssignment;
-	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/backtrack/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/backtrack/ExactLraResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/ExactLraResult$Sat;Lcom/eignex/klause/backtrack/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/ExactLraResult$Sat;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAssignment ()Lcom/eignex/klause/backtrack/ExactLraAssignment;
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/ExactLraResult$Unknown : com/eignex/klause/backtrack/ExactLraResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/backtrack/ExactLraResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/ExactLraResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/ExactLraResult$Unknown;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/ExactLraResult$Unsat : com/eignex/klause/backtrack/ExactLraResult {
-	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/backtrack/ExactLraResult$Unsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/ExactLraResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/ExactLraResult$Unsat;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/ExactLraSolver {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/backtrack/ExactLraResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/backtrack/ExactLraSolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/ExactLraResult;
-}
-
-public final class com/eignex/klause/backtrack/GeneralLiaAssignment {
-	public fun <init> ([Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
-	public final fun component1 ()[Z
-	public final fun component2 ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun copy ([Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/backtrack/GeneralLiaAssignment;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/GeneralLiaAssignment;[Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/GeneralLiaAssignment;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBools ()[Z
-	public final fun getInts ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class com/eignex/klause/backtrack/GeneralLiaResult {
-	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-}
-
-public final class com/eignex/klause/backtrack/GeneralLiaResult$Sat : com/eignex/klause/backtrack/GeneralLiaResult {
-	public fun <init> (Lcom/eignex/klause/backtrack/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/backtrack/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/backtrack/GeneralLiaAssignment;
-	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/backtrack/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/backtrack/GeneralLiaResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/GeneralLiaResult$Sat;Lcom/eignex/klause/backtrack/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/GeneralLiaResult$Sat;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAssignment ()Lcom/eignex/klause/backtrack/GeneralLiaAssignment;
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/GeneralLiaResult$Unknown : com/eignex/klause/backtrack/GeneralLiaResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/backtrack/GeneralLiaResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/GeneralLiaResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/GeneralLiaResult$Unknown;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/GeneralLiaResult$Unsat : com/eignex/klause/backtrack/GeneralLiaResult {
-	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/backtrack/GeneralLiaResult$Unsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/backtrack/GeneralLiaResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/GeneralLiaResult$Unsat;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/backtrack/GeneralLiaSolver {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
-	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/backtrack/GeneralLiaResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/backtrack/GeneralLiaSolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/backtrack/GeneralLiaResult;
-}
-
 public final class com/eignex/klause/backtrack/NodeBudget {
 	public fun <init> (J)V
 	public final fun exhausted ()Z
@@ -4178,33 +4044,6 @@ public final class com/eignex/klause/localsearch/strategy/WalkSat {
 	public static synthetic fun invoke$default (Lcom/eignex/klause/localsearch/strategy/WalkSat;DLcom/eignex/klause/localsearch/TabuFilter;ZILjava/lang/Object;)Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
 }
 
-public final class com/eignex/klause/lp/BigFraction {
-	public static final field Companion Lcom/eignex/klause/lp/BigFraction$Companion;
-	public final fun compareTo (Lcom/eignex/klause/lp/BigFraction;)I
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDen ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun getNum ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public fun hashCode ()I
-	public final fun isZero ()Z
-	public final fun minus (Lcom/eignex/klause/lp/BigFraction;)Lcom/eignex/klause/lp/BigFraction;
-	public final fun negated ()Lcom/eignex/klause/lp/BigFraction;
-	public final fun plus (Lcom/eignex/klause/lp/BigFraction;)Lcom/eignex/klause/lp/BigFraction;
-	public final fun reciprocal ()Lcom/eignex/klause/lp/BigFraction;
-	public final fun signum ()I
-	public final fun times (Lcom/eignex/klause/lp/BigFraction;)Lcom/eignex/klause/lp/BigFraction;
-	public final fun toDouble ()D
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/lp/BigFraction$Companion {
-	public final fun getMINUS_ONE ()Lcom/eignex/klause/lp/BigFraction;
-	public final fun getONE ()Lcom/eignex/klause/lp/BigFraction;
-	public final fun getZERO ()Lcom/eignex/klause/lp/BigFraction;
-	public final fun of (Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/lp/BigFraction;
-	public final fun ofDouble (D)Lcom/eignex/klause/lp/BigFraction;
-	public final fun ofLong (J)Lcom/eignex/klause/lp/BigFraction;
-}
-
 public final class com/eignex/klause/lp/Contribution : java/lang/Enum {
 	public static final field CORE Lcom/eignex/klause/lp/Contribution;
 	public static final field HULL Lcom/eignex/klause/lp/Contribution;
@@ -7675,6 +7514,33 @@ public class com/eignex/klause/schema/VariableSchema : com/eignex/skema/Schema {
 	protected final fun setVar (Lkotlin/ranges/IntRange;)Lkotlin/properties/PropertyDelegateProvider;
 }
 
+public final class com/eignex/klause/simplex/exact/BigFraction {
+	public static final field Companion Lcom/eignex/klause/simplex/exact/BigFraction$Companion;
+	public final fun compareTo (Lcom/eignex/klause/simplex/exact/BigFraction;)I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDen ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getNum ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun hashCode ()I
+	public final fun isZero ()Z
+	public final fun minus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun negated ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun plus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun reciprocal ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun signum ()I
+	public final fun times (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun toDouble ()D
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/simplex/exact/BigFraction$Companion {
+	public final fun getMINUS_ONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getZERO ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun of (Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun ofDouble (D)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun ofLong (J)Lcom/eignex/klause/simplex/exact/BigFraction;
+}
+
 public final class com/eignex/klause/solver/Assignment {
 	public fun <init> (II)V
 	public final fun boolValue (I)Z
@@ -8272,6 +8138,89 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 	public fun toString ()Ljava/lang/String;
 }
 
+public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
+	public final fun copy (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun <init> (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;)V
+	public final fun component1 ()Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
+	public final fun copy (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra;Lcom/eignex/klause/theory/qflra/ExactLraAssignment;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public fun <init> (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;)V
+	public final fun component1 ()Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
+	public final fun copy (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia;Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryResult {
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Sat : com/eignex/klause/solver/pipeline/OpenTheoryResult {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Sat;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown : com/eignex/klause/solver/pipeline/OpenTheoryResult {
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : com/eignex/klause/solver/pipeline/OpenTheoryResult {
+	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheorySolver {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheorySolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+}
+
 public final class com/eignex/klause/solver/result/ConflictAnalysisStats {
 	public fun <init> ()V
 	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;)V
@@ -8746,6 +8695,140 @@ public final class com/eignex/klause/solver/result/UnsatCore$Companion {
 	public final fun getEmpty ()Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun of (Ljava/util/Collection;)Lcom/eignex/klause/solver/result/UnsatCore;
 	public final fun of ([I)Lcom/eignex/klause/solver/result/UnsatCore;
+}
+
+public final class com/eignex/klause/theory/difference/DifferenceTheorySolver {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/solver/SolveResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/theory/difference/DifferenceTheorySolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/SolveResult;
+}
+
+public final class com/eignex/klause/theory/lia/GeneralLiaAssignment {
+	public fun <init> ([Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public final fun component1 ()[Z
+	public final fun component2 ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun copy ([Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;[Z[Lcom/ionspin/kotlin/bignum/integer/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBools ()[Z
+	public final fun getInts ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/theory/lia/GeneralLiaResult {
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+}
+
+public final class com/eignex/klause/theory/lia/GeneralLiaResult$Sat : com/eignex/klause/theory/lia/GeneralLiaResult {
+	public fun <init> (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/lia/GeneralLiaResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/lia/GeneralLiaResult$Sat;Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaResult$Sat;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/lia/GeneralLiaResult$Unknown : com/eignex/klause/theory/lia/GeneralLiaResult {
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/lia/GeneralLiaResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/lia/GeneralLiaResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaResult$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/lia/GeneralLiaResult$Unsat : com/eignex/klause/theory/lia/GeneralLiaResult {
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/lia/GeneralLiaResult$Unsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/lia/GeneralLiaResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaResult$Unsat;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/lia/GeneralLiaSolver {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/theory/lia/GeneralLiaResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/theory/lia/GeneralLiaSolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/lia/GeneralLiaResult;
+}
+
+public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
+	public fun <init> ([ZLjava/util/List;)V
+	public final fun component1 ()[Z
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy ([ZLjava/util/List;)Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;[ZLjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBools ()[Z
+	public final fun getReals ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/theory/qflra/ExactLraResult {
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+}
+
+public final class com/eignex/klause/theory/qflra/ExactLraResult$Sat : com/eignex/klause/theory/qflra/ExactLraResult {
+	public fun <init> (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/qflra/ExactLraResult$Sat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/ExactLraResult$Sat;Lcom/eignex/klause/theory/qflra/ExactLraAssignment;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraResult$Sat;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/qflra/ExactLraResult$Unknown : com/eignex/klause/theory/qflra/ExactLraResult {
+	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/qflra/ExactLraResult$Unknown;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/ExactLraResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraResult$Unknown;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/qflra/ExactLraResult$Unsat : com/eignex/klause/theory/qflra/ExactLraResult {
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/qflra/ExactLraResult$Unsat;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/qflra/ExactLraResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraResult$Unsat;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/theory/qflra/ExactLraSolver {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public final fun solve (Lcom/eignex/klause/backtrack/BacktrackParams;)Lcom/eignex/klause/theory/qflra/ExactLraResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/theory/qflra/ExactLraSolver;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/qflra/ExactLraResult;
 }
 
 public final class com/eignex/klause/util/Bits {
