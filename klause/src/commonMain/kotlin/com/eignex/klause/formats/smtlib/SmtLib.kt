@@ -2,13 +2,11 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_SEARCH_BOUND
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.lp.DeferredIntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
@@ -16,7 +14,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
-import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Raised when an SMT-LIB construct outside the supported linear-arithmetic subset is encountered. */
 class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB", msg)
@@ -44,31 +41,7 @@ data class SmtLibProblem(
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    /** Deferred integer-domain bounding (OBBT), or `null` when every domain is already finite. */
-    val deferredBounds: DeferredIntBounds?,
-    /** True when the box was invented at parse and no [deferredBounds] run will say so later, so an `unsat`
-     *  over it is only `unsat` within the box. */
-    val clamped: Boolean = false,
-    /** Declared int ids lowered onto digit columns, by id — their value is read off the digits, not off the
-     *  variable, which no longer appears in any row. */
-    val intDigits: Map<Int, IntDigitColumns> = emptyMap(),
 )
-
-/** How a declared integer lowered onto digit columns is read back: `value = Σᵢ columns(i)·2^(width·i)`,
- *  the most significant digit signed. */
-data class IntDigitColumns(
-    /** The digit variables, least significant first. */
-    val columns: IntArray,
-    /** Bits per digit, so digit `i` carries weight `2^(width·i)`. */
-    val width: Int,
-) {
-    /** The decimal value these digits hold in an assignment's integer values. */
-    fun decimalIn(ints: LongArray): String {
-        var acc = BigInteger.ZERO
-        for (i in columns.indices.reversed()) acc = acc.shl(width) + BigInteger.fromLong(ints[columns[i]])
-        return acc.toString()
-    }
-}
 
 /** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
  *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
@@ -83,8 +56,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
-        searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
-    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
+    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds)
 
     /** Parse SMT-LIB linear-arithmetic from a streamed [source], pulling one top-level command at a time
      *  so the whole script is never materialized. Semantically identical to the [String] overload. */
@@ -93,9 +65,8 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
-        searchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
     ): SmtLibProblem {
-        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds, searchBound)
+        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds)
         val reader = SExprReader(source)
         while (true) b.command(reader.readCommandOrNull() ?: break)
         return b.build()
@@ -103,12 +74,8 @@ object SmtLib {
 
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
      *  `internal fun SmtLib.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
-    internal class Builder(
-        val unboundedIntLo: Long,
-        val unboundedIntHi: Long,
-        val strictBounds: Boolean,
-        val searchBound: Long,
-    ) : CnfLowering {
+    internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
+        CnfLowering {
         internal val boolNames = HashMap<String, Int>()
         internal val intNames = HashMap<String, Int>()
         internal val realNames = HashMap<String, Int>()
@@ -216,7 +183,7 @@ object SmtLib {
         override fun newBool(): Int = nextBool++
         internal fun newInt(): Int {
             // An unbounded declaration is Open on whichever side the caller left at the `Long.MIN/MAX`
-            // marker; bound inference then closes it (or leaves it open for OBBT).
+            // marker; source bound inference either closes it or preserves the open side.
             intDomains.add(
                 openOrFinite(
                     if (unboundedIntLo == Long.MIN_VALUE) null else unboundedIntLo,
@@ -298,8 +265,13 @@ object SmtLib {
             inferBounds()
             for (a in asserts) assert(a)
             lowerOpenIteChains()
+            val objective = objectiveSpec?.let { (t, neg) ->
+                if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
+            }
+            lowerOpenIteChains() // an objective term can open chains of its own
             val sourceBounds = modelIntBounds()
-            val sourceModel = ProblemSpec(
+
+            val model = ProblemSpec(
                 numBoolVars = nextBool,
                 intBounds = sourceBounds,
                 factors = factors.toTypedArray(),
@@ -307,46 +279,14 @@ object SmtLib {
                 realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
             )
-            val sourcePipeline = sourceModel.pipeline()
-            val deferred = prepareDeferredBounds()
-            val inventedLo = BooleanArray(nextInt)
-            val inventedHi = BooleanArray(nextInt)
-            val digits = if (deferred != null && objectiveSpec == null &&
-                sourcePipeline !in setOf(ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA)
-            ) {
-                closeForDigitization(inventedLo, inventedHi)
-                digitizeWideInts(inventedLo, inventedHi)
-            } else {
-                emptyMap()
-            }
-            val objective = objectiveSpec?.let { (t, neg) ->
-                if (isRealExpr(t)) realObjective(t, neg) else linearObjective(t, neg)
-            }
-            lowerOpenIteChains() // an objective term can open chains of its own
-
-            val model = ProblemSpec(
-                numBoolVars = nextBool,
-                intBounds = if (digits.isEmpty()) sourceBounds else modelIntBounds(),
-                factors = factors.toTypedArray(),
-                numRealVars = nextReal,
-                realLower = DoubleArray(nextReal) { Double.NEGATIVE_INFINITY },
-                realUpper = DoubleArray(nextReal) { Double.POSITIVE_INFINITY },
-                // A raw problem: the root bake is deferred to presolve. On a wide clamped domain an
-                // integer-infeasible equality (e.g. a divisibility contradiction) would grind O(span)
-                // at construction. Presolve's strengthen pass catches that infeasibility first, at
-                // solve time, before the lazy bake runs.
-            )
             return SmtLibProblem(
                 model,
-                sourcePipeline = sourcePipeline,
+                sourcePipeline = model.pipeline(),
                 objective = objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),
                 realVarNames = LinkedHashMap(realNames),
                 sense = if (objectiveSpec?.second == true) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE,
-                deferredBounds = if (digits.isEmpty()) deferred else null,
-                clamped = digits.isNotEmpty(),
-                intDigits = digits.mapValues { (_, columns) -> IntDigitColumns(columns.columns, columns.width) },
             )
         }
     }

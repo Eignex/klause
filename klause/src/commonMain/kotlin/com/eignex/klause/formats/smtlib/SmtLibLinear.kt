@@ -120,9 +120,8 @@ internal fun requireChainableRelation(node: SExpr.SList, op: String) {
     }
 }
 
-/** Collect the 64-bit linear relations of `(op a1 … an)` — one per consecutive pair — for OBBT bound
- *  inference, skipping a pair with a wide operand (a wide relation is enforced by its factor, not used
- *  to tighten bounds). */
+/** Collect the 64-bit linear relations of `(op a1 … an)` — one per consecutive pair — for source bound
+ *  inference, skipping a pair with a wide operand (a wide relation is enforced by its factor). */
 internal fun SmtLib.Builder.relationToLinear(t: SExpr.SList, out: MutableList<Rel>) {
     val op = t.atomAt(0, "relation operator")
     requireChainableRelation(t, op)

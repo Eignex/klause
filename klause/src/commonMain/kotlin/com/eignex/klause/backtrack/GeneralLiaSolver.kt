@@ -102,16 +102,50 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
     ) {
         private var instructionsLeft = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
 
-        fun run(): GeneralLiaSearchOutcome = visit()
+        fun run(): GeneralLiaSearchOutcome {
+            val stack = ArrayDeque<Frame>()
+            stack.addLast(Frame(domains.copyOf()))
+            var completed: GeneralLiaSearchOutcome? = null
+            while (stack.isNotEmpty()) {
+                if (completed != null) {
+                    val frame = stack.removeLast()
+                    val outcome = completed
+                    if (outcome !is GeneralLiaSearchOutcome.Infeasible) {
+                        finish(frame)
+                        completed = outcome
+                        continue
+                    }
+                    when {
+                        frame.bool >= 0 && frame.first -> {
+                            frame.first = false
+                            bools[frame.bool] = true
+                            stack.addLast(frame)
+                            stack.addLast(Frame(domains.copyOf()))
+                            completed = null
+                        }
 
-        private fun visit(): GeneralLiaSearchOutcome {
-            val saved = domains.copyOf()
-            val outcome = visitWithSavedDomains()
-            for (v in domains.indices) domains[v] = saved[v]
-            return outcome
+                        frame.variable >= 0 && frame.first -> {
+                            frame.first = false
+                            domains[frame.variable] = BigInterval(frame.middle + BigInteger.ONE, frame.original.hi)
+                            stack.addLast(frame)
+                            stack.addLast(Frame(domains.copyOf()))
+                            completed = null
+                        }
+
+                        else -> {
+                            finish(frame)
+                            completed = GeneralLiaSearchOutcome.Infeasible
+                        }
+                    }
+                    continue
+                }
+                val frame = stack.last()
+                completed = visit(frame, stack)
+            }
+            return requireNotNull(completed)
         }
 
-        private fun visitWithSavedDomains(): GeneralLiaSearchOutcome {
+        private fun visit(frame: Frame, stack: ArrayDeque<Frame>): GeneralLiaSearchOutcome? {
             if (instructionsLeft == 0L || params.nodeBudget?.exhausted() == true) {
                 return GeneralLiaSearchOutcome.BudgetCapped
             }
@@ -124,15 +158,9 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
             if (bool >= 0) {
                 boolAssigned[bool] = true
                 bools[bool] = false
-                val falseBranch = visit()
-                if (falseBranch !is GeneralLiaSearchOutcome.Infeasible) {
-                    boolAssigned[bool] = false
-                    return falseBranch
-                }
-                bools[bool] = true
-                val trueBranch = visit()
-                boolAssigned[bool] = false
-                return trueBranch
+                frame.bool = bool
+                stack.addLast(Frame(domains.copyOf()))
+                return null
             }
             val variable = widestOpenVariable()
             if (variable < 0) {
@@ -145,15 +173,16 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
             val original = domains[variable]
             val middle = original.lo + (original.hi - original.lo) / BigInteger.fromInt(2)
             domains[variable] = BigInterval(original.lo, middle)
-            val lowerBranch = visit()
-            if (lowerBranch !is GeneralLiaSearchOutcome.Infeasible) {
-                domains[variable] = original
-                return lowerBranch
-            }
-            domains[variable] = BigInterval(middle + BigInteger.ONE, original.hi)
-            val upperBranch = visit()
-            domains[variable] = original
-            return upperBranch
+            frame.variable = variable
+            frame.original = original
+            frame.middle = middle
+            stack.addLast(Frame(domains.copyOf()))
+            return null
+        }
+
+        private fun finish(frame: Frame) {
+            if (frame.bool >= 0) boolAssigned[frame.bool] = false
+            for (v in domains.indices) domains[v] = frame.saved[v]
         }
 
         /**
@@ -333,6 +362,14 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
             for (i in vars.indices) sum += coeffs[i] * domains[vars[i]].lo
             return sum
         }
+    }
+
+    private class Frame(val saved: Array<BigInterval>) {
+        var bool = -1
+        var variable = -1
+        lateinit var original: BigInterval
+        lateinit var middle: BigInteger
+        var first = true
     }
 
     private fun linearBound(factor: Linear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)

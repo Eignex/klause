@@ -15,7 +15,7 @@ class SmtLibDistinctLetTest {
         val names = (0 until operands).joinToString(" ") { "x$it" }
         val decls = (0 until operands).joinToString("\n") { "(declare-fun x$it () Int)" }
         val text = "(set-logic QF_LIA)\n$decls\n(assert (let ((b (distinct $names))) b))\n(check-sat)"
-        return SmtLib.parse(text).problem.numBoolVars
+        return SmtLib.parse(text).model.numBoolVars
     }
 
     @Test

@@ -2,15 +2,13 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.DifferenceTheorySolver
 import com.eignex.klause.backtrack.GeneralLiaResult
 import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.presolve.Presolver
-import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -24,20 +22,25 @@ import kotlin.test.assertTrue
 class SmtLibTest {
 
     private fun solve(text: String): LongArray {
-        val r = BacktrackSolver(SmtLib.parse(text).bounded().bake()).solve(BacktrackParams())
+        val parsed = SmtLib.parse(text)
+        if (parsed.sourcePipeline == ProblemPipeline.GENERAL_LIA) {
+            val result = GeneralLiaSolver(parsed.model).solve()
+            assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
+            return LongArray(parsed.intVarNames.values.maxOrNull()?.plus(1) ?: 0) { v ->
+                result.assignment.ints[v].longValue()
+            }
+        }
+        if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+            val result = DifferenceTheorySolver(parsed.model).solve()
+            assertTrue(result is SolveResult.Sat, "expected SAT, got $result")
+            return result.assignment.ints
+        }
+        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return r.assignment.ints
     }
 
-    // OBBT is deferred to the presolve phase, so the clamp verdict is decided by running the deferred
-    // bounding (not at parse). Run it eagerly here to assert the same behaviour.
-    private fun SmtLibProblem.clamped(): Boolean = clamped || deferredBounds?.run(Cancellation.Never)?.clamped == true
-
-    // Parse leaves domain bounding (OBBT) deferred; the CLI runs it in presolve before solving. Mirror
-    // that here so tests exercise the bounded problem, not the raw wide-fallback one.
-    private fun SmtLibProblem.bounded(): Problem = deferredBounds?.run(
-        Cancellation.Never,
-    )?.let { model.materialize(it.domains) } ?: model.materializeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
 
     @Test
     fun `integer equality over an ite operand is an arithmetic relation`() {
@@ -61,9 +64,8 @@ class SmtLibTest {
             "(declare-const x Int) (assert (<= x 2147483648)) (assert (>= x 4294967296)) (check-sat)",
             unboundedIntLo = 0L,
             unboundedIntHi = Int.MAX_VALUE.toLong(),
-        ).problem
-        // The relation bounds carry the >32-bit literals; the lower bound 2^32 exceeds the +2^31 domain
-        // cap so it clamps, but parsing succeeds with no exception.
+        ).model
+        // The relation bounds carry the >32-bit literals, so parsing succeeds without truncation.
         assertEquals(1, p.numIntVars)
     }
 
@@ -138,7 +140,7 @@ class SmtLibTest {
             SmtLib.parse("(declare-fun f (Int) Int) (assert (>= f 0)) (check-sat)")
         }
         assertTrue("declare-fun" in e.message.orEmpty(), e.message.orEmpty())
-        val p = SmtLib.parse("(declare-fun f () Int) (assert (>= f 0)) (check-sat)").problem
+        val p = SmtLib.parse("(declare-fun f () Int) (assert (>= f 0)) (check-sat)").model
         assertEquals(1, p.numIntVars)
     }
 
@@ -147,13 +149,13 @@ class SmtLibTest {
         val text = """
             (set-logic QF_LIA)
             (declare-const x Int) (declare-const y Int)
-            (assert (>= x 0)) (assert (>= y 0))
+            (assert (>= x 0)) (assert (<= x 10)) (assert (>= y 0)) (assert (<= y 10))
             (assert (<= (+ x y) 10))
             (assert (or (>= x 7) (>= y 7)))
             (check-sat)
         """.trimIndent()
         val parsed = SmtLib.parse(text)
-        assertEquals(2, parsed.problem.numIntVars)
+        assertEquals(2, parsed.model.numIntVars)
         val ints = solve(text)
         val x = ints[0]
         val y = ints[1]
@@ -164,7 +166,7 @@ class SmtLibTest {
     fun `parses objective and finds optimum`() {
         val text = """
             (declare-const x Int) (declare-const y Int)
-            (assert (>= x 0)) (assert (>= y 0))
+            (assert (>= x 0)) (assert (<= x 10)) (assert (>= y 0)) (assert (<= y 10))
             (assert (<= (+ x y) 10))
             (assert (or (>= x 7) (>= y 7)))
             (minimize (+ x y))
@@ -217,7 +219,7 @@ class SmtLibTest {
             (assert (distinct a b c))
             (check-sat)
         """.trimIndent()
-        assertTrue(SmtLib.parse(text).problem.factors.any { it is AllDifferent }, "expected AllDifferent")
+        assertTrue(SmtLib.parse(text).model.factors.any { it is AllDifferent }, "expected AllDifferent")
         val ints = solve(text)
         assertEquals(setOf(1L, 2L, 3L), listOf(ints[0], ints[1], ints[2]).toSet())
     }
@@ -237,8 +239,8 @@ class SmtLibTest {
         val small = SmtLib.parse(boundedInts(6, "(declare-const p Bool) (assert (or p (distinct ${names(6)})))"))
         val large = SmtLib.parse(boundedInts(40, "(declare-const p Bool) (assert (or p (distinct ${names(40)})))"))
         assertEquals(
-            small.problem.numBoolVars,
-            large.problem.numBoolVars,
+            small.model.numBoolVars,
+            large.model.numBoolVars,
             "reified distinct allocated literals per operand pair",
         )
     }
@@ -277,11 +279,11 @@ class SmtLibTest {
             (assert (<= (+ x y) 10)) (assert (>= y 0))
             (check-sat)
         """.trimIndent()
-        val p = SmtLib.parse(text).bounded()
-        assertEquals(3, p.intDomains[0].min)
-        assertEquals(7, p.intDomains[0].max)
-        assertEquals(0, p.intDomains[1].min)
-        assertEquals(7, p.intDomains[1].max)
+        val bounds = SmtLib.parse(text).model.intBounds
+        assertEquals(3, bounds.lower(0))
+        assertEquals(7, bounds.upper(0))
+        assertEquals(0, bounds.lower(1))
+        assertTrue(bounds.isOpenUpper(1))
     }
 
     @Test
@@ -299,25 +301,23 @@ class SmtLibTest {
 
         assertEquals(0, parsed.model.intBounds.lower(0), "a single-variable row is pinned at parse")
         assertTrue(parsed.model.intBounds.isOpenUpper(0), "parse must not derive a bound across terms")
-        // Nothing is lost by leaving it: the deferred run proves the same bound under the budget.
-        assertEquals(10, parsed.bounded().intDomains[0].max)
     }
 
     @Test
-    fun `bound inference falls back to the default bound when unprovable`() {
+    fun `bound inference leaves an unstated side open`() {
         val p = SmtLib.parse(
             "(declare-const x Int) (assert (<= x 4))",
             unboundedIntLo = -50,
             unboundedIntHi = 50,
-        ).bounded()
-        assertEquals(4, p.intDomains[0].max)
-        assertEquals(-50, p.intDomains[0].min)
+        ).model.intBounds
+        assertEquals(4, p.upper(0))
+        assertTrue(p.isOpenLower(0))
     }
 
     @Test
     fun `to_real and to_int are identity over ints`() {
         val p = SmtLib.parse(
-            "(declare-const x Int) (assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
+            "(declare-const x Int) (assert (<= x 5)) (assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
         ).bounded()
         assertEquals(5, p.intDomains[0].min)
         assertEquals(5, p.intDomains[0].max)
@@ -333,7 +333,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        assertEquals(1, parsed.problem.numRealVars)
+        assertEquals(1, parsed.model.numRealVars)
         val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         val n = r.assignment.ints[0]
@@ -434,17 +434,15 @@ class SmtLibTest {
     }
 
     @Test
-    fun `to_int of a fractional real floors it`() {
+    fun `an open mixed integer-real model is not materialized for CP`() {
         val parsed = SmtLib.parse(
             """
             (declare-const r Real) (declare-const n Int)
-            (assert (= r 2.5)) (assert (= n (to_int r)))
+            (assert (= r 2.5)) (assert (>= n 2)) (assert (<= n 2)) (assert (= n (to_int r)))
             (check-sat)
             """.trimIndent(),
         )
-        val res = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
-        assertTrue(res is SolveResult.Sat, "expected SAT, got $res")
-        assertEquals(2L, res.assignment.ints[parsed.intVarNames.getValue("n")])
+        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, parsed.sourcePipeline)
     }
 
     @Test
@@ -518,15 +516,13 @@ class SmtLibTest {
             (assert (>= $letChain 0))
             (check-sat)
         """.trimIndent()
-        val problem = SmtLib.parse(text).problem
+        val problem = SmtLib.parse(text).model
         assertTrue(problem.numIntVars >= 1)
     }
 
     private fun solveFor(text: String, name: String): Long {
         val parsed = SmtLib.parse(text)
-        val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
-        assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
-        return r.assignment.ints[parsed.intVarNames.getValue(name)]
+        return solve(text)[parsed.intVarNames.getValue(name)]
     }
 
     @Test
@@ -585,41 +581,23 @@ class SmtLibTest {
     }
 
     @Test
-    fun `an unbounded variable past the small-model range marks the model as clamped`() {
+    fun `an open variable remains open past the former search range`() {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (> x 3000000000000)) (check-sat)",
         )
         assertFalse(parsed.model.intBounds.isOpenLower(0))
         assertTrue(parsed.model.intBounds.isOpenUpper(0))
-        assertTrue(parsed.clamped(), "the coefficient magnitude pushes the small-model bound past 2^62")
-    }
-
-    @Test
-    fun `rows that cross an unbounded variable's own bounds refute the model outright`() {
-        // y >= 5 leaves y open above, so single-variable inference sees no contradiction; propagating
-        // x + y = 0 against x in [0, 10] puts y at 0, crossing its own lower bound.
-        val parsed = SmtLib.parse(
-            "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
-                "(assert (>= x 0))\n(assert (<= x 10))\n(assert (= (+ x y) 0))\n(assert (>= y 5))\n(check-sat)",
-        )
-        val bounds = parsed.deferredBounds?.run(Cancellation.Never)
-        assertTrue(bounds != null && bounds.openlyInfeasible, "propagation crossed y's bounds")
-        assertFalse(parsed.clamped(), "a refutation over the open range carries no clamp caveat")
-    }
-
-    /** The parsed domain of [name] — what bound inference derived, before any deferred tightening. */
-    private fun domainOf(text: String, name: String): IntDomain {
-        val p = SmtLib.parse(text)
-        return p.problem.intDomains[p.intVarNames.getValue(name)]
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
     }
 
     @Test
     fun `a single-variable equality disjunction bounds the variable`() {
         val text = "(set-logic QF_LIA)\n(declare-fun u () Int)\n" +
             "(assert (or (= u 0) (= u 1) (= u 2) (= u 3) (= u 4)))\n(check-sat)"
-        val d = domainOf(text, "u")
-        assertEquals(0L, d.min)
-        assertEquals(4L, d.max)
+        val parsed = SmtLib.parse(text)
+        val v = parsed.intVarNames.getValue("u")
+        assertEquals(0L, parsed.model.intBounds.lower(v))
+        assertEquals(4L, parsed.model.intBounds.upper(v))
         assertTrue(solve(text)[0] in 0L..4L, "the witness is one of the stated values")
     }
 
@@ -628,69 +606,61 @@ class SmtLibTest {
         // Satisfiable with x arbitrarily large, so no side may be read off the constants.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (or (= x 1) (= y 2)))\n(check-sat)"
-        assertTrue(domainOf(text, "x").max > 1L, "x is not confined by the other disjunct's value")
+        val parsed = SmtLib.parse(text)
+        assertTrue(parsed.model.intBounds.isOpenUpper(parsed.intVarNames.getValue("x")))
     }
 
     @Test
     fun `a disjunction with a non-equality disjunct bounds nothing`() {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n" +
             "(assert (or (= x 1) (>= x 100)))\n(check-sat)"
-        assertTrue(domainOf(text, "x").max > 1L, "one wider disjunct voids the bound")
+        val parsed = SmtLib.parse(text)
+        assertTrue(parsed.model.intBounds.isOpenUpper(parsed.intVarNames.getValue("x")))
     }
 
     @Test
-    fun `a fully bounded model is not clamped`() {
+    fun `a fully bounded model remains finite`() {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
         )
-        assertFalse(parsed.clamped(), "both bounds are provable, so an unsat here is sound")
+        assertEquals(ProblemPipeline.FINITE_CP, parsed.sourcePipeline)
     }
 
     @Test
-    fun `OBBT derives a finite bound for an otherwise-unbounded variable`() {
-        // x has no declared bound, but `2*x = 10` pins it to 5. Interval bound inference cannot divide,
-        // so it leaves x unbounded; OBBT solves the LP to x in [5, 5], so the model is not clamped
-        // (an unsat would be sound) and x solves to 5.
-        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (= (* 2 x) 10))\n(check-sat)"
+    fun `a pinned open variable routes to General LIA`() {
+        val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
+            "(assert (= (+ (* 2 x) y) 10))\n(assert (= y 0))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertFalse(parsed.clamped(), "OBBT bounded x from the LP, so the model is not clamped")
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
         assertEquals(5L, solveFor(text, "x"))
     }
 
     @Test
-    fun `an unbounded variable OBBT cannot bound still finds a witness`() {
-        // x > 3 leaves x unbounded above; OBBT cannot bound it. The small-model box closes it and
-        // search still finds the witness x = 4.
+    fun `an open inequality routes to difference theory`() {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertFalse(parsed.clamped(), "the small-model box is equisatisfiable, not a clamp")
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
         assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the box")
     }
 
     @Test
     fun `a sat witness ten billion values out is found`() {
-        // The searchable fallback spans the overflow-safe Long range, so a witness at 10^10 is
-        // reachable.
+        // The exact theory path does not need a finite search window to reach this witness.
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (>= x 10000000000))\n(check-sat)"
         assertTrue(solveFor(text, "x") >= 10_000_000_000L)
     }
 
     @Test
-    fun `OBBT bounds a coupled equality system interval inference cannot solve`() {
-        // Neither x nor y has a declared bound; x+y=10 and x-y=4 pin x=7. Interval inference cannot
-        // solve the 2x2 system, so both stay open. OBBT's LP relaxation derives x in [7,7], so the model
-        // is not clamped (an unsat would be sound) and x solves to 7.
+    fun `a coupled open equality system routes to General LIA`() {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ x y) 10))\n(assert (= (- x y) 4))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertFalse(parsed.clamped(), "OBBT closed both variables from the linear system")
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
         assertEquals(7L, solveFor(text, "x"))
     }
 
     @Test
-    fun `a fresh variable over an unbounded operand marks the model clamped`() {
-        // A fresh var standing for abs/div/ite must inherit the operand's open range and be flagged when
-        // it is clamped, so a search 'unsat' over the box is reported unknown — never a false unsat.
+    fun `a fresh variable over an unbounded operand stays in General LIA`() {
         val cases = listOf(
             "(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)" to
                 "the fresh abs var inherits x's unbounded range",
@@ -700,35 +670,28 @@ class SmtLibTest {
                 "the fresh ite var inherits the unbounded branch's range",
         )
         for ((text, message) in cases) {
-            assertTrue(SmtLib.parse(text).clamped(), message)
+            assertEquals(ProblemPipeline.GENERAL_LIA, SmtLib.parse(text).sourcePipeline, message)
         }
     }
 
     @Test
-    fun `a divisibility-only unsat over unbounded variables is decided by the small-model box`() {
-        // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1), and its LP relaxation is
-        // feasible so OBBT derives no bound. The small-model bound fits, making the finite box
-        // equisatisfiable: the resulting unsat is sound for the unbounded problem, no clamp flag.
+    fun `a divisibility-only open equality system routes to General LIA`() {
         val parsed = SmtLib.parse(
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
         )
-        assertFalse(parsed.clamped(), "the small-model box decides divisibility unsat exactly")
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
     }
 
     @Test
     fun `presolve proves a gcd-indivisible equality infeasible before baking the wide domain`() {
         // 3x + 3y = 1 has no integer solution (gcd 3 does not divide 1). Coefficient strengthening runs
-        // as the first presolve pass and reports this in O(factors) — before the (deferred) root bake
-        // would narrow the wide clamped domain toward the empty domain one step per round (O(span)).
-        val problem = SmtLib.parse(
+        // as the first exact-theory check.
+        val model = SmtLib.parse(
             "(declare-fun x () Int) (declare-fun y () Int)" +
                 " (assert (= (+ (* 3 x) (* 3 y)) 1)) (check-sat)",
-        ).problem
-        assertTrue(
-            Presolver.run(problem, PresolveConfig.parse("default")).infeasible,
-            "coefficient strengthening should prove the gcd-indivisible equality infeasible",
-        )
+        ).model
+        assertTrue(GeneralLiaSolver(model).solve() is GeneralLiaResult.Unsat)
     }
 
     @Test
@@ -765,11 +728,9 @@ class SmtLibTest {
             assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
             return result.assignment.ints[parsed.intVarNames.values.first()]
         }
-        val r = BacktrackSolver(parsed.problem.bake()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.model.materializeFiniteBounds().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
-        val id = parsed.intVarNames.values.first()
-        return parsed.intDigits[id]?.decimalIn(r.assignment.ints)?.let { BigInteger.parseString(it) }
-            ?: BigInteger.fromLong(r.assignment.ints[id])
+        return BigInteger.fromLong(r.assignment.ints[parsed.intVarNames.values.first()])
     }
 
     @Test
@@ -813,8 +774,6 @@ class SmtLibTest {
             (check-sat)
         """.trimIndent()
         val parsed = SmtLib.parse(text)
-        assertTrue(parsed.intDigits.isEmpty(), "General LIA must not lower declared columns onto digits")
-        assertFalse(parsed.clamped, "General LIA does not invent a Long clamp")
         val result = GeneralLiaSolver(parsed.model).solve()
         assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
         val values = parsed.intVarNames.mapValues { (_, id) -> result.assignment.ints[id] }

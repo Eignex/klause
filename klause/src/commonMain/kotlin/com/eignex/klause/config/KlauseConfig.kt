@@ -16,18 +16,8 @@ const val DEFAULT_UNBOUNDED_INT_HI: Long = Long.MAX_VALUE
 
 /** MiniZinc's own default range for an unbounded `var int` (`±10^6`). This is a *semantic* default: a
  *  MiniZinc `var int` with no declared bounds genuinely **is** this range, so the FlatZinc front-end
- *  adopts it and an `unsat` within it is a sound `unsat`. Distinct from [KlauseConfig.unboundedSearchBound],
- *  which is a finite search window over a *truly* infinite SMT-LIB domain (and downgrades `unsat` to
- *  `unknown`). */
+ *  adopts it and an `unsat` within it is a sound `unsat`. */
 const val MINIZINC_UNBOUNDED_DEFAULT: Long = 1_000_000
-
-/** Default magnitude of the *searchable* window a genuinely unbounded SMT-LIB / MPS integer falls back
- *  to once OBBT and the small-model bound both fail to derive a real one (see
- *  [KlauseConfig.unboundedSearchBound]). Bound-split search over the window is log-depth and the linear
- *  propagators are overflow-guarded, so the window covers effectively the whole overflow-safe `Long`
- *  range: a SAT witness of any representable magnitude is findable, and only `unsat` (sound merely
- *  within the window) degrades to `unknown`. */
-const val DEFAULT_UNBOUNDED_SEARCH_BOUND: Long = 1L shl 62
 
 /** Default integer-domain span above which the span-gated LP presolve steps engage. A model whose
  *  widest integer domain spans no more than this stays on the pure (cheap) presolve + bake path; only a
@@ -119,13 +109,6 @@ data class KlauseConfig(
 
     /** Upper bound counterpart to [unboundedIntLo]. */
     val unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-
-    /** Magnitude of the finite *searchable* window a genuinely unbounded SMT-LIB integer is clamped to
-     *  when OBBT cannot derive a real bound: search still finds a witness within `±this`, but the clamp
-     *  is flagged so an `unsat` over the window becomes `unknown` (never a false `unsat`). Unlike
-     *  [MINIZINC_UNBOUNDED_DEFAULT] this approximates an infinite domain rather than being a real bound;
-     *  widen it (env `KLAUSE_UNBOUNDED_SEARCH_BOUND`) to trade search cost for SAT reach. */
-    val unboundedSearchBound: Long = DEFAULT_UNBOUNDED_SEARCH_BOUND,
 
     /** Integer-domain span above which the span-gated LP presolve steps engage (see
      *  [DEFAULT_LARGE_SPAN_THRESHOLD]). A pure cost gate — below it, presolve/solve behaviour is

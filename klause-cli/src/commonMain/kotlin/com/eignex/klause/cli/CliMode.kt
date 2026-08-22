@@ -257,37 +257,18 @@ internal fun Solvable.presolved(
     config: PresolveConfig,
     solutionSetSensitive: Boolean,
     cancellation: Cancellation = Cancellation.Never,
-    boundingCancellation: Cancellation = cancellation,
     presolveBudget: PresolveBudget? = null,
 ): Solvable {
-    // Domain bounding (OBBT) is deferred out of parsing into this phase, so it runs here (parsing only
-    // reads) and the pipeline's passes see the tightened domains. It only tightens integer domains (no
-    // variable remap), so no reconstruction is threaded for it.
-    //
-    // It takes a slice of the presolve budget rather than the whole-solve deadline: on a model whose
-    // relaxation it cannot close quickly it otherwise spends the entire allowance, and the round engine
-    // starts with none left — presolve then reports no reduction at all despite having run to its limit.
-    // Half of what remains, so a slow bounding still leaves the passes behind it something to work in.
-    val boundsCancellation = presolveBudget
-        ?.let { budget ->
-            val slice = budget.slice(budget.remaining() / 2)
-            Cancellation { boundingCancellation() || slice() }
-        }
-        ?: boundingCancellation
-    val boundedProblem = deferredBounds?.invoke(boundsCancellation) ?: finiteProblem
     val outcome =
         PresolvePipeline.run(
-            boundedProblem,
+            finiteProblem,
             linearObjective,
             config,
             solutionSetSensitive,
             cancellation,
             presolveBudget,
         )
-    if (!outcome.changed) {
-        if (deferredBounds == null) return this
-        return copyWith(boundedProblem, presolve, render, objectiveValue)
-    }
+    if (!outcome.changed) return this
     return copyWith(
         outcome.problem,
         outcome.stats,
@@ -297,28 +278,7 @@ internal fun Solvable.presolved(
     )
 }
 
-/** A copy of this [Solvable] with a [deferredBounds] closure attached (the OBBT relocated out of parsing
- *  into the presolve phase). Carries every other field through. */
-internal fun Solvable.withDeferredBounds(
-    bounds: (Cancellation) -> Problem,
-    unmaterialized: Boolean = false,
-): Solvable = Solvable(
-    problem = if (unmaterialized) null else problem,
-    presolve = presolve,
-    optimize = optimize,
-    maximize = maximize,
-    lsObjective = lsObjective,
-    linearObjective = linearObjective,
-    objVarId = objVarId,
-    definitionalSweep = definitionalSweep,
-    render = render,
-    objectiveValue = objectiveValue,
-    annotatedBacktrackParams = annotatedBacktrackParams,
-    deferredBounds = bounds,
-)
-
-/** Rebuild a [Solvable] with a new [problem]/[presolve]/[render]/[objectiveValue], carrying every other
- *  field through. [deferredBounds] is dropped: bounding has already run. */
+/** Rebuild a [Solvable] with a new [problem]/[presolve]/[render]/[objectiveValue]. */
 private fun Solvable.copyWith(
     problem: Problem,
     presolve: PresolveStats?,
@@ -526,7 +486,7 @@ internal interface OutputProtocol {
  * collapse onto this shape.
  */
 internal class Solvable(
-    /** Finite CP problem, absent until [deferredBounds] materializes an open model. */
+    /** Finite CP problem. */
     val problem: Problem?,
     val optimize: Boolean,
     /** True when the user goal is maximisation (the objectives below already negate for it). */
@@ -551,11 +511,6 @@ internal class Solvable(
     val annotatedBacktrackParams: BacktrackParams? = null,
     /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
     val presolve: PresolveStats? = null,
-    /** Domain-bounding (OBBT) deferred out of parsing into the presolve phase: [presolved] runs it under
-     *  the presolve budget before the pipeline, so parsing only reads and the LP cost is bounded. Given
-     *  the presolve cancellation, it returns a problem with the open integer sides tightened. Null for a
-     *  front-end that has no unbounded domains to close (XCSP3 / FlatZinc / DIMACS / OPB). */
-    val deferredBounds: ((Cancellation) -> Problem)? = null,
     /** Open integer source model handled by the dedicated difference-theory satisfiability pipeline. */
     val differenceTheoryModel: ProblemSpec? = null,
     /** Open integer source model handled by the complete General LIA satisfiability pipeline. */
@@ -594,27 +549,6 @@ internal fun generalLiaSolvable(model: ProblemSpec, render: (GeneralLiaAssignmen
     generalLiaModel = model,
     generalLiaRender = render,
 )
-
-/** Shared mutable cell for a post-presolve clamp verdict: the deferred bounding ([Solvable.deferredBounds])
- *  sets it once the OBBT residual is known, and the mode's [OutputProtocol] reads it at status-line time
- *  (after solving), so an `unsat`/optimum over a lossily-clamped box is reported honestly. */
-internal class ClampFlag {
-    var clamped: Boolean = false
-
-    /**
-     * Re-derives a refutation over the part of the model no invented bound reaches (see
-     * [refutationIsBoxFree]), or null for a mode that offers no such certificate. Consulted only when a
-     * refutation is about to be downgraded for [clamped], so it can only recover a verdict that would
-     * otherwise be discarded.
-     */
-    var boxFreeRefutation: (() -> Boolean)? = null
-
-    private var boxFree: Boolean? = null
-
-    /** Whether the refutation holds without the invented box. Memoized: it runs a search of its own, and
-     *  the status line is not guaranteed to be built once. */
-    fun refutationIsBoxFree(): Boolean = boxFree ?: (boxFreeRefutation?.invoke() ?: false).also { boxFree = it }
-}
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
  *  [CliMode.newSession] so mode-specific flag state never leaks between invocations. */

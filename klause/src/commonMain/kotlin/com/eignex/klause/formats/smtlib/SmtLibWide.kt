@@ -27,26 +27,18 @@ private fun SmtLib.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (val 
 }
 
 /**
- * How far an open side is taken to reach: the same fallback box the deferred bounding closes an open
- * domain to.
- *
- * Reading an open side this way invents nothing the model does not already carry — a model with an open
- * domain is flagged clamped by the deferred bounding regardless, so its `unsat` is already reported
- * `unknown`. What it buys is a decidable `sat`: the quantity gets digits enough to hold every value the
- * box admits, where refusing the term outright gave no verdict at all.
+ * An open side has no finite magnitude. The open theory pipeline carries the fresh quantity as an open
+ * ordinary integer; only the finite CP pipeline needs a digit vector for a genuinely wide finite range.
  */
-private fun SmtLib.Builder.openSide(hi: Boolean): Long =
-    if (hi) minOf(unboundedIntHi, searchBound) else maxOf(unboundedIntLo, -searchBound)
-
-/** The value range of [w] over the current presolve domains, an open side read as [openSide]. */
-internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteger> {
+internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteger>? {
     var lo = w.constant
     var hi = w.constant
     for ((v, c) in w.coeffs) {
         if (c.isZero()) continue
         val (dLo, dHi) = domainBounds(v)
-        val loBound = if (c.signum() > 0) dLo ?: openSide(hi = false) else dHi ?: openSide(hi = true)
-        val hiBound = if (c.signum() > 0) dHi ?: openSide(hi = true) else dLo ?: openSide(hi = false)
+        val loBound = if (c.signum() > 0) dLo else dHi
+        val hiBound = if (c.signum() > 0) dHi else dLo
+        if (loBound == null || hiBound == null) return null
         lo += c * BigInteger.fromLong(loBound)
         hi += c * BigInteger.fromLong(hiBound)
     }
@@ -54,8 +46,8 @@ internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteg
 }
 
 /** A bound on `|value|` of [t]. */
-internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger {
-    val (lo, hi) = wideRange(t.toWide())
+internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger? {
+    val (lo, hi) = wideRange(t.toWide()) ?: return null
     val a = lo.abs()
     val b = hi.abs()
     return if (a > b) a else b
@@ -68,7 +60,8 @@ internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger {
  * digit columns, the leading one signed — one digit vector per value, so search never revisits a value
  * it has already ruled out.
  */
-internal fun SmtLib.Builder.freshWideInt(magnitude: BigInteger): IntComb {
+internal fun SmtLib.Builder.freshWideInt(magnitude: BigInteger?): IntComb {
+    if (magnitude == null) return IntComb.Narrow(LinComb(mapOf(newInt(null, null) to 1), 0))
     val m = magnitude.abs()
     if (m <= LONG_MAX) {
         val bound = m.longValue()
@@ -105,7 +98,7 @@ internal fun SmtLib.Builder.wideDivModTerm(a: IntComb, b: IntComb, quotient: Boo
     val aMagnitude = intCombMagnitude(a)
     // |q| ≤ |a|/|d| + 1: the quotient of the widest value the dividend can reach, with a unit of slack
     // for the remainder's sign.
-    val qMagnitude = aMagnitude / absd + BigInteger.ONE
+    val qMagnitude = aMagnitude?.div(absd)?.plus(BigInteger.ONE)
     val q = freshWideInt(qMagnitude)
     val m = freshWideInt(absd)
     assertRelation(">=", m, IntComb.Wide(WideLinComb(emptyMap(), BigInteger.ZERO)))

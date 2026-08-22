@@ -397,7 +397,7 @@ private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     }
     val magA = intCombMagnitude(a)
     val magB = intCombMagnitude(b)
-    val self = freshWideInt(if (magA > magB) magA else magB)
+    val self = freshWideInt(if (magA == null || magB == null) null else maxOf(magA, magB))
     factors.add(Clause(intArrayOf(Lit.negate(cond), reifyRelation("=", self, a))))
     factors.add(Clause(intArrayOf(cond, reifyRelation("=", self, b))))
     return Res.I(self)
