@@ -34,13 +34,19 @@ internal class QfLraSystem(private val model: ProblemSpec) {
         }
         for (factor in model.factors) when (factor) {
             is Linear -> if (factor.hasReals) {
-                addRow(builder, positive, negative, factor.realVars, factor.realCoeffs, factor.op, factor.realBound, factor.strictReal)
+                addRow(
+                    builder, positive, negative, factor.realVars, factor.realCoeffs, factor.op, factor.realBound,
+                    factor.strictReal,
+                )
             }
 
             is ReifiedRealLinear -> {
                 val truth = bools[factor.aux]
                 val op = if (truth) factor.op else flip(factor.op)
-                addRow(builder, positive, negative, factor.realVars, factor.realCoeffs, op, factor.bound, if (truth) factor.strict else !factor.strict)
+                addRow(
+                    builder, positive, negative, factor.realVars, factor.realCoeffs, op, factor.bound,
+                    if (truth) factor.strict else !factor.strict,
+                )
             }
 
             else -> Unit
