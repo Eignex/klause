@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.GeneralLiaAssignment
+import com.eignex.klause.backtrack.ExactLraAssignment
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -511,14 +512,25 @@ internal class Solvable(
     val annotatedBacktrackParams: BacktrackParams? = null,
     /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
     val presolve: PresolveStats? = null,
-    /** Open integer source model handled by the dedicated difference-theory satisfiability pipeline. */
-    val differenceTheoryModel: ProblemSpec? = null,
-    /** Open integer source model handled by the complete General LIA satisfiability pipeline. */
-    val generalLiaModel: ProblemSpec? = null,
-    /** Render an arbitrary-precision General LIA witness. */
-    val generalLiaRender: ((GeneralLiaAssignment) -> String)? = null,
+    /** The component set selected once while loading the source model. */
+    val pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
 ) {
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
+}
+
+/** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */
+internal sealed interface SolvablePipeline {
+    /** The ordinary finite-domain CP, LP, and search components. */
+    data object FiniteCp : SolvablePipeline
+
+    /** Open integer rows decided by the complete difference theory. */
+    data class DifferenceTheory(val model: ProblemSpec) : SolvablePipeline
+
+    /** Open integer rows decided by the complete General LIA procedure. */
+    data class GeneralLia(val model: ProblemSpec, val render: (GeneralLiaAssignment) -> String) : SolvablePipeline
+
+    /** Open pure-real rows decided by exact rational linear arithmetic. */
+    data class ExactLra(val model: ProblemSpec, val render: (ExactLraAssignment) -> String) : SolvablePipeline
 }
 
 /** Build a satisfiability instance whose open integer rows are decided by difference theory. */
@@ -532,7 +544,7 @@ internal fun differenceTheorySolvable(model: ProblemSpec, render: (Sample) -> St
     definitionalSweep = null,
     render = render,
     objectiveValue = null,
-    differenceTheoryModel = model,
+    pipeline = SolvablePipeline.DifferenceTheory(model),
 )
 
 /** Build a satisfiability instance whose open integer rows are decided by General LIA. */
@@ -546,8 +558,21 @@ internal fun generalLiaSolvable(model: ProblemSpec, render: (GeneralLiaAssignmen
     definitionalSweep = null,
     render = { error("General LIA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    generalLiaModel = model,
-    generalLiaRender = render,
+    pipeline = SolvablePipeline.GeneralLia(model, render),
+)
+
+/** Build a satisfiability instance whose open real rows are decided by exact QF_LRA. */
+internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -> String): Solvable = Solvable(
+    problem = null,
+    optimize = false,
+    maximize = false,
+    lsObjective = null,
+    linearObjective = null,
+    objVarId = null,
+    definitionalSweep = null,
+    render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
+    objectiveValue = null,
+    pipeline = SolvablePipeline.ExactLra(model, render),
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via

@@ -1,0 +1,7 @@
+(set-logic QF_LRA)
+(declare-const x Real)
+(declare-const y Real)
+(assert (= (* 3.0 x) 1.0))
+(assert (= y (+ x (/ 2.0 3.0))))
+(assert (or (<= y 1.0) (>= y 1.0)))
+(check-sat)

@@ -12,6 +12,7 @@ import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -281,7 +282,7 @@ object SmtLib {
             )
             return SmtLibProblem(
                 model,
-                sourcePipeline = model.pipeline(),
+                sourcePipeline = if (model.supportsExactLra()) ProblemPipeline.EXACT_LRA else model.pipeline(),
                 objective = objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),

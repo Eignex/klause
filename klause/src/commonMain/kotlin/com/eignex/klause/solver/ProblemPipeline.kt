@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.smallModelBigIntBound
 import com.eignex.klause.propagation.difference.supportsCompleteDifferenceTheory
 
@@ -13,6 +16,9 @@ enum class ProblemPipeline {
 
     /** Open integer sides are covered by the complete finite-witness General LIA procedure. */
     GENERAL_LIA,
+
+    /** Open pure-real linear arithmetic, decided by the exact rational simplex under Boolean search. */
+    EXACT_LRA,
 
     /** An open integer side reaches a factor no available theory decides. */
     UNSUPPORTED_OPEN,
@@ -31,6 +37,17 @@ fun ProblemSpec.pipeline(): ProblemPipeline {
     } else {
         ProblemPipeline.UNSUPPORTED_OPEN
     }
+}
+
+/** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
+internal fun ProblemSpec.supportsExactLra(): Boolean =
+    numIntVars == 0 && numRealVars != 0 && factors.all(::supportsExactLra)
+
+private fun supportsExactLra(factor: Factor): Boolean = when (factor) {
+    is Clause -> true
+    is Linear -> factor.hasReals
+    is ReifiedRealLinear -> true
+    else -> false
 }
 
 /**

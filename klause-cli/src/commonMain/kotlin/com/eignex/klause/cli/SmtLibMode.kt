@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.GeneralLiaAssignment
+import com.eignex.klause.backtrack.ExactLraAssignment
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.smtlib.SmtLib
@@ -42,21 +43,27 @@ internal object SmtLibMode : CliMode {
                         "open integer bounds require supported difference or General LIA coverage",
                     )
 
-                ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
+                ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA, ProblemPipeline.EXACT_LRA -> {
                     if (parsed.objective != null) {
-                        val theory = if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-                            "difference-theory"
-                        } else {
-                            "General LIA"
+                        val theory = when (parsed.sourcePipeline) {
+                            ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
+                            ProblemPipeline.GENERAL_LIA -> "General LIA"
+                            ProblemPipeline.EXACT_LRA -> "exact LRA"
+                            else -> error("finite and unsupported pipelines do not reach open optimization")
                         }
                         throw UnsupportedSmtException("open $theory optimization is unsupported")
                     }
-                    return if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-                        differenceTheorySolvable(parsed.model, render)
-                    } else {
-                        generalLiaSolvable(parsed.model) { assignment ->
+                    return when (parsed.sourcePipeline) {
+                        ProblemPipeline.DIFFERENCE_THEORY -> differenceTheorySolvable(parsed.model, render)
+                        ProblemPipeline.GENERAL_LIA -> generalLiaSolvable(parsed.model) { assignment ->
                             renderGeneralLiaModel(ints, bools, reals, assignment)
                         }
+
+                        ProblemPipeline.EXACT_LRA -> exactLraSolvable(parsed.model) { assignment ->
+                            renderExactLraModel(ints, bools, reals, assignment)
+                        }
+
+                        else -> error("finite and unsupported pipelines do not reach exact theory routing")
                     }
                 }
 
@@ -103,6 +110,20 @@ internal fun renderGeneralLiaModel(
     append("(\n")
     for ((name, id) in ints) append("  (define-fun $name () Int ${assignment.ints[id]})\n")
     for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.bools[id]})\n")
+    append(")")
+}
+
+/** Render an exact rational QF_LRA model without converting its witness to [Double]. */
+internal fun renderExactLraModel(
+    ints: Map<String, Int>,
+    bools: Map<String, Int>,
+    reals: Map<String, Int>,
+    assignment: ExactLraAssignment,
+): String = buildString {
+    check(ints.isEmpty()) { "exact LRA does not admit integer variables" }
+    append("(\n")
+    for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.bools[id]})\n")
+    for ((name, id) in reals) append("  (define-fun $name () Real ${assignment.reals[id]})\n")
     append(")")
 }
 

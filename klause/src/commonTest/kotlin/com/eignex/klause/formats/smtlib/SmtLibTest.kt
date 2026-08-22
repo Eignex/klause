@@ -3,6 +3,8 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.DifferenceTheorySolver
+import com.eignex.klause.backtrack.ExactLraResult
+import com.eignex.klause.backtrack.ExactLraSolver
 import com.eignex.klause.backtrack.GeneralLiaResult
 import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.factor.global.AllDifferent
@@ -17,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SmtLibTest {
@@ -41,6 +44,51 @@ class SmtLibTest {
     }
 
     private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
+
+    @Test
+    fun `open QF LRA equality returns an exact rational witness`() {
+        val parsed = SmtLib.parse(
+            "(set-logic QF_LRA) (declare-const x Real) (assert (= x (/ 1.0 3.0))) (check-sat)",
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LRA, parsed.sourcePipeline)
+        val result = assertIs<ExactLraResult.Sat>(ExactLraSolver(parsed.model).solve())
+
+        assertEquals("1/3", result.assignment.reals[parsed.realVarNames.getValue("x")].toString())
+    }
+
+    @Test
+    fun `open QF LRA Boolean real atoms decide unsatisfiable`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LRA)
+                (declare-const x Real)
+                (assert (or (<= x (/ 1.0 3.0)) (>= x (/ 2.0 3.0))))
+                (assert (> x (/ 1.0 3.0)))
+                (assert (< x (/ 2.0 3.0)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LRA, parsed.sourcePipeline)
+        assertIs<ExactLraResult.Unsat>(ExactLraSolver(parsed.model).solve())
+    }
+
+    @Test
+    fun `open QF LRA retains a wide rational witness`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LRA)
+                (declare-const x Real)
+                (assert (= (* 1152921504606846976.0 x) 1.0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = assertIs<ExactLraResult.Sat>(ExactLraSolver(parsed.model).solve())
+
+        assertEquals("1/1152921504606846976", result.assignment.reals[parsed.realVarNames.getValue("x")].toString())
+    }
 
     @Test
     fun `integer equality over an ite operand is an arithmetic relation`() {

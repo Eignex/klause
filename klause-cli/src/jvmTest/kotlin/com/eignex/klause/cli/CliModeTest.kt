@@ -80,6 +80,28 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open SMT LRA model renders an exact rational witness`() {
+        val smt = File.createTempFile("clilra", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LRA)
+                (declare-const x Real)
+                (assert (= x (/ 1.0 3.0)))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "sat", out)
+        assertTrue("(define-fun x () Real 1/3)" in out, out)
+    }
+
+    @Test
     fun `an open MPS difference row is solved without a finite search box`() {
         val mps = File.createTempFile("clidiff", ".mps").apply {
             writeText(
