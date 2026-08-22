@@ -10,6 +10,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline
 import java.io.File
@@ -111,7 +112,7 @@ internal object MpsFormat : ProblemFormat {
     )
 }
 
-private fun com.eignex.klause.solver.ProblemSpec.requireFiniteBenchModel(file: File): Problem {
+private fun ProblemSpec.requireFiniteBenchModel(file: File): Problem {
     check(pipeline() == ProblemPipeline.FINITE_CP) {
         "${file.name}: in-process benchmarks require finite integer bounds; use the CLI theory route for open models"
     }
