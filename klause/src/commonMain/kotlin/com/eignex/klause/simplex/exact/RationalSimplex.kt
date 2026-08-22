@@ -10,7 +10,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * Exact rational feasibility of an [LpModel]: slack-form rows `A·x = rhs` over boxes `0 ≤ xⱼ ≤ uⱼ`
  * (`hasUpper[j]` false ⇒ open above). Coefficients come from the double view when the model has one —
  * every finite double is exactly a rational `±m·2ᵉ`, so no scaling ladder or tolerance is involved —
- * and from the Long arrays otherwise. The last-resort certifier behind [solveAndCertify]: it runs
+ * and from the Long arrays otherwise. The last-resort certifier runs
  * only when the float solve plus the cheap exact checks leave the verdict INDETERMINATE, and decides
  * it in exact arithmetic.
  *
