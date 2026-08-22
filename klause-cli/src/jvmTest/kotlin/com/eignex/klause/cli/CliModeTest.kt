@@ -428,9 +428,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `dry-run-presolve reports a domain span too wide for a Long as unbounded`() {
-        // Three vars whose widths each approach 2^63 sum past Long.MAX_VALUE, which a plain sum wraps
-        // to a negative that reads as a real measurement.
+    fun `dry-run-presolve rejects open non-difference arithmetic`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
                 "(set-logic QF_LIA)\n" +
@@ -440,18 +438,15 @@ class CliModeTest {
             )
             deleteOnExit()
         }
-        val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
 
-        val span = out.lineSequence().first { "int-domain span:" in it }
-        val sides = span.substringAfter("int-domain span:").split("->").map { it.trim() }
-        assertEquals("unbounded", sides.first(), "an overflowing span must be named, not wrapped: $span")
-        assertTrue(sides.none { it.startsWith("-") }, "a span is never negative: $span")
+        assertEquals(2, code, err)
+        assertTrue("complete difference-theory coverage" in err, err)
     }
 
     @Test
-    fun `dry-run-presolve counts the open columns the span line cannot distinguish`() {
-        // One open column and one bounded column. The span saturates to the same word either way so the
-        // count is the only thing that separates a mostly-bounded model from a wholly open one.
+    fun `dry-run-presolve rejects mixed open arithmetic`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
                 "(set-logic QF_LIA)\n" +
@@ -462,13 +457,11 @@ class CliModeTest {
             )
             deleteOnExit()
         }
-        val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
 
-        val line = out.lineSequence().first { "open columns:" in it }
-        val before = line.substringAfter("open columns:").substringBefore("->").trim()
-        val total = before.substringAfter(" of ").trim().toInt()
-        val open = before.substringBefore(" of ").trim().toInt()
-        assertTrue(open in 1 until total, "b is bounded and a is not so the count sits strictly inside: $line")
+        assertEquals(2, code, err)
+        assertTrue("complete difference-theory coverage" in err, err)
     }
 
     @Test
