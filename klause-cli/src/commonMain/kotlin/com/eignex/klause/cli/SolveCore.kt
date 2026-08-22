@@ -5,6 +5,8 @@ import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.DifferenceTheorySolver
+import com.eignex.klause.backtrack.GeneralLiaResult
+import com.eignex.klause.backtrack.GeneralLiaSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
@@ -96,6 +98,28 @@ internal object SolveCore {
                 is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
             }
             if (common.statistics) output.onStatistics(result.stats, 0L, if (result is SolveResult.Sat) 1L else 0L)
+            return
+        }
+        rawSolvable.generalLiaModel?.let { model ->
+            if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
+                usageError("all-solution enumeration is unavailable for open General LIA models")
+            }
+            output.begin(optimize = false, maximize = false)
+            val render = requireNotNull(rawSolvable.generalLiaRender)
+            val result = GeneralLiaSolver(model).solve(
+                BacktrackParams(randomSeed = common.randomSeed, cancellation = cancel, nodeBudget = nodeBudget),
+            )
+            when (result) {
+                is GeneralLiaResult.Sat -> {
+                    output.onSolution(render(result.assignment), null)
+                    output.onComplete(Verdict.SATISFIABLE)
+                }
+
+                is GeneralLiaResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
+
+                is GeneralLiaResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
+            }
+            if (common.statistics) output.onStatistics(result.stats, 0L, if (result is GeneralLiaResult.Sat) 1L else 0L)
             return
         }
         val presolveStart = TimeSource.Monotonic.markNow()

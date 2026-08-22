@@ -51,14 +51,16 @@ class CliModeTest {
             deleteOnExit()
         }
 
-        val out = capture { main(arrayOf(smt.absolutePath)) }
+        var code = -1
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
 
+        assertEquals(0, code, out)
         assertTrue(out.lines().firstOrNull() == "sat", out)
         assertTrue("(define-fun x () Int 5)" in out, out)
     }
 
     @Test
-    fun `an open SMT non-difference model is rejected before finite lowering`() {
+    fun `an open SMT general LIA model is solved without finite lowering`() {
         val smt = File.createTempFile("cliopen", ".smt2").apply {
             writeText(
                 """
@@ -71,10 +73,10 @@ class CliModeTest {
             deleteOnExit()
         }
         var code = -1
-        val err = captureErr { code = runCli(arrayOf(smt.absolutePath)) }
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
 
-        assertEquals(2, code, err)
-        assertTrue("complete difference-theory coverage" in err, err)
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "sat", out)
     }
 
     @Test
@@ -102,6 +104,32 @@ class CliModeTest {
 
         assertTrue("s SATISFIABLE" in out, out)
         assertTrue("X=5" in out, out)
+    }
+
+    @Test
+    fun `an open MPS general LIA row is solved without finite lowering`() {
+        val mps = File.createTempFile("clilia", ".mps").apply {
+            writeText(
+                """
+                NAME          LIA
+                ROWS
+                 N  COST
+                 L  ROW
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         ROW            2.0
+                    MK2       'MARKER'                 'INTEND'
+                RHS
+                    RHS       ROW            3.0
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf(mps.absolutePath)) }
+
+        assertTrue("s SATISFIABLE" in out, out)
     }
 
     private fun capture(block: () -> Unit): String {
@@ -428,25 +456,26 @@ class CliModeTest {
     }
 
     @Test
-    fun `dry-run-presolve rejects open non-difference arithmetic`() {
+    fun `an open wide General LIA witness is rendered without Long narrowing`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
                 "(set-logic QF_LIA)\n" +
-                    (1..3).joinToString("") { "(declare-const x$it Int)\n" } +
-                    (1..3).joinToString("") { "(assert (>= (* 18446712406915678208 x$it) 0))\n" } +
+                    "(declare-const x Int)\n" +
+                    "(assert (= x 18446744073709551616))\n" +
                     "(check-sat)\n",
             )
             deleteOnExit()
         }
         var code = -1
-        val err = captureErr { code = runCli(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
 
-        assertEquals(2, code, err)
-        assertTrue("complete difference-theory coverage" in err, err)
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "sat", out)
+        assertTrue("(define-fun x () Int 18446744073709551616)" in out, out)
     }
 
     @Test
-    fun `dry-run-presolve rejects mixed open arithmetic`() {
+    fun `mixed open General LIA arithmetic is decided without a Long witness box`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
                 "(set-logic QF_LIA)\n" +
@@ -458,10 +487,10 @@ class CliModeTest {
             deleteOnExit()
         }
         var code = -1
-        val err = captureErr { code = runCli(arrayOf("--param", "dry-run-presolve=on", smt.absolutePath)) }
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
 
-        assertEquals(2, code, err)
-        assertTrue("complete difference-theory coverage" in err, err)
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "sat", out)
     }
 
     @Test

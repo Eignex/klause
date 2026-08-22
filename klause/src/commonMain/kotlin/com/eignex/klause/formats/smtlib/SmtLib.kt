@@ -312,7 +312,7 @@ object SmtLib {
             val inventedLo = BooleanArray(nextInt)
             val inventedHi = BooleanArray(nextInt)
             val digits = if (deferred != null && objectiveSpec == null &&
-                sourcePipeline != ProblemPipeline.DIFFERENCE_THEORY
+                sourcePipeline !in setOf(ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA)
             ) {
                 closeForDigitization(inventedLo, inventedHi)
                 digitizeWideInts(inventedLo, inventedHi)

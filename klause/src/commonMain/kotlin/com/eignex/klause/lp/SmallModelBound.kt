@@ -1,9 +1,12 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntBounds
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.log2
@@ -15,7 +18,8 @@ import kotlin.math.log2
  * preferred where they apply.
  *
  * Small-model magnitude bound for a pure-integer linear model: when [factors] are boolean
- * structure ([Clause]) over integer-linear rows ([Linear] / [ReifiedLinear]), a satisfiable model
+ * structure ([Clause]) over integer-linear rows ([Linear] / [ReifiedLinear]) and unary comparison
+ * disjunctions ([ComparisonClause]), a satisfiable model
  * has an integer witness with every coordinate's magnitude within the returned bound. This is the
  * small-model property of linear integer arithmetic — a satisfying assignment activates a
  * conjunction of at most all rows or their integer negations, and a feasible integer system of m
@@ -48,6 +52,14 @@ fun smallModelIntBound(numIntVars: Int, factors: List<Factor>): Long? {
                 m += 2.0
             }
 
+            is ComparisonClause -> {
+                // A satisfying assignment selects one unary comparison from the disjunction; its
+                // constant joins the active conjunction used by the small-model theorem. Count two
+                // rows, matching [Linear]'s conservative equality allowance.
+                for (constant in f.consts) a = maxOf(a, abs(constant.toDouble()))
+                m += 2.0
+            }
+
             else -> return null
         }
     }
@@ -55,4 +67,79 @@ fun smallModelIntBound(numIntVars: Int, factors: List<Factor>): Long? {
     val log2B = log2(numIntVars + m) + (2.0 * m + 1.0) * log2(m * (a + 1.0))
     if (!log2B.isFinite() || log2B > 62.0) return null
     return 1L shl ceil(log2B).toInt().coerceIn(1, 62)
+}
+
+/**
+ * Exact version of [smallModelIntBound] for the General LIA path.
+ *
+ * Unlike the finite-CP helper, this keeps the theorem bound in [BigInteger] and includes each
+ * model-declared finite integer side as an inequality row. The latter is necessary: intersecting a
+ * theorem box with a declared side after computing it can exclude every witness.
+ */
+internal fun smallModelBigIntBound(numIntVars: Int, factors: List<Factor>, intBounds: IntBounds): BigInteger? {
+    var a = BigInteger.ONE
+    var m = 0
+
+    fun observe(value: BigInteger) {
+        val magnitude = if (value < BigInteger.ZERO) -value else value
+        if (magnitude > a) a = magnitude
+    }
+
+    fun rows(count: Int): Boolean {
+        if (m > Int.MAX_VALUE - count) return false
+        m += count
+        return true
+    }
+
+    for (f in factors) {
+        when (f) {
+            is Clause -> Unit
+
+            is Linear -> {
+                if (f.hasReals) return null
+                val coeffs = f.wideCoeffs
+                if (coeffs == null) {
+                    for (i in f.vars.indices) observe(BigInteger.fromLong(f.coeff(i)))
+                    observe(BigInteger.fromLong(f.bound))
+                } else {
+                    for (coeff in coeffs) observe(coeff)
+                    observe(requireNotNull(f.wideBound))
+                }
+                if (!rows(2)) return null
+            }
+
+            is ReifiedLinear -> {
+                val coeffs = f.wideCoeffs
+                if (coeffs == null) {
+                    for (i in f.vars.indices) observe(BigInteger.fromLong(f.coeff(i)))
+                    observe(BigInteger.fromLong(f.bound))
+                } else {
+                    for (coeff in coeffs) observe(coeff)
+                    observe(requireNotNull(f.wideBound))
+                }
+                if (!rows(2)) return null
+            }
+
+            is ComparisonClause -> {
+                for (constant in f.consts) observe(BigInteger.fromLong(constant))
+                if (!rows(2)) return null
+            }
+
+            else -> return null
+        }
+    }
+    for (v in 0 until intBounds.size) {
+        if (intBounds.hasLower(v)) {
+            observe(BigInteger.fromLong(intBounds.lower(v)))
+            if (!rows(1)) return null
+        }
+        if (intBounds.hasUpper(v)) {
+            observe(BigInteger.fromLong(intBounds.upper(v)))
+            if (!rows(1)) return null
+        }
+    }
+    if (numIntVars <= 0 || m == 0) return BigInteger.ONE
+    if (m > Int.MAX_VALUE - numIntVars || m > (Int.MAX_VALUE - 1) / 2) return null
+    val rowsBig = BigInteger.fromInt(m)
+    return BigInteger.fromInt(numIntVars + m) * (rowsBig * (a + BigInteger.ONE)).pow(2 * m + 1)
 }

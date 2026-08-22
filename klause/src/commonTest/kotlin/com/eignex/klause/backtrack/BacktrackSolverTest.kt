@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.compile.compile
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -20,6 +21,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,6 +99,177 @@ class BacktrackSolverTest {
 
         assertTrue(result.assignment.bools[0])
         assertTrue(result.assignment.ints[0] <= -4L)
+    }
+
+    @Test
+    fun `general LIA solves an open non-difference row without a clamp`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(
+                IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+                IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+            ),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true, true),
+            openIntHi = booleanArrayOf(true, true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.EQ, 3)),
+        )
+
+        val result = assertIs<GeneralLiaResult.Sat>(GeneralLiaSolver(model).solve())
+
+        assertEquals(
+            BigInteger.fromInt(3),
+            BigInteger.fromInt(2) * result.assignment.ints[0] +
+                result.assignment.ints[1],
+        )
+    }
+
+    @Test
+    fun `general LIA proves an open divisibility contradiction unsatisfiable`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
+        )
+
+        assertIs<GeneralLiaResult.Unsat>(GeneralLiaSolver(model).solve())
+    }
+
+    @Test
+    fun `general LIA retains a declared side while bounding an open side`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(
+                IntDomain(10, Long.MAX_VALUE),
+                IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+            ),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(false, true),
+            openIntHi = booleanArrayOf(true, true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.EQ, 20)),
+        )
+
+        val result = assertIs<GeneralLiaResult.Sat>(GeneralLiaSolver(model).solve())
+
+        assertTrue(result.assignment.ints[0] >= BigInteger.fromInt(10))
+        assertEquals(
+            BigInteger.fromInt(20),
+            BigInteger.fromInt(2) * result.assignment.ints[0] + result.assignment.ints[1],
+        )
+    }
+
+    @Test
+    fun `general LIA includes declared sides in its witness theorem`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(100_000, Long.MAX_VALUE), IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(false, true),
+            openIntHi = booleanArrayOf(true, true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(Linear(intArrayOf(1, -2), intArrayOf(1, 0), LinearOp.EQ, 1)),
+        )
+
+        val result = assertIs<GeneralLiaResult.Sat>(GeneralLiaSolver(model).solve())
+
+        assertEquals(
+            BigInteger.ONE,
+            result.assignment.ints[1] - BigInteger.fromInt(2) * result.assignment.ints[0],
+        )
+        assertTrue(result.assignment.ints[0] >= BigInteger.fromInt(100_000))
+    }
+
+    @Test
+    fun `general LIA preserves a witness beyond Long`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        ).intBounds
+        val value = BigInteger.ONE.shl(64)
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(Linear(intArrayOf(0), arrayOf(BigInteger.ONE), LinearOp.EQ, value)),
+        )
+
+        val result = assertIs<GeneralLiaResult.Sat>(GeneralLiaSolver(model).solve())
+
+        assertEquals(value, result.assignment.ints[0])
+    }
+
+    @Test
+    fun `general LIA decides an open unary comparison disjunction`() {
+        val bounds = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true),
+            openIntHi = booleanArrayOf(true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = bounds,
+            factors = arrayOf(ComparisonClause(intArrayOf(0), arrayOf(LinearOp.GE), longArrayOf(4))),
+        )
+
+        val result = assertIs<GeneralLiaResult.Sat>(GeneralLiaSolver(model).solve())
+
+        assertTrue(result.assignment.ints[0] >= BigInteger.fromInt(4))
+    }
+
+    @Test
+    fun `general LIA decides a false reified wide interval`() {
+        val bounds = Problem(
+            numBoolVars = 1,
+            numIntVars = 2,
+            intDomains = arrayOf(
+                IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+                IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+            ),
+            factors = emptyArray(),
+            openIntLo = booleanArrayOf(true, true),
+            openIntHi = booleanArrayOf(true, true),
+        ).intBounds
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = bounds,
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, false))),
+                ReifiedLinear(0, intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
+        )
+
+        val result = assertIs<GeneralLiaResult.Sat>(GeneralLiaSolver(model).solve())
+
+        assertTrue(!result.assignment.bools[0])
+        assertTrue(BigInteger.fromInt(2) * result.assignment.ints[0] + result.assignment.ints[1] > BigInteger.ZERO)
     }
 
     @Test

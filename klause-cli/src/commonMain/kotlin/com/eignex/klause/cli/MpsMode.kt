@@ -1,5 +1,6 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.GeneralLiaAssignment
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
@@ -13,7 +14,7 @@ import com.eignex.klause.solver.pipeline
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
  * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
  * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
- * model is either routed to difference theory or rejected at load.
+ * model is routed to a complete supported theory pipeline or rejected at load.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
  * `s UNSATISFIABLE` / `s UNKNOWN` and a `v name=value` line. `-s` statistics are `c` comment lines.
  */
@@ -35,15 +36,29 @@ internal object MpsMode : CliMode {
                     "objScale=${compiled.objectiveScale}"
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
-            when (compiled.model.pipeline()) {
+            val pipeline = compiled.model.pipeline()
+            when (pipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
-                    throw MpsFormatException("open integer bounds require complete difference-theory coverage")
+                    throw MpsFormatException("open integer bounds require supported difference or General LIA coverage")
 
-                ProblemPipeline.DIFFERENCE_THEORY -> {
+                ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
                     if (compiled.objective != null) {
-                        throw MpsFormatException("open difference-theory optimization is unsupported")
+                        val theory = if (pipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                            "difference-theory"
+                        } else {
+                            "General LIA"
+                        }
+                        throw MpsFormatException("open $theory optimization is unsupported")
                     }
-                    return differenceTheorySolvable(compiled.model, render)
+                    return if (pipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                        differenceTheorySolvable(compiled.model, render)
+                    } else {
+                        generalLiaSolvable(
+                            compiled.model,
+                        ) { assignment ->
+                            renderMpsGeneralLiaModel(compiled, assignment)
+                        }
+                    }
                 }
 
                 ProblemPipeline.FINITE_CP -> Unit
@@ -66,6 +81,15 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
     for (col in compiled.columns) {
         val value = if (col.real) s.reals[col.id] else s.ints[col.id]
         append(" ${col.name}=$value")
+    }
+}
+
+/** Render an exact General LIA witness without narrowing arbitrary-precision values to [Long]. */
+internal fun renderMpsGeneralLiaModel(compiled: MpsCompiled, assignment: GeneralLiaAssignment): String = buildString {
+    append("v")
+    for (col in compiled.columns) {
+        check(!col.real) { "General LIA does not admit continuous columns" }
+        append(" ${col.name}=${assignment.ints[col.id]}")
     }
 }
 
