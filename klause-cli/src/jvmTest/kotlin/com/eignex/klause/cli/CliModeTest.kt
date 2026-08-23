@@ -102,6 +102,29 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open SMT LIRA model renders mixed exact witnesses`() {
+        val smt = File.createTempFile("clilira", ".smt2").apply {
+            writeText(
+                """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (+ (to_real x) (/ 1.0 3.0))))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "sat", out)
+        assertTrue("(define-fun x () Int " in out, out)
+        assertTrue("(define-fun y () Real " in out, out)
+    }
+
+    @Test
     fun `an open MPS difference row is solved without a finite search box`() {
         val mps = File.createTempFile("clidiff", ".mps").apply {
             writeText(
@@ -152,6 +175,35 @@ class CliModeTest {
         val out = capture { main(arrayOf(mps.absolutePath)) }
 
         assertTrue("s SATISFIABLE" in out, out)
+    }
+
+    @Test
+    fun `an open mixed MPS model remains rejected until optimization uses the LIRA core`() {
+        val mps = File.createTempFile("clilira", ".mps").apply {
+            writeText(
+                """
+                NAME          LIRA
+                ROWS
+                 N  COST
+                 G  ROW
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         ROW            1.0
+                    MK2       'MARKER'                 'INTEND'
+                    Y         ROW            1.0
+                RHS
+                    RHS       ROW            0.0
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val err = captureErr { code = runCli(arrayOf(mps.absolutePath)) }
+
+        assertEquals(2, code, err)
+        assertTrue("open MPS models require a supported theory pipeline" in err, err)
     }
 
     private fun capture(block: () -> Unit): String {

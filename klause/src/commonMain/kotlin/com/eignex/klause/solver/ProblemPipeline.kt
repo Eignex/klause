@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.difference.supportsCompleteDifferenceTheory
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.smallModelBigIntBound
@@ -20,6 +21,9 @@ enum class ProblemPipeline {
     /** Open pure-real linear arithmetic, decided by the exact rational simplex under Boolean search. */
     EXACT_LRA,
 
+    /** Open mixed integer/real linear arithmetic, decided by exact rational LP and integer branching. */
+    EXACT_LIRA,
+
     /** An open integer side reaches a factor no available theory decides. */
     UNSUPPORTED_OPEN,
 }
@@ -30,6 +34,7 @@ fun ProblemSpec.pipeline(): ProblemPipeline {
         return ProblemPipeline.FINITE_CP
     }
     if (supportsExactLra()) return ProblemPipeline.EXACT_LRA
+    if (supportsExactLira()) return ProblemPipeline.EXACT_LIRA
     if (numRealVars != 0) return ProblemPipeline.UNSUPPORTED_OPEN
     return if (supportsCompleteDifferenceTheory(factors, numIntVars, intBounds)) {
         ProblemPipeline.DIFFERENCE_THEORY
@@ -42,14 +47,33 @@ fun ProblemSpec.pipeline(): ProblemPipeline {
 
 /** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
 internal fun ProblemSpec.supportsExactLra(): Boolean =
-    numIntVars == 0 && numRealVars != 0 && factors.all(::supportsExactLra)
+    numIntVars == 0 && numRealVars != 0 && factors.all(::supportsExactTheoryFactor)
 
-private fun supportsExactLra(factor: Factor): Boolean = when (factor) {
+/** Factors whose mixed rows the exact QF_LIRA branch-and-simplex route decides. */
+internal fun ProblemSpec.supportsExactLira(): Boolean =
+    numIntVars != 0 && numRealVars != 0 && factors.all(::supportsExactTheoryFactor)
+
+private fun supportsExactTheoryFactor(factor: Factor): Boolean = when (factor) {
     is Clause -> true
-    is Linear -> factor.hasReals
-    is ReifiedRealLinear -> true
+    is Linear -> factor.wide || factor.coefficientsAreExactlyRepresentable()
+    is ReifiedLinear -> factor.wide || factor.coefficientsAreExactlyRepresentable()
+    is ReifiedRealLinear -> factor.coefficientsAreExactlyRepresentable()
     else -> false
 }
+
+private fun Linear.coefficientsAreExactlyRepresentable(): Boolean =
+    realBound.isFinite() && realIntCoeffs.all(Double::isFinite) && realCoeffs.all(Double::isFinite) &&
+        (!hasReals || realIntCoeffs.all(::isExactInteger)) &&
+        (hasReals || (vars.indices.all { isExactInteger(coeff(it).toDouble()) } && isExactInteger(bound.toDouble())))
+
+private fun ReifiedLinear.coefficientsAreExactlyRepresentable(): Boolean =
+    vars.indices.all { isExactInteger(coeff(it).toDouble()) } && isExactInteger(bound.toDouble())
+
+private fun ReifiedRealLinear.coefficientsAreExactlyRepresentable(): Boolean = bound.isFinite() && intCoeffs.all(
+    Double::isFinite,
+) && realCoeffs.all(Double::isFinite) && intCoeffs.all(::isExactInteger)
+
+private fun isExactInteger(value: Double): Boolean = value.isFinite() && value == value.toLong().toDouble()
 
 /**
  * A finite [com.ionspin.kotlin.bignum.integer.BigInteger] box which preserves satisfiability of this

@@ -7,14 +7,17 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.difference.DifferenceTheorySolver
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.lia.GeneralLiaResult
 import com.eignex.klause.theory.lia.GeneralLiaSolver
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraResult
+import com.eignex.klause.theory.qflra.ExactLiraSolver
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qflra.ExactLraResult
 import com.eignex.klause.theory.qflra.ExactLraSolver
-import com.eignex.klause.theory.TheoryParams
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -34,6 +37,12 @@ sealed interface OpenTheoryAssignment {
     data class ExactLra(
         /** The rational real witness. */
         val assignment: ExactLraAssignment,
+    ) : OpenTheoryAssignment
+
+    /** A mixed arbitrary-precision integer and rational witness from exact QF_LIRA. */
+    data class ExactLira(
+        /** The mixed exact witness. */
+        val assignment: ExactLiraAssignment,
     ) : OpenTheoryAssignment
 }
 
@@ -79,6 +88,7 @@ class OpenTheorySolver(private val model: ProblemSpec, private val route: Proble
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceTheorySolver(model).solve(params).asOpenTheoryResult()
         ProblemPipeline.GENERAL_LIA -> GeneralLiaSolver(model).solve(params).asOpenTheoryResult()
         ProblemPipeline.EXACT_LRA -> ExactLraSolver(model).solve(params).asOpenTheoryResult()
+        ProblemPipeline.EXACT_LIRA -> ExactLiraSolver(model).solve(params).asOpenTheoryResult()
         ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("validated open theory route changed")
     }
 }
@@ -99,4 +109,10 @@ private fun ExactLraResult.asOpenTheoryResult(): OpenTheoryResult = when (this) 
     is ExactLraResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.ExactLra(assignment), stats)
     is ExactLraResult.Unsat -> OpenTheoryResult.Unsat(stats)
     is ExactLraResult.Unknown -> OpenTheoryResult.Unknown(reason, stats)
+}
+
+private fun ExactLiraResult.asOpenTheoryResult(): OpenTheoryResult = when (this) {
+    is ExactLiraResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.ExactLira(assignment), stats)
+    is ExactLiraResult.Unsat -> OpenTheoryResult.Unsat(stats)
+    is ExactLiraResult.Unknown -> OpenTheoryResult.Unknown(reason, stats)
 }
