@@ -370,6 +370,7 @@ final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum
 
 final enum class com.eignex.klause.solver/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver/ProblemPipeline> { // com.eignex.klause.solver/ProblemPipeline|null[0]
     enum entry DIFFERENCE_THEORY // com.eignex.klause.solver/ProblemPipeline.DIFFERENCE_THEORY|null[0]
+    enum entry EXACT_LIRA // com.eignex.klause.solver/ProblemPipeline.EXACT_LIRA|null[0]
     enum entry EXACT_LRA // com.eignex.klause.solver/ProblemPipeline.EXACT_LRA|null[0]
     enum entry FINITE_CP // com.eignex.klause.solver/ProblemPipeline.FINITE_CP|null[0]
     enum entry GENERAL_LIA // com.eignex.klause.solver/ProblemPipeline.GENERAL_LIA|null[0]
@@ -1601,6 +1602,19 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.toString|toString(){}[0]
     }
 
+    final class ExactLira : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira|null[0]
+        constructor <init>(com.eignex.klause.theory.qflra/ExactLiraAssignment) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.<init>|<init>(com.eignex.klause.theory.qflra.ExactLiraAssignment){}[0]
+
+        final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.assignment|{}assignment[0]
+            final fun <get-assignment>(): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.assignment.<get-assignment>|<get-assignment>(){}[0]
+
+        final fun component1(): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.theory.qflra/ExactLiraAssignment = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.copy|copy(com.eignex.klause.theory.qflra.ExactLiraAssignment){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.toString|toString(){}[0]
+    }
+
     final class ExactLra : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra|null[0]
         constructor <init>(com.eignex.klause.theory.qflra/ExactLraAssignment) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.<init>|<init>(com.eignex.klause.theory.qflra.ExactLraAssignment){}[0]
 
@@ -2046,6 +2060,56 @@ sealed interface com.eignex.klause.theory.lia/GeneralLiaResult { // com.eignex.k
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.lia/GeneralLiaResult.Unsat.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.theory.lia/GeneralLiaResult.Unsat.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.theory.lia/GeneralLiaResult.Unsat.toString|toString(){}[0]
+    }
+}
+
+sealed interface com.eignex.klause.theory.qflra/ExactLiraResult { // com.eignex.klause.theory.qflra/ExactLiraResult|null[0]
+    abstract val stats // com.eignex.klause.theory.qflra/ExactLiraResult.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.stats.<get-stats>|<get-stats>(){}[0]
+
+    final class Sat : com.eignex.klause.theory.qflra/ExactLiraResult { // com.eignex.klause.theory.qflra/ExactLiraResult.Sat|null[0]
+        constructor <init>(com.eignex.klause.theory.qflra/ExactLiraAssignment, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.<init>|<init>(com.eignex.klause.theory.qflra.ExactLiraAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val assignment // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.assignment|{}assignment[0]
+            final fun <get-assignment>(): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val stats // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.theory.qflra/ExactLiraAssignment = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.theory.qflra/ExactLiraResult.Sat // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.copy|copy(com.eignex.klause.theory.qflra.ExactLiraAssignment;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/ExactLiraResult.Sat.toString|toString(){}[0]
+    }
+
+    final class Unknown : com.eignex.klause.theory.qflra/ExactLiraResult { // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown|null[0]
+        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val reason // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.reason|{}reason[0]
+            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
+        final val stats // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.component2|component2(){}[0]
+        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.theory.qflra/ExactLiraResult.Unknown // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/ExactLiraResult.Unknown.toString|toString(){}[0]
+    }
+
+    final class Unsat : com.eignex.klause.theory.qflra/ExactLiraResult { // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat|null[0]
+        constructor <init>(com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val stats // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.theory.qflra/ExactLiraResult.Unsat // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.copy|copy(com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/ExactLiraResult.Unsat.toString|toString(){}[0]
     }
 }
 
@@ -8829,6 +8893,31 @@ final class com.eignex.klause.theory.lia/GeneralLiaSolver { // com.eignex.klause
     constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.theory.lia/GeneralLiaSolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
 
     final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.theory.lia/GeneralLiaResult // com.eignex.klause.theory.lia/GeneralLiaSolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
+}
+
+final class com.eignex.klause.theory.qflra/ExactLiraAssignment { // com.eignex.klause.theory.qflra/ExactLiraAssignment|null[0]
+    constructor <init>(kotlin/BooleanArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.theory.qflra/ExactLiraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+
+    final val bools // com.eignex.klause.theory.qflra/ExactLiraAssignment.bools|{}bools[0]
+        final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLiraAssignment.bools.<get-bools>|<get-bools>(){}[0]
+    final val ints // com.eignex.klause.theory.qflra/ExactLiraAssignment.ints|{}ints[0]
+        final fun <get-ints>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.qflra/ExactLiraAssignment.ints.<get-ints>|<get-ints>(){}[0]
+    final val reals // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals|{}reals[0]
+        final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals.<get-reals>|<get-reals>(){}[0]
+
+    final fun component1(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLiraAssignment.component1|component1(){}[0]
+    final fun component2(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component3|component3(){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.theory.qflra/ExactLiraAssignment.copy|copy(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraAssignment.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLiraAssignment.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/ExactLiraAssignment.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.theory.qflra/ExactLiraSolver { // com.eignex.klause.theory.qflra/ExactLiraSolver|null[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec) // com.eignex.klause.theory.qflra/ExactLiraSolver.<init>|<init>(com.eignex.klause.solver.ProblemSpec){}[0]
+
+    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.theory.qflra/ExactLiraResult // com.eignex.klause.theory.qflra/ExactLiraSolver.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.theory.qflra/ExactLraAssignment { // com.eignex.klause.theory.qflra/ExactLraAssignment|null[0]
