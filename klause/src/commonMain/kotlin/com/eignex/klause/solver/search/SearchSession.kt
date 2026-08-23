@@ -544,18 +544,18 @@ class SearchRun internal constructor(
                 is SearchNodeDisposition.Backjump -> {
                     observer.onConflict(null)
                     observer.onLearnedNodeBackjump()
-                    when (applyNodeBackjump(node.consequence)) {
-                        SearchNodeBackjumpResult.Resume -> continue
+                    when (applyLearnedConflict(node.consequence)) {
+                        SearchLearnedConflictResult.Resume -> continue
 
-                        SearchNodeBackjumpResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
+                        SearchLearnedConflictResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
 
-                        SearchNodeBackjumpResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
+                        SearchLearnedConflictResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
 
-                        SearchNodeBackjumpResult.Indeterminate -> {
+                        SearchLearnedConflictResult.Indeterminate -> {
                             return finish(SearchRunEvent.Indeterminate.Component)
                         }
 
-                        is SearchNodeBackjumpResult.Backjump -> error("backjump chain did not terminate")
+                        is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
                     }
                     continue
                 }
@@ -676,6 +676,7 @@ class SearchRun internal constructor(
                     session.popTo(level)
                     if (resolveConflict()) return Advance.Expanded
                     if (frames.isEmpty()) return Advance.Exhausted
+                    if (frames.last() !== frame) return Advance.Exhausted
                 }
             }
         }
@@ -720,36 +721,38 @@ class SearchRun internal constructor(
             SearchConflictResolution.Exhausted -> return false
 
             is SearchConflictResolution.Backjump -> {
-                session.popTo(resolution.decisionLevel)
-                while (frames.isNotEmpty() && frames.last().level >= resolution.decisionLevel) frames.removeLast()
-                return when (resolver.applyResolution(session)) {
-                    ComponentResult.Consistent -> true
-                    is ComponentResult.Conflict -> false
-                    ComponentResult.Indeterminate -> false
+                return when (applyLearnedConflict(resolution.conflict)) {
+                    SearchLearnedConflictResult.Resume -> true
+                    SearchLearnedConflictResult.Exhausted,
+                    SearchLearnedConflictResult.Chronological,
+                    SearchLearnedConflictResult.Indeterminate,
+                    -> false
+
+                    is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
                 }
             }
         }
     }
 
-    private fun applyNodeBackjump(initial: SearchNodeBackjump): SearchNodeBackjumpResult {
-        var consequence = initial
+    private fun applyLearnedConflict(initial: SearchLearnedConflict): SearchLearnedConflictResult {
+        var conflict = initial
         repeat(MAX_NODE_BACKJUMPS) {
-            if (consequence.decisionLevel !in 0..session.decisionLevel) {
-                return SearchNodeBackjumpResult.Chronological
+            if (conflict.decisionLevel !in 0..session.decisionLevel) {
+                return SearchLearnedConflictResult.Chronological
             }
-            session.popTo(consequence.decisionLevel)
-            while (frames.isNotEmpty() && frames.last().level >= consequence.decisionLevel) frames.removeLast()
-            when (val result = consequence.apply(session)) {
-                SearchNodeBackjumpResult.Resume,
-                SearchNodeBackjumpResult.Exhausted,
-                SearchNodeBackjumpResult.Chronological,
-                SearchNodeBackjumpResult.Indeterminate,
+            session.popTo(conflict.decisionLevel)
+            while (frames.isNotEmpty() && frames.last().level >= conflict.decisionLevel) frames.removeLast()
+            when (val result = conflict.apply(session)) {
+                SearchLearnedConflictResult.Resume,
+                SearchLearnedConflictResult.Exhausted,
+                SearchLearnedConflictResult.Chronological,
+                SearchLearnedConflictResult.Indeterminate,
                 -> return result
 
-                is SearchNodeBackjumpResult.Backjump -> consequence = result.consequence
+                is SearchLearnedConflictResult.Backjump -> conflict = result.conflict
             }
         }
-        return SearchNodeBackjumpResult.Chronological
+        return SearchLearnedConflictResult.Chronological
     }
 
     private fun exhausted(): SearchRunEvent = if (sawIndeterminate) {
@@ -854,6 +857,7 @@ interface SearchRunObserver {
 
     /** A node policy supplied an asserting learned consequence. */
     fun onLearnedNodeBackjump() {}
+
 
     /** The runner returned the session to root after [decisions] decisions in the completed run. */
     fun onRestart(decisions: Long) {}

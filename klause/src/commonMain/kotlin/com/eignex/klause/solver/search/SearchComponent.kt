@@ -150,8 +150,6 @@ interface SearchConflictResolver : SearchComponent {
     /** Analyse the most recent native conflict. */
     fun resolveConflict(context: SearchContext): SearchConflictResolution
 
-    /** Assert the learned native consequence after the engine has popped to its requested level. */
-    fun applyResolution(context: SearchContext): ComponentResult
 }
 
 /** Typed result of component-owned conflict analysis. */
@@ -159,11 +157,53 @@ sealed interface SearchConflictResolution {
     /** The shared engine should use ordinary chronological backtracking. */
     data object Chronological : SearchConflictResolution
 
-    /** The engine should retract to [decisionLevel], then call the resolver's apply hook. */
-    data class Backjump(val decisionLevel: Int) : SearchConflictResolution
+    /** The engine should apply an asserting learned consequence. */
+    data class Backjump(
+        /** The full learned consequence and its canonical backjump metadata. */
+        val conflict: SearchLearnedConflict,
+    ) : SearchConflictResolution
 
     /** The analyzer proved a root contradiction. */
     data object Exhausted : SearchConflictResolution
+}
+
+/** A component-owned asserting learned consequence applied by the shared CDCL traversal. */
+interface SearchLearnedConflict {
+    /** Shared decision level where the consequence becomes asserting. */
+    val decisionLevel: Int
+
+    /** Literal block distance of the consequence. */
+    val lbd: Int
+
+    /** Literals used to reject satisfied or repeatedly derived consequences. */
+    val guardLiterals: IntArray
+
+    /** Decision levels participating in the analysis, for assumption-core accounting. */
+    val decisionLevels: IntArray
+
+    /** Assert and import this consequence after the runner retracts to [decisionLevel]. */
+    fun apply(session: SearchSession): SearchLearnedConflictResult
+}
+
+/** Result of applying a [SearchLearnedConflict]. */
+sealed interface SearchLearnedConflictResult {
+    /** The consequence was asserted and propagated. */
+    data object Resume : SearchLearnedConflictResult
+
+    /** Propagation yielded another learned consequence. */
+    data class Backjump(
+        /** The next consequence in the bounded cascade. */
+        val conflict: SearchLearnedConflict,
+    ) : SearchLearnedConflictResult
+
+    /** The root is contradictory. */
+    data object Exhausted : SearchLearnedConflictResult
+
+    /** Preserve completeness by falling back to chronological backtracking. */
+    data object Chronological : SearchLearnedConflictResult
+
+    /** Exact propagation could not complete. */
+    data object Indeterminate : SearchLearnedConflictResult
 }
 
 /** Explicit continuation selected after a resumable run returns a model. */
@@ -218,41 +258,11 @@ sealed interface SearchNodeDisposition {
     /** Learn a native consequence and resume from its asserting backjump level. */
     data class Backjump(
         /** The learned consequence to assert after retracting. */
-        val consequence: SearchNodeBackjump,
+        val consequence: SearchLearnedConflict,
     ) : SearchNodeDisposition
 
     /** The node cannot be decided under the active limits. */
     data object Indeterminate : SearchNodeDisposition
-}
-
-/** A component-owned learned consequence that the shared traversal can backjump and assert. */
-interface SearchNodeBackjump {
-    /** Shared decision level where this consequence becomes asserting. */
-    val decisionLevel: Int
-
-    /** Assert the consequence after the runner has retracted to [decisionLevel]. */
-    fun apply(session: SearchSession): SearchNodeBackjumpResult
-}
-
-/** Result of asserting a [SearchNodeBackjump] at its backjump level. */
-sealed interface SearchNodeBackjumpResult {
-    /** The learned consequence was asserted and traversal can continue. */
-    data object Resume : SearchNodeBackjumpResult
-
-    /** A propagated native conflict supplied another learned consequence. */
-    data class Backjump(
-        /** The next learned consequence in the native conflict chain. */
-        val consequence: SearchNodeBackjump,
-    ) : SearchNodeBackjumpResult
-
-    /** The consequence proved the shared root contradictory. */
-    data object Exhausted : SearchNodeBackjumpResult
-
-    /** The consequence could not be asserted, so use chronological backtracking. */
-    data object Chronological : SearchNodeBackjumpResult
-
-    /** The component could not assert the consequence exactly. */
-    data object Indeterminate : SearchNodeBackjumpResult
 }
 
 /**
@@ -301,6 +311,9 @@ sealed interface SearchRunDisposition {
 interface SearchRestartPolicy {
     /** Start a fresh traversal run. */
     fun beginRun() {}
+
+    /** Record one learned conflict before its asserting consequence is applied. */
+    fun recordConflict(lbd: Int, trailSize: Int) {}
 
     /** True when the current run should return to the shared root. */
     fun shouldRestart(decisionsThisRun: Long): Boolean

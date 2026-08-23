@@ -26,7 +26,7 @@ internal interface RestartSchedule : SearchRestartPolicy {
     override fun beginRun() {}
 
     /** Feed a conflict's LBD and trail depth to the schedule; may raise a pending restart. */
-    fun recordConflict(lbd: Int, trailSize: Int) {}
+    override fun recordConflict(lbd: Int, trailSize: Int) {}
 
     /** True when the current run should restart. [decisionsThisRun] is the caller's decision count
      *  since the last [beginRun]. */

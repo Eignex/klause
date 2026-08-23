@@ -10,6 +10,8 @@ import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
+import com.eignex.klause.solver.search.SearchLearnedConflict
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchSession
@@ -41,7 +43,6 @@ class CpSearchComponent(
     private var sharedRootLevel = 0
     private val nativeLevelBySharedLevel = ArrayList<Int>().apply { add(0) }
     private var lastResult: PropagationResult? = null
-    private var pendingLearned: ConflictAnalyzer.AnalysisResult.LearnedConstraint? = null
 
     override val resolvesAfterModelBlock: Boolean
         get() = session.problem.numIntVars == 0 && session.problem.factors.isEmpty()
@@ -218,9 +219,7 @@ class CpSearchComponent(
         if (learned.guardLiterals.isEmpty() && learned.backjumpLevel == 0) {
             return SearchConflictResolution.Exhausted
         }
-        pendingLearned = learned
-        val sharedLevel = sharedLevelForNative(learned.backjumpLevel)
-        return SearchConflictResolution.Backjump(sharedLevel)
+        return SearchConflictResolution.Backjump(CpLearnedConflict(learned))
     }
 
     /** Shared level corresponding to the latest native level not above [nativeLevel]. */
@@ -228,34 +227,53 @@ class CpSearchComponent(
         level <= nativeLevel
     }.coerceAtLeast(0)
 
-    override fun applyResolution(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
-        val learned = checkNotNull(pendingLearned.also { pendingLearned = null })
-        val result = when (learned) {
-            is ConflictAnalyzer.AnalysisResult.Learned -> session.addLearnedClause(
+    private inner class CpLearnedConflict(
+        private val learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint,
+    ) : SearchLearnedConflict {
+        override val decisionLevel: Int get() = sharedLevelForNative(learned.backjumpLevel)
+        override val lbd: Int get() = learned.lbd
+        override val guardLiterals: IntArray get() = learned.guardLiterals
+        override val decisionLevels: IntArray get() = learned.decisionLevels
+
+        override fun apply(session: SearchSession): SearchLearnedConflictResult {
+            val result = when (learned) {
+            is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
                 Clause(learned.literals),
                 learned.lbd,
             )
 
-            is ConflictAnalyzer.AnalysisResult.LearnedPb -> session.addLearnedPb(
+            is ConflictAnalyzer.AnalysisResult.LearnedPb -> this@CpSearchComponent.session.addLearnedPb(
                 learned.weights,
                 learned.literals,
                 learned.degree,
                 learned.lbd,
             )
         }
-        return when (result) {
+            return when (result) {
             is PropagationResult.Implied -> {
                 if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
-                    context as? SearchSession ?: return ComponentResult.Indeterminate
-                    context.learnFrom(this, SearchExplanation(learned.literals))
+                    session.learnFrom(this@CpSearchComponent, SearchExplanation(learned.literals))
                 }
-                import(result, context as SearchSession)
+                if (import(result, session) !is ComponentResult.Consistent) {
+                    SearchLearnedConflictResult.Chronological
+                } else {
+                    when (session.propagate()) {
+                        ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
+                        is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
+                        ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
+                    }
+                }
             }
 
             is PropagationResult.Unsat -> {
-                lastResult = result
-                conflict(result)
+                val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+                when {
+                    next == null -> SearchLearnedConflictResult.Chronological
+                    next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> SearchLearnedConflictResult.Exhausted
+                    else -> SearchLearnedConflictResult.Backjump(CpLearnedConflict(next))
+                }
             }
+        }
         }
     }
 
