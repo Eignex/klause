@@ -723,6 +723,7 @@ class SearchRun internal constructor(
             is SearchConflictResolution.Backjump -> {
                 return when (applyLearnedConflict(resolution.conflict)) {
                     SearchLearnedConflictResult.Resume -> true
+
                     SearchLearnedConflictResult.Exhausted,
                     SearchLearnedConflictResult.Chronological,
                     SearchLearnedConflictResult.Indeterminate,
@@ -857,7 +858,6 @@ interface SearchRunObserver {
 
     /** A node policy supplied an asserting learned consequence. */
     fun onLearnedNodeBackjump() {}
-
 
     /** The runner returned the session to root after [decisions] decisions in the completed run. */
     fun onRestart(decisions: Long) {}

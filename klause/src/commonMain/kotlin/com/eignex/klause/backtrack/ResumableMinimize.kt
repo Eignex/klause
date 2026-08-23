@@ -37,11 +37,11 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchLearnedConflict
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelDisposition
 import com.eignex.klause.solver.search.SearchModelPolicy
-import com.eignex.klause.solver.search.SearchLearnedConflict
-import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRun

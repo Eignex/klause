@@ -227,9 +227,8 @@ class CpSearchComponent(
         level <= nativeLevel
     }.coerceAtLeast(0)
 
-    private inner class CpLearnedConflict(
-        private val learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint,
-    ) : SearchLearnedConflict {
+    private inner class CpLearnedConflict(private val learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint) :
+        SearchLearnedConflict {
         override val decisionLevel: Int get() = sharedLevelForNative(learned.backjumpLevel)
         override val lbd: Int get() = learned.lbd
         override val guardLiterals: IntArray get() = learned.guardLiterals
@@ -237,43 +236,43 @@ class CpSearchComponent(
 
         override fun apply(session: SearchSession): SearchLearnedConflictResult {
             val result = when (learned) {
-            is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
-                Clause(learned.literals),
-                learned.lbd,
-            )
+                is ConflictAnalyzer.AnalysisResult.Learned -> this@CpSearchComponent.session.addLearnedClause(
+                    Clause(learned.literals),
+                    learned.lbd,
+                )
 
-            is ConflictAnalyzer.AnalysisResult.LearnedPb -> this@CpSearchComponent.session.addLearnedPb(
-                learned.weights,
-                learned.literals,
-                learned.degree,
-                learned.lbd,
-            )
-        }
+                is ConflictAnalyzer.AnalysisResult.LearnedPb -> this@CpSearchComponent.session.addLearnedPb(
+                    learned.weights,
+                    learned.literals,
+                    learned.degree,
+                    learned.lbd,
+                )
+            }
             return when (result) {
-            is PropagationResult.Implied -> {
-                if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
-                    session.learnFrom(this@CpSearchComponent, SearchExplanation(learned.literals))
+                is PropagationResult.Implied -> {
+                    if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
+                        session.learnFrom(this@CpSearchComponent, SearchExplanation(learned.literals))
+                    }
+                    if (import(result, session) !is ComponentResult.Consistent) {
+                        SearchLearnedConflictResult.Chronological
+                    } else {
+                        when (session.propagate()) {
+                            ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
+                            is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
+                            ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
+                        }
+                    }
                 }
-                if (import(result, session) !is ComponentResult.Consistent) {
-                    SearchLearnedConflictResult.Chronological
-                } else {
-                    when (session.propagate()) {
-                        ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
-                        is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
-                        ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
+
+                is PropagationResult.Unsat -> {
+                    val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+                    when {
+                        next == null -> SearchLearnedConflictResult.Chronological
+                        next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> SearchLearnedConflictResult.Exhausted
+                        else -> SearchLearnedConflictResult.Backjump(CpLearnedConflict(next))
                     }
                 }
             }
-
-            is PropagationResult.Unsat -> {
-                val next = result.learnedClause as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
-                when {
-                    next == null -> SearchLearnedConflictResult.Chronological
-                    next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> SearchLearnedConflictResult.Exhausted
-                    else -> SearchLearnedConflictResult.Backjump(CpLearnedConflict(next))
-                }
-            }
-        }
         }
     }
 

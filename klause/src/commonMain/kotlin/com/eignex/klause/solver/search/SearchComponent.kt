@@ -149,7 +149,6 @@ interface SearchConflictResolver : SearchComponent {
 
     /** Analyse the most recent native conflict. */
     fun resolveConflict(context: SearchContext): SearchConflictResolution
-
 }
 
 /** Typed result of component-owned conflict analysis. */
