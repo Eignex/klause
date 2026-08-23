@@ -532,12 +532,31 @@ class SearchRun internal constructor(
                 }
                 cancellationPoller.rearm()
             }
-            when (nodePolicy.beforeBranch(session)) {
+            when (val node = nodePolicy.beforeBranch(session)) {
                 SearchNodeDisposition.Expand -> Unit
 
                 SearchNodeDisposition.Prune -> {
                     observer.onConflict(null)
                     if (!backtrack()) return stopAfterBacktrack()
+                    continue
+                }
+
+                is SearchNodeDisposition.Backjump -> {
+                    observer.onConflict(null)
+                    observer.onLearnedNodeBackjump()
+                    when (applyNodeBackjump(node.consequence)) {
+                        SearchNodeBackjumpResult.Resume -> continue
+
+                        SearchNodeBackjumpResult.Exhausted -> return finish(SearchRunEvent.Exhausted)
+
+                        SearchNodeBackjumpResult.Chronological -> if (!backtrack()) return stopAfterBacktrack()
+
+                        SearchNodeBackjumpResult.Indeterminate -> {
+                            return finish(SearchRunEvent.Indeterminate.Component)
+                        }
+
+                        is SearchNodeBackjumpResult.Backjump -> error("backjump chain did not terminate")
+                    }
                     continue
                 }
 
@@ -712,6 +731,27 @@ class SearchRun internal constructor(
         }
     }
 
+    private fun applyNodeBackjump(initial: SearchNodeBackjump): SearchNodeBackjumpResult {
+        var consequence = initial
+        repeat(MAX_NODE_BACKJUMPS) {
+            if (consequence.decisionLevel !in 0..session.decisionLevel) {
+                return SearchNodeBackjumpResult.Chronological
+            }
+            session.popTo(consequence.decisionLevel)
+            while (frames.isNotEmpty() && frames.last().level >= consequence.decisionLevel) frames.removeLast()
+            when (val result = consequence.apply(session)) {
+                SearchNodeBackjumpResult.Resume,
+                SearchNodeBackjumpResult.Exhausted,
+                SearchNodeBackjumpResult.Chronological,
+                SearchNodeBackjumpResult.Indeterminate,
+                -> return result
+
+                is SearchNodeBackjumpResult.Backjump -> consequence = result.consequence
+            }
+        }
+        return SearchNodeBackjumpResult.Chronological
+    }
+
     private fun exhausted(): SearchRunEvent = if (sawIndeterminate) {
         SearchRunEvent.Indeterminate.Component
     } else {
@@ -787,6 +827,10 @@ class SearchRun internal constructor(
         Budget,
         Restart,
     }
+
+    private companion object {
+        const val MAX_NODE_BACKJUMPS = 64
+    }
 }
 
 /** Charges successful shared decisions to an optional solve-wide allowance. */
@@ -807,6 +851,9 @@ interface SearchRunObserver {
 
     /** A branch assertion or candidate leaf was refuted. */
     fun onConflict(decision: SearchDecision?) {}
+
+    /** A node policy supplied an asserting learned consequence. */
+    fun onLearnedNodeBackjump() {}
 
     /** The runner returned the session to root after [decisions] decisions in the completed run. */
     fun onRestart(decisions: Long) {}

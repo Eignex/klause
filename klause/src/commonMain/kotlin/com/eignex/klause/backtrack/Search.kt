@@ -251,6 +251,10 @@ internal class BacktrackBrancher(
         phase.onConflictTick()
     }
 
+    override fun onLearnedNodeBackjump() {
+        sink?.search?.observeLearn()
+    }
+
     override fun onRestart(decisions: Long) {
         variables.onRestart()
         values.onRestart()
