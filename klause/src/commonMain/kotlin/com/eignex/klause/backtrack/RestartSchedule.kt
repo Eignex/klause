@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.util.lubyN
+import com.eignex.klause.solver.search.SearchRestartPolicy
 
 /**
  * The phase regime a [RestartSchedule] asks the engine's [PhaseSaving] to run under. [PhaseMode.STABLE]
@@ -20,23 +21,23 @@ internal enum class PhaseMode { UNMANAGED, STABLE, FOCUSED }
  * detector state), so the satisfaction path ([BacktrackSolver]) and the branch-and-bound engine
  * ([com.eignex.klause.backtrack.ResumableMinimize]) never share schedule state.
  */
-internal interface RestartSchedule {
+internal interface RestartSchedule : SearchRestartPolicy {
     /** Size the budget for a fresh run — call at the start of each run. */
-    fun beginRun() {}
+    override fun beginRun() {}
 
     /** Feed a conflict's LBD and trail depth to the schedule; may raise a pending restart. */
     fun recordConflict(lbd: Int, trailSize: Int) {}
 
     /** True when the current run should restart. [decisionsThisRun] is the caller's decision count
      *  since the last [beginRun]. */
-    fun shouldRestart(decisionsThisRun: Long): Boolean
+    override fun shouldRestart(decisionsThisRun: Long): Boolean
 
     /** Consume a restart once the caller has popped to root — advance the schedule state. */
-    fun onRestart() {}
+    override fun onRestart() {}
 
     /** Notify the schedule that a feasible solution was found (the first one, and each improving one on
      *  the optimize path). Lets a schedule change regime once the search has something to hold onto. */
-    fun onSolution() {}
+    override fun onSolution() {}
 
     /** The phase regime the schedule wants the engine's [PhaseSaving] to run right now.
      *  [PhaseMode.UNMANAGED] (the default) leaves phasing to its own rephase rotation; a schedule that

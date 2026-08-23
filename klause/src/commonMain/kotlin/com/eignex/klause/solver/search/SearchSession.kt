@@ -25,6 +25,8 @@ class SearchSession(
     private val pendingAssertions = ArrayDeque<PendingAssertion>()
     private val learnedClauses = ArrayList<LearnedClause>()
     private var activeComponent: SearchComponent? = null
+    private var conflictResolver: SearchConflictResolver? = null
+    private var lastPushCreatedLevel = false
     private var checks = 0L
 
     /** Current shared decision level. */
@@ -112,7 +114,12 @@ class SearchSession(
     }
 
     /** Assert [decision], then run a shared propagation round. */
-    fun push(decision: SearchDecision): ComponentResult = recordAndDispatch(decision, source = null)
+    fun push(decision: SearchDecision): ComponentResult {
+        lastPushCreatedLevel = false
+        return recordAndDispatch(decision, source = null)
+    }
+
+    internal fun lastPushCreatedLevel(): Boolean = lastPushCreatedLevel
 
     /**
      * Record a decision already applied by [source], then deliver it to every other component.
@@ -124,6 +131,7 @@ class SearchSession(
         recordAndDispatch(decision, source)
 
     private fun recordAndDispatch(decision: SearchDecision, source: SearchComponent?): ComponentResult {
+        conflictResolver = null
         if (decision is SearchDecision.Bool) {
             val variable = decision.literal ushr 1
             val value = if (decision.literal and 1 == 0) TRUE else FALSE
@@ -134,6 +142,7 @@ class SearchSession(
             }
         }
         trail.add(decision)
+        lastPushCreatedLevel = true
         valuesAtLevel.add(ArrayList())
         priorIntFactsAtLevel.add(HashMap())
         when (decision) {
@@ -156,7 +165,7 @@ class SearchSession(
             activeComponent = component
             val result = component.assert(decision, this)
             activeComponent = null
-            if (result !is ComponentResult.Consistent) return result
+            if (result !is ComponentResult.Consistent) return recordConflict(component, result)
         }
         return propagate()
     }
@@ -206,7 +215,7 @@ class SearchSession(
                     activeComponent = component
                     val result = component.assert(pending.decision, this)
                     activeComponent = null
-                    if (result !is ComponentResult.Consistent) return result
+                    if (result !is ComponentResult.Consistent) return recordConflict(component, result)
                 }
             }
             val result = runComponents { it.propagate(this) }
@@ -229,6 +238,9 @@ class SearchSession(
         return ComponentCheck.Feasible
     }
 
+    internal fun conflictResolution(): Pair<SearchConflictResolver, SearchConflictResolution>? =
+        conflictResolver?.let { it to it.resolveConflict(this) }
+
     /** Assemble a complete model from the active components at the current shared level. */
     fun model(): AssembledSearchModel {
         val values = LinkedHashMap<Any, Any>()
@@ -243,6 +255,12 @@ class SearchSession(
         for (component in components) component.contributeModel(model, this)
         return AssembledSearchModel(values)
     }
+
+    /** First component-owned exhaustive split available at the current shared level. */
+    internal fun branchAlternatives(): List<SearchDecision>? = components.asSequence()
+        .filterIsInstance<SearchBrancher>()
+        .mapNotNull { it.nextBranch(this) }
+        .firstOrNull()
 
     /** Return to root, notify components, and propagate retained learned clauses. */
     fun restart(): ComponentResult {
@@ -291,76 +309,36 @@ class SearchSession(
      * A component with no branch is expected to decide its residual in [SearchComponent.check].
      */
     fun solve(numBoolVars: Int, params: SearchSolveParams = SearchSolveParams()): SearchResult {
-        var sawIndeterminate = false
-        var decisions = 0L
-        var decisionsSinceRestart = 0L
-
-        fun search(): SolveStep {
-            if (cancelled()) return SolveStep.Indeterminate
-            val alternatives = (0 until numBoolVars).firstOrNull { boolValue(it) == null }?.let { variable ->
-                listOf(SearchDecision.Bool((variable shl 1) or 1), SearchDecision.Bool(variable shl 1))
-            } ?: components.asSequence().filterIsInstance<SearchBrancher>()
-                .mapNotNull { it.nextBranch(this) }
-                .firstOrNull()
-            if (alternatives == null) {
-                return when (val result = check()) {
-                    ComponentCheck.Feasible -> SolveStep.Satisfied(model())
-
-                    is ComponentCheck.Infeasible -> {
-                        learn(result.explanation)
-                        SolveStep.Exhausted
-                    }
-
-                    ComponentCheck.Indeterminate -> {
-                        sawIndeterminate = true
-                        SolveStep.Indeterminate
-                    }
-                }
-            }
-            for (decision in alternatives) {
-                if (decisions == params.maxDecisions) return SolveStep.Indeterminate
-                if (params.restart is SearchRestart.Every && decisionsSinceRestart == params.restart.decisions) {
-                    return SolveStep.Restart
-                }
-                val level = decisionLevel
-                decisions++
-                decisionsSinceRestart++
-                when (val result = push(decision)) {
-                    ComponentResult.Consistent -> when (val result = search()) {
-                        is SolveStep.Satisfied -> return result
-                        SolveStep.Indeterminate -> sawIndeterminate = true
-                        SolveStep.Exhausted -> Unit
-                        SolveStep.Restart -> return result
-                    }
-
-                    ComponentResult.Indeterminate -> sawIndeterminate = true
-
-                    is ComponentResult.Conflict -> learn(result.explanation)
-                }
-                popTo(level)
-            }
-            return if (sawIndeterminate) SolveStep.Indeterminate else SolveStep.Exhausted
+        val run = openRun(numBoolVars, params)
+        return when (val event = run.next()) {
+            is SearchRunEvent.Satisfied -> SearchResult.Satisfied(event.model)
+            SearchRunEvent.Exhausted -> SearchResult.Exhausted
+            is SearchRunEvent.Indeterminate -> SearchResult.Indeterminate
         }
+    }
 
-        while (true) {
-            when (val result = search()) {
-                is SolveStep.Satisfied -> return SearchResult.Satisfied(result.model)
+    /** Open a resumable traversal over the shared component set. */
+    fun openRun(
+        numBoolVars: Int,
+        params: SearchSolveParams = SearchSolveParams(),
+        booleanBranching: BooleanBranching = BooleanBranching.SourceOrder(numBoolVars),
+        decisionBudget: SearchDecisionBudget = SearchDecisionBudget.Unlimited,
+        observer: SearchRunObserver = SearchRunObserver.None,
+        modelContinuation: SearchModelContinuation = SearchModelContinuation.Chronological,
+        modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll,
+        nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
+    ): SearchRun = SearchRun(this, params, booleanBranching, decisionBudget, observer, modelContinuation, modelPolicy, nodePolicy)
 
-                SolveStep.Exhausted -> return if (sawIndeterminate) {
-                    SearchResult.Indeterminate
-                } else {
-                    SearchResult.Exhausted
-                }
-
-                SolveStep.Indeterminate -> return SearchResult.Indeterminate
-
-                SolveStep.Restart -> when (restart()) {
-                    ComponentResult.Consistent -> decisionsSinceRestart = 0L
-                    is ComponentResult.Conflict -> return SearchResult.Exhausted
-                    ComponentResult.Indeterminate -> return SearchResult.Indeterminate
-                }
-            }
+    internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {
+        popTo(0)
+        for (component in components) {
+            if (component !is SearchModelBlocker) continue
+            activeComponent = component
+            val result = component.blockModel(model, this)
+            activeComponent = null
+            if (result !is ComponentResult.Consistent) return recordConflict(component, result)
         }
+        return propagate()
     }
 
     /** Number of sound clause-form explanations retained by the shared Boolean engine. */
@@ -393,9 +371,14 @@ class SearchSession(
             activeComponent = component
             val result = call(component)
             activeComponent = null
-            if (result !is ComponentResult.Consistent) return result
+            if (result !is ComponentResult.Consistent) return recordConflict(component, result)
         }
         return ComponentResult.Consistent
+    }
+
+    private fun recordConflict(component: SearchComponent, result: ComponentResult): ComponentResult {
+        if (result is ComponentResult.Conflict) conflictResolver = component as? SearchConflictResolver
+        return result
     }
 
     private fun propagateLearnedClauses(): ComponentResult {
@@ -482,17 +465,347 @@ class SearchSession(
 
     private data class IntFact(val lower: Long?, val upper: Long?)
 
-    private sealed interface SolveStep {
-        data class Satisfied(val model: AssembledSearchModel) : SolveStep
-        data object Exhausted : SolveStep
-        data object Indeterminate : SolveStep
-        data object Restart : SolveStep
-    }
-
     private companion object {
         const val UNASSIGNED = -1
         const val FALSE = 0
         const val TRUE = 1
+    }
+}
+
+/**
+ * Resumable traversal of a [SearchSession].
+ *
+ * Frames contain public shared decisions only. Consequently a CP split, an integer-theory split, and a
+ * future array/function/quantifier split all follow the identical push, propagation, retraction, restart,
+ * and budget path.
+ */
+class SearchRun internal constructor(
+    private val session: SearchSession,
+    private val params: SearchSolveParams,
+    private val booleanBranching: BooleanBranching,
+    private val decisionBudget: SearchDecisionBudget,
+    private val observer: SearchRunObserver,
+    private val modelContinuation: SearchModelContinuation,
+    private val modelPolicy: SearchModelPolicy,
+    private val nodePolicy: SearchNodePolicy,
+) {
+    private val frames = ArrayList<Frame>()
+    private var decisions = 0L
+    private var decisionsSinceRestart = 0L
+    private var sawIndeterminate = false
+    private var resumeAfterSolution = false
+    private var lastModel: AssembledSearchModel? = null
+    private var consumedModel = false
+    private var terminal: SearchRunEvent? = null
+
+    init {
+        params.restart.beginRun()
+    }
+
+    /** Advance until the next model or terminal verdict. */
+    fun next(): SearchRunEvent {
+        terminal?.let { return it }
+        if (resumeAfterSolution) {
+            resumeAfterSolution = false
+            when (modelContinuation) {
+                SearchModelContinuation.Chronological -> if (!backtrack()) return finish(exhausted())
+                SearchModelContinuation.BlockAtRoot -> when (session.blockModelAtRoot(checkNotNull(lastModel))) {
+                    ComponentResult.Consistent -> {
+                        frames.clear()
+                        consumedModel = true
+                    }
+                    is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+                    ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                }
+            }
+        }
+        while (true) {
+            if (session.cancelled()) return finish(SearchRunEvent.Indeterminate.Cancelled)
+            when (nodePolicy.beforeBranch(session)) {
+                SearchNodeDisposition.Expand -> Unit
+                SearchNodeDisposition.Prune -> {
+                    observer.onConflict(null)
+                    if (!backtrack()) return finish(exhausted())
+                    continue
+                }
+
+                SearchNodeDisposition.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+            }
+            when (val alternatives = alternatives()) {
+                is Alternatives.Leaf -> when (val result = session.check()) {
+                    ComponentCheck.Feasible -> {
+                        params.restart.onSolution()
+                        val model = session.model().also {
+                            lastModel = it
+                            observer.onModel(it)
+                        }
+                        resumeAfterSolution = true
+                        when (modelPolicy.onModel(model, session)) {
+                            SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
+                            SearchModelDisposition.Continue -> {
+                                resumeAfterSolution = false
+                                when (modelContinuation) {
+                                    SearchModelContinuation.Chronological -> if (!backtrack()) {
+                                        return finish(exhausted())
+                                    }
+
+                                    SearchModelContinuation.BlockAtRoot -> when (
+                                        session.blockModelAtRoot(checkNotNull(lastModel))
+                                    ) {
+                                        ComponentResult.Consistent -> frames.clear()
+                                        is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+                                        ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                is ComponentCheck.Infeasible -> {
+                    session.learn(result.explanation)
+                    observer.onConflict(null)
+                    if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
+                        when (session.restart()) {
+                            ComponentResult.Consistent -> {
+                                frames.clear()
+                                decisionsSinceRestart = 0L
+                                params.restart.onRestart()
+                                params.restart.beginRun()
+                                observer.onRestart()
+                                continue
+                            }
+
+                            is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+                            ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                        }
+                    }
+                    if (!resolveConflict() && !backtrack()) return finish(exhausted())
+                    }
+
+                    ComponentCheck.Indeterminate -> {
+                        sawIndeterminate = true
+                        if (!backtrack()) return finish(SearchRunEvent.Indeterminate.Component)
+                    }
+                }
+
+                is Alternatives.Branch -> {
+                    if (alternatives.decisions.isEmpty()) {
+                        if (!backtrack()) return finish(exhausted())
+                        continue
+                    }
+                    if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
+                        when (session.restart()) {
+                            ComponentResult.Consistent -> {
+                                frames.clear()
+                                decisionsSinceRestart = 0L
+                                params.restart.onRestart()
+                                params.restart.beginRun()
+                                observer.onRestart()
+                                continue
+                            }
+
+                            is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+                            ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                        }
+                    }
+                    frames += Frame(session.decisionLevel, alternatives.decisions)
+                    when (advanceFrame()) {
+                        Advance.Expanded -> Unit
+                        Advance.Budget -> return finish(SearchRunEvent.Indeterminate.Budget)
+                        Advance.Exhausted -> if (!backtrack()) return finish(exhausted())
+                        Advance.Restart -> when (session.restart()) {
+                            ComponentResult.Consistent -> {
+                                frames.clear()
+                                decisionsSinceRestart = 0L
+                                params.restart.onRestart()
+                                params.restart.beginRun()
+                                observer.onRestart()
+                            }
+
+                            is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+                            ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun alternatives(): Alternatives {
+        booleanBranching.alternatives(session)?.let { return Alternatives.Branch(it) }
+        val decisions = session.branchAlternatives()
+        return if (decisions == null) Alternatives.Leaf else Alternatives.Branch(decisions)
+    }
+
+    private fun advanceFrame(): Advance {
+        val frame = frames.last()
+        while (frame.next < frame.decisions.size) {
+            if (decisions == params.maxDecisions) return Advance.Budget
+            val level = session.decisionLevel
+            val decision = frame.decisions[frame.next++]
+            decisions++
+            decisionsSinceRestart++
+            when (val result = session.push(decision)) {
+                ComponentResult.Consistent -> {
+                    if (!session.lastPushCreatedLevel()) return Advance.Expanded
+                    observer.onCommit(decision, session.decisionLevel)
+                    if (!decisionBudget.consume()) return Advance.Budget
+                    return Advance.Expanded
+                }
+                ComponentResult.Indeterminate -> {
+                    session.popTo(level)
+                    sawIndeterminate = true
+                }
+
+                is ComponentResult.Conflict -> {
+                    session.learn(result.explanation)
+                    observer.onConflict(decision)
+                    session.popTo(level)
+                    if (resolveConflict()) return Advance.Expanded
+                    if (frames.isEmpty()) return Advance.Exhausted
+                }
+            }
+        }
+        frames.removeLast()
+        return Advance.Exhausted
+    }
+
+    private fun backtrack(): Boolean {
+        while (frames.isNotEmpty()) {
+            val frame = frames.last()
+            if (session.decisionLevel > frame.level) session.popTo(frame.level)
+            when (advanceFrame()) {
+                Advance.Expanded -> return true
+                Advance.Budget -> return false
+                Advance.Exhausted -> Unit
+                Advance.Restart -> when (session.restart()) {
+                    ComponentResult.Consistent -> {
+                        frames.clear()
+                        decisionsSinceRestart = 0L
+                        params.restart.onRestart()
+                        params.restart.beginRun()
+                        observer.onRestart()
+                        return true
+                    }
+
+                    is ComponentResult.Conflict, ComponentResult.Indeterminate -> return false
+                }
+            }
+        }
+        return false
+    }
+
+    private fun resolveConflict(): Boolean {
+        val (resolver, resolution) = session.conflictResolution() ?: return false
+        if (consumedModel && !resolver.resolvesAfterModelBlock) return false
+        when (resolution) {
+            SearchConflictResolution.Chronological -> return false
+            SearchConflictResolution.Exhausted -> return false
+
+            is SearchConflictResolution.Backjump -> {
+                session.popTo(resolution.decisionLevel)
+                while (frames.isNotEmpty() && frames.last().level >= resolution.decisionLevel) frames.removeLast()
+                return when (resolver.applyResolution(session)) {
+                    ComponentResult.Consistent -> true
+                    is ComponentResult.Conflict -> false
+                    ComponentResult.Indeterminate -> false
+                }
+            }
+        }
+    }
+
+    private fun exhausted(): SearchRunEvent = if (sawIndeterminate) {
+        SearchRunEvent.Indeterminate.Component
+    } else {
+        SearchRunEvent.Exhausted
+    }
+
+    private fun finish(event: SearchRunEvent): SearchRunEvent {
+        terminal = event
+        return event
+    }
+
+    private data class Frame(val level: Int, val decisions: List<SearchDecision>, var next: Int = 0)
+
+    private sealed interface Alternatives {
+        data object Leaf : Alternatives
+        data class Branch(val decisions: List<SearchDecision>) : Alternatives
+    }
+
+    private enum class Advance {
+        Expanded,
+        Exhausted,
+        Budget,
+        Restart,
+    }
+}
+
+/** Charges successful shared decisions to an optional solve-wide allowance. */
+fun interface SearchDecisionBudget {
+    /** Record one decision and return whether traversal may continue. */
+    fun consume(): Boolean
+
+    /** No additional solve-wide decision limit. */
+    data object Unlimited : SearchDecisionBudget {
+        override fun consume(): Boolean = true
+    }
+}
+
+/** Observes shared traversal lifecycle events without owning its trail. */
+interface SearchRunObserver {
+    /** A shared decision was accepted at [decisionLevel]. */
+    fun onCommit(decision: SearchDecision, decisionLevel: Int) {}
+
+    /** A branch assertion or candidate leaf was refuted. */
+    fun onConflict(decision: SearchDecision?) {}
+
+    /** The runner returned the session to its root. */
+    fun onRestart() {}
+
+    /** The session assembled a complete model. */
+    fun onModel(model: AssembledSearchModel) {}
+
+    /** No-op lifecycle observer. */
+    data object None : SearchRunObserver
+}
+
+/** Supplies Boolean alternatives before component-owned residual splits. */
+fun interface BooleanBranching {
+    /** Exhaustive alternatives for one unassigned Boolean, or null when Boolean branching is complete. */
+    fun alternatives(context: SearchContext): List<SearchDecision>?
+
+    /** Source-order Boolean variables with false before true. */
+    class SourceOrder(private val numBoolVars: Int) : BooleanBranching {
+        override fun alternatives(context: SearchContext): List<SearchDecision>? =
+            (0 until numBoolVars).firstOrNull { context.boolValue(it) == null }?.let { variable ->
+                listOf(SearchDecision.Bool((variable shl 1) or 1), SearchDecision.Bool(variable shl 1))
+            }
+    }
+
+    /** Leave Boolean selection to a component-owned [SearchBrancher]. */
+    data object None : BooleanBranching {
+        override fun alternatives(context: SearchContext): List<SearchDecision>? = null
+    }
+}
+
+/** A model or terminal verdict from a resumable [SearchRun]. */
+sealed interface SearchRunEvent {
+    /** A complete model; call [SearchRun.next] again to continue enumeration. */
+    data class Satisfied(val model: AssembledSearchModel) : SearchRunEvent
+
+    /** Every branch was refuted. */
+    data object Exhausted : SearchRunEvent
+
+    /** Cancellation, a limit, or a component prevented an exact verdict. */
+    sealed interface Indeterminate : SearchRunEvent {
+        /** A component could not decide a candidate leaf exactly. */
+        data object Component : Indeterminate
+
+        /** The shared decision allowance was spent. */
+        data object Budget : Indeterminate
+
+        /** The solve cancellation token fired. */
+        data object Cancelled : Indeterminate
     }
 }
 

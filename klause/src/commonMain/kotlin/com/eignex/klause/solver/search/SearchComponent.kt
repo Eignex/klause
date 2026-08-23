@@ -136,16 +136,118 @@ interface SearchBrancher : SearchComponent {
     fun nextBranch(context: SearchContext): List<SearchDecision>?
 }
 
-/** Restart schedule owned by the shared search engine. */
-sealed interface SearchRestart {
+/** A component that can exclude the model it contributed after the caller consumes it. */
+interface SearchModelBlocker : SearchComponent {
+    /** Post a permanent root-level exclusion for the current model. */
+    fun blockModel(model: AssembledSearchModel, context: SearchContext): ComponentResult
+}
+
+/** A component that retains a native conflict analyzer and can resume from its learned assertion. */
+interface SearchConflictResolver : SearchComponent {
+    /** Whether this resolver can safely backjump after a consumed model was blocked at root. */
+    val resolvesAfterModelBlock: Boolean get() = false
+
+    /** Analyse the most recent native conflict. */
+    fun resolveConflict(context: SearchContext): SearchConflictResolution
+
+    /** Assert the learned native consequence after the engine has popped to its requested level. */
+    fun applyResolution(context: SearchContext): ComponentResult
+}
+
+/** Typed result of component-owned conflict analysis. */
+sealed interface SearchConflictResolution {
+    /** The shared engine should use ordinary chronological backtracking. */
+    data object Chronological : SearchConflictResolution
+
+    /** The engine should retract to [decisionLevel], then call the resolver's apply hook. */
+    data class Backjump(val decisionLevel: Int) : SearchConflictResolution
+
+    /** The analyzer proved a root contradiction. */
+    data object Exhausted : SearchConflictResolution
+}
+
+/** Explicit continuation selected after a resumable run returns a model. */
+sealed interface SearchModelContinuation {
+    /** Continue from the nearest unexplored shared frame. */
+    data object Chronological : SearchModelContinuation
+
+    /** Return to the post-seed root and let model-owning components exclude the consumed model. */
+    data object BlockAtRoot : SearchModelContinuation
+}
+
+/** Selects what a shared traversal does with each feasible complete model. */
+interface SearchModelPolicy {
+    /** Decide whether [model] is reported or blocked and followed by more traversal. */
+    fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition
+
+    /** Surface every feasible model, the satisfaction and enumeration behavior. */
+    data object SurfaceAll : SearchModelPolicy {
+        override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
+            SearchModelDisposition.Surface
+    }
+}
+
+/** Typed model disposition selected by [SearchModelPolicy]. */
+sealed interface SearchModelDisposition {
+    /** Return this model from [SearchRun.next]. */
+    data object Surface : SearchModelDisposition
+
+    /** Exclude this model according to [SearchModelContinuation] and keep traversing. */
+    data object Continue : SearchModelDisposition
+}
+
+/** Selects whether a shared run expands the current node. */
+interface SearchNodePolicy {
+    /** Decide whether the current partial assignment is expanded, pruned, or indeterminate. */
+    fun beforeBranch(context: SearchContext): SearchNodeDisposition
+
+    /** Expand every CP/theory-consistent node, the satisfaction behavior. */
+    data object ExpandAll : SearchNodePolicy {
+        override fun beforeBranch(context: SearchContext): SearchNodeDisposition = SearchNodeDisposition.Expand
+    }
+}
+
+/** Typed node disposition selected by [SearchNodePolicy]. */
+sealed interface SearchNodeDisposition {
+    /** Continue selecting a branch at this node. */
+    data object Expand : SearchNodeDisposition
+
+    /** Refute this node and resume through the shared frame stack. */
+    data object Prune : SearchNodeDisposition
+
+    /** The node cannot be decided under the active limits. */
+    data object Indeterminate : SearchNodeDisposition
+}
+
+/** Restart policy owned by the shared search engine. */
+interface SearchRestartPolicy {
+    /** Start a fresh traversal run. */
+    fun beginRun() {}
+
+    /** True when the current run should return to the shared root. */
+    fun shouldRestart(decisionsThisRun: Long): Boolean
+
+    /** Consume the restart after the engine has returned every component to its root. */
+    fun onRestart() {}
+
+    /** Notify the policy that a complete feasible model was found. */
+    fun onSolution() {}
+}
+
+/** Simple restart schedules owned by the shared search engine. */
+sealed interface SearchRestart : SearchRestartPolicy {
     /** Do not restart the current search. */
-    data object Never : SearchRestart
+    data object Never : SearchRestart {
+        override fun shouldRestart(decisionsThisRun: Long): Boolean = false
+    }
 
     /** Restart after each [decisions] shared decisions. */
     data class Every(val decisions: Long) : SearchRestart {
         init {
             require(decisions > 0) { "restart interval must be positive" }
         }
+
+        override fun shouldRestart(decisionsThisRun: Long): Boolean = decisionsThisRun >= decisions
     }
 }
 
@@ -154,7 +256,7 @@ data class SearchSolveParams(
     /** Maximum shared decisions across all restart runs. */
     val maxDecisions: Long = Long.MAX_VALUE,
     /** Schedule used by the shared engine after decision boundaries. */
-    val restart: SearchRestart = SearchRestart.Never,
+    val restart: SearchRestartPolicy = SearchRestart.Never,
 ) {
     init {
         require(maxDecisions >= 0) { "maximum decisions must not be negative" }
