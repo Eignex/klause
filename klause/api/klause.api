@@ -9560,6 +9560,7 @@ public final class com/eignex/klause/solver/search/SearchRunLifecycle$None : com
 public abstract interface class com/eignex/klause/solver/search/SearchRunObserver {
 	public fun onCommit (Lcom/eignex/klause/solver/search/SearchDecision;I)V
 	public fun onConflict (Lcom/eignex/klause/solver/search/SearchDecision;)V
+	public fun onLearnedConflict (Lcom/eignex/klause/solver/search/SearchLearnedConflict;)V
 	public fun onLearnedNodeBackjump ()V
 	public fun onModel (Lcom/eignex/klause/solver/search/AssembledSearchModel;)V
 	public fun onRestart (J)V
@@ -9568,6 +9569,7 @@ public abstract interface class com/eignex/klause/solver/search/SearchRunObserve
 public final class com/eignex/klause/solver/search/SearchRunObserver$DefaultImpls {
 	public static fun onCommit (Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchDecision;I)V
 	public static fun onConflict (Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchDecision;)V
+	public static fun onLearnedConflict (Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/SearchLearnedConflict;)V
 	public static fun onLearnedNodeBackjump (Lcom/eignex/klause/solver/search/SearchRunObserver;)V
 	public static fun onModel (Lcom/eignex/klause/solver/search/SearchRunObserver;Lcom/eignex/klause/solver/search/AssembledSearchModel;)V
 	public static fun onRestart (Lcom/eignex/klause/solver/search/SearchRunObserver;J)V
@@ -9579,6 +9581,7 @@ public final class com/eignex/klause/solver/search/SearchRunObserver$None : com/
 	public fun hashCode ()I
 	public fun onCommit (Lcom/eignex/klause/solver/search/SearchDecision;I)V
 	public fun onConflict (Lcom/eignex/klause/solver/search/SearchDecision;)V
+	public fun onLearnedConflict (Lcom/eignex/klause/solver/search/SearchLearnedConflict;)V
 	public fun onLearnedNodeBackjump ()V
 	public fun onModel (Lcom/eignex/klause/solver/search/AssembledSearchModel;)V
 	public fun onRestart (J)V

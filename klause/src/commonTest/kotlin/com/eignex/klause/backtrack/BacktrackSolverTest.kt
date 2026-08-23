@@ -9,6 +9,8 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.propagation.ClauseExchange
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
@@ -34,6 +36,96 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+
+    @Test
+    fun `satisfaction restart refreshes the clause exchange`() {
+        var restarts = 0
+        val decision = object : com.eignex.klause.solver.search.SearchTheoryDecision {}
+        val component = object : com.eignex.klause.solver.search.SearchBrancher {
+            private var leaf = false
+
+            override fun assert(
+                decision: com.eignex.klause.solver.search.SearchDecision,
+                context: com.eignex.klause.solver.search.SearchContext,
+            ): com.eignex.klause.solver.search.ComponentResult =
+                com.eignex.klause.solver.search.ComponentResult.Consistent
+
+            override fun retract(decisionLevel: Int) {}
+
+            override fun onRestart(context: com.eignex.klause.solver.search.SearchContext) {
+                leaf = true
+            }
+
+            override fun nextBranch(
+                context: com.eignex.klause.solver.search.SearchContext,
+            ): List<com.eignex.klause.solver.search.SearchDecision>? = if (leaf) {
+                null
+            } else {
+                listOf(com.eignex.klause.solver.search.SearchDecision.Theory(decision))
+            }
+        }
+        val exchange = object : ClauseExchange {
+            override fun onRestart(session: PropagationSession) {
+                restarts++
+            }
+        }
+        val result = BacktrackSolver(
+            Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()).bake(),
+        ).solve(
+            BacktrackParams(
+                lubyRestartBase = 1,
+                clauseExchange = exchange,
+                componentFactory = { listOf(component) },
+            ),
+        )
+
+        assertIs<SolveResult.Sat>(result)
+        assertEquals(1, restarts)
+    }
+
+    @Test
+    fun `learned conflicts retain the participating assumption core`() {
+        val component = object : com.eignex.klause.solver.search.SearchConflictResolver {
+            override fun assert(
+                decision: com.eignex.klause.solver.search.SearchDecision,
+                context: com.eignex.klause.solver.search.SearchContext,
+            ): com.eignex.klause.solver.search.ComponentResult = if (
+                decision is com.eignex.klause.solver.search.SearchDecision.Bool && decision.literal ushr 1 == 1
+            ) {
+                com.eignex.klause.solver.search.ComponentResult.Conflict()
+            } else {
+                com.eignex.klause.solver.search.ComponentResult.Consistent
+            }
+
+            override fun resolveConflict(
+                context: com.eignex.klause.solver.search.SearchContext,
+            ): com.eignex.klause.solver.search.SearchConflictResolution =
+                com.eignex.klause.solver.search.SearchConflictResolution.Backjump(
+                    object : com.eignex.klause.solver.search.SearchLearnedConflict {
+                        override val decisionLevel: Int = 0
+                        override val lbd: Int = 1
+                        override val guardLiterals: IntArray = intArrayOf()
+                        override val decisionLevels: IntArray = intArrayOf(1)
+
+                        override fun apply(
+                            session: com.eignex.klause.solver.search.SearchSession,
+                        ): com.eignex.klause.solver.search.SearchLearnedConflictResult =
+                            com.eignex.klause.solver.search.SearchLearnedConflictResult.Chronological
+                    },
+                )
+        }
+        val assumption = Assumptions(bools = mapOf(0 to true))
+        val result = BacktrackSolver(
+            Problem(numBoolVars = 2, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()).bake(),
+        ).solve(
+            BacktrackParams(
+                assumptions = assumption,
+                componentFactory = { listOf(component) },
+            ),
+        )
+
+        assertEquals(assumption, assertIs<SolveResult.Unsat>(result).assumptionCore)
+    }
 
     @Test
     fun `component factory drives theory branches through legacy DFS`() {
