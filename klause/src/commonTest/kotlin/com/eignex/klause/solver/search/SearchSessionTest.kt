@@ -289,6 +289,46 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `node policy learns at its asserting backjump level`() {
+        var appliedAt: Int? = null
+        var pending = true
+        var learnedBackjumps = 0
+        val policy = object : SearchNodePolicy {
+            override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (
+                pending && context.decisionLevel == 2
+            ) {
+                SearchNodeDisposition.Backjump(object : SearchNodeBackjump {
+                    override val decisionLevel: Int = 1
+
+                    override fun apply(session: SearchSession): SearchNodeBackjumpResult {
+                        appliedAt = session.decisionLevel
+                        pending = false
+                        return SearchNodeBackjumpResult.Resume
+                    }
+                })
+            } else {
+                SearchNodeDisposition.Expand
+            }
+        }
+        val observer = object : SearchRunObserver {
+            override fun onLearnedNodeBackjump() {
+                learnedBackjumps++
+            }
+        }
+        val session = SearchSession(emptyList())
+        val run = session.openRun(
+            numBoolVars = 2,
+            nodePolicy = policy,
+            observer = observer,
+        )
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(1, appliedAt)
+        assertEquals(1, learnedBackjumps)
+    }
+
+    @Test
     fun `restart retracts shared state before notifying components`() {
         var restartedAt = -1
         val component = object : SearchComponent {

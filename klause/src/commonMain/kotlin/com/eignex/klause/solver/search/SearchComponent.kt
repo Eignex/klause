@@ -215,8 +215,38 @@ sealed interface SearchNodeDisposition {
     /** Refute this node and resume through the shared frame stack. */
     data object Prune : SearchNodeDisposition
 
+    /** Learn a native consequence and resume from its asserting backjump level. */
+    data class Backjump(val consequence: SearchNodeBackjump) : SearchNodeDisposition
+
     /** The node cannot be decided under the active limits. */
     data object Indeterminate : SearchNodeDisposition
+}
+
+/** A component-owned learned consequence that the shared traversal can backjump and assert. */
+interface SearchNodeBackjump {
+    /** Shared decision level where this consequence becomes asserting. */
+    val decisionLevel: Int
+
+    /** Assert the consequence after the runner has retracted to [decisionLevel]. */
+    fun apply(session: SearchSession): SearchNodeBackjumpResult
+}
+
+/** Result of asserting a [SearchNodeBackjump] at its backjump level. */
+sealed interface SearchNodeBackjumpResult {
+    /** The learned consequence was asserted and traversal can continue. */
+    data object Resume : SearchNodeBackjumpResult
+
+    /** A propagated native conflict supplied another learned consequence. */
+    data class Backjump(val consequence: SearchNodeBackjump) : SearchNodeBackjumpResult
+
+    /** The consequence proved the shared root contradictory. */
+    data object Exhausted : SearchNodeBackjumpResult
+
+    /** The consequence could not be asserted, so use chronological backtracking. */
+    data object Chronological : SearchNodeBackjumpResult
+
+    /** The component could not assert the consequence exactly. */
+    data object Indeterminate : SearchNodeBackjumpResult
 }
 
 /**

@@ -16,6 +16,7 @@ import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
+import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
@@ -39,6 +40,8 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelDisposition
 import com.eignex.klause.solver.search.SearchModelPolicy
+import com.eignex.klause.solver.search.SearchNodeBackjump
+import com.eignex.klause.solver.search.SearchNodeBackjumpResult
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRun
@@ -591,10 +594,72 @@ internal class ResumableMinimize(
 
     /** Refutes LP-dominated partial assignments through the shared frame stack. */
     private inner class LpNodePolicy : SearchNodePolicy {
-        override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (pruneIf(session)) {
-            SearchNodeDisposition.Prune
-        } else {
-            SearchNodeDisposition.Expand
+        override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+            if (!pruneIf(session)) return SearchNodeDisposition.Expand
+            val learned = lpEngine.lastBackjump()
+            return if (learned != null &&
+                learned.asserting &&
+                learned.guardLiterals.none { session.litTruth(it) == true }
+            ) {
+                sink.lp.observeBackjump()
+                SearchNodeDisposition.Backjump(LpNodeBackjump(learned))
+            } else {
+                SearchNodeDisposition.Prune
+            }
+        }
+    }
+
+    /** Adapts an asserting LP Farkas consequence to the shared traversal's native backjump contract. */
+    private inner class LpNodeBackjump(private val learned: LearnedConstraint) : SearchNodeBackjump {
+        override val decisionLevel: Int get() = cp.sharedLevelForNative(learned.backjumpLevel)
+
+        override fun apply(session: com.eignex.klause.solver.search.SearchSession): SearchNodeBackjumpResult {
+            if (!learned.asserting || learned.guardLiterals.isEmpty()) {
+                return SearchNodeBackjumpResult.Chronological
+            }
+            val result = when (learned) {
+                is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned -> {
+                    this@ResumableMinimize.session.addLearnedClause(Clause(learned.literals), learned.lbd)
+                }
+
+                is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedPb -> {
+                    this@ResumableMinimize.session.addLearnedPb(
+                        learned.weights,
+                        learned.literals,
+                        learned.degree,
+                        learned.lbd,
+                    )
+                }
+            }
+            return when (result) {
+                is PropagationResult.Implied -> {
+                    if (learned is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned) {
+                        session.learnFrom(cp, com.eignex.klause.solver.search.SearchExplanation(learned.literals))
+                    }
+                    if (cp.import(result, session) !is ComponentResult.Consistent) {
+                        SearchNodeBackjumpResult.Chronological
+                    } else {
+                        when (session.propagate()) {
+                            ComponentResult.Consistent -> SearchNodeBackjumpResult.Resume
+                            is ComponentResult.Conflict -> SearchNodeBackjumpResult.Chronological
+                            ComponentResult.Indeterminate -> SearchNodeBackjumpResult.Indeterminate
+                        }
+                    }
+                }
+
+                is PropagationResult.Unsat -> {
+                    val next = result.learnedClause as? LearnedConstraint
+                    when {
+                        next == null -> SearchNodeBackjumpResult.Chronological
+
+                        next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> {
+                            SearchNodeBackjumpResult.Exhausted
+                        }
+
+                        else -> SearchNodeBackjumpResult.Backjump(LpNodeBackjump(next))
+                    }
+                }
+            }
         }
     }
 

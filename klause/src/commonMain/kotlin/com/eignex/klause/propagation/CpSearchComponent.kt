@@ -219,11 +219,14 @@ class CpSearchComponent(
             return SearchConflictResolution.Exhausted
         }
         pendingLearned = learned
-        val sharedLevel = nativeLevelBySharedLevel.indexOfLast { nativeLevel ->
-            nativeLevel <= learned.backjumpLevel
-        }.coerceAtLeast(0)
+        val sharedLevel = sharedLevelForNative(learned.backjumpLevel)
         return SearchConflictResolution.Backjump(sharedLevel)
     }
+
+    /** Shared level corresponding to the latest native level not above [nativeLevel]. */
+    fun sharedLevelForNative(nativeLevel: Int): Int = nativeLevelBySharedLevel.indexOfLast { level ->
+        level <= nativeLevel
+    }.coerceAtLeast(0)
 
     override fun applyResolution(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
         val learned = checkNotNull(pendingLearned.also { pendingLearned = null })
