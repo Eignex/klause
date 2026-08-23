@@ -1,8 +1,6 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.theory.lia.GeneralLiaAssignment
-import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -23,6 +21,9 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.theory.lia.GeneralLiaAssignment
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLraAssignment
 
 /*
  * Generic multi-mode CLI framework.
@@ -577,6 +578,22 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LRA) { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment)
+    },
+)
+
+/** Build a satisfiability instance whose open mixed rows are decided by exact QF_LIRA. */
+internal fun exactLiraSolvable(model: ProblemSpec, render: (ExactLiraAssignment) -> String): Solvable = Solvable(
+    problem = null,
+    optimize = false,
+    maximize = false,
+    lsObjective = null,
+    linearObjective = null,
+    objVarId = null,
+    definitionalSweep = null,
+    render = { error("exact LIRA witnesses are rendered without narrowing to Sample") },
+    objectiveValue = null,
+    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LIRA) { assignment ->
+        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
     },
 )
 

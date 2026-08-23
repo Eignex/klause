@@ -104,6 +104,21 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `retains an exact final tableau for a rational witness`() {
+        val b = LpBuilder()
+        val x = b.addRealVar(0.0, 1.0, cost = 0.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.EQ, 1.0)
+
+        val outcome = bigRationalOutcome(b.build(Sense.MINIMIZE))
+
+        assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
+        assertEquals("1/2", outcome.witness!![x].toString())
+        val row = outcome.tableau!!.single { it.basic == x }
+        assertEquals("1/2", row.rhs.toString())
+        assertEquals(1, row.columns.size)
+    }
+
+    @Test
     fun `ofDouble is the exact rational of the stored double`() {
         // 0.5 is exactly 1/2; 0.1 is exactly 3602879701896397/2^55, NOT 1/10.
         assertEquals("1/2", BigFraction.ofDouble(0.5).toString())

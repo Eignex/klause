@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
@@ -9,6 +8,7 @@ import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline
+import com.eignex.klause.theory.lia.GeneralLiaAssignment
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
@@ -38,7 +38,7 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
             val pipeline = compiled.model.pipeline()
             when (pipeline) {
-                ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA ->
+                ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA, ProblemPipeline.EXACT_LIRA ->
                     throw MpsFormatException("open MPS models require a supported theory pipeline")
 
                 ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {

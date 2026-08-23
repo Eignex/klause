@@ -44,7 +44,25 @@ internal class RationalOutcome(
 
 /** Exact feasibility outcome for consumers that must retain a rational witness rather than round it
  *  back through the floating LP interface. */
-internal class BigRationalOutcome(val feasibility: RationalFeasibility, val witness: List<BigFraction>? = null)
+internal class BigRationalOutcome(
+    val feasibility: RationalFeasibility,
+    val witness: List<BigFraction>? = null,
+    /**
+     * Final exact slack-form rows when feasibility was established.  Each row is
+     * `x[basic] = rhs - sum(coefficients[k] * x[columns[k]])`; [columns] contains
+     * only non-basic variables.  This is intentionally an exact-theory boundary:
+     * mixed-integer clients can separate a cut without rebuilding a floating basis.
+     */
+    val tableau: List<BigRationalTableauRow>? = null,
+)
+
+/** One final exact simplex row, expressed in the original structural/slack column space. */
+internal class BigRationalTableauRow(
+    val basic: Int,
+    val rhs: BigFraction,
+    val columns: IntArray,
+    val coefficients: List<BigFraction>,
+)
 
 /**
  * An arithmetic level for the exact simplex: a rational number type with exact operations. A
@@ -149,7 +167,13 @@ internal fun bigRationalOutcome(
         }
         state.refreshBasicValues()
         val row = state.selectViolatedRow()
-        if (row < 0) return BigRationalOutcome(RationalFeasibility.FEASIBLE, structuralBigWitness(state))
+        if (row < 0) {
+            return BigRationalOutcome(
+                RationalFeasibility.FEASIBLE,
+                structuralBigWitness(state),
+                bigTableau(state),
+            )
+        }
         val enter = state.selectEnteringColumn(row)
         if (enter < 0) return BigRationalOutcome(RationalFeasibility.INFEASIBLE)
         state.pivot(row, enter)
@@ -642,6 +666,34 @@ private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): DoubleA
 
 /** [structuralWitness] without the final lossy conversion for exact-theory clients. */
 private fun structuralBigWitness(st: SimplexState<BigFraction>): List<BigFraction> {
+    val delta = bigWitnessDelta(st)
+    return List(st.model.n) { j ->
+        val row = st.inBasisRow[j]
+        when {
+            row >= 0 -> st.basicA[row] + st.rhsD[row] * delta
+            st.atUpper[j] -> st.uppers[j] ?: BigFraction.ZERO
+            else -> BigFraction.ZERO
+        }
+    }
+}
+
+/** Exact final rows in the same delta instantiation used for [structuralBigWitness]. */
+private fun bigTableau(st: SimplexState<BigFraction>): List<BigRationalTableauRow> {
+    val delta = bigWitnessDelta(st)
+    return List(st.model.m) { row ->
+        val size = st.tab.rowSize(row)
+        val columns = IntArray(size) { index -> st.tab.colAt(row, index) }
+        val coefficients = List(size) { index -> st.tab.valAt(row, index) }
+        BigRationalTableauRow(
+            basic = st.basis[row],
+            rhs = st.rhsA[row] + st.rhsD[row] * delta,
+            columns = columns,
+            coefficients = coefficients,
+        )
+    }
+}
+
+private fun bigWitnessDelta(st: SimplexState<BigFraction>): BigFraction {
     var delta = BigFraction.ONE
     for (i in 0 until st.model.m) {
         val a = st.basicA[i]
@@ -656,15 +708,7 @@ private fun structuralBigWitness(st: SimplexState<BigFraction>): List<BigFractio
             if (cap < delta) delta = cap
         }
     }
-    delta *= BigFraction.of(BigInteger.ONE, BigInteger.TWO)
-    return List(st.model.n) { j ->
-        val row = st.inBasisRow[j]
-        when {
-            row >= 0 -> st.basicA[row] + st.rhsD[row] * delta
-            st.atUpper[j] -> st.uppers[j] ?: BigFraction.ZERO
-            else -> BigFraction.ZERO
-        }
-    }
+    return delta * BigFraction.of(BigInteger.ONE, BigInteger.TWO)
 }
 
 /** Pivot cap: generous for the small leaf models the fallback targets, tiny relative to a search. */

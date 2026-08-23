@@ -4,13 +4,17 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.difference.DifferenceTheorySolver
 import com.eignex.klause.theory.lia.GeneralLiaResult
 import com.eignex.klause.theory.lia.GeneralLiaSolver
+import com.eignex.klause.theory.qflra.ExactLiraResult
+import com.eignex.klause.theory.qflra.ExactLiraSolver
 import com.eignex.klause.theory.qflra.ExactLraResult
 import com.eignex.klause.theory.qflra.ExactLraSolver
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -44,6 +48,215 @@ class SmtLibTest {
     }
 
     private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
+
+    @Test
+    fun `open QF LIRA returns an exact mixed witness`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (+ (to_real x) (/ 1.0 3.0))))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        val x = result.assignment.ints[parsed.intVarNames.getValue("x")]
+        val y = result.assignment.reals[parsed.realVarNames.getValue("y")]
+        assertEquals("1/3", (y - BigFraction.of(x, BigInteger.ONE)).toString())
+    }
+
+    @Test
+    fun `open QF LIRA evaluates one satisfiable leaf within a one leaf budget`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (to_real x)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = ExactLiraSolver(parsed.model).solve(TheoryParams(maxLeaves = 1))
+
+        assertIs<ExactLiraResult.Sat>(result)
+    }
+
+    @Test
+    fun `open QF LIRA cuts a fractional integer relaxation`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= (to_real x) y))
+                (assert (= y (/ 1.0 2.0)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertIs<ExactLiraResult.Unsat>(ExactLiraSolver(parsed.model).solve(TheoryParams(maxLeaves = 3)))
+    }
+
+    @Test
+    fun `open QF LIRA retains a BigInteger branch bound`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= (to_real x) y))
+                (assert (= y (/ 2305843009213693953.0 2.0)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertIs<ExactLiraResult.Unsat>(ExactLiraSolver(parsed.model).solve())
+    }
+
+    @Test
+    fun `open QF LIRA finds a witness beyond the former frontend clamp`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= (to_real x) y))
+                (assert (= y 1180591620717411303424.0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve(TheoryParams(maxLeaves = 2)))
+
+        assertEquals(BigInteger.ONE shl 70, result.assignment.ints[parsed.intVarNames.getValue("x")])
+    }
+
+    @Test
+    fun `open QF LIRA keeps a wide integer row exact beside a real column`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (to_real x)))
+                (assert (= (* 1208925819614629174706176 x) 1208925819614629174706176))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        assertEquals(BigInteger.ONE, result.assignment.ints[parsed.intVarNames.getValue("x")])
+    }
+
+    @Test
+    fun `open QF LIRA keeps integer-only rows in the mixed relaxation`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (>= x 5))
+                (assert (= y (+ (to_real x) (/ 1.0 3.0))))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] >= BigInteger.fromInt(5))
+    }
+
+    @Test
+    fun `open QF LIRA searches Boolean real atoms before integer branching`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (>= x 0))
+                (assert (= y (/ 1.0 2.0)))
+                (assert (or (<= y (to_real x)) (>= y (+ (to_real x) 1.0))))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] >= BigInteger.ONE)
+    }
+
+    @Test
+    fun `open QF LIRA decomposes an integer disequality`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (to_real x)))
+                (assert (distinct x 0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
+    }
+
+    @Test
+    fun `open QF LIRA decomposes a real disequality into strict arms`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (to_real x)))
+                (assert (distinct y 0.0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        assertTrue(result.assignment.reals[parsed.realVarNames.getValue("y")].isZero.not())
+    }
+
+    @Test
+    fun `open QF LIRA decomposes a reified integer disequality`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real) (declare-const p Bool)
+                (assert (= y (to_real x)))
+                (assert (or (not (= x 0)) p))
+                (assert (not p))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+
+        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
+    }
+
+    @Test
+    fun `open QF LIRA proves an incompatible integer disequality unsatisfiable`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (= y (to_real x)))
+                (assert (= y 0.0))
+                (assert (distinct x 0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertIs<ExactLiraResult.Unsat>(ExactLiraSolver(parsed.model).solve())
+    }
 
     @Test
     fun `open QF LRA equality returns an exact rational witness`() {
@@ -491,7 +704,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
     }
 
     @Test

@@ -659,7 +659,7 @@ internal class LpBuilder {
         for (j in 0 until n) {
             costD[j] = signed * costRawD[j]
             upperD[j] = hiD[j] - loD[j]
-            hasUpperD[j] = true
+            hasUpperD[j] = j !in openAboveCols
             objConstantD += costD[j] * loD[j]
         }
         for (i in 0 until m) {

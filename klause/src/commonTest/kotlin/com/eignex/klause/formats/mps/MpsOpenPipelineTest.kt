@@ -26,7 +26,7 @@ class MpsOpenPipelineTest {
     }
 
     @Test
-    fun `classifies an open mixed MPS model as unsupported`() {
+    fun `classifies an open mixed MPS model for the exact LIRA core`() {
         val compiled = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
@@ -38,7 +38,7 @@ class MpsOpenPipelineTest {
             listOf(MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), lower = 0.0, upper = null)),
         ).toProblem()
 
-        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, compiled.model.pipeline())
+        assertEquals(ProblemPipeline.EXACT_LIRA, compiled.model.pipeline())
     }
 
     @Test
