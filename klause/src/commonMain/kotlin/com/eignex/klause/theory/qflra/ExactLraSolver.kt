@@ -4,13 +4,12 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.supportsExactLra
-import com.eignex.klause.theory.TheoryParams
+import com.eignex.klause.theory.Theory
+import com.eignex.klause.theory.TheoryCheck
+import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.theory.TheoryResult
 
 /** An exact QF_LRA assignment, independent of the finite CP [com.eignex.klause.solver.Sample]. */
 data class ExactLraAssignment(
@@ -20,27 +19,11 @@ data class ExactLraAssignment(
     val reals: List<BigFraction>,
 )
 
-/** Result of complete QF_LRA satisfiability search. */
-sealed interface ExactLraResult {
-    /** Statistics gathered while deciding the model. */
-    val stats: SolveStats
-
-    /** A satisfiable result with a rational witness. */
-    data class Sat(
-        /** The satisfying Boolean and real assignment. */
-        val assignment: ExactLraAssignment,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : ExactLraResult
-
-    /** A proof that every Boolean leaf is infeasible. */
-    data class Unsat(override val stats: SolveStats = SolveStats.EMPTY) : ExactLraResult
-
-    /** A search interrupted before it could determine satisfiability. */
-    data class Unknown(
-        /** The condition which stopped the search. */
-        val reason: TerminationReason,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : ExactLraResult
+/** Compatibility names for exact QF_LRA's shared theory outcomes. */
+object ExactLraResult {
+    typealias Sat = TheoryResult.Sat<ExactLraAssignment>
+    typealias Unsat = TheoryResult.Unsat
+    typealias Unknown = TheoryResult.Unknown
 }
 
 /**
@@ -49,54 +32,31 @@ sealed interface ExactLraResult {
  * Each Boolean leaf emits only its active real atoms into the existing LP assembler, then the exact
  * rational simplex decides that conjunction. The finite CP and double-simplex lanes are never entered.
  */
-class ExactLraSolver(private val model: ProblemSpec) {
+class ExactLraSolver(override val model: ProblemSpec) : Theory<ExactLraAssignment> {
     init {
         require(model.supportsExactLra()) {
             "exact LRA search requires a pure-real linear source model"
         }
     }
 
-    /** Decides the model subject to the supplied search budgets and cancellation signal. */
-    fun solve(params: TheoryParams = TheoryParams()): ExactLraResult {
-        val cancellation = Cancellation { params.cancellation() || model.cancellation() }
-        val bools = BooleanArray(model.numBoolVars)
+    override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLraAssignment> {
+        if (!context.consumeCheck()) return TheoryCheck.Cancelled
+        val cancellation = Cancellation(context::cancelled)
         val system = QfLraSystem(model)
-        var leavesLeft = params.maxLeaves
-        while (true) {
-            if (leavesLeft == 0L) {
-                return ExactLraResult.Unknown(TerminationReason.BudgetExhausted)
-            }
-            if (cancellation()) return ExactLraResult.Unknown(TerminationReason.Cancelled)
-            leavesLeft--
-            if (!clausesHold(bools)) {
-                if (!nextAssignment(bools)) return ExactLraResult.Unsat()
-                continue
-            }
-            val relaxation = system.build(bools)
-            val outcome = bigRationalOutcome(
-                relaxation.model,
-                cancellation,
-                maxPivots = Int.MAX_VALUE,
+        val relaxation = system.build(bools)
+        val outcome = bigRationalOutcome(relaxation.model, cancellation, maxPivots = Int.MAX_VALUE)
+        return when (outcome.feasibility) {
+            RationalFeasibility.FEASIBLE -> TheoryCheck.Sat(
+                ExactLraAssignment(bools.copyOf(), reals(model.numRealVars, relaxation, outcome.witness!!)),
             )
-            when (outcome.feasibility) {
-                RationalFeasibility.FEASIBLE -> return ExactLraResult.Sat(
-                    ExactLraAssignment(bools.copyOf(), reals(model.numRealVars, relaxation, outcome.witness!!)),
-                )
 
-                RationalFeasibility.UNKNOWN -> return ExactLraResult.Unknown(TerminationReason.Cancelled)
+            RationalFeasibility.UNKNOWN -> TheoryCheck.Cancelled
 
-                RationalFeasibility.INFEASIBLE -> {
-                    if (!nextAssignment(bools)) return ExactLraResult.Unsat()
-                }
-            }
+            RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible
         }
     }
 
-    private fun reals(
-        count: Int,
-        relaxation: QfLraLeaf,
-        witness: List<BigFraction>,
-    ): List<BigFraction> {
+    private fun reals(count: Int, relaxation: QfLraLeaf, witness: List<BigFraction>): List<BigFraction> {
         val result = MutableList(count) { BigFraction.ZERO }
         for (column in relaxation.realId.indices) {
             val real = relaxation.realId[column]
@@ -104,20 +64,5 @@ class ExactLraSolver(private val model: ProblemSpec) {
             result[real] = if (relaxation.realSign[column] > 0) result[real] + value else result[real] - value
         }
         return result
-    }
-
-    private fun clausesHold(bools: BooleanArray): Boolean = model.factors.filterIsInstance<Clause>().all { clause ->
-        clause.literals.any { Lit.evaluate(it, bools[Lit.variable(it)]) }
-    }
-
-    private fun nextAssignment(bools: BooleanArray): Boolean {
-        var bit = bools.lastIndex
-        while (bit >= 0 && bools[bit]) {
-            bools[bit] = false
-            bit--
-        }
-        if (bit < 0) return false
-        bools[bit] = true
-        return true
     }
 }

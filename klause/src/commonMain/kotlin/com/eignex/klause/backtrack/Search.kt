@@ -12,12 +12,14 @@ import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 
@@ -74,27 +76,24 @@ internal sealed interface SearchOutcome {
 
 /**
  * A trail frame for one variable being explored. The value iterator is supplied by the
- * caller's [ValueSelector] at node creation; [applyNext] pulls the next value, pushes
- * it into the session, and reports back both the value (so the engine can fire
- * heuristic callbacks scoped to the attempted pair) and the session's propagation
- * response. Returns `null` when the value iterator is exhausted.
+ * caller's [ValueSelector] at node creation; [nextDecision] pulls the next value and
+ * describes the corresponding shared search decision. Returns `null` when the value
+ * iterator is exhausted.
  */
 internal sealed interface TrailNode {
     val varRef: VarRef
-    fun applyNext(session: PropagationSession): ApplyOutcome?
+    fun nextDecision(session: PropagationSession): NextDecision?
 }
 
-/** What [TrailNode.applyNext] returns: the actual value pushed (bools encoded as 0/1
- *  so the value heuristic callbacks see the original heuristic-emitted form) plus the
- *  session's [PropagationResult]. */
-internal data class ApplyOutcome(val value: Long, val result: PropagationResult)
+/** The heuristic-visible value and the shared decision selected for a trail frame. */
+internal data class NextDecision(val value: Long, val decision: SearchDecision)
 
 internal class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Long>) : TrailNode {
     private val iter = valueSeq.iterator()
-    override fun applyNext(session: PropagationSession): ApplyOutcome? {
+    override fun nextDecision(session: PropagationSession): NextDecision? {
         if (!iter.hasNext()) return null
         val v = iter.next()
-        return ApplyOutcome(v, session.pinBool(varRef.varId, v != 0L))
+        return NextDecision(v, SearchDecision.Bool(Lit.make(varRef.varId, v != 0L)))
     }
 }
 
@@ -114,7 +113,7 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
     private var lowerFirst = true
     private var resolved = false
 
-    override fun applyNext(session: PropagationSession): ApplyOutcome? {
+    override fun nextDecision(session: PropagationSession): NextDecision? {
         if (!resolved) {
             val d = session.intDomain(varRef.varId)
             // On a non-enumerable (wide-span) domain, split at the bounds midpoint regardless of the value
@@ -147,15 +146,15 @@ internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Lo
         val vid = varRef.varId
         return when (step++) {
             0 -> if (lowerFirst) {
-                ApplyOutcome(splitLo, session.pinIntAtMost(vid, splitLo))
+                NextDecision(splitLo, SearchDecision.IntAtMost(vid, splitLo))
             } else {
-                ApplyOutcome(splitHi, session.pinIntAtLeast(vid, splitHi))
+                NextDecision(splitHi, SearchDecision.IntAtLeast(vid, splitHi))
             }
 
             1 -> if (lowerFirst) {
-                ApplyOutcome(splitHi, session.pinIntAtLeast(vid, splitHi))
+                NextDecision(splitHi, SearchDecision.IntAtLeast(vid, splitHi))
             } else {
-                ApplyOutcome(splitLo, session.pinIntAtMost(vid, splitLo))
+                NextDecision(splitLo, SearchDecision.IntAtMost(vid, splitLo))
             }
 
             else -> null

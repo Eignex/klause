@@ -26,7 +26,8 @@ import kotlin.time.TimeSource
  *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [Assignment].
  *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [Assignment].
  *
- * Each integer variable has an [IntDomain] for bounds. Factors mention either or both.
+ * An integer variable may have an [IntDomain] for finite CP search, or be symbolic and owned by a
+ * theory component. Factors mention either or both.
  * Occurrence lists are split per kind so `flip(boolVar)` and `setInt(intVar)` only walk the
  * factors mentioning that specific variable.
  *
@@ -38,8 +39,8 @@ open class Problem(
     val numBoolVars: Int,
     /** Number of integer variables; ids occupy `[0, numIntVars)`. */
     val numIntVars: Int,
-    /** Domain (bounds) of each integer variable as declared by the caller. */
-    intDomains: Array<IntDomain>,
+    /** Typed integer-column capabilities selected by the component plan. */
+    val intColumns: IntColumns,
     /** The constraints over the variables. */
     val factors: Array<Factor>,
     /**
@@ -77,7 +78,7 @@ open class Problem(
      */
     val hasSymmetryBreaking: Boolean = false,
     /**
-     * Skip the defensive copy of [intDomains]: when `true`, the passed array is shared as-is rather than
+     * Skip the defensive copy of finite domains: when `true`, the passed array is shared as-is rather than
      * copied. Internal to [BakedProblem]'s already-folded construction (the incremental
      * [com.eignex.klause.presolve.PresolveSession] and the SMT/MPS front-ends supply a re-propagated array
      * read — never mutated — within one firing and rebuilt on the next change, so sharing saves an
@@ -115,20 +116,25 @@ open class Problem(
     /** Source-model bounds, when this finite problem was materialized from a [ProblemSpec]. */
     modelBounds: IntBounds? = null,
 ) {
-    /**
-     * Domain (bounds) of each integer variable, indexed by int var id. On a raw [Problem] these are the
-     * declared domains verbatim (a defensive copy of the constructor input); [BakedProblem] strengthens
-     * them by folding in the root-level deductions from [baked] — bound tightenings, interior holes and
-     * pins derived by one propagation fixpoint over the factors — so search/export consumers of a baked
-     * problem start from a stronger, finite root even when the declared domains were loosely bounded.
-     *
-     * A [sharedDomains] construction skips the defensive copy: the caller supplies an array that is safe
-     * to share (read, never mutated, within one presolve firing), saving an O([numIntVars]) copy.
-     */
-    private val ownedIntDomains: Array<IntDomain> = if (sharedDomains) intDomains else intDomains.copyOf()
+    /** Finite CP domain capability of [v], or `null` when a theory owns the column. */
+    fun intDomainOrNull(v: Int): IntDomain? = intColumns.domainOrNull(v)
 
-    /** Finite domains used by CP and local search. */
-    val intDomains: Array<IntDomain> get() = ownedIntDomains
+    /** True when every integer column can be handed to the finite CP engine. */
+    val hasFiniteIntDomains: Boolean get() = intColumns.allFiniteOrNull() != null
+
+    /**
+     * Finite domains used by CP and local search.
+     *
+     * This compatibility view is intentionally a checked boundary: generic model and theory code must
+     * use [intDomainOrNull] or [intBounds], while a finite engine explicitly asserts that it received no
+     * symbolic columns.
+     */
+    val intDomains: Array<IntDomain> get() = requireFiniteIntDomains()
+
+    /** Return all finite CP domains, rejecting a problem that contains symbolic theory columns. */
+    fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(intColumns.allFiniteOrNull()) {
+        "finite CP state requested for a problem with symbolic integer columns"
+    }
 
     /**
      * Model-level bounds of the integer columns. Unlike [intDomains], either side may be absent when
@@ -136,13 +142,16 @@ open class Problem(
      * the model rather than enumerate its values must read this state, or explicitly decline open
      * columns, instead of treating the fallback endpoint as a constraint.
      */
-    val intBounds: IntBounds = modelBounds ?: IntBounds.fromOpenSides(
-        domains = intDomains,
-        openLo = openIntLo,
-        openHi = openIntHi,
-        packedOpenLo = packedOpenIntLo,
-        packedOpenHi = packedOpenIntHi,
-    )
+    val intBounds: IntBounds = modelBounds ?: run {
+        require(hasFiniteIntDomains) { "symbolic integer columns require source model bounds" }
+        IntBounds.fromOpenSides(
+            domains = requireFiniteIntDomains(),
+            openLo = openIntLo,
+            openHi = openIntHi,
+            packedOpenLo = packedOpenIntLo,
+            packedOpenHi = packedOpenIntHi,
+        )
+    }
 
     /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
      *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
@@ -161,8 +170,8 @@ open class Problem(
     val invariants: Array<out Invariant> by lazy { Array(factors.size) { factors[it].asInvariant() } }
 
     init {
-        require(intDomains.size == numIntVars) {
-            "intDomains size ${intDomains.size} != numIntVars $numIntVars"
+        require(intColumns.size == numIntVars) {
+            "integer column count ${intColumns.size} != numIntVars $numIntVars"
         }
         require(openIntLo == null || openIntLo.size == numIntVars) {
             "openIntLo size ${openIntLo?.size} != numIntVars $numIntVars"
@@ -187,6 +196,44 @@ open class Problem(
         numBoolVars: Int,
         numIntVars: Int,
         intDomains: Array<IntDomain>,
+        factors: Array<Factor>,
+        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
+        cancellation: Cancellation = Cancellation.Never,
+        impliedFactorMask: BooleanArray? = null,
+        hasSymmetryBreaking: Boolean = false,
+        sharedDomains: Boolean = false,
+        numRealVars: Int = 0,
+        realLower: DoubleArray = EmptyDoubleArray,
+        realUpper: DoubleArray = EmptyDoubleArray,
+        openIntLo: BooleanArray? = null,
+        openIntHi: BooleanArray? = null,
+        packedOpenIntLo: Bits? = null,
+        packedOpenIntHi: Bits? = null,
+        modelBounds: IntBounds? = null,
+    ) : this(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intColumns = FiniteIntColumns(intDomains, sharedDomains),
+        factors = factors,
+        seedDeductions = seedDeductions,
+        cancellation = cancellation,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        sharedDomains = sharedDomains,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        openIntLo = openIntLo,
+        openIntHi = openIntHi,
+        packedOpenIntLo = packedOpenIntLo,
+        packedOpenIntHi = packedOpenIntHi,
+        modelBounds = modelBounds,
+    )
+
+    constructor(
+        numBoolVars: Int,
+        numIntVars: Int,
+        intDomains: Array<IntDomain>,
         factors: List<Factor>,
         seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
         cancellation: Cancellation = Cancellation.Never,
@@ -203,7 +250,7 @@ open class Problem(
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intDomains = intDomains,
+        intColumns = FiniteIntColumns(intDomains),
         factors = Array(factors.size) { factors[it] },
         seedDeductions = seedDeductions,
         cancellation = cancellation,
@@ -343,12 +390,13 @@ open class Problem(
      */
     fun bake(cancellation: Cancellation = this.cancellation): BakedProblem {
         if (this is BakedProblem) return this
+        require(hasFiniteIntDomains) { "only finite CP problems can be baked" }
         // A raw front-end/builder problem carries no seedDeductions (those come from a presolve rebuild,
         // which constructs its BakedProblem directly), so the bake is the plain base propagation.
         return BakedProblem(
             numBoolVars = numBoolVars,
             numIntVars = numIntVars,
-            intDomains = Array(numIntVars) { intDomains[it] },
+            intDomains = Array(numIntVars) { requireFiniteIntDomains()[it] },
             factors = factors,
             cancellation = cancellation,
             impliedFactorMask = impliedFactorMask,

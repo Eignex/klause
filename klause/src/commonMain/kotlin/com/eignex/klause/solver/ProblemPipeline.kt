@@ -9,7 +9,12 @@ import com.eignex.klause.lp.smallModelBigIntBound
 
 /** The solver pipeline selected once from a source [ProblemSpec]. */
 enum class ProblemPipeline {
-    /** Every integer is finitely bounded, so the ordinary CP pipeline applies. */
+    /**
+     * Legacy finite-search/optimization route.
+     *
+     * This is a frontend policy, not variable ownership: [ProblemSpec.componentPlan] may still select a
+     * complete arithmetic theory for the same finite source model when no finite-domain factor is present.
+     */
     FINITE_CP,
 
     /** Open integer sides are covered entirely by difference logic. */
@@ -28,7 +33,12 @@ enum class ProblemPipeline {
     UNSUPPORTED_OPEN,
 }
 
-/** Select the only sound pipeline for this source model before CP domains are materialized. */
+/**
+ * Select the legacy frontend pipeline before CP domains are materialized.
+ *
+ * Finite optimization still uses this route. Satisfaction planning must use [ProblemSpec.componentPlan]
+ * instead, because a finite range does not by itself require a CP-owned [IntDomain].
+ */
 fun ProblemSpec.pipeline(): ProblemPipeline {
     if ((0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }) {
         return ProblemPipeline.FINITE_CP
@@ -53,7 +63,7 @@ internal fun ProblemSpec.supportsExactLra(): Boolean =
 internal fun ProblemSpec.supportsExactLira(): Boolean =
     numIntVars != 0 && numRealVars != 0 && factors.all(::supportsExactTheoryFactor)
 
-private fun supportsExactTheoryFactor(factor: Factor): Boolean = when (factor) {
+internal fun supportsExactTheoryFactor(factor: Factor): Boolean = when (factor) {
     is Clause -> true
     is Linear -> factor.wide || factor.coefficientsAreExactlyRepresentable()
     is ReifiedLinear -> factor.wide || factor.coefficientsAreExactlyRepresentable()

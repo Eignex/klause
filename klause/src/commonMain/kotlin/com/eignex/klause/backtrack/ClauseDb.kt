@@ -5,12 +5,16 @@ import com.eignex.klause.propagation.ClauseTier
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedPb
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchExplanation
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
@@ -22,6 +26,9 @@ import com.eignex.klause.util.IntHashSet
 internal sealed interface AdvanceOutcome {
     /** A value pinned cleanly; commit the node to the trail. */
     data object Success : AdvanceOutcome
+
+    /** The shared trail already carried the selected fact; CP was synchronized without a new level. */
+    data object AlreadyApplied : AdvanceOutcome
 
     /** Node has no more values; chronological backtrack. */
     data object Exhausted : AdvanceOutcome
@@ -37,9 +44,12 @@ internal sealed interface AdvanceOutcome {
     data class Backjump(val learned: LearnedConstraint) : AdvanceOutcome
 }
 
+private data class ApplyOutcome(val value: Long, val result: PropagationResult)
+
 internal fun BacktrackSolver.advance(
     node: TrailNode,
-    session: PropagationSession,
+    cpComponent: CpSearchComponent,
+    searchSession: SearchSession,
     params: BacktrackParams,
     pruneIf: ((PropagationSession) -> Boolean)?,
     decisionsRemaining: () -> Long,
@@ -49,11 +59,33 @@ internal fun BacktrackSolver.advance(
     onConflictTick: (() -> Unit)? = null,
     pruneLearned: (() -> Learned?)? = null,
 ): AdvanceOutcome {
+    val session = cpComponent.session
     while (true) {
         if (decisionsRemaining() <= 0) return AdvanceOutcome.BudgetCapped
         decrement()
         val propsBefore = session.propagationCount
-        val outcome = node.applyNext(session) ?: return AdvanceOutcome.Exhausted
+        val next = node.nextDecision(session) ?: return AdvanceOutcome.Exhausted
+        val pushed = cpComponent.push(searchSession, next.decision)
+        if (pushed.replayed && pushed.componentResult is ComponentResult.Consistent) {
+            return AdvanceOutcome.AlreadyApplied
+        }
+        if (pushed.propagation !is PropagationResult.Unsat) {
+            when (pushed.componentResult) {
+                ComponentResult.Consistent -> Unit
+
+                ComponentResult.Indeterminate -> return AdvanceOutcome.BudgetCapped
+
+                is ComponentResult.Conflict -> {
+                    searchSession.learn(pushed.componentResult.explanation)
+                    sink?.search?.observeFail()
+                    continue
+                }
+            }
+        }
+        val outcome = ApplyOutcome(
+            next.value,
+            requireNotNull(pushed.propagation) { "finite CP branch was not delivered to the CP component" },
+        )
         // Count every factor-forced assignment this pin triggered — including the
         // propagation done on the way to a conflict (Unsat returns below).
         sink?.search?.observePropagation(session.propagationCount - propsBefore)
@@ -134,10 +166,10 @@ internal fun BacktrackSolver.advance(
             ) {
                 sink?.lp?.observeBackjump()
                 sink?.search?.observeLearn()
-                session.popLast()
+                searchSession.popTo(searchSession.decisionLevel - 1)
                 return AdvanceOutcome.Backjump(lpLearned)
             }
-            session.popLast()
+            searchSession.popTo(searchSession.decisionLevel - 1)
             continue
         }
         // ABS-style activity heuristics need the implied set from the just-completed
@@ -385,10 +417,12 @@ internal enum class BackjumpTerm {
 internal fun BacktrackSolver.backjumpAndLearn(
     learned: LearnedConstraint,
     trail: MutableList<TrailNode>,
-    session: PropagationSession,
+    cpComponent: CpSearchComponent,
+    searchSession: SearchSession,
     @Suppress("UNUSED_PARAMETER") params: BacktrackParams,
     alignFirst: Boolean,
 ): BackjumpTerm {
+    val session = cpComponent.session
     if (alignFirst && trail.isNotEmpty()) trail.removeAt(trail.size - 1)
     var current = learned
     // Cap the recursive backjump loop to defend against pathological cycles. Each
@@ -401,7 +435,7 @@ internal fun BacktrackSolver.backjumpAndLearn(
         if (!current.asserting) return BackjumpTerm.Stuck
         // Pop trail + session to the backjump level.
         while (trail.size > current.backjumpLevel) {
-            session.popLast()
+            searchSession.popTo(searchSession.decisionLevel - 1)
             trail.removeAt(trail.size - 1)
         }
         // Materialize the learned constraint and assert it — a clause for a 1UIP clause, a
@@ -411,8 +445,18 @@ internal fun BacktrackSolver.backjumpAndLearn(
             is Learned -> session.addLearnedClause(Clause(c.literals), c.lbd)
             is LearnedPb -> session.addLearnedPb(c.weights, c.literals, c.degree, c.lbd)
         }
+        if (current is Learned) {
+            searchSession.learnFrom(cpComponent, SearchExplanation(current.literals))
+        }
         when (result) {
-            is PropagationResult.Implied -> return BackjumpTerm.Resume
+            is PropagationResult.Implied -> {
+                val imported = cpComponent.import(result, searchSession)
+                if (imported !is ComponentResult.Consistent) return BackjumpTerm.Stuck
+                return when (searchSession.propagate()) {
+                    ComponentResult.Consistent -> BackjumpTerm.Resume
+                    is ComponentResult.Conflict, ComponentResult.Indeterminate -> BackjumpTerm.Stuck
+                }
+            }
 
             is PropagationResult.Unsat -> {
                 // Assertion cascaded into another conflict. The session ran the

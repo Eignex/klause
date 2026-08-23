@@ -1,23 +1,18 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.TheoryParams
-import com.eignex.klause.theory.difference.DifferenceTheorySolver
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
-import com.eignex.klause.theory.lia.GeneralLiaResult
-import com.eignex.klause.theory.lia.GeneralLiaSolver
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.theory.qflra.ExactLiraResult
-import com.eignex.klause.theory.qflra.ExactLiraSolver
 import com.eignex.klause.theory.qflra.ExactLraAssignment
-import com.eignex.klause.theory.qflra.ExactLraResult
-import com.eignex.klause.theory.qflra.ExactLraSolver
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
@@ -72,47 +67,71 @@ sealed interface OpenTheoryResult {
 /**
  * Selects and executes the complete theory route for an open source model.
  *
- * Route selection happens once from [ProblemSpec.pipeline]. Frontends consume this uniform result
+ * Route selection happens once from `ProblemSpec.pipeline()`. Frontends consume this uniform result
  * rather than importing or dispatching to individual theory implementations.
  */
-class OpenTheorySolver(private val model: ProblemSpec, private val route: ProblemPipeline) {
+class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
+    private val model = model
+    private val route = route
 
     init {
         require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {
             "open theory solver requires a supported open source model"
         }
+        require(model.componentPlan().theoryPipeline == route) { "open theory route disagrees with component plan" }
     }
 
-    /** Decide the model with the complete theory selected for its source fragment. */
-    fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult = when (route) {
-        ProblemPipeline.DIFFERENCE_THEORY -> DifferenceTheorySolver(model).solve(params).asOpenTheoryResult()
-        ProblemPipeline.GENERAL_LIA -> GeneralLiaSolver(model).solve(params).asOpenTheoryResult()
-        ProblemPipeline.EXACT_LRA -> ExactLraSolver(model).solve(params).asOpenTheoryResult()
-        ProblemPipeline.EXACT_LIRA -> ExactLiraSolver(model).solve(params).asOpenTheoryResult()
+    /** Decide the model through its immutable component plan and one shared search session. */
+    fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult {
+        val cancellation = Cancellation { params.cancellation() || model.cancellation() }
+        val planned = model.componentPlan().search(
+            model,
+            emptyMap(),
+            maxChecks = params.maxLeaves,
+            cancellation = cancellation,
+        )
+        when (planned.session.initialize()) {
+            ComponentResult.Consistent -> Unit
+            is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(SolveStats.EMPTY)
+            ComponentResult.Indeterminate -> return unknown(planned.session.cancelled())
+        }
+        return when (val result = planned.session.solve(model.numBoolVars)) {
+            is SearchResult.Satisfied -> OpenTheoryResult.Sat(
+                assignment(result.model, checkNotNull(planned.theory)),
+                SolveStats.EMPTY,
+            )
+
+            SearchResult.Exhausted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+
+            SearchResult.Indeterminate -> unknown(planned.session.cancelled())
+        }
+    }
+
+    private fun unknown(cancelled: Boolean): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
+        if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
+        SolveStats.EMPTY,
+    )
+
+    private fun assignment(
+        model: com.eignex.klause.solver.search.AssembledSearchModel,
+        component: Any,
+    ): OpenTheoryAssignment = when (route) {
+        ProblemPipeline.DIFFERENCE_THEORY -> OpenTheoryAssignment.Difference(
+            checkNotNull(model.valueOf<Sample>(component)),
+        )
+
+        ProblemPipeline.GENERAL_LIA -> OpenTheoryAssignment.GeneralLia(
+            checkNotNull(model.valueOf<GeneralLiaAssignment>(component)),
+        )
+
+        ProblemPipeline.EXACT_LRA -> OpenTheoryAssignment.ExactLra(
+            checkNotNull(model.valueOf<ExactLraAssignment>(component)),
+        )
+
+        ProblemPipeline.EXACT_LIRA -> OpenTheoryAssignment.ExactLira(
+            checkNotNull(model.valueOf<ExactLiraAssignment>(component)),
+        )
+
         ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("validated open theory route changed")
     }
-}
-
-private fun SolveResult.asOpenTheoryResult(): OpenTheoryResult = when (this) {
-    is SolveResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.Difference(assignment), stats)
-    is SolveResult.Unsat -> OpenTheoryResult.Unsat(stats)
-    is SolveResult.Unknown -> OpenTheoryResult.Unknown(reason, stats)
-}
-
-private fun GeneralLiaResult.asOpenTheoryResult(): OpenTheoryResult = when (this) {
-    is GeneralLiaResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.GeneralLia(assignment), stats)
-    is GeneralLiaResult.Unsat -> OpenTheoryResult.Unsat(stats)
-    is GeneralLiaResult.Unknown -> OpenTheoryResult.Unknown(reason, stats)
-}
-
-private fun ExactLraResult.asOpenTheoryResult(): OpenTheoryResult = when (this) {
-    is ExactLraResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.ExactLra(assignment), stats)
-    is ExactLraResult.Unsat -> OpenTheoryResult.Unsat(stats)
-    is ExactLraResult.Unknown -> OpenTheoryResult.Unknown(reason, stats)
-}
-
-private fun ExactLiraResult.asOpenTheoryResult(): OpenTheoryResult = when (this) {
-    is ExactLiraResult.Sat -> OpenTheoryResult.Sat(OpenTheoryAssignment.ExactLira(assignment), stats)
-    is ExactLiraResult.Unsat -> OpenTheoryResult.Unsat(stats)
-    is ExactLiraResult.Unknown -> OpenTheoryResult.Unknown(reason, stats)
 }

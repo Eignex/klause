@@ -7,12 +7,20 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.generalLiaWitnessBound
 import com.eignex.klause.solver.pipeline
-import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.theory.TheoryParams
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchTheoryDecision
+import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.Theory
+import com.eignex.klause.theory.TheoryCheck
+import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.theory.TheoryResult
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** An exact General LIA assignment, independent of CP's Long-backed Sample. */
@@ -23,27 +31,11 @@ data class GeneralLiaAssignment(
     val ints: Array<BigInteger>,
 )
 
-/** Result of an exact General LIA satisfiability search. */
-sealed interface GeneralLiaResult {
-    /** Search telemetry collected by this solver. */
-    val stats: SolveStats
-
-    /** Satisfiable, carrying an exact assignment. */
-    data class Sat(
-        /** The satisfying Boolean/integer assignment. */
-        val assignment: GeneralLiaAssignment,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : GeneralLiaResult
-
-    /** Proven infeasible. */
-    data class Unsat(override val stats: SolveStats = SolveStats.EMPTY) : GeneralLiaResult
-
-    /** Indeterminate because an explicit search budget or cancellation interrupted the search. */
-    data class Unknown(
-        /** The interruption reason. */
-        val reason: TerminationReason,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : GeneralLiaResult
+/** Compatibility names for General LIA's shared theory outcomes. */
+object GeneralLiaResult {
+    typealias Sat = TheoryResult.Sat<GeneralLiaAssignment>
+    typealias Unsat = TheoryResult.Unsat
+    typealias Unknown = TheoryResult.Unknown
 }
 
 /**
@@ -53,7 +45,7 @@ sealed interface GeneralLiaResult {
  * branch intervals, split points, row sums, and witnesses are BigInteger. LP keeps its existing
  * double-based relaxation role in the finite CP path; it is deliberately not used as a certificate here.
  */
-class GeneralLiaSolver(private val model: ProblemSpec) {
+class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssignment> {
     private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
 
     init {
@@ -62,8 +54,7 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         }
     }
 
-    /** Decide satisfiability without converting an integer bound, coefficient, or witness to Long. */
-    fun solve(params: TheoryParams = TheoryParams()): GeneralLiaResult {
+    override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<GeneralLiaAssignment> {
         val domains = Array(model.numIntVars) { v ->
             val lo = if (model.intBounds.hasLower(v)) {
                 maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(v)))
@@ -75,26 +66,18 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
             } else {
                 witnessBound
             }
-            BigInterval(lo, hi)
-        }
-        if (domains.any { it.lo > it.hi }) return GeneralLiaResult.Unsat()
-        val bools = BooleanArray(model.numBoolVars)
-        val boolAssigned = BooleanArray(model.numBoolVars)
-        val search = Search(domains, bools, boolAssigned, params.copy(cancellation = Cancellation {
-            params.cancellation() || model.cancellation()
-        }))
-        return when (val outcome = search.run()) {
-            is GeneralLiaSearchOutcome.Found -> GeneralLiaResult.Sat(
-                GeneralLiaAssignment(bools.copyOf(), outcome.values),
+            BigInterval(
+                context.intLowerBound(v)?.let { maxOf(lo, BigInteger.fromLong(it)) } ?: lo,
+                context.intUpperBound(v)?.let { minOf(hi, BigInteger.fromLong(it)) } ?: hi,
             )
-
-            GeneralLiaSearchOutcome.Infeasible -> GeneralLiaResult.Unsat()
-
-            GeneralLiaSearchOutcome.Cancelled ->
-                GeneralLiaResult.Unknown(TerminationReason.Cancelled)
-
-            GeneralLiaSearchOutcome.BudgetCapped ->
-                GeneralLiaResult.Unknown(TerminationReason.BudgetExhausted)
+        }
+        if (domains.any { it.lo > it.hi }) return TheoryCheck.Infeasible
+        val search = Search(domains, bools, BooleanArray(model.numBoolVars) { true }, context)
+        return when (val outcome = search.run()) {
+            is GeneralLiaSearchOutcome.Found -> TheoryCheck.Sat(GeneralLiaAssignment(bools.copyOf(), outcome.values))
+            GeneralLiaSearchOutcome.Infeasible -> TheoryCheck.Infeasible
+            GeneralLiaSearchOutcome.Cancelled -> TheoryCheck.Cancelled
+            GeneralLiaSearchOutcome.BudgetCapped -> TheoryCheck.Cancelled
         }
     }
 
@@ -102,10 +85,8 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         private val domains: Array<BigInterval>,
         private val bools: BooleanArray,
         private val boolAssigned: BooleanArray,
-        private val params: TheoryParams,
+        private val context: TheoryContext,
     ) {
-        private var leavesLeft = params.maxLeaves
-
         fun run(): GeneralLiaSearchOutcome {
             val stack = ArrayDeque<Frame>()
             stack.addLast(Frame(domains.copyOf()))
@@ -150,11 +131,10 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         }
 
         private fun visit(frame: Frame, stack: ArrayDeque<Frame>): GeneralLiaSearchOutcome? {
-            if (leavesLeft == 0L) {
+            if (!context.consumeCheck()) {
                 return GeneralLiaSearchOutcome.BudgetCapped
             }
-            if (params.cancellation()) return GeneralLiaSearchOutcome.Cancelled
-            leavesLeft--
+            if (context.cancelled()) return GeneralLiaSearchOutcome.Cancelled
             if (!propagateEqualities()) return GeneralLiaSearchOutcome.Infeasible
             if (!factorsPossible()) return GeneralLiaSearchOutcome.Infeasible
             val bool = boolAssigned.indexOfFirst { !it }
@@ -407,6 +387,396 @@ class GeneralLiaSolver(private val model: ProblemSpec) {
         LinearOp.EQ -> value == bound
         LinearOp.GE -> value >= bound
         LinearOp.NE -> value != bound
+    }
+}
+
+/**
+ * Incremental General LIA participant.
+ *
+ * Its finite-witness intervals stay arbitrary precision and theory-local. Each bisection is carried
+ * as an opaque [SearchDecision.Theory], so [com.eignex.klause.solver.search.SearchSession] owns the
+ * resulting tree, retraction, limits, and restart lifecycle.
+ */
+class GeneralLiaSearchComponent(
+    private val model: ProblemSpec,
+    theoryIntVars: IntArray = IntArray(model.numIntVars) { it },
+    private val modelContribution: ((GeneralLiaAssignment, SearchModel) -> Unit)? = null,
+) : TheoryComponent,
+    SearchBrancher {
+    private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
+    private val theoryIntVars = theoryIntVars.copyOf()
+    private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
+    private val boolLevels = IntArray(model.numBoolVars) { -1 }
+    private val domainsByLevel = HashMap<Int, Array<BigInterval>>()
+    private var assignment: GeneralLiaAssignment? = null
+    private var outcome: ComponentCheck? = null
+
+    init {
+        require(model.generalLiaWitnessBound() != null) {
+            "general LIA component requires a pure-integer linear model with a finite witness bound"
+        }
+        require(this.theoryIntVars.all { it in 0 until model.numIntVars }) {
+            "General LIA branch variables must be source integer columns"
+        }
+    }
+
+    override fun initialize(context: SearchContext): ComponentResult {
+        domainsByLevel[0] = initialDomains(context)
+        return if (domainsByLevel.getValue(
+                0,
+            ).any { it.lo > it.hi }
+        ) {
+            ComponentResult.Conflict()
+        } else {
+            ComponentResult.Consistent
+        }
+    }
+
+    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+        when (decision) {
+            is SearchDecision.Bool -> {
+                val variable = decision.literal ushr 1
+                bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
+                boolLevels[variable] = context.decisionLevel
+            }
+
+            is SearchDecision.Theory -> (decision.decision as? GeneralLiaDecision)?.let { branch ->
+                domainsByLevel[context.decisionLevel] = branch.domains
+            }
+
+            is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> Unit
+        }
+        assignment = null
+        outcome = null
+        return ComponentResult.Consistent
+    }
+
+    override fun retract(decisionLevel: Int) {
+        for (variable in bools.indices) {
+            if (boolLevels[variable] > decisionLevel) {
+                bools[variable] = UNASSIGNED
+                boolLevels[variable] = -1
+            }
+        }
+        domainsByLevel.keys.removeAll { it > decisionLevel }
+        assignment = null
+        outcome = null
+    }
+
+    override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (context.cancelled() || !context.consumeCheck()) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        val domains = currentDomains().copyOf()
+        if (!applyPublishedBounds(domains, context)) {
+            outcome = ComponentCheck.Infeasible()
+            return null
+        }
+        if (!propagateEqualities(domains) || !factorsPossible(domains)) {
+            outcome = ComponentCheck.Infeasible()
+            return null
+        }
+        val variable = widestOpenVariable(domains)
+        if (variable < 0) {
+            outcome = if (factorsHold(domains)) {
+                assignment = GeneralLiaAssignment(
+                    BooleanArray(bools.size) { bools[it] == TRUE },
+                    Array(domains.size) { domains[it].lo },
+                )
+                ComponentCheck.Feasible
+            } else {
+                ComponentCheck.Infeasible()
+            }
+            return null
+        }
+        val original = domains[variable]
+        val middle = original.lo + (original.hi - original.lo) / BigInteger.fromInt(2)
+        return listOf(
+            decision(domains.withInterval(variable, BigInterval(original.lo, middle))),
+            decision(domains.withInterval(variable, BigInterval(middle + BigInteger.ONE, original.hi))),
+        )
+    }
+
+    override fun check(context: SearchContext): ComponentCheck = outcome ?: ComponentCheck.Indeterminate
+
+    override fun contributeModel(model: SearchModel, context: SearchContext) {
+        assignment?.let { value ->
+            model.put(this, value)
+            modelContribution?.invoke(value, model)
+        }
+    }
+
+    private fun initialDomains(context: SearchContext): Array<BigInterval> = Array(model.numIntVars) { variable ->
+        val lo = if (model.intBounds.hasLower(variable)) {
+            maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(variable)))
+        } else {
+            -witnessBound
+        }
+        val hi = if (model.intBounds.hasUpper(variable)) {
+            minOf(witnessBound, BigInteger.fromLong(model.intBounds.upper(variable)))
+        } else {
+            witnessBound
+        }
+        BigInterval(
+            context.intLowerBound(variable)?.let { maxOf(lo, BigInteger.fromLong(it)) } ?: lo,
+            context.intUpperBound(variable)?.let { minOf(hi, BigInteger.fromLong(it)) } ?: hi,
+        )
+    }
+
+    private fun currentDomains(): Array<BigInterval> = domainsByLevel.entries.maxByOrNull { it.key }?.value
+        ?: error("General LIA component was not initialized")
+
+    private fun decision(domains: Array<BigInterval>): SearchDecision.Theory =
+        SearchDecision.Theory(GeneralLiaDecision(domains))
+
+    private fun Array<BigInterval>.withInterval(variable: Int, interval: BigInterval): Array<BigInterval> =
+        copyOf().also { it[variable] = interval }
+
+    private fun propagateEqualities(domains: Array<BigInterval>): Boolean {
+        var changed: Boolean
+        do {
+            changed = false
+            for (factor in model.factors) {
+                val row = when (factor) {
+                    is Linear -> if (factor.op == LinearOp.EQ) LiaRow.of(factor) else null
+
+                    is ReifiedLinear -> if (bools[factor.auxBoolVar] == TRUE && factor.op == LinearOp.EQ) {
+                        LiaRow.of(
+                            factor,
+                        )
+                    } else {
+                        null
+                    }
+
+                    else -> null
+                } ?: continue
+                for (index in row.vars.indices) {
+                    val coefficient = row.coeffs[index]
+                    if (coefficient == BigInteger.ZERO) continue
+                    val rest = rowRangeExcept(row, index, domains)
+                    val lowerProduct = row.bound - rest.hi
+                    val upperProduct = row.bound - rest.lo
+                    val implied = if (coefficient > BigInteger.ZERO) {
+                        BigInterval(ceilDiv(lowerProduct, coefficient), floorDiv(upperProduct, coefficient))
+                    } else {
+                        BigInterval(ceilDiv(upperProduct, coefficient), floorDiv(lowerProduct, coefficient))
+                    }
+                    val variable = row.vars[index]
+                    val current = domains[variable]
+                    val narrowed = BigInterval(maxOf(current.lo, implied.lo), minOf(current.hi, implied.hi))
+                    if (narrowed.lo > narrowed.hi) return false
+                    if (narrowed != current) {
+                        domains[variable] = narrowed
+                        changed = true
+                    }
+                }
+            }
+        } while (changed)
+        return true
+    }
+
+    private fun rowRangeExcept(row: LiaRow, skipped: Int, domains: Array<BigInterval>): BigInterval {
+        var lo = BigInteger.ZERO
+        var hi = BigInteger.ZERO
+        for (index in row.vars.indices) {
+            if (index == skipped) continue
+            val domain = domains[row.vars[index]]
+            if (row.coeffs[index] >= BigInteger.ZERO) {
+                lo += row.coeffs[index] * domain.lo
+                hi += row.coeffs[index] * domain.hi
+            } else {
+                lo += row.coeffs[index] * domain.hi
+                hi += row.coeffs[index] * domain.lo
+            }
+        }
+        return BigInterval(lo, hi)
+    }
+
+    private fun applyPublishedBounds(domains: Array<BigInterval>, context: SearchContext): Boolean {
+        for (variable in domains.indices) {
+            val current = domains[variable]
+            val lower = context.intLowerBound(variable)?.let { BigInteger.fromLong(it) } ?: current.lo
+            val upper = context.intUpperBound(variable)?.let { BigInteger.fromLong(it) } ?: current.hi
+            val narrowed = BigInterval(maxOf(current.lo, lower), minOf(current.hi, upper))
+            if (narrowed.lo > narrowed.hi) return false
+            domains[variable] = narrowed
+        }
+        return true
+    }
+
+    private fun widestOpenVariable(domains: Array<BigInterval>): Int {
+        var result = -1
+        var width = BigInteger.ZERO
+        for (variable in theoryIntVars) {
+            val candidate = domains[variable].hi - domains[variable].lo
+            if (candidate > width) {
+                width = candidate
+                result = variable
+            }
+        }
+        return result
+    }
+
+    private fun factorsPossible(domains: Array<BigInterval>): Boolean = model.factors.all { factor ->
+        when (factor) {
+            is Clause -> factor.literals.any { literal ->
+                bools[literal ushr 1] == UNASSIGNED ||
+                    bools[literal ushr 1] == truth(
+                        literal,
+                    )
+            }
+
+            is Linear -> relationPossible(rowRange(factor, domains), factor.op, linearBound(factor))
+
+            is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || relationPossibleForTruth(
+                rowRange(factor, domains),
+                factor.op,
+                reifiedBound(factor),
+                bools[factor.auxBoolVar] == TRUE,
+            )
+
+            is ComparisonClause -> factor.vars.indices.any { index ->
+                relationPossible(
+                    domains[factor.vars[index]],
+                    factor.ops[index],
+                    BigInteger.fromLong(factor.consts[index]),
+                )
+            }
+
+            else -> false
+        }
+    }
+
+    private fun factorsHold(domains: Array<BigInterval>): Boolean = model.factors.all { factor ->
+        when (factor) {
+            is Clause -> factor.literals.any { literal -> bools[literal ushr 1] == truth(literal) }
+
+            is Linear -> relationHolds(rowValue(factor, domains), factor.op, linearBound(factor))
+
+            is ReifiedLinear -> relationHolds(
+                rowValue(factor, domains),
+                factor.op,
+                reifiedBound(factor),
+            ) == (bools[factor.auxBoolVar] == TRUE)
+
+            is ComparisonClause -> factor.vars.indices.any { index ->
+                relationHolds(
+                    domains[factor.vars[index]].lo,
+                    factor.ops[index],
+                    BigInteger.fromLong(factor.consts[index]),
+                )
+            }
+
+            else -> false
+        }
+    }
+
+    private fun rowRange(factor: Linear, domains: Array<BigInterval>): BigInterval = rowRange(
+        factor.vars,
+        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
+        domains,
+    )
+
+    private fun rowRange(factor: ReifiedLinear, domains: Array<BigInterval>): BigInterval = rowRange(
+        factor.vars,
+        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
+        domains,
+    )
+
+    private fun rowRange(vars: IntArray, coeffs: Array<BigInteger>, domains: Array<BigInterval>): BigInterval {
+        var lo = BigInteger.ZERO
+        var hi = BigInteger.ZERO
+        for (index in vars.indices) {
+            val domain = domains[vars[index]]
+            if (coeffs[index] >= BigInteger.ZERO) {
+                lo += coeffs[index] * domain.lo
+                hi += coeffs[index] * domain.hi
+            } else {
+                lo += coeffs[index] * domain.hi
+                hi += coeffs[index] * domain.lo
+            }
+        }
+        return BigInterval(lo, hi)
+    }
+
+    private fun rowValue(factor: Linear, domains: Array<BigInterval>): BigInteger = rowValue(
+        factor.vars,
+        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
+        domains,
+    )
+
+    private fun rowValue(factor: ReifiedLinear, domains: Array<BigInterval>): BigInteger = rowValue(
+        factor.vars,
+        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
+        domains,
+    )
+
+    private fun rowValue(vars: IntArray, coeffs: Array<BigInteger>, domains: Array<BigInterval>): BigInteger {
+        var sum = BigInteger.ZERO
+        for (index in vars.indices) sum += coeffs[index] * domains[vars[index]].lo
+        return sum
+    }
+
+    private fun linearBound(factor: Linear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)
+
+    private fun reifiedBound(factor: ReifiedLinear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)
+
+    private fun relationPossible(range: BigInterval, op: LinearOp, bound: BigInteger): Boolean = when (op) {
+        LinearOp.LE -> range.lo <= bound
+        LinearOp.EQ -> range.lo <= bound && bound <= range.hi
+        LinearOp.GE -> range.hi >= bound
+        LinearOp.NE -> range.lo != range.hi || range.lo != bound
+    }
+
+    private fun relationPossibleForTruth(range: BigInterval, op: LinearOp, bound: BigInteger, truth: Boolean): Boolean =
+        if (truth) {
+            relationPossible(range, op, bound)
+        } else {
+            when (op) {
+                LinearOp.LE -> range.hi > bound
+                LinearOp.EQ -> range.lo != range.hi || range.lo != bound
+                LinearOp.GE -> range.lo < bound
+                LinearOp.NE -> range.lo <= bound && bound <= range.hi
+            }
+        }
+
+    private fun relationHolds(value: BigInteger, op: LinearOp, bound: BigInteger): Boolean = when (op) {
+        LinearOp.LE -> value <= bound
+        LinearOp.EQ -> value == bound
+        LinearOp.GE -> value >= bound
+        LinearOp.NE -> value != bound
+    }
+
+    private companion object {
+        const val UNASSIGNED = -1
+        const val FALSE = 0
+        const val TRUE = 1
+
+        fun truth(literal: Int): Int = if (literal and 1 == 0) TRUE else FALSE
+    }
+}
+
+private data class GeneralLiaDecision(val domains: Array<BigInterval>) : SearchTheoryDecision
+
+private data class LiaRow(val vars: IntArray, val coeffs: Array<BigInteger>, val bound: BigInteger) {
+    companion object {
+        fun of(factor: Linear): LiaRow = LiaRow(
+            factor.vars,
+            Array(
+                factor.vars.size,
+            ) { index -> factor.wideCoeffs?.get(index) ?: BigInteger.fromLong(factor.coeff(index)) },
+            factor.wideBound ?: BigInteger.fromLong(factor.bound),
+        )
+
+        fun of(factor: ReifiedLinear): LiaRow = LiaRow(
+            factor.vars,
+            Array(
+                factor.vars.size,
+            ) { index -> factor.wideCoeffs?.get(index) ?: BigInteger.fromLong(factor.coeff(index)) },
+            factor.wideBound ?: BigInteger.fromLong(factor.bound),
+        )
     }
 }
 
