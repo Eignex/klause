@@ -216,7 +216,10 @@ sealed interface SearchNodeDisposition {
     data object Prune : SearchNodeDisposition
 
     /** Learn a native consequence and resume from its asserting backjump level. */
-    data class Backjump(val consequence: SearchNodeBackjump) : SearchNodeDisposition
+    data class Backjump(
+        /** The learned consequence to assert after retracting. */
+        val consequence: SearchNodeBackjump,
+    ) : SearchNodeDisposition
 
     /** The node cannot be decided under the active limits. */
     data object Indeterminate : SearchNodeDisposition
@@ -237,7 +240,10 @@ sealed interface SearchNodeBackjumpResult {
     data object Resume : SearchNodeBackjumpResult
 
     /** A propagated native conflict supplied another learned consequence. */
-    data class Backjump(val consequence: SearchNodeBackjump) : SearchNodeBackjumpResult
+    data class Backjump(
+        /** The next learned consequence in the native conflict chain. */
+        val consequence: SearchNodeBackjump,
+    ) : SearchNodeBackjumpResult
 
     /** The consequence proved the shared root contradictory. */
     data object Exhausted : SearchNodeBackjumpResult
