@@ -840,7 +840,10 @@ fun interface BooleanBranching {
 /** A model or terminal verdict from a resumable [SearchRun]. */
 sealed interface SearchRunEvent {
     /** A complete model; call [SearchRun.next] again to continue enumeration. */
-    data class Satisfied(val model: AssembledSearchModel) : SearchRunEvent
+    data class Satisfied(
+        /** The complete model assembled by the participating search components. */
+        val model: AssembledSearchModel,
+    ) : SearchRunEvent
 
     /** Every branch was refuted. */
     data object Exhausted : SearchRunEvent
