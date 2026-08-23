@@ -26,8 +26,8 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.OpenTheorySolver
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
@@ -84,7 +84,7 @@ internal object SolveCore {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
                 output.begin(optimize = false, maximize = false)
-                val result = OpenTheorySolver(pipeline.model, pipeline.route).solve(
+                val result = OpenTheoryEngine(pipeline.model, pipeline.route).solve(
                     TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel),
                 )
                 when (result) {

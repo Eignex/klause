@@ -2,9 +2,11 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -85,5 +87,36 @@ class ProblemTest {
         )
 
         assertTrue(spec.variablePartition().isTheoryEligible(0))
+    }
+
+    @Test
+    fun `component plan keeps open theory columns unmaterialized`() {
+        val openUpper = Bits(3).also { it.set(1) }
+        val spec = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(3, 0, 3), null, openUpper),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 2), domainMin = 0, domainSize = 4),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 4),
+            ),
+        )
+
+        val plan = spec.componentPlan()
+        val problem = plan.materialize(spec, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
+        val cp = plan.cpProjection(spec, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
+
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertEquals(IntVariableOwner.THEORY, plan.intOwner(1))
+        assertEquals(FactorOwner.CP, plan.factorOwner(0))
+        assertEquals(FactorOwner.THEORY, plan.factorOwner(1))
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
+        assertEquals(IntDomain(0, 3), problem.intDomainOrNull(0))
+        assertEquals(null, problem.intDomainOrNull(1))
+        assertEquals(IntColumn.Symbolic, problem.intColumns.column(1))
+        assertFailsWith<IllegalArgumentException> { problem.requireFiniteIntDomains() }
+        assertEquals(2, cp.problem.numIntVars)
+        assertEquals(0, cp.cpId(0))
+        assertEquals(-1, cp.cpId(1))
+        assertEquals(0, cp.sourceId(0))
     }
 }

@@ -40,7 +40,7 @@ class ProblemSpec(
         require(realLower.size == numRealVars && realUpper.size == numRealVars)
     }
 
-    /** Build a finite [Problem] using the backend-selected [intDomains]. */
+    /** Build a [Problem] using the component-selected integer-domain capabilities. */
     fun materialize(intDomains: Array<IntDomain>): Problem {
         require(intDomains.size == numIntVars)
         return Problem(
@@ -58,6 +58,22 @@ class ProblemSpec(
             modelBounds = intBounds,
         )
     }
+
+    /** Build a hybrid problem from typed column capabilities selected before search. */
+    fun materialize(intColumns: IntColumns): Problem = Problem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intColumns = intColumns,
+        factors = factors,
+        seedDeductions = seedDeductions,
+        cancellation = cancellation,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        modelBounds = intBounds,
+    )
 
     /** Materialize the model's own finite ranges without inventing a search window. */
     fun materializeFiniteBounds(): Problem = materialize(

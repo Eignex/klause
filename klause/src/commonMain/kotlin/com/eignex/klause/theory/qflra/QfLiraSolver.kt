@@ -13,12 +13,20 @@ import com.eignex.klause.simplex.exact.BigRationalTableauRow
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchTheoryDecision
+import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.solver.supportsExactLira
-import com.eignex.klause.theory.TheoryParams
+import com.eignex.klause.theory.Theory
+import com.eignex.klause.theory.TheoryCheck
+import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.theory.TheoryResult
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** An exact mixed integer/rational witness for an open QF_LIRA model. */
@@ -31,27 +39,11 @@ data class ExactLiraAssignment(
     val reals: List<BigFraction>,
 )
 
-/** Result of exact QF_LIRA feasibility search. */
-sealed interface ExactLiraResult {
-    /** Statistics gathered while deciding the model. */
-    val stats: SolveStats
-
-    /** Satisfiable with an exact mixed witness. */
-    data class Sat(
-        /** The satisfying mixed assignment. */
-        val assignment: ExactLiraAssignment,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : ExactLiraResult
-
-    /** Every Boolean and integer branch is infeasible. */
-    data class Unsat(override val stats: SolveStats = SolveStats.EMPTY) : ExactLiraResult
-
-    /** An explicit budget or cancellation interrupted the exact search. */
-    data class Unknown(
-        /** The interruption cause. */
-        val reason: TerminationReason,
-        override val stats: SolveStats = SolveStats.EMPTY,
-    ) : ExactLiraResult
+/** Compatibility names for exact QF_LIRA's shared theory outcomes. */
+object ExactLiraResult {
+    typealias Sat = TheoryResult.Sat<ExactLiraAssignment>
+    typealias Unsat = TheoryResult.Unsat
+    typealias Unknown = TheoryResult.Unknown
 }
 
 /**
@@ -62,41 +54,19 @@ sealed interface ExactLiraResult {
  * boxes are disjoint and cover every integer value. This deliberately lives beside QF_LRA rather than
  * entering finite CP: the only branching here is theory-local integrality branching.
  */
-class ExactLiraSolver(private val model: ProblemSpec) {
+class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignment> {
     private val witnessBound = requireNotNull(model.liraWitnessBound())
 
     init {
         require(model.supportsExactLira()) { "exact LIRA search requires a supported open mixed linear model" }
     }
 
-    /** Decide the model subject to the supplied cancellation and leaf limits. */
-    fun solve(params: TheoryParams = TheoryParams()): ExactLiraResult {
-        val cancellation = Cancellation { params.cancellation() || model.cancellation() }
-        val bools = BooleanArray(model.numBoolVars)
-        var leavesLeft = params.maxLeaves
-        while (true) {
-            if (cancellation()) return ExactLiraResult.Unknown(TerminationReason.Cancelled)
-            if (!clausesHold(bools)) {
-                if (leavesLeft == 0L) return ExactLiraResult.Unknown(TerminationReason.BudgetExhausted)
-                leavesLeft--
-                if (!nextAssignment(bools)) return ExactLiraResult.Unsat()
-                continue
-            }
-            when (
-                val result = IntegerSearch(bools, cancellation) {
-                    if (leavesLeft == 0L) {
-                        false
-                    } else {
-                        leavesLeft--
-                        true
-                    }
-                }.run()
-            ) {
-                is IntegerSearchResult.Found -> return ExactLiraResult.Sat(result.assignment)
-                IntegerSearchResult.Infeasible -> if (!nextAssignment(bools)) return ExactLiraResult.Unsat()
-                IntegerSearchResult.Cancelled -> return ExactLiraResult.Unknown(TerminationReason.Cancelled)
-                IntegerSearchResult.Budget -> return ExactLiraResult.Unknown(TerminationReason.BudgetExhausted)
-            }
+    override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLiraAssignment> {
+        val cancellation = Cancellation(context::cancelled)
+        return when (val result = IntegerSearch(bools, cancellation, context::consumeCheck).run()) {
+            is IntegerSearchResult.Found -> TheoryCheck.Sat(result.assignment)
+            IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible
+            IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
         }
     }
 
@@ -173,20 +143,143 @@ class ExactLiraSolver(private val model: ProblemSpec) {
             return IntegerSearchResult.Infeasible
         }
     }
+}
 
-    private fun clausesHold(bools: BooleanArray): Boolean = model.factors.filterIsInstance<Clause>().all { clause ->
-        clause.literals.any { Lit.evaluate(it, bools[Lit.variable(it)]) }
+/**
+ * Incremental QF_LIRA participant whose exact simplex probes emit their residual integer splits to the
+ * shared search engine. The component owns only its branch description and exact tableau assembly;
+ * [com.eignex.klause.solver.search.SearchSession] owns the tree, decision levels, and retraction.
+ */
+class ExactLiraSearchComponent(
+    private val model: ProblemSpec,
+    private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
+) : TheoryComponent,
+    SearchBrancher {
+    private val witnessBound = requireNotNull(model.liraWitnessBound())
+    private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
+    private val boolLevels = IntArray(model.numBoolVars) { -1 }
+    private val root = SearchNode(
+        branches = List(model.numIntVars) { integer ->
+            IntegerBranch(integer, lower = -witnessBound, upper = witnessBound)
+        },
+    )
+    private val nodesByLevel = HashMap<Int, SearchNode>()
+    private var node = root
+    private var assignment: ExactLiraAssignment? = null
+    private var outcome: ComponentCheck? = null
+
+    init {
+        require(model.supportsExactLira()) { "exact LIRA component requires a supported mixed linear model" }
+        nodesByLevel[0] = root
     }
 
-    private fun nextAssignment(bools: BooleanArray): Boolean {
-        var bit = bools.lastIndex
-        while (bit >= 0 && bools[bit]) {
-            bools[bit] = false
-            bit--
+    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+        when (decision) {
+            is SearchDecision.Bool -> {
+                val variable = decision.literal ushr 1
+                bools[variable] = if (decision.literal and 1 == 0) TRUE else FALSE
+                boolLevels[variable] = context.decisionLevel
+            }
+
+            is SearchDecision.Theory -> (decision.decision as? ExactLiraDecision)?.let { branch ->
+                node = branch.node
+                nodesByLevel[context.decisionLevel] = node
+            }
+
+            is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> Unit
         }
-        if (bit < 0) return false
-        bools[bit] = true
-        return true
+        assignment = null
+        outcome = null
+        return ComponentResult.Consistent
+    }
+
+    override fun retract(decisionLevel: Int) {
+        for (variable in bools.indices) {
+            if (boolLevels[variable] > decisionLevel) {
+                bools[variable] = UNASSIGNED
+                boolLevels[variable] = -1
+            }
+        }
+        nodesByLevel.keys.removeAll { it > decisionLevel }
+        node = nodesByLevel.entries.maxByOrNull { it.key }?.value ?: root
+        assignment = null
+        outcome = null
+    }
+
+    override fun nextBranch(context: SearchContext): List<SearchDecision>? {
+        if (bools.any { it == UNASSIGNED } || outcome != null) return null
+        if (context.cancelled() || !context.consumeCheck()) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        val values = BooleanArray(bools.size) { bools[it] == TRUE }
+        val disequality = node.nextDisequality(model, values)
+        if (disequality >= 0) {
+            return listOf(
+                decision(node.withDirection(disequality, LinearOp.GE)),
+                decision(node.withDirection(disequality, LinearOp.LE)),
+            )
+        }
+        val leaf = QfLiraSystem(model).build(values, node)
+        if (leaf == null) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        val simplex = bigRationalOutcome(leaf.model, Cancellation(context::cancelled), Int.MAX_VALUE)
+        when (simplex.feasibility) {
+            RationalFeasibility.INFEASIBLE -> {
+                outcome = ComponentCheck.Infeasible()
+                return null
+            }
+
+            RationalFeasibility.UNKNOWN -> {
+                outcome = ComponentCheck.Indeterminate
+                return null
+            }
+
+            RationalFeasibility.FEASIBLE -> Unit
+        }
+        val witness = checkNotNull(simplex.witness)
+        leaf.gmiCut(simplex.tableau)?.takeUnless { candidate -> node.cuts.any { it.sameAs(candidate) } }?.let { cut ->
+            return listOf(decision(node.withCut(cut)))
+        }
+        val split = leaf.integerPositive.indices.firstOrNull { integer ->
+            !leaf.value(witness, leaf.integerPositive[integer], leaf.integerNegative[integer]).isInteger()
+        }
+        if (split != null) {
+            val value = leaf.value(witness, leaf.integerPositive[split], leaf.integerNegative[split])
+            val floor = value.floor()
+            return listOf(
+                decision(node.withBranch(IntegerBranch(split, lower = floor + BigInteger.ONE))),
+                decision(node.withBranch(IntegerBranch(split, upper = floor))),
+            )
+        }
+        assignment = ExactLiraAssignment(
+            values,
+            Array(model.numIntVars) { integer ->
+                leaf.value(witness, leaf.integerPositive[integer], leaf.integerNegative[integer]).num
+            },
+            List(model.numRealVars) { real -> leaf.value(witness, leaf.realPositive[real], leaf.realNegative[real]) },
+        )
+        outcome = ComponentCheck.Feasible
+        return null
+    }
+
+    override fun check(context: SearchContext): ComponentCheck = outcome ?: ComponentCheck.Indeterminate
+
+    override fun contributeModel(model: SearchModel, context: SearchContext) {
+        assignment?.let { value ->
+            model.put(this, value)
+            modelContribution?.invoke(value, model)
+        }
+    }
+
+    private fun decision(node: SearchNode): SearchDecision = SearchDecision.Theory(ExactLiraDecision(node))
+
+    private companion object {
+        const val UNASSIGNED = -1
+        const val FALSE = 0
+        const val TRUE = 1
     }
 }
 
@@ -234,6 +327,9 @@ private data class SearchNode(
         LinearOp.NE -> LinearOp.EQ
     }
 }
+
+/** QF_LIRA branch payload opaque to the shared session. */
+private data class ExactLiraDecision(val node: SearchNode) : SearchTheoryDecision
 
 /** Direct exact-simplex assembler for one Boolean/integer branch of a mixed source model. */
 private class QfLiraSystem(private val model: ProblemSpec) {

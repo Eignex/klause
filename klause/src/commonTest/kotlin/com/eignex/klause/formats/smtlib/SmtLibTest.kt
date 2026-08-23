@@ -10,6 +10,7 @@ import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.TheoryParams
+import com.eignex.klause.theory.TheoryResult
 import com.eignex.klause.theory.difference.DifferenceTheorySolver
 import com.eignex.klause.theory.lia.GeneralLiaResult
 import com.eignex.klause.theory.lia.GeneralLiaSolver
@@ -32,14 +33,14 @@ class SmtLibTest {
         val parsed = SmtLib.parse(text)
         if (parsed.sourcePipeline == ProblemPipeline.GENERAL_LIA) {
             val result = GeneralLiaSolver(parsed.model).solve()
-            assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
+            assertTrue(result is TheoryResult.Sat, "expected SAT, got $result")
             return LongArray(parsed.intVarNames.values.maxOrNull()?.plus(1) ?: 0) { v ->
                 result.assignment.ints[v].longValue()
             }
         }
         if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
             val result = DifferenceTheorySolver(parsed.model).solve()
-            assertTrue(result is SolveResult.Sat, "expected SAT, got $result")
+            assertTrue(result is TheoryResult.Sat, "expected SAT, got $result")
             return result.assignment.ints
         }
         val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())

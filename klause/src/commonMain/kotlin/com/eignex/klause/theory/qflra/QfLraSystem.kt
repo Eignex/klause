@@ -32,24 +32,38 @@ internal class QfLraSystem(private val model: ProblemSpec) {
                 pos
             }
         }
-        for (factor in model.factors) when (factor) {
-            is Linear -> if (factor.hasReals) {
-                addRow(
-                    builder, positive, negative, factor.realVars, factor.realCoeffs, factor.op, factor.realBound,
-                    factor.strictReal,
-                )
-            }
+        for (factor in model.factors) {
+            when (factor) {
+                is Linear -> if (factor.hasReals) {
+                    addRow(
+                        builder,
+                        positive,
+                        negative,
+                        factor.realVars,
+                        factor.realCoeffs,
+                        factor.op,
+                        factor.realBound,
+                        factor.strictReal,
+                    )
+                }
 
-            is ReifiedRealLinear -> {
-                val truth = bools[factor.aux]
-                val op = if (truth) factor.op else flip(factor.op)
-                addRow(
-                    builder, positive, negative, factor.realVars, factor.realCoeffs, op, factor.bound,
-                    if (truth) factor.strict else !factor.strict,
-                )
-            }
+                is ReifiedRealLinear -> {
+                    val truth = bools[factor.aux]
+                    val op = if (truth) factor.op else flip(factor.op)
+                    addRow(
+                        builder,
+                        positive,
+                        negative,
+                        factor.realVars,
+                        factor.realCoeffs,
+                        op,
+                        factor.bound,
+                        if (truth) factor.strict else !factor.strict,
+                    )
+                }
 
-            else -> Unit
+                else -> Unit
+            }
         }
         return QfLraLeaf(builder.build(Sense.MINIMIZE), realId.toIntArray(), realSign.toIntArray())
     }

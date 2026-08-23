@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.LearnedConstraint
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
@@ -12,6 +13,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableLongIntMap
 import com.eignex.kumulant.math.splitmix64
@@ -127,15 +131,21 @@ internal class DfsEngine<L>(
 
     // null = auto-dispatch: the native-SAT lane engages exactly when the baked problem is eligible
     // (PropagationState gates on that anyway). An explicit true/false overrides the auto choice.
-    private val session = PropagationSession(
-        problem,
-        params.cancellation,
-        params.propagationCancelFloor,
-        nativeSat = params.nativeSat ?: true,
-        // null = auto: PB cutting-planes learning is on for pure-Boolean problems (PropagationState gates
-        // it to numIntVars == 0 anyway). An explicit true/false overrides.
-        pbLearning = params.pbLearning ?: true,
+    private val cpComponent = CpSearchComponent(
+        PropagationSession(
+            problem,
+            params.cancellation,
+            params.propagationCancelFloor,
+            nativeSat = params.nativeSat ?: true,
+            // null = auto: PB cutting-planes learning is on for pure-Boolean problems (PropagationState gates
+            // it to numIntVars == 0 anyway). An explicit true/false overrides.
+            pbLearning = params.pbLearning ?: true,
+        ),
     )
+    private val extraComponents = params0.componentFactory?.invoke().orEmpty()
+    private val session: PropagationSession = cpComponent.session
+    private val componentSet = SearchComponentSet(listOf(cpComponent) + extraComponents)
+    private val searchSession = componentSet.session(cancellation = params.cancellation)
 
     // Number of decision levels the seed uses (bool pins then int pins); levels 1..numSeed are
     // assumptions, levels > numSeed are post-seed DFS decisions.
@@ -188,6 +198,8 @@ internal class DfsEngine<L>(
     init {
         val baked = problem.baked
         if (baked is PropagationResult.Unsat) {
+            cpComponent.rebase()
+            check(searchSession.initialize() is ComponentResult.Consistent || session.isUnsatAtRoot)
             rootExhausted = EngineEvent.Exhausted(solver.coreOf(baked), solver.touchedToArray(touchedSeedLevels))
         } else {
             if (params.variableSelector.tracksUnassign) {
@@ -203,6 +215,10 @@ internal class DfsEngine<L>(
                 rootExhausted =
                     EngineEvent.Exhausted(solver.coreOf(seedResult), solver.touchedToArray(touchedSeedLevels))
             } else {
+                // The CP adapter owns finite-domain propagation; the shared session begins at the
+                // post-seed root so its level zero matches the DFS trail's level zero.
+                cpComponent.rebase()
+                check(searchSession.initialize() is ComponentResult.Consistent)
                 // Import nogoods already in the shared pool before the first run (cross-arm); the
                 // session persists for the whole search so this arm's own clauses are never lost.
                 params.clauseExchange?.onSearchStart(session)
@@ -223,6 +239,7 @@ internal class DfsEngine<L>(
      * prune. (Blocking nogoods likewise only forbid already-surfaced assignments.)
      */
     fun reseed(assumptions: Assumptions, decisionBudget: Long) {
+        searchSession.popTo(0)
         trail.clear()
         pendingBlock = null
         descend = true
@@ -239,10 +256,16 @@ internal class DfsEngine<L>(
         // shared complement carries over, so re-seeding a small-delta fragment stays cheap.
         val seedResult = session.reseedFrom(assumptions)
         if (seedResult is PropagationResult.Unsat) {
+            cpComponent.rebase()
+            searchSession.resetRootFacts()
+            check(searchSession.initialize() is ComponentResult.Consistent || session.isUnsatAtRoot)
             recordTouchedSeedLevels(seedResult.conflictLevels)
             rootExhausted =
                 EngineEvent.Exhausted(solver.coreOf(seedResult), solver.touchedToArray(touchedSeedLevels))
         } else {
+            cpComponent.rebase()
+            searchSession.resetRootFacts()
+            check(searchSession.initialize() is ComponentResult.Consistent)
             params.clauseExchange?.onSearchStart(session)
         }
     }
@@ -305,7 +328,26 @@ internal class DfsEngine<L>(
                 descend = false
                 return EngineEvent.BudgetCapped
             }
-            val snap = snapshotAssignment(session)
+            when (val check = searchSession.check()) {
+                ComponentCheck.Feasible -> Unit
+
+                is ComponentCheck.Infeasible -> {
+                    searchSession.learn(check.explanation)
+                    sink?.search?.observeFail()
+                    descend = false
+                    return null
+                }
+
+                ComponentCheck.Indeterminate -> {
+                    policy.onBudgetExit(session)
+                    descend = false
+                    return EngineEvent.BudgetCapped
+                }
+            }
+            // The CP adapter contributes the legacy [Sample] under its component identity. Reading it
+            // through the shared model boundary keeps finite and theory-backed leaves on the same model
+            // assembly lifecycle.
+            val snap = checkNotNull(searchSession.model().valueOf<Sample>(cpComponent))
             params.variableSelector.onSolution(snap)
             params.valueSelector.onSolution(snap)
             phase.onSolution(snap)
@@ -339,6 +381,8 @@ internal class DfsEngine<L>(
                 // without a deadline the engine may not poll at all.
                 spendNodeBudget()
             }
+
+            AdvanceOutcome.AlreadyApplied -> null
 
             AdvanceOutcome.Exhausted -> {
                 descend = false
@@ -375,11 +419,17 @@ internal class DfsEngine<L>(
         }
         if (trail.isEmpty()) return exhausted()
         val top = trail.last()
-        session.popLast()
+        searchSession.popTo(searchSession.decisionLevel - 1)
         val out = runAdvance(top)
         return when (out) {
             AdvanceOutcome.Success -> {
                 phase.capture(top.varRef, session)
+                descend = true
+                null
+            }
+
+            AdvanceOutcome.AlreadyApplied -> {
+                trail.removeAt(trail.size - 1)
                 descend = true
                 null
             }
@@ -403,7 +453,7 @@ internal class DfsEngine<L>(
     private fun handleBackjump(learned: LearnedConstraint, alignFirst: Boolean): EngineEvent<L>? {
         recordTouchedSeedLevels(learned.decisionLevels)
         restart.recordConflict(learned.lbd, trail.size)
-        return when (solver.backjumpAndLearn(learned, trail, session, params, alignFirst)) {
+        return when (solver.backjumpAndLearn(learned, trail, cpComponent, searchSession, params, alignFirst)) {
             BackjumpTerm.Resume -> {
                 descend = true
                 null
@@ -423,6 +473,11 @@ internal class DfsEngine<L>(
     // before the objective bound is asserted, so the bound is posted against the fully updated root.
     private fun doRestart(): EngineEvent<L>? {
         popTrailToRoot()
+        when (searchSession.restart()) {
+            ComponentResult.Consistent -> Unit
+            is ComponentResult.Conflict -> return exhausted()
+            ComponentResult.Indeterminate -> return EngineEvent.BudgetCapped
+        }
         val restartBlock = pendingBlock
         if (restartBlock != null) {
             pendingBlock = null
@@ -467,7 +522,7 @@ internal class DfsEngine<L>(
     /** Pop every decision frame, reverting the session in lockstep, back to the post-seed root. */
     private fun popTrailToRoot() {
         while (trail.isNotEmpty()) {
-            session.popLast()
+            searchSession.popTo(searchSession.decisionLevel - 1)
             trail.removeAt(trail.size - 1)
         }
     }
@@ -491,7 +546,8 @@ internal class DfsEngine<L>(
         val decsBefore = decisionsLeft
         val out = solver.advance(
             node,
-            session,
+            cpComponent,
+            searchSession,
             params,
             policy.pruneIf,
             { decisionsLeft },

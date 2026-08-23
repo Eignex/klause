@@ -21,6 +21,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.theory.TheoryResult
 import com.eignex.klause.theory.difference.DifferenceTheorySolver
 import com.eignex.klause.theory.lia.GeneralLiaResult
 import com.eignex.klause.theory.lia.GeneralLiaSolver
@@ -33,6 +34,51 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class BacktrackSolverTest {
+
+    @Test
+    fun `component factory refutes finite CP leaves through the shared session`() {
+        val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
+        val result = BacktrackSolver(problem.bake()).solve(
+            BacktrackParams(
+                componentFactory = {
+                    listOf(object : com.eignex.klause.solver.search.TheoryComponent {
+                        override fun check(
+                            context: com.eignex.klause.solver.search.SearchContext,
+                        ): com.eignex.klause.solver.search.ComponentCheck =
+                            com.eignex.klause.solver.search.ComponentCheck.Infeasible()
+                    })
+                },
+            ),
+        )
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `component assertion conflict prunes a CP branch through the shared session`() {
+        val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
+        val result = BacktrackSolver(problem.bake()).solve(
+            BacktrackParams(
+                componentFactory = {
+                    listOf(object : com.eignex.klause.solver.search.TheoryComponent {
+                        override fun assert(
+                            decision: com.eignex.klause.solver.search.SearchDecision,
+                            context: com.eignex.klause.solver.search.SearchContext,
+                        ): com.eignex.klause.solver.search.ComponentResult =
+                            com.eignex.klause.solver.search.ComponentResult.Conflict(
+                                com.eignex.klause.solver.search.SearchExplanation(
+                                    intArrayOf(
+                                        (decision as com.eignex.klause.solver.search.SearchDecision.Bool).literal xor 1,
+                                    ),
+                                ),
+                            )
+                    })
+                },
+            ),
+        )
+
+        assertIs<SolveResult.Unsat>(result)
+    }
 
     @Test
     fun `difference theory solves an open integer row without a finite domain`() {
@@ -50,7 +96,7 @@ class BacktrackSolverTest {
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 5)),
         )
 
-        val result = assertIs<SolveResult.Sat>(DifferenceTheorySolver(model).solve())
+        val result = assertIs<TheoryResult.Sat<com.eignex.klause.solver.Sample>>(DifferenceTheorySolver(model).solve())
 
         assertTrue(result.assignment.ints[0] >= 5L)
     }
@@ -76,7 +122,7 @@ class BacktrackSolverTest {
 
         val result = DifferenceTheorySolver(model).solve()
 
-        assertIs<SolveResult.Unsat>(result)
+        assertIs<TheoryResult.Unsat>(result)
     }
 
     @Test
@@ -98,7 +144,7 @@ class BacktrackSolverTest {
             ),
         )
 
-        val result = assertIs<SolveResult.Sat>(DifferenceTheorySolver(model).solve())
+        val result = assertIs<TheoryResult.Sat<com.eignex.klause.solver.Sample>>(DifferenceTheorySolver(model).solve())
 
         assertTrue(result.assignment.bools[0])
         assertTrue(result.assignment.ints[0] <= -4L)

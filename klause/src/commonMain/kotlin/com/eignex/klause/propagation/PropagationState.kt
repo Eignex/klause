@@ -118,7 +118,7 @@ class PropagationState(
     /** The stable root domains this state was seeded from — the search root, read by propagators for a
      *  variable's original bounds. Decoupled from [problem] so the bake can seed from raw declared domains
      *  and search from baked ones without the machinery caring which. */
-    val rootDomains: Array<IntDomain> = problem.intDomains
+    val rootDomains: Array<IntDomain> = problem.requireFiniteIntDomains()
 
     /** Per-int current domain (copy of [rootDomains], narrowed as propagation proceeds). */
     val intDomains: Array<IntDomain> = Array(problem.numIntVars) { rootDomains[it] }

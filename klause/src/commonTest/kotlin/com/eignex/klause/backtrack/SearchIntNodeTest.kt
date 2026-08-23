@@ -25,12 +25,12 @@ class SearchIntNodeTest {
         val wideHi = 3_000_000_000L // span > 2^31, so the domain is non-enumerable
         val session = PropagationSession(problemOf(IntDomain(0, wideHi)))
         assertFalse(session.intDomain(0).enumerable)
-        // The bounds midpoint of the pre-decision domain (applyNext narrows it via the pin below).
+        // The bounds midpoint of the pre-decision domain (the returned decision narrows it when applied).
         val mid = boundsMidpoint(session.intDomain(0))
         // `indomain_min` offers `min` as the preferred value; on a wide domain the node must still bisect,
         // else it peels one value per level (O(span) branch depth) instead of O(log span).
         val node = IntNode(VarRef.IntVar(0), sequenceOf(0L))
-        val out = node.applyNext(session)!!
+        val out = node.nextDecision(session)!!
         assertEquals(mid, out.value, "wide-domain split point must be the bounds midpoint, not the boundary")
         assertTrue(mid in 1L until wideHi, "the midpoint is strictly interior, so both children are non-empty")
     }
@@ -40,7 +40,7 @@ class SearchIntNodeTest {
         val session = PropagationSession(problemOf(IntDomain(0, 10)))
         assertTrue(session.intDomain(0).enumerable)
         val node = IntNode(VarRef.IntVar(0), sequenceOf(0L)) // `indomain_min` prefers the minimum
-        val out = node.applyNext(session)!!
+        val out = node.nextDecision(session)!!
         assertEquals(0L, out.value, "enumerable-domain behavior is unchanged: split at the preferred value")
     }
 }

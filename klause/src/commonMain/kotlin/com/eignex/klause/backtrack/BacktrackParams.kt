@@ -24,6 +24,7 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.search.SearchComponent
 
 /**
  * Per-call params for [BacktrackSolver].
@@ -49,6 +50,13 @@ import com.eignex.klause.solver.result.SearchEvent
  *    correct for all standard use. Ignored by `solve` / `samples`.
  */
 data class BacktrackParams(
+    /**
+     * Additional theory or lemma components for this search.
+     *
+     * The factory runs once per [DfsEngine], outside the decision hot path. Components observe the
+     * shared trail through [com.eignex.klause.solver.search.SearchSession] and must not read CP domains.
+     */
+    val componentFactory: (() -> List<SearchComponent>)? = null,
     /**
      * Decisions one slice of the search may push before it gives up (Unknown). A restart, a resuming
      * portfolio arm or an ALNS repair re-enters the engine with the allowance renewed, so this bounds a
