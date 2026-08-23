@@ -121,15 +121,6 @@ class SearchSession(
 
     internal fun lastPushCreatedLevel(): Boolean = lastPushCreatedLevel
 
-    /**
-     * Record a decision already applied by [source], then deliver it to every other component.
-     *
-     * The CP adapter uses this while its specialised pin/analysis path remains in place. It avoids
-     * applying the same CP pin twice while giving theory components the identical shared trail.
-     */
-    fun observe(decision: SearchDecision, source: SearchComponent): ComponentResult =
-        recordAndDispatch(decision, source)
-
     private fun recordAndDispatch(decision: SearchDecision, source: SearchComponent?): ComponentResult {
         conflictResolver = null
         if (decision is SearchDecision.Bool) {
@@ -172,20 +163,10 @@ class SearchSession(
 
     /** Retract all decisions above [decisionLevel] in reverse trail order. */
     fun popTo(decisionLevel: Int) {
-        retractTo(decisionLevel, alreadyRetracted = null)
+        retractTo(decisionLevel)
     }
 
-    /**
-     * Remove a failed assertion after [alreadyRetracted] has reverted its own native trail.
-     *
-     * CP's pin API rolls a conflicting pin back before returning its conflict. The shared trail and
-     * peer components still saw that assertion, so they must be reverted without popping CP twice.
-     */
-    fun rollbackFailedPush(decisionLevel: Int, alreadyRetracted: SearchComponent) {
-        retractTo(decisionLevel, alreadyRetracted)
-    }
-
-    private fun retractTo(decisionLevel: Int, alreadyRetracted: SearchComponent?) {
+    private fun retractTo(decisionLevel: Int) {
         require(decisionLevel in 0..trail.size) { "invalid search decision level $decisionLevel" }
         if (decisionLevel == trail.size) return
         for (level in trail.size downTo decisionLevel + 1) {
@@ -202,7 +183,7 @@ class SearchSession(
         }
         trail.subList(decisionLevel, trail.size).clear()
         pendingAssertions.clear()
-        for (component in components) if (component !== alreadyRetracted) component.retract(decisionLevel)
+        for (component in components) component.retract(decisionLevel)
     }
 
     /** Run all components until each has observed the current shared state once. */
@@ -313,6 +294,7 @@ class SearchSession(
         return when (val event = run.next()) {
             is SearchRunEvent.Satisfied -> SearchResult.Satisfied(event.model)
             SearchRunEvent.Exhausted -> SearchResult.Exhausted
+            SearchRunEvent.Paused -> SearchResult.Indeterminate
             is SearchRunEvent.Indeterminate -> SearchResult.Indeterminate
         }
     }
@@ -327,7 +309,18 @@ class SearchSession(
         modelContinuation: SearchModelContinuation = SearchModelContinuation.Chronological,
         modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll,
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
-    ): SearchRun = SearchRun(this, params, booleanBranching, decisionBudget, observer, modelContinuation, modelPolicy, nodePolicy)
+        lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
+    ): SearchRun = SearchRun(
+        this,
+        params,
+        booleanBranching,
+        decisionBudget,
+        observer,
+        modelContinuation,
+        modelPolicy,
+        nodePolicy,
+        lifecycle,
+    )
 
     internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {
         popTo(0)
@@ -488,6 +481,7 @@ class SearchRun internal constructor(
     private val modelContinuation: SearchModelContinuation,
     private val modelPolicy: SearchModelPolicy,
     private val nodePolicy: SearchNodePolicy,
+    private val lifecycle: SearchRunLifecycle,
 ) {
     private val frames = ArrayList<Frame>()
     private var decisions = 0L
@@ -497,6 +491,8 @@ class SearchRun internal constructor(
     private var lastModel: AssembledSearchModel? = null
     private var consumedModel = false
     private var terminal: SearchRunEvent? = null
+    private var started = false
+    private val cancellationPoller = SearchCancellationPoller()
 
     init {
         params.restart.beginRun()
@@ -505,27 +501,43 @@ class SearchRun internal constructor(
     /** Advance until the next model or terminal verdict. */
     fun next(): SearchRunEvent {
         terminal?.let { return it }
+        if (!started) {
+            started = true
+            lifecycle.onStart(session).toEvent()?.let { return it }
+        }
+        lifecycle.onResume(session).toEvent()?.let { return it }
         if (resumeAfterSolution) {
             resumeAfterSolution = false
             when (modelContinuation) {
-                SearchModelContinuation.Chronological -> if (!backtrack()) return finish(exhausted())
+                SearchModelContinuation.Chronological -> if (!backtrack()) return stopAfterBacktrack()
+
                 SearchModelContinuation.BlockAtRoot -> when (session.blockModelAtRoot(checkNotNull(lastModel))) {
                     ComponentResult.Consistent -> {
                         frames.clear()
                         consumedModel = true
+                        lifecycle.onModelBlocked(session).toEvent()?.let { return it }
                     }
+
                     is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
+
                     ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
                 }
             }
         }
         while (true) {
-            if (session.cancelled()) return finish(SearchRunEvent.Indeterminate.Cancelled)
+            if (cancellationPoller.due()) {
+                if (session.cancelled()) {
+                    return lifecycle.onCancellation(session).toEvent()
+                        ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+                }
+                cancellationPoller.rearm()
+            }
             when (nodePolicy.beforeBranch(session)) {
                 SearchNodeDisposition.Expand -> Unit
+
                 SearchNodeDisposition.Prune -> {
                     observer.onConflict(null)
-                    if (!backtrack()) return finish(exhausted())
+                    if (!backtrack()) return stopAfterBacktrack()
                     continue
                 }
 
@@ -542,89 +554,69 @@ class SearchRun internal constructor(
                         resumeAfterSolution = true
                         when (modelPolicy.onModel(model, session)) {
                             SearchModelDisposition.Surface -> return SearchRunEvent.Satisfied(model)
+
                             SearchModelDisposition.Continue -> {
                                 resumeAfterSolution = false
                                 when (modelContinuation) {
                                     SearchModelContinuation.Chronological -> if (!backtrack()) {
-                                        return finish(exhausted())
+                                        return stopAfterBacktrack()
                                     }
 
                                     SearchModelContinuation.BlockAtRoot -> when (
                                         session.blockModelAtRoot(checkNotNull(lastModel))
                                     ) {
-                                        ComponentResult.Consistent -> frames.clear()
+                                        ComponentResult.Consistent -> {
+                                            frames.clear()
+                                            consumedModel = true
+                                            lifecycle.onModelBlocked(session).toEvent()?.let { return it }
+                                        }
+
                                         is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-                                        ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+
+                                        ComponentResult.Indeterminate -> return finish(
+                                            SearchRunEvent.Indeterminate.Component,
+                                        )
                                     }
                                 }
                             }
                         }
                     }
 
-                is ComponentCheck.Infeasible -> {
-                    session.learn(result.explanation)
-                    observer.onConflict(null)
-                    if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
-                        when (session.restart()) {
-                            ComponentResult.Consistent -> {
-                                frames.clear()
-                                decisionsSinceRestart = 0L
-                                params.restart.onRestart()
-                                params.restart.beginRun()
-                                observer.onRestart()
-                                continue
-                            }
-
-                            is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-                            ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
+                    is ComponentCheck.Infeasible -> {
+                        session.learn(result.explanation)
+                        observer.onConflict(null)
+                        if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
+                            restart()?.let { return it }
+                            continue
                         }
-                    }
-                    if (!resolveConflict() && !backtrack()) return finish(exhausted())
+                        if (!resolveConflict() && !backtrack()) return stopAfterBacktrack()
                     }
 
                     ComponentCheck.Indeterminate -> {
                         sawIndeterminate = true
-                        if (!backtrack()) return finish(SearchRunEvent.Indeterminate.Component)
+                        if (session.cancelled()) {
+                            return lifecycle.onCancellation(session).toEvent()
+                                ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+                        }
+                        if (!backtrack()) return stopAfterBacktrack(indeterminate = true)
                     }
                 }
 
                 is Alternatives.Branch -> {
                     if (alternatives.decisions.isEmpty()) {
-                        if (!backtrack()) return finish(exhausted())
+                        if (!backtrack()) return stopAfterBacktrack()
                         continue
                     }
                     if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
-                        when (session.restart()) {
-                            ComponentResult.Consistent -> {
-                                frames.clear()
-                                decisionsSinceRestart = 0L
-                                params.restart.onRestart()
-                                params.restart.beginRun()
-                                observer.onRestart()
-                                continue
-                            }
-
-                            is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-                            ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
-                        }
+                        restart()?.let { return it }
+                        continue
                     }
                     frames += Frame(session.decisionLevel, alternatives.decisions)
                     when (advanceFrame()) {
                         Advance.Expanded -> Unit
                         Advance.Budget -> return finish(SearchRunEvent.Indeterminate.Budget)
-                        Advance.Exhausted -> if (!backtrack()) return finish(exhausted())
-                        Advance.Restart -> when (session.restart()) {
-                            ComponentResult.Consistent -> {
-                                frames.clear()
-                                decisionsSinceRestart = 0L
-                                params.restart.onRestart()
-                                params.restart.beginRun()
-                                observer.onRestart()
-                            }
-
-                            is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
-                            ComponentResult.Indeterminate -> return finish(SearchRunEvent.Indeterminate.Component)
-                        }
+                        Advance.Exhausted -> if (!backtrack()) return stopAfterBacktrack()
+                        Advance.Restart -> restart()?.let { return it }
                     }
                 }
             }
@@ -643,15 +635,17 @@ class SearchRun internal constructor(
             if (decisions == params.maxDecisions) return Advance.Budget
             val level = session.decisionLevel
             val decision = frame.decisions[frame.next++]
+            if (!decision.tightens(session)) continue
             decisions++
             decisionsSinceRestart++
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
-                    if (!session.lastPushCreatedLevel()) return Advance.Expanded
+                    if (!session.lastPushCreatedLevel()) continue
                     observer.onCommit(decision, session.decisionLevel)
                     if (!decisionBudget.consume()) return Advance.Budget
                     return Advance.Expanded
                 }
+
                 ComponentResult.Indeterminate -> {
                     session.popTo(level)
                     sawIndeterminate = true
@@ -670,6 +664,20 @@ class SearchRun internal constructor(
         return Advance.Exhausted
     }
 
+    private fun SearchDecision.tightens(context: SearchContext): Boolean = when (this) {
+        is SearchDecision.Bool -> context.boolValue(literal ushr 1) == null
+
+        is SearchDecision.IntAtMost -> (context.intUpperBound(variable) ?: Long.MAX_VALUE) > upper
+
+        is SearchDecision.IntAtLeast -> (context.intLowerBound(variable) ?: Long.MIN_VALUE) < lower
+
+        is SearchDecision.IntEqual -> context.intLowerBound(
+            variable,
+        ) != value || context.intUpperBound(variable) != value
+
+        is SearchDecision.Theory -> true
+    }
+
     private fun backtrack(): Boolean {
         while (frames.isNotEmpty()) {
             val frame = frames.last()
@@ -678,18 +686,7 @@ class SearchRun internal constructor(
                 Advance.Expanded -> return true
                 Advance.Budget -> return false
                 Advance.Exhausted -> Unit
-                Advance.Restart -> when (session.restart()) {
-                    ComponentResult.Consistent -> {
-                        frames.clear()
-                        decisionsSinceRestart = 0L
-                        params.restart.onRestart()
-                        params.restart.beginRun()
-                        observer.onRestart()
-                        return true
-                    }
-
-                    is ComponentResult.Conflict, ComponentResult.Indeterminate -> return false
-                }
+                Advance.Restart -> return restart() == null
             }
         }
         return false
@@ -700,6 +697,7 @@ class SearchRun internal constructor(
         if (consumedModel && !resolver.resolvesAfterModelBlock) return false
         when (resolution) {
             SearchConflictResolution.Chronological -> return false
+
             SearchConflictResolution.Exhausted -> return false
 
             is SearchConflictResolution.Backjump -> {
@@ -723,6 +721,57 @@ class SearchRun internal constructor(
     private fun finish(event: SearchRunEvent): SearchRunEvent {
         terminal = event
         return event
+    }
+
+    private fun stopAfterBacktrack(indeterminate: Boolean = false): SearchRunEvent {
+        if (session.cancelled()) {
+            return lifecycle.onCancellation(session).toEvent()
+                ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+        }
+        return if (indeterminate) finish(SearchRunEvent.Indeterminate.Component) else finish(exhausted())
+    }
+
+    /** Return the shared session to its root and run every mode-specific restart action. */
+    private fun restart(): SearchRunEvent? = when (session.restart()) {
+        ComponentResult.Consistent -> {
+            frames.clear()
+            params.restart.onRestart()
+            observer.onRestart(decisionsSinceRestart)
+            decisionsSinceRestart = 0L
+            params.restart.beginRun()
+            lifecycle.onRestart(session).toEvent()
+        }
+
+        is ComponentResult.Conflict -> finish(SearchRunEvent.Exhausted)
+
+        ComponentResult.Indeterminate -> if (session.cancelled()) {
+            lifecycle.onCancellation(session).toEvent() ?: finish(SearchRunEvent.Indeterminate.Cancelled)
+        } else {
+            finish(SearchRunEvent.Indeterminate.Component)
+        }
+    }
+
+    private fun SearchRunDisposition.toEvent(): SearchRunEvent? = when (this) {
+        SearchRunDisposition.Continue -> null
+        SearchRunDisposition.Exhausted -> finish(exhausted())
+        SearchRunDisposition.Pause -> SearchRunEvent.Paused
+        SearchRunDisposition.Indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
+    }
+
+    /** Reset traversal state after its components have been reseeded at root. */
+    fun reset() {
+        check(session.decisionLevel == 0) { "a search run may only reset at its root" }
+        frames.clear()
+        decisions = 0L
+        decisionsSinceRestart = 0L
+        sawIndeterminate = false
+        resumeAfterSolution = false
+        lastModel = null
+        consumedModel = false
+        terminal = null
+        started = false
+        cancellationPoller.reset()
+        params.restart.beginRun()
     }
 
     private data class Frame(val level: Int, val decisions: List<SearchDecision>, var next: Int = 0)
@@ -759,8 +808,8 @@ interface SearchRunObserver {
     /** A branch assertion or candidate leaf was refuted. */
     fun onConflict(decision: SearchDecision?) {}
 
-    /** The runner returned the session to its root. */
-    fun onRestart() {}
+    /** The runner returned the session to root after [decisions] decisions in the completed run. */
+    fun onRestart(decisions: Long) {}
 
     /** The session assembled a complete model. */
     fun onModel(model: AssembledSearchModel) {}
@@ -795,6 +844,9 @@ sealed interface SearchRunEvent {
 
     /** Every branch was refuted. */
     data object Exhausted : SearchRunEvent
+
+    /** The mode yielded cooperatively and may resume by calling [SearchRun.next]. */
+    data object Paused : SearchRunEvent
 
     /** Cancellation, a limit, or a component prevented an exact verdict. */
     sealed interface Indeterminate : SearchRunEvent {

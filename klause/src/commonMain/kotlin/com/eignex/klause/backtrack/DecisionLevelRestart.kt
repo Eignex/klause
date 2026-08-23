@@ -6,7 +6,7 @@ package com.eignex.klause.backtrack
  * before conflicting, a sign the current region is unproductive and it should re-pick. The complement of
  * [GlucoseRestart]'s LBD signal: LBD measures learned-clause quality, decision level measures how deep
  * the search drove to hit the conflict. The decision level is the trail depth at the conflict (klause's
- * [DfsEngine] passes the decision-node count).
+ * [com.eignex.klause.solver.search.SearchRun] passes the decision-node count).
  *
  *  - [window] — recent-window capacity; the restart check is gated on the window being full, so tiny
  *    searches never restart.

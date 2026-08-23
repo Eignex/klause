@@ -60,8 +60,13 @@ class BacktrackSolverTest {
 
                         override fun nextBranch(
                             context: com.eignex.klause.solver.search.SearchContext,
-                        ): List<com.eignex.klause.solver.search.SearchDecision>? =
-                            if (selected) null else listOf(com.eignex.klause.solver.search.SearchDecision.Theory(branch))
+                        ): List<com.eignex.klause.solver.search.SearchDecision>? = if (selected) {
+                            null
+                        } else {
+                            listOf(
+                                com.eignex.klause.solver.search.SearchDecision.Theory(branch),
+                            )
+                        }
 
                         override fun check(
                             context: com.eignex.klause.solver.search.SearchContext,

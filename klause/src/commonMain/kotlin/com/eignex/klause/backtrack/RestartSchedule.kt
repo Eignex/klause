@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.util.lubyN
 import com.eignex.klause.solver.search.SearchRestartPolicy
+import com.eignex.klause.util.lubyN
 
 /**
  * The phase regime a [RestartSchedule] asks the engine's [PhaseSaving] to run under. [PhaseMode.STABLE]
@@ -15,7 +15,7 @@ internal enum class PhaseMode { UNMANAGED, STABLE, FOCUSED }
  * Pluggable restart *schedule* for one backtrack run: the per-run decision budget and the decision of
  * when to cut a run short and pop back to root. Decouples *when* to restart from the restart *action* —
  * popping the trail, replaying nogoods, forgetting, vivifying — which stays with the caller
- * ([DfsEngine]), so a new schedule can be dropped in without touching the engine.
+ * ([com.eignex.klause.solver.search.SearchRun]), so a new schedule can be dropped in without touching traversal.
  *
  * Selected from [BacktrackParams] by [from]; each driver owns its own instance (and thus its own
  * detector state), so the satisfaction path ([BacktrackSolver]) and the branch-and-bound engine

@@ -181,7 +181,7 @@ class AtomConflictAnalyzerTest {
         // x,y,z over [0,2] with three pairwise strict-order constraints forming a cycle:
         //   x < y, y < z, z < x. No assignment satisfies a 3-cycle of <, so the search must
         //   learn its way to UNSAT through several conflict/backjump rounds (the
-        //   backjumpAndLearn repeat loop) and terminate at the Exhausted terminal.
+        //   shared conflict-resolution loop) and terminate at the Exhausted terminal.
         val problem = Problem(
             numBoolVars = 0,
             numIntVars = 3,

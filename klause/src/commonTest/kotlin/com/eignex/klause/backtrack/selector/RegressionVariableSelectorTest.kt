@@ -62,7 +62,7 @@ class RegressionVariableSelectorTest {
 
     @Test
     fun `a reused selector is copied on the minimize path too`() {
-        // The COP path (minimize) builds its own DfsEngine separately from solve; the selector copy
+        // The COP path (minimize) builds its own shared run separately from solve; the selector copy
         // must cover it, else the small solve's activity arrays are indexed against the larger one.
         val selector = RegressionVariableSelector.linUcb(seed = 1L)
         val small = Problem(

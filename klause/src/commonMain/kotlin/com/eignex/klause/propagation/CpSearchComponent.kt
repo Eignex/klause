@@ -29,7 +29,9 @@ class CpSearchComponent(
     sourceIntIds: IntArray? = null,
     /** Typed CP split policy; the shared runner owns applying and retracting its returned decisions. */
     private val branching: CpBranching = CpBranching.Middle,
-) : SearchBrancher, SearchModelBlocker, SearchConflictResolver {
+) : SearchBrancher,
+    SearchModelBlocker,
+    SearchConflictResolver {
     private val sourceIntIds = sourceIntIds?.copyOf()
     private val cpIntBySource = this.sourceIntIds?.let { ids ->
         IntArray((ids.maxOrNull() ?: -1) + 1) { -1 }.also { map ->
@@ -49,53 +51,6 @@ class CpSearchComponent(
         sharedRootLevel = session.decisionLevel
         nativeLevelBySharedLevel.clear()
         nativeLevelBySharedLevel += sharedRootLevel
-    }
-
-    /** Apply [decision] through [shared], retaining both CP and peer-component outcomes. */
-    fun push(shared: SearchSession, decision: SearchDecision): CpPushOutcome {
-        val level = shared.decisionLevel
-        lastResult = null
-        var result = shared.push(decision)
-        var propagation = lastResult
-        var replayed = false
-        if (propagation == null && result is ComponentResult.Consistent) {
-            // A shared learned clause can already carry this fact while the native CP session has not
-            // received it yet. Legacy DFS still selects from CP state, so repair that skew before it
-            // treats the branch as committed; otherwise its conflict analysis has no native result.
-            propagation = pin(decision)
-            replayed = true
-            result = when (propagation) {
-                is PropagationResult.Implied -> import(propagation, shared)
-                is PropagationResult.Unsat -> ComponentResult.Conflict()
-            }
-        }
-        if (result !is ComponentResult.Consistent) {
-            if (propagation is PropagationResult.Unsat) {
-                shared.rollbackFailedPush(level, this)
-            } else {
-                shared.popTo(level)
-            }
-        }
-        return CpPushOutcome(
-            propagation,
-            result,
-            replayed,
-        )
-    }
-
-    private fun pin(decision: SearchDecision): PropagationResult = when (decision) {
-        is SearchDecision.Bool -> session.pinBool(
-            Lit.variable(decision.literal),
-            Lit.isPositive(decision.literal),
-        )
-
-        is SearchDecision.IntAtMost -> session.pinIntAtMost(checkNotNull(cpIntId(decision.variable)), decision.upper)
-
-        is SearchDecision.IntAtLeast -> session.pinIntAtLeast(checkNotNull(cpIntId(decision.variable)), decision.lower)
-
-        is SearchDecision.IntEqual -> session.pinInt(checkNotNull(cpIntId(decision.variable)), decision.value)
-
-        is SearchDecision.Theory -> error("CP cannot pin a theory-owned decision")
     }
 
     override fun initialize(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
@@ -121,34 +76,34 @@ class CpSearchComponent(
         context: com.eignex.klause.solver.search.SearchContext,
     ): ComponentResult {
         val result = when (decision) {
-        is SearchDecision.Bool -> when (
-            val result = session.pinBool(
-                Lit.variable(decision.literal),
-                Lit.isPositive(decision.literal),
-            )
-        ) {
-            is PropagationResult.Implied -> {
-                lastResult = result
-                publish(result, context, Lit.variable(decision.literal))
+            is SearchDecision.Bool -> when (
+                val result = session.pinBool(
+                    Lit.variable(decision.literal),
+                    Lit.isPositive(decision.literal),
+                )
+            ) {
+                is PropagationResult.Implied -> {
+                    lastResult = result
+                    publish(result, context, Lit.variable(decision.literal))
+                }
+
+                is PropagationResult.Unsat -> {
+                    lastResult = result
+                    conflict(result)
+                }
             }
 
-            is PropagationResult.Unsat -> {
-                lastResult = result
-                conflict(result)
-            }
-        }
+            is SearchDecision.IntAtMost -> cpIntId(decision.variable)?.let {
+                result(session.pinIntAtMost(it, decision.upper), context)
+            } ?: ComponentResult.Consistent
 
-        is SearchDecision.IntAtMost -> cpIntId(decision.variable)?.let {
-            result(session.pinIntAtMost(it, decision.upper), context)
-        } ?: ComponentResult.Consistent
+            is SearchDecision.IntAtLeast -> cpIntId(decision.variable)?.let {
+                result(session.pinIntAtLeast(it, decision.lower), context)
+            } ?: ComponentResult.Consistent
 
-        is SearchDecision.IntAtLeast -> cpIntId(decision.variable)?.let {
-            result(session.pinIntAtLeast(it, decision.lower), context)
-        } ?: ComponentResult.Consistent
-
-        is SearchDecision.IntEqual -> cpIntId(decision.variable)?.let {
-            result(session.pinInt(it, decision.value), context)
-        } ?: ComponentResult.Consistent
+            is SearchDecision.IntEqual -> cpIntId(decision.variable)?.let {
+                result(session.pinInt(it, decision.value), context)
+            } ?: ComponentResult.Consistent
 
             is SearchDecision.Theory -> ComponentResult.Consistent
         }
@@ -235,9 +190,8 @@ class CpSearchComponent(
         )
     }
 
-    override fun nextBranch(context: com.eignex.klause.solver.search.SearchContext): List<SearchDecision>? {
-        return branching.alternatives(session, ::sourceIntId)
-    }
+    override fun nextBranch(context: com.eignex.klause.solver.search.SearchContext): List<SearchDecision>? =
+        branching.alternatives(session, ::sourceIntId)
 
     override fun blockModel(
         model: com.eignex.klause.solver.search.AssembledSearchModel,
@@ -274,7 +228,11 @@ class CpSearchComponent(
     override fun applyResolution(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
         val learned = checkNotNull(pendingLearned.also { pendingLearned = null })
         val result = when (learned) {
-            is ConflictAnalyzer.AnalysisResult.Learned -> session.addLearnedClause(Clause(learned.literals), learned.lbd)
+            is ConflictAnalyzer.AnalysisResult.Learned -> session.addLearnedClause(
+                Clause(learned.literals),
+                learned.lbd,
+            )
+
             is ConflictAnalyzer.AnalysisResult.LearnedPb -> session.addLearnedPb(
                 learned.weights,
                 learned.literals,
@@ -318,40 +276,23 @@ fun interface CpBranching {
 
     /** First unfixed column, split at its inclusive midpoint. */
     data object Middle : CpBranching {
-        override fun alternatives(
-            session: PropagationSession,
-            sourceIntId: (Int) -> Int,
-        ): List<SearchDecision>? {
-        for (variable in 0 until session.problem.numIntVars) {
-            val domain = session.intDomain(variable)
-            if (domain.min == domain.max) continue
-            // Unsigned halving preserves the inclusive midpoint even for the full signed Long range.
-            val middle = domain.min + ((domain.max - domain.min) ushr 1)
-            return listOf(
-                SearchDecision.IntAtMost(sourceIntId(variable), middle),
-                SearchDecision.IntAtLeast(sourceIntId(variable), middle + 1),
-            )
+        override fun alternatives(session: PropagationSession, sourceIntId: (Int) -> Int): List<SearchDecision>? {
+            for (variable in 0 until session.problem.numIntVars) {
+                val domain = session.intDomain(variable)
+                if (domain.min == domain.max) continue
+                // Unsigned halving preserves the inclusive midpoint even for the full signed Long range.
+                val middle = domain.min + ((domain.max - domain.min) ushr 1)
+                return listOf(
+                    SearchDecision.IntAtMost(sourceIntId(variable), middle),
+                    SearchDecision.IntAtLeast(sourceIntId(variable), middle + 1),
+                )
+            }
+            return null
         }
-        return null
-    }
-
     }
 
     /** Leave residual selection to another shared [SearchBrancher]. */
     data object None : CpBranching {
-        override fun alternatives(
-            session: PropagationSession,
-            sourceIntId: (Int) -> Int,
-        ): List<SearchDecision>? = null
+        override fun alternatives(session: PropagationSession, sourceIntId: (Int) -> Int): List<SearchDecision>? = null
     }
 }
-
-/** Native CP propagation and the shared component result of one asserted decision. */
-data class CpPushOutcome(
-    /** Native result, absent when the shared trail rejected before CP received the assertion. */
-    val propagation: PropagationResult?,
-    /** Result contributed by the composed component set. */
-    val componentResult: ComponentResult,
-    /** True when a fact already held by the shared trail had to be replayed into native CP. */
-    val replayed: Boolean,
-)

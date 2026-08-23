@@ -287,7 +287,7 @@ class BacktrackSolver(override val problem: BakedProblem) :
 
 /** Ceiling on the adaptive cancellation cadence (nodes between deadline polls). Fast instances
  *  settle here — a few microseconds per check at worst; slow ones adapt below it. See
- *  [DeadlinePoller]. */
+ *  [com.eignex.klause.solver.search.SearchCancellationPoller]. */
 internal const val CANCEL_CHECK_INTERVAL: Int = 256
 
 /** Target wall-clock gap (ms) between deadline polls; the adaptive cadence steers toward it so `-t`

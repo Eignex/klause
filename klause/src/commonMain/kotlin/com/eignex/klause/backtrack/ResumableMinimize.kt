@@ -16,7 +16,8 @@ import com.eignex.klause.lp.bounding.rootLpRelaxationBound
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
-import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
+import com.eignex.klause.propagation.CpBranching
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
@@ -31,6 +32,20 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.solver.search.BooleanBranching
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchModelContinuation
+import com.eignex.klause.solver.search.SearchModelDisposition
+import com.eignex.klause.solver.search.SearchModelPolicy
+import com.eignex.klause.solver.search.SearchNodeDisposition
+import com.eignex.klause.solver.search.SearchNodePolicy
+import com.eignex.klause.solver.search.SearchRun
+import com.eignex.klause.solver.search.SearchRunDisposition
+import com.eignex.klause.solver.search.SearchRunEvent
+import com.eignex.klause.solver.search.SearchRunLifecycle
+import com.eignex.klause.solver.search.SearchSolveParams
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -43,10 +58,10 @@ internal sealed interface StepEvent {
 }
 
 /**
- * The optimize driver: branch-and-bound minimisation over the shared [DfsEngine]. A thin wrapper that
+ * The optimize driver: branch-and-bound minimisation over the shared [SearchRun]. A thin wrapper that
  * owns the incumbent, the LP-relaxation family (built once; persists across slices = rolling warm
  * starts), the objective-bound propagation, and the stats sink lifecycle; the DFS orchestration itself
- * lives in [DfsEngine], driven through the inner [MinimizePolicy]. [runUntilEvent] advances to the next
+ * lives in [SearchRun], driven through typed model, node, and lifecycle policies. [runUntilEvent] advances to the next
  * reportable event (a new incumbent, the terminal verdict, or — in pausable mode — a slice-boundary
  * pause) and returns; the engine retains all state so the next call resumes.
  *
@@ -58,9 +73,8 @@ internal sealed interface StepEvent {
  *    arm never cold-restarts.
  */
 internal class ResumableMinimize(
-    // Carries the [BacktrackSolver.problem] plus the search primitives defined as its extension
-    // functions (advance, applyPhase, backjumpAndLearn, …); the solver holds no state beyond the problem.
-    solver: BacktrackSolver,
+    // Carries the immutable problem and shared search helpers; the solver holds no per-run state.
+    private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     params0: BacktrackParams,
     // true: a fired cancellation is a slice boundary the caller may resume past ([runSlice]); false:
@@ -144,12 +158,27 @@ internal class ResumableMinimize(
             singleObj?.ascending ?: true,
         )
     }
-    private val pruneLearned: () -> Learned? = { lpEngine.lastBackjump() }
-
-    // The shared DFS engine holds the live session, trail, phase saving, restart controller and budget;
-    // this class supplies the optimize behaviour through [MinimizePolicy].
-    private val engine = DfsEngine(solver, params, sink, MinimizePolicy())
-    private val session: PropagationSession get() = engine.propagationSession
+    private val cp = CpSearchComponent(
+        PropagationSession(
+            problem,
+            params.cancellation,
+            params.propagationCancelFloor,
+            nativeSat = params.nativeSat ?: true,
+            pbLearning = params.pbLearning ?: true,
+        ),
+        branching = CpBranching.None,
+    )
+    private val session: PropagationSession get() = cp.session
+    private val restart = RestartSchedule.from(params)
+    private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
+    private val brancher = BacktrackBrancher(session, params, sink, restart, LpGuidedBranching())
+    private val searchSession = SearchComponentSet(listOf(cp, brancher)).session(cancellation = params.cancellation)
+    private val run: SearchRun
+    private var rootExhausted: UnsatCore? = null
+    private var rootIsExhausted = false
+    private var firstRun = true
+    private val inprocessing = Inprocessing.from(solver, params)
+    private var lastPooledSolution: Sample? = null
 
     // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
     // use is the first-run boundExchange work, well after construction.
@@ -157,7 +186,37 @@ internal class ResumableMinimize(
 
     /** Terminal verdict once the search completes; null while still pending. */
     private var done: MinimizeResult? = null
+    private var pendingIncumbent: MinimizeResult.WithSample? = null
     override val isDone: Boolean get() = done != null
+
+    init {
+        val seeded = session.seed(params.assumptions)
+        cp.rebase()
+        if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot) {
+            rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(solver::coreOf)
+            rootIsExhausted = true
+        } else {
+            when (searchSession.initialize()) {
+                ComponentResult.Consistent -> params.clauseExchange?.onSearchStart(session)
+                is ComponentResult.Conflict -> rootExhausted = null
+                ComponentResult.Indeterminate -> Unit
+            }
+        }
+        run = searchSession.openRun(
+            problem.numBoolVars,
+            SearchSolveParams(
+                maxDecisions = Long.MAX_VALUE,
+                restart = restart,
+            ),
+            BooleanBranching.None,
+            decisionBudget = { --decisionLimit >= 0L },
+            observer = brancher,
+            modelContinuation = SearchModelContinuation.BlockAtRoot,
+            modelPolicy = IncumbentPolicy(),
+            nodePolicy = LpNodePolicy(),
+            lifecycle = OptimizationLifecycle(),
+        )
+    }
 
     override fun runSlice(
         global: Cancellation,
@@ -182,12 +241,28 @@ internal class ResumableMinimize(
 
     /**
      * Re-drive this search on a new [assumptions] set with a fresh [decisionBudget] (LNS repair):
-     * [DfsEngine.reseed]s the persistent session and resets the fragment incumbent, while the LP
+     * Re-seeds the persistent session and resets the fragment incumbent, while the LP
      * relaxation warm start and the session's learned-clause database survive. The caller must drive
-     * successive repairs against a monotone non-increasing objective cutoff (see [DfsEngine.reseed]).
+     * successive repairs against a monotone non-increasing objective cutoff.
      */
     fun rebind(assumptions: Assumptions, decisionBudget: Long) {
-        engine.reseed(assumptions, decisionBudget)
+        searchSession.popTo(0)
+        val seeded = session.reseedFrom(assumptions)
+        cp.rebase()
+        searchSession.resetRootFacts()
+        rootIsExhausted = seeded is PropagationResult.Unsat || session.isUnsatAtRoot
+        rootExhausted = null
+        if (!rootIsExhausted) {
+            when (searchSession.initialize()) {
+                ComponentResult.Consistent -> params.clauseExchange?.onSearchStart(session)
+                is ComponentResult.Conflict -> rootExhausted = null
+                ComponentResult.Indeterminate -> Unit
+            }
+        }
+        decisionLimit = decisionBudget
+        run.reset()
+        inprocessing?.reset()
+        firstRun = true
         best = null
         bestObj = Double.POSITIVE_INFINITY
         objVarBest = null
@@ -201,11 +276,23 @@ internal class ResumableMinimize(
      *  [StepEvent]. Visible to the enclosing solver (which streams it from [BacktrackSolver.improvements]). */
     fun runUntilEvent(): StepEvent {
         done?.let { return StepEvent.Terminal(it) }
-        return when (val e = engine.runUntilEvent()) {
-            is EngineEvent.Solution -> StepEvent.Incumbent(e.payload)
-            is EngineEvent.Exhausted -> terminal(terminalExhausted(e.core))
-            EngineEvent.BudgetCapped -> terminal(terminalBudget())
-            EngineEvent.Cancelled -> if (pausable) StepEvent.Paused else terminal(terminalBudget())
+        if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
+        if (firstRun) {
+            firstRun = false
+            firstRunWork()?.let { return StepEvent.Incumbent(it) }
+        }
+        return when (val e = run.next()) {
+            is SearchRunEvent.Satisfied -> StepEvent.Incumbent(checkNotNull(pendingIncumbent))
+
+            SearchRunEvent.Exhausted -> terminal(terminalExhausted(null))
+
+            SearchRunEvent.Paused -> StepEvent.Paused
+
+            is SearchRunEvent.Indeterminate -> if (pausable && sliceCancelled()) {
+                StepEvent.Paused
+            } else {
+                terminal(terminalBudget())
+            }
         }
     }
 
@@ -492,78 +579,97 @@ internal class ResumableMinimize(
         return false
     }
 
-    /** The optimize behaviour plugged into [DfsEngine]: LP node pruning + branch hints, the incumbent
-     *  fold at each leaf, the objective-bound assertion, and the cut/bound exchanges at each restart. */
-    private inner class MinimizePolicy : SearchPolicy<MinimizeResult.WithSample> {
-        override val pruneIf: (PropagationSession) -> Boolean get() = this@ResumableMinimize.pruneIf
-        override val pruneLearned: () -> Learned? get() = this@ResumableMinimize.pruneLearned
+    /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
+    private inner class LpGuidedBranching : BacktrackBranching {
+        override fun pick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
 
-        override fun cancelled(): Boolean = sliceCancelled()
+        override fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> =
+            lpHints?.order(variable, values) ?: values
+    }
 
-        // Reduced-cost-average branching: prefer the LP's most cost-impactful fractional variable; null
-        // falls back to the configured selector.
-        override fun branchPick(session: PropagationSession): VarRef? = lpEngine.lpBranchPick(session, lpHints)
+    /** Refutes LP-dominated partial assignments through the shared frame stack. */
+    private inner class LpNodePolicy : SearchNodePolicy {
+        override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (pruneIf(session)) {
+            SearchNodeDisposition.Prune
+        } else {
+            SearchNodeDisposition.Expand
+        }
+    }
 
-        override fun orderValues(varRef: VarRef, values: Sequence<Long>): Sequence<Long> =
-            lpHints?.order(varRef, values) ?: values
-
-        // Always block this leaf and backtrack (the engine does that); surface it only when it strictly
-        // improves the incumbent. With LP-only continuous variables a leaf is a solution only if the
-        // residual real LP is feasible — the real rows carry no propagator, so CP alone has not enforced
-        // them; an uncertifiable residual taints the terminal verdict to `unknown`.
-        override fun onLeaf(snap: Sample, session: PropagationSession): MinimizeResult.WithSample? {
-            if (problem.numRealVars > 0) {
-                val res = leafRealFeasibility(problem, objective, snap, Cancellation { sliceCancelled() })
-                when (res.verdict) {
-                    LpVerdict.INFEASIBLE -> return null
+    /** Turns feasible shared models into strictly improving optimization incumbents. */
+    private inner class IncumbentPolicy : SearchModelPolicy {
+        override fun onModel(
+            model: com.eignex.klause.solver.search.AssembledSearchModel,
+            context: SearchContext,
+        ): SearchModelDisposition {
+            val sample = checkNotNull(model.valueOf<Sample>(cp))
+            brancher.onSolution(sample)
+            val incumbent = if (problem.numRealVars == 0) {
+                recordIfImproving(sample, objective.evaluate(sample))
+            } else {
+                val real = leafRealFeasibility(problem, objective, sample, Cancellation { sliceCancelled() })
+                when (real.verdict) {
+                    LpVerdict.INFEASIBLE -> null
 
                     LpVerdict.INDETERMINATE -> {
                         sawIndeterminateLeaf = true
-                        return null
+                        null
                     }
 
-                    // Complete the assignment with the LP's continuous values, and score the objective
-                    // over the full solution (its real part is resolved by the LP, not by CP).
                     LpVerdict.OPTIMAL -> {
-                        val full = snap.copy(reals = res.reals)
-                        return recordIfImproving(full, objective.evaluate(full))
+                        val full = sample.copy(reals = real.reals)
+                        recordIfImproving(full, objective.evaluate(full))
                     }
                 }
             }
-            return recordIfImproving(snap, objective.evaluate(snap))
+            return if (incumbent == null) {
+                SearchModelDisposition.Continue
+            } else {
+                pendingIncumbent = incumbent
+                SearchModelDisposition.Surface
+            }
+        }
+    }
+
+    /** Root-only optimization work attached to the generic run lifecycle. */
+    private inner class OptimizationLifecycle : SearchRunLifecycle {
+        override fun onResume(context: SearchContext): SearchRunDisposition {
+            boundExchange.applySharedFloor()
+            return SearchRunDisposition.Continue
         }
 
-        override fun assertObjectiveBoundAtRoot(session: PropagationSession): Boolean {
-            // Root (level 0) on the live session: install the incremental objective bool lower bound here
-            // so the always-on linear bound is O(1) per node instead of an O(numBoolVars) rescan. Idempotent
-            // — a no-op once installed; the baseline captures the never-undone level-0 assignment.
-            session.installObjectiveBoolBound(objective.boolWeights)
-            if (this@ResumableMinimize.assertObjectiveBoundAtRoot()) return true
-            return tightenOpenColumnsAtRoot()
-        }
+        override fun onModelBlocked(context: SearchContext): SearchRunDisposition = applyObjectiveBound()
 
-        override fun drainLpNogoodsAtRestart(session: PropagationSession): Boolean = drainLpNogoods()
-
-        override fun onRestartCuts(session: PropagationSession) {
+        override fun onRestart(context: SearchContext): SearchRunDisposition {
+            if (drainLpNogoods()) return SearchRunDisposition.Exhausted
+            params.clauseExchange?.onRestart(session)
             params.cutExchange?.let { lpEngine.exchangeCuts(it) }
-        }
-
-        override fun onRestartBounds(session: PropagationSession) {
-            // At level 0 import the shared objective lower bound (tightening this arm's objVar) and
-            // republish this arm's own raised floor, so a bound proven mid-search propagates through the
-            // pool. Import peers' globally-valid level-0 variable tightenings (import only — not publish,
-            // since level-0 domains here may carry this arm's incumbent-relative fixings, not global).
+            val bound = applyObjectiveBound()
+            if (bound != SearchRunDisposition.Continue) return bound
             boundExchange.applySharedFloor()
             boundExchange.publishFloor()
             boundExchange.importGlobalVarBounds()
+            solver.forgetIfOverCap(session, params)
+            inprocessing?.onRestart(session, params)
+            params.pooledSolutionSupplier?.invoke()?.takeIf { it !== lastPooledSolution }?.let { pooled ->
+                lastPooledSolution = pooled
+                brancher.importPooledSolution(pooled)
+            }
+            return SearchRunDisposition.Continue
         }
 
-        override fun onFirstRun(): MinimizeResult.WithSample? = firstRunWork()
+        override fun onCancellation(context: SearchContext): SearchRunDisposition {
+            params.clauseExchange?.onSearchEnd(session)
+            return if (pausable) SearchRunDisposition.Pause else SearchRunDisposition.Indeterminate
+        }
+    }
 
-        override fun onResumeEntry() {
-            // Re-read the shared lower bound each slice: a peer arm may have proven a tighter floor.
-            // Monotone and sound, so re-asserting only strengthens pruning.
-            boundExchange.applySharedFloor()
+    private fun applyObjectiveBound(): SearchRunDisposition {
+        session.installObjectiveBoolBound(objective.boolWeights)
+        return if (assertObjectiveBoundAtRoot() || tightenOpenColumnsAtRoot()) {
+            SearchRunDisposition.Exhausted
+        } else {
+            SearchRunDisposition.Continue
         }
     }
 }

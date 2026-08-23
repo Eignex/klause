@@ -219,6 +219,48 @@ sealed interface SearchNodeDisposition {
     data object Indeterminate : SearchNodeDisposition
 }
 
+/**
+ * Owns mode-specific work at resumable traversal boundaries.
+ *
+ * Implementations may close over a native component session, but expose only a typed outcome to the
+ * shared engine. This keeps root bounds, portfolio exchange, and cooperative slice pauses on the same
+ * traversal lifecycle as every other theory.
+ */
+interface SearchRunLifecycle {
+    /** Called once before the first branch of a run. */
+    fun onStart(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
+
+    /** Called at every [SearchRun.next] entry after [onStart]. */
+    fun onResume(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
+
+    /** Called after the session has returned to root during a restart. */
+    fun onRestart(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
+
+    /** Called after a consumed model was excluded at root. */
+    fun onModelBlocked(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Continue
+
+    /** Classify a cancellation poll. */
+    fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Indeterminate
+
+    /** Satisfaction lifecycle with no boundary work. */
+    data object None : SearchRunLifecycle
+}
+
+/** Typed control result returned from a [SearchRunLifecycle] boundary. */
+sealed interface SearchRunDisposition {
+    /** Continue the current traversal. */
+    data object Continue : SearchRunDisposition
+
+    /** The mode proved the remaining search space empty. */
+    data object Exhausted : SearchRunDisposition
+
+    /** Preserve the current stack and return control to a resumable caller. */
+    data object Pause : SearchRunDisposition
+
+    /** The mode cannot continue to an exact verdict. */
+    data object Indeterminate : SearchRunDisposition
+}
+
 /** Restart policy owned by the shared search engine. */
 interface SearchRestartPolicy {
     /** Start a fresh traversal run. */

@@ -255,7 +255,9 @@ class ExactLiraSearchComponent(
             RationalFeasibility.FEASIBLE -> Unit
         }
         val witness = checkNotNull(simplex.witness)
-        leaf.gmiCut(simplex.tableau)?.takeUnless { candidate -> current.cuts.any { it.sameAs(candidate) } }?.let { cut ->
+        leaf.gmiCut(
+            simplex.tableau,
+        )?.takeUnless { candidate -> current.cuts.any { it.sameAs(candidate) } }?.let { cut ->
             return listOf(decision(current.withCut(cut)))
         }
         val split = leaf.integerPositive.indices.firstOrNull { integer ->
