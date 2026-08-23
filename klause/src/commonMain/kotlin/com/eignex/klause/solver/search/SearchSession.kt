@@ -741,6 +741,8 @@ class SearchRun internal constructor(
             if (conflict.decisionLevel !in 0..session.decisionLevel) {
                 return SearchLearnedConflictResult.Chronological
             }
+            params.restart.recordConflict(conflict.lbd, session.decisionLevel)
+            observer.onLearnedConflict(conflict)
             session.popTo(conflict.decisionLevel)
             while (frames.isNotEmpty() && frames.last().level >= conflict.decisionLevel) frames.removeLast()
             when (val result = conflict.apply(session)) {
@@ -858,6 +860,14 @@ interface SearchRunObserver {
 
     /** A node policy supplied an asserting learned consequence. */
     fun onLearnedNodeBackjump() {}
+
+    /**
+     * A component produced a learned consequence before the runner retracts to its asserting level.
+     *
+     * The observer may retain analysis metadata for mode-specific reporting, such as projecting an
+     * assumption core. Restart feedback remains owned by [SearchRun].
+     */
+    fun onLearnedConflict(conflict: SearchLearnedConflict) {}
 
     /** The runner returned the session to root after [decisions] decisions in the completed run. */
     fun onRestart(decisions: Long) {}

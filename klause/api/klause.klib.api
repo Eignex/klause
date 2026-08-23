@@ -884,6 +884,7 @@ abstract interface com.eignex.klause.solver.search/SearchRunLifecycle { // com.e
 abstract interface com.eignex.klause.solver.search/SearchRunObserver { // com.eignex.klause.solver.search/SearchRunObserver|null[0]
     open fun onCommit(com.eignex.klause.solver.search/SearchDecision, kotlin/Int) // com.eignex.klause.solver.search/SearchRunObserver.onCommit|onCommit(com.eignex.klause.solver.search.SearchDecision;kotlin.Int){}[0]
     open fun onConflict(com.eignex.klause.solver.search/SearchDecision?) // com.eignex.klause.solver.search/SearchRunObserver.onConflict|onConflict(com.eignex.klause.solver.search.SearchDecision?){}[0]
+    open fun onLearnedConflict(com.eignex.klause.solver.search/SearchLearnedConflict) // com.eignex.klause.solver.search/SearchRunObserver.onLearnedConflict|onLearnedConflict(com.eignex.klause.solver.search.SearchLearnedConflict){}[0]
     open fun onLearnedNodeBackjump() // com.eignex.klause.solver.search/SearchRunObserver.onLearnedNodeBackjump|onLearnedNodeBackjump(){}[0]
     open fun onModel(com.eignex.klause.solver.search/AssembledSearchModel) // com.eignex.klause.solver.search/SearchRunObserver.onModel|onModel(com.eignex.klause.solver.search.AssembledSearchModel){}[0]
     open fun onRestart(kotlin/Long) // com.eignex.klause.solver.search/SearchRunObserver.onRestart|onRestart(kotlin.Long){}[0]

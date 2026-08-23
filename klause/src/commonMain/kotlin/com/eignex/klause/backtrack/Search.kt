@@ -27,7 +27,9 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchModelContinuation
+import com.eignex.klause.solver.search.SearchRunDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
+import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.EmptyIntArray
@@ -113,7 +115,13 @@ private fun BacktrackSolver.driveSharedSearch(
     )
     val completion = BacktrackCompletion.of(problem, cp, params)
     val restart = RestartSchedule.from(params)
-    val brancher = BacktrackBrancher(cp.session, params, sink, restart)
+    val brancher = BacktrackBrancher(
+        cp.session,
+        params,
+        sink,
+        restart,
+        seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
+    )
     val components = ArrayList<SearchComponent>()
     components += cp
     components += brancher
@@ -158,6 +166,7 @@ private fun BacktrackSolver.driveSharedSearch(
         },
         brancher,
         SearchModelContinuation.BlockAtRoot,
+        lifecycle = SatisfactionLifecycle(this@driveSharedSearch, params, cp.session, brancher),
     )
     while (true) {
         when (val event = run.next()) {
@@ -168,7 +177,7 @@ private fun BacktrackSolver.driveSharedSearch(
             }
 
             SearchRunEvent.Exhausted -> {
-                yield(SearchOutcome.Exhausted())
+                yield(SearchOutcome.Exhausted(touchedAssumptionLevels = brancher.touchedAssumptionLevels()))
                 return@sequence
             }
 
@@ -185,12 +194,40 @@ private fun BacktrackSolver.driveSharedSearch(
     }
 }
 
+/** Maintains the ordinary SAT/CP learned-state lifecycle at shared runner boundaries. */
+private class SatisfactionLifecycle(
+    private val solver: BacktrackSolver,
+    private val params: BacktrackParams,
+    private val session: PropagationSession,
+    private val brancher: BacktrackBrancher,
+) : SearchRunLifecycle {
+    private val inprocessing = Inprocessing.from(solver, params)
+    private var lastPooledSolution: Sample? = null
+
+    override fun onRestart(context: SearchContext): SearchRunDisposition {
+        params.clauseExchange?.onRestart(session)
+        solver.forgetIfOverCap(session, params)
+        inprocessing?.onRestart(session, params)
+        params.pooledSolutionSupplier?.invoke()?.takeIf { it !== lastPooledSolution }?.let { pooled ->
+            lastPooledSolution = pooled
+            brancher.importPooledSolution(pooled)
+        }
+        return SearchRunDisposition.Continue
+    }
+
+    override fun onCancellation(context: SearchContext): SearchRunDisposition {
+        params.clauseExchange?.onSearchEnd(session)
+        return SearchRunDisposition.Indeterminate
+    }
+}
+
 internal class BacktrackBrancher(
     private val session: PropagationSession,
     params: BacktrackParams,
     private val sink: SolveStatsSink?,
     private val restart: RestartSchedule,
     private val branching: BacktrackBranching = BacktrackBranching.Selectors,
+    private val seedDecisionLevels: Int = 0,
 ) : SearchBrancher,
     SearchRunObserver {
     private val variables = params.variableSelector.fresh()
@@ -199,6 +236,7 @@ internal class BacktrackBrancher(
     private val rng = Random(params.randomSeed ?: Random.Default.nextLong())
     private val onEvent = params.onEvent
     private var restartCount = 0L
+    private val touchedSeedLevels = IntHashSet()
 
     init {
         if (variables.tracksUnassign) {
@@ -255,6 +293,12 @@ internal class BacktrackBrancher(
         sink?.search?.observeLearn()
     }
 
+    override fun onLearnedConflict(conflict: com.eignex.klause.solver.search.SearchLearnedConflict) {
+        for (level in conflict.decisionLevels) {
+            if (level in 1..seedDecisionLevels) touchedSeedLevels.add(level)
+        }
+    }
+
     override fun onRestart(decisions: Long) {
         variables.onRestart()
         values.onRestart()
@@ -270,6 +314,11 @@ internal class BacktrackBrancher(
 
     fun importPooledSolution(sample: Sample) {
         phase.onSolution(sample)
+    }
+
+    fun touchedAssumptionLevels(): IntArray {
+        if (touchedSeedLevels.isEmpty()) return EmptyIntArray
+        return touchedSeedLevels.toIntArray().also(IntArray::sort)
     }
 }
 

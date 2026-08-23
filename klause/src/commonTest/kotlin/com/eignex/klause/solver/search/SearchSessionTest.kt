@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class SearchSessionTest {
 
@@ -329,6 +330,54 @@ class SearchSessionTest {
 
         assertEquals(1, appliedAt)
         assertEquals(1, learnedBackjumps)
+    }
+
+    @Test
+    fun `learned conflicts feed restart quality and observer metadata before backjumping`() {
+        var recorded: Pair<Int, Int>? = null
+        var observedLevels: IntArray? = null
+        val restart = object : SearchRestartPolicy {
+            override fun recordConflict(lbd: Int, trailSize: Int) {
+                recorded = lbd to trailSize
+            }
+
+            override fun shouldRestart(decisionsThisRun: Long): Boolean = false
+        }
+        var pending = true
+        val session = SearchSession(emptyList())
+        val run = session.openRun(
+            numBoolVars = 2,
+            params = SearchSolveParams(restart = restart),
+            nodePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (
+                    pending && context.decisionLevel == 2
+                ) {
+                    SearchNodeDisposition.Backjump(object : SearchLearnedConflict {
+                        override val decisionLevel: Int = 1
+                        override val lbd: Int = 7
+                        override val guardLiterals: IntArray = intArrayOf(0)
+                        override val decisionLevels: IntArray = intArrayOf(1, 4)
+
+                        override fun apply(session: SearchSession): SearchLearnedConflictResult {
+                            pending = false
+                            return SearchLearnedConflictResult.Resume
+                        }
+                    })
+                } else {
+                    SearchNodeDisposition.Expand
+                }
+            },
+            observer = object : SearchRunObserver {
+                override fun onLearnedConflict(conflict: SearchLearnedConflict) {
+                    observedLevels = conflict.decisionLevels
+                }
+            },
+        )
+
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(7 to 2, recorded)
+        assertTrue(observedLevels!!.contentEquals(intArrayOf(1, 4)))
     }
 
     @Test
