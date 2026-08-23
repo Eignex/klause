@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.solver.search.SearchCancellationPoller
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,7 +12,7 @@ class DeadlinePollerTest {
 
     @Test
     fun `polls on the first call then backs off`() {
-        val poller = DeadlinePoller(TestTimeSource())
+        val poller = SearchCancellationPoller(TestTimeSource())
         assertTrue(poller.due(), "first call should poll immediately")
         poller.rearm()
         assertFalse(poller.due(), "should not poll again on the very next call after backing off")
@@ -20,7 +21,7 @@ class DeadlinePollerTest {
     // Drive `nodes` loop iterations, elapsing `gapMs` of wall-clock per poll, and count the polls.
     private fun pollsOver(nodes: Int, gapMs: Long): Int {
         val clock = TestTimeSource()
-        val poller = DeadlinePoller(clock)
+        val poller = SearchCancellationPoller(clock)
         var polls = 0
         repeat(nodes) {
             if (poller.due()) {
@@ -44,9 +45,9 @@ class DeadlinePollerTest {
 
     @Test
     fun `cheap gaps grow the interval to the ceiling`() {
-        // With sub-target gaps the interval doubles until it saturates at CANCEL_CHECK_INTERVAL, so the
+        // With sub-target gaps the interval doubles until it saturates at the shared ceiling, so the
         // poll count over N nodes approaches N / ceiling — far below one poll per node.
-        val polls = pollsOver(nodes = CANCEL_CHECK_INTERVAL * 4, gapMs = 0)
+        val polls = pollsOver(nodes = 256 * 4, gapMs = 0)
         assertTrue(polls < 20, "cheap gaps should keep polls sparse, got $polls")
     }
 

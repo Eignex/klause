@@ -6,6 +6,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.search.SearchDecision
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -29,9 +30,8 @@ class SearchIntNodeTest {
         val mid = boundsMidpoint(session.intDomain(0))
         // `indomain_min` offers `min` as the preferred value; on a wide domain the node must still bisect,
         // else it peels one value per level (O(span) branch depth) instead of O(log span).
-        val node = IntNode(VarRef.IntVar(0), sequenceOf(0L))
-        val out = node.nextDecision(session)!!
-        assertEquals(mid, out.value, "wide-domain split point must be the bounds midpoint, not the boundary")
+        val out = splitIntAlternatives(session, VarRef.IntVar(0), preferred = 0L).first()
+        assertEquals(SearchDecision.IntAtMost(0, mid), out, "wide-domain split point must be the bounds midpoint")
         assertTrue(mid in 1L until wideHi, "the midpoint is strictly interior, so both children are non-empty")
     }
 
@@ -39,8 +39,7 @@ class SearchIntNodeTest {
     fun `an enumerable domain still splits at the value heuristic's preferred value`() {
         val session = PropagationSession(problemOf(IntDomain(0, 10)))
         assertTrue(session.intDomain(0).enumerable)
-        val node = IntNode(VarRef.IntVar(0), sequenceOf(0L)) // `indomain_min` prefers the minimum
-        val out = node.nextDecision(session)!!
-        assertEquals(0L, out.value, "enumerable-domain behavior is unchanged: split at the preferred value")
+        val out = splitIntAlternatives(session, VarRef.IntVar(0), preferred = 0L).first()
+        assertEquals(SearchDecision.IntAtMost(0, 0L), out, "enumerable-domain behavior is unchanged")
     }
 }

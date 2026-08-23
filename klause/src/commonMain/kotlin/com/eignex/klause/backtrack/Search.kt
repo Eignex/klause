@@ -1,13 +1,12 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
-import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.CpBranching
+import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
@@ -15,21 +14,21 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.UnsatCore
 import com.eignex.klause.solver.result.projectSeedConflictToAssumptions
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
-import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunObserver
-import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
@@ -86,94 +85,6 @@ internal sealed interface SearchOutcome {
     data object BudgetCapped : SearchOutcome
 }
 
-/**
- * A trail frame for one variable being explored. The value iterator is supplied by the
- * caller's [ValueSelector] at node creation; [nextDecision] pulls the next value and
- * describes the corresponding shared search decision. Returns `null` when the value
- * iterator is exhausted.
- */
-internal sealed interface TrailNode {
-    val varRef: VarRef
-    fun nextDecision(session: PropagationSession): NextDecision?
-}
-
-/** The heuristic-visible value and the shared decision selected for a trail frame. */
-internal data class NextDecision(val value: Long, val decision: SearchDecision)
-
-internal class BoolNode(override val varRef: VarRef.Bool, valueSeq: Sequence<Long>) : TrailNode {
-    private val iter = valueSeq.iterator()
-    override fun nextDecision(session: PropagationSession): NextDecision? {
-        if (!iter.hasNext()) return null
-        val v = iter.next()
-        return NextDecision(v, SearchDecision.Bool(Lit.make(varRef.varId, v != 0L)))
-    }
-}
-
-/**
- * Int decisions branch on a **bound**, not an equality: `v ≤ s` then `v ≥ s+1` (or the
- * reverse). Each branch is a single bound atom, so a conflict it seeds has one literal at
- * its level and 1UIP yields an asserting clause — an equality pin (`v = k`) instead pins
- * two same-level bound atoms that 1UIP cannot collapse, which stalls conflict learning.
- * The split point `s` is the value heuristic's preferred value (clamped into `[min, max-1]`
- * so both children are non-empty); the side holding that preferred value is explored first.
- */
-internal class IntNode(override val varRef: VarRef.IntVar, valueSeq: Sequence<Long>) : TrailNode {
-    private val preferred: Long = valueSeq.firstOrNull() ?: 0L
-    private var step = 0
-    private var splitLo = 0L
-    private var splitHi = 0L
-    private var lowerFirst = true
-    private var resolved = false
-
-    override fun nextDecision(session: PropagationSession): NextDecision? {
-        if (!resolved) {
-            val d = session.intDomain(varRef.varId)
-            // On a non-enumerable (wide-span) domain, split at the bounds midpoint regardless of the value
-            // heuristic's preferred value. An extreme preferred (min/max, e.g. indomain_min) would otherwise
-            // peel one value per level — O(span) branch depth on a > 2^31-span domain — where a dichotomic
-            // split is O(log span). [boundsMidpoint] lands in `[min, max-1]` here (min < max on a wide
-            // domain), so both children stay non-empty; the partition `x <= s` / `x >= s+1` is complete for
-            // any `s`, so this changes cost, never soundness.
-            val s = when {
-                // A preferred value strictly inside a wide domain is a real signal — on the LP path it is
-                // the relaxation's own value for this column ([LpHints.order]) — and branching there is the
-                // branch-and-bound split `x ≤ ⌊v⌋` / `x ≥ ⌈v⌉`. It matters most on a column left open by the
-                // search clamp, where the midpoint is a bisection of an invented box rather than of
-                // anything the model says. A preferred sitting *at* a bound carries no such signal (that is
-                // what `indomain_min`/`max` produce), and following it would peel one value per level —
-                // O(span) depth — so those still bisect.
-                !d.enumerable && preferred > d.min && preferred < d.max -> preferred
-
-                !d.enumerable -> boundsMidpoint(d)
-
-                preferred >= d.max -> d.max - 1
-
-                else -> maxOf(preferred, d.min)
-            }
-            splitLo = s
-            splitHi = s + 1
-            lowerFirst = preferred <= s
-            resolved = true
-        }
-        val vid = varRef.varId
-        return when (step++) {
-            0 -> if (lowerFirst) {
-                NextDecision(splitLo, SearchDecision.IntAtMost(vid, splitLo))
-            } else {
-                NextDecision(splitHi, SearchDecision.IntAtLeast(vid, splitHi))
-            }
-
-            1 -> if (lowerFirst) {
-                NextDecision(splitHi, SearchDecision.IntAtLeast(vid, splitHi))
-            } else {
-                NextDecision(splitLo, SearchDecision.IntAtMost(vid, splitLo))
-            }
-
-            else -> null
-        }
-    }
-}
-
 /** Lazy shared-session outcomes for satisfaction, enumeration, and sampling. */
 internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
@@ -201,7 +112,8 @@ private fun BacktrackSolver.driveSharedSearch(
         branching = CpBranching.None,
     )
     val completion = BacktrackCompletion.of(problem, cp, params)
-    val brancher = BacktrackBrancher(cp.session, params, sink)
+    val restart = RestartSchedule.from(params)
+    val brancher = BacktrackBrancher(cp.session, params, sink, restart)
     val components = ArrayList<SearchComponent>()
     components += cp
     components += brancher
@@ -220,6 +132,7 @@ private fun BacktrackSolver.driveSharedSearch(
     }
     when (session.initialize()) {
         com.eignex.klause.solver.search.ComponentResult.Consistent -> Unit
+
         is com.eignex.klause.solver.search.ComponentResult.Conflict -> {
             yield(SearchOutcome.Exhausted())
             return@sequence
@@ -234,7 +147,7 @@ private fun BacktrackSolver.driveSharedSearch(
         problem.numBoolVars,
         SearchSolveParams(
             maxDecisions = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
-            restart = RestartSchedule.from(params),
+            restart = restart,
         ),
         BooleanBranching.None,
         SearchDecisionBudget {
@@ -264,7 +177,7 @@ private fun BacktrackSolver.driveSharedSearch(
                 return@sequence
             }
 
-            SearchRunEvent.Indeterminate.Budget, SearchRunEvent.Indeterminate.Cancelled -> {
+            SearchRunEvent.Paused, SearchRunEvent.Indeterminate.Budget, SearchRunEvent.Indeterminate.Cancelled -> {
                 yield(SearchOutcome.BudgetCapped)
                 return@sequence
             }
@@ -272,45 +185,53 @@ private fun BacktrackSolver.driveSharedSearch(
     }
 }
 
-private class BacktrackBrancher(
+internal class BacktrackBrancher(
     private val session: PropagationSession,
     params: BacktrackParams,
     private val sink: SolveStatsSink?,
-) : SearchBrancher, SearchRunObserver {
+    private val restart: RestartSchedule,
+    private val branching: BacktrackBranching = BacktrackBranching.Selectors,
+) : SearchBrancher,
+    SearchRunObserver {
     private val variables = params.variableSelector.fresh()
     private val values = params.valueSelector.fresh()
     private val phase = PhaseSaving(session.problem.numBoolVars, session.problem.numIntVars, params)
-    private val restart = RestartSchedule.from(params)
     private val rng = Random(params.randomSeed ?: Random.Default.nextLong())
     private val onEvent = params.onEvent
     private var restartCount = 0L
 
+    init {
+        if (variables.tracksUnassign) {
+            val numBool = session.problem.numBoolVars
+            session.unassignListener = { encoded ->
+                variables.onUnassign(if (encoded < numBool) VarRef.Bool(encoded) else VarRef.IntVar(encoded - numBool))
+            }
+        }
+    }
+
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
-        val variable = variables.pick(session, rng) ?: return null
+        val variable = branching.pick(session)
+            ?.takeIf(::isOpen)
+            ?: variables.pick(session, rng)
+            ?: return null
         if (restart.phaseMode() != PhaseMode.UNMANAGED) phase.setManagedMode(restart.phaseMode())
-        val ordered = phase.applyPhase(variable, values.values(session, variable, rng), rng)
+        val ordered = branching.orderValues(
+            variable,
+            phase.applyPhase(variable, values.values(session, variable, rng), rng),
+        )
         return when (variable) {
             is VarRef.Bool -> ordered.map { value ->
                 require(value == 0L || value == 1L) { "Boolean selector produced $value" }
                 SearchDecision.Bool(Lit.make(variable.varId, value != 0L))
             }.toList()
 
-            is VarRef.IntVar -> intAlternatives(variable, ordered.firstOrNull() ?: return null)
+            is VarRef.IntVar -> splitIntAlternatives(session, variable, ordered.firstOrNull() ?: return null)
         }
     }
 
-    private fun intAlternatives(variable: VarRef.IntVar, preferred: Long): List<SearchDecision> {
-        val domain = session.intDomain(variable.varId)
-        check(domain.min < domain.max) { "selector chose fixed integer ${variable.varId}" }
-        val split = when {
-            !domain.enumerable && preferred > domain.min && preferred < domain.max -> preferred
-            !domain.enumerable -> boundsMidpoint(domain)
-            preferred >= domain.max -> domain.max - 1
-            else -> maxOf(preferred, domain.min)
-        }
-        val lower = SearchDecision.IntAtMost(variable.varId, split)
-        val upper = SearchDecision.IntAtLeast(variable.varId, split + 1)
-        return if (preferred <= split) listOf(lower, upper) else listOf(upper, lower)
+    private fun isOpen(variable: VarRef): Boolean = when (variable) {
+        is VarRef.Bool -> session.boolValue(variable.varId) == null
+        is VarRef.IntVar -> session.intDomain(variable.varId).size > 1
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
@@ -330,11 +251,11 @@ private class BacktrackBrancher(
         phase.onConflictTick()
     }
 
-    override fun onRestart() {
+    override fun onRestart(decisions: Long) {
         variables.onRestart()
         values.onRestart()
         sink?.search?.observeRestart()
-        onEvent?.invoke(SearchEvent.Restart(++restartCount, 0L))
+        onEvent?.invoke(SearchEvent.Restart(++restartCount, decisions))
     }
 
     fun onSolution(sample: Sample) {
@@ -342,6 +263,37 @@ private class BacktrackBrancher(
         values.onSolution(sample)
         phase.onSolution(sample)
     }
+
+    fun importPooledSolution(sample: Sample) {
+        phase.onSolution(sample)
+    }
+}
+
+internal fun splitIntAlternatives(
+    session: PropagationSession,
+    variable: VarRef.IntVar,
+    preferred: Long,
+): List<SearchDecision> {
+    val domain = session.intDomain(variable.varId)
+    check(domain.min < domain.max) { "selector chose fixed integer ${variable.varId}" }
+    val split = when {
+        !domain.enumerable && preferred > domain.min && preferred < domain.max -> preferred
+        !domain.enumerable -> boundsMidpoint(domain)
+        preferred >= domain.max -> domain.max - 1
+        else -> maxOf(preferred, domain.min)
+    }
+    val lower = SearchDecision.IntAtMost(variable.varId, split)
+    val upper = SearchDecision.IntAtLeast(variable.varId, split + 1)
+    return if (preferred <= split) listOf(lower, upper) else listOf(upper, lower)
+}
+
+/** Optional search-only branch guidance layered over the configured selectors. */
+internal interface BacktrackBranching {
+    fun pick(session: PropagationSession): VarRef? = null
+
+    fun orderValues(variable: VarRef, values: Sequence<Long>): Sequence<Long> = values
+
+    data object Selectors : BacktrackBranching
 }
 
 private fun SearchDecision.asSelectorDecision(): Pair<VarRef, Long>? = when (this) {
@@ -366,9 +318,7 @@ private sealed interface BacktrackCompletion {
         ): Sample = checkNotNull(model.valueOf(cp))
     }
 
-    class ResidualReal(
-        private val component: ResidualRealComponent,
-    ) : BacktrackCompletion {
+    class ResidualReal(private val component: ResidualRealComponent) : BacktrackCompletion {
         override fun addTo(components: MutableList<SearchComponent>) {
             components += component
         }
@@ -416,7 +366,9 @@ private class ResidualRealComponent(
                     result.reals,
                 )
             }
+
             LpVerdict.INFEASIBLE -> ComponentCheck.Infeasible()
+
             LpVerdict.INDETERMINATE -> ComponentCheck.Indeterminate
         }
     }
@@ -426,9 +378,4 @@ private class ResidualRealComponent(
     }
 
     fun sample(): Sample = requireNotNull(completed)
-}
-
-internal fun BacktrackSolver.makeNode(varRef: VarRef, values: Sequence<Long>): TrailNode = when (varRef) {
-    is VarRef.Bool -> BoolNode(varRef, values)
-    is VarRef.IntVar -> IntNode(varRef, values)
 }

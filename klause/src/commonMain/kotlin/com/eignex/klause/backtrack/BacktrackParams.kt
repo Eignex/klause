@@ -53,7 +53,7 @@ data class BacktrackParams(
     /**
      * Additional theory or lemma components for this search.
      *
-     * The factory runs once per [DfsEngine], outside the decision hot path. Components observe the
+     * The factory runs once per shared search run, outside the decision hot path. Components observe the
      * shared trail through [com.eignex.klause.solver.search.SearchSession] and must not read CP domains.
      */
     val componentFactory: (() -> List<SearchComponent>)? = null,
