@@ -272,8 +272,10 @@ internal class ResumableMinimize(
         done = null
     }
 
-    /** Advance the search to the next reportable event, mapping the engine's [EngineEvent] to a
-     *  [StepEvent]. Visible to the enclosing solver (which streams it from [BacktrackSolver.improvements]). */
+    /** Advance the search to the next reportable [StepEvent].
+     *
+     * Visible to the enclosing solver, which streams it from [BacktrackSolver.improvements].
+     */
     fun runUntilEvent(): StepEvent {
         done?.let { return StepEvent.Terminal(it) }
         if (rootIsExhausted) return terminal(terminalExhausted(rootExhausted))
