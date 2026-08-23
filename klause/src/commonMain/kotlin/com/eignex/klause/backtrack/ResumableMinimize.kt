@@ -40,8 +40,8 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelDisposition
 import com.eignex.klause.solver.search.SearchModelPolicy
-import com.eignex.klause.solver.search.SearchNodeBackjump
-import com.eignex.klause.solver.search.SearchNodeBackjumpResult
+import com.eignex.klause.solver.search.SearchLearnedConflict
+import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRun
@@ -602,7 +602,7 @@ internal class ResumableMinimize(
                 learned.guardLiterals.none { session.litTruth(it) == true }
             ) {
                 sink.lp.observeBackjump()
-                SearchNodeDisposition.Backjump(LpNodeBackjump(learned))
+                SearchNodeDisposition.Backjump(LpLearnedConflict(learned))
             } else {
                 SearchNodeDisposition.Prune
             }
@@ -610,12 +610,15 @@ internal class ResumableMinimize(
     }
 
     /** Adapts an asserting LP Farkas consequence to the shared traversal's native backjump contract. */
-    private inner class LpNodeBackjump(private val learned: LearnedConstraint) : SearchNodeBackjump {
+    private inner class LpLearnedConflict(private val learned: LearnedConstraint) : SearchLearnedConflict {
         override val decisionLevel: Int get() = cp.sharedLevelForNative(learned.backjumpLevel)
+        override val lbd: Int get() = learned.lbd
+        override val guardLiterals: IntArray get() = learned.guardLiterals
+        override val decisionLevels: IntArray get() = learned.decisionLevels
 
-        override fun apply(session: com.eignex.klause.solver.search.SearchSession): SearchNodeBackjumpResult {
+        override fun apply(session: com.eignex.klause.solver.search.SearchSession): SearchLearnedConflictResult {
             if (!learned.asserting || learned.guardLiterals.isEmpty()) {
-                return SearchNodeBackjumpResult.Chronological
+                return SearchLearnedConflictResult.Chronological
             }
             val result = when (learned) {
                 is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned -> {
@@ -637,12 +640,12 @@ internal class ResumableMinimize(
                         session.learnFrom(cp, com.eignex.klause.solver.search.SearchExplanation(learned.literals))
                     }
                     if (cp.import(result, session) !is ComponentResult.Consistent) {
-                        SearchNodeBackjumpResult.Chronological
+                        SearchLearnedConflictResult.Chronological
                     } else {
                         when (session.propagate()) {
-                            ComponentResult.Consistent -> SearchNodeBackjumpResult.Resume
-                            is ComponentResult.Conflict -> SearchNodeBackjumpResult.Chronological
-                            ComponentResult.Indeterminate -> SearchNodeBackjumpResult.Indeterminate
+                            ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
+                            is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
+                            ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
                         }
                     }
                 }
@@ -650,13 +653,13 @@ internal class ResumableMinimize(
                 is PropagationResult.Unsat -> {
                     val next = result.learnedClause as? LearnedConstraint
                     when {
-                        next == null -> SearchNodeBackjumpResult.Chronological
+                        next == null -> SearchLearnedConflictResult.Chronological
 
                         next.backjumpLevel == 0 && next.guardLiterals.isEmpty() -> {
-                            SearchNodeBackjumpResult.Exhausted
+                            SearchLearnedConflictResult.Exhausted
                         }
 
-                        else -> SearchNodeBackjumpResult.Backjump(LpNodeBackjump(next))
+                        else -> SearchLearnedConflictResult.Backjump(LpLearnedConflict(next))
                     }
                 }
             }

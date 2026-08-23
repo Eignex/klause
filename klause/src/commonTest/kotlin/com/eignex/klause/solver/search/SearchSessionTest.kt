@@ -297,13 +297,16 @@ class SearchSessionTest {
             override fun beforeBranch(context: SearchContext): SearchNodeDisposition = if (
                 pending && context.decisionLevel == 2
             ) {
-                SearchNodeDisposition.Backjump(object : SearchNodeBackjump {
+                SearchNodeDisposition.Backjump(object : SearchLearnedConflict {
                     override val decisionLevel: Int = 1
+                    override val lbd: Int = 1
+                    override val guardLiterals: IntArray = intArrayOf(0)
+                    override val decisionLevels: IntArray = intArrayOf(1)
 
-                    override fun apply(session: SearchSession): SearchNodeBackjumpResult {
+                    override fun apply(session: SearchSession): SearchLearnedConflictResult {
                         appliedAt = session.decisionLevel
                         pending = false
-                        return SearchNodeBackjumpResult.Resume
+                        return SearchLearnedConflictResult.Resume
                     }
                 })
             } else {
