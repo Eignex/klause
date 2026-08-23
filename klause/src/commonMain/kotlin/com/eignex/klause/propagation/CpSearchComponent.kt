@@ -1,13 +1,17 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
+import com.eignex.klause.solver.search.SearchConflictResolution
+import com.eignex.klause.solver.search.SearchConflictResolver
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchSession
 
 /**
@@ -23,7 +27,9 @@ class CpSearchComponent(
     val session: PropagationSession,
     /** Source id for each CP-local integer column; `null` keeps the ordinary identity mapping. */
     sourceIntIds: IntArray? = null,
-) : SearchBrancher {
+    /** Typed CP split policy; the shared runner owns applying and retracting its returned decisions. */
+    private val branching: CpBranching = CpBranching.Middle,
+) : SearchBrancher, SearchModelBlocker, SearchConflictResolver {
     private val sourceIntIds = sourceIntIds?.copyOf()
     private val cpIntBySource = this.sourceIntIds?.let { ids ->
         IntArray((ids.maxOrNull() ?: -1) + 1) { -1 }.also { map ->
@@ -31,11 +37,18 @@ class CpSearchComponent(
         }
     }
     private var sharedRootLevel = 0
+    private val nativeLevelBySharedLevel = ArrayList<Int>().apply { add(0) }
     private var lastResult: PropagationResult? = null
+    private var pendingLearned: ConflictAnalyzer.AnalysisResult.LearnedConstraint? = null
+
+    override val resolvesAfterModelBlock: Boolean
+        get() = session.problem.numIntVars == 0 && session.problem.factors.isEmpty()
 
     /** Align shared decision level zero with CP's post-seed root. */
     fun rebase() {
         sharedRootLevel = session.decisionLevel
+        nativeLevelBySharedLevel.clear()
+        nativeLevelBySharedLevel += sharedRootLevel
     }
 
     /** Apply [decision] through [shared], retaining both CP and peer-component outcomes. */
@@ -106,7 +119,8 @@ class CpSearchComponent(
     override fun assert(
         decision: SearchDecision,
         context: com.eignex.klause.solver.search.SearchContext,
-    ): ComponentResult = when (decision) {
+    ): ComponentResult {
+        val result = when (decision) {
         is SearchDecision.Bool -> when (
             val result = session.pinBool(
                 Lit.variable(decision.literal),
@@ -136,7 +150,10 @@ class CpSearchComponent(
             result(session.pinInt(it, decision.value), context)
         } ?: ComponentResult.Consistent
 
-        is SearchDecision.Theory -> ComponentResult.Consistent
+            is SearchDecision.Theory -> ComponentResult.Consistent
+        }
+        recordNativeLevel(context.decisionLevel)
+        return result
     }
 
     private fun result(
@@ -200,7 +217,9 @@ class CpSearchComponent(
     }
 
     override fun retract(decisionLevel: Int) {
-        session.popToLevel(sharedRootLevel + decisionLevel)
+        val target = nativeLevelBySharedLevel.getOrElse(decisionLevel) { sharedRootLevel }
+        session.popToLevel(target)
+        while (nativeLevelBySharedLevel.size > decisionLevel + 1) nativeLevelBySharedLevel.removeLast()
     }
 
     override fun contributeModel(model: SearchModel, context: com.eignex.klause.solver.search.SearchContext) {
@@ -217,18 +236,66 @@ class CpSearchComponent(
     }
 
     override fun nextBranch(context: com.eignex.klause.solver.search.SearchContext): List<SearchDecision>? {
-        for (variable in 0 until session.problem.numIntVars) {
-            val domain = session.intDomain(variable)
-            if (domain.min == domain.max) continue
-            // Unsigned halving preserves the inclusive midpoint even for the full signed Long range.
-            val middle = domain.min + ((domain.max - domain.min) ushr 1)
-            val source = sourceIntId(variable)
-            return listOf(
-                SearchDecision.IntAtMost(source, middle),
-                SearchDecision.IntAtLeast(source, middle + 1),
+        return branching.alternatives(session, ::sourceIntId)
+    }
+
+    override fun blockModel(
+        model: com.eignex.klause.solver.search.AssembledSearchModel,
+        context: com.eignex.klause.solver.search.SearchContext,
+    ): ComponentResult {
+        val sample = checkNotNull(model.valueOf<Sample>(this))
+        val nogood = session.assignmentNogood(
+            sample.bools,
+            sample.ints,
+        )
+        if (nogood.isEmpty()) return ComponentResult.Conflict()
+        return when (val result = session.addLearnedClause(Clause(nogood), lbd = nogood.size, permanent = true)) {
+            is PropagationResult.Implied -> publish(result, context)
+            is PropagationResult.Unsat -> ComponentResult.Conflict()
+        }
+    }
+
+    override fun resolveConflict(context: com.eignex.klause.solver.search.SearchContext): SearchConflictResolution {
+        if (session.problem.numIntVars != 0) return SearchConflictResolution.Chronological
+        val learned = (lastResult as? PropagationResult.Unsat)?.learnedClause
+            as? ConflictAnalyzer.AnalysisResult.LearnedConstraint
+            ?: return SearchConflictResolution.Chronological
+        if (!learned.asserting) return SearchConflictResolution.Chronological
+        if (learned.guardLiterals.isEmpty() && learned.backjumpLevel == 0) {
+            return SearchConflictResolution.Exhausted
+        }
+        pendingLearned = learned
+        val sharedLevel = nativeLevelBySharedLevel.indexOfLast { nativeLevel ->
+            nativeLevel <= learned.backjumpLevel
+        }.coerceAtLeast(0)
+        return SearchConflictResolution.Backjump(sharedLevel)
+    }
+
+    override fun applyResolution(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
+        val learned = checkNotNull(pendingLearned.also { pendingLearned = null })
+        val result = when (learned) {
+            is ConflictAnalyzer.AnalysisResult.Learned -> session.addLearnedClause(Clause(learned.literals), learned.lbd)
+            is ConflictAnalyzer.AnalysisResult.LearnedPb -> session.addLearnedPb(
+                learned.weights,
+                learned.literals,
+                learned.degree,
+                learned.lbd,
             )
         }
-        return null
+        return when (result) {
+            is PropagationResult.Implied -> {
+                if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
+                    context as? SearchSession ?: return ComponentResult.Indeterminate
+                    context.learnFrom(this, SearchExplanation(learned.literals))
+                }
+                import(result, context as SearchSession)
+            }
+
+            is PropagationResult.Unsat -> {
+                lastResult = result
+                conflict(result)
+            }
+        }
     }
 
     private fun cpIntId(sourceIntId: Int): Int? {
@@ -237,6 +304,46 @@ class CpSearchComponent(
     }
 
     private fun sourceIntId(cpIntId: Int): Int = sourceIntIds?.get(cpIntId) ?: cpIntId
+
+    private fun recordNativeLevel(sharedLevel: Int) {
+        while (nativeLevelBySharedLevel.size <= sharedLevel) nativeLevelBySharedLevel += session.decisionLevel
+        nativeLevelBySharedLevel[sharedLevel] = session.decisionLevel
+    }
+}
+
+/** Supplies finite-domain splits without owning a search trail. */
+fun interface CpBranching {
+    /** Exhaustive alternatives for the current CP state, or null once all CP columns are fixed. */
+    fun alternatives(session: PropagationSession, sourceIntId: (Int) -> Int): List<SearchDecision>?
+
+    /** First unfixed column, split at its inclusive midpoint. */
+    data object Middle : CpBranching {
+        override fun alternatives(
+            session: PropagationSession,
+            sourceIntId: (Int) -> Int,
+        ): List<SearchDecision>? {
+        for (variable in 0 until session.problem.numIntVars) {
+            val domain = session.intDomain(variable)
+            if (domain.min == domain.max) continue
+            // Unsigned halving preserves the inclusive midpoint even for the full signed Long range.
+            val middle = domain.min + ((domain.max - domain.min) ushr 1)
+            return listOf(
+                SearchDecision.IntAtMost(sourceIntId(variable), middle),
+                SearchDecision.IntAtLeast(sourceIntId(variable), middle + 1),
+            )
+        }
+        return null
+    }
+
+    }
+
+    /** Leave residual selection to another shared [SearchBrancher]. */
+    data object None : CpBranching {
+        override fun alternatives(
+            session: PropagationSession,
+            sourceIntId: (Int) -> Int,
+        ): List<SearchDecision>? = null
+    }
 }
 
 /** Native CP propagation and the shared component result of one asserted decision. */

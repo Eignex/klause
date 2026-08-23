@@ -36,6 +36,49 @@ import kotlin.test.assertTrue
 class BacktrackSolverTest {
 
     @Test
+    fun `component factory drives theory branches through legacy DFS`() {
+        val branch = object : com.eignex.klause.solver.search.SearchTheoryDecision {}
+        val result = BacktrackSolver(
+            Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray()).bake(),
+        ).solve(
+            BacktrackParams(
+                componentFactory = {
+                    listOf(object : com.eignex.klause.solver.search.SearchBrancher {
+                        private var selected = false
+
+                        override fun assert(
+                            decision: com.eignex.klause.solver.search.SearchDecision,
+                            context: com.eignex.klause.solver.search.SearchContext,
+                        ): com.eignex.klause.solver.search.ComponentResult {
+                            selected = decision == com.eignex.klause.solver.search.SearchDecision.Theory(branch)
+                            return com.eignex.klause.solver.search.ComponentResult.Consistent
+                        }
+
+                        override fun retract(decisionLevel: Int) {
+                            if (decisionLevel == 0) selected = false
+                        }
+
+                        override fun nextBranch(
+                            context: com.eignex.klause.solver.search.SearchContext,
+                        ): List<com.eignex.klause.solver.search.SearchDecision>? =
+                            if (selected) null else listOf(com.eignex.klause.solver.search.SearchDecision.Theory(branch))
+
+                        override fun check(
+                            context: com.eignex.klause.solver.search.SearchContext,
+                        ): com.eignex.klause.solver.search.ComponentCheck = if (selected) {
+                            com.eignex.klause.solver.search.ComponentCheck.Feasible
+                        } else {
+                            com.eignex.klause.solver.search.ComponentCheck.Indeterminate
+                        }
+                    })
+                },
+            ),
+        )
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
     fun `component factory refutes finite CP leaves through the shared session`() {
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val result = BacktrackSolver(problem.bake()).solve(

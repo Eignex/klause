@@ -7,12 +7,36 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class CpSearchComponentTest {
+
+    @Test
+    fun `shared runner enumerates CP branches without repeating a model`() {
+        val component = CpSearchComponent(
+            PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())),
+        )
+        component.rebase()
+        val session = SearchSession(listOf(component))
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val run = session.openRun(0)
+        val first = assertIs<SearchRunEvent.Satisfied>(run.next())
+        val second = assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(
+            setOf(0L, 1L),
+            setOf(
+                first.model.valueOf<Long>(com.eignex.klause.solver.search.SearchIntValue(0)),
+                second.model.valueOf<Long>(com.eignex.klause.solver.search.SearchIntValue(0)),
+            ),
+        )
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+    }
 
     @Test
     fun `shared trail retraction rewinds the CP component`() {

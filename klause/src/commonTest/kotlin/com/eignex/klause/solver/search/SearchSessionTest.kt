@@ -338,6 +338,40 @@ class SearchSessionTest {
         assertIs<SearchResult.Indeterminate>(session.solve(2, SearchSolveParams(maxDecisions = 1)))
     }
 
+    @Test
+    fun `model policy continues through a non-reportable model`() {
+        var seen = 0
+        val session = SearchSession(emptyList())
+        val run = session.openRun(
+            numBoolVars = 1,
+            modelPolicy = object : SearchModelPolicy {
+                override fun onModel(model: AssembledSearchModel, context: SearchContext): SearchModelDisposition =
+                    if (++seen == 1) SearchModelDisposition.Continue else SearchModelDisposition.Surface
+            },
+        )
+
+        val result = assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(2, seen)
+        assertEquals(true, result.model.valueOf<Boolean>(SearchBoolValue(0)))
+    }
+
+    @Test
+    fun `node policy prunes through the shared frame stack`() {
+        var calls = 0
+        val session = SearchSession(emptyList())
+        val run = session.openRun(
+            numBoolVars = 1,
+            nodePolicy = object : SearchNodePolicy {
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                    if (++calls >= 2) SearchNodeDisposition.Prune else SearchNodeDisposition.Expand
+            },
+        )
+
+        assertIs<SearchRunEvent.Exhausted>(run.next())
+        assertEquals(3, calls)
+    }
+
     private class RecordingComponent : SearchComponent {
         val retractions = ArrayList<Int>()
 

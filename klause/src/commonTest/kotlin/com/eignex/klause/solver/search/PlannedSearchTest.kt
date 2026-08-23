@@ -133,6 +133,29 @@ class PlannedSearchTest {
     }
 
     @Test
+    fun `hybrid QF LIRA rows receive CP-owned values through the shared trail`() {
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 1), longArrayOf(1, 1), null, null),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 2),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
+        )
+        val planned = model.componentPlan().search(
+            model,
+            mapOf(0 to IntDomain(0, 1), 1 to IntDomain(1, 1)),
+        )
+
+        assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+        assertIs<SearchResult.Exhausted>(planned.session.solve(0))
+    }
+
+    @Test
     fun `hybrid root conflict is reported through the shared component session`() {
         val openUpper = Bits(3).also { it.set(1) }
         val model = ProblemSpec(
