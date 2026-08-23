@@ -49,7 +49,7 @@ internal class BigRationalOutcome(
     val witness: List<BigFraction>? = null,
     /**
      * Final exact slack-form rows when feasibility was established.  Each row is
-     * `x[basic] = rhs - sum(coefficients[k] * x[columns[k]])`; [columns] contains
+     * `x(basic) = rhs - sum(coefficients(k) * x(columns(k)))`; `columns` contains
      * only non-basic variables.  This is intentionally an exact-theory boundary:
      * mixed-integer clients can separate a cut without rebuilding a floating basis.
      */
