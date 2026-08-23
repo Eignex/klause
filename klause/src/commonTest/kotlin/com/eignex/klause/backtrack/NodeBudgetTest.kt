@@ -34,9 +34,9 @@ class NodeBudgetTest {
 
     @Test
     fun `a spent allowance stops the search short of a verdict`() {
-        val budget = NodeBudget(limit = 200)
+        val budget = NodeBudget(limit = 1)
         val result = BacktrackSolver(php(pigeons = 8, holes = 7).bake()).solve(params(budget))
-        assertIs<SolveResult.Unknown>(result, "the refutation needs far more than 200 nodes")
+        assertIs<SolveResult.Unknown>(result, "the first decision exhausts the allowance before the refutation")
         assertTrue(budget.exhausted(), "the allowance is what stopped it, spent=${budget.spent}")
     }
 
