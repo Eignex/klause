@@ -309,6 +309,39 @@ sealed interface SearchRunDisposition {
     data object Indeterminate : SearchRunDisposition
 }
 
+/**
+ * Complete mode-specific wiring for one [SearchRun].
+ *
+ * The session owns traversal; a policy only selects branching, limits, model continuation, and lifecycle
+ * boundary work for one caller. Finite CP, optimization, and future frontends can therefore share the
+ * same decision stack and conflict path without reimplementing the run loop.
+ */
+internal interface SearchTraversalPolicy {
+    /** Limits and restart schedule for this traversal. */
+    val solveParams: SearchSolveParams
+
+    /** Boolean branching preceding component-local splits. */
+    val booleanBranching: BooleanBranching
+
+    /** Shared-decision budget for this traversal. */
+    val decisionBudget: SearchDecisionBudget
+
+    /** Traversal observations such as selector updates and statistics. */
+    val observer: SearchRunObserver
+
+    /** Continuation after a surfaced or consumed model. */
+    val modelContinuation: SearchModelContinuation
+
+    /** Model reporting policy. */
+    val modelPolicy: SearchModelPolicy
+
+    /** Per-node pruning or learned-backjump policy. */
+    val nodePolicy: SearchNodePolicy
+
+    /** Restart, cancellation, and resumable boundary work. */
+    val lifecycle: SearchRunLifecycle
+}
+
 /** Restart policy owned by the shared search engine. */
 interface SearchRestartPolicy {
     /** Start a fresh traversal run. */
