@@ -175,6 +175,9 @@ class CpSearchComponent(
         return published
     }
 
+    override fun reasonFor(literal: Int): SearchExplanation? =
+        session.boolReasonClause(Lit.variable(literal))?.let(::SearchExplanation)
+
     override fun retract(decisionLevel: Int) {
         val target = if (decisionLevel < nativeLevelBySharedLevel.size) {
             nativeLevelBySharedLevel[decisionLevel]

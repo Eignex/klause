@@ -18,18 +18,22 @@ class SearchSession(
     private val maxChecks: Long = Long.MAX_VALUE,
     private val cancellation: Cancellation = Cancellation.Never,
     private val learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
-) : SearchContext {
+) : SearchContext,
+    ClauseWatchHost {
     private val trail = ArrayList<SearchDecision>()
     private val boolValues = MutableIntIntMap()
     private val boolLevels = MutableIntIntMap()
     private val boolReasons = MutableIntObjectMap<SearchExplanation>()
+
+    /** Component that published a Boolean consequence without a clause, which may still explain it. */
+    private val boolPublisher = MutableIntObjectMap<SearchComponent>()
     private val valuesAtLevel = ArrayList<IntArrayList>().apply { add(IntArrayList()) }
     private val intFacts = MutableIntObjectMap<IntFact>()
     private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>>().apply {
         add(MutableIntObjectMap())
     }
     private val pendingAssertions = ArrayDeque<PendingAssertion>()
-    private val learned = LearnedClauseStore()
+    private val learned = WatchedClauseStore()
     private val boolTrail = IntArrayList()
     private val trailStartAtLevel = IntArrayList().apply { add(0) }
     private val pendingAttach = ArrayDeque<Int>()
@@ -105,7 +109,11 @@ class SearchSession(
 
             UNASSIGNED -> {
                 assignBool(variable, value)
-                if (explanation != null) boolReasons.put(variable, explanation)
+                if (explanation != null) {
+                    boolReasons.put(variable, explanation)
+                } else {
+                    activeComponent?.let { boolPublisher.put(variable, it) }
+                }
                 pendingAssertions.addLast(PendingAssertion(SearchDecision.Bool(literal), activeComponent))
                 ComponentResult.Consistent
             }
@@ -188,6 +196,7 @@ class SearchSession(
                 boolValues.remove(variable)
                 boolLevels.remove(variable)
                 boolReasons.remove(variable)
+                boolPublisher.remove(variable)
             }
             valuesAtLevel.removeAt(level)
             priorIntFactsAtLevel.removeAt(level).forEach { variable, fact ->
@@ -293,10 +302,23 @@ class SearchSession(
             val assigned = boolValues.getOrDefault(variable, UNASSIGNED).takeIf { it != UNASSIGNED } ?: continue
             val falsified = (variable shl 1) or assigned
             if (falsified !in clause) continue
-            val reason = boolReasons[variable] ?: continue
+            val reason = reasonOf(variable, falsified xor 1) ?: continue
             return falsified to reason
         }
         return null
+    }
+
+    /**
+     * Reason for the current assignment of [variable], asking its publisher when the session holds
+     * none. A component-supplied clause is retained, so a second resolution through the same literal
+     * does not rebuild it.
+     */
+    private fun reasonOf(variable: Int, implied: Int): SearchExplanation? {
+        boolReasons[variable]?.let { return it }
+        val published = boolPublisher[variable]?.reasonFor(implied) ?: return null
+        if (implied !in published.literals) return null
+        boolReasons.put(variable, published)
+        return published
     }
 
     private fun resolve(clause: List<Int>, pivot: Int, reason: SearchExplanation): List<Int>? {
@@ -353,6 +375,7 @@ class SearchSession(
         boolValues.clear()
         boolLevels.clear()
         boolReasons.clear()
+        boolPublisher.clear()
         valuesAtLevel.clear()
         valuesAtLevel.add(IntArrayList())
         intFacts.clear()
@@ -476,34 +499,6 @@ class SearchSession(
     }
 
     /**
-     * Move the two literals that must be watched to the front of [literals].
-     *
-     * An unassigned or satisfied literal is always preferable, and among falsified literals the one
-     * assigned deepest is preferable: it is the first to be unassigned, which is what keeps a watch
-     * from going stale after a backjump.
-     */
-    private fun orderWatches(literals: IntArray) {
-        for (slot in 0 until minOf(2, literals.size)) {
-            var best = slot
-            for (candidate in slot + 1 until literals.size) {
-                if (watchRank(literals[candidate]) > watchRank(literals[best])) best = candidate
-            }
-            val swapped = literals[slot]
-            literals[slot] = literals[best]
-            literals[best] = swapped
-        }
-    }
-
-    private fun watchRank(literal: Int): Int {
-        val variable = literal ushr 1
-        val value = boolValue(variable) ?: return UNASSIGNED_WATCH_RANK
-        if (value == (literal and 1 == 0)) return SATISFIED_WATCH_RANK
-        return boolLevels.getOrDefault(variable, 0)
-    }
-
-    private fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
-
-    /**
      * Drop the weakest retained clauses once the database exceeds its cap.
      *
      * Every learned clause is implied by the root problem, so forgetting one only weakens propagation.
@@ -557,13 +552,23 @@ class SearchSession(
      * every other clause is visited only when one of its two watched literals is falsified.
      */
     private fun propagateLearnedClauses(): ComponentResult {
-        val attached = drainPendingAttach()
-        if (attached !is ComponentResult.Consistent) return attached
-        val units = propagateUnitClauses()
-        if (units !is ComponentResult.Consistent) return units
+        while (pendingAttach.isNotEmpty()) {
+            val result = learned.attach(pendingAttach.removeFirst(), this)
+            if (result !is ComponentResult.Consistent) return result
+        }
+        if (unitsPending) {
+            unitsPending = false
+            val result = learned.propagateUnits(this)
+            if (result !is ComponentResult.Consistent) {
+                // The units after this one stay pending: leaving early must not drop them until the
+                // next retraction.
+                unitsPending = true
+                return result
+            }
+        }
         while (propagatedTrail < boolTrail.size) {
             val falsified = boolTrail[propagatedTrail++] xor 1
-            val result = propagateWatchers(falsified)
+            val result = learned.propagate(falsified, this)
             if (result !is ComponentResult.Consistent) {
                 // The watchers of this literal were left partly unvisited, and a backjump does not
                 // always rewind past it, so it stays queued rather than being silently skipped.
@@ -574,109 +579,14 @@ class SearchSession(
         return ComponentResult.Consistent
     }
 
-    private fun drainPendingAttach(): ComponentResult {
-        while (pendingAttach.isNotEmpty()) {
-            val result = examineAttached(pendingAttach.removeFirst())
-            if (result !is ComponentResult.Consistent) return result
-        }
-        return ComponentResult.Consistent
-    }
+    override fun truth(literal: Int): Boolean? = literalTruth(literal)
 
-    /** Choose watches for a freshly learned clause and evaluate it against the current assignment. */
-    private fun examineAttached(index: Int): ComponentResult {
-        val literals = learned.literalsAt(index)
-        orderWatches(literals)
-        learned.watch(index)
-        val watched = literals[0]
-        if (literalTruth(watched) == true) return ComponentResult.Consistent
-        if (literalTruth(watched) == false) return conflictOn(index)
-        val blocker = if (literals.size == 1) null else literals[1]
-        if (blocker != null && literalTruth(blocker) != false) return ComponentResult.Consistent
-        return implyFromClause(index, watched)
-    }
+    override fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
 
-    private fun propagateUnitClauses(): ComponentResult {
-        if (!unitsPending) return ComponentResult.Consistent
-        unitsPending = false
-        learned.units.forEach { index ->
-            val literal = learned.literalsAt(index)[0]
-            when (literalTruth(literal)) {
-                true -> Unit
+    override fun implied(clause: Int, literal: Int): ComponentResult =
+        implyFrom(learned.sourceAt(clause), literal, learned.explanationOf(clause))
 
-                // The units after this one stay pending: leaving early must not drop them until the
-                // next retraction.
-                false -> {
-                    unitsPending = true
-                    return conflictOn(index)
-                }
-
-                null -> {
-                    val result = implyFromClause(index, literal)
-                    if (result !is ComponentResult.Consistent) {
-                        unitsPending = true
-                        return result
-                    }
-                }
-            }
-        }
-        return ComponentResult.Consistent
-    }
-
-    /**
-     * Visit every clause watching [falsified], restoring the two-watch invariant.
-     *
-     * A clause that finds a non-falsified replacement literal moves its watch and leaves this list; a
-     * clause with no replacement either implies its remaining watch or is in conflict.
-     */
-    private fun propagateWatchers(falsified: Int): ComponentResult {
-        val watchers = learned.watchersOf(falsified) ?: return ComponentResult.Consistent
-        var source = 0
-        var target = 0
-        var outcome: ComponentResult = ComponentResult.Consistent
-        while (source < watchers.size) {
-            val index = watchers[source++]
-            val literals = learned.literalsAt(index)
-            if (literals[0] == falsified && literals.size > 1) {
-                literals[0] = literals[1]
-                literals[1] = falsified
-            }
-            val other = literals[0]
-            if (literalTruth(other) == true) {
-                watchers[target++] = index
-                continue
-            }
-            val replacement = replacementWatch(literals)
-            if (replacement > 0) {
-                literals[1] = literals[replacement]
-                literals[replacement] = falsified
-                learned.addWatcher(literals[1], index)
-                continue
-            }
-            watchers[target++] = index
-            outcome = if (literalTruth(other) == false) conflictOn(index) else implyFromClause(index, other)
-            if (outcome !is ComponentResult.Consistent) break
-        }
-        while (source < watchers.size) watchers[target++] = watchers[source++]
-        watchers.truncateTo(target)
-        return outcome
-    }
-
-    private fun replacementWatch(literals: IntArray): Int {
-        for (position in 2 until literals.size) {
-            if (literalTruth(literals[position]) != false) return position
-        }
-        return -1
-    }
-
-    private fun conflictOn(index: Int): ComponentResult {
-        learned.markUsed(index)
-        return ComponentResult.Conflict(SearchExplanation(learned.literalsAt(index).copyOf()))
-    }
-
-    private fun implyFromClause(index: Int, literal: Int): ComponentResult {
-        learned.markUsed(index)
-        return implyFrom(learned.sourceAt(index), literal, SearchExplanation(learned.literalsAt(index).copyOf()))
-    }
+    override fun conflicted(clause: Int): ComponentResult = ComponentResult.Conflict(learned.explanationOf(clause))
 
     private fun literalTruth(literal: Int): Boolean? {
         val value = boolValue(literal ushr 1) ?: return null
@@ -756,12 +666,6 @@ class SearchSession(
         const val UNASSIGNED = -1
         const val FALSE = 0
         const val TRUE = 1
-
-        /** Watch preference for an unassigned literal; below a satisfied one, above any level. */
-        const val UNASSIGNED_WATCH_RANK = Int.MAX_VALUE - 1
-
-        /** Watch preference for a satisfied literal, which never needs replacing. */
-        const val SATISFIED_WATCH_RANK = Int.MAX_VALUE
     }
 }
 

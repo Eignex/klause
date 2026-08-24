@@ -648,6 +648,42 @@ class SearchSessionTest {
         assertEquals(true, session.boolValue(1))
     }
 
+    @Test
+    fun `shared analysis resolves through a literal its publisher explains`() {
+        val session = SearchSession(listOf(ExplainingPublisher(explains = true)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+
+        val resolution = session.explainedConflict(SearchExplanation(intArrayOf(5, 7, 1)))
+
+        val backjump = assertIs<SearchConflictResolution.Backjump>(resolution)
+        assertEquals(1, backjump.conflict.decisionLevel)
+    }
+
+    @Test
+    fun `shared analysis stays chronological when no publisher explains the literal`() {
+        val session = SearchSession(listOf(ExplainingPublisher(explains = false)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(2)))
+
+        val resolution = session.explainedConflict(SearchExplanation(intArrayOf(5, 7, 1)))
+
+        assertEquals(SearchConflictResolution.Chronological, resolution)
+    }
+
+    /** Publishes two literals without clauses once the second decision lands, explaining on demand. */
+    private class ExplainingPublisher(private val explains: Boolean) : SearchComponent {
+        override fun propagate(context: SearchContext): ComponentResult {
+            if (context.boolValue(1) != true) return ComponentResult.Consistent
+            if (context.boolValue(2) == null) return context.publish(4)
+            if (context.boolValue(3) == null) return context.publish(6)
+            return ComponentResult.Consistent
+        }
+
+        override fun reasonFor(literal: Int): SearchExplanation? =
+            if (explains && literal == 6) SearchExplanation(intArrayOf(6, 5)) else null
+    }
+
     private class RecordingComponent : SearchComponent {
         val retractions = ArrayList<Int>()
 
