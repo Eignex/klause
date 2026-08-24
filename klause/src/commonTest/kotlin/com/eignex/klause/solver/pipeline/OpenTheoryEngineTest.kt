@@ -4,9 +4,11 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,6 +29,22 @@ class OpenTheoryEngineTest {
 
         val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
         assertEquals(0L, assertIs<OpenTheoryAssignment.Difference>(assignment).sample.ints[0])
+    }
+
+    @Test
+    fun `open route reports a spent budget as a timed-out run`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = emptyArray(),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
+            .solve(TheoryParams(cancellation = Cancellation { true }))
+
+        assertIs<OpenTheoryResult.Unknown>(result)
+        assertEquals(true, result.stats.run.timedOut, "a cancelled open run reports its budget as spent")
     }
 
     @Test
