@@ -40,12 +40,23 @@ enum class ProblemPipeline {
  * classified by [componentPlan], which reads column and factor ownership rather than demanding one
  * theory cover the whole model.
  */
-fun ProblemSpec.sourceRoute(): ProblemPipeline =
-    if ((0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }) {
-        ProblemPipeline.FINITE_CP
-    } else {
-        componentPlan().theoryPipeline
+fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
+    (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) } -> ProblemPipeline.FINITE_CP
+
+    // An open column a finite-domain factor reaches has no owner: CP cannot index it and the theory
+    // cannot hold the factor. That is a verdict about the model, so it is answered here rather than
+    // left to the plan, which states it as an invariant it may assume.
+    !openColumnsAreTheoryEligible() -> ProblemPipeline.UNSUPPORTED_OPEN
+
+    else -> componentPlan().theoryPipeline
+}
+
+private fun ProblemSpec.openColumnsAreTheoryEligible(): Boolean {
+    val partition = variablePartition()
+    return (0 until numIntVars).none { v ->
+        (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) && !partition.isTheoryEligible(v)
     }
+}
 
 /** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
 internal fun ProblemSpec.supportsExactLra(): Boolean =
