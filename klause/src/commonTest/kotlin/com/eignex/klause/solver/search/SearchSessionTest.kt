@@ -543,6 +543,111 @@ class SearchSessionTest {
         assertEquals(3, calls)
     }
 
+    @Test
+    fun `learned clause implies its last unfalsified literal`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+
+        assertEquals(true, session.boolValue(2))
+    }
+
+    @Test
+    fun `learned clause conflicts when propagation falsifies every literal`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(0, 3)))
+
+        val result = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(1)))
+
+        assertEquals(setOf(0, 3), result.explanation?.literals?.toSet())
+    }
+
+    @Test
+    fun `learned clause implies again after its watches are refalsified in another order`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+        session.learn(SearchExplanation(intArrayOf(0, 2, 4)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        session.popTo(0)
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(5)))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `learned unit clause is reimplied after the level that learned it is retracted`() {
+        val session = SearchSession(emptyList())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(3)))
+        session.learn(SearchExplanation(intArrayOf(0)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        session.popTo(0)
+        assertEquals(null, session.boolValue(0))
+
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertEquals(true, session.boolValue(0))
+    }
+
+    @Test
+    fun `permuted explanation does not enter the database twice`() {
+        val session = SearchSession(emptyList())
+
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(2, 0)))
+
+        assertEquals(1, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `restart drops the clauses over the learned database cap`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertEquals(1, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `restart retains glue clauses over the learned database cap`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 1),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertEquals(2, session.learnedClauseCount)
+    }
+
+    @Test
+    fun `a clause retained through a reduction still propagates`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
+
+        assertEquals(true, session.boolValue(1))
+    }
+
     private class RecordingComponent : SearchComponent {
         val retractions = ArrayList<Int>()
 

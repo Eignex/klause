@@ -377,6 +377,24 @@ sealed interface SearchRestart : SearchRestartPolicy {
     }
 }
 
+/**
+ * Bound on the clause database a [SearchSession] has learned.
+ *
+ * A learned clause is implied by the root problem, so forgetting one only weakens propagation. The cap
+ * is off by default: it is a measured knob rather than a correctness requirement.
+ */
+data class SearchLearnedDbParams(
+    /** Retained clause cap applied at a restart boundary, or null to retain every learned clause. */
+    val maxClauses: Int? = null,
+    /** Clauses whose literal block distance is at most this are retained regardless of the cap. */
+    val glueLbd: Int = 2,
+) {
+    init {
+        require(maxClauses == null || maxClauses >= 0) { "learned clause cap must not be negative" }
+        require(glueLbd >= 0) { "glue threshold must not be negative" }
+    }
+}
+
 /** Limits and restart policy for one invocation of [SearchSession.solve]. */
 data class SearchSolveParams(
     /** Maximum shared decisions across all restart runs. */

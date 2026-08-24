@@ -9308,7 +9308,7 @@ final class com.eignex.klause.solver.search/SearchCancellationPoller { // com.ei
 final class com.eignex.klause.solver.search/SearchComponentSet { // com.eignex.klause.solver.search/SearchComponentSet|null[0]
     constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>) // com.eignex.klause.solver.search/SearchComponentSet.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>){}[0]
 
-    final fun session(kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ...): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
+    final fun session(kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ...): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.solver.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams){}[0]
 }
 
 final class com.eignex.klause.solver.search/SearchExplanation { // com.eignex.klause.solver.search/SearchExplanation|null[0]
@@ -9337,6 +9337,22 @@ final class com.eignex.klause.solver.search/SearchIntValue : com.eignex.klause.s
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchIntValue.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver.search/SearchLearnedDbParams { // com.eignex.klause.solver.search/SearchLearnedDbParams|null[0]
+    constructor <init>(kotlin/Int? = ..., kotlin/Int = ...) // com.eignex.klause.solver.search/SearchLearnedDbParams.<init>|<init>(kotlin.Int?;kotlin.Int){}[0]
+
+    final val glueLbd // com.eignex.klause.solver.search/SearchLearnedDbParams.glueLbd|{}glueLbd[0]
+        final fun <get-glueLbd>(): kotlin/Int // com.eignex.klause.solver.search/SearchLearnedDbParams.glueLbd.<get-glueLbd>|<get-glueLbd>(){}[0]
+    final val maxClauses // com.eignex.klause.solver.search/SearchLearnedDbParams.maxClauses|{}maxClauses[0]
+        final fun <get-maxClauses>(): kotlin/Int? // com.eignex.klause.solver.search/SearchLearnedDbParams.maxClauses.<get-maxClauses>|<get-maxClauses>(){}[0]
+
+    final fun component1(): kotlin/Int? // com.eignex.klause.solver.search/SearchLearnedDbParams.component1|component1(){}[0]
+    final fun component2(): kotlin/Int // com.eignex.klause.solver.search/SearchLearnedDbParams.component2|component2(){}[0]
+    final fun copy(kotlin/Int? = ..., kotlin/Int = ...): com.eignex.klause.solver.search/SearchLearnedDbParams // com.eignex.klause.solver.search/SearchLearnedDbParams.copy|copy(kotlin.Int?;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SearchLearnedDbParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SearchLearnedDbParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchLearnedDbParams.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.solver.search/SearchRealValue : com.eignex.klause.solver.search/SearchValueKey { // com.eignex.klause.solver.search/SearchRealValue|null[0]
     constructor <init>(kotlin/Int) // com.eignex.klause.solver.search/SearchRealValue.<init>|<init>(kotlin.Int){}[0]
 
@@ -9356,7 +9372,7 @@ final class com.eignex.klause.solver.search/SearchRun { // com.eignex.klause.sol
 }
 
 final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.solver.search/SearchContext { // com.eignex.klause.solver.search/SearchSession|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ...) // com.eignex.klause.solver.search/SearchSession.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ...) // com.eignex.klause.solver.search/SearchSession.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.Long;com.eignex.klause.solver.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams){}[0]
 
     final val decisionLevel // com.eignex.klause.solver.search/SearchSession.decisionLevel|{}decisionLevel[0]
         final fun <get-decisionLevel>(): kotlin/Int // com.eignex.klause.solver.search/SearchSession.decisionLevel.<get-decisionLevel>|<get-decisionLevel>(){}[0]

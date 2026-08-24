@@ -17,6 +17,9 @@ class SearchComponentSet(components: List<SearchComponent>) {
     }
 
     /** Create the one shared session which drives this selected component set. */
-    fun session(maxChecks: Long = Long.MAX_VALUE, cancellation: Cancellation = Cancellation.Never): SearchSession =
-        SearchSession(components, maxChecks, cancellation)
+    fun session(
+        maxChecks: Long = Long.MAX_VALUE,
+        cancellation: Cancellation = Cancellation.Never,
+        learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+    ): SearchSession = SearchSession(components, maxChecks, cancellation, learnedDb)
 }
