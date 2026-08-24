@@ -172,7 +172,7 @@ internal object RedundantConstraints {
         val out4 = dropCliqueImpliedKnapsacks(out3, cancellation)
         // Phase 5: drop globals the current domains make vacuously satisfied; removing one frees
         // a variable contained only in it, which the affine pass then projects out (implied-free).
-        val out5 = out4.filterNot { isVacuousGlobal(it, problem.intDomains) }
+        val out5 = out4.filterNot { isVacuousGlobal(it, problem.requireFiniteIntDomains()) }
         if (out5.size == factors.size) return PassDelta()
         // This pass only drops; every survivor in [out5] is identity-equal to an input factor, in input
         // order, so a two-pointer walk recovers the dropped input indices (correct even with reference
@@ -544,7 +544,7 @@ internal object RedundantConstraints {
         var maxExtra = 0L
         b.coeffByVar.forEach { v, cb ->
             if (!a.coeffByVar.containsKey(v)) {
-                val d = problem.intDomains[v]
+                val d = problem.requireFiniteIntDomains()[v]
                 maxExtra += if (cb >= 0) cb * d.max else cb * d.min
                 // Conservative overflow guard: an extra activity this large can't be dominated by a
                 // small-bound row anyway, so bail rather than risk a wrapped Long comparison.

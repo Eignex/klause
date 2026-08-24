@@ -42,8 +42,12 @@ internal class FlowCoverSeparator : CutSeparator {
         for (f in problem.factors) {
             if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0L) continue
             val (y, x, u) = matchVub(f) ?: continue
-            if (problem.intDomains[x].min != 0L || problem.intDomains[x].max != 1L) continue // xⱼ ∈ {0,1}
-            val cap = minOf(u, problem.intDomains[y].max) // effective flow when xⱼ = 1
+            if (problem.requireFiniteIntDomains()[x].min != 0L ||
+                problem.requireFiniteIntDomains()[x].max != 1L
+            ) {
+                continue // xⱼ ∈ {0,1}
+            }
+            val cap = minOf(u, problem.requireFiniteIntDomains()[y].max) // effective flow when xⱼ = 1
             if (cap <= 0L) continue
             indicator.put(y, x)
             vubCap.put(y, cap)
@@ -92,7 +96,7 @@ internal class FlowCoverSeparator : CutSeparator {
     private fun implicitArcs(f: Linear, problem: Problem, intColOf: IntArray): List<Arc>? {
         for (i in f.vars.indices) {
             if (f.coeff(i) <= 0) return null
-            val d = problem.intDomains[f.vars[i]]
+            val d = problem.requireFiniteIntDomains()[f.vars[i]]
             if (d.min != 0L || d.max != 1L || intColOf[f.vars[i]] < 0) return null
         }
         return f.vars.indices.map { i ->

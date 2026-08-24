@@ -75,7 +75,7 @@ internal fun Problem.withHashes(hashes: List<Xor>): Problem {
     return Problem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intDomains = intDomains,
+        intDomains = requireFiniteIntDomains(),
         factors = merged,
     )
 }

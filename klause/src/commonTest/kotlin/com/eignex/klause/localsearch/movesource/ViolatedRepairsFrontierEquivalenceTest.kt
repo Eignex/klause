@@ -76,7 +76,7 @@ class ViolatedRepairsFrontierEquivalenceTest {
         for (u in nfac.intVars) {
             if (b <= 0) return b
             val cur = state.assignment.intValue(u)
-            val d = state.problem.intDomains[u]
+            val d = state.problem.requireFiniteIntDomains()[u]
             if (cur < d.max) {
                 sink.addChannelingIntSet(state, u, cur + 1)
                 b--

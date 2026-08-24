@@ -111,7 +111,7 @@ internal object SymmetryBreaking {
             val orbitSet = LongHashSet()
             orbit.forEach { orbitSet.add(it) }
             val internal = (0 until problem.numIntVars)
-                .filter { it !in objectiveIntVars && domainWithin(problem.intDomains[it], orbitSet) }
+                .filter { it !in objectiveIntVars && domainWithin(problem.requireFiniteIntDomains()[it], orbitSet) }
             when {
                 // Law–Lee value precedence (the default value break): introduce the orbit's values in
                 // sorted order across the interchangeable variables — one representative per value-symmetry
@@ -164,7 +164,7 @@ internal object SymmetryBreaking {
         val base: Map<StructuralKey, Int> by lazy { PresolveShared.structuralKeyMultiset(problem.factors.asList()) }
         var lo = Long.MAX_VALUE
         var hi = Long.MIN_VALUE
-        for (d in problem.intDomains) {
+        for (d in problem.requireFiniteIntDomains()) {
             if (d.min < lo) lo = d.min
             if (d.max > hi) hi = d.max
         }
@@ -183,7 +183,7 @@ internal object SymmetryBreaking {
             // value-symmetry phase's cost; returning what is grouped so far only forgoes value pins.
             if (cancellation()) return null
             val sig = LongArrayList()
-            for (x in 0 until problem.numIntVars) if (value in problem.intDomains[x]) sig.add(x.toLong())
+            for (x in 0 until problem.numIntVars) if (value in problem.requireFiniteIntDomains()[x]) sig.add(x.toLong())
             if (!sig.isEmpty()) incidence.getOrPut(RefineKey(sig.toLongArray())) { ArrayList() }.add(value)
         }
         val orbits = ArrayList<List<Long>>()
@@ -231,7 +231,7 @@ internal object SymmetryBreaking {
             orbit.forEach { orbitSet.add(it) }
             val seq = IntArrayList()
             for (x in 0 until n) {
-                if (x !in objectiveIntVars && domainWithin(problem.intDomains[x], orbitSet)) seq.add(x)
+                if (x !in objectiveIntVars && domainWithin(problem.requireFiniteIntDomains()[x], orbitSet)) seq.add(x)
             }
             if (seq.size < 2) continue
             val sortedValues = orbit.sorted()
@@ -367,7 +367,7 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int>,
     ): Pair<IntArray, IntArray> {
         val seedInt = Array(problem.numIntVars) { v ->
-            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.intDomains[v])
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.requireFiniteIntDomains()[v])
         }
         val seedBool = Array(problem.numBoolVars) { v ->
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))
@@ -590,7 +590,7 @@ internal object SymmetryBreaking {
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
-            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.intDomains[v])
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else domainSeed(problem.requireFiniteIntDomains()[v])
         }
         val seedBoolBase = Array(nBool) { v ->
             if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else RefineKey(longArrayOf(SPACE_BOOL, SEED_BOOL))

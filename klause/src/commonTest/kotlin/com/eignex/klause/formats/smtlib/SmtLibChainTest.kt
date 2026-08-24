@@ -43,7 +43,7 @@ class SmtLibChainTest {
         for (code in 0 until SIZE * SIZE * SIZE) {
             val tuple = List(VARS) { ((code / pow(SIZE, it)) % SIZE).toLong() }
             val domains = Array(parsed.numIntVars) { v ->
-                if (v < VARS) IntDomain(tuple[v], tuple[v]) else parsed.intDomains[v]
+                if (v < VARS) IntDomain(tuple[v], tuple[v]) else parsed.requireFiniteIntDomains()[v]
             }
             val r = BacktrackSolver(parsed.withIntDomains(domains).bake()).solve(BacktrackParams())
             if (r is SolveResult.Sat) out.add(tuple)
@@ -158,8 +158,8 @@ class SmtLibChainTest {
     @Test
     fun `a constant-bounded chain tightens the variable domain`() {
         val p = SmtLib.parse("(declare-const x Int) (assert (<= 3 x 7)) (check-sat)").bounded()
-        assertEquals(3, p.intDomains[0].min)
-        assertEquals(7, p.intDomains[0].max)
+        assertEquals(3, p.requireFiniteIntDomains()[0].min)
+        assertEquals(7, p.requireFiniteIntDomains()[0].max)
     }
 
     @Test

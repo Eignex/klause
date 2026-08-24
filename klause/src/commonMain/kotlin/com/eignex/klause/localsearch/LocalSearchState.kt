@@ -40,7 +40,7 @@ class LocalSearchState(
     /** The stable root domains this search was seeded from — read by invariants for a variable's
      *  original bounds. Decoupled from [problem] so the seed source (declared vs baked) can vary without
      *  the invariants caring which. */
-    val rootDomains: Array<IntDomain> = problem.intDomains
+    val rootDomains: Array<IntDomain> = problem.requireFiniteIntDomains()
 
     /** The current variable assignment. */
     val assignment: Assignment = Assignment(

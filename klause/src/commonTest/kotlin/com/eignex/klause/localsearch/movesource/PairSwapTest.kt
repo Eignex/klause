@@ -65,7 +65,11 @@ class PairSwapTest {
                 val va = state.assignment.intValue(a)
                 val vb = state.assignment.intValue(b)
                 if (va == vb) return@run null
-                if (vb !in state.problem.intDomains[a] || va !in state.problem.intDomains[b]) return@run null
+                if (vb !in state.problem.requireFiniteIntDomains()[a] ||
+                    va !in state.problem.requireFiniteIntDomains()[b]
+                ) {
+                    return@run null
+                }
                 Move.Compound(listOf(Move.IntSet(a, vb), Move.IntSet(b, va)))
             } ?: return@repeat
             sink.addCompound(swap.parts)

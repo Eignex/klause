@@ -19,14 +19,14 @@ internal object StructuralReduction {
         val added = ArrayList<Factor>()
         var domains: Array<IntDomain>? = null
         problem.factors.forEachIndexed { i, f ->
-            when (val reduction = f.structuralReduce(problem.intDomains)) {
+            when (val reduction = f.structuralReduce(problem.requireFiniteIntDomains())) {
                 FactorReduction.Unchanged -> {}
 
                 is FactorReduction.Rewrite -> {
                     dropped.add(i)
                     added.addAll(reduction.replacement)
                     for ((v, range) in reduction.tightenedBounds) {
-                        val d = domains ?: problem.intDomains.copyOf().also { domains = it }
+                        val d = domains ?: problem.requireFiniteIntDomains().copyOf().also { domains = it }
                         d[v] = d[v].withMinAtLeast(range.first.toLong()).withMaxAtMost(range.last.toLong())
                     }
                 }

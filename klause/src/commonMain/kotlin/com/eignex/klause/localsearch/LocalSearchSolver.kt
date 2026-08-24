@@ -122,7 +122,7 @@ class LocalSearchSolver(
                 if (seedImplicitOnRestart) state.seedImplicitFeasible()
                 definitionalSweep?.sweep(
                     state.assignment,
-                    problem.intDomains,
+                    problem.requireFiniteIntDomains(),
                     problem.factors,
                 ) { state.assumptions.isFrozenBool(it) }
                 state.recompute()
@@ -681,7 +681,7 @@ class LocalSearchSolver(
             // from the seeded decision variables — otherwise a definitional constraint reads as violated
             // and the engine fights up from a spuriously-infeasible state, discarding the warm start.
             definitionalSweep?.let { sweep ->
-                sweep.sweep(state.assignment, problem.intDomains, problem.factors) {
+                sweep.sweep(state.assignment, problem.requireFiniteIntDomains(), problem.factors) {
                     state.assumptions.isFrozenBool(it)
                 }
                 state.recompute()
@@ -860,7 +860,7 @@ class LocalSearchSolver(
  *  repair-move proposers walking the domain value-by-value (O(span)) — a hang. Either way local search
  *  cannot soundly or feasibly handle the problem, so the caller falls back to the backtrack engine. */
 private fun hasWideIntValues(problem: Problem): Boolean {
-    for (d in problem.intDomains) {
+    for (d in problem.requireFiniteIntDomains()) {
         if ((d.spanOrNull() == null) || d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
     }
     return false

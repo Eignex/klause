@@ -106,7 +106,7 @@ internal interface CutSeparator {
 private fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
     for (v in vars) {
         val live = ctx.session.intDomain(v)
-        val declared = ctx.problem.intDomains[v]
+        val declared = ctx.problem.requireFiniteIntDomains()[v]
         if (live.min != declared.min || live.max != declared.max) return false
     }
     return true
@@ -116,7 +116,7 @@ private fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
  *  declared one, so equal sizes mean equal value sets. */
 private fun liveDomainsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
     for (v in vars) {
-        if (ctx.session.intDomain(v).valueCount != ctx.problem.intDomains[v].valueCount) return false
+        if (ctx.session.intDomain(v).valueCount != ctx.problem.requireFiniteIntDomains()[v].valueCount) return false
     }
     return true
 }

@@ -9,8 +9,14 @@ sealed interface IntColumn {
      */
     data class Finite(val domain: IntDomain) : IntColumn
 
-    /** A theory owns this column symbolically; no finite search state exists. */
-    data object Symbolic : IntColumn
+    /**
+     * No finite search state exists for this column: a theory owns it and reasons over the bounds the
+     * source model stated, either of which may be absent.
+     *
+     * @property lower Inclusive lower bound, or null when the column is open below.
+     * @property upper Inclusive upper bound, or null when the column is open above.
+     */
+    data class Bounded(val lower: Long?, val upper: Long?) : IntColumn
 }
 
 /**
@@ -26,8 +32,14 @@ sealed class IntColumns {
     /** Typed capability of source column [v]. */
     abstract fun column(v: Int): IntColumn
 
-    /** Finite domain of [v], or null when a theory owns it symbolically. */
+    /** Finite domain of [v], or null when a theory owns it and only its bounds are known. */
     fun domainOrNull(v: Int): IntDomain? = (column(v) as? IntColumn.Finite)?.domain
+
+    /** Bounds of [v] however it is owned: a finite domain reports its own, a theory column its stated ones. */
+    fun boundsOf(v: Int): IntColumn.Bounded = when (val c = column(v)) {
+        is IntColumn.Finite -> IntColumn.Bounded(c.domain.min, c.domain.max)
+        is IntColumn.Bounded -> c
+    }
 
     /** Packed finite domains when every column is CP-owned, or null otherwise. */
     abstract fun allFiniteOrNull(): Array<IntDomain>?

@@ -161,7 +161,7 @@ private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
         } else {
             val iv = dv - numBools
             val d = intDomains[iv]
-            val root = problem.intDomains[iv]
+            val root = rootDomains[iv]
             if (d.min > root.min) lits.add(Lit.make(atomVarGe(iv, d.min), false))
             if (d.max < root.max) lits.add(Lit.make(atomVarLe(iv, d.max), false))
         }
@@ -181,7 +181,7 @@ private fun PropagationState.decisionCutAntecedents(base: IntArray?): IntArray {
  */
 internal fun PropagationState.antecedentsAcrossHoles(v: Int, crossed: LongRange, base: IntArray?): IntArray? {
     var out: IntArrayList? = null
-    val orig = problem.intDomains[v]
+    val orig = rootDomains[v]
     fun cite(value: Long) {
         val o = out ?: IntArrayList().also { fresh ->
             out = fresh
@@ -266,7 +266,7 @@ private inline fun PropagationState.tightenBoundImpl(
     val snapped = if (isMin) newDomain.min > bound else newDomain.max < bound
     val ant = if (snapped) {
         val priorLit = Lit.make(if (isMin) atomVarGe(v, bound) else atomVarLe(v, bound), false)
-        val root = problem.intDomains[v]
+        val root = rootDomains[v]
         val cite = (if (isMin) bound > root.min else bound < root.max) && antecedents == null
         val crossed = if (isMin) bound until newDomain.min else (newDomain.max + 1)..bound
         appendPriorBound(priorLit, cite, antecedentsAcrossHoles(v, crossed, antecedents))
@@ -331,13 +331,13 @@ internal fun PropagationState.excludeIntValueImpl(v: Int, value: Long, anteceden
     val antNear = when {
         newDomain.min != d.min -> appendPriorBound(
             Lit.make(atomVarGe(v, d.min), false),
-            d.min > problem.intDomains[v].min,
+            d.min > rootDomains[v].min,
             antecedents,
         )
 
         newDomain.max != d.max -> appendPriorBound(
             Lit.make(atomVarLe(v, d.max), false),
-            d.max < problem.intDomains[v].max,
+            d.max < rootDomains[v].max,
             antecedents,
         )
 
@@ -418,7 +418,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
     base: IntArray?,
 ): IntArray? {
     var out: IntArrayList? = null
-    val root = problem.intDomains[v]
+    val root = rootDomains[v]
     fun cite(value: Long) {
         val o = out ?: IntArrayList().also { fresh ->
             out = fresh
@@ -484,7 +484,7 @@ internal fun PropagationState.excludeIntValues(v: Int, values: LongArray, antece
     }
     if (currentFactor >= 0) propagations += excluded
 
-    val root = problem.intDomains[v]
+    val root = rootDomains[v]
     val antMin = if (newMin != d.min) {
         citeCrossedSearchHoles(
             v,

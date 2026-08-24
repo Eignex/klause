@@ -99,7 +99,7 @@ internal fun LocalSearchState.emitFactorPrimitives(seed: Int, nf: Int, seenFacto
     val nfac = problem.factors[nf]
     for (u in nfac.intVars) {
         val cur = assignment.intValue(u)
-        val d = problem.intDomains[u]
+        val d = problem.requireFiniteIntDomains()[u]
         if (cur < d.max) sink.addChannelingIntSet(this, u, cur + 1)
         if (cur > d.min) sink.addChannelingIntSet(this, u, cur - 1)
         if (cur - 1 > d.min) sink.addChannelingIntSet(this, u, d.min)

@@ -88,7 +88,10 @@ class SolveCorePresolveLoopTest {
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         val once = solvableOf(problem, obj).presolved(config, false)
-        assertTrue(once.finiteProblem.intDomains[3].min >= 2, "the harvest should have raised the objective floor")
+        assertTrue(
+            once.finiteProblem.requireFiniteIntDomains()[3].min >= 2,
+            "the harvest should have raised the objective floor",
+        )
         val again = solvableOf(once.finiteProblem, obj).presolved(config, false)
         assertSame(
             again.finiteProblem,

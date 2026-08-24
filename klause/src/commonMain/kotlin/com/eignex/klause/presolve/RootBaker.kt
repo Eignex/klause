@@ -42,7 +42,7 @@ object RootBaker {
         return BakedProblem(
             numBoolVars = problem.numBoolVars,
             numIntVars = problem.numIntVars,
-            intDomains = Array(problem.numIntVars) { problem.intDomains[it] },
+            intDomains = Array(problem.numIntVars) { problem.requireFiniteIntDomains()[it] },
             factors = problem.factors,
             seedDeductions = extra,
             cancellation = problem.cancellation,
@@ -111,7 +111,7 @@ object RootBaker {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
-                val orig = problem.intDomains[v]
+                val orig = problem.requireFiniteIntDomains()[v]
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
@@ -160,7 +160,7 @@ object RootBaker {
         val numIntVars = problem.numIntVars
         val scores = DoubleArray(numIntVars) { v ->
             if (acc.intValueOrNull(v) != null) return@DoubleArray Double.NEGATIVE_INFINITY
-            val orig = problem.intDomains[v]
+            val orig = problem.requireFiniteIntDomains()[v]
             val lo = acc.intMinOrNullCompat(v) ?: orig.min
             val hi = acc.intMaxOrNullCompat(v) ?: orig.max
             val dom = (hi - lo + 1).coerceAtLeast(1)
@@ -213,7 +213,7 @@ object RootBaker {
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
-                val orig = problem.intDomains[v]
+                val orig = problem.requireFiniteIntDomains()[v]
                 val curMin = acc.intMinOrNullCompat(v) ?: orig.min
                 val curMax = acc.intMaxOrNullCompat(v) ?: orig.max
                 if (curMin >= curMax) continue
@@ -310,7 +310,7 @@ object RootBaker {
         factors.addAll(problem.factors)
         when {
             problem.numIntVars > 0 -> {
-                val min = problem.intDomains[0].min
+                val min = problem.requireFiniteIntDomains()[0].min
                 val c = if (min < Long.MAX_VALUE) min else min - 1
                 factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c))
                 factors.add(Linear(longArrayOf(1), intArrayOf(0), LinearOp.EQ, c + 1))
@@ -327,7 +327,7 @@ object RootBaker {
             Problem(
                 numBoolVars = problem.numBoolVars,
                 numIntVars = problem.numIntVars,
-                intDomains = problem.intDomains.copyOf(),
+                intDomains = problem.requireFiniteIntDomains().copyOf(),
                 factors = factors,
             ),
             config,

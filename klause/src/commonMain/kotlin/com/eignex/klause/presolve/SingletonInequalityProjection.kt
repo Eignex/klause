@@ -42,7 +42,7 @@ internal object SingletonInequalityProjection {
             } ?: return@forEachIndexed
             val x = f.vars[j]
             val a = f.coeff(j)
-            val dom = problem.intDomains[x]
+            val dom = problem.requireFiniteIntDomains()[x]
             if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) return@forEachIndexed
             // The bound of x that leaves `rest` the widest feasible region.
             val xBest = when (f.op) {

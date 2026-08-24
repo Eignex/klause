@@ -40,7 +40,7 @@ internal fun objectiveBoundOverlay(
 private fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
-    intDomains = intDomains,
+    intDomains = requireFiniteIntDomains(),
     factors = factors + extra,
     seedDeductions = baked,
     cancellation = cancellation,

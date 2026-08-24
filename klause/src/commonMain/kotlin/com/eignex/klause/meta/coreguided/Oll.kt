@@ -113,7 +113,7 @@ internal object Oll {
         val problem = Problem(
             numBoolVars = base.numBoolVars,
             numIntVars = base.numIntVars,
-            intDomains = base.intDomains,
+            intDomains = base.requireFiniteIntDomains(),
             factors = factors,
         )
         return (BacktrackSolver(problem.bake()).solve(params) as? SolveResult.Sat)?.assignment ?: sample

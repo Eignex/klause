@@ -106,7 +106,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.NE) continue
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && !removed.contains(idx) }
-        val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
+        val others = Problem(problem.numBoolVars, problem.numIntVars, problem.requireFiniteIntDomains().copyOf(), kept)
         val a = LongArray(problem.numIntVars)
         for (k in f.vars.indices) a[f.vars[k]] += f.coeff(k)
         val b = f.bound.toDouble()
@@ -226,7 +226,7 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
     var done = 0
     for (v in widestFirst(n)) {
         if (done >= OBBT_MAX_VARS || token()) break
-        val d = problem.intDomains[v]
+        val d = problem.requireFiniteIntDomains()[v]
         if (d.min >= d.max) continue
         done++
         val coeffs = LongArray(n).also { it[v] = 1L }
@@ -248,9 +248,9 @@ internal fun LpEngine.rootLpBoundsNoBake(token: Cancellation): List<ShavedBound>
  * first — it is the most open there is.
  */
 private fun LpEngine.widestFirst(n: Int): List<Int> =
-    (0 until n).filter { problem.intDomains[it].min < problem.intDomains[it].max }
+    (0 until n).filter { problem.requireFiniteIntDomains()[it].min < problem.requireFiniteIntDomains()[it].max }
         .sortedByDescending {
-            val d = problem.intDomains[it]
+            val d = problem.requireFiniteIntDomains()[it]
             val width = d.max - d.min
             if (width < 0L) Long.MAX_VALUE else width
         }

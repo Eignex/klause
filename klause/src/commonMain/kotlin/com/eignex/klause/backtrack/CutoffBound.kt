@@ -50,7 +50,7 @@ internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective,
     for (i in 0 until n) {
         val c = coefficients[i]
         if (c == 0L) continue
-        val d = problem.intDomains[i]
+        val d = problem.requireFiniteIntDomains()[i]
         floor.addProduct(c, if (c > 0L) d.min else d.max)
     }
     for (b in 0 until minOf(problem.numBoolVars, objective.boolWeights.size)) {
@@ -70,7 +70,7 @@ internal fun objectiveCutoffBounds(problem: Problem, objective: LinearObjective,
     for (i in 0 until n) {
         val c = coefficients[i]
         if (c <= 0L || !problem.intBounds.isOpenUpper(i) || problem.intBounds.isOpenLower(i)) continue
-        val d = problem.intDomains[i]
+        val d = problem.requireFiniteIntDomains()[i]
         val steps = slack.floorDivPositive(c) ?: continue
         val hi = addOrNull(d.min, steps) ?: continue
         if (hi < d.max) out.add(CutoffBound(i, hi))

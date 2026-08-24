@@ -212,7 +212,7 @@ private const val PRESOLVE_ABORT_FRACTION = 0.001
  *  problem (symmetry breaking adding ordering constraints) simply doesn't trip the abort. */
 private fun complexity(problem: Problem): Long {
     var c = problem.factors.size.toLong()
-    for (d in problem.intDomains) c += d.max - d.min
+    for (d in problem.requireFiniteIntDomains()) c += d.max - d.min
     return c
 }
 

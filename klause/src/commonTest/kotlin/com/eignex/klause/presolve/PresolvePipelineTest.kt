@@ -30,14 +30,14 @@ class PresolvePipelineTest {
     private fun boxPoints(problem: Problem): List<LongArray> {
         val n = problem.numIntVars
         val out = ArrayList<LongArray>()
-        val ints = LongArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.requireFiniteIntDomains()[it].min }
         while (true) {
             out.add(ints.copyOf())
             var i = 0
             while (i < n) {
                 ints[i]++
-                if (ints[i] <= problem.intDomains[i].max) break
-                ints[i] = problem.intDomains[i].min
+                if (ints[i] <= problem.requireFiniteIntDomains()[i].max) break
+                ints[i] = problem.requireFiniteIntDomains()[i].min
                 i++
             }
             if (i == n) break
@@ -114,7 +114,7 @@ class PresolvePipelineTest {
         val lifted = ArrayList<List<Long>>()
         for (mask in 0 until (1 shl outcome.problem.numBoolVars)) {
             val bools = BooleanArray(outcome.problem.numBoolVars) { ((mask shr it) and 1) == 1 }
-            val ints = LongArray(outcome.problem.numIntVars) { outcome.problem.intDomains[it].min }
+            val ints = LongArray(outcome.problem.numIntVars) { outcome.problem.requireFiniteIntDomains()[it].min }
             var a = Assumptions.None
             for (b in bools.indices) a = a.withBool(b, bools[b])
             for (v in ints.indices) a = a.withInt(v, ints[v])

@@ -111,7 +111,7 @@ class LocalSearchStateRecomputeTest {
             Move.BoolFlip(rng.nextInt(problem.numBoolVars))
         } else {
             val v = rng.nextInt(problem.numIntVars)
-            val d = problem.intDomains[v]
+            val d = problem.requireFiniteIntDomains()[v]
             val cur = state.assignment.intValue(v)
             var target = cur
             repeat(8) {

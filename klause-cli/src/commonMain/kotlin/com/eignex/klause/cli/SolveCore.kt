@@ -421,7 +421,7 @@ internal object SolveCore {
      */
     private fun domainSpan(problem: Problem): Long {
         var span = 0L
-        for (d in problem.intDomains) {
+        for (d in problem.requireFiniteIntDomains()) {
             val width = d.max - d.min
             if (width < 0L) return Long.MAX_VALUE
             span += width
@@ -444,11 +444,11 @@ internal object SolveCore {
 
     private fun openText(problem: Problem): String {
         var open = 0
-        for (d in problem.intDomains) {
+        for (d in problem.requireFiniteIntDomains()) {
             val width = d.max - d.min
             if (width < 0L || width > OPEN_WIDTH) open++
         }
-        return "$open of ${problem.intDomains.size}"
+        return "$open of ${problem.requireFiniteIntDomains().size}"
     }
 
     /**

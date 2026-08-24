@@ -78,12 +78,12 @@ class LpHarvestTest {
             fun rec(idx: Int) {
                 if (idx == n) {
                     if (feasible()) {
+                        val harvestedDomains = harvested.requireFiniteIntDomains()
                         for (v in 0 until n) {
                             assertTrue(
-                                point[v].toLong() in harvested.intDomains[v],
-                                "harvest excluded feasible x$v=${point[v]} from ${harvested.intDomains[v].min}..${
-                                    harvested.intDomains[v].max
-                                }",
+                                point[v].toLong() in harvestedDomains[v],
+                                "harvest excluded feasible x$v=${point[v]} from " +
+                                    "${harvestedDomains[v].min}..${harvestedDomains[v].max}",
                             )
                         }
                     }
@@ -118,8 +118,8 @@ class LpHarvestTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
         val harvested = lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never)
         assertTrue(harvested !== problem, "objective shaving proved a floor; the harvest must apply it")
-        assertTrue(harvested.intDomains[3].min >= 2, "objective floor z>=2 not folded into the domain")
-        assertTrue(2 in harvested.intDomains[3], "harvest excluded the attainable optimum z=2")
+        assertTrue(harvested.requireFiniteIntDomains()[3].min >= 2, "objective floor z>=2 not folded into the domain")
+        assertTrue(2 in harvested.requireFiniteIntDomains()[3], "harvest excluded the attainable optimum z=2")
     }
 
     @Test
@@ -155,8 +155,14 @@ class LpHarvestTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
         val harvested = lpHarvest(problem, obj, shavingParams, cancellation = Cancellation.Never)
         for (v in 0 until problem.numIntVars) {
-            assertTrue(harvested.intDomains[v].min >= problem.intDomains[v].min, "lower bound widened for x$v")
-            assertTrue(harvested.intDomains[v].max <= problem.intDomains[v].max, "upper bound widened for x$v")
+            assertTrue(
+                harvested.requireFiniteIntDomains()[v].min >= problem.requireFiniteIntDomains()[v].min,
+                "lower bound widened for x$v",
+            )
+            assertTrue(
+                harvested.requireFiniteIntDomains()[v].max <= problem.requireFiniteIntDomains()[v].max,
+                "upper bound widened for x$v",
+            )
         }
     }
 
@@ -366,7 +372,7 @@ class LpHarvestTest {
         )
         val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
         assertTrue(tightened !== problem, "OBBT must tighten a domain the LP bounds below propagation")
-        assertEquals(5L, tightened.intDomains[0].max, "the LP proves x <= 5 (2x <= x + y <= 10)")
+        assertEquals(5L, tightened.requireFiniteIntDomains()[0].max, "the LP proves x <= 5 (2x <= x + y <= 10)")
     }
 
     @Test
@@ -387,7 +393,11 @@ class LpHarvestTest {
             ),
         )
         val tightened = lpRootBounds(problem, LinearObjective(), LpPlan(bounding = true))
-        assertEquals(5L, tightened.intDomains[x].max, "the widest domain is probed regardless of its index")
+        assertEquals(
+            5L,
+            tightened.requireFiniteIntDomains()[x].max,
+            "the widest domain is probed regardless of its index",
+        )
     }
 
     @Test
@@ -429,7 +439,7 @@ class LpHarvestTest {
         val n = original.numIntVars
         val point = IntArray(n)
         fun feasible(p: Problem): Boolean {
-            for (v in 0 until n) if (point[v].toLong() !in p.intDomains[v]) return false
+            for (v in 0 until n) if (point[v].toLong() !in p.requireFiniteIntDomains()[v]) return false
             return p.factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
                 for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]

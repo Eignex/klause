@@ -46,7 +46,7 @@ internal object CoefficientStrengthening {
             val factor = factors[i]
             // An equality whose coefficient GCD does not divide its bound can never hold; replace it by
             // an explicit contradiction (the original is redundant once the problem is infeasible).
-            val contradiction = equalityContradiction(factor, problem.intDomains)
+            val contradiction = equalityContradiction(factor, problem.requireFiniteIntDomains())
             if (contradiction != null) {
                 dropped.add(i)
                 added.addAll(contradiction)
@@ -54,7 +54,7 @@ internal object CoefficientStrengthening {
                 continue
             }
             val rewritten = when {
-                factor is Linear && factor.isIntegerCore -> strengthenLinear(factor, problem.intDomains)
+                factor is Linear && factor.isIntegerCore -> strengthenLinear(factor, problem.requireFiniteIntDomains())
                 factor is PseudoBoolean -> strengthenPb(factor)
                 else -> factor
             }

@@ -43,7 +43,7 @@ class GreedyInit {
             } else {
                 val intId = v - problem.numBoolVars
                 if (state.assumptions.isFrozenInt(intId)) continue
-                val d = problem.intDomains[intId]
+                val d = problem.requireFiniteIntDomains()[intId]
                 val cur = state.assignment.intValue(intId)
                 if (d.isFixed) continue
                 // Sweep tiny domains exhaustively; sample larger ones to bound per-pass cost.

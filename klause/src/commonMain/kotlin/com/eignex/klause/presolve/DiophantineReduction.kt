@@ -86,7 +86,7 @@ internal object DiophantineReduction {
                 val (root, mod) = sol
                 if (mod <= 1L) continue
                 val v = f.vars[j]
-                val dom = out?.get(v) ?: problem.intDomains[v]
+                val dom = out?.get(v) ?: problem.requireFiniteIntDomains()[v]
                 // Carve interior off-residue values — the reduction bound propagation cannot make (it
                 // keeps only intervals). Iterate the domain's live values (O(size), never O(span)) and
                 // gate on [SIZE_CAP] so a wide contiguous domain is skipped rather than enumerated.
@@ -98,7 +98,7 @@ internal object DiophantineReduction {
                     if (((x - root) % mod + mod) % mod != 0L) remove.add(x)
                 }
                 if (remove.isEmpty()) continue
-                if (out == null) out = problem.intDomains.copyOf()
+                if (out == null) out = problem.requireFiniteIntDomains().copyOf()
                 out[v] = out[v].excludeValues(remove.toLongArray()) ?: return contradiction(problem, v)
             }
         }
@@ -108,7 +108,7 @@ internal object DiophantineReduction {
     /** Two contradictory unit equalities on [v] — jointly unsatisfiable, so the bake reports `Unsat`
      *  (mirrors [CoefficientStrengthening]'s handling of a `g ∤ b` equality). */
     private fun contradiction(problem: Problem, v: Int): PassDelta {
-        val c = problem.intDomains[v].min
+        val c = problem.requireFiniteIntDomains()[v].min
         return PassDelta(
             addedFactors = listOf<Factor>(
                 Linear(longArrayOf(1L), intArrayOf(v), LinearOp.EQ, c),

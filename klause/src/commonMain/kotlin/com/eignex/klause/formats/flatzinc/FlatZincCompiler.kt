@@ -96,7 +96,7 @@ internal class FlatZincCompiler(
         }
         // The LS functional objective and definitional sweep resolve constraint args, which allocates a
         // singleton int var per integer-literal argument ([resolveIntVar] on an `IntLit` appends to
-        // [intDomains]). Build them BEFORE snapshotting the [Problem] so those vars are counted in
+        // [requireFiniteIntDomains]). Build them BEFORE snapshotting the [Problem] so those vars are counted in
         // numIntVars/intDomains — otherwise the sweep references a var id the Problem lacks and the LS
         // invariant network indexes out of bounds.
         val lsObjective = when (solveDirective) {

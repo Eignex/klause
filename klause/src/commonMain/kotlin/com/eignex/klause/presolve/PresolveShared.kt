@@ -304,7 +304,7 @@ internal object PresolveShared {
         }
         for (i in factors.indices) if (dropped == null || i !in dropped) kept.add(factors[i])
         kept.addAll(delta.addedFactors)
-        return rebuildProblem(this, kept, delta.domains ?: intDomains.copyOf(), bakeConfig)
+        return rebuildProblem(this, kept, delta.domains ?: requireFiniteIntDomains().copyOf(), bakeConfig)
     }
 
     /**
@@ -336,7 +336,7 @@ internal object PresolveShared {
     fun rebuildProblem(
         problem: Problem,
         factors: List<Factor>,
-        intDomains: Array<IntDomain> = problem.intDomains.copyOf(),
+        intDomains: Array<IntDomain> = problem.requireFiniteIntDomains().copyOf(),
         bakeConfig: BakeConfig = BakeConfig.NONE,
         // Extends the Boolean namespace for the one transform that mints variables
         // ([BinaryColumnSubstitution]): ids `[problem.numBoolVars, numBoolVars)` are the fresh ones, so
@@ -384,7 +384,7 @@ internal object PresolveShared {
      *  presolve steps — it reads each domain's endpoints only, never enumerating values. */
     fun maxIntSpan(problem: Problem): Long {
         var widest = 0L
-        for (d in problem.intDomains) {
+        for (d in problem.requireFiniteIntDomains()) {
             val span = d.max - d.min
             widest = maxOf(widest, if (span < 0L) Long.MAX_VALUE else span)
         }

@@ -23,7 +23,7 @@ class ProblemTest {
             intDomains = arrayOf(IntDomain(0, 10)),
             factors = tighteningFactors(),
         )
-        assertEquals(10, problem.intDomains[0].max, "a raw problem never folds the root bake")
+        assertEquals(10, problem.requireFiniteIntDomains()[0].max, "a raw problem never folds the root bake")
     }
 
     @Test
@@ -34,7 +34,7 @@ class ProblemTest {
             intDomains = arrayOf(IntDomain(0, 10)),
             factors = tighteningFactors(),
         )
-        assertEquals(3, problem.bake().intDomains[0].max, "bake carries the x <= 3 tightening")
+        assertEquals(3, problem.bake().requireFiniteIntDomains()[0].max, "bake carries the x <= 3 tightening")
     }
 
     @Test
@@ -73,7 +73,7 @@ class ProblemTest {
 
         val problem = model.materialize(arrayOf(IntDomain(3, 8)))
 
-        assertEquals(8, problem.intDomains[0].max)
+        assertEquals(8, problem.requireFiniteIntDomains()[0].max)
         assertFalse(problem.intBounds.hasUpper(0))
     }
 
@@ -112,7 +112,11 @@ class ProblemTest {
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, plan.theoryPipeline)
         assertEquals(IntDomain(0, 3), problem.intDomainOrNull(0))
         assertEquals(null, problem.intDomainOrNull(1))
-        assertEquals(IntColumn.Symbolic, problem.intColumns.column(1))
+        assertEquals(
+            IntColumn.Bounded(lower = 0, upper = null),
+            problem.intColumns.column(1),
+            "a theory column carries the source bounds, open side included",
+        )
         assertFailsWith<IllegalArgumentException> { problem.requireFiniteIntDomains() }
         assertEquals(2, cp.problem.numIntVars)
         assertEquals(0, cp.cpId(0))

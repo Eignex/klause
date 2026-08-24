@@ -33,15 +33,15 @@ class RedundantConstraintsTest {
 
     private fun feasibleCount(problem: Problem): Int {
         val n = problem.numIntVars
-        val ints = LongArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.requireFiniteIntDomains()[it].min }
         var count = 0
         while (true) {
             if (isFeasible(problem, ints.copyOf())) count++
             var i = 0
             while (i < n) {
                 ints[i]++
-                if (ints[i] <= problem.intDomains[i].max) break
-                ints[i] = problem.intDomains[i].min
+                if (ints[i] <= problem.requireFiniteIntDomains()[i].max) break
+                ints[i] = problem.requireFiniteIntDomains()[i].min
                 i++
             }
             if (i == n) break

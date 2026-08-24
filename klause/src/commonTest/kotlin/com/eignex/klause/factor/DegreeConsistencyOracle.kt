@@ -125,7 +125,7 @@ object DegreeConsistencyOracle {
         // Bias toward int moves when both exist; both kinds get exercised over many iters.
         return if (ni > 0 && (nb == 0 || rng.nextBoolean())) {
             val v = rng.nextInt(ni)
-            val d = problem.intDomains[v]
+            val d = problem.requireFiniteIntDomains()[v]
             val cur = state.assignment.intValue(v)
             val target = d.values.valueAt(rng.nextInt(d.values.size))
             if (target == cur) null else Move.IntSet(v, target)
@@ -137,7 +137,7 @@ object DegreeConsistencyOracle {
     private fun randomize(state: LocalSearchState, problem: Problem, rng: Random) {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in 0 until problem.numIntVars) {
-            val d: IntDomain = problem.intDomains[i]
+            val d: IntDomain = problem.requireFiniteIntDomains()[i]
             state.assignment.setInt(i, d.values.valueAt(rng.nextInt(d.values.size)))
         }
     }

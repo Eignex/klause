@@ -49,7 +49,7 @@ internal object AnytimeCounter {
             ) {
                 2.0
             } else {
-                problem.intDomains[intVars[d - boolVars.size]].valueCount.toDouble()
+                problem.requireFiniteIntDomains()[intVars[d - boolVars.size]].valueCount.toDouble()
             }
             suffix[d] = sizeAtD * suffix[d + 1]
         }
@@ -131,7 +131,7 @@ internal object AnytimeCounter {
     )
 
     private fun valuesOf(problem: Problem, intVar: Int): List<Long> {
-        val dom = problem.intDomains[intVar]
+        val dom = problem.requireFiniteIntDomains()[intVar]
         return List(dom.values.size) { dom.values.valueAt(it) }
     }
 

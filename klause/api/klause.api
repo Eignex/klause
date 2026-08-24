@@ -7807,6 +7807,19 @@ public final class com/eignex/klause/solver/IntBounds$Companion {
 public abstract interface class com/eignex/klause/solver/IntColumn {
 }
 
+public final class com/eignex/klause/solver/IntColumn$Bounded : com/eignex/klause/solver/IntColumn {
+	public fun <init> (Ljava/lang/Long;Ljava/lang/Long;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun copy (Ljava/lang/Long;Ljava/lang/Long;)Lcom/eignex/klause/solver/IntColumn$Bounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/IntColumn$Bounded;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/solver/IntColumn$Bounded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLower ()Ljava/lang/Long;
+	public final fun getUpper ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/IntColumn$Finite : com/eignex/klause/solver/IntColumn {
 	public fun <init> (Lcom/eignex/klause/solver/IntDomain;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/IntDomain;
@@ -7818,15 +7831,9 @@ public final class com/eignex/klause/solver/IntColumn$Finite : com/eignex/klause
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/solver/IntColumn$Symbolic : com/eignex/klause/solver/IntColumn {
-	public static final field INSTANCE Lcom/eignex/klause/solver/IntColumn$Symbolic;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
 public abstract class com/eignex/klause/solver/IntColumns {
 	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
+	public final fun boundsOf (I)Lcom/eignex/klause/solver/IntColumn$Bounded;
 	public abstract fun column (I)Lcom/eignex/klause/solver/IntColumn;
 	public final fun domainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
 	public abstract fun getSize ()I
@@ -7956,7 +7963,6 @@ public class com/eignex/klause/solver/Problem {
 	public final fun getImpliedFactorMask ()[Z
 	public final fun getIntBounds ()Lcom/eignex/klause/solver/IntBounds;
 	public final fun getIntColumns ()Lcom/eignex/klause/solver/IntColumns;
-	public final fun getIntDomains ()[Lcom/eignex/klause/solver/IntDomain;
 	public final fun getIntOccurrences ()[[I
 	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
 	public final fun getLsBoolOccurrences ()[[I

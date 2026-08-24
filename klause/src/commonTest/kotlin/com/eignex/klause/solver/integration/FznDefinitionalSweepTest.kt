@@ -52,7 +52,7 @@ class FznDefinitionalSweepTest {
         state.assignment.setInt(yId, 0) // dy = -2, b = 2
         state.recompute()
         val costBefore = state.cost
-        sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
+        sweep.sweep(state.assignment, program.problem.requireFiniteIntDomains(), program.problem.factors)
         assertEquals(3, state.assignment.intValue(program.intVarsByName.getValue("a")))
         assertEquals(2, state.assignment.intValue(program.intVarsByName.getValue("b")))
         assertEquals(2, state.assignment.intValue(program.intVarsByName.getValue("m")))
@@ -79,7 +79,7 @@ class FznDefinitionalSweepTest {
         val state = LocalSearchState(program.problem, Random(1))
         state.assignment.setInt(program.intVarsByName.getValue("x"), 0) // a = 7
         state.assignment.setInt(program.intVarsByName.getValue("y"), 10) // b = 8 -> s would be 15
-        sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
+        sweep.sweep(state.assignment, program.problem.requireFiniteIntDomains(), program.problem.factors)
         assertEquals(3, state.assignment.intValue(program.intVarsByName.getValue("s")), "clamped into domain")
         state.recompute()
         assertTrue(state.cost > 0, "the unsatisfiable-by-domain definition stays a violation")
@@ -111,13 +111,13 @@ class FznDefinitionalSweepTest {
         state.assignment.setInt(iv.getValue("u"), 2)
         state.assignment.setInt(iv.getValue("v"), 2) // r = true, ri = 1, t = u + ri = 3
         state.assignment.setInt(iv.getValue("i"), 3) // e = 9
-        sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
+        sweep.sweep(state.assignment, program.problem.requireFiniteIntDomains(), program.problem.factors)
         assertEquals(1, state.assignment.intValue(iv.getValue("ri")))
         assertEquals(3, state.assignment.intValue(iv.getValue("t")))
         assertEquals(9, state.assignment.intValue(iv.getValue("e")))
         // Flip v so the reif goes false and the chain re-evaluates.
         state.assignment.setInt(iv.getValue("v"), 1)
-        sweep.sweep(state.assignment, program.problem.intDomains, program.problem.factors)
+        sweep.sweep(state.assignment, program.problem.requireFiniteIntDomains(), program.problem.factors)
         assertEquals(0, state.assignment.intValue(iv.getValue("ri")))
         assertEquals(2, state.assignment.intValue(iv.getValue("t")))
     }
