@@ -2,11 +2,14 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.TheoryParams
@@ -484,6 +487,43 @@ class SmtLibTest {
         assertTrue(SmtLib.parse(text).model.factors.any { it is AllDifferent }, "expected AllDifferent")
         val ints = solve(text)
         assertEquals(setOf(1L, 2L, 3L), listOf(ints[0], ints[1], ints[2]).toSet())
+    }
+
+    @Test
+    fun `open distinct posts strict-order theory alternatives`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (declare-const y Int)
+                (assert (distinct x y))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(2, parsed.model.factors.count { it is ReifiedLinear })
+        assertEquals(1, parsed.model.factors.count { it is Clause })
+        val result = assertIs<TheoryResult.Sat<Sample>>(DifferenceTheorySolver(parsed.model).solve())
+        assertTrue(result.assignment.ints[0] != result.assignment.ints[1])
+    }
+
+    @Test
+    fun `reified open distinct posts strict-order theory alternatives`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (declare-const y Int)
+                (assert (or false (distinct x y)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(2, parsed.model.factors.count { it is ReifiedLinear })
+        val result = assertIs<TheoryResult.Sat<Sample>>(DifferenceTheorySolver(parsed.model).solve())
+        assertTrue(result.assignment.ints[0] != result.assignment.ints[1])
     }
 
     /** `k` bounded integers over `[0, k - 1]`, with [tail] appended as the closing assertions. */

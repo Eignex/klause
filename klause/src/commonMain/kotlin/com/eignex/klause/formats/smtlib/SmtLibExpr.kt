@@ -4,7 +4,9 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.formats.allDifferentWindowSize
 import com.eignex.klause.formats.channelBoolTo01
 import com.eignex.klause.formats.reifyLinear
 import com.eignex.klause.formats.trueLit
@@ -157,9 +159,14 @@ internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
             val vars = simpleVars.toIntArray()
             val min = vars.minOf { (intDomains[it] as PresolveDomain.Finite).domain.min }
             val max = vars.maxOf { (intDomains[it] as PresolveDomain.Finite).domain.max }
-            factors.add(
-                AllDifferent(vars = vars, domainMin = min, domainSize = (max - min + 1).toInt()),
-            )
+            val window = allDifferentWindowSize(min, max)
+            if (window != null) {
+                factors.add(AllDifferent(vars = vars, domainMin = min, domainSize = window))
+            } else {
+                assertPairwiseStrictOrder(terms)
+            }
+        } else if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size) {
+            assertPairwiseStrictOrder(terms)
         } else {
             assertPairwiseNe(terms)
         }
@@ -172,6 +179,19 @@ internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
 internal fun SmtLib.Builder.assertPairwiseNe(terms: List<LinComb>) {
     for (i in terms.indices) {
         for (j in i + 1 until terms.size) factors.add(neLinear(terms[i], terms[j]))
+    }
+}
+
+/** Post every integer disequality as the Boolean-theory choice `a < b ∨ a > b`. */
+private fun SmtLib.Builder.assertPairwiseStrictOrder(terms: List<LinComb>) {
+    for (i in terms.indices) {
+        for (j in i + 1 until terms.size) {
+            val left = IntComb.Narrow(terms[i])
+            val right = IntComb.Narrow(terms[j])
+            val less = reifyRelation("<", left, right)
+            val greater = reifyRelation(">", left, right)
+            factors.add(Clause(intArrayOf(less, greater)))
+        }
     }
 }
 
