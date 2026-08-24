@@ -50,8 +50,6 @@ class BacktrackSolverTest {
             ): com.eignex.klause.solver.search.ComponentResult =
                 com.eignex.klause.solver.search.ComponentResult.Consistent
 
-            override fun retract(decisionLevel: Int) {}
-
             override fun onRestart(context: com.eignex.klause.solver.search.SearchContext) {
                 leaf = true
             }
