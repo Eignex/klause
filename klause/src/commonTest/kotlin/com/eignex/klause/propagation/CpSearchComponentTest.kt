@@ -39,6 +39,28 @@ class CpSearchComponentTest {
     }
 
     @Test
+    fun `CP explains a Boolean it published when the shared analyzer asks`() {
+        val propagation = PropagationSession(
+            Problem(
+                2,
+                0,
+                emptyArray(),
+                arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))),
+            ),
+        )
+        val component = CpSearchComponent(propagation)
+        val session = SearchSession(listOf(component))
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(Lit.make(0, true))))
+
+        val reason = component.reasonFor(Lit.make(1, true))
+
+        assertEquals(
+            setOf(Lit.make(1, true), Lit.make(0, false)),
+            reason?.literals?.toSet(),
+        )
+    }
+
+    @Test
     fun `shared trail retraction rewinds the CP component`() {
         val propagation = PropagationSession(
             Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true))))),

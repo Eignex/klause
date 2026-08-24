@@ -117,6 +117,16 @@ interface SearchComponent {
     /** Called after the shared engine has returned every component to its root level. */
     fun onRestart(context: SearchContext) {}
 
+    /**
+     * Clause-form reason for a Boolean consequence this component published without one, or null when
+     * it cannot name one.
+     *
+     * The shared analyzer asks only while resolving a conflict, so a component that would have to
+     * build the clause eagerly for every implication pays for it only where it is used. The returned
+     * clause must contain [literal] and hold under the root problem.
+     */
+    fun reasonFor(literal: Int): SearchExplanation? = null
+
     /** Add this component's values to the shared complete model. */
     fun contributeModel(model: SearchModel, context: SearchContext) {}
 }

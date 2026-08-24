@@ -465,6 +465,22 @@ class PropagationSession(
     /** Unified truth of a bool or atom literal — null when undetermined. */
     fun litTruth(lit: Int): Boolean? = state.litTruth(lit)
 
+    /**
+     * The clause that forced the current pin of Boolean variable [v], as `pinned ∨ antecedents`, or
+     * null when the pin was a decision or came from a factor that records no antecedents.
+     *
+     * This is the same antecedent set native first-UIP analysis walks, exposed so a shared analyzer
+     * can resolve through a CP-implied literal instead of stopping at it.
+     */
+    fun boolReasonClause(v: Int): IntArray? {
+        val antecedents = state.boolAntecedents[v] ?: return null
+        val assigned = state.boolValues[v] ?: return null
+        val reason = IntArray(antecedents.size + 1)
+        reason[0] = Lit.make(v, assigned)
+        antecedents.copyInto(reason, destinationOffset = 1)
+        return reason
+    }
+
     /** Run 1UIP conflict analysis from an externally supplied all-false conflict clause (e.g. an LP
      *  Farkas certificate) to obtain a learned clause and backjump level. See
      *  [ConflictAnalyzer.analyzeConflictClause]. */

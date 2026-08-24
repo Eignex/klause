@@ -136,7 +136,9 @@ internal class PbAccumulator {
         val d = positiveDegree()
         if (d <= 0L) return
         coef.forEach { v, c ->
-            if (c > d) coef.put(v, d) else if (c < -d) {
+            if (c > d) {
+                coef.put(v, d)
+            } else if (c < -d) {
                 coef.put(v, -d)
             }
         }
