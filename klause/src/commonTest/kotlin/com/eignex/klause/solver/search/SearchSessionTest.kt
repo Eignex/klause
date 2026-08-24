@@ -36,6 +36,25 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `complete check clears a resolver from an earlier conflict`() {
+        val resolver = object : SearchConflictResolver {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                ComponentResult.Conflict()
+
+            override fun resolveConflict(context: SearchContext): SearchConflictResolution =
+                SearchConflictResolution.Chronological
+        }
+        val session = SearchSession(listOf(resolver))
+
+        assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+        assertTrue(session.hasNativeConflictResolver)
+        session.popTo(0)
+        assertIs<ComponentCheck.Feasible>(session.check())
+
+        assertEquals(false, session.hasNativeConflictResolver)
+    }
+
+    @Test
     fun `components observe shared Boolean decisions without finite-domain state`() {
         var observed: Boolean? = null
         val session = SearchSession(
