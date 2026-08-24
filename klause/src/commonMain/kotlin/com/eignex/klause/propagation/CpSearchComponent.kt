@@ -263,9 +263,9 @@ class CpSearchComponent(
             }
             return when (result) {
                 is PropagationResult.Implied -> {
-                    if (learned is ConflictAnalyzer.AnalysisResult.Learned) {
-                        session.learnFrom(this@CpSearchComponent, SearchExplanation(learned.literals))
-                    }
+                    // The clause stays in this component's own database. Copying it into the shared one
+                    // would give the same clause two watch indexes and two reduction policies, and the
+                    // shared analyzer reaches this component's reasoning through [reasonFor] instead.
                     if (import(result, session) !is ComponentResult.Consistent) {
                         SearchLearnedConflictResult.Chronological
                     } else {

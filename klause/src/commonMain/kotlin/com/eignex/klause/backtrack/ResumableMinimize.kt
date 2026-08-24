@@ -629,9 +629,7 @@ internal class ResumableMinimize(
             }
             return when (result) {
                 is PropagationResult.Implied -> {
-                    if (learned is com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned) {
-                        session.learnFrom(cp, com.eignex.klause.solver.search.SearchExplanation(learned.literals))
-                    }
+                    // The clause stays in the CP database; see the note in CpSearchComponent.
                     if (cp.import(result, session) !is ComponentResult.Consistent) {
                         SearchLearnedConflictResult.Chronological
                     } else {
