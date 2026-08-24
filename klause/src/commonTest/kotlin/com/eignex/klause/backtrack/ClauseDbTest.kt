@@ -30,7 +30,7 @@ class ClauseDbTest {
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
             lbd = 3,
         )
-        BacktrackSolver(baked).vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0)
+        vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0)
         assertEquals(1, session.learnedClauseCount)
         return session.learnedClauseLiterals(0).toSet()
     }
@@ -53,7 +53,7 @@ class ClauseDbTest {
             Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
             lbd = 1,
         )
-        BacktrackSolver(baked).vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0)
+        vivify(session, BacktrackParams(vivification = true, vivifyBatch = 8), 0)
         assertEquals(2, session.learnedClauseLiterals(0).size)
         assertEquals(1, session.learnedClauseLbd(0), "the subclause keeps the parent's glue standing")
     }

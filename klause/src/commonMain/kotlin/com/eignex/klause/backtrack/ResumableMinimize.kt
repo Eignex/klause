@@ -180,7 +180,7 @@ internal class ResumableMinimize(
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
     private var firstRun = true
-    private val inprocessing = Inprocessing.from(solver, params)
+    private val inprocessing = Inprocessing.from(params)
     private var lastPooledSolution: Sample? = null
 
     // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
@@ -196,7 +196,7 @@ internal class ResumableMinimize(
         val seeded = session.seed(params.assumptions)
         cp.rebase()
         if (seeded is PropagationResult.Unsat || session.isUnsatAtRoot) {
-            rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(solver::coreOf)
+            rootExhausted = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
             rootIsExhausted = true
         } else {
             when (searchSession.initialize()) {
@@ -719,7 +719,7 @@ internal class ResumableMinimize(
             boundExchange.applySharedFloor()
             boundExchange.publishFloor()
             boundExchange.importGlobalVarBounds()
-            solver.forgetIfOverCap(session, params)
+            forgetIfOverCap(session, params)
             inprocessing?.onRestart(session, params)
             params.pooledSolutionSupplier?.invoke()?.takeIf { it !== lastPooledSolution }?.let { pooled ->
                 lastPooledSolution = pooled
