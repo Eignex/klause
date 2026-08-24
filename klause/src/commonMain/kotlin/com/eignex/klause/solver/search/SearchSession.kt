@@ -594,11 +594,19 @@ class SearchSession(
             when (literalTruth(literal)) {
                 true -> Unit
 
-                false -> return conflictOn(index)
+                // The units after this one stay pending: leaving early must not drop them until the
+                // next retraction.
+                false -> {
+                    unitsPending = true
+                    return conflictOn(index)
+                }
 
                 null -> {
                     val result = implyFromClause(index, literal)
-                    if (result !is ComponentResult.Consistent) return result
+                    if (result !is ComponentResult.Consistent) {
+                        unitsPending = true
+                        return result
+                    }
                 }
             }
         }

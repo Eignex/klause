@@ -16,7 +16,7 @@ internal class LearnedClauseStore {
     private val lbds = IntArrayList()
     private val used = ArrayList<Boolean>()
     private val watchers = HashMap<Int, IntArrayList>()
-    private val keys = HashSet<List<Int>>()
+    private val signatures = HashMap<Int, IntArrayList>()
     private val unitClauses = IntArrayList()
 
     /** Number of retained clauses. */
@@ -57,8 +57,13 @@ internal class LearnedClauseStore {
      * assignment as it stands when the clause is first examined, not when it was learned.
      */
     fun add(literals: IntArray, source: SearchComponent?, lbd: Int): Int {
-        if (literals.isEmpty() || !keys.add(literals.sorted())) return -1
+        if (literals.isEmpty()) return -1
+        val bucket = signatures.getOrPut(signatureOf(literals)) { IntArrayList(1) }
+        for (position in 0 until bucket.size) {
+            if (sameLiterals(clauses[bucket[position]], literals)) return -1
+        }
         val index = clauses.size
+        bucket.add(index)
         clauses.add(literals)
         sources.add(source)
         lbds.add(lbd)
@@ -83,6 +88,9 @@ internal class LearnedClauseStore {
      *
      * Watch positions survive the move, so a rebuild neither re-examines assignments nor invalidates
      * the invariant that a clause's watched literals are the last of it to be falsified.
+     *
+     * [keep] is called while survivors are being compacted into place, so it must decide from data it
+     * already holds rather than by reading this store.
      */
     fun retain(keep: (Int) -> Boolean) {
         var target = 0
@@ -101,10 +109,44 @@ internal class LearnedClauseStore {
         lbds.truncateTo(target)
         watchers.clear()
         unitClauses.clear()
-        keys.clear()
+        signatures.clear()
         for (index in clauses.indices) {
-            keys.add(clauses[index].sorted())
+            signatures.getOrPut(signatureOf(clauses[index])) { IntArrayList(1) }.add(index)
             watch(index)
         }
+    }
+
+    /**
+     * Order-insensitive fingerprint of [literals], so a permutation of a stored clause lands in the
+     * same bucket. Literals are avalanched before being summed, which keeps sets that share a sum of
+     * raw values apart.
+     */
+    private fun signatureOf(literals: IntArray): Int {
+        var accumulated = 0
+        for (literal in literals) accumulated += avalanche(literal)
+        return accumulated * SIGNATURE_SIZE_FACTOR + literals.size
+    }
+
+    private fun avalanche(value: Int): Int {
+        var mixed = value xor (value ushr SHIFT_HIGH)
+        mixed *= MIX_FIRST
+        mixed = mixed xor (mixed ushr SHIFT_MID)
+        mixed *= MIX_SECOND
+        return mixed xor (mixed ushr SHIFT_HIGH)
+    }
+
+    private fun sameLiterals(stored: IntArray, candidate: IntArray): Boolean {
+        if (stored.size != candidate.size) return false
+        val left = stored.copyOf().also(IntArray::sort)
+        val right = candidate.copyOf().also(IntArray::sort)
+        return left.contentEquals(right)
+    }
+
+    private companion object {
+        const val SIGNATURE_SIZE_FACTOR = 31
+        const val SHIFT_HIGH = 16
+        const val SHIFT_MID = 13
+        const val MIX_FIRST = -2048144789
+        const val MIX_SECOND = -1028477387
     }
 }
