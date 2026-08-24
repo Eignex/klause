@@ -826,7 +826,7 @@ class SearchRun internal constructor(
                             }
                             continue
                         }
-                        session.learn(result.explanation)
+                        retainExplanation(result.explanation)
                         if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
                             restart()?.let { return it }
                             continue
@@ -901,7 +901,7 @@ class SearchRun internal constructor(
                         return Advance.Expanded
                     }
                     if (session.decisionLevel < level) return Advance.Exhausted
-                    session.learn(result.explanation)
+                    retainExplanation(result.explanation)
                     session.popTo(level)
                     if (resolveConflict()) return Advance.Expanded
                     if (frames.isEmpty()) return Advance.Exhausted
@@ -939,6 +939,19 @@ class SearchRun internal constructor(
             }
         }
         return false
+    }
+
+    /**
+     * Retain a conflict explanation the shared database does not already own elsewhere.
+     *
+     * A component with its own conflict analyzer keeps the clause in its own database and propagates it
+     * there, so copying it here would give one clause two watch indexes and two reduction policies while
+     * deducing nothing new. The shared analyzer still reaches that component's reasoning, through
+     * [SearchComponent.reasonFor].
+     */
+    private fun retainExplanation(explanation: SearchExplanation?) {
+        if (session.hasNativeConflictResolver) return
+        session.learn(explanation)
     }
 
     private fun resolveExplainedConflict(explanation: SearchExplanation?): Boolean {

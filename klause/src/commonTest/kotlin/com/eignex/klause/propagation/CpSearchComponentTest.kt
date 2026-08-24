@@ -163,7 +163,7 @@ class CpSearchComponentTest {
     }
 
     @Test
-    fun `generic session retains a Boolean CP conflict explanation`() {
+    fun `a Boolean CP conflict is not duplicated into the shared database`() {
         val propagation = PropagationSession(
             Problem(
                 2,
@@ -180,7 +180,7 @@ class CpSearchComponentTest {
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<SearchResult.Satisfied>(session.solve(1))
 
-        assertEquals(1, session.learnedClauseCount)
-        assertEquals(true, session.boolValue(0))
+        assertEquals(0, session.learnedClauseCount, "CP keeps the clause in its own database")
+        assertEquals(true, session.boolValue(0), "its consequence still reaches the shared session")
     }
 }
