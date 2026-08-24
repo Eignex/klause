@@ -17,15 +17,19 @@ object IndomainRandom : ValueSelector {
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            val n = d.size
+            // Ask only for as many values as the eager path would shuffle: a wider domain declines
+            // here and takes the bounds draw below, instead of being counted first and rejected.
+            val eager = d.spanOrNull(INDOMAIN_EAGER_MAX.toLong())
+            val full = d.spanOrNull()
+            val n = full?.size ?: 0
             when {
-                n <= 1 -> sequenceOf(d.min)
+                d.isFixed -> sequenceOf(d.min)
 
-                n <= INDOMAIN_EAGER_MAX -> {
+                eager != null -> {
                     // Small domain: materialise the non-hole values and Fisher-Yates shuffle in
                     // place (cheaper than the lazy coroutine + map for a handful of values).
-                    val arr = LongArray(n) { d.valueAt(it) }
-                    for (i in n - 1 downTo 1) {
+                    val arr = LongArray(eager.size) { eager.valueAt(it) }
+                    for (i in arr.size - 1 downTo 1) {
                         val j = rng.nextInt(i + 1)
                         val tmp = arr[i]
                         arr[i] = arr[j]
@@ -34,13 +38,11 @@ object IndomainRandom : ValueSelector {
                     arr.asSequence()
                 }
 
-                !d.enumerable -> sequence {
-                    // A positional shuffle cannot reach values past index 2^31 on a saturated
-                    // domain, so draw the head — the value a bound split actually consumes —
-                    // uniformly from the bounds; the positional tail keeps the sequence non-empty
-                    // for consumers that enumerate further.
+                full == null -> sequence {
+                    // A positional shuffle cannot reach values past index 2^31 on a domain with more
+                    // values than an index addresses, so draw the head — the value a bound split
+                    // actually consumes — uniformly from the bounds.
                     yield(d.clamp(randomInBounds(d, rng)))
-                    for (i in 0 until n) yield(d.valueAt(i))
                 }
 
                 else -> sequence {
@@ -55,7 +57,7 @@ object IndomainRandom : ValueSelector {
                         val ak = swap.getOrDefault(k, k)
                         val aj = if (j == k) ak else swap.getOrDefault(j, j)
                         if (j != k) swap.put(j, ak)
-                        yield(d.valueAt(aj))
+                        yield(full.valueAt(aj))
                     }
                 }
             }

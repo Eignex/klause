@@ -3,6 +3,7 @@ package com.eignex.klause.factor.circuit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.solver.values
 
 /** LS implementation for [Circuit]: violation scoring and move proposal for the optional-cycle
  *  constraint. */
@@ -16,16 +17,16 @@ internal class SubcircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSe
             val cur = state.assignment.intValue(v)
             val d = state.rootDomains[v]
             if (i.toLong() != cur && i.toLong() in d) sink.addChannelingIntSet(state, v, i.toLong())
-            val span = d.size
+            val span = d.values.size
             if (span <= MAX_TARGETS) {
-                d.forEach { target ->
+                d.values.forEach { target ->
                     if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
             } else {
                 if (cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
                 if (cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                 repeat(MAX_TARGETS) {
-                    val target = d.valueAt(state.rng.nextInt(span))
+                    val target = d.values.valueAt(state.rng.nextInt(span))
                     if (target != cur) sink.addChannelingIntSet(state, v, target)
                 }
             }

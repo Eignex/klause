@@ -12,6 +12,7 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 
 /**
@@ -109,8 +110,8 @@ class TieredVariableSelector(
         }
         for (v in tier.intVars) {
             val d = session.intDomain(v)
-            if (d.size <= 1) continue
-            val regret = d.valueAt(1) - d.valueAt(0)
+            if (d.isFixed) continue
+            val regret = d.values.valueAt(1) - d.values.valueAt(0)
             if (regret > bestRegret) {
                 best = VarRef.IntVar(v)
                 bestRegret = regret
@@ -121,14 +122,14 @@ class TieredVariableSelector(
 
     private fun firstFree(tier: SearchTier, session: PropagationSession): VarRef? {
         for (v in tier.boolVars) if (session.boolValue(v) == null) return VarRef.Bool(v)
-        for (v in tier.intVars) if (session.intDomain(v).size > 1) return VarRef.IntVar(v)
+        for (v in tier.intVars) if (session.intDomain(v).values.size > 1) return VarRef.IntVar(v)
         return null
     }
 
     private fun randomFree(tier: SearchTier, session: PropagationSession, rng: Random): VarRef? {
         val candidates = ArrayList<VarRef>(tier.boolVars.size + tier.intVars.size)
         for (v in tier.boolVars) if (session.boolValue(v) == null) candidates.add(VarRef.Bool(v))
-        for (v in tier.intVars) if (session.intDomain(v).size > 1) candidates.add(VarRef.IntVar(v))
+        for (v in tier.intVars) if (session.intDomain(v).values.size > 1) candidates.add(VarRef.IntVar(v))
         return if (candidates.isEmpty()) null else candidates[rng.nextInt(candidates.size)]
     }
 
@@ -151,8 +152,8 @@ class TieredVariableSelector(
         }
         for (v in tier.intVars) {
             val d = session.intDomain(v)
-            if (d.size <= 1) continue
-            val s = score(d.size, d.min, d.max)
+            if (d.isFixed) continue
+            val s = score(d.values.size, d.min, d.max)
             if (s > bestScore) {
                 bestScore = s
                 best = VarRef.IntVar(v)

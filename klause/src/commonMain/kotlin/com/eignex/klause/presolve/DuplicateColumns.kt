@@ -221,7 +221,7 @@ internal object DuplicateColumns {
         return if (((a xor r) and (b xor r)) < 0L) null else r
     }
 
-    private fun IntDomain.isContiguous(): Boolean = size.toLong() == max - min + 1
+    private fun IntDomain.isContiguous(): Boolean = holeCount == 0L
 }
 
 /** A single duplicate-column aggregation: the surviving aggregate [keep] absorbs [drop]. Both

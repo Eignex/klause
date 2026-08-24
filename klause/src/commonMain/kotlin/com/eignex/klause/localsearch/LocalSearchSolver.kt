@@ -861,7 +861,7 @@ class LocalSearchSolver(
  *  cannot soundly or feasibly handle the problem, so the caller falls back to the backtrack engine. */
 private fun hasWideIntValues(problem: Problem): Boolean {
     for (d in problem.intDomains) {
-        if (!d.enumerable || d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
+        if ((d.spanOrNull() == null) || d.min < Int.MIN_VALUE.toLong() || d.max > Int.MAX_VALUE.toLong()) return true
     }
     return false
 }

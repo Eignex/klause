@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.propagation.excludeIntValues
 import com.eignex.klause.propagation.restrictIntToSurvivors
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
@@ -105,16 +106,26 @@ internal class ElementConstState(
         if (pi != null && idxDom !== pi) {
             // Rebuild (span-safe) whenever the current or previous domain is too large to walk: neither
             // widening detection nor the delta's removed-set walk can touch such a domain.
-            if (idxDom.sizeLong > DEFAULT_DOMAIN_WALK_CAP || pi.sizeLong > DEFAULT_DOMAIN_WALK_CAP) return true
+            if (idxDom.spanOrNull(
+                    DEFAULT_DOMAIN_WALK_CAP,
+                ) == null || pi.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null
+            ) {
+                return true
+            }
             var w = false
-            idxDom.forEach { v -> if (v !in pi) w = true }
+            idxDom.values.forEach { v -> if (v !in pi) w = true }
             if (w) return true
         }
         val pr = domRefResult.value
         if (pr != null && resDom !== pr) {
-            if (resDom.sizeLong > DEFAULT_DOMAIN_WALK_CAP || pr.sizeLong > DEFAULT_DOMAIN_WALK_CAP) return true
+            if (resDom.spanOrNull(
+                    DEFAULT_DOMAIN_WALK_CAP,
+                ) == null || pr.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null
+            ) {
+                return true
+            }
             var w = false
-            resDom.forEach { v -> if (v !in pr) w = true }
+            resDom.values.forEach { v -> if (v !in pr) w = true }
             if (w) return true
         }
         return false
@@ -148,8 +159,8 @@ internal class ElementConstState(
         val resSeed = LongArrayList()
         // A result domain too large to walk skips its per-value support scan (sound — it resumes once
         // result narrows below the cap, and every leaf has singleton domains).
-        if (resDom.sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
-            resDom.forEach { rv ->
+        if (resDom.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
+            resDom.values.forEach { rv ->
                 val id = idFor(rv)
                 if (id < 0 || counts[id] == 0) resSeed.add(rv)
             }
@@ -204,7 +215,7 @@ internal class ElementConstState(
     private fun removedSince(prev: IntDomain?, cur: IntDomain): LongArrayList? {
         if (prev == null || prev === cur) return null
         val out = LongArrayList()
-        prev.forEach { v -> if (v !in cur) out.add(v) }
+        prev.values.forEach { v -> if (v !in cur) out.add(v) }
         return out
     }
 

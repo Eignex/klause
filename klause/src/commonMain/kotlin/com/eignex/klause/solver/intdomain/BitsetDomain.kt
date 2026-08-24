@@ -2,6 +2,7 @@ package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntSpan
 import com.eignex.klause.util.Bits
 
 /** Bitset over a narrow span: bit `(value - bitsetLo)` is set iff `value` is present. The backing
@@ -12,7 +13,8 @@ internal class BitsetDomain(
     override val max: Long,
     private val bitset: LongArray,
     private val bitsetLo: Long,
-) : AbstractIntDomain() {
+) : AbstractIntDomain(),
+    IntSpan {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         // The endpoints must be members — a violation here means a caller built the bit array wrong
@@ -20,6 +22,8 @@ internal class BitsetDomain(
         check(Bits.has(bitset, (min - bitsetLo).toInt())) { "min $min is not a member (lo=$bitsetLo)" }
         check(Bits.has(bitset, (max - bitsetLo).toInt())) { "max $max is not a member (lo=$bitsetLo)" }
     }
+
+    override fun spanOrNull(maxValues: Long): IntSpan? = if (size.toLong() <= maxValues) this else null
 
     override val size: Int = run {
         var s = 0

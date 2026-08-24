@@ -9,6 +9,7 @@ import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 
 /** CP implementation for [Circuit]: propagation of the optional-cycle constraint over successor vars. */
@@ -106,7 +107,13 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         if (mandCount < 2) return true
         val rev = Array(n) { IntArrayList() }
         for (i in 0 until n) {
-            state.intDomains[succ[i]].forEach { j -> if (j != i.toLong() && j in 0 until n) rev[j.toInt()].add(i) }
+            state.intDomains[succ[i]].values.forEach { j ->
+                if (j != i.toLong() && j in 0 until n) {
+                    rev[j.toInt()].add(
+                        i,
+                    )
+                }
+            }
         }
         // Only mandatory nodes must be mutually reachable; a self-loop (v == u) is an opt-out, not a
         // tour edge, so it never carries reachability.

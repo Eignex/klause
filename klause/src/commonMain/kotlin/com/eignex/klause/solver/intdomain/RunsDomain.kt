@@ -2,12 +2,14 @@ package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntSpan
 import com.eignex.klause.util.LongArrayList
 
 /** Interval-run list: flattened sorted disjoint present runs `[lo0,hi0, lo1,hi1, …]`, `>= 2` runs,
  *  strict gaps between them, `runs[0] == min`, `runs[last] == max`. */
 internal class RunsDomain(override val min: Long, override val max: Long, private val runs: LongArray) :
-    AbstractIntDomain() {
+    AbstractIntDomain(),
+    IntSpan {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         require(runs.size >= 4 && runs.size % 2 == 0) { "RunsDomain needs >= 2 runs" }
@@ -28,11 +30,14 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
     }
 
     // Saturates at Int.MAX_VALUE (a run may span more than 32 bits); such a domain is never enumerated.
+    override fun spanOrNull(maxValues: Long): IntSpan? =
+        if (exactSize <= minOf(maxValues, Int.MAX_VALUE.toLong())) this else null
+
     override val size: Int = exactSize.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
-    override val enumerable: Boolean get() = exactSize <= Int.MAX_VALUE.toLong()
+    private val enumerable: Boolean get() = exactSize <= Int.MAX_VALUE.toLong()
 
-    override val sizeLong: Long get() = exactSize
+    private val exactValueCount: Long get() = exactSize
 
     // Summed from the gaps between consecutive runs, so it stays exact even when `size` saturates.
     override val holeCount: Long = run {
@@ -82,7 +87,7 @@ internal class RunsDomain(override val min: Long, override val max: Long, privat
 
     override fun contains(value: Long): Boolean = value in min..max && runIndexContaining(value) >= 0
 
-    // The interface defaults binary-search positions in `0 until size`; on a saturated [size] that
+    // The interface defaults binary-search positions in `0 until size`; on a saturated count that
     // misses every value past index Int.MAX_VALUE and returns a wrong neighbour. Search the runs
     // instead — exact at any width, and O(log runs) rather than O(log size) valueAt walks.
     override fun lower(value: Long): Long {

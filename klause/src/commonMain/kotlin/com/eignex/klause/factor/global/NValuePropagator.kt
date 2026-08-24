@@ -6,6 +6,7 @@ import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
 import com.eignex.klause.factor.global.internals.reginTarjanScc
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
@@ -49,7 +50,7 @@ internal class NValuePropagator(
             // The matching build enumerates each variable's domain. On a domain too large to walk fall
             // back to the trivial sound upper bound (distinct values ≤ number of variables) and skip the
             // GAC value pruning, which needs the matching.
-            if (xs.all { state.intDomains[it].sizeLong <= DEFAULT_DOMAIN_WALK_CAP }) {
+            if (xs.all { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null }) {
                 val matching = buildMatching(state)
                 if (!state.tightenIntMax(n, matching.size.toLong(), ant)) return false
                 if (state.intDomains[n].min == matching.size.toLong()) {
@@ -75,7 +76,7 @@ internal class NValuePropagator(
         // present variables (sound). No cheap sound lower bound here, so leave the minimum untightened
         // (sound, just weaker) — the AtMost mode, which only tightens the minimum, is a no-op.
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
-        if (nonAbsent.any { state.intDomains[xs[it]].sizeLong > DEFAULT_DOMAIN_WALK_CAP }) {
+        if (nonAbsent.any { state.intDomains[xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
             val boundsAnt = collectHoleAndBoundAntecedents(state, xs)
             return when (mode) {
                 NValue.Mode.Eq, NValue.Mode.AtLeast -> state.tightenIntMax(n, nonAbsent.size.toLong(), boundsAnt)
@@ -85,21 +86,21 @@ internal class NValuePropagator(
         val unionValues = LongHashSet()
         for (i in xs.indices) {
             if (definitelyAbsentNvFn(i, state)) continue
-            state.intDomains[xs[i]].forEach { unionValues.add(it) }
+            state.intDomains[xs[i]].values.forEach { unionValues.add(it) }
         }
         val maxDistinct = unionValues.size
         val present = IntArrayList(xs.size)
         for (i in xs.indices) if (definitelyPresentNvFn(i, state)) present.add(xs[i])
-        present.sortByIntKey { state.intDomains[it].size }
+        present.sortByIntKey { state.intDomains[it].values.size }
         val covered = LongHashSet()
         var minDistinct = 0
         for (idx in 0 until present.size) {
             val d = state.intDomains[present[idx]]
             var disjoint = true
-            d.forEach { if (covered.contains(it)) disjoint = false }
+            d.values.forEach { if (covered.contains(it)) disjoint = false }
             if (disjoint) {
                 minDistinct++
-                d.forEach { covered.add(it) }
+                d.values.forEach { covered.add(it) }
             }
         }
         val ant = collectHoleAndBoundAntecedents(state, xs)
@@ -135,7 +136,7 @@ internal class NValuePropagator(
         val values = LongArrayList()
         val adj = Array(xs.size) { i ->
             val ids = IntArrayList()
-            state.intDomains[xs[i]].forEach { v ->
+            state.intDomains[xs[i]].values.forEach { v ->
                 var id = valueId.getOrDefault(v, -1)
                 if (id < 0) {
                     id = values.size

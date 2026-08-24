@@ -2,6 +2,7 @@ package com.eignex.klause.factor.circuit.internals
 
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 
 /** Subscribe to all four event types for each distinct variable in [succ]. */
@@ -47,7 +48,7 @@ internal inline fun PropagationState.circuitReachesAll(
         val u = stack[stack.size - 1]
         stack.removeAt(stack.size - 1)
         if (forward) {
-            intDomains[succ[u]].forEach { vLong ->
+            intDomains[succ[u]].values.forEach { vLong ->
                 val v = vLong.toInt()
                 if (arcAllowed(u, v) && !seen[v]) {
                     seen[v] = true

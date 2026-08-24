@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.orderingSize
 import kotlin.random.Random
 
 /**
@@ -11,5 +12,5 @@ object SmallestDomain : VariableSelector {
     override fun fresh() = this
 
     override fun pick(session: PropagationSession, rng: Random): VarRef? =
-        pickByDomainMetric(session, maximize = false, boolScore = 2L) { it.sizeLong }
+        pickByDomainMetric(session, maximize = false, boolScore = 2L) { it.orderingSize() }
 }

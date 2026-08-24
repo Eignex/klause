@@ -10,7 +10,9 @@ internal abstract class AbstractIntDomain : IntDomain {
     override val holeCount: Long
         get() {
             val span = max - min
-            return if (span < 0) Long.MAX_VALUE else span + 1 - size
+            if (span < 0) return Long.MAX_VALUE
+            val present = spanOrNull(Long.MAX_VALUE)?.let { it.size.toLong() } ?: (span + 1)
+            return span + 1 - present
         }
 
     override fun excludeValues(values: LongArray): IntDomain? {
@@ -21,29 +23,32 @@ internal abstract class AbstractIntDomain : IntDomain {
         // is a span-independent run split — so the cost scales with the excluded-value count, not the span.
         // A finite exclusion set cannot empty such a domain (> 2^31 values remain), so the result is never
         // null; identity is preserved when nothing was actually present to exclude.
-        if (!enumerable) {
+        val span = spanOrNull()
+        if (span == null) {
             var d: IntDomain = this
             for (v in values) d = d.excludeValue(v)
             return if (d === this) this else d
         }
-        // Grow from a small default rather than preallocating [size]: when a wide domain is carved to a
-        // sparse survivor set the result is tiny, and [size] can be huge (or saturated) — a `size`-capacity
+        // Grow from a small default rather than preallocating the value count: when a wide domain is carved to a
+        // sparse survivor set the result is tiny, and the count can be huge — a count-capacity
         // LongArray would waste (or exhaust) memory.
         val out = LongArrayList()
         var j = 0
-        forEach { p ->
+        span.forEach { p ->
             while (j < values.size && values[j] < p) j++
             if (j < values.size && values[j] == p) j++ else out.add(p)
         }
-        if (out.size == size) return this
+        if (out.size == span.size) return this
         if (out.size == 0) return null
         return intDomainFromSurvivors(out.toLongArray())
     }
 
     override fun equals(other: Any?): Boolean {
         if (other !is IntDomain) return false
-        if (min != other.min || max != other.max || size != other.size || holeCount != other.holeCount) return false
-        if (!enumerable) {
+        if (min != other.min || max != other.max) return false
+        if (holeCount != other.holeCount) return false
+        val span = spanOrNull()
+        if (span == null) {
             // A saturated size carries no information, but `holeCount` stays exact: with equal bounds
             // and hole counts, disjointness of this domain's holes from the other's present values
             // means the hole sets coincide — checked in O(holes), never walking the span.
@@ -53,19 +58,20 @@ internal abstract class AbstractIntDomain : IntDomain {
         }
         // Sizes and bounds agree, so `this ⊆ other` ⇒ equal sets.
         var ok = true
-        forEach { v -> if (v !in other) ok = false }
+        span.forEach { v -> if (v !in other) ok = false }
         return ok
     }
 
     override fun hashCode(): Int {
         var h = min.hashCode() * 31 + max.hashCode()
-        if (!enumerable) {
+        val span = spanOrNull()
+        if (span == null) {
             // Hash the holes instead of the (un-walkable) values. Consistent with [equals]: a
             // non-enumerable domain never set-equals an enumerable one — their exact counts differ.
             forEachHole { v -> h = h * 31 + v.hashCode() }
             return h
         }
-        forEach { v -> h = h * 31 + v.hashCode() }
+        span.forEach { v -> h = h * 31 + v.hashCode() }
         return h
     }
 }

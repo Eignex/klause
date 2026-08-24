@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -53,7 +54,7 @@ internal fun reginFilter(
     // A domain too large to walk would make the GAC value graph below enumerate its span. Fall back to
     // the span-safe bounds-consistency filter for plain alldifferent; for the except variant (excepted
     // values may repeat, which bounds consistency cannot model) skip filtering — sound, just no prune.
-    if (filteredVars.any { state.intDomains[it].sizeLong > DEFAULT_DOMAIN_WALK_CAP }) {
+    if (filteredVars.any { state.intDomains[it].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
         return if (exceptSet.isEmpty()) boundsAllDifferentFilter(state, filteredVars, premises) else null
     }
 
@@ -80,7 +81,7 @@ internal fun reginFilter(
     val valuesPerVar = Array(n) { i ->
         val d = state.intDomains[filteredVars[i]]
         val list = IntArrayList()
-        d.forEach { v ->
+        d.values.forEach { v ->
             if (v in exceptSet) {
                 var base = exceptBase.getOrDefault(v, -1)
                 if (base < 0) {
@@ -312,7 +313,7 @@ internal class ReginCache {
      *  universe outgrows the current capacity. A fresh state starts invalid ([ReginIncrementalState.valid]
      *  == 0), forcing a full rebuild that re-seeds it. */
     fun incremental(state: PropagationState, vars: IntArray): ReginIncrementalState {
-        for (vi in vars) state.intDomains[vi].forEach { v -> idFor(v) }
+        for (vi in vars) state.intDomains[vi].values.forEach { v -> idFor(v) }
         val need = valueOfId.size
         val cur = inc
         if (cur == null || !cur.vars.contentEquals(vars) || cur.valueCap < need) {

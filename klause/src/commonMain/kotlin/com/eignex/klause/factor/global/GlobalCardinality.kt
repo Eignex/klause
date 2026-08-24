@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -171,7 +172,7 @@ class GlobalCardinality(
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         val counts = countVars ?: return // constant-bound form has no count var to bound
         var cells = 0L
-        for (x in xs) cells += builder.declaredDomain(x).size.toLong()
+        for (x in xs) cells += builder.declaredDomain(x).values.size.toLong()
         if (cells == 0L || cells > MAX_GCC_CELLS) return
         // Selector columns per cover value, indexed by cover position via [coverIndexByValue], whose
         // Long keys address cover values across the full value range.
@@ -181,7 +182,7 @@ class GlobalCardinality(
             val live = builder.liveDomain(x)
             val sel = IntArrayList()
             val selVal = LongArrayList()
-            declared.forEach { v ->
+            declared.values.forEach { v ->
                 // The selector z_xv is present while value v stays in x's live domain.
                 val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
                 sel.add(z)
@@ -221,7 +222,7 @@ class GlobalCardinality(
     override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
         if (countVars == null || presents.isNotEmpty()) return null
         var cells = 0L
-        for (x in xs) cells += domains[x].size.toLong()
+        for (x in xs) cells += domains[x].values.size.toLong()
         if (cells == 0L || cells > MAX_GCC_CELLS) return null
         // One z selector per var×declared-value; (Σz=1, channel) per var + one count row per cover value.
         return LpSizeEstimate(cols = cells, rows = 2L * xs.size + cover.size)

@@ -1,12 +1,12 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 
 /**
  * Median value (middle of the domain *by position*) first, then alternating outward
- * (`indomain_median`). [IntDomain.valueAt] is sparse-aware, so the median always lands on a
+ * (`indomain_median`). [com.eignex.klause.solver.IntSpan.valueAt] is sparse-aware, so the median always lands on a
  * present value; differs from [IndomainMiddle] (mean of bounds) when the domain is skewed or holey.
  */
 object IndomainMedian : ValueSelector {
@@ -19,7 +19,7 @@ object IndomainMedian : ValueSelector {
             val d = session.intDomain(varRef.varId)
             // A non-enumerable domain has no meaningful positional index; the bounds midpoint is the
             // exact positional median for the shape that dominates there (a hole-free interval).
-            val median = if (!d.enumerable) boundsMidpoint(d) else d.valueAt(d.size / 2)
+            val median = if ((d.spanOrNull() == null)) boundsMidpoint(d) else d.values.valueAt(d.values.size / 2)
             centeredDomainValues(d, median)
         }
     }

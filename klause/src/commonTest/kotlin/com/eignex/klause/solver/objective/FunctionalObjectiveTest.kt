@@ -5,6 +5,7 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.values
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
@@ -44,12 +45,12 @@ class FunctionalObjectiveTest {
         repeat(200) {
             for (i in 0 until program.problem.numIntVars) {
                 val dom = program.problem.intDomains[i]
-                state.assignment.setInt(i, dom.valueAt(rng.nextInt(dom.size)))
+                state.assignment.setInt(i, dom.values.valueAt(rng.nextInt(dom.values.size)))
             }
             // Pick a leaf var move.
             val v = listOf(aId, bId, cId).random(rng)
             val dom = program.problem.intDomains[v]
-            val nv = dom.valueAt(rng.nextInt(dom.size))
+            val nv = dom.values.valueAt(rng.nextInt(dom.values.size))
             val move = Move.IntSet(v, nv)
             val before = obj.evaluate(snapshot(state, program))
             val predicted = obj.deltaIfApplied(state.assignment, move)

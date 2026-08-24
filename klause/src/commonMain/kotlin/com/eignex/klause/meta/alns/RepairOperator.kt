@@ -10,6 +10,7 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.values
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -197,10 +198,10 @@ internal class GreedyConstructionRepair(
             val baseline = currentScore()
             var bestVal = cur
             var bestScore = baseline
-            val candidates: LongArray = if (d.size <= intDomainSampleCap) {
-                LongArray(d.size) { d.valueAt(it) }
+            val candidates: LongArray = if (d.values.size <= intDomainSampleCap) {
+                LongArray(d.values.size) { d.values.valueAt(it) }
             } else {
-                LongArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                LongArray(intDomainSampleCap) { d.values.valueAt(context.rng.nextInt(d.values.size)) }
             }
             for (v in candidates) {
                 if (v == cur) continue
@@ -266,10 +267,10 @@ internal class RegretRepair(
         for (i in context.freed.ints) {
             val d = problem.intDomains[i]
             val cur = state.assignment.intValue(i)
-            val cand: LongArray = if (d.size <= intDomainSampleCap) {
-                LongArray(d.size) { d.valueAt(it) }
+            val cand: LongArray = if (d.values.size <= intDomainSampleCap) {
+                LongArray(d.values.size) { d.values.valueAt(it) }
             } else {
-                LongArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                LongArray(intDomainSampleCap) { d.values.valueAt(context.rng.nextInt(d.values.size)) }
             }
             var best = cur
             var bestScore = currentScore()
@@ -338,10 +339,10 @@ internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIter
             for (i in context.freed.ints) {
                 val d = problem.intDomains[i]
                 val cur = state.assignment.intValue(i)
-                val cand: LongArray = if (d.size <= intDomainSampleCap) {
-                    LongArray(d.size) { d.valueAt(it) }
+                val cand: LongArray = if (d.values.size <= intDomainSampleCap) {
+                    LongArray(d.values.size) { d.values.valueAt(it) }
                 } else {
-                    LongArray(intDomainSampleCap) { d.valueAt(context.rng.nextInt(d.size)) }
+                    LongArray(intDomainSampleCap) { d.values.valueAt(context.rng.nextInt(d.values.size)) }
                 }
                 for (v in cand) {
                     if (v == cur) continue

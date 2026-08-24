@@ -3,10 +3,13 @@ package com.eignex.klause.solver.intdomain
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntSpan
 import com.eignex.klause.util.Bits
 
 /** Contiguous `(min..max)`, no interior holes. */
-internal class ContiguousDomain(override val min: Long, override val max: Long) : AbstractIntDomain() {
+internal class ContiguousDomain(override val min: Long, override val max: Long) :
+    AbstractIntDomain(),
+    IntSpan {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
     }
@@ -15,17 +18,24 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
     // so callers that read size on it want "very large", not an exact (unrepresentable) count. A full
     // Long.MIN..Long.MAX span overflows `max - min` to a negative value, so treat a negative span as
     // "very large" too rather than letting it wrap to a bogus small count.
+    override fun spanOrNull(maxValues: Long): IntSpan? {
+        val span = max - min
+        // Never past Int range whatever the caller asks for: a span indexes its values with an Int.
+        val cap = minOf(maxValues, Int.MAX_VALUE.toLong())
+        return if (span >= 0 && span + 1 <= cap) this else null
+    }
+
     override val size: Int get() {
         val span = max - min
         return if (span < 0L || span >= Int.MAX_VALUE.toLong()) Int.MAX_VALUE else (span + 1L).toInt()
     }
 
-    override val enumerable: Boolean get() {
+    private val enumerable: Boolean get() {
         val span = max - min
         return span in 0L until Int.MAX_VALUE.toLong()
     }
 
-    override val sizeLong: Long get() {
+    private val exactValueCount: Long get() {
         val span = max - min
         return if (span < 0L || span == Long.MAX_VALUE) Long.MAX_VALUE else span + 1
     }

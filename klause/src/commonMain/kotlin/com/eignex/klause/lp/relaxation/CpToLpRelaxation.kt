@@ -37,6 +37,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -604,7 +605,7 @@ internal class CpToLpRelaxation(
             // graphs (small per-node successor domains) are not skipped by a blunt node cap.
             var arcCount = 0
             for (i in 0 until n) {
-                problem.intDomains[succ[i]].forEach { j ->
+                problem.intDomains[succ[i]].values.forEach { j ->
                     if ((selfLoops || j != i.toLong()) && j >= 0 &&
                         j < n
                     ) {
@@ -623,7 +624,7 @@ internal class CpToLpRelaxation(
                 val outCols = IntArrayList()
                 val chanCols = IntArrayList()
                 val chanCoef = IntArrayList()
-                problem.intDomains[succ[i]].forEach { j ->
+                problem.intDomains[succ[i]].values.forEach { j ->
                     if ((!selfLoops && j == i.toLong()) || j < 0 || j >= n) return@forEach
                     val jn = j.toInt() // validated node index in [0, n)
                     val present = live.contains(j)

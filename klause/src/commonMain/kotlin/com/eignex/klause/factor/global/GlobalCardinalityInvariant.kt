@@ -9,6 +9,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 
@@ -157,7 +158,7 @@ internal class GlobalCardinalityInvariant(
                     if (cur != coverVal) continue
                     val d = state.rootDomains[xs[i]]
                     var pick: Long? = null
-                    d.forEach { if (pick == null && it != coverVal) pick = it }
+                    d.values.forEach { if (pick == null && it != coverVal) pick = it }
                     val p = pick
                     if (p != null) sink.addChannelingIntSet(state, xs[i], p)
                 }

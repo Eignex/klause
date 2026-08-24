@@ -4,6 +4,8 @@ import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.orderingSize
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.LongHashSet
 import kotlin.math.ln
@@ -70,8 +72,9 @@ internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = 
 }
 
 /** Uniform random value in `[min(d), max(d)]`, overflow-safe on spans wider than `Long.MAX_VALUE`.
- *  Snap to a present value with [IntDomain.clamp]; positional sampling via [IntDomain.valueAt] is
- *  wrong on a non-[IntDomain.enumerable] domain (it only ever reaches the first 2^31 values). */
+ *  Snap to a present value with [IntDomain.clamp]; positional sampling via a span's
+ *  [com.eignex.klause.solver.IntSpan.valueAt] is
+ *  wrong on a domain with no span (it only ever reaches the first 2^31 values). */
 internal fun randomInBounds(d: IntDomain, rng: Random): Long {
     val span = d.max - d.min
     if (span < 0L || span == Long.MAX_VALUE) return rng.nextLong()
@@ -110,8 +113,8 @@ internal fun probeAndOrder(
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            if (d.size <= maxProbes) {
-                LongArray(d.size) { d.valueAt(it) }
+            if (d.values.size <= maxProbes) {
+                LongArray(d.values.size) { d.values.valueAt(it) }
             } else {
                 val seen = LongHashSet(maxProbes * 2)
                 val sample = LongArray(maxProbes)
@@ -120,8 +123,8 @@ internal fun probeAndOrder(
                 while (i < maxProbes && guard < maxProbes * 8) {
                     // Positional sampling is uniform only over an enumerable domain; a saturated
                     // index space never reaches values past the first 2^31, so sample the bounds.
-                    val candidate = if (d.enumerable) {
-                        d.valueAt(rng.nextInt(d.size))
+                    val candidate = if ((d.spanOrNull() != null)) {
+                        d.values.valueAt(rng.nextInt(d.values.size))
                     } else {
                         d.clamp(randomInBounds(d, rng))
                     }
@@ -167,12 +170,12 @@ internal fun probeAndOrder(
     if (ascending) scored.sortBy { it.second } else scored.sortByDescending { it.second }
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)
-        if (candidates.size < d.size) {
+        if (candidates.size < d.values.size) {
             // Already offered (ordered) or deliberately dropped; everything else in the domain follows.
             val ordered = scored.asSequence().map { it.first }
             return ordered + sequence {
-                for (i in 0 until d.size) {
-                    val v = d.valueAt(i)
+                for (i in 0 until d.values.size) {
+                    val v = d.values.valueAt(i)
                     if (v !in settled) yield(v)
                 }
             }
@@ -189,7 +192,7 @@ internal fun logRemainingDomainProduct(session: PropagationSession): Double {
     val ln2 = ln(2.0)
     for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += ln2
     for (v in 0 until p.numIntVars) {
-        val sz = session.intDomain(v).sizeLong
+        val sz = session.intDomain(v).orderingSize()
         if (sz > 1) s += ln(sz.toDouble())
     }
     return s
@@ -198,7 +201,7 @@ internal fun logRemainingDomainProduct(session: PropagationSession): Double {
 /** Ascending sequence of all values in [d], skipping any holes. Materialises lazily so
  *  the engine can early-exit before enumerating the full domain on a backtrack. */
 internal fun domainValuesAscending(d: IntDomain): Sequence<Long> =
-    sequence { for (i in 0 until d.size) yield(d.valueAt(i)) }
+    sequence { for (i in 0 until d.values.size) yield(d.values.valueAt(i)) }
 
 /** Descending sequence; same skip-holes semantics. */
 internal fun domainValuesDescending(d: IntDomain): Sequence<Long> = sequence {

@@ -13,6 +13,7 @@ import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -114,7 +115,7 @@ class LocalSearchStateRecomputeTest {
             val cur = state.assignment.intValue(v)
             var target = cur
             repeat(8) {
-                val cand = d.min + rng.nextInt(d.size)
+                val cand = d.min + rng.nextInt(d.values.size)
                 if (cand != cur) {
                     target = cand
                     return@repeat

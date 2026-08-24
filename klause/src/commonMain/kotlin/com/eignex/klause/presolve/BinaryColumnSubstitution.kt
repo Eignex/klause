@@ -244,7 +244,7 @@ internal object BinaryColumnSubstitution {
         }
     }
 
-    private fun IntDomain.isBinary(): Boolean = min == 0L && max == 1L && size == 2
+    private fun IntDomain.isBinary(): Boolean = min == 0L && max == 1L && holeCount == 0L
 
     private fun negateOrNull(a: Long): Long? = if (a == Long.MIN_VALUE) null else -a
 

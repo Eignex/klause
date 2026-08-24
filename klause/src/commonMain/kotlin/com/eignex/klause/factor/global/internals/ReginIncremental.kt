@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.global.internals
 
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
@@ -114,12 +115,12 @@ private fun reginDelta(
         val cur = state.intDomains[vars[i]]
         if (cur === prev) continue
         var widened = false
-        cur.forEach { v -> if (v !in prev) widened = true }
+        cur.values.forEach { v -> if (v !in prev) widened = true }
         if (widened) return reginRebuild(state, vars, cache, inc, premises) // not deletions-only → rebuild
         val matchedId = inc.matchVar[i]
         // Values that left var i since the last fire (deletions only — widening ruled out above).
         var brokeMatch = false
-        prev.forEach { v ->
+        prev.values.forEach { v ->
             if (v !in cur) {
                 val vid = cache.idFor(v)
                 if (vid == matchedId) {
@@ -144,7 +145,7 @@ private fun reginDelta(
 private fun buildValuesPerVar(state: PropagationState, vars: IntArray, cache: ReginCache, n: Int): Array<IntArray> =
     Array(n) { i ->
         val list = IntArrayList()
-        state.intDomains[vars[i]].forEach { v -> list.add(cache.idFor(v)) }
+        state.intDomains[vars[i]].values.forEach { v -> list.add(cache.idFor(v)) }
         list.toIntArray()
     }
 

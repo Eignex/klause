@@ -7842,19 +7842,18 @@ public abstract interface class com/eignex/klause/solver/IntDomain {
 	public abstract fun contains (J)Z
 	public abstract fun excludeValue (J)Lcom/eignex/klause/solver/IntDomain;
 	public abstract fun excludeValues ([J)Lcom/eignex/klause/solver/IntDomain;
-	public abstract fun forEach (Lcom/eignex/klause/solver/IntConsumer;)V
 	public abstract fun forEachHole (Lcom/eignex/klause/solver/IntConsumer;)V
 	public abstract fun forEachHoleInRange (JJLcom/eignex/klause/solver/IntConsumer;)V
-	public fun getEnumerable ()Z
 	public abstract fun getHoleCount ()J
 	public abstract fun getMax ()J
 	public abstract fun getMin ()J
-	public abstract fun getSize ()I
-	public fun getSizeLong ()J
 	public fun higher (J)J
 	public abstract fun includeInteriorValue (J)Lcom/eignex/klause/solver/IntDomain;
+	public fun isFixed ()Z
 	public fun lower (J)J
-	public abstract fun valueAt (I)J
+	public fun span ()Lcom/eignex/klause/solver/IntSpan;
+	public abstract fun spanOrNull (J)Lcom/eignex/klause/solver/IntSpan;
+	public static synthetic fun spanOrNull$default (Lcom/eignex/klause/solver/IntDomain;JILjava/lang/Object;)Lcom/eignex/klause/solver/IntSpan;
 	public abstract fun withMaxAtMost (J)Lcom/eignex/klause/solver/IntDomain;
 	public abstract fun withMinAtLeast (J)Lcom/eignex/klause/solver/IntDomain;
 }
@@ -7865,10 +7864,22 @@ public final class com/eignex/klause/solver/IntDomain$Companion {
 
 public final class com/eignex/klause/solver/IntDomain$DefaultImpls {
 	public static fun clamp (Lcom/eignex/klause/solver/IntDomain;J)J
-	public static fun getEnumerable (Lcom/eignex/klause/solver/IntDomain;)Z
-	public static fun getSizeLong (Lcom/eignex/klause/solver/IntDomain;)J
 	public static fun higher (Lcom/eignex/klause/solver/IntDomain;J)J
+	public static fun isFixed (Lcom/eignex/klause/solver/IntDomain;)Z
 	public static fun lower (Lcom/eignex/klause/solver/IntDomain;J)J
+	public static fun span (Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/IntSpan;
+	public static synthetic fun spanOrNull$default (Lcom/eignex/klause/solver/IntDomain;JILjava/lang/Object;)Lcom/eignex/klause/solver/IntSpan;
+}
+
+public final class com/eignex/klause/solver/IntDomainKt {
+	public static final fun getValues (Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/IntSpan;
+	public static final fun orderingSize (Lcom/eignex/klause/solver/IntDomain;)J
+}
+
+public abstract interface class com/eignex/klause/solver/IntSpan {
+	public abstract fun forEach (Lcom/eignex/klause/solver/IntConsumer;)V
+	public abstract fun getSize ()I
+	public abstract fun valueAt (I)J
 }
 
 public final class com/eignex/klause/solver/IntVariableOwner : java/lang/Enum {

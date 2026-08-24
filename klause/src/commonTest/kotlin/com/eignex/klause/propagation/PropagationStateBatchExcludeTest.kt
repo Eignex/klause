@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -142,7 +143,7 @@ class PropagationStateBatchExcludeTest {
                         // Exclude a random non-empty subset of the live domain, keeping a survivor.
                         val picked = mutableSetOf<Long>()
                         val live = ArrayList<Long>()
-                        d.forEach { live.add(it) }
+                        d.values.forEach { live.add(it) }
                         val take = rng.nextInt(1, live.size)
                         repeat(take) { picked.add(live[rng.nextInt(live.size)]) }
                         if (picked.size >= live.size) picked.remove(picked.first())

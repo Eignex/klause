@@ -1,9 +1,11 @@
 package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
+import com.eignex.klause.solver.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RunsDomainTest {
@@ -30,16 +32,17 @@ class RunsDomainTest {
     @Test
     fun `enumerable follows the exact count not the saturated size`() {
         val wide = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
-        assertFalse(wide.enumerable)
+        assertFalse((wide.spanOrNull() != null))
         val narrow = ContiguousDomain(0, 100_000).excludeValue(50_000)
         assertTrue(narrow is RunsDomain)
-        assertTrue(narrow.enumerable)
+        assertTrue((narrow.spanOrNull() != null))
     }
 
     @Test
-    fun `sizeLong counts wide runs exactly`() {
+    fun `a wide run domain counts its holes without walking its values`() {
         val wide = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
-        assertEquals(5_000_000_000L, wide.sizeLong)
+        assertEquals(1L, wide.holeCount)
+        assertNull(wide.spanOrNull())
     }
 
     @Test
@@ -60,7 +63,7 @@ class RunsDomainTest {
         d = d.includeInteriorValue(50_000)
         assertTrue(50_000 in d)
         assertTrue(25_000 !in d)
-        assertEquals(99_999, d.size)
+        assertEquals(99_999, d.values.size)
         d = d.excludeValue(25_001)
         assertTrue(25_001 !in d)
         d = d.includeInteriorValue(25_001)

@@ -7,6 +7,7 @@ import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -251,7 +252,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         for (v in domains.indices) {
             val target = domains[v]
             val cur = state.intDomains[v]
-            if (target.min == cur.min && target.max == cur.max && target.size == cur.size) continue
+            if (target.min == cur.min && target.max == cur.max && target.values.size == cur.values.size) continue
             if (!state.tightenIntMin(v, target.min)) return false
             if (!state.tightenIntMax(v, target.max)) return false
             if (!pushInteriorHoles(v, target)) return false
@@ -263,7 +264,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
      *  on the state but absent from the target (rare; bound tightenings dominate). Returns false on a
      *  conflict, and skips the value scan entirely when the state domain already has no extra values. */
     private fun pushInteriorHoles(v: Int, target: IntDomain): Boolean {
-        if (target.size == state.intDomains[v].size) return true
+        if (target.values.size == state.intDomains[v].values.size) return true
         for (value in target.min..target.max) {
             if (value in target || value !in state.intDomains[v]) continue
             if (!state.excludeIntValue(v, value)) return false
@@ -385,7 +386,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         for (v in 0 until base.numIntVars) {
             val cur = state.intDomains[v]
             val target = domains[v]
-            if (target.min < cur.min || target.max > cur.max || target.size > cur.size) return true
+            if (target.min < cur.min || target.max > cur.max || target.values.size > cur.values.size) return true
         }
         return false
     }

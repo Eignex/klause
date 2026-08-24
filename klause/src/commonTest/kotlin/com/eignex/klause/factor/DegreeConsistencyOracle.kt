@@ -4,6 +4,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -126,7 +127,7 @@ object DegreeConsistencyOracle {
             val v = rng.nextInt(ni)
             val d = problem.intDomains[v]
             val cur = state.assignment.intValue(v)
-            val target = d.valueAt(rng.nextInt(d.size))
+            val target = d.values.valueAt(rng.nextInt(d.values.size))
             if (target == cur) null else Move.IntSet(v, target)
         } else {
             Move.BoolFlip(rng.nextInt(nb))
@@ -137,7 +138,7 @@ object DegreeConsistencyOracle {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in 0 until problem.numIntVars) {
             val d: IntDomain = problem.intDomains[i]
-            state.assignment.setInt(i, d.valueAt(rng.nextInt(d.size)))
+            state.assignment.setInt(i, d.values.valueAt(rng.nextInt(d.values.size)))
         }
     }
 }

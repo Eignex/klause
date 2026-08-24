@@ -13,6 +13,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -154,6 +155,6 @@ class BinaryColumnSubstitutionTest {
 
         val result = requireNotNull(substitute(model))
 
-        assertTrue(result.problem.intDomains.all { it.size == 1 })
+        assertTrue(result.problem.intDomains.all { it.values.size == 1 })
     }
 }

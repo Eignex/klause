@@ -42,7 +42,7 @@ internal class MaxRegret(private val objective: LinearObjective, private val bas
         }
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
-            if (d.size <= 1) continue
+            if (d.isFixed) continue
             val c = if (v < objective.intCoefficients.size) objective.intCoefficients[v] else 0L
             val r = saturatingMul(abs(c), saturatingSpan(d))
             if (r > bestRegret) {

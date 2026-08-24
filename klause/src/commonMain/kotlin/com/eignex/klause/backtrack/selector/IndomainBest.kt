@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 
 /**
@@ -36,7 +37,7 @@ internal class IndomainBest(private val objective: LinearObjective) : ValueSelec
             }
             val d = session.intDomain(varRef.varId)
             if (c >= 0L) {
-                sequence { for (i in 0 until d.size) yield(d.valueAt(i)) }
+                sequence { for (i in 0 until d.values.size) yield(d.values.valueAt(i)) }
             } else {
                 sequence { for (v in d.max downTo d.min) if (v in d) yield(v) }
             }

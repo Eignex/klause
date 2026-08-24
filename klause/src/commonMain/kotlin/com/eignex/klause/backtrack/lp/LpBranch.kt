@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.values
 
 /**
  * Reduced-cost-average branching: pick the unassigned variable with the highest LP branch score
@@ -28,7 +29,7 @@ internal fun LpEngine.lpBranchPick(session: PropagationSession, hints: LpHints?)
         }
     }
     for (i in 0 until problem.numIntVars) {
-        if (session.intDomain(i).size <= 1) continue
+        if (session.intDomain(i).values.size <= 1) continue
         val s = hints.branchScore(VarRef.IntVar(i))
         if (!s.isNaN() && s > bestScore) {
             bestScore = s

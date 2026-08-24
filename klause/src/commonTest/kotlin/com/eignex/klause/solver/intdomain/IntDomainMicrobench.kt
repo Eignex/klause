@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Ignore
@@ -53,7 +54,7 @@ class IntDomainMicrobench {
             var hits = 0
             val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
             println(
-                "span=2^$spanShift ($span) rep=${d::class.simpleName} size=${d.size} " +
+                "span=2^$spanShift ($span) rep=${d::class.simpleName} size=${d.values.size} " +
                     "1M contains=$t hits=$hits",
             )
         }
@@ -80,7 +81,7 @@ class IntDomainMicrobench {
             val probes = IntArray(1_000_000) { rng.nextInt(span) }
             var hits = 0
             val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
-            println("avgRun~$avgRun rep=${d::class.simpleName} size=${d.size} 1M contains=$t")
+            println("avgRun~$avgRun rep=${d::class.simpleName} size=${d.values.size} 1M contains=$t")
         }
     }
 
@@ -96,7 +97,7 @@ class IntDomainMicrobench {
             val d = carveDownTo(span, sv)
             val excl = LongArray(1000) { rng.nextInt(span).toLong() }.also { it.sort() }
             val tExcl = measureTime { repeat(1000) { d.excludeValues(excl) } }
-            println("wide-sparse rep=${d::class.simpleName} size=${d.size} 1000xexcludeValues=$tExcl")
+            println("wide-sparse rep=${d::class.simpleName} size=${d.values.size} 1000xexcludeValues=$tExcl")
         }
 
         // Few-holes-wide: nearly full domain with a few holes (interval rep, few runs).
@@ -106,7 +107,7 @@ class IntDomainMicrobench {
             val probes = IntArray(1_000_000) { rng.nextInt(span) }
             var hits = 0
             val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
-            println("few-holes-wide rep=${d::class.simpleName} size=${d.size} 1M contains=$t hits=$hits")
+            println("few-holes-wide rep=${d::class.simpleName} size=${d.values.size} 1M contains=$t hits=$hits")
         }
 
         // Alternating comb: every other value present (survivor rep, the adversary).
@@ -121,7 +122,7 @@ class IntDomainMicrobench {
             var hits = 0
             val t = measureTime { for (p in probes) if (p.toLong() in d) hits++ }
             println(
-                "comb rep=${d::class.simpleName} size=${d.size} (survivors=${sv.size}) " +
+                "comb rep=${d::class.simpleName} size=${d.values.size} (survivors=${sv.size}) " +
                     "1M contains=$t hits=$hits",
             )
         }

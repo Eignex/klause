@@ -9,6 +9,7 @@ import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 
 /** CP implementation for [Circuit]: propagation of the Hamiltonian-cycle constraint over successor vars. */
@@ -164,7 +165,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         val predAdj = Array(total) { IntArrayList() }
         for (i in 0 until n) {
             val from = if (i == 0) source else i
-            state.intDomains[succ[i]].forEach { yLong ->
+            state.intDomains[succ[i]].values.forEach { yLong ->
                 if (yLong in 0 until n) {
                     val y = yLong.toInt()
                     succAdj[from].add(y)
@@ -176,7 +177,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         for (v in 0 until n) if (idom[v] == -1) return false // source cannot reach every node
         for (x in 1 until n) {
             val dvals = IntArrayList()
-            state.intDomains[succ[x]].forEach { y -> if (y in 0 until n) dvals.add(y.toInt()) }
+            state.intDomains[succ[x]].values.forEach { y -> if (y in 0 until n) dvals.add(y.toInt()) }
             for (k in 0 until dvals.size) {
                 val y = dvals[k]
                 if (y != x && dominates(idom, source, y, x)) {
@@ -273,7 +274,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
     private fun stronglyConnected(state: PropagationState): Boolean {
         val rev = Array(n) { IntArrayList() }
         for (i in 0 until n) {
-            state.intDomains[succ[i]].forEach { k -> if (k in 0 until n) rev[k.toInt()].add(i) }
+            state.intDomains[succ[i]].values.forEach { k -> if (k in 0 until n) rev[k.toInt()].add(i) }
         }
         // A Hamiltonian circuit visits every node, so from node 0 all n must be reachable both
         // forward (over candidate successors) and backward — any node in range is a tour edge.

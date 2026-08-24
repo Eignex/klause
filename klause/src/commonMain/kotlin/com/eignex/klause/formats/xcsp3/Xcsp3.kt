@@ -31,6 +31,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
@@ -1234,8 +1235,8 @@ object Xcsp3 {
         internal fun domainSpan(vars: IntArray) = vars.maxOf { domains[it].max } - domainMin(vars) + 1
         internal fun domainValues(v: Int): List<Int> {
             val d = domains[v]
-            val out = ArrayList<Int>(d.size)
-            for (k in 0 until d.size) out.add(d.valueAt(k).toInt())
+            val out = ArrayList<Int>(d.values.size)
+            for (k in 0 until d.values.size) out.add(d.values.valueAt(k).toInt())
             return out
         }
 

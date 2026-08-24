@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongArrayList
 import kotlin.random.Random
 import kotlin.test.Test
@@ -22,14 +23,14 @@ class IntDomainTest {
         val d = IntDomain(0, 2_000_000).excludeValues(toExclude.toLongArray())!!
         assertEquals(3, d.min)
         assertEquals(2_000_000, d.max)
-        assertEquals(survivors.size, d.size)
+        assertEquals(survivors.size, d.values.size)
         for (s in survivors) assertTrue(s.toLong() in d, "survivor $s present")
         assertFalse(8 in d)
         assertFalse(99_999 in d)
         val seen = mutableListOf<Long>()
-        d.forEach { seen.add(it) }
+        d.values.forEach { seen.add(it) }
         assertEquals(survivors.map { it.toLong() }, seen)
-        for ((i, s) in survivors.withIndex()) assertEquals(s.toLong(), d.valueAt(i))
+        for ((i, s) in survivors.withIndex()) assertEquals(s.toLong(), d.values.valueAt(i))
         assertEquals(100_000, d.withMinAtLeast(8).min)
         assertEquals(7, d.withMaxAtMost(99_999).max)
     }
@@ -40,7 +41,7 @@ class IntDomainTest {
         // min..max one value at a time and grew a LongArrayList past Int.MAX (NegativeArraySizeException);
         // the fix folds each excluded value as a span-independent run split.
         val wide = IntDomain(0, 3_000_000_000L)
-        assertFalse(wide.enumerable)
+        assertFalse((wide.spanOrNull() != null))
         val holes = longArrayOf(5L, 1_000_000_000L, 2_999_999_999L)
         val d = wide.excludeValues(holes)!!
         assertEquals(0L, d.min)
@@ -69,7 +70,7 @@ class IntDomainTest {
                 var d: IntDomain? = base
                 for (v in values) {
                     val cur = d ?: break
-                    d = if (cur.size == 1 && v in cur) null else cur.excludeValue(v)
+                    d = if (cur.values.size == 1 && v in cur) null else cur.excludeValue(v)
                 }
                 d
             }
@@ -79,7 +80,7 @@ class IntDomainTest {
                 assertEquals(null, bulk, "values=${values.toList()} on $base should empty")
             } else {
                 assertEquals(folded, bulk, "values=${values.toList()} on $base")
-                assertEquals(folded.size, bulk!!.size)
+                assertEquals(folded.values.size, bulk!!.values.size)
                 assertEquals(folded.min, bulk.min)
                 assertEquals(folded.max, bulk.max)
             }
@@ -101,7 +102,7 @@ class IntDomainTest {
 
             val d = IntDomain(lo.toLong(), hi.toLong()).excludeValues(toExclude.map { it.toLong() }.toLongArray())
                 ?: error("non-empty present set must not yield null")
-            assertEquals(present.size, d.size, "size")
+            assertEquals(present.size, d.values.size, "size")
             assertEquals(present.min().toLong(), d.min, "min")
             assertEquals(present.max().toLong(), d.max, "max")
 
@@ -109,9 +110,9 @@ class IntDomainTest {
 
             val ordered = present.sorted()
             val seen = mutableListOf<Long>()
-            d.forEach { value -> seen.add(value) }
+            d.values.forEach { value -> seen.add(value) }
             assertEquals(ordered.map { it.toLong() }, seen, "forEach order")
-            for (i in ordered.indices) assertEquals(ordered[i].toLong(), d.valueAt(i), "valueAt($i)")
+            for (i in ordered.indices) assertEquals(ordered[i].toLong(), d.values.valueAt(i), "valueAt($i)")
 
             val holes = mutableListOf<Long>()
             d.forEachHole { hole -> holes.add(hole) }
@@ -123,14 +124,14 @@ class IntDomainTest {
             if (expectMin.isNotEmpty()) {
                 val e = d.withMinAtLeast(tMin.toLong())
                 assertEquals(expectMin.min().toLong(), e.min, "withMinAtLeast($tMin).min")
-                assertEquals(expectMin.size, e.size, "withMinAtLeast($tMin).size")
+                assertEquals(expectMin.size, e.values.size, "withMinAtLeast($tMin).size")
             }
             val tMax = rng.nextInt(lo, hi + 1)
             val expectMax = present.filter { value -> value <= tMax }
             if (expectMax.isNotEmpty()) {
                 val e = d.withMaxAtMost(tMax.toLong())
                 assertEquals(expectMax.max().toLong(), e.max, "withMaxAtMost($tMax).max")
-                assertEquals(expectMax.size, e.size, "withMaxAtMost($tMax).size")
+                assertEquals(expectMax.size, e.values.size, "withMaxAtMost($tMax).size")
             }
         }
     }
@@ -163,7 +164,7 @@ class IntDomainTest {
         assertTrue(62 in d)
         assertTrue(65 in d)
         assertTrue(198 in d)
-        assertEquals(195, d.size)
+        assertEquals(195, d.values.size)
     }
 
     @Test

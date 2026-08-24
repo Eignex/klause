@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IndexedMaxHeap
 import kotlin.random.Random
 
@@ -88,7 +89,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
                     if (session.boolValue(id) == null) return VarRef.Bool(id)
                 } else {
                     val intId = id - numBoolCached
-                    if (session.intDomain(intId).size > 1) {
+                    if (!session.intDomain(intId).isFixed) {
                         h.restore(id)
                         return VarRef.IntVar(intId)
                     }
@@ -109,7 +110,7 @@ class Vsids(private val decay: Double = 0.95, private val rescaleThreshold: Doub
                 }
             }
             for (v in 0 until numIntCached) {
-                if (session.intDomain(v).size > 1 && !h.contains(numBoolCached + v)) {
+                if (session.intDomain(v).values.size > 1 && !h.contains(numBoolCached + v)) {
                     h.restore(numBoolCached + v)
                     refilled = true
                 }
