@@ -87,8 +87,12 @@ class StructuralReductionTest {
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         assertEquals(7L, theLinear(out).bound)
-        assertEquals(1L, out.intDomains[0].min, "index lower bound clamped to the array's first position")
-        assertEquals(3L, out.intDomains[0].max, "index upper bound clamped to the array's last position")
+        assertEquals(
+            1L,
+            out.requireFiniteIntDomains()[0].min,
+            "index lower bound clamped to the array's first position",
+        )
+        assertEquals(3L, out.requireFiniteIntDomains()[0].max, "index upper bound clamped to the array's last position")
     }
 
     @Test

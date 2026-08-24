@@ -47,7 +47,7 @@ internal fun Problem.withDifferenceSystem(): Problem {
     return BakedProblem(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intDomains = intDomains,
+        intDomains = requireFiniteIntDomains(),
         factors = factors + DifferenceSystem(fragment.edges),
         seedDeductions = baked,
         cancellation = cancellation,

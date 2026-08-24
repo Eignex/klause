@@ -51,7 +51,7 @@ class SmtLibIteChainTest {
         val r = parsed.intVarNames.getValue("r")
         return (SEL_LO..SEL_HI).map { v ->
             val domains = Array(problem.numIntVars) { i ->
-                if (i == s) IntDomain(v.toLong(), v.toLong()) else problem.intDomains[i]
+                if (i == s) IntDomain(v.toLong(), v.toLong()) else problem.requireFiniteIntDomains()[i]
             }
             val solved = BacktrackSolver(problem.withIntDomains(domains).bake()).solve(BacktrackParams())
             assertIs<SolveResult.Sat>(solved, "no solution for s = $v")

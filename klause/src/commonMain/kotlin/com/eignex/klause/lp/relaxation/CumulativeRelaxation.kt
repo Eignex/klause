@@ -110,8 +110,8 @@ internal class CumulativeRelaxation(
         val cap = plan.capacity
         val n = plan.startVars.size
         val estLive = LongArray(n) { domains.intDomain(plan.startVars[it]).min }
-        val estDecl = LongArray(n) { problem.intDomains[plan.startVars[it]].min }
-        val floor = cap * problem.intDomains[plan.makespanVar].min
+        val estDecl = LongArray(n) { problem.requireFiniteIntDomains()[plan.startVars[it]].min }
+        val floor = cap * problem.requireFiniteIntDomains()[plan.makespanVar].min
 
         val energetic = try {
             energeticRhs(cap, estLive, plan.durations, plan.resources)
@@ -252,11 +252,17 @@ internal class CumulativeRelaxation(
                     // the link is conditional on presence. Both are skipped (drops energy, sound).
                     if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty()) continue
                     if (f.starts.size > MAX_TASKS) continue
-                    val cap = if (f.capacityVar >= 0) problem.intDomains[f.capacityVar].max else f.capacity
+                    val cap = if (f.capacityVar >=
+                        0
+                    ) {
+                        problem.requireFiniteIntDomains()[f.capacityVar].max
+                    } else {
+                        f.capacity
+                    }
                     if (cap <= 0L) continue
                     val res = LongArray(f.starts.size) { i ->
                         if (f.resourceVars.isNotEmpty()) {
-                            problem.intDomains[f.resourceVars[i]].min
+                            problem.requireFiniteIntDomains()[f.resourceVars[i]].min
                         } else {
                             f.resources[i]
                         }
@@ -291,7 +297,7 @@ internal class CumulativeRelaxation(
         var hi = Long.MIN_VALUE
         var lo = Long.MAX_VALUE
         for (i in coords.indices) {
-            val d = problem.intDomains[coords[i]]
+            val d = problem.requireFiniteIntDomains()[coords[i]]
             if (d.max + sizes[i] > hi) hi = d.max + sizes[i]
             if (d.min < lo) lo = d.min
         }

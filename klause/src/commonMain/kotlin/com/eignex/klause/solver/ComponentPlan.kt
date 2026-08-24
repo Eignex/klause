@@ -80,7 +80,12 @@ class ComponentPlan internal constructor(
                     requireNotNull(cpDomains[v]) { "missing finite domain for CP integer column $v" },
                 )
 
-                IntVariableOwner.THEORY -> IntColumn.Symbolic
+                // The theory reasons over the source bounds, so the column carries them rather than
+                // standing for their absence and sending every reader to a parallel table.
+                IntVariableOwner.THEORY -> IntColumn.Bounded(
+                    lower = if (spec.intBounds.hasLower(v)) spec.intBounds.lower(v) else null,
+                    upper = if (spec.intBounds.hasUpper(v)) spec.intBounds.upper(v) else null,
+                )
             }
         }
         return spec.materialize(MixedIntColumns(columns))

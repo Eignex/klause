@@ -44,12 +44,12 @@ class FunctionalObjectiveTest {
         val state = LocalSearchState(program.problem, rng)
         repeat(200) {
             for (i in 0 until program.problem.numIntVars) {
-                val dom = program.problem.intDomains[i]
+                val dom = program.problem.requireFiniteIntDomains()[i]
                 state.assignment.setInt(i, dom.values.valueAt(rng.nextInt(dom.values.size)))
             }
             // Pick a leaf var move.
             val v = listOf(aId, bId, cId).random(rng)
-            val dom = program.problem.intDomains[v]
+            val dom = program.problem.requireFiniteIntDomains()[v]
             val nv = dom.values.valueAt(rng.nextInt(dom.values.size))
             val move = Move.IntSet(v, nv)
             val before = obj.evaluate(snapshot(state, program))

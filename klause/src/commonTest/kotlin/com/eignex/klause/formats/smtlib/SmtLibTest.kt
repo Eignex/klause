@@ -652,8 +652,8 @@ class SmtLibTest {
             "(declare-const x Int) (assert (<= x 5)) " +
                 "(assert (<= (to_int (to_real x)) 5)) (assert (>= x 5)) (check-sat)",
         ).bounded()
-        assertEquals(5, p.intDomains[0].min)
-        assertEquals(5, p.intDomains[0].max)
+        assertEquals(5, p.requireFiniteIntDomains()[0].min)
+        assertEquals(5, p.requireFiniteIntDomains()[0].max)
     }
 
     @Test

@@ -105,12 +105,18 @@ internal object AffineSingletons {
                     eliminated,
                     objVars,
                     capWide,
-                    problem.intDomains,
+                    problem.requireFiniteIntDomains(),
                     cancellation,
                 )
             } else {
                 findAffineCandidate(seed, 0, eliminated, objVars, capWide, cancellation) != null ||
-                    findResidueCandidate(seed, eliminated, objVars, problem.intDomains, cancellation) != null
+                    findResidueCandidate(
+                        seed,
+                        eliminated,
+                        objVars,
+                        problem.requireFiniteIntDomains(),
+                        cancellation,
+                    ) != null
             }
             if (!hasCandidate) return PassDelta()
         }
@@ -149,7 +155,7 @@ internal object AffineSingletons {
         // integer. Restrict `y` to those values (a domain modification, not a folded factor) and
         // reconstruct `x` with the divisor. Runs after the unit-pivot loop, so a residue partner `y`
         // is always a surviving variable.
-        val domains = problem.intDomains.copyOf()
+        val domains = problem.requireFiniteIntDomains().copyOf()
         while (!cancellation()) {
             val r = findResidueCandidate(ws, eliminated, objVars, domains, cancellation) ?: break
             ws.drop(r.defIdx)
@@ -1146,7 +1152,7 @@ internal object AffineSingletons {
                 if (next !== f) replace(id, f, next)
             }
             drop(c.defIdx)
-            for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+            for (bound in domainBoundsOnTerms(problem.requireFiniteIntDomains()[c.x], c)) append(bound)
             // The lowest stable id whose candidacy this fold can newly establish: only the rewritten
             // factors (the pivot's occurrences) change content, so no factor below their minimum can
             // become a candidate. The candidate scan resumes from here instead of restarting at 0.
@@ -1197,7 +1203,7 @@ internal object AffineSingletons {
             // eliminated, so any remaining x count is dead.
             drop(c.defIdx)
             atCapCount[c.x] = 0
-            for (bound in domainBoundsOnTerms(problem.intDomains[c.x], c)) append(bound)
+            for (bound in domainBoundsOnTerms(problem.requireFiniteIntDomains()[c.x], c)) append(bound)
             // Only the rewritten factors (`x`'s occurrences, now renamed to `y`) change content, so — as in
             // [fold] — no factor below their minimum can newly become a candidate; the scan resumes from
             // here instead of restarting at 0. (The occurrence-scoped remap above is what makes this valid:

@@ -42,7 +42,7 @@ internal object Probing {
         }
 
         val units = ArrayList<Factor>()
-        val domains = problem.intDomains.copyOf()
+        val domains = problem.requireFiniteIntDomains().copyOf()
         var domainsChanged = false
         var probed = 0
         var v = 0

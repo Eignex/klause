@@ -34,11 +34,11 @@ internal fun schedulingViews(problem: Problem): List<SchedulingView> {
         when (f) {
             is Cumulative -> {
                 if (f.durationVars.isNotEmpty() || f.presents.isNotEmpty() || f.starts.isEmpty()) continue
-                val cap = if (f.capacityVar >= 0) problem.intDomains[f.capacityVar].max else f.capacity
+                val cap = if (f.capacityVar >= 0) problem.requireFiniteIntDomains()[f.capacityVar].max else f.capacity
                 if (cap <= 0L) continue
                 val res = LongArray(f.starts.size) { i ->
                     if (f.resourceVars.isNotEmpty()) {
-                        problem.intDomains[f.resourceVars[i]].min
+                        problem.requireFiniteIntDomains()[f.resourceVars[i]].min
                     } else {
                         f.resources[i]
                     }

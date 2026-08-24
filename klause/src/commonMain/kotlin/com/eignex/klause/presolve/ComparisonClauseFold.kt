@@ -47,7 +47,7 @@ internal object ComparisonClauseFold {
         for (i in factors.indices) {
             val f = factors[i]
             if (f !is Clause || f.literals.size < 2) continue
-            foldClause(f, defByAux, occ, problem.intDomains)?.let { (clause, consumed) ->
+            foldClause(f, defByAux, occ, problem.requireFiniteIntDomains())?.let { (clause, consumed) ->
                 dropped.add(i)
                 for (c in consumed) dropped.add(c)
                 added.add(clause)

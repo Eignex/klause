@@ -95,8 +95,8 @@ class CblsStallSwapTest {
                 // A value exchange: each var receives the other's current value.
                 assertEquals(state.assignment.intValue(b.varId), a.newValue, "swap must exchange values")
                 assertEquals(state.assignment.intValue(a.varId), b.newValue, "swap must exchange values")
-                val da = problem.intDomains[a.varId]
-                val db = problem.intDomains[b.varId]
+                val da = problem.requireFiniteIntDomains()[a.varId]
+                val db = problem.requireFiniteIntDomains()[b.varId]
                 assertEquals(da.min, db.min, "swap pairs must share domain bounds")
                 assertEquals(da.max, db.max, "swap pairs must share domain bounds")
             }

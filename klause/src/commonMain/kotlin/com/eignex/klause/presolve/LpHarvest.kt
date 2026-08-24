@@ -91,7 +91,7 @@ fun lpRootBounds(
     )
     val shaved = engine.rootLpBoundsNoBake(cancellation)
     if (shaved.isEmpty()) return problem
-    val domains = problem.intDomains.copyOf()
+    val domains = problem.requireFiniteIntDomains().copyOf()
     for (sb in shaved) domains[sb.varId] = domains[sb.varId].withMinAtLeast(sb.lo).withMaxAtMost(sb.hi)
     return Problem(
         numBoolVars = problem.numBoolVars,
@@ -172,7 +172,7 @@ fun lpHarvestReporting(
         relaxationNnz = size?.nnz ?: 0,
     )
 
-    val domains = problem.intDomains.copyOf()
+    val domains = problem.requireFiniteIntDomains().copyOf()
     for (sb in shaved) {
         // sb.lo/sb.hi lie within the variable's current [min, max] with lo <= hi, so neither narrowing
         // can empty the domain.

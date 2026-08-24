@@ -355,7 +355,7 @@ class FactorPropertyTest {
                             "${factor::class.simpleName} proposed IntSet on var ${move.varId} " +
                                 "not in intVars ${factor.intVars.toList()}",
                         )
-                        val d = problem.intDomains[move.varId]
+                        val d = problem.requireFiniteIntDomains()[move.varId]
                         assertTrue(
                             move.newValue in d.min..d.max,
                             "${factor::class.simpleName} proposed IntSet target ${move.newValue} out of domain $d",

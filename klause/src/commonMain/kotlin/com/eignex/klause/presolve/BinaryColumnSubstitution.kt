@@ -72,7 +72,7 @@ internal object BinaryColumnSubstitution {
         val substitutable = BooleanArray(numInts)
         var anyColumn = false
         for (v in 0 until numInts) {
-            if (!problem.intDomains[v].isBinary() || v in objectiveIntVars) continue
+            if (!problem.requireFiniteIntDomains()[v].isBinary() || v in objectiveIntVars) continue
             substitutable[v] = true
             anyColumn = true
         }
@@ -110,7 +110,7 @@ internal object BinaryColumnSubstitution {
             }
             out.addAll(lower(f, boolOf, bound))
         }
-        val domains = Array(numInts) { problem.intDomains[it] }
+        val domains = Array(numInts) { problem.requireFiniteIntDomains()[it] }
         for (k in 0 until columns.size) domains[columns[k]] = IntDomain(0, 0)
         val rebuilt = PresolveShared.rebuildProblem(problem, out, domains, bakeConfig, numBoolVars = nextBool)
         val substituted = columns.toIntArray()

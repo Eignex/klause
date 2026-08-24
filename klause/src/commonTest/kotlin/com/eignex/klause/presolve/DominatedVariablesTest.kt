@@ -33,7 +33,7 @@ class DominatedVariablesTest {
     /** Minimum of `Σ coeffs·x` over the feasible assignments of [problem], or `null` if infeasible. */
     private fun minObjective(problem: Problem, coeffs: Map<Int, Long>): Long? {
         val n = problem.numIntVars
-        val ints = LongArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.requireFiniteIntDomains()[it].min }
         var best: Long? = null
         while (true) {
             if (isFeasible(problem, ints.copyOf())) {
@@ -44,8 +44,8 @@ class DominatedVariablesTest {
             var i = 0
             while (i < n) {
                 ints[i]++
-                if (ints[i] <= problem.intDomains[i].max) break
-                ints[i] = problem.intDomains[i].min
+                if (ints[i] <= problem.requireFiniteIntDomains()[i].max) break
+                ints[i] = problem.requireFiniteIntDomains()[i].min
                 i++
             }
             if (i == n) break
@@ -60,7 +60,10 @@ class DominatedVariablesTest {
         val out = fixed(problem, coeffs)
         assertEquals(minObjective(problem, coeffs), minObjective(out, coeffs), "$name: optimum changed")
         for (v in expectFixed) {
-            assertTrue(out.intDomains[v].min == out.intDomains[v].max, "$name: var $v should be pinned")
+            assertTrue(
+                out.requireFiniteIntDomains()[v].min == out.requireFiniteIntDomains()[v].max,
+                "$name: var $v should be pinned",
+            )
         }
         if (expectFixed.isEmpty()) {
             assertTrue(Presolve.fixDominatedVariables(problem, coeffs).isEmpty, "$name: expected no fixing")
@@ -79,8 +82,8 @@ class DominatedVariablesTest {
         )
         checkDualFix("down-safe", problem, emptyMap(), setOf(0, 1))
         val out = fixed(problem, emptyMap())
-        assertEquals(0L, out.intDomains[0].min)
-        assertEquals(0L, out.intDomains[0].max)
+        assertEquals(0L, out.requireFiniteIntDomains()[0].min)
+        assertEquals(0L, out.requireFiniteIntDomains()[0].max)
     }
 
     @Test
@@ -107,8 +110,8 @@ class DominatedVariablesTest {
         )
         val out = fixed(problem, mapOf(0 to -1L))
         assertEquals(minObjective(problem, mapOf(0 to -1L)), minObjective(out, mapOf(0 to -1L)), "optimum changed")
-        assertEquals(5L, out.intDomains[0].min)
-        assertEquals(5L, out.intDomains[0].max)
+        assertEquals(5L, out.requireFiniteIntDomains()[0].min)
+        assertEquals(5L, out.requireFiniteIntDomains()[0].max)
     }
 
     @Test
@@ -127,7 +130,7 @@ class DominatedVariablesTest {
         )
         val out = fixed(problem, emptyMap())
         assertEquals(minObjective(problem, emptyMap()), minObjective(out, emptyMap()), "optimum changed")
-        assertTrue(out.intDomains[0].min != out.intDomains[0].max, "x0 must stay free")
+        assertTrue(out.requireFiniteIntDomains()[0].min != out.requireFiniteIntDomains()[0].max, "x0 must stay free")
     }
 
     @Test

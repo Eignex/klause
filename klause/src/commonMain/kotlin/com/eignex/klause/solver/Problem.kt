@@ -48,7 +48,7 @@ open class Problem(
      * Extra root deductions computed outside the kernel — the failed-literal / SAC probing tiers
      * live in [com.eignex.klause.presolve.RootBaker], which runs them against an already-base-baked
      * [Problem] and feeds the result back here. Merged into the base `propagate(Assumptions.None)`
-     * bake before it folds into [intDomains], so the extra pins / bound tightenings / holes become
+     * bake before it folds into [requireFiniteIntDomains], so the extra pins / bound tightenings / holes become
      * part of [baked] and the problem's own domains. Defaults to empty = base bake only; the kernel
      * never initiates probing itself (that would create a `solver → presolve → solver` cycle).
      */
@@ -90,7 +90,7 @@ open class Problem(
     /**
      * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
      * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
-     * continuous column but absent from CP search — it has no [intDomains] entry, no trail, and is never
+     * continuous column but absent from CP search — it has no [requireFiniteIntDomains] entry, no trail, and is never
      * branched. The simplex resolves it at nodes and leaves (the LP-only-columns hybrid engine).
      * Zero for the pure integer/Boolean core, which every existing consumer builds.
      */
@@ -123,22 +123,13 @@ open class Problem(
     /** True when every integer column can be handed to the finite CP engine. */
     val hasFiniteIntDomains: Boolean get() = intColumns.allFiniteOrNull() != null
 
-    /**
-     * Finite domains used by CP and local search.
-     *
-     * This compatibility view is intentionally a checked boundary: generic model and theory code must
-     * use [intDomainOrNull] or [intBounds], while a finite engine explicitly asserts that it received no
-     * symbolic columns.
-     */
-    val intDomains: Array<IntDomain> get() = requireFiniteIntDomains()
-
     /** Return all finite CP domains, rejecting a problem that contains symbolic theory columns. */
     fun requireFiniteIntDomains(): Array<IntDomain> = requireNotNull(intColumns.allFiniteOrNull()) {
         "finite CP state requested for a problem with symbolic integer columns"
     }
 
     /**
-     * Model-level bounds of the integer columns. Unlike [intDomains], either side may be absent when
+     * Model-level bounds of the integer columns. Unlike [requireFiniteIntDomains], either side may be absent when
      * the finite search domain was closed by an invented fallback bound. Consumers that reason over
      * the model rather than enumerate its values must read this state, or explicitly decline open
      * columns, instead of treating the fallback endpoint as a constraint.
@@ -360,7 +351,7 @@ open class Problem(
      * budget. May be [PropagationResult.Unsat] for trivially-infeasible problems; callers that want
      * fail-fast behavior can check this.
      *
-     * The deductions recorded here are also folded back into [intDomains], so the diff is
+     * The deductions recorded here are also folded back into [requireFiniteIntDomains], so the diff is
      * expressed relative to the constructor-input domains rather than the tightened ones.
      * Re-seeding it on an already-tightened domain is a no-op, so existing consumers that
      * replay [baked] as assumptions are unaffected.
@@ -374,7 +365,7 @@ open class Problem(
     }
 
     /** Wall time the root bake took on a [BakedProblem]: forcing [baked] (root propagation to fixpoint)
-     *  and folding it into [intDomains]. Zero on a raw [Problem] (which never bakes) and on a
+     *  and folding it into [requireFiniteIntDomains]. Zero on a raw [Problem] (which never bakes) and on a
      *  [sharedDomains] baked problem (whose domains arrive already folded). Lets a front-end separate parse
      *  cost from bake cost when reporting load time. Set once by [BakedProblem]'s construction. */
     var bakeElapsed: Duration = Duration.ZERO
@@ -411,17 +402,17 @@ open class Problem(
         )
     }
 
-    /** Folds the root-level int deductions of a successful bake into [intDomains] so the
+    /** Folds the root-level int deductions of a successful bake into [requireFiniteIntDomains] so the
      *  tightened bounds are part of the problem itself rather than transient solver state.
      *  Bounds are applied before holes so every recorded hole is interior to the final
      *  bounds; pins collapse the domain to a singleton via the same hole-aware paths. */
     protected fun foldIntoDomains(result: PropagationResult) {
         if (result !is PropagationResult.Implied) return
         result.forEachInt { v, value ->
-            intDomains[v] = intDomains[v].withMinAtLeast(value).withMaxAtMost(value)
+            requireFiniteIntDomains()[v] = requireFiniteIntDomains()[v].withMinAtLeast(value).withMaxAtMost(value)
         }
-        result.forEachIntMin { v, lo -> intDomains[v] = intDomains[v].withMinAtLeast(lo) }
-        result.forEachIntMax { v, hi -> intDomains[v] = intDomains[v].withMaxAtMost(hi) }
+        result.forEachIntMin { v, lo -> requireFiniteIntDomains()[v] = requireFiniteIntDomains()[v].withMinAtLeast(lo) }
+        result.forEachIntMax { v, hi -> requireFiniteIntDomains()[v] = requireFiniteIntDomains()[v].withMaxAtMost(hi) }
         // Group the baked holes per variable and exclude each set in one merged pass. Applying a
         // wide hole set one value at a time rebuilds the hole array per value (O(holes^2)) — the
         // construction-time wedge on Element-heavy instances. Holes are interior to the
@@ -430,13 +421,13 @@ open class Problem(
         result.forEachIntHole { v, value -> holesByVar.getOrPut(v) { LongArrayList() }.add(value) }
         holesByVar.forEach { v, holes ->
             val sorted = holes.toSortedLongArray()
-            intDomains[v] = requireNotNull(intDomains[v].excludeValues(sorted)) {
+            requireFiniteIntDomains()[v] = requireNotNull(requireFiniteIntDomains()[v].excludeValues(sorted)) {
                 "baked holes emptied domain $v despite an Implied bake"
             }
         }
         // Wide-but-sparse reductions fold by rebuilding the domain from its survivor set directly —
         // O(survivors), never materializing the O(span) hole set the excludeValues path above would.
-        result.forEachIntSet { v, survivors -> intDomains[v] = intDomainFromSurvivors(survivors) }
+        result.forEachIntSet { v, survivors -> requireFiniteIntDomains()[v] = intDomainFromSurvivors(survivors) }
     }
 
     /** Merge the presolve-lane [seed] deductions into the kernel's [base] `propagate` bake. An
@@ -544,7 +535,7 @@ open class Problem(
                 continue
             }
             // Non-singleton: emit bound tightenings relative to the effective seed bounds.
-            val orig = intDomains[v]
+            val orig = requireFiniteIntDomains()[v]
             val seedMin = maxOf(orig.min, assumptions.deductions.intMinOrNull(v) ?: Long.MIN_VALUE)
             val seedMax = minOf(orig.max, assumptions.deductions.intMaxOrNull(v) ?: Long.MAX_VALUE)
             if (d.min > seedMin) {
@@ -597,7 +588,7 @@ open class Problem(
 }
 
 /**
- * A [Problem] whose root bake is guaranteed to have run: its [Problem.intDomains] carry the
+ * A [Problem] whose root bake is guaranteed to have run: its [Problem.requireFiniteIntDomains] carry the
  * root-propagation fold, and it is the only problem type the solvers, the model counter,
  * sampling and the LP engine accept. Produced only by [Problem.bake] (or the presolve pipeline). A raw
  * [Problem] is the supertype, so handing an un-baked model to a solver is a compile error — the caller
@@ -621,9 +612,9 @@ class BakedProblem internal constructor(
     modelBounds: IntBounds? = null,
     cancellation: Cancellation = Cancellation.Never,
     /**
-     * When `true`, [intDomains] already carry the root-bake fold (an incremental presolve pass view or a
+     * When `true`, [requireFiniteIntDomains] already carry the root-bake fold (an incremental presolve pass view or a
      * presolve rebuild supplies its re-propagated array): share the array and skip the fold. When `false`
-     * (the [Problem.bake] path), [intDomains] are the raw declared domains and this constructor folds the
+     * (the [Problem.bake] path), [requireFiniteIntDomains] are the raw declared domains and this constructor folds the
      * base bake into them.
      */
     alreadyFolded: Boolean = false,

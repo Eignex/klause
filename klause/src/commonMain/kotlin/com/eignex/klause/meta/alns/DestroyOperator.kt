@@ -186,7 +186,7 @@ internal fun interface DestroyOperator {
             var globalLo = Long.MAX_VALUE
             var globalHi = Long.MIN_VALUE
             for (i in 0 until n) {
-                val d = problem.intDomains[i]
+                val d = problem.requireFiniteIntDomains()[i]
                 if (d.min < globalLo) globalLo = d.min
                 if (d.max > globalHi) globalHi = d.max
             }

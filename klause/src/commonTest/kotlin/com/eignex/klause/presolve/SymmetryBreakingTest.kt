@@ -57,7 +57,7 @@ class SymmetryBreakingTest {
     private fun countFeasible(problem: Problem): Int {
         val b = problem.numBoolVars
         val n = problem.numIntVars
-        val ints = LongArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.requireFiniteIntDomains()[it].min }
         var count = 0
         while (true) {
             for (mask in 0 until (1 shl b).coerceAtLeast(1)) {
@@ -67,8 +67,8 @@ class SymmetryBreakingTest {
             var i = 0
             while (i < n) {
                 ints[i]++
-                if (ints[i] <= problem.intDomains[i].max) break
-                ints[i] = problem.intDomains[i].min
+                if (ints[i] <= problem.requireFiniteIntDomains()[i].max) break
+                ints[i] = problem.requireFiniteIntDomains()[i].min
                 i++
             }
             if (i == n) break

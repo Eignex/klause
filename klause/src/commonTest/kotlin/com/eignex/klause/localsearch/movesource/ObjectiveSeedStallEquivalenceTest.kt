@@ -62,7 +62,7 @@ class ObjectiveSeedStallEquivalenceTest {
             for (v in obj.intCoefficients.indices) {
                 if (obj.intCoefficients[v] == 0L) continue
                 val cur = state.assignment.intValue(v)
-                val d = state.problem.intDomains[v]
+                val d = state.problem.requireFiniteIntDomains()[v]
                 if (obj.intCoefficients[v] > 0 && cur > d.min) sink.addChannelingIntSet(state, v, cur - 1)
                 if (obj.intCoefficients[v] < 0 && cur < d.max) sink.addChannelingIntSet(state, v, cur + 1)
             }
@@ -92,8 +92,8 @@ class ObjectiveSeedStallEquivalenceTest {
             }
             if (w == u) continue
             if (state.assumptions.isFrozenInt(u) || state.assumptions.isFrozenInt(w)) continue
-            val du = problem.intDomains[u]
-            val dw = problem.intDomains[w]
+            val du = problem.requireFiniteIntDomains()[u]
+            val dw = problem.requireFiniteIntDomains()[w]
             if (du.min != dw.min || du.max != dw.max) continue
             val vu = state.assignment.intValue(u)
             val vw = state.assignment.intValue(w)

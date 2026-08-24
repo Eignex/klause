@@ -61,7 +61,7 @@ class AffineEliminationTest {
         val reconstruct = delta.reconstruct ?: { it }
         val origFeasible = feasibleSet(original)
         val reconstructed = HashSet<List<Long>>()
-        enumerate(reduced.intDomains) { assign ->
+        enumerate(reduced.requireFiniteIntDomains()) { assign ->
             if (isFeasible(reduced, Sample(BooleanArray(0), assign))) {
                 val full = reconstruct(Sample(BooleanArray(0), assign.copyOf()))
                 assertTrue(isFeasible(original, full), "$name: reconstructed $full infeasible in original")
@@ -73,7 +73,7 @@ class AffineEliminationTest {
 
     private fun feasibleSet(problem: Problem): Set<List<Long>> {
         val out = HashSet<List<Long>>()
-        enumerate(problem.intDomains) { assign ->
+        enumerate(problem.requireFiniteIntDomains()) { assign ->
             if (isFeasible(problem, Sample(BooleanArray(0), assign))) out.add(assign.toList())
         }
         return out

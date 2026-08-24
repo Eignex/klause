@@ -44,7 +44,7 @@ class ProbingTest {
         val n = problem.numIntVars
         val nb = problem.numBoolVars
         val found = HashSet<String>()
-        val ints = LongArray(n) { problem.intDomains[it].min }
+        val ints = LongArray(n) { problem.requireFiniteIntDomains()[it].min }
         while (true) {
             for (mask in 0 until (1 shl nb)) {
                 val bits = BooleanArray(nb) { (mask shr it) and 1 == 1 }
@@ -53,8 +53,8 @@ class ProbingTest {
             var i = 0
             while (i < n) {
                 ints[i]++
-                if (ints[i] <= problem.intDomains[i].max) break
-                ints[i] = problem.intDomains[i].min
+                if (ints[i] <= problem.requireFiniteIntDomains()[i].max) break
+                ints[i] = problem.requireFiniteIntDomains()[i].min
                 i++
             }
             if (i == n) break
@@ -108,7 +108,7 @@ class ProbingTest {
             ),
         )
         val out = probed(problem)
-        assertEquals(2L, out.intDomains[0].min, "the common lower bound x ≥ 2 is folded in")
+        assertEquals(2L, out.requireFiniteIntDomains()[0].min, "the common lower bound x ≥ 2 is folded in")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }
 
@@ -140,7 +140,7 @@ class ProbingTest {
             ),
         )
         val out = probed(problem)
-        assertEquals(8L, out.intDomains[0].max, "the common upper bound x ≤ 8 is folded in")
+        assertEquals(8L, out.requireFiniteIntDomains()[0].max, "the common upper bound x ≤ 8 is folded in")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }
 
@@ -181,7 +181,7 @@ class ProbingTest {
             ),
         )
         val out = probed(problem)
-        assertEquals(0L, out.intDomains[0].min, "a one-sided bound must not be applied")
+        assertEquals(0L, out.requireFiniteIntDomains()[0].min, "a one-sided bound must not be applied")
         assertTrue(units(out).isEmpty(), "no literal failed")
         assertEquals(feasibleAssignments(problem), feasibleAssignments(out), "feasibility set changed")
     }

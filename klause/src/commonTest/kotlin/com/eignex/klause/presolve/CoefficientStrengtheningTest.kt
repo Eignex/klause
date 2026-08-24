@@ -101,7 +101,7 @@ class CoefficientStrengtheningTest {
         // conjunction of whatever rewritten factors remain.
         val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
-            val d = problem.intDomains[v]
+            val d = problem.requireFiniteIntDomains()[v]
             IntArray(d.values.size) { d.values.valueAt(it).toInt() }
         }
         val assign = IntArray(numVars)

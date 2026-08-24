@@ -60,7 +60,7 @@ class StallKick(
             val occ: IntArray
             if (pick < nInts) {
                 val v = scope.intVars[pick]
-                val d = problem.intDomains[v]
+                val d = problem.requireFiniteIntDomains()[v]
                 if (!d.isFixed) {
                     val nv = d.randomValue(state.rng)
                     if (nv != state.assignment.intValue(v)) {

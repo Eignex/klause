@@ -366,7 +366,7 @@ object LpAutoConfig {
             if (n < 2) continue
             var arcs = 0L
             for (i in 0 until n) {
-                problem.intDomains[succ[i]].values.forEach { j ->
+                problem.requireFiniteIntDomains()[succ[i]].values.forEach { j ->
                     if ((selfLoops || j != i.toLong()) &&
                         j in 0L until n
                     ) {
@@ -391,7 +391,7 @@ object LpAutoConfig {
         var any = false
         for (f in problem.factors) {
             if (f.hullFamily != family) continue
-            val e = f.lpSizeEstimate(problem.intDomains) ?: continue
+            val e = f.lpSizeEstimate(problem.requireFiniteIntDomains()) ?: continue
             cols += e.cols
             rows += e.rows
             any = true
@@ -412,7 +412,7 @@ object LpAutoConfig {
             var c = 0L
             var ok = true
             for (i in 0 until n) {
-                val dom = problem.intDomains[v.starts[i]]
+                val dom = problem.requireFiniteIntDomains()[v.starts[i]]
                 if (dom.max < dom.min) {
                     ok = false
                     break

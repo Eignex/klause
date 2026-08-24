@@ -27,8 +27,8 @@ class ProblemDomainTighteningTest {
                     Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
                 ),
             ).bake()
-        assertEquals(0, p.intDomains[0].min)
-        assertEquals(1, p.intDomains[0].max)
+        assertEquals(0, p.requireFiniteIntDomains()[0].min)
+        assertEquals(1, p.requireFiniteIntDomains()[0].max)
     }
 
     @Test
@@ -40,8 +40,8 @@ class ProblemDomainTighteningTest {
                 arrayOf(IntDomain(-1_000_000, 1_000_000)),
                 listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 7)),
             ).bake()
-        assertEquals(7, p.intDomains[0].min)
-        assertEquals(7, p.intDomains[0].max)
+        assertEquals(7, p.requireFiniteIntDomains()[0].min)
+        assertEquals(7, p.requireFiniteIntDomains()[0].max)
     }
 
     @Test
@@ -59,8 +59,8 @@ class ProblemDomainTighteningTest {
                 ),
             ).bake()
         for (v in 0..1) {
-            assertEquals(0, p.intDomains[v].min, "var $v min")
-            assertEquals(1, p.intDomains[v].max, "var $v max")
+            assertEquals(0, p.requireFiniteIntDomains()[v].min, "var $v min")
+            assertEquals(1, p.requireFiniteIntDomains()[v].max, "var $v max")
         }
     }
 
@@ -75,9 +75,9 @@ class ProblemDomainTighteningTest {
             ).bake()
         val p = RootBaker.reseed(base, BakeConfig(probeIntHoles = true))
         assertIs<PropagationResult.Implied>(p.baked)
-        assertFalse(2 in p.intDomains[0])
-        assertTrue(1 in p.intDomains[0])
-        assertTrue(3 in p.intDomains[0])
+        assertFalse(2 in p.requireFiniteIntDomains()[0])
+        assertTrue(1 in p.requireFiniteIntDomains()[0])
+        assertTrue(3 in p.requireFiniteIntDomains()[0])
     }
 
     @Test
@@ -99,7 +99,7 @@ class ProblemDomainTighteningTest {
                     Linear(intArrayOf(1, -1), intArrayOf(3, 2), LinearOp.LE, 0), // x3 - x2 <= 0
                 ),
             ).bake()
-        for (v in 0..3) assertEquals(5, p.intDomains[v].max, "var $v max should propagate to 5")
+        for (v in 0..3) assertEquals(5, p.requireFiniteIntDomains()[v].max, "var $v max should propagate to 5")
     }
 
     @Test
@@ -126,14 +126,14 @@ class ProblemDomainTighteningTest {
             Problem(0, 2, arrayOf(wide(), wide()), factors, cancellation = { true }).bake()
         assertIs<PropagationResult.Implied>(cancelled.baked)
         for (v in 0..1) {
-            assertEquals(-1_000_000, cancelled.intDomains[v].min, "var $v min unchanged")
-            assertEquals(1_000_000, cancelled.intDomains[v].max, "var $v max unchanged")
+            assertEquals(-1_000_000, cancelled.requireFiniteIntDomains()[v].min, "var $v min unchanged")
+            assertEquals(1_000_000, cancelled.requireFiniteIntDomains()[v].max, "var $v max unchanged")
         }
         // Same model with the default never-cancel token bakes to completion and tightens.
         val baked = Problem(0, 2, arrayOf(wide(), wide()), factors).bake()
         for (v in 0..1) {
-            assertEquals(0, baked.intDomains[v].min, "var $v min baked")
-            assertEquals(1, baked.intDomains[v].max, "var $v max baked")
+            assertEquals(0, baked.requireFiniteIntDomains()[v].min, "var $v min baked")
+            assertEquals(1, baked.requireFiniteIntDomains()[v].max, "var $v max baked")
         }
     }
 
@@ -150,7 +150,7 @@ class ProblemDomainTighteningTest {
                 ),
             ).bake()
         assertIs<PropagationResult.Unsat>(p.baked)
-        assertEquals(0, p.intDomains[0].min)
-        assertEquals(10, p.intDomains[0].max)
+        assertEquals(0, p.requireFiniteIntDomains()[0].min)
+        assertEquals(10, p.requireFiniteIntDomains()[0].max)
     }
 }

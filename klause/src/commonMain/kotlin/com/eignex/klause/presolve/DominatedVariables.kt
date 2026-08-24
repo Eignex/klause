@@ -91,10 +91,10 @@ internal object DominatedVariables {
             markBoolSafety(f, trueSafe, falseSafe, boolEligible, alreadyPinned)
         }
         var domainsNarrowed = false
-        val domains = problem.intDomains.copyOf()
+        val domains = problem.requireFiniteIntDomains().copyOf()
         for (v in 0 until n) {
             if (!intEligible[v]) continue
-            val d = problem.intDomains[v]
+            val d = problem.requireFiniteIntDomains()[v]
             if (d.min == d.max) continue // already fixed
             val c = objectiveIntCoeffs[v] ?: 0L
             when {

@@ -69,7 +69,7 @@ internal class PortfolioBoundExchange(
         if (session.decisionLevel != 0) return
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
-            val declared = problem.intDomains[v]
+            val declared = problem.requireFiniteIntDomains()[v]
             if (d.min > declared.min || d.max < declared.max) sink(v, d.min, d.max)
         }
     }

@@ -107,7 +107,7 @@ object FactorPropagationOracle {
         // For each int var, every supported value must remain allowed by propagation.
         for (v in 0 until problem.numIntVars) {
             val pinned = result.intValueOrNull(v)
-            val orig = problem.intDomains[v]
+            val orig = problem.requireFiniteIntDomains()[v]
             for (value in orig.min..orig.max) {
                 if (value !in orig) continue
                 val supported = samples.any { it.ints[v] == value }
@@ -124,8 +124,8 @@ object FactorPropagationOracle {
 
     private fun isAllowed(r: PropagationResult.Implied, problem: Problem, v: Int, value: Long, pinned: Long?): Boolean {
         if (pinned != null) return pinned == value
-        val lo = r.intMinOrNullCompat(v) ?: problem.intDomains[v].min
-        val hi = r.intMaxOrNullCompat(v) ?: problem.intDomains[v].max
+        val lo = r.intMinOrNullCompat(v) ?: problem.requireFiniteIntDomains()[v].min
+        val hi = r.intMaxOrNullCompat(v) ?: problem.requireFiniteIntDomains()[v].max
         if (value < lo || value > hi) return false
         var hole = false
         r.forEachIntHole { id, k -> if (id == v && k == value) hole = true }

@@ -83,7 +83,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // materialized domains are these, not the partially-tightened live ones — mirroring the fresh path,
     // where `foldIntoDomains` skips on an Unsat bake and the reported span stays at the pre-conflict
     // domains. Snapshotted at each mutation entry (before its narrowings) and initialised to the base.
-    private var lastFeasibleDomains: Array<IntDomain> = Array(base.numIntVars) { base.intDomains[it] }
+    private var lastFeasibleDomains: Array<IntDomain> = Array(base.numIntVars) { base.requireFiniteIntDomains()[it] }
 
     // Stable ids of the live factors [passInput] last returned, parallel to that view's factor list, so
     // a [PassDelta]'s droppedIndices (into that list) map back to the stable ids [apply] tombstones.

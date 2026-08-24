@@ -257,7 +257,7 @@ internal class CoreGuidedOptimizer(val baseProblem: Problem) {
         return Problem(
             numBoolVars = totalBoolVars,
             numIntVars = base.numIntVars,
-            intDomains = base.intDomains,
+            intDomains = base.requireFiniteIntDomains(),
             factors = factors,
         )
     }

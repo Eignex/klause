@@ -58,7 +58,7 @@ internal object IntBitChannel {
         val bitsPerVar = ArrayList<IntArray>(intVars.size)
 
         for (x in intVars) {
-            val dom = base.intDomains[x]
+            val dom = base.requireFiniteIntDomains()[x]
             val min = dom.min
             val span = dom.max - dom.min
             val width = bitWidth(span)
@@ -103,7 +103,7 @@ internal object IntBitChannel {
         val problem = Problem(
             numBoolVars = nextBool,
             numIntVars = nextInt,
-            intDomains = base.intDomains + extraDomains.toTypedArray(),
+            intDomains = base.requireFiniteIntDomains() + extraDomains.toTypedArray(),
             factors = base.factors + extraFactors.toTypedArray(),
         )
         return Result(problem, bitsPerVar)

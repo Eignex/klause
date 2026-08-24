@@ -73,7 +73,7 @@ internal object DuplicateColumns {
         // Eligibility and signatures are therefore computed once over the input rather than re-derived after
         // each fold: a class of K identical columns collapses in a single O(n) scan instead of K of them,
         // which is what let numbrix (a ~3950-column class) spend seconds re-scanning 8505 variables per pair.
-        val domains = problem.intDomains.copyOf()
+        val domains = problem.requireFiniteIntDomains().copyOf()
         val eligible = eligibleColumns(problem.factors, n, domains, objectiveIntVars)
         val signatures = columnSignatures(problem.factors, n, eligible)
         // Group eligible columns by signature in ascending-id order; the first is the representative.
@@ -157,7 +157,7 @@ internal object DuplicateColumns {
         objectiveIntVars: Set<Int>,
     ): Boolean {
         for (v in touched) {
-            if (v in objectiveIntVars || !problem.intDomains[v].isContiguous()) continue
+            if (v in objectiveIntVars || !problem.requireFiniteIntDomains()[v].isContiguous()) continue
             val start = occ.offsets[v]
             val end = occ.offsets[v + 1]
             var onlyLinear = true

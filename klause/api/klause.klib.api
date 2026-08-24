@@ -2615,6 +2615,22 @@ sealed interface com.eignex.klause.solver/FactorReduction { // com.eignex.klause
 }
 
 sealed interface com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn|null[0]
+    final class Bounded : com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn.Bounded|null[0]
+        constructor <init>(kotlin/Long?, kotlin/Long?) // com.eignex.klause.solver/IntColumn.Bounded.<init>|<init>(kotlin.Long?;kotlin.Long?){}[0]
+
+        final val lower // com.eignex.klause.solver/IntColumn.Bounded.lower|{}lower[0]
+            final fun <get-lower>(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.lower.<get-lower>|<get-lower>(){}[0]
+        final val upper // com.eignex.klause.solver/IntColumn.Bounded.upper|{}upper[0]
+            final fun <get-upper>(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.upper.<get-upper>|<get-upper>(){}[0]
+
+        final fun component1(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.component1|component1(){}[0]
+        final fun component2(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.component2|component2(){}[0]
+        final fun copy(kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.solver/IntColumn.Bounded // com.eignex.klause.solver/IntColumn.Bounded.copy|copy(kotlin.Long?;kotlin.Long?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/IntColumn.Bounded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver/IntColumn.Bounded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver/IntColumn.Bounded.toString|toString(){}[0]
+    }
+
     final class Finite : com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn.Finite|null[0]
         constructor <init>(com.eignex.klause.solver/IntDomain) // com.eignex.klause.solver/IntColumn.Finite.<init>|<init>(com.eignex.klause.solver.IntDomain){}[0]
 
@@ -2626,12 +2642,6 @@ sealed interface com.eignex.klause.solver/IntColumn { // com.eignex.klause.solve
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/IntColumn.Finite.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/IntColumn.Finite.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/IntColumn.Finite.toString|toString(){}[0]
-    }
-
-    final object Symbolic : com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn.Symbolic|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/IntColumn.Symbolic.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.solver/IntColumn.Symbolic.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.solver/IntColumn.Symbolic.toString|toString(){}[0]
     }
 }
 
@@ -9950,8 +9960,6 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
         final fun <get-intBounds>(): com.eignex.klause.solver/IntBounds // com.eignex.klause.solver/Problem.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
     final val intColumns // com.eignex.klause.solver/Problem.intColumns|{}intColumns[0]
         final fun <get-intColumns>(): com.eignex.klause.solver/IntColumns // com.eignex.klause.solver/Problem.intColumns.<get-intColumns>|<get-intColumns>(){}[0]
-    final val intDomains // com.eignex.klause.solver/Problem.intDomains|{}intDomains[0]
-        final fun <get-intDomains>(): kotlin/Array<com.eignex.klause.solver/IntDomain> // com.eignex.klause.solver/Problem.intDomains.<get-intDomains>|<get-intDomains>(){}[0]
     final val intOccurrences // com.eignex.klause.solver/Problem.intOccurrences|{}intOccurrences[0]
         final fun <get-intOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.intOccurrences.<get-intOccurrences>|<get-intOccurrences>(){}[0]
     final val invariants // com.eignex.klause.solver/Problem.invariants|{}invariants[0]
@@ -10007,6 +10015,7 @@ sealed class com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/I
 
     abstract fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.solver/IntDomain>? // com.eignex.klause.solver/IntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
     abstract fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/IntColumns.column|column(kotlin.Int){}[0]
+    final fun boundsOf(kotlin/Int): com.eignex.klause.solver/IntColumn.Bounded // com.eignex.klause.solver/IntColumns.boundsOf|boundsOf(kotlin.Int){}[0]
     final fun domainOrNull(kotlin/Int): com.eignex.klause.solver/IntDomain? // com.eignex.klause.solver/IntColumns.domainOrNull|domainOrNull(kotlin.Int){}[0]
 }
 

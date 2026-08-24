@@ -214,7 +214,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
                 // holey domains (e.g. {0,2}) must enumerate real members, never the hole.
                 DimKind.INT -> state.assignment.setInt(
                     dim.varId,
-                    problem.intDomains[dim.varId].values.valueAt(digit),
+                    problem.requireFiniteIntDomains()[dim.varId].values.valueAt(digit),
                 )
             }
         }
@@ -256,7 +256,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
                 if (size > Long.MAX_VALUE / 2) return Long.MAX_VALUE
                 size *= 2
             }
-            for (d in problem.intDomains) {
+            for (d in problem.requireFiniteIntDomains()) {
                 val r = d.valueCount
                 if (r <= 0) return Long.MAX_VALUE
                 if (size > Long.MAX_VALUE / r) return Long.MAX_VALUE
@@ -272,7 +272,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
             val dims = ArrayList<Dim>(problem.numBoolVars + problem.numIntVars)
             for (b in 0 until problem.numBoolVars) dims.add(Dim(DimKind.BOOL, b, 2L))
             for (i in 0 until problem.numIntVars) {
-                dims.add(Dim(DimKind.INT, i, problem.intDomains[i].valueCount))
+                dims.add(Dim(DimKind.INT, i, problem.requireFiniteIntDomains()[i].valueCount))
             }
             val chunks = ArrayList<Chunk>()
 

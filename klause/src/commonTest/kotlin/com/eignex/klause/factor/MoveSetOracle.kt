@@ -146,7 +146,7 @@ object MoveSetOracle {
                     move.varId in factor.intVars,
                     "$label: proposed IntSet on var ${move.varId} not in intVars ${factor.intVars.toList()}",
                 )
-                val d = problem.intDomains[move.varId]
+                val d = problem.requireFiniteIntDomains()[move.varId]
                 assertTrue(
                     move.newValue in d,
                     "$label: proposed IntSet target ${move.newValue} out of domain $d",
@@ -182,7 +182,7 @@ object MoveSetOracle {
             if (applyAndReport(problem, state, move) < 0) out.add(move)
         }
         for (v in factor.intVars) {
-            val d = problem.intDomains[v]
+            val d = problem.requireFiniteIntDomains()[v]
             val cur = state.assignment.intValue(v)
             for (k in d.min..d.max) {
                 if (k !in d) continue
@@ -197,7 +197,7 @@ object MoveSetOracle {
     private fun randomizeAssignment(state: LocalSearchState, problem: Problem, rng: Random) {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in 0 until problem.numIntVars) {
-            val d: IntDomain = problem.intDomains[i]
+            val d: IntDomain = problem.requireFiniteIntDomains()[i]
             state.assignment.setInt(i, d.values.valueAt(rng.nextInt(d.values.size)))
         }
     }

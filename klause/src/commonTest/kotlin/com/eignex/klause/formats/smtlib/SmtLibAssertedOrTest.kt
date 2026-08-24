@@ -48,7 +48,9 @@ class SmtLibAssertedOrTest {
         val decl = "(declare-const x Int) (assert (>= x 0)) (assert (<= x 5))"
         val parsed = parse("$decl (assert (or (= x 1) (= x 4)))")
         val accepted = (0L..5L).filter { v ->
-            val domains = Array(parsed.numIntVars) { i -> if (i == 0) IntDomain(v, v) else parsed.intDomains[i] }
+            val domains = Array(
+                parsed.numIntVars,
+            ) { i -> if (i == 0) IntDomain(v, v) else parsed.requireFiniteIntDomains()[i] }
             BacktrackSolver(parsed.withIntDomains(domains).bake()).solve(BacktrackParams()) is SolveResult.Sat
         }
         assertEquals(listOf(1L, 4L), accepted, "only the disjoined values should survive")
