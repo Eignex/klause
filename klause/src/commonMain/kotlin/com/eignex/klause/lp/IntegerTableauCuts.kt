@@ -3,6 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.LongHashSet
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.sparse.lu
 import kotlin.math.abs
@@ -131,14 +132,16 @@ private fun bestRoundedCut(
     // The aggregated coefficient gₖ for EVERY structural column: a ≤-row slack back-substitution can put
     // a nonzero coefficient on a column whose gₖ = 0, so the cut loop below must visit all columns.
     val colG = Array(n) { aggregatedColumn(model, w, it) }
-    val divisorSet = LinkedHashSet<Long>()
+    val divisorSeen = LongHashSet()
+    // Trial order is the column order, so membership and order are tracked separately.
+    val divisorSet = LongArrayList()
     var anyTouched = false
     for (k in 0 until n) {
         val g = colG[k]
         if (g.fitsLong()) {
             if (g.toLong() != 0L) anyTouched = true
             val mag = abs(g.toLong())
-            if (mag > 1L) divisorSet.add(mag)
+            if (mag > 1L && divisorSeen.add(mag)) divisorSet.add(mag)
         } else {
             anyTouched = true
         }

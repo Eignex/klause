@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 import kotlin.math.max
@@ -117,22 +118,26 @@ internal class FlowCoverSeparator : CutSeparator {
 
         // Σ_C flowⱼ + Σ_C mⱼ·(1 − xⱼ) ≤ b, mⱼ = max(0, capⱼ − λ). Rewrite over columns, coalescing the
         // flow and indicator coefficients that share a column (the implicit knapsack arc).
-        val coeffByCol = LinkedHashMap<Int, Long>()
+        val coeffByCol = MutableIntLongMap()
+        // Columns in first-seen order, so the emitted cut keeps the cover's arc order.
+        val order = IntArrayList()
         var rhs = b
         for (arc in cover) {
-            coeffByCol[arc.flowCol] = (coeffByCol[arc.flowCol] ?: 0L) + arc.flowCoeff
+            if (!coeffByCol.containsKey(arc.flowCol)) order.add(arc.flowCol)
+            coeffByCol.put(arc.flowCol, coeffByCol.getOrDefault(arc.flowCol, 0L) + arc.flowCoeff)
             val m = max(0L, arc.cap - lambda)
             if (m != 0L) {
-                coeffByCol[arc.indicatorCol] = (coeffByCol[arc.indicatorCol] ?: 0L) - m
+                if (!coeffByCol.containsKey(arc.indicatorCol)) order.add(arc.indicatorCol)
+                coeffByCol.put(arc.indicatorCol, coeffByCol.getOrDefault(arc.indicatorCol, 0L) - m)
                 rhs -= m
             }
         }
         var activity = 0.0
-        for ((col, c) in coeffByCol) activity += c * ctx.primalOf(col)
+        order.forEach { col -> activity += coeffByCol.getOrDefault(col, 0L) * ctx.primalOf(col) }
         if (activity <= rhs + VIOLATION_TOL) return null // not violated
 
-        val cols = coeffByCol.keys.toIntArray()
-        val coeffs = LongArray(cols.size) { coeffByCol.getValue(cols[it]) }
+        val cols = order.toIntArray()
+        val coeffs = LongArray(cols.size) { coeffByCol.getOrDefault(cols[it], 0L) }
         // Globally valid iff the source rows are global (every detected row is a declared constraint).
         return Cut(cols, coeffs, Relation.LE, rhs, global = true)
     }

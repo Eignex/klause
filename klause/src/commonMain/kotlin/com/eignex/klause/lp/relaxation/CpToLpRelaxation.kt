@@ -41,6 +41,7 @@ import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 
 /**
@@ -515,7 +516,7 @@ internal class CpToLpRelaxation(
         private val colRealSign = IntArrayList()
 
         // Primary column -> negative-part column of a split lower-unbounded real variable.
-        private val realNegOf = HashMap<Int, Int>()
+        private val realNegOf = MutableIntIntMap()
 
         // Per-column live-bound rule for the persistent relaxation. For an auxiliary column,
         // colReq[c] holds its presence requirement as flat (intVar, value) membership pairs and
@@ -732,7 +733,7 @@ internal class CpToLpRelaxation(
                     registerRealCol(realVar, sign = 1)
                     val neg = builder.addRealVar(lower = 0.0, upper = null, cost = -realCost(realVar))
                     registerRealCol(realVar, sign = -1)
-                    realNegOf[c] = neg
+                    realNegOf.put(c, neg)
                     if (hi.isFinite()) {
                         builder.addRealRow(intArrayOf(c, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
                     }
@@ -1102,7 +1103,7 @@ internal class CpToLpRelaxation(
             for (k in columns.indices) {
                 cols[k] = columns[k]
                 vals[k] = coeffs[k]
-                val neg = realNegOf[columns[k]] ?: continue
+                val neg = realNegOf.getOrDefault(columns[k], -1).takeIf { it >= 0 } ?: continue
                 cols[w] = neg
                 vals[w] = -coeffs[k]
                 w++

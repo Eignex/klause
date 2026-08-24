@@ -333,11 +333,14 @@ internal class DifferenceSystemPropagator(edges: List<DifferenceEdge>) : Propaga
      * the system is unsatisfiable outright.
      */
     private fun blockingClause(edges: IntArray): IntArray {
-        val lits = LinkedHashSet<Int>()
+        // Guard order is the edge order, and an edge set is small, so a linear membership check
+        // costs less than a hash set and keeps the emitted clause deterministic.
+        val lits = IntArrayList(edges.size)
         for (e in edges) {
             val g = guards[e]
             if (g == DifferenceEdge.ALWAYS) continue
-            lits.add(Lit.negate(g))
+            val negated = Lit.negate(g)
+            if (!lits.contains(negated)) lits.add(negated)
         }
         return if (lits.isEmpty()) EmptyIntArray else lits.toIntArray()
     }

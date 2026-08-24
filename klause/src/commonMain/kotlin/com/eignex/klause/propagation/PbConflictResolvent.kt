@@ -64,7 +64,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     override val liveAtCurrentLevel: Int
         get() {
             var n = 0
-            for (v in acc.coef.keys) {
+            acc.forEachVar { v ->
                 if (isFrontier(v) && graph.levelOf(v) == conflictLevel) n++
             }
             return n
@@ -186,7 +186,7 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
     }
 
     private fun bumpAll(a: PbAccumulator) {
-        for (v in a.coef.keys) {
+        a.forEachVar { v ->
             if (a.coefOf(v) != 0L && bumped.add(v)) bumpBoolVars.add(v)
         }
     }

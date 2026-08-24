@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.lp.cut.SharedCut
+import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -20,7 +21,7 @@ import com.eignex.kumulant.stream.lock
  */
 internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), private val cap: Int = DEFAULT_CAP) {
     private val cuts = ArrayList<SharedCut>()
-    private val keys = HashSet<Long>()
+    private val keys = LongHashSet()
 
     /** Append the unseen cuts of [batch] (by key), up to [cap]. */
     fun publish(batch: List<SharedCut>) {
@@ -56,7 +57,7 @@ internal class SharedCutPool(private val lock: Mutex = Concurrency.None.lock(), 
  */
 internal class PoolCutExchange(private val pool: SharedCutPool) : CutExchange {
     private var cursor = 0
-    private val seen = HashSet<Long>()
+    private val seen = LongHashSet()
 
     override fun exchange(sharing: CutSharing) {
         val drained = pool.drainSince(cursor)

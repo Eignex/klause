@@ -15,6 +15,7 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelBlocker
 import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.util.IntArrayList
 
 /**
  * The finite-domain participant in a shared search session.
@@ -41,7 +42,7 @@ class CpSearchComponent(
         }
     }
     private var sharedRootLevel = 0
-    private val nativeLevelBySharedLevel = ArrayList<Int>().apply { add(0) }
+    private val nativeLevelBySharedLevel = IntArrayList().apply { add(0) }
     private var lastResult: PropagationResult? = null
 
     override val resolvesAfterModelBlock: Boolean
@@ -53,7 +54,7 @@ class CpSearchComponent(
     fun rebase() {
         sharedRootLevel = session.decisionLevel
         nativeLevelBySharedLevel.clear()
-        nativeLevelBySharedLevel += sharedRootLevel
+        nativeLevelBySharedLevel.add(sharedRootLevel)
     }
 
     override fun initialize(context: com.eignex.klause.solver.search.SearchContext): ComponentResult {
@@ -175,9 +176,13 @@ class CpSearchComponent(
     }
 
     override fun retract(decisionLevel: Int) {
-        val target = nativeLevelBySharedLevel.getOrElse(decisionLevel) { sharedRootLevel }
+        val target = if (decisionLevel < nativeLevelBySharedLevel.size) {
+            nativeLevelBySharedLevel[decisionLevel]
+        } else {
+            sharedRootLevel
+        }
         session.popToLevel(target)
-        while (nativeLevelBySharedLevel.size > decisionLevel + 1) nativeLevelBySharedLevel.removeLast()
+        nativeLevelBySharedLevel.truncateTo(decisionLevel + 1)
     }
 
     override fun contributeModel(model: SearchModel, context: com.eignex.klause.solver.search.SearchContext) {
@@ -225,9 +230,12 @@ class CpSearchComponent(
     }
 
     /** Shared level corresponding to the latest native level not above [nativeLevel]. */
-    fun sharedLevelForNative(nativeLevel: Int): Int = nativeLevelBySharedLevel.indexOfLast { level ->
-        level <= nativeLevel
-    }.coerceAtLeast(0)
+    fun sharedLevelForNative(nativeLevel: Int): Int {
+        for (level in nativeLevelBySharedLevel.size - 1 downTo 0) {
+            if (nativeLevelBySharedLevel[level] <= nativeLevel) return level
+        }
+        return 0
+    }
 
     private inner class CpLearnedConflict(private val learned: ConflictAnalyzer.AnalysisResult.LearnedConstraint) :
         SearchLearnedConflict {
@@ -286,7 +294,7 @@ class CpSearchComponent(
     private fun sourceIntId(cpIntId: Int): Int = sourceIntIds?.get(cpIntId) ?: cpIntId
 
     private fun recordNativeLevel(sharedLevel: Int) {
-        while (nativeLevelBySharedLevel.size <= sharedLevel) nativeLevelBySharedLevel += session.decisionLevel
+        while (nativeLevelBySharedLevel.size <= sharedLevel) nativeLevelBySharedLevel.add(session.decisionLevel)
         nativeLevelBySharedLevel[sharedLevel] = session.decisionLevel
     }
 }

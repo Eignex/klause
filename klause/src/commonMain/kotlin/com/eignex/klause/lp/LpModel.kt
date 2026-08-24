@@ -4,6 +4,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
+import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.toSortedIntArray
 
@@ -356,9 +357,9 @@ internal class LpBuilder {
     // LP-only continuous columns and their real bounds/cost — the double data the [LpDoubleView] is built
     // from. Empty for the pure-integer core, which never materializes a double view.
     private val continuousCols = HashSet<Int>()
-    private val contLo = HashMap<Int, Double>()
-    private val contHi = HashMap<Int, Double>()
-    private val contCost = HashMap<Int, Double>()
+    private val contLo = MutableIntDoubleMap()
+    private val contHi = MutableIntDoubleMap()
+    private val contCost = MutableIntDoubleMap()
     private var anyRealRow = false
 
     // A row's coefficients as parallel primitive arrays (column index, value); no boxed map. A real-
@@ -454,9 +455,9 @@ internal class LpBuilder {
         this.cost.add(0L)
         tags.add(tag)
         continuousCols.add(j)
-        contLo[j] = lower ?: -LP_UNBOUNDED_PROBE.toDouble()
-        contHi[j] = upper ?: LP_UNBOUNDED_PROBE.toDouble()
-        contCost[j] = cost
+        contLo.put(j, lower ?: -LP_UNBOUNDED_PROBE.toDouble())
+        contHi.put(j, upper ?: LP_UNBOUNDED_PROBE.toDouble())
+        contCost.put(j, cost)
         if (lower == null) clampedLoCols.add(j)
         if (upper == null) clampedHiCols.add(j)
         return j
@@ -601,9 +602,9 @@ internal class LpBuilder {
      *  `>=`-to-`<=`) in double, from the real column data ([contLo]/[contHi]/[contCost]) and any real
      *  rows. Integer columns and rows contribute their exact [Long] values widened to double. */
     private fun buildDoubleView(n: Int, m: Int, signedSense: Long): LpDoubleView {
-        val loD = DoubleArray(n) { contLo[it] ?: lo[it].toDouble() }
-        val hiD = DoubleArray(n) { contHi[it] ?: hi[it].toDouble() }
-        val costRawD = DoubleArray(n) { contCost[it] ?: this.cost[it].toDouble() }
+        val loD = DoubleArray(n) { contLo.getOrDefault(it, lo[it].toDouble()) }
+        val hiD = DoubleArray(n) { contHi.getOrDefault(it, hi[it].toDouble()) }
+        val costRawD = DoubleArray(n) { contCost.getOrDefault(it, this.cost[it].toDouble()) }
         val rhsD = DoubleArray(m)
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
@@ -622,14 +623,17 @@ internal class LpBuilder {
         for ((i, row) in rows.withIndex()) {
             val flip = row.rel == Relation.GE
             val rvals = row.valsD ?: DoubleArray(row.vals.size) { row.vals[it].toDouble() }
-            val summed = HashMap<Int, Double>(row.cols.size)
+            val summed = MutableIntDoubleMap(row.cols.size)
             for (k in row.cols.indices) {
                 val j = row.cols[k]
                 val coeff = if (flip) -rvals[k] else rvals[k]
-                summed[j] = (summed[j] ?: 0.0) + coeff
+                summed.put(j, summed.getOrDefault(j, 0.0) + coeff)
             }
-            for (j in summed.keys.sorted()) {
-                val v = summed.getValue(j)
+            // Ascending column order keeps the CSC deterministic; i ascends ⇒ rows ascend within a column.
+            val summedCols = IntArrayList()
+            summed.forEach { j, _ -> summedCols.add(j) }
+            for (j in summedCols.toSortedIntArray()) {
+                val v = summed.getOrDefault(j, 0.0)
                 if (v != 0.0) {
                     colRowBuckets[j].add(i)
                     colValBuckets[j].add(v)

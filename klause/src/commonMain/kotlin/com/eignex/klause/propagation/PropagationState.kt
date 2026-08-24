@@ -16,6 +16,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.MutableIntObjectMap
 
 /** Sentinel for [PropagationState.propagateAtomsForVar]'s carved-value parameter. */
 internal const val NO_CARVE: Long = Long.MIN_VALUE
@@ -603,7 +604,7 @@ class PropagationState(
     /** Shared empty payload map for marks taken when no [SnapshottablePayload] is live —
      *  avoids a per-push allocation in the common (no Table/Mdd) case. `emptyMap()` returns
      *  a singleton, so this never allocates. Read-only: [undoTo] only iterates it. */
-    internal val emptyPayloads: Map<Int, SnapshottablePayload> = emptyMap()
+    internal val emptyPayloads: MutableIntObjectMap<SnapshottablePayload> = MutableIntObjectMap(1)
 
     /** Reusable conflict analyzer for this state — one instance whose scratch buffers
      *  persist across conflicts instead of reallocating per analysis. Single-threaded
@@ -881,7 +882,7 @@ class PropagationState(
         internal val undoSize: Int,
         internal val ltdvSize: Int,
         internal val pinOrderSize: Int,
-        internal val snapshottablePayloads: Map<Int, SnapshottablePayload>,
+        internal val snapshottablePayloads: MutableIntObjectMap<SnapshottablePayload>,
         internal val revSize: Int,
         internal val atomUndoSize: Int,
     )

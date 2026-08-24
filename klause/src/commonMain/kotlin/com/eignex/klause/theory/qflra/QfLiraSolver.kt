@@ -27,6 +27,7 @@ import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.theory.TheoryResult
+import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** An exact mixed integer/rational witness for an open QF_LIRA model. */
@@ -173,14 +174,14 @@ class ExactLiraSearchComponent(
             IntegerBranch(integer, lower = -witnessBound, upper = witnessBound)
         },
     )
-    private val nodesByLevel = HashMap<Int, SearchNode>()
+    private val nodesByLevel = MutableIntObjectMap<SearchNode>()
     private var node = root
     private var assignment: ExactLiraAssignment? = null
     private var outcome: ComponentCheck? = null
 
     init {
         require(model.supportsExactLira()) { "exact LIRA component requires a supported mixed linear model" }
-        nodesByLevel[0] = root
+        nodesByLevel.put(0, root)
     }
 
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
@@ -193,7 +194,7 @@ class ExactLiraSearchComponent(
 
             is SearchDecision.Theory -> (decision.decision as? ExactLiraDecision)?.let { branch ->
                 node = branch.node
-                nodesByLevel[context.decisionLevel] = node
+                nodesByLevel.put(context.decisionLevel, node)
             }
 
             is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> Unit
@@ -210,8 +211,8 @@ class ExactLiraSearchComponent(
                 boolLevels[variable] = -1
             }
         }
-        nodesByLevel.keys.removeAll { it > decisionLevel }
-        node = nodesByLevel.entries.maxByOrNull { it.key }?.value ?: root
+        nodesByLevel.removeKeysAbove(decisionLevel)
+        node = nodesByLevel.valueAtMaxKey() ?: root
         assignment = null
         outcome = null
     }

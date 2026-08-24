@@ -123,28 +123,29 @@ internal class AggregationMirSeparator : CutSeparator {
         out: MutableList<Row>,
     ) {
         try {
-            val coef = LinkedHashMap<Int, Long>()
+            val coef = MutableIntLongMap()
+            // Columns in first-seen order, so the emitted row keeps the source row's column order.
+            val order = IntArrayList()
             var b = if (flip) -bound else bound
             for (k in lits.indices) {
                 val col = ctx.relaxation.boolColOf[Lit.variable(lits[k])]
                 if (col < 0) return
                 val w = if (flip) -weightOf(k) else weightOf(k)
+                if (!coef.containsKey(col)) order.add(col)
                 if (Lit.isPositive(lits[k])) {
-                    coef[col] = addExact(coef[col] ?: 0L, w)
+                    coef.put(col, addExact(coef.getOrDefault(col, 0L), w))
                 } else {
-                    coef[col] = addExact(coef[col] ?: 0L, -w)
+                    coef.put(col, addExact(coef.getOrDefault(col, 0L), -w))
                     b = addExact(b, -w)
                 }
                 loOf.put(col, 0L)
             }
             if (coef.isEmpty()) return
-            val cols = IntArray(coef.size)
-            val a = LongArray(coef.size)
-            var i = 0
-            for ((c, cw) in coef) {
-                cols[i] = c
-                a[i] = cw
-                i++
+            val cols = IntArray(order.size)
+            val a = LongArray(order.size)
+            for (i in 0 until order.size) {
+                cols[i] = order[i]
+                a[i] = coef.getOrDefault(order[i], 0L)
             }
             out.add(Row(cols, a, b))
         } catch (_: LpOverflowException) {
