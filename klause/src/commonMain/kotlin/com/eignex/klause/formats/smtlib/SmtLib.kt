@@ -11,7 +11,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.sourceRoute
 import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
@@ -33,7 +33,7 @@ data class SmtLibProblem(
     /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
     /** Pipeline selected from the source model before any finite digit lowering. */
-    val sourcePipeline: ProblemPipeline = model.pipeline(),
+    val sourcePipeline: ProblemPipeline = model.sourceRoute(),
     /** Declared `Int` variable name to int id. */
     val intVarNames: Map<String, Int> = emptyMap(),
     /** Declared `Bool` variable name to bool id. */
@@ -282,7 +282,11 @@ object SmtLib {
             )
             return SmtLibProblem(
                 model,
-                sourcePipeline = if (model.supportsExactLra()) ProblemPipeline.EXACT_LRA else model.pipeline(),
+                sourcePipeline = if (model.supportsExactLra()) {
+                    ProblemPipeline.EXACT_LRA
+                } else {
+                    model.sourceRoute()
+                },
                 objective = objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),

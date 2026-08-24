@@ -3,7 +3,7 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.solver.ProblemPipeline
-import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.sourceRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -22,7 +22,7 @@ class MpsOpenPipelineTest {
 
         assertTrue(compiled.model.intBounds.isOpenLower(0))
         assertTrue(compiled.model.intBounds.isOpenUpper(0))
-        assertEquals(ProblemPipeline.GENERAL_LIA, compiled.model.pipeline())
+        assertEquals(ProblemPipeline.GENERAL_LIA, compiled.model.sourceRoute())
     }
 
     @Test
@@ -38,7 +38,7 @@ class MpsOpenPipelineTest {
             listOf(MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), lower = 0.0, upper = null)),
         ).toProblem()
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, compiled.model.pipeline())
+        assertEquals(ProblemPipeline.EXACT_LIRA, compiled.model.sourceRoute())
     }
 
     @Test
@@ -54,7 +54,7 @@ class MpsOpenPipelineTest {
             listOf(MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), lower = 0.0, upper = null)),
         ).toProblem()
 
-        assertEquals(ProblemPipeline.FINITE_CP, compiled.model.pipeline())
+        assertEquals(ProblemPipeline.FINITE_CP, compiled.model.sourceRoute())
     }
 
     @Test

@@ -26,7 +26,6 @@ import com.eignex.klause.solver.supportsExactLira
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
-import com.eignex.klause.theory.TheoryResult
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -39,13 +38,6 @@ data class ExactLiraAssignment(
     /** Rational real values indexed by model real variable id. */
     val reals: List<BigFraction>,
 )
-
-/** Compatibility names for exact QF_LIRA's shared theory outcomes. */
-object ExactLiraResult {
-    typealias Sat = TheoryResult.Sat<ExactLiraAssignment>
-    typealias Unsat = TheoryResult.Unsat
-    typealias Unknown = TheoryResult.Unknown
-}
 
 /**
  * Exact feasibility for the supported open QF_LIRA fragment.

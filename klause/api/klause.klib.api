@@ -590,7 +590,6 @@ abstract interface <#A: out kotlin/Any?> com.eignex.klause.theory/Theory { // co
         abstract fun <get-model>(): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.theory/Theory.model.<get-model>|<get-model>(){}[0]
 
     abstract fun check(kotlin/BooleanArray, com.eignex.klause.theory/TheoryContext): com.eignex.klause.theory/TheoryCheck<#A> // com.eignex.klause.theory/Theory.check|check(kotlin.BooleanArray;com.eignex.klause.theory.TheoryContext){}[0]
-    open fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.theory/TheoryResult<#A> // com.eignex.klause.theory/Theory.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 abstract interface com.eignex.klause.backtrack.selector/ValueSelector { // com.eignex.klause.backtrack.selector/ValueSelector|null[0]
@@ -1027,56 +1026,6 @@ sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryCheck { //
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Cancelled.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Cancelled.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Cancelled.toString|toString(){}[0]
-    }
-}
-
-sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryResult { // com.eignex.klause.theory/TheoryResult|null[0]
-    abstract val stats // com.eignex.klause.theory/TheoryResult.stats|{}stats[0]
-        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.stats.<get-stats>|<get-stats>(){}[0]
-
-    final class <#A1: kotlin/Any?> Sat : com.eignex.klause.theory/TheoryResult<#A1> { // com.eignex.klause.theory/TheoryResult.Sat|null[0]
-        constructor <init>(#A1, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.theory/TheoryResult.Sat.<init>|<init>(1:0;com.eignex.klause.solver.result.SolveStats){}[0]
-
-        final val assignment // com.eignex.klause.theory/TheoryResult.Sat.assignment|{}assignment[0]
-            final fun <get-assignment>(): #A1 // com.eignex.klause.theory/TheoryResult.Sat.assignment.<get-assignment>|<get-assignment>(){}[0]
-        final val stats // com.eignex.klause.theory/TheoryResult.Sat.stats|{}stats[0]
-            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.Sat.stats.<get-stats>|<get-stats>(){}[0]
-
-        final fun component1(): #A1 // com.eignex.klause.theory/TheoryResult.Sat.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.Sat.component2|component2(){}[0]
-        final fun copy(#A1 = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.theory/TheoryResult.Sat<#A1> // com.eignex.klause.theory/TheoryResult.Sat.copy|copy(1:0;com.eignex.klause.solver.result.SolveStats){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryResult.Sat.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryResult.Sat.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryResult.Sat.toString|toString(){}[0]
-    }
-
-    final class Unknown : com.eignex.klause.theory/TheoryResult<kotlin/Nothing> { // com.eignex.klause.theory/TheoryResult.Unknown|null[0]
-        constructor <init>(com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.theory/TheoryResult.Unknown.<init>|<init>(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
-
-        final val reason // com.eignex.klause.theory/TheoryResult.Unknown.reason|{}reason[0]
-            final fun <get-reason>(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.theory/TheoryResult.Unknown.reason.<get-reason>|<get-reason>(){}[0]
-        final val stats // com.eignex.klause.theory/TheoryResult.Unknown.stats|{}stats[0]
-            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.Unknown.stats.<get-stats>|<get-stats>(){}[0]
-
-        final fun component1(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.theory/TheoryResult.Unknown.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.Unknown.component2|component2(){}[0]
-        final fun copy(com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.theory/TheoryResult.Unknown // com.eignex.klause.theory/TheoryResult.Unknown.copy|copy(com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryResult.Unknown.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryResult.Unknown.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryResult.Unknown.toString|toString(){}[0]
-    }
-
-    final class Unsat : com.eignex.klause.theory/TheoryResult<kotlin/Nothing> { // com.eignex.klause.theory/TheoryResult.Unsat|null[0]
-        constructor <init>(com.eignex.klause.solver.result/SolveStats = ...) // com.eignex.klause.theory/TheoryResult.Unsat.<init>|<init>(com.eignex.klause.solver.result.SolveStats){}[0]
-
-        final val stats // com.eignex.klause.theory/TheoryResult.Unsat.stats|{}stats[0]
-            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.Unsat.stats.<get-stats>|<get-stats>(){}[0]
-
-        final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.theory/TheoryResult.Unsat.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.theory/TheoryResult.Unsat // com.eignex.klause.theory/TheoryResult.Unsat.copy|copy(com.eignex.klause.solver.result.SolveStats){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryResult.Unsat.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryResult.Unsat.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryResult.Unsat.toString|toString(){}[0]
     }
 }
 
@@ -2754,12 +2703,6 @@ abstract class com.eignex.klause.localsearch.schedule/AbstractSchedule : com.eig
     open fun observe(com.eignex.klause.localsearch.schedule/RoundLog) // com.eignex.klause.localsearch.schedule/AbstractSchedule.observe|observe(com.eignex.klause.localsearch.schedule.RoundLog){}[0]
     open fun reheat(kotlin/Double) // com.eignex.klause.localsearch.schedule/AbstractSchedule.reheat|reheat(kotlin.Double){}[0]
     open fun reset() // com.eignex.klause.localsearch.schedule/AbstractSchedule.reset|reset(){}[0]
-}
-
-final class <#A: kotlin/Any?> com.eignex.klause.theory/TheoryEngine { // com.eignex.klause.theory/TheoryEngine|null[0]
-    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.theory/Theory<#A>) // com.eignex.klause.theory/TheoryEngine.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.theory.Theory<1:0>){}[0]
-
-    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.theory/TheoryResult<#A> // com.eignex.klause.theory/TheoryEngine.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 final class <#A: kotlin/Any?> com.eignex.klause.theory/TheorySearchComponent : com.eignex.klause.solver.search/TheoryComponent { // com.eignex.klause.theory/TheorySearchComponent|null[0]
@@ -8719,10 +8662,8 @@ final class com.eignex.klause.schema/FloatExpr : com.eignex.klause.schema/FloatT
 }
 
 final class com.eignex.klause.schema/FloatHandle : com.eignex.klause.schema/FloatTerm { // com.eignex.klause.schema/FloatHandle|null[0]
-    constructor <init>(kotlin/String, kotlin/Double, kotlin/Double, kotlin/Int = ...) // com.eignex.klause.schema/FloatHandle.<init>|<init>(kotlin.String;kotlin.Double;kotlin.Double;kotlin.Int){}[0]
+    constructor <init>(kotlin/String, kotlin/Double, kotlin/Double) // com.eignex.klause.schema/FloatHandle.<init>|<init>(kotlin.String;kotlin.Double;kotlin.Double){}[0]
 
-    final val buckets // com.eignex.klause.schema/FloatHandle.buckets|{}buckets[0]
-        final fun <get-buckets>(): kotlin/Int // com.eignex.klause.schema/FloatHandle.buckets.<get-buckets>|<get-buckets>(){}[0]
     final val max // com.eignex.klause.schema/FloatHandle.max|{}max[0]
         final fun <get-max>(): kotlin/Double // com.eignex.klause.schema/FloatHandle.max.<get-max>|<get-max>(){}[0]
     final val min // com.eignex.klause.schema/FloatHandle.min|{}min[0]
@@ -10351,12 +10292,6 @@ final object com.eignex.klause.solver/Lit { // com.eignex.klause.solver/Lit|null
     final fun variable(kotlin/Int): kotlin/Int // com.eignex.klause.solver/Lit.variable|variable(kotlin.Int){}[0]
 }
 
-final object com.eignex.klause.theory.lia/GeneralLiaResult // com.eignex.klause.theory.lia/GeneralLiaResult|null[0]
-
-final object com.eignex.klause.theory.qflra/ExactLiraResult // com.eignex.klause.theory.qflra/ExactLiraResult|null[0]
-
-final object com.eignex.klause.theory.qflra/ExactLraResult // com.eignex.klause.theory.qflra/ExactLraResult|null[0]
-
 final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]
     final fun orbit(kotlin.collections/List<kotlin/IntArray>, kotlin/Int): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbit|orbit(kotlin.collections.List<kotlin.IntArray>;kotlin.Int){}[0]
     final fun orbitUnderStabilizer(kotlin.collections/List<kotlin/IntArray>, kotlin/IntArray, kotlin/Int, kotlin/Int, kotlin/Int = ...): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbitUnderStabilizer|orbitUnderStabilizer(kotlin.collections.List<kotlin.IntArray>;kotlin.IntArray;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
@@ -10445,7 +10380,7 @@ final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.Problem(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/componentPlan(): com.eignex.klause.solver/ComponentPlan // com.eignex.klause.solver/componentPlan|componentPlan@com.eignex.klause.solver.ProblemSpec(){}[0]
-final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/pipeline(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/pipeline|pipeline@com.eignex.klause.solver.ProblemSpec(){}[0]
+final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/sourceRoute(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/sourceRoute|sourceRoute@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]

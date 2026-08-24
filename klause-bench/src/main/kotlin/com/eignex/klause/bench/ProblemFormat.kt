@@ -12,7 +12,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.sourceRoute
 import java.io.File
 
 /** A parsed instance lifted into klause's solver representation, plus an optional objective. */
@@ -113,7 +113,7 @@ internal object MpsFormat : ProblemFormat {
 }
 
 private fun ProblemSpec.requireFiniteBenchModel(file: File): Problem {
-    check(pipeline() == ProblemPipeline.FINITE_CP) {
+    check(sourceRoute() == ProblemPipeline.FINITE_CP) {
         "${file.name}: in-process benchmarks require finite integer bounds; use the CLI theory route for open models"
     }
     return materializeFiniteBounds()

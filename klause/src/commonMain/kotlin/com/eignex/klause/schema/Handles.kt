@@ -63,8 +63,8 @@ interface FloatTerm {
 /**
  * DSL handle for a declared float variable. Combines and compares via the shared [FloatTerm]
  * operators, lowering to a [FloatLinearConstraint] AST node (the compiler turns that into a
- * `com.eignex.klause.factor.FloatLinear` factor). The `buckets` parameter is accepted but
- * ignored — bucketing is a per-backend solve-time concern.
+ * `com.eignex.klause.factor.FloatLinear` factor). Bucketing is a per-backend solve-time concern and
+ * lives on the variable's spec, not on this handle.
  */
 class FloatHandle(
     /** Name of the underlying float variable. */
@@ -73,9 +73,6 @@ class FloatHandle(
     val min: Double,
     /** Inclusive upper real bound. */
     val max: Double,
-    /** Deprecated, ignored bucket count kept for source compatibility. */
-    @Deprecated("Bucketing is now a per-backend solve-time concern; this parameter is ignored.")
-    val buckets: Int = 0,
 ) : FloatTerm {
     override fun toFloatExpr(): FloatExpr = FloatExpr(this, coeff = 1.0, offset = 0.0)
 }

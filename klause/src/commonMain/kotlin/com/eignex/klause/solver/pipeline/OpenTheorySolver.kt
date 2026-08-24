@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
@@ -68,7 +69,7 @@ sealed interface OpenTheoryResult {
 /**
  * Selects and executes the complete theory route for an open source model.
  *
- * Route selection happens once from `ProblemSpec.pipeline()`. Frontends consume this uniform result
+ * Route selection happens once from `ProblemSpec.componentPlan()`. Frontends consume this uniform result
  * rather than importing or dispatching to individual theory implementations.
  */
 class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
@@ -87,9 +88,15 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
         val cancellation = Cancellation { params.cancellation() || model.cancellation() }
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
-        val planned = model.componentPlan().search(
+        val plan = model.componentPlan()
+        // A plan may hand finite columns to CP alongside an open theory fragment. Those columns are
+        // bounded by construction, so their domains come straight from the source bounds.
+        val cpDomains = plan.cpIntVars.associateWith { column ->
+            IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
+        }
+        val planned = plan.search(
             model,
-            emptyMap(),
+            cpDomains,
             maxChecks = params.maxLeaves,
             cancellation = cancellation,
         )
