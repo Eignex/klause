@@ -7,6 +7,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchResult
 
 /** A complete decision procedure for one open-model theory fragment. */
@@ -46,8 +47,14 @@ sealed interface TheoryCheck<out A> {
      */
     data class Sat<A>(val assignment: A) : TheoryCheck<A>
 
-    /** This Boolean assignment is infeasible in the theory fragment. */
-    data object Infeasible : TheoryCheck<Nothing>
+    /**
+     * This Boolean assignment is infeasible in the theory fragment.
+     *
+     * [explanation] is a clause over source Boolean literals that is false under the checked
+     * assignment. It lets a complete theory share a conflict certificate with the common search
+     * engine; absent certificates preserve the existing chronological fallback.
+     */
+    data class Infeasible(val explanation: SearchExplanation? = null) : TheoryCheck<Nothing>
 
     /** Exact checking stopped before determining the assignment. */
     data object Cancelled : TheoryCheck<Nothing>

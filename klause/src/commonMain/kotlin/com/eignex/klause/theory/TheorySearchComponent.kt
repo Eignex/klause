@@ -83,7 +83,7 @@ class TheorySearchComponent<A>(
                 ComponentCheck.Feasible.also { outcome = it }
             }
 
-            TheoryCheck.Infeasible -> ComponentCheck.Infeasible().also { outcome = it }
+            is TheoryCheck.Infeasible -> ComponentCheck.Infeasible(result.explanation).also { outcome = it }
 
             TheoryCheck.Cancelled -> ComponentCheck.Indeterminate
         }

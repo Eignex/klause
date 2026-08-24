@@ -73,7 +73,7 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
             ).run()
         ) {
             is IntegerSearchResult.Found -> TheoryCheck.Sat(result.assignment)
-            IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible
+            IntegerSearchResult.Infeasible -> TheoryCheck.Infeasible()
             IntegerSearchResult.Cancelled, IntegerSearchResult.Budget -> TheoryCheck.Cancelled
         }
     }

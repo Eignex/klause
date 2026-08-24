@@ -222,6 +222,37 @@ class SearchSession(
     internal fun conflictResolution(): Pair<SearchConflictResolver, SearchConflictResolution>? =
         conflictResolver?.let { it to it.resolveConflict(this) }
 
+    /** Whether the latest conflict belongs to a component with native conflict analysis. */
+    internal val hasNativeConflictResolver: Boolean get() = conflictResolver != null
+
+    /**
+     * Turn a falsified clause-form component explanation into an asserting shared consequence.
+     *
+     * Components use this for certificates such as a guarded difference-logic negative cycle. The
+     * clause has already been retained by [learn]; when precisely one of its literals was assigned at
+     * the current highest level, retracting to the second-highest level makes that literal unit.
+     * Explanations with several literals at the highest level remain soundly learned but fall back to
+     * chronological traversal until a component supplies a stronger analysis.
+     */
+    internal fun explainedConflict(explanation: SearchExplanation?): SearchConflictResolution? {
+        val clause = explanation?.literals ?: return null
+        if (clause.isEmpty()) return SearchConflictResolution.Exhausted
+        val levels = IntArray(clause.size)
+        for (index in clause.indices) {
+            val literal = clause[index]
+            val value = boolValue(literal ushr 1) ?: return null
+            val expected = literal and 1 == 0
+            if (value == expected) return null
+            levels[index] = checkNotNull(boolLevels[literal ushr 1])
+        }
+        val highest = levels.max()
+        val atHighest = levels.count { it == highest }
+        if (atHighest != 1) return SearchConflictResolution.Chronological
+        if (highest == 0) return SearchConflictResolution.Exhausted
+        val backjump = levels.filter { it != highest }.maxOrNull() ?: 0
+        return SearchConflictResolution.Backjump(ExplainedLearnedConflict(explanation, backjump, levels))
+    }
+
     /** Assemble a complete model from the active components at the current shared level. */
     fun model(): AssembledSearchModel {
         val values = LinkedHashMap<Any, Any>()
@@ -456,6 +487,24 @@ class SearchSession(
 
     private data class LearnedClause(val literals: IntArray, val source: SearchComponent?)
 
+    private inner class ExplainedLearnedConflict(
+        private val explanation: SearchExplanation,
+        override val decisionLevel: Int,
+        override val decisionLevels: IntArray,
+    ) : SearchLearnedConflict {
+        override val lbd: Int get() = decisionLevels.toSet().size
+        override val guardLiterals: IntArray get() = explanation.literals
+
+        override fun apply(session: SearchSession): SearchLearnedConflictResult {
+            session.learn(explanation)
+            return when (session.propagate()) {
+                ComponentResult.Consistent -> SearchLearnedConflictResult.Resume
+                is ComponentResult.Conflict -> SearchLearnedConflictResult.Chronological
+                ComponentResult.Indeterminate -> SearchLearnedConflictResult.Indeterminate
+            }
+        }
+    }
+
     private data class IntFact(val lower: Long?, val upper: Long?)
 
     private companion object {
@@ -608,7 +657,9 @@ class SearchRun internal constructor(
                             restart()?.let { return it }
                             continue
                         }
-                        if (!resolveConflict() && !backtrack()) return stopAfterBacktrack()
+                        if (!resolveExplainedConflict(result.explanation) && !resolveConflict() && !backtrack()) {
+                            return stopAfterBacktrack()
+                        }
                     }
 
                     ComponentCheck.Indeterminate -> {
@@ -673,6 +724,7 @@ class SearchRun internal constructor(
                 is ComponentResult.Conflict -> {
                     session.learn(result.explanation)
                     observer.onConflict(decision)
+                    if (resolveExplainedConflict(result.explanation)) return Advance.Expanded
                     session.popTo(level)
                     if (resolveConflict()) return Advance.Expanded
                     if (frames.isEmpty()) return Advance.Exhausted
@@ -708,6 +760,29 @@ class SearchRun internal constructor(
                 Advance.Exhausted -> Unit
                 Advance.Restart -> return restart() == null
             }
+        }
+        return false
+    }
+
+    private fun resolveExplainedConflict(explanation: SearchExplanation?): Boolean {
+        if (session.hasNativeConflictResolver) return false
+        when (val resolution = session.explainedConflict(explanation)) {
+            is SearchConflictResolution.Backjump -> {
+                return when (applyLearnedConflict(resolution.conflict)) {
+                    SearchLearnedConflictResult.Resume -> true
+
+                    SearchLearnedConflictResult.Exhausted,
+                    SearchLearnedConflictResult.Chronological,
+                    SearchLearnedConflictResult.Indeterminate,
+                    -> false
+
+                    is SearchLearnedConflictResult.Backjump -> error("learned conflict cascade did not terminate")
+                }
+            }
+
+            SearchConflictResolution.Exhausted -> return false
+
+            SearchConflictResolution.Chronological, null -> Unit
         }
         return false
     }

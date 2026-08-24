@@ -10,6 +10,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
@@ -30,14 +31,8 @@ class DifferenceSearchComponent(
             val guard = fragment.edges[edge].guard
             guard == DifferenceEdge.ALWAYS || context.boolValue(Lit.variable(guard)) == Lit.isPositive(guard)
         }
-        return if (fragment.graph().potentials(
-                active,
-            ) == null
-        ) {
-            ComponentResult.Conflict()
-        } else {
-            ComponentResult.Consistent
-        }
+        val cycle = fragment.graph().negativeCycle(active) ?: return ComponentResult.Consistent
+        return ComponentResult.Conflict(cycleExplanation(fragment, cycle))
     }
 
     override fun check(context: SearchContext): ComponentCheck {
@@ -75,6 +70,13 @@ class DifferenceSearchComponent(
             context.intLowerBound(variable)?.let { edges += DifferenceEdge(variable, DifferenceFragment.ZERO, -it) }
         }
         return DifferenceFragment(edges)
+    }
+
+    /** A guarded negative cycle proves that at least one asserted guard must be false. */
+    private fun cycleExplanation(fragment: DifferenceFragment, cycle: IntArray): SearchExplanation? {
+        val guards = cycle.map { fragment.edges[it].guard }
+        if (guards.any { it == DifferenceEdge.ALWAYS }) return null
+        return SearchExplanation(guards.distinct().map(Lit::negate).toIntArray())
     }
 
     private fun unconstrainedValues(context: SearchContext): LongArray = LongArray(model.numIntVars) { variable ->

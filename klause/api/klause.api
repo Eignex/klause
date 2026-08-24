@@ -9675,8 +9675,14 @@ public final class com/eignex/klause/theory/TheoryCheck$Cancelled : com/eignex/k
 }
 
 public final class com/eignex/klause/theory/TheoryCheck$Infeasible : com/eignex/klause/theory/TheoryCheck {
-	public static final field INSTANCE Lcom/eignex/klause/theory/TheoryCheck$Infeasible;
+	public fun <init> ()V
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchExplanation;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/search/SearchExplanation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchExplanation;
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchExplanation;)Lcom/eignex/klause/theory/TheoryCheck$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/theory/TheoryCheck$Infeasible;Lcom/eignex/klause/solver/search/SearchExplanation;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryCheck$Infeasible;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExplanation ()Lcom/eignex/klause/solver/search/SearchExplanation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

@@ -1004,16 +1004,23 @@ sealed interface <#A: out kotlin/Any?> com.eignex.klause.theory/TheoryCheck { //
         final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Sat.toString|toString(){}[0]
     }
 
+    final class Infeasible : com.eignex.klause.theory/TheoryCheck<kotlin/Nothing> { // com.eignex.klause.theory/TheoryCheck.Infeasible|null[0]
+        constructor <init>(com.eignex.klause.solver.search/SearchExplanation? = ...) // com.eignex.klause.theory/TheoryCheck.Infeasible.<init>|<init>(com.eignex.klause.solver.search.SearchExplanation?){}[0]
+
+        final val explanation // com.eignex.klause.theory/TheoryCheck.Infeasible.explanation|{}explanation[0]
+            final fun <get-explanation>(): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.theory/TheoryCheck.Infeasible.explanation.<get-explanation>|<get-explanation>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.search/SearchExplanation? // com.eignex.klause.theory/TheoryCheck.Infeasible.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.search/SearchExplanation? = ...): com.eignex.klause.theory/TheoryCheck.Infeasible // com.eignex.klause.theory/TheoryCheck.Infeasible.copy|copy(com.eignex.klause.solver.search.SearchExplanation?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Infeasible.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Infeasible.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Infeasible.toString|toString(){}[0]
+    }
+
     final object Cancelled : com.eignex.klause.theory/TheoryCheck<kotlin/Nothing> { // com.eignex.klause.theory/TheoryCheck.Cancelled|null[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Cancelled.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Cancelled.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Cancelled.toString|toString(){}[0]
-    }
-
-    final object Infeasible : com.eignex.klause.theory/TheoryCheck<kotlin/Nothing> { // com.eignex.klause.theory/TheoryCheck.Infeasible|null[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryCheck.Infeasible.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryCheck.Infeasible.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryCheck.Infeasible.toString|toString(){}[0]
     }
 }
 
