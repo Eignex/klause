@@ -7325,9 +7325,7 @@ public final class com/eignex/klause/schema/FloatExpr : com/eignex/klause/schema
 }
 
 public final class com/eignex/klause/schema/FloatHandle : com/eignex/klause/schema/FloatTerm {
-	public fun <init> (Ljava/lang/String;DDI)V
-	public synthetic fun <init> (Ljava/lang/String;DDIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getBuckets ()I
+	public fun <init> (Ljava/lang/String;DD)V
 	public final fun getMax ()D
 	public final fun getMin ()D
 	public final fun getName ()Ljava/lang/String;
@@ -7986,7 +7984,7 @@ public final class com/eignex/klause/solver/ProblemPipeline : java/lang/Enum {
 }
 
 public final class com/eignex/klause/solver/ProblemPipelineKt {
-	public static final fun pipeline (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemPipeline;
+	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemPipeline;
 }
 
 public final class com/eignex/klause/solver/ProblemSpec {
@@ -9698,13 +9696,6 @@ public final class com/eignex/klause/solver/search/TheoryComponent$DefaultImpls 
 public abstract interface class com/eignex/klause/theory/Theory {
 	public abstract fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public abstract fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
-	public fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/theory/Theory;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryResult;
-}
-
-public final class com/eignex/klause/theory/Theory$DefaultImpls {
-	public static fun solve (Lcom/eignex/klause/theory/Theory;Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/theory/Theory;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryResult;
 }
 
 public abstract interface class com/eignex/klause/theory/TheoryCheck {
@@ -9757,12 +9748,6 @@ public final class com/eignex/klause/theory/TheoryContext$DefaultImpls {
 	public static fun intUpperBound (Lcom/eignex/klause/theory/TheoryContext;I)Ljava/lang/Long;
 }
 
-public final class com/eignex/klause/theory/TheoryEngine {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/theory/Theory;)V
-	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/theory/TheoryEngine;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryResult;
-}
-
 public final class com/eignex/klause/theory/TheoryParams {
 	public fun <init> ()V
 	public fun <init> (JLcom/eignex/klause/solver/Cancellation;)V
@@ -9774,51 +9759,6 @@ public final class com/eignex/klause/theory/TheoryParams {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCancellation ()Lcom/eignex/klause/solver/Cancellation;
 	public final fun getMaxLeaves ()J
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract interface class com/eignex/klause/theory/TheoryResult {
-	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-}
-
-public final class com/eignex/klause/theory/TheoryResult$Sat : com/eignex/klause/theory/TheoryResult {
-	public fun <init> (Ljava/lang/Object;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Ljava/lang/Object;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/Object;
-	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Ljava/lang/Object;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/TheoryResult$Sat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/TheoryResult$Sat;Ljava/lang/Object;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryResult$Sat;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getAssignment ()Ljava/lang/Object;
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/TheoryResult$Unknown : com/eignex/klause/theory/TheoryResult {
-	public fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public final fun component2 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/TheoryResult$Unknown;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/TheoryResult$Unknown;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryResult$Unknown;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/TheoryResult$Unsat : com/eignex/klause/theory/TheoryResult {
-	public fun <init> ()V
-	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/result/SolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/theory/TheoryResult$Unsat;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/TheoryResult$Unsat;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryResult$Unsat;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -9855,7 +9795,6 @@ public final class com/eignex/klause/theory/difference/DifferenceTheorySolver : 
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
-	public fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
 }
 
 public final class com/eignex/klause/theory/lia/GeneralLiaAssignment {
@@ -9869,10 +9808,6 @@ public final class com/eignex/klause/theory/lia/GeneralLiaAssignment {
 	public final fun getInts ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/lia/GeneralLiaResult {
-	public static final field INSTANCE Lcom/eignex/klause/theory/lia/GeneralLiaResult;
 }
 
 public final class com/eignex/klause/theory/lia/GeneralLiaSearchComponent : com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/TheoryComponent {
@@ -9894,7 +9829,6 @@ public final class com/eignex/klause/theory/lia/GeneralLiaSolver : com/eignex/kl
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
-	public fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
@@ -9910,10 +9844,6 @@ public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
 	public final fun getReals ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/theory/qflra/ExactLiraResult {
-	public static final field INSTANCE Lcom/eignex/klause/theory/qflra/ExactLiraResult;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/TheoryComponent {
@@ -9935,7 +9865,6 @@ public final class com/eignex/klause/theory/qflra/ExactLiraSolver : com/eignex/k
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
-	public fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
@@ -9951,15 +9880,10 @@ public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/theory/qflra/ExactLraResult {
-	public static final field INSTANCE Lcom/eignex/klause/theory/qflra/ExactLraResult;
-}
-
 public final class com/eignex/klause/theory/qflra/ExactLraSolver : com/eignex/klause/theory/Theory {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
-	public fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/theory/TheoryResult;
 }
 
 public final class com/eignex/klause/util/Bits {

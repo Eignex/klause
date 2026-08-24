@@ -40,7 +40,7 @@ open class VariableSchema : Schema<SchemaEntry>() {
     protected fun intVar(min: Int, max: Int) = register(IntSpec(min, max)) { IntHandle(it, min, max) }
 
     protected fun floatVar(min: Double, max: Double, buckets: Int = DEFAULT_FLOAT_BUCKETS) =
-        register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max, buckets) }
+        register(FloatSpec(min, max, buckets)) { FloatHandle(it, min, max) }
 
     /**
      * Shared delegate for the opt-variable builders: declares the synthetic presence Boolean

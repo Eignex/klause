@@ -1,6 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.arithmetic.difference.supportsCompleteDifferenceTheory
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -10,7 +9,7 @@ import com.eignex.klause.lp.smallModelBigIntBound
 /** The solver pipeline selected once from a source [ProblemSpec]. */
 enum class ProblemPipeline {
     /**
-     * Legacy finite-search/optimization route.
+     * Finite search and optimization route.
      *
      * This is a frontend policy, not variable ownership: [ProblemSpec.componentPlan] may still select a
      * complete arithmetic theory for the same finite source model when no finite-domain factor is present.
@@ -34,26 +33,19 @@ enum class ProblemPipeline {
 }
 
 /**
- * Select the legacy frontend pipeline before CP domains are materialized.
+ * The route a frontend hands to the solver for one source model.
  *
- * Finite optimization still uses this route. Satisfaction planning must use [ProblemSpec.componentPlan]
- * instead, because a finite range does not by itself require a CP-owned [IntDomain].
+ * A fully bounded model stays on the finite route: that is a frontend policy about which engine owns a
+ * finite domain, not a statement that no theory could decide it. Anything with an open integer side is
+ * classified by [componentPlan], which reads column and factor ownership rather than demanding one
+ * theory cover the whole model.
  */
-fun ProblemSpec.pipeline(): ProblemPipeline {
+fun ProblemSpec.sourceRoute(): ProblemPipeline =
     if ((0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }) {
-        return ProblemPipeline.FINITE_CP
-    }
-    if (supportsExactLra()) return ProblemPipeline.EXACT_LRA
-    if (supportsExactLira()) return ProblemPipeline.EXACT_LIRA
-    if (numRealVars != 0) return ProblemPipeline.UNSUPPORTED_OPEN
-    return if (supportsCompleteDifferenceTheory(factors, numIntVars, intBounds)) {
-        ProblemPipeline.DIFFERENCE_THEORY
-    } else if (generalLiaWitnessBound() != null) {
-        ProblemPipeline.GENERAL_LIA
+        ProblemPipeline.FINITE_CP
     } else {
-        ProblemPipeline.UNSUPPORTED_OPEN
+        componentPlan().theoryPipeline
     }
-}
 
 /** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
 internal fun ProblemSpec.supportsExactLra(): Boolean =

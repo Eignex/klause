@@ -9,7 +9,6 @@ import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
-import com.eignex.klause.theory.TheoryResult
 
 /** An exact QF_LRA assignment, independent of the finite CP [com.eignex.klause.solver.Sample]. */
 data class ExactLraAssignment(
@@ -18,13 +17,6 @@ data class ExactLraAssignment(
     /** Rational real values indexed by model real variable id. */
     val reals: List<BigFraction>,
 )
-
-/** Compatibility names for exact QF_LRA's shared theory outcomes. */
-object ExactLraResult {
-    typealias Sat = TheoryResult.Sat<ExactLraAssignment>
-    typealias Unsat = TheoryResult.Unsat
-    typealias Unknown = TheoryResult.Unknown
-}
 
 /**
  * Exact QF_LRA satisfiability over the source model's Boolean skeleton and continuous columns.

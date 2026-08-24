@@ -48,6 +48,28 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `a finite global alongside an open column routes and answers`() {
+        // The chain collapses to an Element, which needs finite domains, while `r` stays open. A
+        // whole-model classifier calls that unroutable; ownership per column gives CP the Element and
+        // the theory the open row.
+        val chain = (0..19).toList().foldRight("0") { k, rest -> "(ite (= s $k) ${k * 3} $rest)" }
+        val parsed = SmtLib.parse(
+            """
+                (declare-const s Int) (declare-const r Int)
+                (assert (>= s 0)) (assert (<= s 19))
+                (assert (= r $chain))
+                (assert (= s 7))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve()
+
+        val assignment = assertIs<OpenTheoryAssignment.GeneralLia>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        assertEquals("21", assignment.assignment.ints[parsed.intVarNames.getValue("r")].toString())
+    }
+
+    @Test
     fun `open general LIA route assembles its theory assignment`() {
         val openUpper = Bits(2).also {
             it.set(0)

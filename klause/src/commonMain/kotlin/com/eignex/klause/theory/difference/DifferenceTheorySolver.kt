@@ -7,7 +7,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
@@ -18,7 +18,7 @@ class DifferenceTheorySolver(override val model: ProblemSpec) : Theory<Sample> {
     private val fragment = differenceFragmentOf(model.factors, model.numIntVars, model.intBounds)
 
     init {
-        require(model.pipeline() == ProblemPipeline.DIFFERENCE_THEORY) {
+        require(model.componentPlan().theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
             "difference-theory search requires complete difference coverage over an open integer model"
         }
     }

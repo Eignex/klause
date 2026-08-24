@@ -11,16 +11,15 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.componentPlan
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.TheoryParams
-import com.eignex.klause.theory.TheoryResult
-import com.eignex.klause.theory.difference.DifferenceTheorySolver
-import com.eignex.klause.theory.lia.GeneralLiaResult
-import com.eignex.klause.theory.lia.GeneralLiaSolver
-import com.eignex.klause.theory.qflra.ExactLiraResult
-import com.eignex.klause.theory.qflra.ExactLiraSolver
-import com.eignex.klause.theory.qflra.ExactLraResult
-import com.eignex.klause.theory.qflra.ExactLraSolver
+import com.eignex.klause.theory.lia.GeneralLiaAssignment
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.test.Test
@@ -32,19 +31,52 @@ import kotlin.test.assertTrue
 
 class SmtLibTest {
 
+    private fun openSolve(
+        model: com.eignex.klause.solver.ProblemSpec,
+        params: TheoryParams = TheoryParams(),
+    ): OpenTheoryResult = OpenTheoryEngine(model, model.componentPlan().theoryPipeline).solve(params)
+
+    private fun liraSat(
+        model: com.eignex.klause.solver.ProblemSpec,
+        params: TheoryParams = TheoryParams(),
+    ): ExactLiraAssignment {
+        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model, params))
+        return assertIs<OpenTheoryAssignment.ExactLira>(sat.assignment).assignment
+    }
+
+    private fun liraUnsat(model: com.eignex.klause.solver.ProblemSpec, params: TheoryParams = TheoryParams()) {
+        assertIs<OpenTheoryResult.Unsat>(openSolve(model, params))
+    }
+
+    private fun lraSat(model: com.eignex.klause.solver.ProblemSpec): ExactLraAssignment {
+        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
+        return assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment).assignment
+    }
+
+    private fun lraUnsat(model: com.eignex.klause.solver.ProblemSpec) {
+        assertIs<OpenTheoryResult.Unsat>(openSolve(model))
+    }
+
+    private fun liaSat(model: com.eignex.klause.solver.ProblemSpec): GeneralLiaAssignment {
+        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
+        return assertIs<OpenTheoryAssignment.GeneralLia>(sat.assignment).assignment
+    }
+
+    private fun differenceSat(model: com.eignex.klause.solver.ProblemSpec): Sample {
+        val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
+        return assertIs<OpenTheoryAssignment.Difference>(sat.assignment).sample
+    }
+
     private fun solve(text: String): LongArray {
         val parsed = SmtLib.parse(text)
         if (parsed.sourcePipeline == ProblemPipeline.GENERAL_LIA) {
-            val result = GeneralLiaSolver(parsed.model).solve()
-            assertTrue(result is TheoryResult.Sat, "expected SAT, got $result")
+            val assignment = liaSat(parsed.model)
             return LongArray(parsed.intVarNames.values.maxOrNull()?.plus(1) ?: 0) { v ->
-                result.assignment.ints[v].longValue()
+                assignment.ints[v].longValue()
             }
         }
         if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-            val result = DifferenceTheorySolver(parsed.model).solve()
-            assertTrue(result is TheoryResult.Sat, "expected SAT, got $result")
-            return result.assignment.ints
+            return differenceSat(parsed.model).ints
         }
         val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
@@ -65,10 +97,10 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        val x = result.assignment.ints[parsed.intVarNames.getValue("x")]
-        val y = result.assignment.reals[parsed.realVarNames.getValue("y")]
+        val x = result.ints[parsed.intVarNames.getValue("x")]
+        val y = result.reals[parsed.realVarNames.getValue("y")]
         assertEquals("1/3", (y - BigFraction.of(x, BigInteger.ONE)).toString())
     }
 
@@ -83,9 +115,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        val result = ExactLiraSolver(parsed.model).solve(TheoryParams(maxLeaves = 1))
-
-        assertIs<ExactLiraResult.Sat>(result)
+        val result = liraSat(parsed.model, TheoryParams(maxLeaves = 1))
     }
 
     @Test
@@ -101,7 +131,7 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        assertIs<ExactLiraResult.Unsat>(ExactLiraSolver(parsed.model).solve(TheoryParams(maxLeaves = 3)))
+        liraUnsat(parsed.model, TheoryParams(maxLeaves = 3))
     }
 
     @Test
@@ -117,7 +147,7 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        assertIs<ExactLiraResult.Unsat>(ExactLiraSolver(parsed.model).solve())
+        liraUnsat(parsed.model)
     }
 
     @Test
@@ -132,9 +162,9 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve(TheoryParams(maxLeaves = 2)))
+        val result = liraSat(parsed.model, TheoryParams(maxLeaves = 2))
 
-        assertEquals(BigInteger.ONE shl 70, result.assignment.ints[parsed.intVarNames.getValue("x")])
+        assertEquals(BigInteger.ONE shl 70, result.ints[parsed.intVarNames.getValue("x")])
     }
 
     @Test
@@ -150,9 +180,9 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        assertEquals(BigInteger.ONE, result.assignment.ints[parsed.intVarNames.getValue("x")])
+        assertEquals(BigInteger.ONE, result.ints[parsed.intVarNames.getValue("x")])
     }
 
     @Test
@@ -167,9 +197,9 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] >= BigInteger.fromInt(5))
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] >= BigInteger.fromInt(5))
     }
 
     @Test
@@ -185,9 +215,9 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] >= BigInteger.ONE)
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] >= BigInteger.ONE)
     }
 
     @Test
@@ -203,9 +233,9 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
     }
 
     @Test
@@ -221,9 +251,9 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        assertTrue(result.assignment.reals[parsed.realVarNames.getValue("y")].isZero.not())
+        assertTrue(result.reals[parsed.realVarNames.getValue("y")].isZero.not())
     }
 
     @Test
@@ -240,9 +270,9 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        val result = assertIs<ExactLiraResult.Sat>(ExactLiraSolver(parsed.model).solve())
+        val result = liraSat(parsed.model)
 
-        assertTrue(result.assignment.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
+        assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
     }
 
     @Test
@@ -259,7 +289,7 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
-        assertIs<ExactLiraResult.Unsat>(ExactLiraSolver(parsed.model).solve())
+        liraUnsat(parsed.model)
     }
 
     @Test
@@ -269,9 +299,9 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LRA, parsed.sourcePipeline)
-        val result = assertIs<ExactLraResult.Sat>(ExactLraSolver(parsed.model).solve())
+        val result = lraSat(parsed.model)
 
-        assertEquals("1/3", result.assignment.reals[parsed.realVarNames.getValue("x")].toString())
+        assertEquals("1/3", result.reals[parsed.realVarNames.getValue("x")].toString())
     }
 
     @Test
@@ -288,7 +318,7 @@ class SmtLibTest {
         )
 
         assertEquals(ProblemPipeline.EXACT_LRA, parsed.sourcePipeline)
-        assertIs<ExactLraResult.Unsat>(ExactLraSolver(parsed.model).solve())
+        lraUnsat(parsed.model)
     }
 
     @Test
@@ -302,9 +332,9 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        val result = assertIs<ExactLraResult.Sat>(ExactLraSolver(parsed.model).solve())
+        val result = lraSat(parsed.model)
 
-        assertEquals("1/1152921504606846976", result.assignment.reals[parsed.realVarNames.getValue("x")].toString())
+        assertEquals("1/1152921504606846976", result.reals[parsed.realVarNames.getValue("x")].toString())
     }
 
     @Test
@@ -504,8 +534,8 @@ class SmtLibTest {
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
         assertEquals(2, parsed.model.factors.count { it is ReifiedLinear })
         assertEquals(1, parsed.model.factors.count { it is Clause })
-        val result = assertIs<TheoryResult.Sat<Sample>>(DifferenceTheorySolver(parsed.model).solve())
-        assertTrue(result.assignment.ints[0] != result.assignment.ints[1])
+        val result = differenceSat(parsed.model)
+        assertTrue(result.ints[0] != result.ints[1])
     }
 
     @Test
@@ -522,8 +552,8 @@ class SmtLibTest {
 
         assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
         assertEquals(2, parsed.model.factors.count { it is ReifiedLinear })
-        val result = assertIs<TheoryResult.Sat<Sample>>(DifferenceTheorySolver(parsed.model).solve())
-        assertTrue(result.assignment.ints[0] != result.assignment.ints[1])
+        val result = differenceSat(parsed.model)
+        assertTrue(result.ints[0] != result.ints[1])
     }
 
     /** `k` bounded integers over `[0, k - 1]`, with [tail] appended as the closing assertions. */
@@ -994,7 +1024,7 @@ class SmtLibTest {
             "(declare-fun x () Int) (declare-fun y () Int)" +
                 " (assert (= (+ (* 3 x) (* 3 y)) 1)) (check-sat)",
         ).model
-        assertTrue(GeneralLiaSolver(model).solve() is GeneralLiaResult.Unsat)
+        assertIs<OpenTheoryResult.Unsat>(openSolve(model))
     }
 
     @Test
@@ -1027,9 +1057,7 @@ class SmtLibTest {
     private fun soleIntValue(text: String): BigInteger {
         val parsed = SmtLib.parse(text)
         if (parsed.sourcePipeline == com.eignex.klause.solver.ProblemPipeline.GENERAL_LIA) {
-            val result = GeneralLiaSolver(parsed.model).solve()
-            assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
-            return result.assignment.ints[parsed.intVarNames.values.first()]
+            return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
         val r = BacktrackSolver(parsed.model.materializeFiniteBounds().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
@@ -1077,9 +1105,8 @@ class SmtLibTest {
             (check-sat)
         """.trimIndent()
         val parsed = SmtLib.parse(text)
-        val result = GeneralLiaSolver(parsed.model).solve()
-        assertTrue(result is GeneralLiaResult.Sat, "expected SAT, got $result")
-        val values = parsed.intVarNames.mapValues { (_, id) -> result.assignment.ints[id] }
+        val result = liaSat(parsed.model)
+        val values = parsed.intVarNames.mapValues { (_, id) -> result.ints[id] }
         val sixtyFour = BigInteger.fromLong(64)
         assertEquals(values.getValue("b"), values.getValue("a") * sixtyFour, "b = 64a")
         assertEquals(values.getValue("c"), values.getValue("b") * sixtyFour, "c = 64b")

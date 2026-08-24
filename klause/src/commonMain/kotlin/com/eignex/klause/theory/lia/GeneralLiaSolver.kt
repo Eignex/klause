@@ -7,8 +7,8 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.generalLiaWitnessBound
-import com.eignex.klause.solver.pipeline
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
@@ -20,7 +20,6 @@ import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
-import com.eignex.klause.theory.TheoryResult
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -31,13 +30,6 @@ data class GeneralLiaAssignment(
     /** Integer values indexed by model integer variable id. */
     val ints: Array<BigInteger>,
 )
-
-/** Compatibility names for General LIA's shared theory outcomes. */
-object GeneralLiaResult {
-    typealias Sat = TheoryResult.Sat<GeneralLiaAssignment>
-    typealias Unsat = TheoryResult.Unsat
-    typealias Unknown = TheoryResult.Unknown
-}
 
 /**
  * Complete finite-witness search for open General LIA.
@@ -50,7 +42,7 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
     private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
 
     init {
-        require(model.pipeline() == ProblemPipeline.GENERAL_LIA) {
+        require(model.componentPlan().theoryPipeline == ProblemPipeline.GENERAL_LIA) {
             "general LIA search requires an open pure-integer linear model"
         }
     }

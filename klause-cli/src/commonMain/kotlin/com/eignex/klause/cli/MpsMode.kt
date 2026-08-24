@@ -7,7 +7,7 @@ import com.eignex.klause.formats.mps.MpsFormatException
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline
+import com.eignex.klause.solver.sourceRoute
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 
 /**
@@ -36,7 +36,7 @@ internal object MpsMode : CliMode {
                     "objScale=${compiled.objectiveScale}"
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
-            val pipeline = compiled.model.pipeline()
+            val pipeline = compiled.model.sourceRoute()
             when (pipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA, ProblemPipeline.EXACT_LIRA ->
                     throw MpsFormatException("open MPS models require a supported theory pipeline")
