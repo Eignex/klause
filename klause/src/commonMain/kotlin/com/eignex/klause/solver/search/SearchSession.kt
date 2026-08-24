@@ -284,10 +284,23 @@ class SearchSession(
                     ExplainedLearnedConflict(SearchExplanation(clause.toIntArray()), backjump, levels),
                 )
             }
-            if (remainingResolutions-- == 0) return SearchConflictResolution.Chronological
-            val pivot = latestResolvableLiteral(clause, conflictLevel) ?: return SearchConflictResolution.Chronological
-            clause = resolve(clause, pivot.first, pivot.second) ?: return SearchConflictResolution.Chronological
+            if (remainingResolutions-- == 0) return retainUnasserting(clause)
+            val pivot = latestResolvableLiteral(clause, conflictLevel) ?: return retainUnasserting(clause)
+            clause = resolve(clause, pivot.first, pivot.second) ?: return retainUnasserting(clause)
         }
+    }
+
+    /**
+     * Retain a conflict that resolution could not make asserting, and leave the traversal to backtrack.
+     *
+     * The clause is a resolvent of valid clauses, so it holds under the root problem whether or not one
+     * literal of it remains at the conflict level. Keeping it is what makes every conflict inform the
+     * rest of the search; the caller still backtracks chronologically, which cannot loop the way a
+     * non-asserting backjump would.
+     */
+    private fun retainUnasserting(clause: List<Int>): SearchConflictResolution {
+        learn(SearchExplanation(clause.toIntArray()))
+        return SearchConflictResolution.Chronological
     }
 
     private fun isFalseLiteral(literal: Int): Boolean {
