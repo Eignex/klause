@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -97,14 +98,14 @@ internal fun LpEngine.shaveVariableBounds(token: Cancellation): List<ShavedBound
  */
 internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
     if (lpRelaxer == null) return emptyList()
-    val removed = LinkedHashSet<Int>()
+    val removed = IntHashSet()
     var probes = 0
     for (i in problem.factors.indices) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
         val f = problem.factors[i]
         if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.NE) continue
         probes++
-        val kept = problem.factors.filterIndexed { idx, _ -> idx != i && idx !in removed }
+        val kept = problem.factors.filterIndexed { idx, _ -> idx != i && !removed.contains(idx) }
         val others = Problem(problem.numBoolVars, problem.numIntVars, problem.intDomains.copyOf(), kept)
         val a = LongArray(problem.numIntVars)
         for (k in f.vars.indices) a[f.vars[k]] += f.coeff(k)
@@ -125,7 +126,7 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
         }
         if (redundant) removed.add(i)
     }
-    return removed.toList()
+    return removed.toIntArray().also(IntArray::sort).toList()
 }
 
 /**

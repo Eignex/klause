@@ -1,5 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.util.MutableIntObjectMap
+
 internal fun PropagationState.logBoolPin(v: Int) {
     undo.tag.add(0)
     undo.varId.add(v)
@@ -63,13 +65,15 @@ internal fun PropagationState.undoIsBoolAt(i: Int): Boolean = undo.tag[i] == 0
  *  never allocates per push. */
 internal fun PropagationState.mark(): PropagationState.LevelMark {
     @Suppress("DoubleMutabilityForCollection") // lazily allocated when a snapshot is taken
-    var payloads: HashMap<Int, PropagationState.SnapshottablePayload>? = null
+    var payloads: MutableIntObjectMap<PropagationState.SnapshottablePayload>? = null
     // Only the tracked snapshottable slots need copying — no per-pin scan of every factor.
     snapshottableIndices.forEach { i ->
         val p = refPayloadStore[i]
         if (p is PropagationState.SnapshottablePayload) {
-            val m = payloads ?: HashMap<Int, PropagationState.SnapshottablePayload>().also { payloads = it }
-            m[i] = p.snapshotCopy()
+            val m = payloads ?: MutableIntObjectMap<PropagationState.SnapshottablePayload>().also {
+                payloads = it
+            }
+            m.put(i, p.snapshotCopy())
         }
     }
     return PropagationState.LevelMark(
@@ -166,7 +170,7 @@ internal fun PropagationState.undoTo(mark: PropagationState.LevelMark) {
     }
     // Restore snapshottable per-factor payloads. Defensive snapshotCopy so a later
     // undo to the same mark returns to the same logical state.
-    for ((fid, payload) in mark.snapshottablePayloads) {
+    mark.snapshottablePayloads.forEach { fid, payload ->
         refPayloadStore[fid] = payload.snapshotCopy()
     }
     // Restore atom truths recorded since the mark (the reversible atom trail): replay top-down so

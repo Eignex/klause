@@ -3,6 +3,8 @@ package com.eignex.klause.lp
 import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.argsortBy
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.sparse.lu
 import kotlin.math.abs
@@ -258,7 +260,8 @@ internal class RevisedSimplex(
         val aq = DoubleArray(m)
         val pivotRowEntry = DoubleArray(numVars) // ρ·A_j per nonbasic, reused by the bound-flip ratio test
         val ratioBuf = DoubleArray(numVars) // |d_j / a_j| per eligible nonbasic
-        val elig = ArrayList<Int>()
+        val elig = IntArrayList()
+        val eligOrdered = IntArray(numVars) // scratch for the ratio-ordered permutation of [elig]
         var iter = 0
         while (iter++ < maxIter) {
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
@@ -344,7 +347,7 @@ internal class RevisedSimplex(
                 keptFactor = factor // the seated basis stays dual-feasible for the next [resolve]
                 return null
             }
-            val q = chooseEntering(elig, ratioBuf, pivotRowEntry, worst)
+            val q = chooseEntering(elig, eligOrdered, ratioBuf, pivotRowEntry, worst)
 
             denseColumn(q, aq)
             val alpha = factor.solve(aq) // spike η = B⁻¹ A_q in the pre-pivot factorization
@@ -436,14 +439,18 @@ internal class RevisedSimplex(
      * the basis is certified downstream.
      */
     private fun chooseEntering(
-        elig: ArrayList<Int>,
+        elig: IntArrayList,
+        ordered: IntArray,
         ratioBuf: DoubleArray,
         pivotRowEntry: DoubleArray,
         delta: Double,
     ): Int {
-        elig.sortBy { ratioBuf[it] }
+        // Stable ascending order by ratio, matching the tie order a stable sort by the same key gives.
+        val order = argsortBy(elig.size) { a, b -> ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]]) }
+        for (position in order.indices) ordered[position] = elig[order[position]]
+        for (position in order.indices) elig[position] = ordered[position]
         var acc = 0.0
-        for (idx in elig.indices) {
+        for (idx in 0 until elig.size) {
             val j = elig[idx]
             val range = if (model.hasFiniteUpper(j)) model.upperD(j) else Double.MAX_VALUE
             val cap = abs(pivotRowEntry[j]) * range

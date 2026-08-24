@@ -1,5 +1,6 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.util.IntArrayList
 import com.eignex.koblas.Workspace
 import com.eignex.koblas.koblas
 import com.eignex.koblas.sparse.SparseFactorization
@@ -24,7 +25,7 @@ import com.eignex.koblas.sparse.SparseFactorization
 internal class EtaBasis private constructor(private val base: SparseFactorization) {
     private val m: Int = base.n
 
-    private val etaRow = ArrayList<Int>()
+    private val etaRow = IntArrayList()
     private val etaSpike = ArrayList<DoubleArray>()
 
     // This object is already mutable — update() appends to the chain — so it owns its solve scratch

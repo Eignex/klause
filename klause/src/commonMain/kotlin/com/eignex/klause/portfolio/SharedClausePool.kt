@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
+import com.eignex.klause.util.LongHashSet
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.Mutex
 import com.eignex.kumulant.stream.lock
@@ -41,7 +42,7 @@ internal class SharedClausePool(
 ) {
     private val clauses = ArrayList<SharedClause>()
     private val global = ArrayList<Boolean>()
-    private val keys = HashSet<Long>()
+    private val keys = LongHashSet()
     private var generation = 0
 
     /** Append the unseen clauses of [batch] (by key), compacting on overflow. [isGlobal] marks a
@@ -130,7 +131,7 @@ internal class PoolClauseExchange(
     private val shareGlobalNogoods: Boolean = true,
 ) : ClauseExchange {
     private var cursor = 0L
-    private val seen = HashSet<Long>()
+    private val seen = LongHashSet()
 
     override fun onRestart(session: PropagationSession) {
         val drained = pool.drainSince(cursor)

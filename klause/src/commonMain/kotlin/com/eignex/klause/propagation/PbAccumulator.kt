@@ -1,6 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntLongMap
 
 /**
  * A pseudo-Boolean constraint in signed-per-variable cutting-planes form, used as the accumulating
@@ -26,7 +28,15 @@ import com.eignex.klause.solver.Lit
  */
 internal class PbAccumulator {
     /** var → signed coefficient on `x_v`. Zero entries are pruned. */
-    val coef = HashMap<Int, Long>()
+    private val coef = MutableIntLongMap()
+
+    /** Invoke [action] for each stored variable. Order is unspecified. */
+    inline fun forEachVar(action: (Int) -> Unit) {
+        coefficients.forEach { variable, _ -> action(variable) }
+    }
+
+    /** Exposed for the inline [forEachVar]; not part of the contract. */
+    @PublishedApi internal val coefficients: MutableIntLongMap get() = coef
     var rhs: Long = 0L
 
     fun clear() {
@@ -37,19 +47,19 @@ internal class PbAccumulator {
     fun isEmpty(): Boolean = coef.isEmpty()
 
     private fun put(v: Int, c: Long) {
-        if (c == 0L) coef.remove(v) else coef[v] = c
+        if (c == 0L) coef.remove(v) else coef.put(v, c)
     }
 
     /** The all-positive-literal degree; the constraint is infeasible iff this exceeds the total
      *  available positive weight. */
     fun positiveDegree(): Long {
         var d = rhs
-        for (c in coef.values) if (c < 0L) d -= c // subtract negative ⇒ add magnitude
+        coef.forEach { _, c -> if (c < 0L) d -= c } // subtract negative ⇒ add magnitude
         return d
     }
 
     /** Signed coefficient on `x_v` (0 if absent). */
-    fun coefOf(v: Int): Long = coef[v] ?: 0L
+    fun coefOf(v: Int): Long = coef.getOrDefault(v, 0L)
 
     /**
      * Load this accumulator from a pseudo-Boolean constraint already in `≥` form: `Σ weightsᵢ·literalsᵢ ≥
@@ -81,7 +91,7 @@ internal class PbAccumulator {
     }
 
     private fun addCoef(v: Int, delta: Long): Boolean {
-        val cur = coef[v] ?: 0L
+        val cur = coef.getOrDefault(v, 0L)
         val next = addExact(cur, delta) ?: return false
         put(v, next)
         return true
@@ -95,19 +105,26 @@ internal class PbAccumulator {
     fun addScaled(other: PbAccumulator, mulSelf: Long, mulOther: Long): Boolean {
         // Scale existing terms.
         if (mulSelf != 1L) {
-            for (v in coef.keys.toList()) {
-                val scaled = mulExact(coef.getValue(v), mulSelf) ?: return false
-                coef[v] = scaled
+            var overflowed = false
+            // Rewriting a stored value never rehashes, so this updates in place rather than over a
+            // snapshot of the keys.
+            coef.forEach { v, c ->
+                val scaled = mulExact(c, mulSelf)
+                if (scaled == null) overflowed = true else coef.put(v, scaled)
             }
+            if (overflowed) return false
         }
         val scaledRhsSelf = mulExact(rhs, mulSelf) ?: return false
         val scaledRhsOther = mulExact(other.rhs, mulOther) ?: return false
         rhs = addExact(scaledRhsSelf, scaledRhsOther) ?: return false
-        for ((v, c) in other.coef) {
-            val add = mulExact(c, mulOther) ?: return false
-            if (!addCoef(v, add)) return false
+        var failed = false
+        other.coef.forEach { v, c ->
+            if (!failed) {
+                val add = mulExact(c, mulOther)
+                if (add == null || !addCoef(v, add)) failed = true
+            }
         }
-        return true
+        return !failed
     }
 
     /**
@@ -118,12 +135,9 @@ internal class PbAccumulator {
     fun saturate() {
         val d = positiveDegree()
         if (d <= 0L) return
-        for (v in coef.keys.toList()) {
-            val c = coef.getValue(v)
-            if (c > d) {
-                coef[v] = d
-            } else if (c < -d) {
-                coef[v] = -d
+        coef.forEach { v, c ->
+            if (c > d) coef.put(v, d) else if (c < -d) {
+                coef.put(v, -d)
             }
         }
     }
@@ -132,16 +146,13 @@ internal class PbAccumulator {
      *  and keeps coefficients from growing across resolution steps. No-op when the gcd is 0 or 1. */
     fun normalizeByGcd() {
         var g = 0L
-        for (c in coef.values) {
-            g = gcd(g, c)
-            if (g == 1L) return
-        }
+        coef.forEach { _, c -> if (g != 1L) g = gcd(g, c) }
         if (g <= 1L) return
-        for (v in coef.keys.toList()) coef[v] = coef.getValue(v) / g
+        coef.forEach { v, c -> coef.put(v, c / g) }
         // Positive-literal degree divides with ceil; recover rhs from the divided coefficients.
         val newPosDegree = ceilDiv(positiveDegree(), g)
         var negSum = 0L
-        for (c in coef.values) if (c < 0L) negSum -= c
+        coef.forEach { _, c -> if (c < 0L) negSum -= c }
         rhs = newPosDegree - negSum
     }
 
@@ -156,14 +167,16 @@ internal class PbAccumulator {
      */
     fun weakenForDivision(keepVar: Int, divisor: Long, isFalse: (Int) -> Boolean) {
         if (divisor <= 1L) return // everything divides by 1 — nothing to weaken
-        for (v in coef.keys.toList()) {
-            if (v == keepVar) continue
-            val c = coef.getValue(v)
+        // Removal shifts entries, so the candidates are collected before any of them is dropped.
+        val candidates = IntArrayList(coef.size)
+        coef.forEach { v, _ -> if (v != keepVar) candidates.add(v) }
+        candidates.forEach { v ->
+            val c = coef.getOrDefault(v, 0L)
             val mag = if (c < 0L) -c else c
-            if (mag % divisor == 0L) continue // divides exactly ⇒ no rounding slack
-            if (isFalse(Lit.make(v, c > 0L))) continue // falsified ⇒ contributes no slack
-            if (c > 0L) rhs -= c // drop the literal, reducing the degree by its weight
-            coef.remove(v)
+            if (mag % divisor != 0L && !isFalse(Lit.make(v, c > 0L))) {
+                if (c > 0L) rhs -= c // drop the literal, reducing the degree by its weight
+                coef.remove(v)
+            }
         }
     }
 
@@ -174,13 +187,10 @@ internal class PbAccumulator {
      */
     fun divideRoundUp(d: Long) {
         if (d <= 1L) return
-        for (v in coef.keys.toList()) {
-            val c = coef.getValue(v)
-            coef[v] = if (c >= 0L) ceilDiv(c, d) else -ceilDiv(-c, d)
-        }
+        coef.forEach { v, c -> coef.put(v, if (c >= 0L) ceilDiv(c, d) else -ceilDiv(-c, d)) }
         val newPosDegree = ceilDiv(positiveDegree(), d)
         var negSum = 0L
-        for (c in coef.values) if (c < 0L) negSum -= c
+        coef.forEach { _, c -> if (c < 0L) negSum -= c }
         rhs = newPosDegree - negSum
     }
 
@@ -197,11 +207,12 @@ internal class PbAccumulator {
         val weights = LongArray(n)
         val literals = IntArray(n)
         var i = 0
-        for ((v, c) in coef) {
-            if (c == 0L) continue
-            weights[i] = if (c > 0L) c else -c
-            literals[i] = Lit.make(v, c > 0L)
-            i++
+        coef.forEach { v, c ->
+            if (c != 0L) {
+                weights[i] = if (c > 0L) c else -c
+                literals[i] = Lit.make(v, c > 0L)
+                i++
+            }
         }
         if (i == 0) return null
         return PbLearned(weights.copyOf(i), literals.copyOf(i), degree)

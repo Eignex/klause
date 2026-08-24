@@ -21,6 +21,7 @@ import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.theory.TheoryResult
+import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** An exact General LIA assignment, independent of CP's Long-backed Sample. */
@@ -407,7 +408,7 @@ class GeneralLiaSearchComponent(
     private val theoryIntVars = theoryIntVars.copyOf()
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
-    private val domainsByLevel = HashMap<Int, Array<BigInterval>>()
+    private val domainsByLevel = MutableIntObjectMap<Array<BigInterval>>()
     private var assignment: GeneralLiaAssignment? = null
     private var outcome: ComponentCheck? = null
 
@@ -421,7 +422,7 @@ class GeneralLiaSearchComponent(
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
-        domainsByLevel[0] = initialDomains(context)
+        domainsByLevel.put(0, initialDomains(context))
         return if (domainsByLevel.getValue(
                 0,
             ).any { it.lo > it.hi }
@@ -441,7 +442,7 @@ class GeneralLiaSearchComponent(
             }
 
             is SearchDecision.Theory -> (decision.decision as? GeneralLiaDecision)?.let { branch ->
-                domainsByLevel[context.decisionLevel] = branch.domains
+                domainsByLevel.put(context.decisionLevel, branch.domains)
             }
 
             is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual -> Unit
@@ -458,7 +459,7 @@ class GeneralLiaSearchComponent(
                 boolLevels[variable] = -1
             }
         }
-        domainsByLevel.keys.removeAll { it > decisionLevel }
+        domainsByLevel.removeKeysAbove(decisionLevel)
         assignment = null
         outcome = null
     }
@@ -525,7 +526,7 @@ class GeneralLiaSearchComponent(
         )
     }
 
-    private fun currentDomains(): Array<BigInterval> = domainsByLevel.entries.maxByOrNull { it.key }?.value
+    private fun currentDomains(): Array<BigInterval> = domainsByLevel.valueAtMaxKey()
         ?: error("General LIA component was not initialized")
 
     private fun decision(domains: Array<BigInterval>): SearchDecision.Theory =

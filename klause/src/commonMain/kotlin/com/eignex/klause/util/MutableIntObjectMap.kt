@@ -99,6 +99,29 @@ internal class MutableIntObjectMap<V>(initialCapacity: Int = 8) {
 
     fun isEmpty(): Boolean = size == 0
 
+    /**
+     * Remove every entry whose key exceeds [threshold]. Keys are collected before any removal, since
+     * backward-shift deletion moves entries that an in-place iteration would then skip.
+     */
+    fun removeKeysAbove(threshold: Int) {
+        val doomed = IntArrayList()
+        forEach { key, _ -> if (key > threshold) doomed.add(key) }
+        doomed.forEach { remove(it) }
+    }
+
+    /** Value stored under the greatest key, or null when the map is empty. */
+    fun valueAtMaxKey(): V? {
+        var bestKey = Int.MIN_VALUE
+        var best: V? = null
+        forEach { key, value ->
+            if (best == null || key >= bestKey) {
+                bestKey = key
+                best = value
+            }
+        }
+        return best
+    }
+
     fun clear() {
         used.fill(false)
         values.fill(null)
