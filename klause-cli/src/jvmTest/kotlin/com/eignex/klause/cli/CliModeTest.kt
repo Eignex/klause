@@ -60,6 +60,28 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open theory run that spends its budget names the cause`() {
+        val smt = File.createTempFile("clibudget", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (assert (>= x 5))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        // A zero budget is already spent at the first poll, so the cause is decided rather than raced.
+        val out = capture { code = runCli(arrayOf("-s", "-t", "0", smt.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "unknown", out)
+        assertTrue("; budget exhausted" in out, out)
+    }
+
+    @Test
     fun `an open SMT general LIA model is solved without finite lowering`() {
         val smt = File.createTempFile("cliopen", ".smt2").apply {
             writeText(

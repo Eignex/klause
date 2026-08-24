@@ -87,6 +87,9 @@ internal object SolveCore {
                 val result = OpenTheoryEngine(pipeline.model, pipeline.route).solve(
                     TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel),
                 )
+                output.onVerdictContext(
+                    VerdictContext(budgetExhausted = budgetSpent(common, result.stats.run.timedOut)),
+                )
                 when (result) {
                     is OpenTheoryResult.Sat -> {
                         output.onSolution(pipeline.render(result.assignment), null)
@@ -98,7 +101,11 @@ internal object SolveCore {
                     is OpenTheoryResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
                 }
                 if (common.statistics) {
-                    output.onStatistics(result.stats, 0L, if (result is OpenTheoryResult.Sat) 1L else 0L)
+                    output.onStatistics(
+                        result.stats,
+                        result.stats.run.wallMs,
+                        if (result is OpenTheoryResult.Sat) 1L else 0L,
+                    )
                 }
                 return
             }

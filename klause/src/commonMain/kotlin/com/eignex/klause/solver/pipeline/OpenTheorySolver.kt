@@ -6,6 +6,7 @@ import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchResult
@@ -84,6 +85,8 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
     /** Decide the model through its immutable component plan and one shared search session. */
     fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult {
         val cancellation = Cancellation { params.cancellation() || model.cancellation() }
+        val stats = SolveStatsSink(backend = route.backendName())
+        stats.start()
         val planned = model.componentPlan().search(
             model,
             emptyMap(),
@@ -92,25 +95,46 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
         )
         when (planned.session.initialize()) {
             ComponentResult.Consistent -> Unit
-            is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(SolveStats.EMPTY)
-            ComponentResult.Indeterminate -> return unknown(planned.session.cancelled())
+            is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(stats.finish())
+            ComponentResult.Indeterminate -> return unknown(planned.session.cancelled(), stats)
         }
         return when (val result = planned.session.solve(model.numBoolVars)) {
             is SearchResult.Satisfied -> OpenTheoryResult.Sat(
                 assignment(result.model, checkNotNull(planned.theory)),
-                SolveStats.EMPTY,
+                stats.finish(),
             )
 
-            SearchResult.Exhausted -> OpenTheoryResult.Unsat(SolveStats.EMPTY)
+            SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish())
 
-            SearchResult.Indeterminate -> unknown(planned.session.cancelled())
+            SearchResult.Indeterminate -> unknown(planned.session.cancelled(), stats)
         }
     }
 
-    private fun unknown(cancelled: Boolean): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
-        if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
-        SolveStats.EMPTY,
-    )
+    /**
+     * An unknown from a complete theory always means a spent allowance — the cancellation token or the
+     * leaf budget — so the run is reported as timed out. Without it a caller cannot tell an exhausted
+     * budget from a structural stop, and reports the wrong reason for every open run.
+     */
+    private fun unknown(cancelled: Boolean, stats: SolveStatsSink): OpenTheoryResult.Unknown {
+        stats.timedOut = true
+        return OpenTheoryResult.Unknown(
+            if (cancelled) TerminationReason.Cancelled else TerminationReason.BudgetExhausted,
+            stats.finish(),
+        )
+    }
+
+    private fun SolveStatsSink.finish(): SolveStats {
+        stop()
+        return snapshot()
+    }
+
+    private fun ProblemPipeline.backendName(): String = when (this) {
+        ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
+        ProblemPipeline.GENERAL_LIA -> "general-lia"
+        ProblemPipeline.EXACT_LRA -> "exact-lra"
+        ProblemPipeline.EXACT_LIRA -> "exact-lira"
+        ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("not an open theory route")
+    }
 
     private fun assignment(
         model: com.eignex.klause.solver.search.AssembledSearchModel,
