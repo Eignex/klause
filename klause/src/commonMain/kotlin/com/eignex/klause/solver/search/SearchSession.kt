@@ -2,6 +2,8 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.MutableIntObjectMap
 
 /**
  * Shared trailed coordination for finite-domain and theory components.
@@ -18,12 +20,14 @@ class SearchSession(
     private val learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
 ) : SearchContext {
     private val trail = ArrayList<SearchDecision>()
-    private val boolValues = HashMap<Int, Int>()
-    private val boolLevels = HashMap<Int, Int>()
-    private val boolReasons = HashMap<Int, SearchExplanation>()
-    private val valuesAtLevel = ArrayList<MutableList<Int>>().apply { add(ArrayList()) }
-    private val intFacts = HashMap<Int, IntFact>()
-    private val priorIntFactsAtLevel = ArrayList<MutableMap<Int, IntFact?>>().apply { add(HashMap()) }
+    private val boolValues = MutableIntIntMap()
+    private val boolLevels = MutableIntIntMap()
+    private val boolReasons = MutableIntObjectMap<SearchExplanation>()
+    private val valuesAtLevel = ArrayList<IntArrayList>().apply { add(IntArrayList()) }
+    private val intFacts = MutableIntObjectMap<IntFact>()
+    private val priorIntFactsAtLevel = ArrayList<MutableIntObjectMap<IntFact?>>().apply {
+        add(MutableIntObjectMap())
+    }
     private val pendingAssertions = ArrayDeque<PendingAssertion>()
     private val learned = LearnedClauseStore()
     private val boolTrail = IntArrayList()
@@ -39,7 +43,7 @@ class SearchSession(
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
 
-    override fun boolValue(variable: Int): Boolean? = when (val value = boolValues[variable] ?: UNASSIGNED) {
+    override fun boolValue(variable: Int): Boolean? = when (val value = boolValues.getOrDefault(variable, UNASSIGNED)) {
         FALSE -> false
         TRUE -> true
         else -> null
@@ -96,12 +100,12 @@ class SearchSession(
     private fun assignImplied(literal: Int, explanation: SearchExplanation?): ComponentResult {
         val variable = literal ushr 1
         val value = if (literal and 1 == 0) TRUE else FALSE
-        return when (boolValues[variable] ?: UNASSIGNED) {
+        return when (boolValues.getOrDefault(variable, UNASSIGNED)) {
             value -> ComponentResult.Consistent
 
             UNASSIGNED -> {
                 assignBool(variable, value)
-                if (explanation != null) boolReasons[variable] = explanation
+                if (explanation != null) boolReasons.put(variable, explanation)
                 pendingAssertions.addLast(PendingAssertion(SearchDecision.Bool(literal), activeComponent))
                 ComponentResult.Consistent
             }
@@ -133,7 +137,7 @@ class SearchSession(
         if (decision is SearchDecision.Bool) {
             val variable = decision.literal ushr 1
             val value = if (decision.literal and 1 == 0) TRUE else FALSE
-            when (boolValues[variable] ?: UNASSIGNED) {
+            when (boolValues.getOrDefault(variable, UNASSIGNED)) {
                 value -> return ComponentResult.Consistent
                 UNASSIGNED -> Unit
                 else -> return ComponentResult.Conflict()
@@ -142,8 +146,8 @@ class SearchSession(
         trail.add(decision)
         lastPushCreatedLevel = true
         trailStartAtLevel.add(boolTrail.size)
-        valuesAtLevel.add(ArrayList())
-        priorIntFactsAtLevel.add(HashMap())
+        valuesAtLevel.add(IntArrayList())
+        priorIntFactsAtLevel.add(MutableIntObjectMap())
         when (decision) {
             is SearchDecision.Bool -> assignBool(
                 decision.literal ushr 1,
@@ -178,15 +182,16 @@ class SearchSession(
         require(decisionLevel in 0..trail.size) { "invalid search decision level $decisionLevel" }
         if (decisionLevel == trail.size) return
         for (level in trail.size downTo decisionLevel + 1) {
-            for (variable in valuesAtLevel[level].asReversed()) {
+            val assignedAtLevel = valuesAtLevel[level]
+            for (position in assignedAtLevel.size - 1 downTo 0) {
+                val variable = assignedAtLevel[position]
                 boolValues.remove(variable)
                 boolLevels.remove(variable)
                 boolReasons.remove(variable)
             }
             valuesAtLevel.removeAt(level)
-            val prior = priorIntFactsAtLevel.removeAt(level)
-            for ((variable, fact) in prior) {
-                if (fact == null) intFacts.remove(variable) else intFacts[variable] = fact
+            priorIntFactsAtLevel.removeAt(level).forEach { variable, fact ->
+                if (fact == null) intFacts.remove(variable) else intFacts.put(variable, fact)
             }
         }
         trail.subList(decisionLevel, trail.size).clear()
@@ -258,10 +263,10 @@ class SearchSession(
         if (!clause.all(::isFalseLiteral)) return null
         var remainingResolutions = boolValues.size
         while (true) {
-            val conflictLevel = clause.maxOf { literal -> checkNotNull(boolLevels[literal ushr 1]) }
+            val conflictLevel = clause.maxOf { literal -> levelOf(literal) }
             if (conflictLevel == 0) return SearchConflictResolution.Exhausted
-            if (clause.count { literal -> boolLevels[literal ushr 1] == conflictLevel } == 1) {
-                val levels = clause.map { literal -> checkNotNull(boolLevels[literal ushr 1]) }
+            if (clause.count { literal -> levelOf(literal) == conflictLevel } == 1) {
+                val levels = clause.map { literal -> levelOf(literal) }
                     .distinct()
                     .sorted()
                     .toIntArray()
@@ -282,8 +287,10 @@ class SearchSession(
     }
 
     private fun latestResolvableLiteral(clause: List<Int>, level: Int): Pair<Int, SearchExplanation>? {
-        for (variable in valuesAtLevel[level].asReversed()) {
-            val assigned = boolValues[variable] ?: continue
+        val assignedAtLevel = valuesAtLevel[level]
+        for (position in assignedAtLevel.size - 1 downTo 0) {
+            val variable = assignedAtLevel[position]
+            val assigned = boolValues.getOrDefault(variable, UNASSIGNED).takeIf { it != UNASSIGNED } ?: continue
             val falsified = (variable shl 1) or assigned
             if (falsified !in clause) continue
             val reason = boolReasons[variable] ?: continue
@@ -313,7 +320,7 @@ class SearchSession(
                 check(values.put(key, value) == null) { "duplicate model contribution for $key" }
             }
         }
-        for ((variable, value) in boolValues) {
+        boolValues.forEach { variable, value ->
             model.put(SearchBoolValue(variable), value == TRUE)
         }
         for (component in components) component.contributeModel(model, this)
@@ -347,10 +354,10 @@ class SearchSession(
         boolLevels.clear()
         boolReasons.clear()
         valuesAtLevel.clear()
-        valuesAtLevel.add(ArrayList())
+        valuesAtLevel.add(IntArrayList())
         intFacts.clear()
         priorIntFactsAtLevel.clear()
-        priorIntFactsAtLevel.add(HashMap())
+        priorIntFactsAtLevel.add(MutableIntObjectMap())
         pendingAssertions.clear()
         boolTrail.clear()
         trailStartAtLevel.clear()
@@ -464,7 +471,7 @@ class SearchSession(
 
     private fun lbdOf(literals: IntArray): Int {
         val levels = HashSet<Int>(literals.size)
-        for (literal in literals) levels.add(boolLevels[literal ushr 1] ?: 0)
+        for (literal in literals) levels.add(levelOf(literal))
         return levels.size
     }
 
@@ -491,8 +498,10 @@ class SearchSession(
         val variable = literal ushr 1
         val value = boolValue(variable) ?: return UNASSIGNED_WATCH_RANK
         if (value == (literal and 1 == 0)) return SATISFIED_WATCH_RANK
-        return boolLevels[variable] ?: 0
+        return boolLevels.getOrDefault(variable, 0)
     }
+
+    private fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
 
     /**
      * Drop the weakest retained clauses once the database exceeds its cap.
@@ -675,8 +684,8 @@ class SearchSession(
     }
 
     private fun assignBool(variable: Int, value: Int) {
-        boolValues[variable] = value
-        boolLevels[variable] = decisionLevel
+        boolValues.put(variable, value)
+        boolLevels.put(variable, decisionLevel)
         valuesAtLevel[decisionLevel].add(variable)
         boolTrail.add((variable shl 1) or if (value == TRUE) 0 else 1)
     }
@@ -709,8 +718,8 @@ class SearchSession(
         }
         if (candidate == prior) return ComponentResult.Consistent
         val changedAtLevel = priorIntFactsAtLevel[decisionLevel]
-        if (!changedAtLevel.containsKey(variable)) changedAtLevel[variable] = prior
-        intFacts[variable] = candidate
+        if (!changedAtLevel.containsKey(variable)) changedAtLevel.put(variable, prior)
+        intFacts.put(variable, candidate)
         return ComponentResult.Consistent
     }
 
