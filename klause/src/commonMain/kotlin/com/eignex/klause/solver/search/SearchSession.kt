@@ -209,6 +209,7 @@ class SearchSession(
 
     /** Complete the candidate leaf, preserving unknown rather than treating it as infeasible. */
     fun check(): ComponentCheck {
+        conflictResolver = null
         for (component in components) {
             when (val result = component.check(this)) {
                 ComponentCheck.Feasible -> Unit
@@ -219,8 +220,11 @@ class SearchSession(
         return ComponentCheck.Feasible
     }
 
-    internal fun conflictResolution(): Pair<SearchConflictResolver, SearchConflictResolution>? =
-        conflictResolver?.let { it to it.resolveConflict(this) }
+    internal fun conflictResolution(): Pair<SearchConflictResolver, SearchConflictResolution>? {
+        val resolver = conflictResolver ?: return null
+        conflictResolver = null
+        return resolver to resolver.resolveConflict(this)
+    }
 
     /** Whether the latest conflict belongs to a component with native conflict analysis. */
     internal val hasNativeConflictResolver: Boolean get() = conflictResolver != null
