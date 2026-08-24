@@ -253,6 +253,66 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `shared analysis resolves a nonasserting theory conflict to first UIP`() {
+        val theory = object : SearchConflictResolver {
+            override val prefersNativeConflictAnalysis: Boolean get() = false
+
+            override fun propagate(context: SearchContext): ComponentResult = if (
+                context.boolValue(3) == true && context.boolValue(4) == true
+            ) {
+                ComponentResult.Conflict(SearchExplanation(intArrayOf(3, 7, 9)))
+            } else {
+                ComponentResult.Consistent
+            }
+
+            override fun resolveConflict(context: SearchContext): SearchConflictResolution =
+                error("mixed conflicts use shared analysis")
+        }
+        val session = SearchSession(
+            listOf(
+                ClauseSearchComponent(
+                    listOf(
+                        Clause(intArrayOf(0, 2)),
+                        Clause(intArrayOf(4, 6)),
+                        Clause(intArrayOf(4, 8)),
+                    ),
+                ),
+                theory,
+            ),
+        )
+        var learned: SearchLearnedConflict? = null
+        val run = session.openRun(
+            numBoolVars = 5,
+            observer = object : SearchRunObserver {
+                override fun onLearnedConflict(conflict: SearchLearnedConflict) {
+                    learned = conflict
+                }
+            },
+        )
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<SearchRunEvent.Satisfied>(run.next())
+
+        assertEquals(1, session.learnedClauseCount)
+        assertEquals(1, learned?.decisionLevel)
+        assertTrue(learned?.guardLiterals?.contentEquals(intArrayOf(3, 4)) == true)
+        assertEquals(true, session.boolValue(2))
+    }
+
+    @Test
+    fun `shared analysis identifies a root explanation as exhausted`() {
+        val session = SearchSession(emptyList())
+        session.learn(SearchExplanation(intArrayOf(0)))
+
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertEquals(
+            SearchConflictResolution.Exhausted,
+            session.explainedConflict(SearchExplanation(intArrayOf(1))),
+        )
+    }
+
+    @Test
     fun `generic driver backtracks component branches through the shared trail`() {
         val brancher = object : SearchBrancher {
             override fun nextBranch(context: SearchContext): List<SearchDecision>? =

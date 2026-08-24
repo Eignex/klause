@@ -7023,6 +7023,7 @@ public final class com/eignex/klause/propagation/CpSearchComponent : com/eignex/
 	public fun blockModel (Lcom/eignex/klause/solver/search/AssembledSearchModel;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getPrefersNativeConflictAnalysis ()Z
 	public fun getResolvesAfterModelBlock ()Z
 	public final fun getSession ()Lcom/eignex/klause/propagation/PropagationSession;
 	public final fun import (Lcom/eignex/klause/propagation/PropagationResult$Implied;Lcom/eignex/klause/solver/search/SearchSession;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9063,6 +9064,7 @@ public final class com/eignex/klause/solver/search/SearchConflictResolution$Exha
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchConflictResolver : com/eignex/klause/solver/search/SearchComponent {
+	public fun getPrefersNativeConflictAnalysis ()Z
 	public fun getResolvesAfterModelBlock ()Z
 	public abstract fun resolveConflict (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/SearchConflictResolution;
 }
@@ -9071,6 +9073,7 @@ public final class com/eignex/klause/solver/search/SearchConflictResolver$Defaul
 	public static fun assert (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun check (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public static fun contributeModel (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public static fun getPrefersNativeConflictAnalysis (Lcom/eignex/klause/solver/search/SearchConflictResolver;)Z
 	public static fun getResolvesAfterModelBlock (Lcom/eignex/klause/solver/search/SearchConflictResolver;)Z
 	public static fun initialize (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun onRestart (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchContext;)V

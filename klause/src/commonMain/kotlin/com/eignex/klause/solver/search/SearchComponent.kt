@@ -144,6 +144,9 @@ interface SearchModelBlocker : SearchComponent {
 
 /** A component that retains a native conflict analyzer and can resume from its learned assertion. */
 interface SearchConflictResolver : SearchComponent {
+    /** Whether this conflict should use native analysis before shared Boolean first-UIP analysis. */
+    val prefersNativeConflictAnalysis: Boolean get() = true
+
     /** Whether this resolver can safely backjump after a consumed model was blocked at root. */
     val resolvesAfterModelBlock: Boolean get() = false
 

@@ -796,6 +796,8 @@ abstract interface com.eignex.klause.solver.search/SearchComponent { // com.eign
 }
 
 abstract interface com.eignex.klause.solver.search/SearchConflictResolver : com.eignex.klause.solver.search/SearchComponent { // com.eignex.klause.solver.search/SearchConflictResolver|null[0]
+    open val prefersNativeConflictAnalysis // com.eignex.klause.solver.search/SearchConflictResolver.prefersNativeConflictAnalysis|{}prefersNativeConflictAnalysis[0]
+        open fun <get-prefersNativeConflictAnalysis>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchConflictResolver.prefersNativeConflictAnalysis.<get-prefersNativeConflictAnalysis>|<get-prefersNativeConflictAnalysis>(){}[0]
     open val resolvesAfterModelBlock // com.eignex.klause.solver.search/SearchConflictResolver.resolvesAfterModelBlock|{}resolvesAfterModelBlock[0]
         open fun <get-resolvesAfterModelBlock>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchConflictResolver.resolvesAfterModelBlock.<get-resolvesAfterModelBlock>|<get-resolvesAfterModelBlock>(){}[0]
 
@@ -8525,6 +8527,8 @@ final class com.eignex.klause.presolve/SharedIntOccurrence // com.eignex.klause.
 final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.solver.search/SearchBrancher, com.eignex.klause.solver.search/SearchConflictResolver, com.eignex.klause.solver.search/SearchModelBlocker { // com.eignex.klause.propagation/CpSearchComponent|null[0]
     constructor <init>(com.eignex.klause.propagation/PropagationSession, kotlin/IntArray? = ..., com.eignex.klause.propagation/CpBranching = ...) // com.eignex.klause.propagation/CpSearchComponent.<init>|<init>(com.eignex.klause.propagation.PropagationSession;kotlin.IntArray?;com.eignex.klause.propagation.CpBranching){}[0]
 
+    final val prefersNativeConflictAnalysis // com.eignex.klause.propagation/CpSearchComponent.prefersNativeConflictAnalysis|{}prefersNativeConflictAnalysis[0]
+        final fun <get-prefersNativeConflictAnalysis>(): kotlin/Boolean // com.eignex.klause.propagation/CpSearchComponent.prefersNativeConflictAnalysis.<get-prefersNativeConflictAnalysis>|<get-prefersNativeConflictAnalysis>(){}[0]
     final val resolvesAfterModelBlock // com.eignex.klause.propagation/CpSearchComponent.resolvesAfterModelBlock|{}resolvesAfterModelBlock[0]
         final fun <get-resolvesAfterModelBlock>(): kotlin/Boolean // com.eignex.klause.propagation/CpSearchComponent.resolvesAfterModelBlock.<get-resolvesAfterModelBlock>|<get-resolvesAfterModelBlock>(){}[0]
     final val session // com.eignex.klause.propagation/CpSearchComponent.session|{}session[0]

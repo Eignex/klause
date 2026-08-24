@@ -226,36 +226,70 @@ class SearchSession(
         return resolver to resolver.resolveConflict(this)
     }
 
-    /** Whether the latest conflict belongs to a component with native conflict analysis. */
-    internal val hasNativeConflictResolver: Boolean get() = conflictResolver != null
+    /** Whether the latest conflict prefers its component-owned analyzer. */
+    internal val hasNativeConflictResolver: Boolean
+        get() = conflictResolver?.prefersNativeConflictAnalysis == true
 
     /**
-     * Turn a falsified clause-form component explanation into an asserting shared consequence.
+     * Resolve a falsified clause-form component explanation to a shared first-UIP consequence.
      *
      * Components use this for certificates such as a guarded difference-logic negative cycle. The
-     * clause has already been retained by [learn]; when precisely one of its literals was assigned at
-     * the current highest level, retracting to the second-highest level makes that literal unit.
-     * Explanations with several literals at the highest level remain soundly learned but fall back to
-     * chronological traversal until a component supplies a stronger analysis.
+     * analyzer resolves latest implied literals at the conflict level through their trailed reasons
+     * until one first-UIP literal remains. Retracting to the second-highest level then makes that
+     * literal unit.
      */
     internal fun explainedConflict(explanation: SearchExplanation?): SearchConflictResolution? {
-        val clause = explanation?.literals ?: return null
+        var clause = explanation?.literals?.toList() ?: return null
         if (clause.isEmpty()) return SearchConflictResolution.Exhausted
-        val levels = IntArray(clause.size)
-        for (index in clause.indices) {
-            val literal = clause[index]
-            val value = boolValue(literal ushr 1) ?: return null
-            val expected = literal and 1 == 0
-            if (value == expected) return null
-            levels[index] = checkNotNull(boolLevels[literal ushr 1])
+        if (!clause.all(::isFalseLiteral)) return null
+        var remainingResolutions = boolValues.size
+        while (true) {
+            val conflictLevel = clause.maxOf { literal -> checkNotNull(boolLevels[literal ushr 1]) }
+            if (conflictLevel == 0) return SearchConflictResolution.Exhausted
+            if (clause.count { literal -> boolLevels[literal ushr 1] == conflictLevel } == 1) {
+                val levels = clause.map { literal -> checkNotNull(boolLevels[literal ushr 1]) }
+                    .distinct()
+                    .sorted()
+                    .toIntArray()
+                val backjump = levels.lastOrNull { it < conflictLevel } ?: 0
+                return SearchConflictResolution.Backjump(
+                    ExplainedLearnedConflict(SearchExplanation(clause.toIntArray()), backjump, levels),
+                )
+            }
+            if (remainingResolutions-- == 0) return SearchConflictResolution.Chronological
+            val pivot = latestResolvableLiteral(clause, conflictLevel) ?: return SearchConflictResolution.Chronological
+            clause = resolve(clause, pivot.first, pivot.second) ?: return SearchConflictResolution.Chronological
         }
-        val highest = levels.max()
-        val atHighest = levels.count { it == highest }
-        if (atHighest != 1) return SearchConflictResolution.Chronological
-        if (highest == 0) return SearchConflictResolution.Exhausted
-        val backjump = levels.filter { it != highest }.maxOrNull() ?: 0
-        return SearchConflictResolution.Backjump(ExplainedLearnedConflict(explanation, backjump, levels))
     }
+
+    private fun isFalseLiteral(literal: Int): Boolean {
+        val value = boolValue(literal ushr 1) ?: return false
+        return value != (literal and 1 == 0)
+    }
+
+    private fun latestResolvableLiteral(clause: List<Int>, level: Int): Pair<Int, SearchExplanation>? {
+        for (variable in valuesAtLevel[level].asReversed()) {
+            val assigned = boolValues[variable] ?: continue
+            val falsified = (variable shl 1) or assigned
+            if (falsified !in clause) continue
+            val reason = boolReasons[variable] ?: continue
+            return falsified to reason
+        }
+        return null
+    }
+
+    private fun resolve(clause: List<Int>, pivot: Int, reason: SearchExplanation): List<Int>? {
+        val implied = pivot xor 1
+        if (implied !in reason.literals) return null
+        val resolvent = LinkedHashSet<Int>(clause.size + reason.literals.size)
+        for (literal in clause) if (literal != pivot && !addFalseLiteral(resolvent, literal)) return null
+        for (literal in reason.literals) if (literal != implied && !addFalseLiteral(resolvent, literal)) return null
+        if (pivot in resolvent) return null
+        return resolvent.toList()
+    }
+
+    private fun addFalseLiteral(clause: MutableSet<Int>, literal: Int): Boolean =
+        isFalseLiteral(literal) && literal xor 1 !in clause && (literal in clause || clause.add(literal))
 
     /** Assemble a complete model from the active components at the current shared level. */
     fun model(): AssembledSearchModel {
@@ -655,13 +689,19 @@ class SearchRun internal constructor(
                     }
 
                     is ComponentCheck.Infeasible -> {
-                        session.learn(result.explanation)
                         observer.onConflict(null)
+                        if (resolveExplainedConflict(result.explanation)) {
+                            if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
+                                restart()?.let { return it }
+                            }
+                            continue
+                        }
+                        session.learn(result.explanation)
                         if (decisionsSinceRestart > 0 && params.restart.shouldRestart(decisionsSinceRestart)) {
                             restart()?.let { return it }
                             continue
                         }
-                        if (!resolveExplainedConflict(result.explanation) && !resolveConflict() && !backtrack()) {
+                        if (!resolveConflict() && !backtrack()) {
                             return stopAfterBacktrack()
                         }
                     }
@@ -726,9 +766,12 @@ class SearchRun internal constructor(
                 }
 
                 is ComponentResult.Conflict -> {
-                    session.learn(result.explanation)
                     observer.onConflict(decision)
-                    if (resolveExplainedConflict(result.explanation)) return Advance.Expanded
+                    if (!session.hasNativeConflictResolver && resolveExplainedConflict(result.explanation)) {
+                        return Advance.Expanded
+                    }
+                    if (session.decisionLevel < level) return Advance.Exhausted
+                    session.learn(result.explanation)
                     session.popTo(level)
                     if (resolveConflict()) return Advance.Expanded
                     if (frames.isEmpty()) return Advance.Exhausted

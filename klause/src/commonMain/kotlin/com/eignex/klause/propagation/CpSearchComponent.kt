@@ -47,6 +47,8 @@ class CpSearchComponent(
     override val resolvesAfterModelBlock: Boolean
         get() = session.problem.numIntVars == 0 && session.problem.factors.isEmpty()
 
+    override val prefersNativeConflictAnalysis: Boolean get() = session.problem.numIntVars == 0
+
     /** Align shared decision level zero with CP's post-seed root. */
     fun rebase() {
         sharedRootLevel = session.decisionLevel
