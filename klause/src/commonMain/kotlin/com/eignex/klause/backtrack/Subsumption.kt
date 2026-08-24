@@ -25,7 +25,7 @@ import com.eignex.klause.util.IntHashSet
  * lists actually touched. The index is rebuilt per run from a snapshot; like [vivify], any mutation
  * renumbers the database, so the cursor restarts after a mutating pass.
  */
-internal fun BacktrackSolver.subsume(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+internal fun subsume(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
     val count = session.learnedClauseCount
     if (count < 2) return 0
     val native = session.usesNativeSat

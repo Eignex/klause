@@ -70,12 +70,10 @@ class InprocessingTest {
 
     @Test
     fun `from should build a loop only for an unseeded search with a pass enabled`() {
-        val solver = BacktrackSolver(problem().bake())
-        assertNull(Inprocessing.from(solver, BacktrackParams()))
-        assertNotNull(Inprocessing.from(solver, BacktrackParams(vivification = true)))
+        assertNull(Inprocessing.from(BacktrackParams()))
+        assertNotNull(Inprocessing.from(BacktrackParams(vivification = true)))
         assertNull(
             Inprocessing.from(
-                solver,
                 BacktrackParams(vivification = true, assumptions = Assumptions(bools = mapOf(0 to true))),
             ),
         )

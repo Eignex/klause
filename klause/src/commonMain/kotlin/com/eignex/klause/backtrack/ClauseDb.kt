@@ -11,7 +11,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /** Reduce the learned-clause database at a restart without discarding permanent or glue clauses. */
-internal fun BacktrackSolver.forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
+internal fun forgetIfOverCap(session: PropagationSession, params: BacktrackParams) {
     val cap = params.maxLearnedClauses ?: return
     val learnedSize = session.learnedClauseCount
     if (learnedSize <= cap) return
@@ -38,12 +38,7 @@ internal fun BacktrackSolver.forgetIfOverCap(session: PropagationSession, params
     params.onEvent?.invoke(SearchEvent.LearnedDbSweep(kept = learnedSize - dropped, dropped = dropped))
 }
 
-private fun BacktrackSolver.forgetTiered(
-    session: PropagationSession,
-    params: BacktrackParams,
-    cap: Int,
-    learnedSize: Int,
-) {
+private fun forgetTiered(session: PropagationSession, params: BacktrackParams, cap: Int, learnedSize: Int) {
     val coreThreshold = params.lbdGlueThreshold
     val midThreshold = params.midLbdThreshold
     val locals = ArrayList<IntArray>(learnedSize)
@@ -88,7 +83,7 @@ private fun BacktrackSolver.forgetTiered(
 }
 
 /** Strengthen a bounded round-robin slice of learned Boolean clauses at a root restart. */
-internal fun BacktrackSolver.vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
+internal fun vivify(session: PropagationSession, params: BacktrackParams, startCursor: Int): Int {
     val count = session.learnedClauseCount
     if (count == 0) return 0
     val native = session.usesNativeSat
@@ -117,7 +112,7 @@ internal fun BacktrackSolver.vivify(session: PropagationSession, params: Backtra
     return 0
 }
 
-private fun BacktrackSolver.vivifyClause(session: PropagationSession, literals: IntArray): IntArray? {
+private fun vivifyClause(session: PropagationSession, literals: IntArray): IntArray? {
     val kept = IntArrayList(literals.size)
     var pushes = 0
     var result: IntArray? = null

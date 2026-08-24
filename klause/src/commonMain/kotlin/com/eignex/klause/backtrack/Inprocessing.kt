@@ -26,12 +26,12 @@ internal interface InprocessingPass {
 
 /** Clause vivification behind the inprocessing seam: a round-robin cursor over the learned
  *  database, one [BacktrackParams.vivifyBatch]-sized slice per scheduled run. */
-internal class VivificationPass(private val solver: BacktrackSolver) : InprocessingPass {
+internal class VivificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
 
     override fun run(session: PropagationSession, params: BacktrackParams) {
-        cursor = solver.vivify(session, params, cursor)
+        cursor = vivify(session, params, cursor)
     }
 
     override fun reset() {
@@ -42,12 +42,12 @@ internal class VivificationPass(private val solver: BacktrackSolver) : Inprocess
 /** Clause subsumption + self-subsuming resolution behind the inprocessing seam: a
  *  round-robin cursor over the learned database, one [BacktrackParams.subsumeBatch]-sized slice per
  *  scheduled run. */
-internal class SubsumptionPass(private val solver: BacktrackSolver) : InprocessingPass {
+internal class SubsumptionPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
     private var cursor = 0
 
     override fun run(session: PropagationSession, params: BacktrackParams) {
-        cursor = solver.subsume(session, params, cursor)
+        cursor = subsume(session, params, cursor)
     }
 
     override fun reset() {
@@ -90,13 +90,13 @@ internal class Inprocessing(private val passes: List<InprocessingPass>, private 
          * and with assumption pins standing those derivations would hold only under the pins yet be
          * stored as unconditional learned clauses.
          */
-        fun from(solver: BacktrackSolver, params: BacktrackParams): Inprocessing? {
+        fun from(params: BacktrackParams): Inprocessing? {
             if (!params.assumptions.isEmpty) return null
             val passes = buildList {
                 // Subsumption first: it only shrinks the database, so vivification's probing works
                 // the surviving clauses instead of ones about to be dropped.
-                if (params.subsumption) add(SubsumptionPass(solver))
-                if (params.vivification) add(VivificationPass(solver))
+                if (params.subsumption) add(SubsumptionPass())
+                if (params.vivification) add(VivificationPass())
             }
             if (passes.isEmpty()) return null
             return Inprocessing(passes, params.inprocessingCadence)

@@ -10,6 +10,7 @@ import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -51,7 +52,7 @@ internal fun BacktrackSolver.projectTouchedToAssumptions(input: Assumptions, lev
 
 /** Convert a touched-seed-level set into a sorted-ascending [IntArray], or empty
  *  when there were no touches (or no seed in the first place). */
-internal fun BacktrackSolver.touchedToArray(touched: IntHashSet?): IntArray {
+internal fun touchedToArray(touched: IntHashSet?): IntArray {
     if (touched == null || touched.isEmpty()) return EmptyIntArray
     val out = touched.toIntArray()
     out.sort()
@@ -62,7 +63,7 @@ internal fun BacktrackSolver.touchedToArray(touched: IntHashSet?): IntArray {
  *  Empty `conflictFactors` (seed-only contradiction, no factor invocation involved)
  *  collapses to `null` — the API contract is "core absent" rather than "core empty",
  *  since an empty core wouldn't be actionable. */
-internal fun BacktrackSolver.coreOf(unsat: PropagationResult.Unsat): UnsatCore? = if (unsat.conflictFactors.isEmpty()) {
+internal fun coreOf(unsat: PropagationResult.Unsat): UnsatCore? = if (unsat.conflictFactors.isEmpty()) {
     null
 } else {
     UnsatCore.of(unsat.conflictFactors)
@@ -94,7 +95,7 @@ internal sealed interface SearchOutcome {
 internal fun BacktrackSolver.driveSearch(
     params: BacktrackParams,
     sink: SolveStatsSink? = null,
-): Sequence<SearchOutcome> = driveSharedSearch(params, sink)
+): Sequence<SearchOutcome> = CpSatisfactionTraversal(problem, params, sink).outcomes()
 
 /**
  * Satisfaction path for a CP/theory search.
@@ -102,79 +103,83 @@ internal fun BacktrackSolver.driveSearch(
  * This has no private DFS trail: [CpSearchComponent] and every supplied theory component are driven by
  * [com.eignex.klause.solver.search.SearchRun].
  */
-private fun BacktrackSolver.driveSharedSearch(
-    params: BacktrackParams,
-    sink: SolveStatsSink? = null,
-): Sequence<SearchOutcome> = sequence {
-    val cp = CpSearchComponent(
-        PropagationSession(
-            problem,
-            params.cancellation,
-            params.propagationCancelFloor,
-            nativeSat = params.nativeSat ?: true,
-            pbLearning = params.pbLearning ?: true,
-        ),
-        branching = CpBranching.None,
-    )
-    val completion = BacktrackCompletion.of(problem, cp, params)
-    val traversal = CpSatisfactionTraversalPolicy(
-        this@driveSharedSearch,
-        cp.session,
-        params,
-        sink,
-        seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
-    )
-    val components = ArrayList<SearchComponent>()
-    components += cp
-    components += traversal.brancher
-    completion.addTo(components)
-    components += params.componentFactory?.invoke().orEmpty()
-    val session = SearchComponentSet(components).session(cancellation = params.cancellation)
-    val seeded = cp.session.seed(params.assumptions)
-    cp.rebase()
-    if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
-        val core = (problem.baked as? PropagationResult.Unsat)?.let(this@driveSharedSearch::coreOf)
-        val touched = (seeded as? PropagationResult.Unsat)?.conflictLevels?.let { levels ->
-            touchedToArray(IntHashSet().also { touched -> levels.forEach(touched::add) })
-        } ?: EmptyIntArray
-        yield(SearchOutcome.Exhausted(core, touched))
-        return@sequence
-    }
-    when (session.initialize()) {
-        com.eignex.klause.solver.search.ComponentResult.Consistent -> Unit
-
-        is com.eignex.klause.solver.search.ComponentResult.Conflict -> {
-            yield(SearchOutcome.Exhausted())
+private class CpSatisfactionTraversal(
+    private val problem: BakedProblem,
+    private val params: BacktrackParams,
+    private val sink: SolveStatsSink?,
+) {
+    fun outcomes(): Sequence<SearchOutcome> = sequence {
+        val cp = CpSearchComponent(
+            PropagationSession(
+                problem,
+                params.cancellation,
+                params.propagationCancelFloor,
+                nativeSat = params.nativeSat ?: true,
+                pbLearning = params.pbLearning ?: true,
+            ),
+            branching = CpBranching.None,
+        )
+        val completion = BacktrackCompletion.of(problem, cp, params)
+        val traversal = CpSatisfactionTraversalPolicy(
+            cp.session,
+            params,
+            sink,
+            seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
+        )
+        val components = ArrayList<SearchComponent>()
+        components += cp
+        components += traversal.brancher
+        completion.addTo(components)
+        components += params.componentFactory?.invoke().orEmpty()
+        val session = SearchComponentSet(components).session(cancellation = params.cancellation)
+        val seeded = cp.session.seed(params.assumptions)
+        cp.rebase()
+        if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
+            val core = (problem.baked as? PropagationResult.Unsat)?.let(::coreOf)
+            val touched = (seeded as? PropagationResult.Unsat)?.conflictLevels?.let { levels ->
+                touchedToArray(IntHashSet().also { touched -> levels.forEach(touched::add) })
+            } ?: EmptyIntArray
+            yield(SearchOutcome.Exhausted(core, touched))
             return@sequence
         }
+        when (session.initialize()) {
+            com.eignex.klause.solver.search.ComponentResult.Consistent -> Unit
 
-        com.eignex.klause.solver.search.ComponentResult.Indeterminate -> {
-            yield(SearchOutcome.BudgetCapped)
-            return@sequence
-        }
-    }
-    val run = session.openRun(problem.numBoolVars, traversal)
-    while (true) {
-        when (val event = run.next()) {
-            is SearchRunEvent.Satisfied -> {
-                val sample = completion.sample(event.model, cp)
-                traversal.brancher.onSolution(sample)
-                yield(SearchOutcome.Found(sample))
-            }
-
-            SearchRunEvent.Exhausted -> {
-                yield(SearchOutcome.Exhausted(touchedAssumptionLevels = traversal.brancher.touchedAssumptionLevels()))
+            is com.eignex.klause.solver.search.ComponentResult.Conflict -> {
+                yield(SearchOutcome.Exhausted())
                 return@sequence
             }
 
-            SearchRunEvent.Indeterminate.Component -> {
-                yield(SearchOutcome.Exhausted(indeterminate = true))
-                return@sequence
-            }
-
-            SearchRunEvent.Paused, SearchRunEvent.Indeterminate.Budget, SearchRunEvent.Indeterminate.Cancelled -> {
+            com.eignex.klause.solver.search.ComponentResult.Indeterminate -> {
                 yield(SearchOutcome.BudgetCapped)
                 return@sequence
+            }
+        }
+        val run = session.openRun(problem.numBoolVars, traversal)
+        while (true) {
+            when (val event = run.next()) {
+                is SearchRunEvent.Satisfied -> {
+                    val sample = completion.sample(event.model, cp)
+                    traversal.brancher.onSolution(sample)
+                    yield(SearchOutcome.Found(sample))
+                }
+
+                SearchRunEvent.Exhausted -> {
+                    yield(
+                        SearchOutcome.Exhausted(touchedAssumptionLevels = traversal.brancher.touchedAssumptionLevels()),
+                    )
+                    return@sequence
+                }
+
+                SearchRunEvent.Indeterminate.Component -> {
+                    yield(SearchOutcome.Exhausted(indeterminate = true))
+                    return@sequence
+                }
+
+                SearchRunEvent.Paused, SearchRunEvent.Indeterminate.Budget, SearchRunEvent.Indeterminate.Cancelled -> {
+                    yield(SearchOutcome.BudgetCapped)
+                    return@sequence
+                }
             }
         }
     }
@@ -182,7 +187,6 @@ private fun BacktrackSolver.driveSharedSearch(
 
 /** CP-specific wiring around the shared traversal engine for satisfaction and model streaming. */
 private class CpSatisfactionTraversalPolicy(
-    solver: BacktrackSolver,
     session: PropagationSession,
     params: BacktrackParams,
     sink: SolveStatsSink?,
@@ -207,22 +211,21 @@ private class CpSatisfactionTraversalPolicy(
     override val modelContinuation = SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
     override val nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll
-    override val lifecycle: SearchRunLifecycle = SatisfactionLifecycle(solver, params, session, brancher)
+    override val lifecycle: SearchRunLifecycle = SatisfactionLifecycle(params, session, brancher)
 }
 
 /** Maintains the ordinary SAT/CP learned-state lifecycle at shared runner boundaries. */
 private class SatisfactionLifecycle(
-    private val solver: BacktrackSolver,
     private val params: BacktrackParams,
     private val session: PropagationSession,
     private val brancher: BacktrackBrancher,
 ) : SearchRunLifecycle {
-    private val inprocessing = Inprocessing.from(solver, params)
+    private val inprocessing = Inprocessing.from(params)
     private var lastPooledSolution: Sample? = null
 
     override fun onRestart(context: SearchContext): SearchRunDisposition {
         params.clauseExchange?.onRestart(session)
-        solver.forgetIfOverCap(session, params)
+        forgetIfOverCap(session, params)
         inprocessing?.onRestart(session, params)
         params.pooledSolutionSupplier?.invoke()?.takeIf { it !== lastPooledSolution }?.let { pooled ->
             lastPooledSolution = pooled

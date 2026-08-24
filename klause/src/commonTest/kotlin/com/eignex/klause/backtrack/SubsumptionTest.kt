@@ -22,7 +22,7 @@ class SubsumptionTest {
         val session = PropagationSession(baked, nativeSat = nativeSat)
         assertEquals(nativeSat, session.usesNativeSat)
         for (lits in learned) session.addLearnedClause(Clause(lits), lbd = lits.size)
-        BacktrackSolver(baked).subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0)
+        subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0)
         return session
     }
 
@@ -90,7 +90,7 @@ class SubsumptionTest {
         val session = PropagationSession(baked)
         session.addLearnedClause(Clause(lits(0 to true, 1 to false)), lbd = 2)
         session.addLearnedClause(Clause(lits(0 to true, 1 to true, 2 to true)), lbd = 1)
-        BacktrackSolver(baked).subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0)
+        subsume(session, BacktrackParams(subsumption = true, subsumeBatch = 64), 0)
         val resolvent = (0 until session.learnedClauseCount)
             .single { session.learnedClauseLiterals(it).toSet() == lits(0 to true, 2 to true).toSet() }
         assertEquals(1, session.learnedClauseLbd(resolvent), "the resolvent keeps the parent's glue standing")
