@@ -7025,6 +7025,7 @@ public final class com/eignex/klause/propagation/CpSearchComponent : com/eignex/
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public fun getPrefersNativeConflictAnalysis ()Z
 	public fun getResolvesAfterModelBlock ()Z
+	public fun getRetainsOwnExplanations ()Z
 	public final fun getSession ()Lcom/eignex/klause/propagation/PropagationSession;
 	public final fun import (Lcom/eignex/klause/propagation/PropagationResult$Implied;Lcom/eignex/klause/solver/search/SearchSession;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -8912,6 +8913,7 @@ public final class com/eignex/klause/solver/search/ClauseSearchComponent : com/e
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun conflicted (I)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
 	public fun implied (II)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun levelOf (I)I
@@ -9001,6 +9003,7 @@ public final class com/eignex/klause/solver/search/SearchBrancher$DefaultImpls {
 	public static fun assert (Lcom/eignex/klause/solver/search/SearchBrancher;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun check (Lcom/eignex/klause/solver/search/SearchBrancher;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public static fun contributeModel (Lcom/eignex/klause/solver/search/SearchBrancher;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public static fun getRetainsOwnExplanations (Lcom/eignex/klause/solver/search/SearchBrancher;)Z
 	public static fun initialize (Lcom/eignex/klause/solver/search/SearchBrancher;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun onRestart (Lcom/eignex/klause/solver/search/SearchBrancher;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public static fun propagate (Lcom/eignex/klause/solver/search/SearchBrancher;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9021,6 +9024,7 @@ public abstract interface class com/eignex/klause/solver/search/SearchComponent 
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
 	public fun propagate (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9032,6 +9036,7 @@ public final class com/eignex/klause/solver/search/SearchComponent$DefaultImpls 
 	public static fun assert (Lcom/eignex/klause/solver/search/SearchComponent;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun check (Lcom/eignex/klause/solver/search/SearchComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public static fun contributeModel (Lcom/eignex/klause/solver/search/SearchComponent;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public static fun getRetainsOwnExplanations (Lcom/eignex/klause/solver/search/SearchComponent;)Z
 	public static fun initialize (Lcom/eignex/klause/solver/search/SearchComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun onRestart (Lcom/eignex/klause/solver/search/SearchComponent;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public static fun propagate (Lcom/eignex/klause/solver/search/SearchComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9085,6 +9090,7 @@ public final class com/eignex/klause/solver/search/SearchConflictResolver$Defaul
 	public static fun contributeModel (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public static fun getPrefersNativeConflictAnalysis (Lcom/eignex/klause/solver/search/SearchConflictResolver;)Z
 	public static fun getResolvesAfterModelBlock (Lcom/eignex/klause/solver/search/SearchConflictResolver;)Z
+	public static fun getRetainsOwnExplanations (Lcom/eignex/klause/solver/search/SearchConflictResolver;)Z
 	public static fun initialize (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun onRestart (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public static fun propagate (Lcom/eignex/klause/solver/search/SearchConflictResolver;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9279,6 +9285,7 @@ public final class com/eignex/klause/solver/search/SearchModelBlocker$DefaultImp
 	public static fun assert (Lcom/eignex/klause/solver/search/SearchModelBlocker;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun check (Lcom/eignex/klause/solver/search/SearchModelBlocker;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public static fun contributeModel (Lcom/eignex/klause/solver/search/SearchModelBlocker;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public static fun getRetainsOwnExplanations (Lcom/eignex/klause/solver/search/SearchModelBlocker;)Z
 	public static fun initialize (Lcom/eignex/klause/solver/search/SearchModelBlocker;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun onRestart (Lcom/eignex/klause/solver/search/SearchModelBlocker;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public static fun propagate (Lcom/eignex/klause/solver/search/SearchModelBlocker;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9680,6 +9687,7 @@ public final class com/eignex/klause/solver/search/TheoryComponent$DefaultImpls 
 	public static fun assert (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun check (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public static fun contributeModel (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public static fun getRetainsOwnExplanations (Lcom/eignex/klause/solver/search/TheoryComponent;)Z
 	public static fun initialize (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public static fun onRestart (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)V
 	public static fun propagate (Lcom/eignex/klause/solver/search/TheoryComponent;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9821,6 +9829,7 @@ public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/k
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
 	public fun propagate (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9834,6 +9843,7 @@ public final class com/eignex/klause/theory/difference/DifferenceSearchComponent
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
 	public fun propagate (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
@@ -9871,6 +9881,7 @@ public final class com/eignex/klause/theory/lia/GeneralLiaSearchComponent : com/
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun nextBranch (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V
@@ -9911,6 +9922,7 @@ public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
+	public fun getRetainsOwnExplanations ()Z
 	public fun initialize (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun nextBranch (Lcom/eignex/klause/solver/search/SearchContext;)Ljava/util/List;
 	public fun onRestart (Lcom/eignex/klause/solver/search/SearchContext;)V

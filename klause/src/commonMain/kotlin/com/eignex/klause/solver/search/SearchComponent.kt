@@ -118,6 +118,20 @@ interface SearchComponent {
     fun onRestart(context: SearchContext) {}
 
     /**
+     * Whether this component keeps its own conflict explanations in a database it propagates from.
+     *
+     * The shared engine leaves those explanations where they are rather than retaining a second copy,
+     * since one clause in two databases means two watch indexes and two reduction policies deducing the
+     * same thing. It is deliberately separate from [SearchConflictResolver.prefersNativeConflictAnalysis]:
+     * analysing a conflict natively and storing the result natively are different capabilities.
+     *
+     * It governs the component's own explanation only. A consequence the shared analyzer derives from
+     * one belongs to the engine and is retained whatever this says, which is why the property bites on
+     * the path where a native analyzer has stood the shared one down.
+     */
+    val retainsOwnExplanations: Boolean get() = false
+
+    /**
      * Clause-form reason for a Boolean consequence this component published without one, or null when
      * it cannot name one.
      *
