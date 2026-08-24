@@ -669,6 +669,7 @@ class SearchSessionTest {
         val resolution = session.explainedConflict(SearchExplanation(intArrayOf(5, 7, 1)))
 
         assertEquals(SearchConflictResolution.Chronological, resolution)
+        assertEquals(1, session.learnedClauseCount, "an unasserting conflict is still retained")
     }
 
     /** Publishes two literals without clauses once the second decision lands, explaining on demand. */
