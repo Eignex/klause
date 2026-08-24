@@ -142,29 +142,46 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `source learned clause reaches peers without reasserting its native owner`() {
-        var sourceAssertions = 0
-        var peerAssertions = 0
-        val source = object : SearchComponent {
-            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                sourceAssertions++
-                return ComponentResult.Consistent
-            }
-        }
-        val peer = object : SearchComponent {
-            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                peerAssertions++
-                return ComponentResult.Consistent
-            }
-        }
-        val session = SearchSession(listOf(source, peer))
+    fun `a conflict from a component that keeps its explanations is not retained again`() {
+        val session = SearchSession(listOf(ConflictingComponent(retains = true)))
 
-        session.learnFrom(source, SearchExplanation(intArrayOf(0)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
+        drainToExhaustion(session.openRun(numBoolVars = 1))
 
-        assertEquals(true, session.boolValue(0))
-        assertEquals(0, sourceAssertions)
-        assertEquals(1, peerAssertions)
+        assertEquals(0, session.learnedClauseCount, "the owner keeps the clause in its own database")
+    }
+
+    @Test
+    fun `a conflict from a component that keeps nothing is retained by the engine`() {
+        val session = SearchSession(listOf(ConflictingComponent(retains = false)))
+
+        drainToExhaustion(session.openRun(numBoolVars = 1))
+
+        assertEquals(1, session.learnedClauseCount, "nothing else holds the clause")
+    }
+
+    private fun drainToExhaustion(run: SearchRun) {
+        repeat(DRAIN_LIMIT) {
+            if (run.next() is SearchRunEvent.Exhausted) return
+        }
+        error("traversal did not exhaust a single-variable space")
+    }
+
+    /**
+     * Refuses variable 0 being true and analyses that conflict itself, which is the shape the rule
+     * governs: the shared analyzer stands aside for a native one, so retention is the engine's only
+     * chance to keep a copy.
+     */
+    private class ConflictingComponent(private val retains: Boolean) : SearchConflictResolver {
+        override val retainsOwnExplanations: Boolean get() = retains
+
+        override fun propagate(context: SearchContext): ComponentResult = if (context.boolValue(0) == true) {
+            ComponentResult.Conflict(SearchExplanation(intArrayOf(1)))
+        } else {
+            ComponentResult.Consistent
+        }
+
+        override fun resolveConflict(context: SearchContext): SearchConflictResolution =
+            SearchConflictResolution.Chronological
     }
 
     @Test
@@ -683,6 +700,10 @@ class SearchSessionTest {
 
         override fun reasonFor(literal: Int): SearchExplanation? =
             if (explains && literal == 6) SearchExplanation(intArrayOf(6, 5)) else null
+    }
+
+    private companion object {
+        const val DRAIN_LIMIT = 8
     }
 
     private class RecordingComponent : SearchComponent {

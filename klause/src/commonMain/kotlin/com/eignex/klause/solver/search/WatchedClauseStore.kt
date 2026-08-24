@@ -33,7 +33,6 @@ internal interface ClauseWatchHost {
  */
 internal class WatchedClauseStore {
     private val clauses = ArrayList<IntArray>()
-    private val sources = ArrayList<SearchComponent?>()
     private val lbds = IntArrayList()
     private val used = ArrayList<Boolean>()
     private val watchers = HashMap<Int, IntArrayList>()
@@ -48,9 +47,6 @@ internal class WatchedClauseStore {
 
     /** Literals of clause [index], watched literals first. */
     fun literalsAt(index: Int): IntArray = clauses[index]
-
-    /** Component that owns an equivalent native constraint for clause [index], if any. */
-    fun sourceAt(index: Int): SearchComponent? = sources[index]
 
     /** Literal block distance recorded for clause [index] when it was learned. */
     fun lbdAt(index: Int): Int = lbds[index]
@@ -77,7 +73,7 @@ internal class WatchedClauseStore {
      * Watching is a separate step because the two literals a clause must watch depend on the
      * assignment as it stands when the clause is first examined, not when it was learned.
      */
-    fun add(literals: IntArray, source: SearchComponent?, lbd: Int): Int {
+    fun add(literals: IntArray, lbd: Int): Int {
         if (literals.isEmpty()) return -1
         val bucket = signatures.getOrPut(signatureOf(literals)) { IntArrayList(1) }
         for (position in 0 until bucket.size) {
@@ -86,7 +82,6 @@ internal class WatchedClauseStore {
         val index = clauses.size
         bucket.add(index)
         clauses.add(literals)
-        sources.add(source)
         lbds.add(lbd)
         used.add(false)
         return index
@@ -118,14 +113,12 @@ internal class WatchedClauseStore {
         for (index in clauses.indices) {
             if (!keep(index)) continue
             clauses[target] = clauses[index]
-            sources[target] = sources[index]
             lbds[target] = lbds[index]
             used[target] = used[index]
             target++
         }
         if (target == clauses.size) return
         clauses.subList(target, clauses.size).clear()
-        sources.subList(target, sources.size).clear()
         used.subList(target, used.size).clear()
         lbds.truncateTo(target)
         watchers.clear()

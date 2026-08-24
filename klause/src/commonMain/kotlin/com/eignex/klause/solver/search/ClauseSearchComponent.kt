@@ -24,7 +24,7 @@ class ClauseSearchComponent(clauses: Iterable<Clause>) :
 
     override fun initialize(context: SearchContext): ComponentResult = withContext(context) {
         for (literals in sourceClauses) {
-            val index = store.add(literals.copyOf(), source = this, lbd = literals.size)
+            val index = store.add(literals.copyOf(), lbd = literals.size)
             if (index < 0) continue
             val result = store.attach(index, this)
             if (result !is ComponentResult.Consistent) return@withContext result

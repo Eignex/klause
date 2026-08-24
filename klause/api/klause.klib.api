@@ -786,6 +786,9 @@ abstract interface com.eignex.klause.solver.search/SearchBrancher : com.eignex.k
 }
 
 abstract interface com.eignex.klause.solver.search/SearchComponent { // com.eignex.klause.solver.search/SearchComponent|null[0]
+    open val retainsOwnExplanations // com.eignex.klause.solver.search/SearchComponent.retainsOwnExplanations|{}retainsOwnExplanations[0]
+        open fun <get-retainsOwnExplanations>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchComponent.retainsOwnExplanations.<get-retainsOwnExplanations>|<get-retainsOwnExplanations>(){}[0]
+
     open fun assert(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.solver.search/SearchComponent.assert|assert(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchContext){}[0]
     open fun check(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentCheck // com.eignex.klause.solver.search/SearchComponent.check|check(com.eignex.klause.solver.search.SearchContext){}[0]
     open fun contributeModel(com.eignex.klause.solver.search/SearchModel, com.eignex.klause.solver.search/SearchContext) // com.eignex.klause.solver.search/SearchComponent.contributeModel|contributeModel(com.eignex.klause.solver.search.SearchModel;com.eignex.klause.solver.search.SearchContext){}[0]
@@ -8532,6 +8535,8 @@ final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.
         final fun <get-prefersNativeConflictAnalysis>(): kotlin/Boolean // com.eignex.klause.propagation/CpSearchComponent.prefersNativeConflictAnalysis.<get-prefersNativeConflictAnalysis>|<get-prefersNativeConflictAnalysis>(){}[0]
     final val resolvesAfterModelBlock // com.eignex.klause.propagation/CpSearchComponent.resolvesAfterModelBlock|{}resolvesAfterModelBlock[0]
         final fun <get-resolvesAfterModelBlock>(): kotlin/Boolean // com.eignex.klause.propagation/CpSearchComponent.resolvesAfterModelBlock.<get-resolvesAfterModelBlock>|<get-resolvesAfterModelBlock>(){}[0]
+    final val retainsOwnExplanations // com.eignex.klause.propagation/CpSearchComponent.retainsOwnExplanations|{}retainsOwnExplanations[0]
+        final fun <get-retainsOwnExplanations>(): kotlin/Boolean // com.eignex.klause.propagation/CpSearchComponent.retainsOwnExplanations.<get-retainsOwnExplanations>|<get-retainsOwnExplanations>(){}[0]
     final val session // com.eignex.klause.propagation/CpSearchComponent.session|{}session[0]
         final fun <get-session>(): com.eignex.klause.propagation/PropagationSession // com.eignex.klause.propagation/CpSearchComponent.session.<get-session>|<get-session>(){}[0]
 

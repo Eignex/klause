@@ -175,6 +175,8 @@ class CpSearchComponent(
         return published
     }
 
+    override val retainsOwnExplanations: Boolean get() = true
+
     override fun reasonFor(literal: Int): SearchExplanation? =
         session.boolReasonClause(Lit.variable(literal))?.let(::SearchExplanation)
 

@@ -41,6 +41,9 @@ class SearchSession(
     private var unitsPending = false
     private var activeComponent: SearchComponent? = null
     private var conflictResolver: SearchConflictResolver? = null
+
+    /** Component whose deduction produced the current conflict, or null when the shared engine did. */
+    private var conflictOwner: SearchComponent? = null
     private var lastPushCreatedLevel = false
     private var checks = 0L
 
@@ -142,6 +145,7 @@ class SearchSession(
 
     private fun recordAndDispatch(decision: SearchDecision, source: SearchComponent?): ComponentResult {
         conflictResolver = null
+        conflictOwner = null
         if (decision is SearchDecision.Bool) {
             val variable = decision.literal ushr 1
             val value = if (decision.literal and 1 == 0) TRUE else FALSE
@@ -238,6 +242,7 @@ class SearchSession(
     /** Complete the candidate leaf, preserving unknown rather than treating it as infeasible. */
     fun check(): ComponentCheck {
         conflictResolver = null
+        conflictOwner = null
         for (component in components) {
             when (val result = component.check(this)) {
                 ComponentCheck.Feasible -> Unit
@@ -251,12 +256,17 @@ class SearchSession(
     internal fun conflictResolution(): Pair<SearchConflictResolver, SearchConflictResolution>? {
         val resolver = conflictResolver ?: return null
         conflictResolver = null
+        conflictOwner = null
         return resolver to resolver.resolveConflict(this)
     }
 
     /** Whether the latest conflict prefers its component-owned analyzer. */
     internal val hasNativeConflictResolver: Boolean
         get() = conflictResolver?.prefersNativeConflictAnalysis == true
+
+    /** Whether the component that produced the latest conflict keeps that explanation itself. */
+    internal val explanationIsOwnedElsewhere: Boolean
+        get() = conflictOwner?.retainsOwnExplanations == true
 
     /**
      * Resolve a falsified clause-form component explanation to a shared first-UIP consequence.
@@ -485,23 +495,12 @@ class SearchSession(
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {
         val literals = explanation?.literals ?: return
-        learn(literals, source = null)
+        learn(literals)
     }
 
-    /**
-     * Retain a clause learned by [source], whose native state already contains the same constraint.
-     *
-     * Subsequent unit consequences are delivered to every peer but not back to [source]. This is what
-     * lets a CP analyzer share its learned clause with theory components without creating a duplicate
-     * CP pin or an extra private propagation level.
-     */
-    internal fun learnFrom(source: SearchComponent, explanation: SearchExplanation) {
-        learn(explanation.literals, source)
-    }
-
-    private fun learn(literals: IntArray, source: SearchComponent?) {
+    private fun learn(literals: IntArray) {
         if (literals.isEmpty()) return
-        val index = learned.add(literals.copyOf(), source, lbdOf(literals))
+        val index = learned.add(literals.copyOf(), lbdOf(literals))
         if (index >= 0) pendingAttach.addLast(index)
     }
 
@@ -554,7 +553,10 @@ class SearchSession(
     }
 
     private fun recordConflict(component: SearchComponent, result: ComponentResult): ComponentResult {
-        if (result is ComponentResult.Conflict) conflictResolver = component as? SearchConflictResolver
+        if (result is ComponentResult.Conflict) {
+            conflictResolver = component as? SearchConflictResolver
+            conflictOwner = component
+        }
         return result
     }
 
@@ -565,6 +567,8 @@ class SearchSession(
      * every other clause is visited only when one of its two watched literals is falsified.
      */
     private fun propagateLearnedClauses(): ComponentResult {
+        // A conflict from this store belongs to the engine, not to whichever component last had one.
+        conflictOwner = null
         while (pendingAttach.isNotEmpty()) {
             val result = learned.attach(pendingAttach.removeFirst(), this)
             if (result !is ComponentResult.Consistent) return result
@@ -596,8 +600,7 @@ class SearchSession(
 
     override fun levelOf(literal: Int): Int = boolLevels.getOrDefault(literal ushr 1, 0)
 
-    override fun implied(clause: Int, literal: Int): ComponentResult =
-        implyFrom(learned.sourceAt(clause), literal, learned.explanationOf(clause))
+    override fun implied(clause: Int, literal: Int): ComponentResult = imply(literal, learned.explanationOf(clause))
 
     override fun conflicted(clause: Int): ComponentResult = ComponentResult.Conflict(learned.explanationOf(clause))
 
@@ -950,7 +953,7 @@ class SearchRun internal constructor(
      * [SearchComponent.reasonFor].
      */
     private fun retainExplanation(explanation: SearchExplanation?) {
-        if (session.hasNativeConflictResolver) return
+        if (session.explanationIsOwnedElsewhere) return
         session.learn(explanation)
     }
 
