@@ -391,6 +391,19 @@ class SearchSession(
         lifecycle,
     )
 
+    /** Open a run from one mode-specific [SearchTraversalPolicy]. */
+    internal fun openRun(numBoolVars: Int, policy: SearchTraversalPolicy): SearchRun = openRun(
+        numBoolVars = numBoolVars,
+        params = policy.solveParams,
+        booleanBranching = policy.booleanBranching,
+        decisionBudget = policy.decisionBudget,
+        observer = policy.observer,
+        modelContinuation = policy.modelContinuation,
+        modelPolicy = policy.modelPolicy,
+        nodePolicy = policy.nodePolicy,
+        lifecycle = policy.lifecycle,
+    )
+
     internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {
         popTo(0)
         for (component in components) {

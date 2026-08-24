@@ -27,11 +27,14 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchModelContinuation
+import com.eignex.klause.solver.search.SearchModelPolicy
+import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.solver.search.SearchRunDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
@@ -114,17 +117,16 @@ private fun BacktrackSolver.driveSharedSearch(
         branching = CpBranching.None,
     )
     val completion = BacktrackCompletion.of(problem, cp, params)
-    val restart = RestartSchedule.from(params)
-    val brancher = BacktrackBrancher(
+    val traversal = CpSatisfactionTraversalPolicy(
+        this@driveSharedSearch,
         cp.session,
         params,
         sink,
-        restart,
         seedDecisionLevels = params.assumptions.boolKeys.size + params.assumptions.intKeys.size,
     )
     val components = ArrayList<SearchComponent>()
     components += cp
-    components += brancher
+    components += traversal.brancher
     completion.addTo(components)
     components += params.componentFactory?.invoke().orEmpty()
     val session = SearchComponentSet(components).session(cancellation = params.cancellation)
@@ -151,33 +153,17 @@ private fun BacktrackSolver.driveSharedSearch(
             return@sequence
         }
     }
-    val run = session.openRun(
-        problem.numBoolVars,
-        SearchSolveParams(
-            maxDecisions = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
-            restart = restart,
-        ),
-        BooleanBranching.None,
-        SearchDecisionBudget {
-            params.nodeBudget?.let { budget ->
-                budget.spend()
-                !budget.exhausted()
-            } ?: true
-        },
-        brancher,
-        SearchModelContinuation.BlockAtRoot,
-        lifecycle = SatisfactionLifecycle(this@driveSharedSearch, params, cp.session, brancher),
-    )
+    val run = session.openRun(problem.numBoolVars, traversal)
     while (true) {
         when (val event = run.next()) {
             is SearchRunEvent.Satisfied -> {
                 val sample = completion.sample(event.model, cp)
-                brancher.onSolution(sample)
+                traversal.brancher.onSolution(sample)
                 yield(SearchOutcome.Found(sample))
             }
 
             SearchRunEvent.Exhausted -> {
-                yield(SearchOutcome.Exhausted(touchedAssumptionLevels = brancher.touchedAssumptionLevels()))
+                yield(SearchOutcome.Exhausted(touchedAssumptionLevels = traversal.brancher.touchedAssumptionLevels()))
                 return@sequence
             }
 
@@ -192,6 +178,36 @@ private fun BacktrackSolver.driveSharedSearch(
             }
         }
     }
+}
+
+/** CP-specific wiring around the shared traversal engine for satisfaction and model streaming. */
+private class CpSatisfactionTraversalPolicy(
+    solver: BacktrackSolver,
+    session: PropagationSession,
+    params: BacktrackParams,
+    sink: SolveStatsSink?,
+    seedDecisionLevels: Int,
+) : SearchTraversalPolicy {
+    private val restart = RestartSchedule.from(params)
+
+    val brancher = BacktrackBrancher(session, params, sink, restart, seedDecisionLevels = seedDecisionLevels)
+
+    override val solveParams = SearchSolveParams(
+        maxDecisions = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
+        restart = restart,
+    )
+    override val booleanBranching = BooleanBranching.None
+    override val decisionBudget = SearchDecisionBudget {
+        params.nodeBudget?.let { budget ->
+            budget.spend()
+            !budget.exhausted()
+        } ?: true
+    }
+    override val observer: SearchRunObserver = brancher
+    override val modelContinuation = SearchModelContinuation.BlockAtRoot
+    override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
+    override val nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll
+    override val lifecycle: SearchRunLifecycle = SatisfactionLifecycle(solver, params, session, brancher)
 }
 
 /** Maintains the ordinary SAT/CP learned-state lifecycle at shared runner boundaries. */
