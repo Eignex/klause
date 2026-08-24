@@ -27,6 +27,7 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchDecisionBudget
+import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchModelContinuation
 import com.eignex.klause.solver.search.SearchModelPolicy
 import com.eignex.klause.solver.search.SearchNodePolicy
@@ -131,7 +132,10 @@ private class CpSatisfactionTraversal(
         components += traversal.brancher
         completion.addTo(components)
         components += params.componentFactory?.invoke().orEmpty()
-        val session = SearchComponentSet(components).session(cancellation = params.cancellation)
+        val session = SearchComponentSet(components).session(
+            cancellation = params.cancellation,
+            learnedDb = params.sharedLearnedDb(),
+        )
         val seeded = cp.session.seed(params.assumptions)
         cp.rebase()
         if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
@@ -445,3 +449,7 @@ private class ResidualRealComponent(
 
     fun sample(): Sample = requireNotNull(completed)
 }
+
+/** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */
+internal fun BacktrackParams.sharedLearnedDb(): SearchLearnedDbParams =
+    SearchLearnedDbParams(maxClauses = maxLearnedClauses, glueLbd = lbdGlueThreshold)

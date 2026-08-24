@@ -177,7 +177,10 @@ internal class ResumableMinimize(
     private val restart = RestartSchedule.from(params)
     private var decisionLimit = minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE)
     private val brancher = BacktrackBrancher(session, params, sink, restart, LpGuidedBranching())
-    private val searchSession = SearchComponentSet(listOf(cp, brancher)).session(cancellation = params.cancellation)
+    private val searchSession = SearchComponentSet(listOf(cp, brancher)).session(
+        cancellation = params.cancellation,
+        learnedDb = params.sharedLearnedDb(),
+    )
     private val run: SearchRun
     private var rootExhausted: UnsatCore? = null
     private var rootIsExhausted = false
