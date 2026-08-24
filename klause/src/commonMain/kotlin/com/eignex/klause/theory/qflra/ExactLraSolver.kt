@@ -52,7 +52,7 @@ class ExactLraSolver(override val model: ProblemSpec) : Theory<ExactLraAssignmen
 
             RationalFeasibility.UNKNOWN -> TheoryCheck.Cancelled
 
-            RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible
+            RationalFeasibility.INFEASIBLE -> TheoryCheck.Infeasible()
         }
     }
 

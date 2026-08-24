@@ -7,6 +7,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -51,12 +52,13 @@ class TheorySearchComponentTest {
             override val model: ProblemSpec = model
 
             override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Unit> =
-                if (bools[0]) TheoryCheck.Infeasible else TheoryCheck.Sat(Unit)
+                if (bools[0]) TheoryCheck.Infeasible(SearchExplanation(intArrayOf(1))) else TheoryCheck.Sat(Unit)
         }
         val session = SearchSession(listOf(TheorySearchComponent(theory)))
 
         assertIs<ComponentResult.Consistent>(session.initialize())
-        assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+        val conflict = assertIs<ComponentResult.Conflict>(session.push(SearchDecision.Bool(0)))
+        assertEquals(true, conflict.explanation?.literals?.contentEquals(intArrayOf(1)))
         session.popTo(0)
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(1)))
     }

@@ -71,11 +71,11 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
                 context.intUpperBound(v)?.let { minOf(hi, BigInteger.fromLong(it)) } ?: hi,
             )
         }
-        if (domains.any { it.lo > it.hi }) return TheoryCheck.Infeasible
+        if (domains.any { it.lo > it.hi }) return TheoryCheck.Infeasible()
         val search = Search(domains, bools, BooleanArray(model.numBoolVars) { true }, context)
         return when (val outcome = search.run()) {
             is GeneralLiaSearchOutcome.Found -> TheoryCheck.Sat(GeneralLiaAssignment(bools.copyOf(), outcome.values))
-            GeneralLiaSearchOutcome.Infeasible -> TheoryCheck.Infeasible
+            GeneralLiaSearchOutcome.Infeasible -> TheoryCheck.Infeasible()
             GeneralLiaSearchOutcome.Cancelled -> TheoryCheck.Cancelled
             GeneralLiaSearchOutcome.BudgetCapped -> TheoryCheck.Cancelled
         }
