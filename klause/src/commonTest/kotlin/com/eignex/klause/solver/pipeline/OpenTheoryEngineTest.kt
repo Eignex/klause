@@ -70,6 +70,24 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `an open column inside a finite global is unroutable rather than fatal`() {
+        // The arms name an open column, so the collapsed Element has no owner: CP cannot index it and
+        // the theory cannot hold the Element. That is a verdict, not a broken invariant.
+        val chain = (0..19).toList().foldRight("0") { k, rest -> "(ite (= s $k) (+ t $k) $rest)" }
+        val parsed = SmtLib.parse(
+            """
+                (declare-const s Int) (declare-const t Int) (declare-const r Int)
+                (assert (>= s 0)) (assert (<= s 19))
+                (assert (> t 100))
+                (assert (= r $chain))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, parsed.sourcePipeline)
+    }
+
+    @Test
     fun `open general LIA route assembles its theory assignment`() {
         val openUpper = Bits(2).also {
             it.set(0)
