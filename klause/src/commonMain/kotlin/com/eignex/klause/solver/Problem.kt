@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.extractConflictBools
 import com.eignex.klause.propagation.extractConflictFactors
 import com.eignex.klause.propagation.extractConflictInts
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -532,14 +533,13 @@ open class Problem(
             // are few and cheap, and the hole path carries the pre-existing-seed dedup the survivor path
             // omits). A full contiguous domain has `size == span`, so `size <= holes` excludes it anyway.
             val span = d.max - d.min + 1
-            val holeCount = span - d.size
-            // The survivor path enumerates every present value, so it requires an [IntDomain.enumerable]
-            // domain. A wide contiguous (or huge-run) domain saturates [size] at Int.MAX — its
-            // `holeCount` then looks positive though it is hole-free/few-holed; those fall through to
-            // the bound + forEachHole path below (span-independent), never enumerating billions of values.
-            if (span > KlauseConfig.current.bitsetThreshold && d.enumerable && d.size <= holeCount) {
+            // The survivor path enumerates every present value, so it asks for them and takes the
+            // bound + forEachHole path below when the domain has too many to walk — span-independent,
+            // never enumerating billions of values.
+            val values = if (span > KlauseConfig.current.bitsetThreshold) d.spanOrNull() else null
+            if (values != null && values.size <= d.holeCount) {
                 iSetKeys.add(v)
-                d.forEach { iSetVals.add(it) }
+                values.forEach { iSetVals.add(it) }
                 iSetOffsets.add(iSetVals.size)
                 continue
             }

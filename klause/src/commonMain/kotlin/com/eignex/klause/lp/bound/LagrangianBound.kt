@@ -10,6 +10,7 @@ import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -177,8 +178,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                 // Abort before walking a domain too large to assign over — notably a wide (>2^31-span)
                 // domain, whose `sizeLong` saturates past the cap, so it is never enumerated. Sound: the
                 // Lagrangian bound is simply skipped (null), never a wrong bound.
-                if (session.intDomain(vars[pos]).sizeLong > MAX_VALUES) return null
-                session.intDomain(vars[pos]).forEach { value ->
+                if (session.intDomain(vars[pos]).spanOrNull(MAX_VALUES.toLong()) == null) return null
+                session.intDomain(vars[pos]).values.forEach { value ->
                     if (!index.containsKey(value)) {
                         index.put(value, list.size)
                         list.add(value)
@@ -250,7 +251,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                     val a = coeffOf(r, varId)
                     if (a != 0L) w = addExact(w, mulExact(p[r], a))
                 }
-                session.intDomain(varId).forEach { value ->
+                session.intDomain(varId).values.forEach { value ->
                     assign.addOption(idx, blockValueIndex[j].getOrDefault(value, -1), mulExact(w, value))
                 }
             }

@@ -2,15 +2,19 @@ package com.eignex.klause.solver.intdomain
 
 import com.eignex.klause.solver.IntConsumer
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.IntSpan
 import com.eignex.klause.util.binarySearchLong
 
 /** Survivor list: the sorted present values, with `>= 1` interior gap. */
 internal class SurvivorsDomain(override val min: Long, override val max: Long, private val survivors: LongArray) :
-    AbstractIntDomain() {
+    AbstractIntDomain(),
+    IntSpan {
     init {
         require(min <= max) { "Empty domain: $min..$max" }
         require(survivors.size >= 2) { "SurvivorsDomain needs >= 2 survivors" }
     }
+
+    override fun spanOrNull(maxValues: Long): IntSpan? = if (survivors.size.toLong() <= maxValues) this else null
 
     override val size: Int get() = survivors.size
 

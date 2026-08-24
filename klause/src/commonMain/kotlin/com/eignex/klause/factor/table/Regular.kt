@@ -15,6 +15,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -136,7 +137,7 @@ class Regular(
             val declared = builder.declaredDomain(seq[t])
             val live = builder.liveDomain(seq[t])
             reach[t].forEach { state ->
-                declared.forEach { sym ->
+                declared.values.forEach { sym ->
                     if (sym !in 1..s) return@forEach
                     val nxt = delta(state, sym)
                     if (nxt == 0) return@forEach

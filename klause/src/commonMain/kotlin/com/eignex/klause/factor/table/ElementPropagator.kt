@@ -8,6 +8,7 @@ import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
@@ -109,8 +110,8 @@ internal class ElementPropagator(
         var resExclude: LongArrayList? = null
         // A result domain too large to walk skips its per-value support scan (sound — the scan resumes once
         // it narrows below the cap, and every leaf has singleton domains).
-        if (state.intDomains[result].sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
-            state.intDomains[result].forEach { rv ->
+        if (state.intDomains[result].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
+            state.intDomains[result].values.forEach { rv ->
                 var supported = false
                 for (k in 0 until positions.size) {
                     if (rv in state.intDomains[arr[positions[k]].toInt()]) {
@@ -136,8 +137,8 @@ internal class ElementPropagator(
                 var selExclude: LongArrayList? = null
                 // A selected-cell domain too large to walk skips its per-value scan (sound — it resumes
                 // once the cell narrows below the cap, and leaves have singleton domains).
-                if (state.intDomains[sel].sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
-                    state.intDomains[sel].forEach { v ->
+                if (state.intDomains[sel].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
+                    state.intDomains[sel].values.forEach { v ->
                         if (v !in resD) (selExclude ?: LongArrayList().also { selExclude = it }).add(v)
                     }
                 }
@@ -157,10 +158,10 @@ internal fun elementDomainsIntersect(a: IntDomain, b: IntDomain): Boolean {
     // Walking the smaller domain to find a shared value is O(span) for a large domain. When either is
     // larger than the walk cap, report an intersection whenever the bounds overlap — a sound over-
     // approximation (it can only leave an index unpruned, never prune a supported one).
-    if (a.sizeLong > DEFAULT_DOMAIN_WALK_CAP || b.sizeLong > DEFAULT_DOMAIN_WALK_CAP) return true
-    val small = if (a.size <= b.size) a else b
-    val large = if (a.size <= b.size) b else a
+    if (a.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null || b.spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null) return true
+    val small = if (a.values.size <= b.values.size) a else b
+    val large = if (a.values.size <= b.values.size) b else a
     var found = false
-    small.forEach { v -> if (v in large) found = true }
+    small.values.forEach { v -> if (v in large) found = true }
     return found
 }

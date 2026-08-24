@@ -4,6 +4,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.excludeIntValues
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongArrayList
 
 /*
@@ -86,7 +87,7 @@ internal class RegularIncrementalState(
         scratch.fill(0L)
         val d = state.intDomains[seq[i]]
         forEachState(fwd, i) { q ->
-            d.forEach { s ->
+            d.values.forEach { s ->
                 val nx = delta(q, s)
                 if (nx != 0) scratch[(nx - 1) ushr 6] = scratch[(nx - 1) ushr 6] or (1L shl ((nx - 1) and 63))
             }
@@ -100,7 +101,7 @@ internal class RegularIncrementalState(
         val d = state.intDomains[seq[i]]
         forEachState(fwd, i) { q ->
             var alive = false
-            d.forEach { s ->
+            d.values.forEach { s ->
                 val nx = delta(q, s)
                 if (nx != 0 && testBit(bwd, i + 1, nx - 1)) alive = true
             }
@@ -127,7 +128,7 @@ internal class RegularIncrementalState(
         for (i in lo..hi) {
             val d = state.intDomains[seq[i]]
             var toRemove: LongArrayList? = null
-            d.forEach { s ->
+            d.values.forEach { s ->
                 var live = false
                 forEachState(fwd, i) { q ->
                     if (!live) {

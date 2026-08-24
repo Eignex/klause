@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.scheduling.internals
 
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import kotlin.math.max
 import kotlin.math.min
 
@@ -203,7 +204,7 @@ internal fun firstInDomainAtLeast(domain: IntDomain, lo: Long): Long? {
     if (lo > domain.max) return null
     var pick = Long.MIN_VALUE
     var found = false
-    domain.forEach {
+    domain.values.forEach {
         if (!found && it >= lo) {
             pick = it
             found = true

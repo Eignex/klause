@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.solver.values
 
 /**
  * Feasibility-Jump / ViolationLS candidate generation. Where the step-based sources
@@ -61,9 +62,9 @@ class ArgminJump(
         var bestVal = cur
         // Staying put is the baseline candidate (Δ = 0); a jump is taken only if it strictly beats it.
         var bestDelta = 0.0
-        if (d.size <= maxValueTries) {
-            for (idx in 0 until d.size) {
-                val candidate = d.valueAt(idx)
+        if (d.values.size <= maxValueTries) {
+            for (idx in 0 until d.values.size) {
+                val candidate = d.values.valueAt(idx)
                 if (candidate == cur) continue
                 val delta = weightedIntSetDelta(state, weights, v, candidate)
                 if (delta < bestDelta) {
@@ -73,7 +74,7 @@ class ArgminJump(
             }
         } else {
             repeat(maxValueTries) {
-                val candidate = d.valueAt(state.rng.nextInt(d.size))
+                val candidate = d.values.valueAt(state.rng.nextInt(d.values.size))
                 if (candidate == cur) return@repeat
                 val delta = weightedIntSetDelta(state, weights, v, candidate)
                 if (delta < bestDelta) {

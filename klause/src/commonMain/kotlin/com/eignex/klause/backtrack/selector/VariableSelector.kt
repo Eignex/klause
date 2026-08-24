@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.orderingSize
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
@@ -103,7 +104,7 @@ internal fun pickByActivityWithDomDivider(
             }
         } else {
             val intId = topId - numBool
-            val dom = session.intDomain(intId).sizeLong
+            val dom = session.intDomain(intId).orderingSize()
             if (dom > 1) {
                 val score = activity / dom.toDouble()
                 if (score > bestScore) {

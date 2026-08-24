@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,7 +61,7 @@ class LocalSearchStateBreakCacheTest {
             if (pickInt) {
                 val v = rng.nextInt(numInt)
                 val d = problem.intDomains[v]
-                val target = d.min + rng.nextInt(d.size)
+                val target = d.min + rng.nextInt(d.values.size)
                 state.apply(Move.IntSet(v, target))
                 assertCacheConsistent(state, "after IntSet($v=$target) at step=$step")
             } else {

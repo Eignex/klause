@@ -18,6 +18,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -171,7 +172,7 @@ class NValue(
         if (!builder.hullEnabled()) return
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         var cells = 0L
-        for (x in xs) cells += builder.declaredDomain(x).size.toLong()
+        for (x in xs) cells += builder.declaredDomain(x).values.size.toLong()
         if (cells == 0L || cells > MAX_NVALUE_CELLS) return
         val yCols = IntArrayList()
         val yByValue = MutableLongIntMap()
@@ -190,7 +191,7 @@ class NValue(
             val live = builder.liveDomain(x)
             val sel = IntArrayList()
             val selVal = LongArrayList()
-            declared.forEach { v ->
+            declared.values.forEach { v ->
                 // The selector z_xv is present while value v stays in x's live domain.
                 val z = builder.auxColumn(0L, if (live.contains(v)) 1L else 0L, presence = longArrayOf(x.toLong(), v))
                 sel.add(z)
@@ -233,7 +234,7 @@ class NValue(
     override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
         if (presents.isNotEmpty()) return null
         var cells = 0L
-        for (x in xs) cells += domains[x].size.toLong()
+        for (x in xs) cells += domains[x].values.size.toLong()
         if (cells == 0L || cells > MAX_NVALUE_CELLS) return null
         // z (per var×value) + y (≤ distinct values ≤ cells) columns; y≥z rows + (Σz=1, channel) per
         // var + the count row.

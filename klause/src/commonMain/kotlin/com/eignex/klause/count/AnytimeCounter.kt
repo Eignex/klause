@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.ceil
 import kotlin.math.min
@@ -43,7 +44,13 @@ internal object AnytimeCounter {
         val suffix = DoubleArray(depth + 1)
         suffix[depth] = 1.0
         for (d in depth - 1 downTo 0) {
-            val sizeAtD = if (d < boolVars.size) 2.0 else problem.intDomains[intVars[d - boolVars.size]].size.toDouble()
+            val sizeAtD = if (d <
+                boolVars.size
+            ) {
+                2.0
+            } else {
+                problem.intDomains[intVars[d - boolVars.size]].values.size.toDouble()
+            }
             suffix[d] = sizeAtD * suffix[d + 1]
         }
 
@@ -125,7 +132,7 @@ internal object AnytimeCounter {
 
     private fun valuesOf(problem: Problem, intVar: Int): List<Long> {
         val dom = problem.intDomains[intVar]
-        return List(dom.size) { dom.valueAt(it) }
+        return List(dom.values.size) { dom.values.valueAt(it) }
     }
 
     private fun clampToLong(x: Double): Long =

@@ -18,6 +18,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -115,7 +116,7 @@ private fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
  *  declared one, so equal sizes mean equal value sets. */
 private fun liveDomainsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
     for (v in vars) {
-        if (ctx.session.intDomain(v).size != ctx.problem.intDomains[v].size) return false
+        if (ctx.session.intDomain(v).values.size != ctx.problem.intDomains[v].values.size) return false
     }
     return true
 }
@@ -270,8 +271,8 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
             // Abort before walking a domain that is too large to assign over — in particular a wide
             // (>2^31-span) domain, whose `sizeLong` saturates well past the cap, so it is never
             // enumerated value-by-value. Sound: no cut is produced, only strengthening is skipped.
-            if (session.intDomain(v).sizeLong > MAX_VALUES) return null
-            session.intDomain(v).forEach { value ->
+            if (session.intDomain(v).spanOrNull(MAX_VALUES.toLong()) == null) return null
+            session.intDomain(v).values.forEach { value ->
                 if (!valueIndex.containsKey(value)) {
                     valueIndex.put(value, values.size)
                     values.add(value)
@@ -283,7 +284,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
             val assign = MinCostAssignment(vars.size, values.size)
             for (i in vars.indices) {
                 val c = intCoef.getOrElse(vars[i]) { 0L }
-                session.intDomain(vars[i]).forEach { value ->
+                session.intDomain(vars[i]).values.forEach { value ->
                     assign.addOption(i, valueIndex.getOrDefault(value, -1), mulExact(c, value))
                 }
             }

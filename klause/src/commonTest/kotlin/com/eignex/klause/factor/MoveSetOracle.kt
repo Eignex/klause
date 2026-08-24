@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.assertTrue
 
@@ -197,7 +198,7 @@ object MoveSetOracle {
         for (b in 0 until problem.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in 0 until problem.numIntVars) {
             val d: IntDomain = problem.intDomains[i]
-            state.assignment.setInt(i, d.valueAt(rng.nextInt(d.size)))
+            state.assignment.setInt(i, d.values.valueAt(rng.nextInt(d.values.size)))
         }
     }
 

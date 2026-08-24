@@ -4,6 +4,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -431,8 +432,8 @@ internal fun PropagationState.citeCrossedSearchHoles(
     // so walking holes would be O(span); iterate the root's members instead. Identical cited set.
     val lo = maxOf(from, prior.min)
     val hi = minOf(until - 1, prior.max)
-    if (root.size.toLong() <= prior.holeCount) {
-        root.forEach { value ->
+    if (root.values.size.toLong() <= prior.holeCount) {
+        root.values.forEach { value ->
             if (value in lo..hi && value !in prior) cite(value)
         }
     } else {
@@ -569,7 +570,8 @@ internal fun PropagationState.restrictIntToSurvivors(v: Int, survivors: LongArra
         seedConflictFactor(currentFactor)
         return false
     }
-    if (kept == d.size) return true // survivors already cover every live value — no restriction
+    // A domain with more values than the survivor list can hold is never fully covered by it.
+    if (kept == d.spanOrNull()?.size) return true // survivors already cover every live value
     val filtered = if (kept == survivors.size) {
         survivors
     } else {

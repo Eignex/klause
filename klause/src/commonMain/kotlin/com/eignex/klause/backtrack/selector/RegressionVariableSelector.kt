@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.values
 import com.eignex.kumulant.bandit.contextual.LinearRegressionSpec
 import com.eignex.kumulant.bandit.contextual.RegressionContextualBandit
 import com.eignex.kumulant.bandit.contextual.RegressionContextualSpec
@@ -122,7 +123,7 @@ class RegressionVariableSelector private constructor(
             if (session.boolValue(v) == null) all.add(Candidate(VarRef.Bool(v), 2))
         }
         for (v in 0 until problem.numIntVars) {
-            val size = session.intDomain(v).size
+            val size = session.intDomain(v).values.size
             if (size > 1) all.add(Candidate(VarRef.IntVar(v), size))
         }
         if (all.size <= scoreCap) return all
@@ -168,7 +169,7 @@ class RegressionVariableSelector private constructor(
         for (v in 0 until problem.numIntVars) maxDegree = maxOf(maxDegree, problem.intOccurrences[v].size)
         degreeScale = maxDegree.toDouble()
         var maxDom = 2
-        for (v in 0 until problem.numIntVars) maxDom = maxOf(maxDom, problem.intDomains[v].size)
+        for (v in 0 until problem.numIntVars) maxDom = maxOf(maxDom, problem.intDomains[v].values.size)
         lnDomScale = ln((maxDom + 1).toDouble())
         depthScale = maxOf(1, n).toDouble()
     }

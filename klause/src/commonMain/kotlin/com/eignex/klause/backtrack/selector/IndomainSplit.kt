@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 
 /**
@@ -23,8 +24,8 @@ object IndomainSplit : ValueSelector {
             // trailing ascending walk keeps the sequence complete for any consumer that
             // enumerates past the first value.
             sequenceOf(mid) + sequence {
-                for (i in 0 until d.size) {
-                    val v = d.valueAt(i)
+                for (i in 0 until d.values.size) {
+                    val v = d.values.valueAt(i)
                     if (v != mid) yield(v)
                 }
             }

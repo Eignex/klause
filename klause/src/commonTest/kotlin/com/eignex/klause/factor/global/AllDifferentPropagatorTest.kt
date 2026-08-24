@@ -17,6 +17,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -333,7 +334,7 @@ class AllDifferentPropagatorTest {
         val d1 = session.intDomain(1)
         assertEquals(1, d1.min, "v1's min should remain 1 (3 is interior)")
         assertEquals(5, d1.max, "v1's max should remain 5 (3 is interior)")
-        assertEquals(4, d1.size, "v1 should have 4 values after punching out 3; got $d1")
+        assertEquals(4, d1.values.size, "v1 should have 4 values after punching out 3; got $d1")
         assertTrue(3 !in d1, "v1 should no longer contain 3")
         assertTrue(2 in d1 && 4 in d1, "v1 should still contain 2 and 4")
     }

@@ -50,36 +50,14 @@ interface IntDomain {
     /** Inclusive upper bound; always an in-domain value. May exceed 32-bit range. */
     val max: Long
 
-    /** Number of values in the domain (O(1)). An index/count kept 32-bit: a *materialisable* domain
-     *  never holds more than [Int.MAX_VALUE] present values, even when its value span is far wider
-     *  (a wide [ContiguousDomain] reports [Int.MAX_VALUE] — its values are never enumerated).
-     *  Exact only when [enumerable]; a saturated count carries no information beyond "very large". */
-    val size: Int
-
-    /** True when [size] is the exact present-value count, so positional access ([valueAt] over
-     *  `0 until size`) covers the whole domain. False for the wide reps whose count exceeds (and
-     *  [size] saturates at) [Int.MAX_VALUE] — a contiguous or run domain spanning beyond 32-bit.
-     *  Such a domain must be processed through its bounds and [forEachHole], never by value
-     *  enumeration or positional indexing. */
-    val enumerable: Boolean get() = true
-
-    /** Exact present-value count as a Long, saturating at [Long.MAX_VALUE] only when the count
-     *  exceeds Long range (a domain spanning more than 2^63 values). Unlike [size] it stays exact
-     *  on wide non-[enumerable] domains, so span-sensitive heuristics can still discriminate
-     *  between them. */
-    val sizeLong: Long get() = size.toLong()
-
     /** Number of interior holes: values strictly between [min] and [max] that are absent. O(1) or
      *  O(runs) and span-independent — it never walks the gap value by value. Zero for a contiguous
-     *  domain; may exceed [Int] range for a sparse domain over a wide span. The dual of [size], for
+     *  domain; may exceed [Int] range for a sparse domain over a wide span. The dual of the value count, for
      *  callers deciding whether iterating holes or members is cheaper. */
     val holeCount: Long
 
     /** True iff [value] lies in the domain. */
     operator fun contains(value: Long): Boolean
-
-    /** The `i`-th value present in the domain (0-indexed, ascending). */
-    fun valueAt(i: Int): Long
 
     /** Return a new domain with [value] excluded, or `this` if [value] is absent (idempotent).
      *  Throws if removing [value] would empty the domain. */
@@ -109,8 +87,26 @@ interface IntDomain {
      */
     fun includeInteriorValue(value: Long): IntDomain
 
-    /** Invoke [action] for each value present in the domain, ascending. */
-    fun forEach(action: IntConsumer)
+    /**
+     * This domain's values when there are at most [maxValues] of them, else null.
+     *
+     * The only way to obtain values, so a caller states what it can afford before it walks anything —
+     * the question the old `sizeLong <= cap` guards asked separately from the walk they guarded.
+     * Returns the domain itself, so asking allocates nothing and keeps the packed representation.
+     */
+    fun spanOrNull(maxValues: Long = Int.MAX_VALUE.toLong()): IntSpan?
+
+    /**
+     * This domain's values, or a failure when it has too many to enumerate.
+     *
+     * For a caller whose constraint only makes sense over an enumerable domain — a table, a value
+     * graph, an all-different — so the requirement is stated once at the top of the operation rather
+     * than re-derived per access. Prefer [spanOrNull] wherever declining is a real option.
+     */
+    fun span(): IntSpan = spanOrNull() ?: error("domain [$min, $max] holds too many values to enumerate")
+
+    /** True when exactly one value remains. O(1) on every representation. */
+    val isFixed: Boolean get() = min == max
 
     /** Invoke [action] for each value excluded strictly between [min] and [max], ascending.
      *  No-op for a contiguous domain. */
@@ -143,11 +139,11 @@ interface IntDomain {
         val cand = value - 1
         if (cand in this) return cand
         var lo = 0
-        var hi = size - 1
+        var hi = values.size - 1
         var ans = min
         while (lo <= hi) {
             val mid = (lo + hi) ushr 1
-            val v = valueAt(mid)
+            val v = values.valueAt(mid)
             if (v < value) {
                 ans = v
                 lo = mid + 1
@@ -164,11 +160,11 @@ interface IntDomain {
         val cand = value + 1
         if (cand in this) return cand
         var lo = 0
-        var hi = size - 1
+        var hi = values.size - 1
         var ans = max
         while (lo <= hi) {
             val mid = (lo + hi) ushr 1
-            val v = valueAt(mid)
+            val v = values.valueAt(mid)
             if (v > value) {
                 ans = v
                 hi = mid - 1
@@ -185,4 +181,39 @@ interface IntDomain {
         /** Construct the contiguous domain `(min..max)`. */
         operator fun invoke(min: Long, max: Long): IntDomain = ContiguousDomain(min, max)
     }
+}
+
+/**
+ * The values of a domain whose constraint only holds over an enumerable one — a table, a value graph,
+ * an all-different. Fails loudly on a domain too wide to walk, where the old saturating `size` returned
+ * a number that silently meant "very large". A caller that can decline instead should ask
+ * [IntDomain.spanOrNull].
+ */
+val IntDomain.values: IntSpan get() = span()
+
+/**
+ * A magnitude for domain-ordering heuristics: the exact value count when the domain is enumerable,
+ * else the width of its bounds. Deliberately approximate — a first-fail order only needs to compare
+ * domains, and a domain too wide to count is large under either reading.
+ */
+fun IntDomain.orderingSize(): Long = spanOrNull()?.size?.toLong() ?: (max - min + 1)
+
+/**
+ * The values of an [IntDomain], in ascending order, when there are few enough of them to index.
+ *
+ * Separate from [IntDomain] on purpose. A domain knows its bounds and its holes however wide it is,
+ * while enumeration is only meaningful when the present values can be addressed by an `Int` index —
+ * so a caller that walks values must obtain this first and handle its absence, rather than checking a
+ * predicate and hoping. Obtained from [IntDomain.spanOrNull]; the domain returns itself, so holding a
+ * span allocates nothing and keeps the packed representation.
+ */
+interface IntSpan {
+    /** Number of values, exact. */
+    val size: Int
+
+    /** The `i`-th value, 0-indexed ascending. */
+    fun valueAt(i: Int): Long
+
+    /** Invoke [action] for each value, ascending. */
+    fun forEach(action: IntConsumer)
 }

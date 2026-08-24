@@ -81,8 +81,9 @@ internal fun collectHoleAndBoundAntecedents(
         // its bounds. Enumerate whichever side is smaller: a survivor set over a wide span has span-many
         // holes but few members, so walking holes would be O(span) — iterate the original's members
         // instead. Both paths visit the same values ascending, so the cited literal set is identical.
-        if (orig.size.toLong() <= d.holeCount) {
-            orig.forEach { value ->
+        val members = orig.spanOrNull(d.holeCount)
+        if (members != null) {
+            members.forEach { value ->
                 if (value in lo..hi && value !in d) {
                     val lit = Lit.make(state.atomVarEq(v, value), true)
                     if (seen.add(lit)) out.add(lit)

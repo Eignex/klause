@@ -26,6 +26,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —
@@ -365,7 +366,7 @@ object LpAutoConfig {
             if (n < 2) continue
             var arcs = 0L
             for (i in 0 until n) {
-                problem.intDomains[succ[i]].forEach { j ->
+                problem.intDomains[succ[i]].values.forEach { j ->
                     if ((selfLoops || j != i.toLong()) &&
                         j in 0L until n
                     ) {

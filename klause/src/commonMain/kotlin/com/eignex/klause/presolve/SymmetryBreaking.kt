@@ -11,6 +11,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
 import com.eignex.klause.util.LongArrayList
@@ -316,18 +317,18 @@ internal object SymmetryBreaking {
         // carry a distinct marker word so they never collide; within a form, equal domains yield equal keys
         // and distinct domains distinct keys, so the colour partition — and thus every generator found — is
         // identical to the all-holes seed, at O(min(holes, survivors)) rather than O(span).
-        val holeCount = (d.max - d.min + 1) - d.size
-        // Only the survivor form for an [IntDomain.enumerable] domain: a wide contiguous/huge-run domain
+        val holeCount = (d.max - d.min + 1) - d.values.size
+        // Only the survivor form for a domain that has a span: a wide contiguous/huge-run domain
         // saturates [size] at Int.MAX, so its `holeCount` looks positive though it is hole-free/few-holed;
         // it takes the hole form below (forEachHole is empty/small), never allocating a span-sized array.
-        if (d.enumerable && d.size <= holeCount) {
-            val words = LongArray(4 + d.size)
+        if ((d.spanOrNull() != null) && d.values.size <= holeCount) {
+            val words = LongArray(4 + d.values.size)
             words[0] = SPACE_INT
             words[1] = SEED_DOMAIN_SURVIVORS
             words[2] = d.min
             words[3] = d.max
             var i = 4
-            d.forEach { words[i++] = it }
+            d.values.forEach { words[i++] = it }
             return RefineKey(words)
         }
         val holes = LongArrayList()

@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IndexedMaxHeap
 import com.eignex.klause.util.IntArrayList
@@ -93,7 +94,7 @@ class Chb(
                 }
             } else {
                 val intId = id - numBoolCached
-                if (session.intDomain(intId).size > 1) {
+                if (session.intDomain(intId).values.size > 1) {
                     result = VarRef.IntVar(intId)
                     break
                 }

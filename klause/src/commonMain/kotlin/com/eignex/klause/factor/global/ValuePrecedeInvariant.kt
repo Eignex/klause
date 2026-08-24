@@ -4,6 +4,7 @@ import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.solver.values
 
 /** LS invariant logic for `value_precede`. */
 internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, private val xs: IntArray) : Invariant {
@@ -67,7 +68,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
             val d = state.rootDomains[xs[i]]
             var pick = -1L
             var seen = 0
-            d.forEach { w ->
+            d.values.forEach { w ->
                 if (w != v && (w == s || (w != t && v != s))) {
                     seen++
                     if (state.rng.nextInt(seen) == 0) pick = w
@@ -88,7 +89,7 @@ internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, p
             }
             val d = state.rootDomains[v]
             var pick = -1L
-            d.forEach { if (pick < 0 && it != t) pick = it }
+            d.values.forEach { if (pick < 0 && it != t) pick = it }
             if (pick < 0) return false
             state.assignment.setInt(v, pick)
         }

@@ -3,6 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -41,7 +42,7 @@ class PropagationStateExcludeTest {
         val d = s.intDomains[0]
         assertEquals(1, d.min)
         assertEquals(5, d.max)
-        assertEquals(4, d.size)
+        assertEquals(4, d.values.size)
         assertFalse(3 in d)
         assertTrue(2 in d)
         assertTrue(4 in d)
@@ -69,7 +70,7 @@ class PropagationStateExcludeTest {
         val d = s.intDomains[0]
         assertEquals(2, d.min)
         assertEquals(5, d.max)
-        assertEquals(3, d.size)
+        assertEquals(3, d.values.size)
         assertFalse(3 in d, "hole at 3 should survive the lower-bound tighten")
         assertTrue(2 in d)
         assertTrue(4 in d)
@@ -84,7 +85,7 @@ class PropagationStateExcludeTest {
         val d = s.intDomains[0]
         assertEquals(1, d.min)
         assertEquals(2, d.max)
-        assertEquals(2, d.size)
+        assertEquals(2, d.values.size)
     }
 
     @Test
@@ -96,7 +97,7 @@ class PropagationStateExcludeTest {
         val d = s.intDomains[0]
         assertEquals(0, d.min)
         assertEquals(10, d.max)
-        assertEquals(8, d.size)
+        assertEquals(8, d.values.size)
         for (h in longArrayOf(3, 5, 7)) assertFalse(h in d, "$h should be a hole")
         for (k in longArrayOf(0, 1, 2, 4, 6, 8, 9, 10)) assertTrue(k in d, "$k should remain in domain")
     }

@@ -8,6 +8,7 @@ import com.eignex.klause.factor.table.internals.allEventWatches
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 
@@ -84,7 +85,7 @@ internal class TablePropagator(
                 val d = state.intDomains[xs[col]]
                 mins[col] = d.min
                 maxs[col] = d.max
-                if (d.size.toLong() != d.max - d.min + 1) contiguous = false
+                if (d.values.size.toLong() != d.max - d.min + 1) contiguous = false
             }
             if (contiguous && gc.isNoop(mins, maxs)) {
                 // This row sweeps nothing, so it has nothing to filter and needs no live set. A group's
@@ -102,7 +103,7 @@ internal class TablePropagator(
                 if (contiguous && gc.noopMins == null) {
                     var noPrune = true
                     for (col in 0 until arity) {
-                        if (state.intDomains[xs[col]].size.toLong() != maxs[col] - mins[col] + 1) {
+                        if (state.intDomains[xs[col]].values.size.toLong() != maxs[col] - mins[col] + 1) {
                             noPrune = false
                             break
                         }
@@ -215,8 +216,8 @@ internal class TablePropagator(
             val colLo = domLo[col]
             val colHi = domHi[col]
             var toRemoveCount = 0
-            val toRemove = LongArray(d.size)
-            d.forEach { value ->
+            val toRemove = LongArray(d.values.size)
+            d.values.forEach { value ->
                 if (value in colLo..colHi) {
                     val off = (value - colLo).toInt()
                     if (((bits[off ushr 6] ushr (off and 63)) and 1L) == 0L) toRemove[toRemoveCount++] = value
@@ -291,9 +292,9 @@ internal class TablePropagator(
             // A column too large to walk keeps its bounds tightening above; skip the per-value support
             // removal rather than walking the span. Sound: such a domain is never a full assignment, and
             // the removal runs once the column narrows below the cap (every leaf is singleton domains).
-            if (state.intDomains[xs[col]].sizeLong <= DEFAULT_DOMAIN_WALK_CAP) {
+            if (state.intDomains[xs[col]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) != null) {
                 val toRemove = LongArrayList()
-                state.intDomains[xs[col]].forEach { value ->
+                state.intDomains[xs[col]].values.forEach { value ->
                     if (value !in sup) toRemove.add(value)
                 }
                 for (k in 0 until toRemove.size) {

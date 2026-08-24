@@ -20,6 +20,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -479,7 +480,7 @@ class FactorPropertyTest {
 
             var target = cur
             repeat(8) {
-                val candidate = d.min + rng.nextInt(d.size)
+                val candidate = d.min + rng.nextInt(d.values.size)
                 if (candidate != cur) {
                     target = candidate
                     return@repeat
@@ -494,7 +495,7 @@ class FactorPropertyTest {
         for (b in 0 until env.numBoolVars) state.assignment.setBool(b, rng.nextBoolean())
         for (i in env.intDomains.indices) {
             val d = env.intDomains[i]
-            state.assignment.setInt(i, d.min + rng.nextInt(d.size))
+            state.assignment.setInt(i, d.min + rng.nextInt(d.values.size))
         }
     }
 

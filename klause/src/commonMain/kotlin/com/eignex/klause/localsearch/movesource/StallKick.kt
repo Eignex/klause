@@ -4,6 +4,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.MoveSizeDistribution
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -60,8 +61,8 @@ class StallKick(
             if (pick < nInts) {
                 val v = scope.intVars[pick]
                 val d = problem.intDomains[v]
-                if (d.size > 1) {
-                    val nv = d.valueAt(state.rng.nextInt(d.size)) // sparse-aware: never lands on a hole
+                if (!d.isFixed) {
+                    val nv = d.values.valueAt(state.rng.nextInt(d.values.size)) // sparse-aware: never lands on a hole
                     if (nv != state.assignment.intValue(v)) {
                         scratch.addChannelingIntSet(state, v, nv)
                         budget--

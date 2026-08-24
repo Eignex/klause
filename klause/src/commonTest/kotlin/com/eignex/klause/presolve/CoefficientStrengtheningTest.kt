@@ -10,6 +10,7 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -101,7 +102,7 @@ class CoefficientStrengtheningTest {
         val rewritten = strengthened(problem).factors.filterIsInstance<Linear>()
         val values = Array(numVars) { v ->
             val d = problem.intDomains[v]
-            IntArray(d.size) { d.valueAt(it).toInt() }
+            IntArray(d.values.size) { d.values.valueAt(it).toInt() }
         }
         val assign = IntArray(numVars)
         enumerateMixed(values) { idx ->

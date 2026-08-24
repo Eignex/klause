@@ -29,7 +29,7 @@ internal fun pickByDomainMetric(
     }
     for (v in 0 until problem.numIntVars) {
         val d = session.intDomain(v)
-        if (d.size <= 1) continue
+        if (d.isFixed) continue
         val score = intScore(d)
         if (improves(score, bestScore, maximize)) {
             best = VarRef.IntVar(v)

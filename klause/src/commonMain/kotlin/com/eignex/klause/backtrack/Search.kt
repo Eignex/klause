@@ -37,6 +37,7 @@ import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random
@@ -286,7 +287,7 @@ internal class BacktrackBrancher(
 
     private fun isOpen(variable: VarRef): Boolean = when (variable) {
         is VarRef.Bool -> session.boolValue(variable.varId) == null
-        is VarRef.IntVar -> session.intDomain(variable.varId).size > 1
+        is VarRef.IntVar -> session.intDomain(variable.varId).values.size > 1
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
@@ -347,8 +348,8 @@ internal fun splitIntAlternatives(
     val domain = session.intDomain(variable.varId)
     check(domain.min < domain.max) { "selector chose fixed integer ${variable.varId}" }
     val split = when {
-        !domain.enumerable && preferred > domain.min && preferred < domain.max -> preferred
-        !domain.enumerable -> boundsMidpoint(domain)
+        (domain.spanOrNull() == null) && preferred > domain.min && preferred < domain.max -> preferred
+        (domain.spanOrNull() == null) -> boundsMidpoint(domain)
         preferred >= domain.max -> domain.max - 1
         else -> maxOf(preferred, domain.min)
     }

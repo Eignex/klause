@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
@@ -156,7 +157,7 @@ internal class AllDifferentInvariant(
             if (state.assumptions.isFrozenInt(v)) continue
             val d = state.rootDomains[v]
             var chosen = Long.MIN_VALUE
-            d.forEach { cand ->
+            d.values.forEach { cand ->
                 if (chosen == Long.MIN_VALUE && (cand in exceptValues || !used.contains(cand))) chosen = cand
             }
             if (chosen == Long.MIN_VALUE) {
@@ -199,7 +200,7 @@ internal class AllDifferentInvariant(
         val valuesPerVar = Array(m) { k ->
             val d = state.rootDomains[freeVars[k]]
             val allowed = IntArrayList()
-            d.forEach { cand ->
+            d.values.forEach { cand ->
                 val idx = cand - domainMin
                 if (idx in 0L until domainSize.toLong() && cand !in exceptValues && !taken[idx.toInt()]) {
                     allowed.add(idx.toInt())
@@ -222,7 +223,7 @@ internal class AllDifferentInvariant(
                 continue
             }
             var chosen = Long.MIN_VALUE
-            state.rootDomains[v].forEach { cand ->
+            state.rootDomains[v].values.forEach { cand ->
                 if (chosen == Long.MIN_VALUE && cand in exceptValues) {
                     chosen = cand
                 }
@@ -262,7 +263,7 @@ internal class AllDifferentInvariant(
         val targets = LongArray(MAX_REPAIR_TARGETS) { Long.MIN_VALUE }
         var filled = 0
         var seenTargets = 0
-        d.forEach { target ->
+        d.values.forEach { target ->
             if (target != value && s.counts.getOrDefault(target, 0) == 0) {
                 seenTargets++
                 if (filled < MAX_REPAIR_TARGETS) {

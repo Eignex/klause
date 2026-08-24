@@ -7,6 +7,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 
@@ -155,7 +156,7 @@ internal class NValueInvariant(
                 if (s.counts.getOrDefault(cur, 0) <= 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
-                d.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
+                d.values.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) == 0) pick = it }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
@@ -167,7 +168,7 @@ internal class NValueInvariant(
                 if (s.counts.getOrDefault(cur, 0) > 1) continue
                 val d = state.rootDomains[xs[i]]
                 var pick: Long? = null
-                d.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
+                d.values.forEach { if (pick == null && it != cur && s.counts.getOrDefault(it, 0) > 0) pick = it }
                 val p = pick
                 if (p != null) sink.addChannelingIntSet(state, xs[i], p)
             }
@@ -190,7 +191,7 @@ internal class NValueInvariant(
             val d = state.rootDomains[xs[i]]
             var pick = -1L
             var seen = 0
-            d.forEach { w ->
+            d.values.forEach { w ->
                 if (w != v) {
                     val wBorn = s.counts.getOrDefault(w, 0) == 0
                     if (vDies == wBorn) {
@@ -248,14 +249,14 @@ internal class NValueInvariant(
     private fun largestInDomainAtMost(d: IntDomain, bound: Int): Long? {
         if (d.min > bound) return null
         var pick = -1L
-        d.forEach { if (it <= bound) pick = it }
+        d.values.forEach { if (it <= bound) pick = it }
         return if (pick < 0) null else pick
     }
 
     private fun smallestInDomainAtLeast(d: IntDomain, bound: Int): Long? {
         if (d.max < bound) return null
         var pick = -1L
-        d.forEach { if (pick < 0 && it >= bound) pick = it }
+        d.values.forEach { if (pick < 0 && it >= bound) pick = it }
         return if (pick < 0) null else pick
     }
 

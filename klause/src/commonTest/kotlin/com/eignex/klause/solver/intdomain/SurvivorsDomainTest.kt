@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.intdomain
 
+import com.eignex.klause.solver.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,7 +19,7 @@ class SurvivorsDomainTest {
         val d = SurvivorsDomain(1, 9, longArrayOf(1, 4, 9))
         val e = d.includeInteriorValue(6)
         val seen = mutableListOf<Long>()
-        e.forEach { seen.add(it) }
+        e.values.forEach { seen.add(it) }
         assertEquals(listOf(1L, 4L, 6L, 9L), seen)
     }
 
@@ -28,7 +29,7 @@ class SurvivorsDomainTest {
         val e = d.withMaxAtMost(9)
         assertEquals(1, e.min)
         assertEquals(9, e.max)
-        assertEquals(3, e.size)
+        assertEquals(3, e.values.size)
         assertTrue(20 !in e)
     }
 }

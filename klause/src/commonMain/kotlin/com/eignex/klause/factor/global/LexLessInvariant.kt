@@ -5,6 +5,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntHashSet
 
 /** LS invariant logic for `lex_less` / `lex_lesseq`. */
@@ -113,7 +114,7 @@ internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArr
             val d = state.rootDomains[vId]
             var pick = -1L
             var seen = 0
-            d.forEach { w ->
+            d.values.forEach { w ->
                 if (w != cur) {
                     seen++
                     if (state.rng.nextInt(seen) == 0) pick = w

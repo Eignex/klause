@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.intdomain
 
+import com.eignex.klause.solver.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -51,7 +52,7 @@ class BitsetDomainTest {
         val d = ContiguousDomain(0, 20).excludeValue(10)
         val restored = d.includeInteriorValue(10)
         assertTrue(10 in restored)
-        assertEquals(21, restored.size)
+        assertEquals(21, restored.values.size)
     }
 
     @Test
@@ -89,7 +90,7 @@ class BitsetDomainTest {
         val d = ContiguousDomain(5, 20).excludeValue(10).excludeValue(15)
         val expected = (5..20).filter { it != 10 && it != 15 }
         for ((i, v) in expected.withIndex()) {
-            assertEquals(v.toLong(), d.valueAt(i), "valueAt($i)")
+            assertEquals(v.toLong(), d.values.valueAt(i), "valueAt($i)")
         }
     }
 
@@ -97,7 +98,7 @@ class BitsetDomainTest {
     fun `bitset rep forEach matches expected sequence`() {
         val d = ContiguousDomain(0, 80).excludeValue(40)
         val seen = mutableListOf<Long>()
-        d.forEach { seen.add(it) }
+        d.values.forEach { seen.add(it) }
         val expected = (0..80).filter { it != 40 }.map { it.toLong() }
         assertEquals(expected, seen)
     }
@@ -115,7 +116,7 @@ class BitsetDomainTest {
         d = d.excludeValue(0)
         d = d.excludeValue(4)
         d = d.excludeValue(3)
-        assertEquals(1, d.size)
+        assertEquals(1, d.values.size)
         assertFails { d.excludeValue(1) }
     }
 }
