@@ -187,11 +187,12 @@ private class CpSatisfactionTraversal(
 
 /** CP-specific wiring around the shared traversal engine for satisfaction and model streaming. */
 private class CpSatisfactionTraversalPolicy(
-    session: PropagationSession,
-    params: BacktrackParams,
+    private val session: PropagationSession,
+    private val params: BacktrackParams,
     sink: SolveStatsSink?,
     seedDecisionLevels: Int,
-) : SearchTraversalPolicy {
+) : SearchTraversalPolicy,
+    SearchRunLifecycle {
     private val restart = RestartSchedule.from(params)
 
     val brancher = BacktrackBrancher(session, params, sink, restart, seedDecisionLevels = seedDecisionLevels)
@@ -211,15 +212,8 @@ private class CpSatisfactionTraversalPolicy(
     override val modelContinuation = SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
     override val nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll
-    override val lifecycle: SearchRunLifecycle = SatisfactionLifecycle(params, session, brancher)
-}
+    override val lifecycle: SearchRunLifecycle get() = this
 
-/** Maintains the ordinary SAT/CP learned-state lifecycle at shared runner boundaries. */
-private class SatisfactionLifecycle(
-    private val params: BacktrackParams,
-    private val session: PropagationSession,
-    private val brancher: BacktrackBrancher,
-) : SearchRunLifecycle {
     private val inprocessing = Inprocessing.from(params)
     private var lastPooledSolution: Sample? = null
 

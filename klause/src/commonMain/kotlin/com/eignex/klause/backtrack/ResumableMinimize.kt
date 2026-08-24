@@ -37,6 +37,7 @@ import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchContext
+import com.eignex.klause.solver.search.SearchDecisionBudget
 import com.eignex.klause.solver.search.SearchLearnedConflict
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchModelContinuation
@@ -49,6 +50,7 @@ import com.eignex.klause.solver.search.SearchRunDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchSolveParams
+import com.eignex.klause.solver.search.SearchTraversalPolicy
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -182,6 +184,7 @@ internal class ResumableMinimize(
     private var firstRun = true
     private val inprocessing = Inprocessing.from(params)
     private var lastPooledSolution: Sample? = null
+    private val traversal = OptimizationTraversalPolicy()
 
     // Built lazily so it binds the engine's session (created inside the engine's constructor). Its first
     // use is the first-run boundExchange work, well after construction.
@@ -205,20 +208,7 @@ internal class ResumableMinimize(
                 ComponentResult.Indeterminate -> Unit
             }
         }
-        run = searchSession.openRun(
-            problem.numBoolVars,
-            SearchSolveParams(
-                maxDecisions = Long.MAX_VALUE,
-                restart = restart,
-            ),
-            BooleanBranching.None,
-            decisionBudget = { --decisionLimit >= 0L },
-            observer = brancher,
-            modelContinuation = SearchModelContinuation.BlockAtRoot,
-            modelPolicy = IncumbentPolicy(),
-            nodePolicy = LpNodePolicy(),
-            lifecycle = OptimizationLifecycle(),
-        )
+        run = searchSession.openRun(problem.numBoolVars, traversal)
     }
 
     override fun runSlice(
@@ -701,8 +691,19 @@ internal class ResumableMinimize(
         }
     }
 
-    /** Root-only optimization work attached to the generic run lifecycle. */
-    private inner class OptimizationLifecycle : SearchRunLifecycle {
+    /** CP optimization configuration and root-boundary work for the shared traversal. */
+    private inner class OptimizationTraversalPolicy :
+        SearchTraversalPolicy,
+        SearchRunLifecycle {
+        override val solveParams = SearchSolveParams(maxDecisions = Long.MAX_VALUE, restart = restart)
+        override val booleanBranching = BooleanBranching.None
+        override val decisionBudget = SearchDecisionBudget { --decisionLimit >= 0L }
+        override val observer = brancher
+        override val modelContinuation = SearchModelContinuation.BlockAtRoot
+        override val modelPolicy: SearchModelPolicy = IncumbentPolicy()
+        override val nodePolicy: SearchNodePolicy = LpNodePolicy()
+        override val lifecycle: SearchRunLifecycle get() = this
+
         override fun onResume(context: SearchContext): SearchRunDisposition {
             boundExchange.applySharedFloor()
             return SearchRunDisposition.Continue
