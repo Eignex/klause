@@ -499,18 +499,22 @@ private inline fun SmtLib.Builder.chainReified(n: Int, reifyPair: (Int) -> Int):
     if (n == 2) reifyPair(0) else tseitinAnd((0 until n - 1).map(reifyPair))
 
 /** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
- *  witness encoding where every operand is a bare finite-domain variable, else pairwise `!=`. */
+ *  witness encoding where every operand is a bare finite-domain variable, else pairwise strict-order choices. */
 private fun SmtLib.Builder.distinctFromArgs(args: List<Res>): Int {
     if (args.size < 2) return trueLit()
     val terms = args.map {
         if (it is Res.B) IntComb.Narrow(litToIntTerm(it.lit)) else it.asIntComb()
     }
     witnessDistinct(terms)?.let { return it }
-    val neLits = ArrayList<Int>()
+    val orderLits = ArrayList<Int>()
     for (i in terms.indices) {
-        for (j in i + 1 until terms.size) neLits.add(reifyRelation("distinct", terms[i], terms[j]))
+        for (j in i + 1 until terms.size) {
+            val less = reifyRelation("<", terms[i], terms[j])
+            val greater = reifyRelation(">", terms[i], terms[j])
+            orderLits.add(tseitinOr(listOf(less, greater)))
+        }
     }
-    return tseitinAnd(neLits)
+    return tseitinAnd(orderLits)
 }
 
 /** The witness reification of `distinct`, or null when an operand is not a bare variable, repeats another,
