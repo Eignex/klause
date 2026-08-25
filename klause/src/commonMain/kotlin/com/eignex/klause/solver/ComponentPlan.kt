@@ -1,9 +1,6 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.difference.supportsCompleteDifferenceTheory
-import com.eignex.klause.factor.arithmetic.ComparisonClause
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 
 /** Ownership of an integer column selected once before a search begins. */
@@ -230,6 +227,3 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         route,
     )
 }
-
-internal fun Factor.supportsIntegerTheory(): Boolean = this is Linear || this is ReifiedLinear ||
-    this is ComparisonClause

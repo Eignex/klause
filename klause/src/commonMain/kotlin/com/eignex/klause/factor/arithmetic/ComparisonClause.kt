@@ -31,6 +31,8 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
 
     override val variables: VarList = MixedVars(boundInts = vars.distinct().toIntArray(), boolVars = IntArray(0))
 
+    override val integerTheoryOwnable: Boolean get() = true
+
     override fun remap(mapping: VarRemap): Factor = ComparisonClause(mapping.ints(vars), ops, consts)
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.COMPARISON_CLAUSE, ::buildKey)

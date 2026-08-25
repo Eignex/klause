@@ -83,6 +83,15 @@ class ReifiedLinear private constructor(
             wideBoundIn = wideBound,
         )
 
+    override val integerTheoryOwnable: Boolean get() = true
+
+    override val exactTheoryOwnable: Boolean get() = when (val c = constants) {
+        is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
+            isExactInteger(c.bound.toDouble())
+
+        is WideConstants -> true
+    }
+
     override val variables: VarList = MixedVars(boundInts = vars, boolVars = intArrayOf(auxBoolVar))
 
     /**

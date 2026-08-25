@@ -52,6 +52,10 @@ class Clause(val literals: IntArray) :
 
     override val variables: VarList = BoolVars(literals.litVars())
 
+    override val integerTheoryOwnable: Boolean get() = true
+
+    override val exactTheoryOwnable: Boolean get() = true
+
     override val extendsObjectiveCone: Boolean = true
 
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
