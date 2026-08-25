@@ -3,6 +3,7 @@ package com.eignex.klause.solver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
@@ -36,6 +37,34 @@ class ProblemTest {
             factors = tighteningFactors(),
         )
         assertEquals(3, problem.bake().requireFiniteIntDomains()[0].max, "bake carries the x <= 3 tightening")
+    }
+
+    @Test
+    fun `problem rejects a factor with an invalid Boolean variable`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            Problem(
+                numBoolVars = 1,
+                numIntVars = 0,
+                intDomains = emptyArray(),
+                factors = arrayOf(Clause(intArrayOf(Lit.make(1, true)))),
+            )
+        }
+
+        assertTrue(error.message!!.contains("factor 0 references Boolean variable 1"))
+    }
+
+    @Test
+    fun `problem rejects a factor with an invalid integer variable`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            Problem(
+                numBoolVars = 0,
+                numIntVars = 1,
+                intDomains = arrayOf(IntDomain(0, 1)),
+                factors = arrayOf(Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 0)),
+            )
+        }
+
+        assertTrue(error.message!!.contains("factor 0 references integer variable 1"))
     }
 
     @Test
