@@ -177,6 +177,23 @@ open class Problem(
         require(realLower.size == numRealVars && realUpper.size == numRealVars) {
             "real bound arrays (${realLower.size}/${realUpper.size}) != numRealVars $numRealVars"
         }
+        factors.forEachIndexed { factorId, factor ->
+            factor.boolVars.forEach { variable ->
+                require(variable in 0 until numBoolVars) {
+                    "factor $factorId references Boolean variable $variable outside [0, $numBoolVars)"
+                }
+            }
+            factor.intVars.forEach { variable ->
+                require(variable in 0 until numIntVars) {
+                    "factor $factorId references integer variable $variable outside [0, $numIntVars)"
+                }
+            }
+            factor.variables.reals.forEach { variable ->
+                require(variable in 0 until numRealVars) {
+                    "factor $factorId references real variable $variable outside [0, $numRealVars)"
+                }
+            }
+        }
     }
 
     /**
