@@ -10015,7 +10015,6 @@ sealed class com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/I
 
     abstract fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.solver/IntDomain>? // com.eignex.klause.solver/IntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
     abstract fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/IntColumns.column|column(kotlin.Int){}[0]
-    final fun boundsOf(kotlin/Int): com.eignex.klause.solver/IntColumn.Bounded // com.eignex.klause.solver/IntColumns.boundsOf|boundsOf(kotlin.Int){}[0]
     final fun domainOrNull(kotlin/Int): com.eignex.klause.solver/IntDomain? // com.eignex.klause.solver/IntColumns.domainOrNull|domainOrNull(kotlin.Int){}[0]
 }
 

@@ -7833,7 +7833,6 @@ public final class com/eignex/klause/solver/IntColumn$Finite : com/eignex/klause
 
 public abstract class com/eignex/klause/solver/IntColumns {
 	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
-	public final fun boundsOf (I)Lcom/eignex/klause/solver/IntColumn$Bounded;
 	public abstract fun column (I)Lcom/eignex/klause/solver/IntColumn;
 	public final fun domainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
 	public abstract fun getSize ()I

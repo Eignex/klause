@@ -12,26 +12,41 @@ import kotlin.test.assertNull
 class IntColumnsTest {
 
     @Test
-    fun `a finite column reports its domain and its bounds`() {
+    fun `a finite column reports its domain`() {
         val columns = FiniteIntColumns(arrayOf(IntDomain(2, 9)))
 
         assertEquals(IntDomain(2, 9), columns.domainOrNull(0))
-        assertEquals(IntColumn.Bounded(2, 9), columns.boundsOf(0))
+        assertEquals(IntColumn.Finite(IntDomain(2, 9)), columns.column(0))
     }
 
     @Test
-    fun `a theory column has no domain but still answers its bounds`() {
+    fun `a theory column has no domain but still states its bounds`() {
         val columns = MixedIntColumns(arrayOf(IntColumn.Bounded(lower = 5, upper = null)))
 
         assertNull(columns.domainOrNull(0))
-        assertEquals(IntColumn.Bounded(5, null), columns.boundsOf(0))
+        assertEquals(IntColumn.Bounded(5, null), columns.column(0))
     }
 
     @Test
     fun `an open side is representable rather than merely absent`() {
         val columns = MixedIntColumns(arrayOf(IntColumn.Bounded(lower = null, upper = null)))
 
-        assertEquals(IntColumn.Bounded(null, null), columns.boundsOf(0))
+        assertEquals(IntColumn.Bounded(null, null), columns.column(0))
+    }
+
+    @Test
+    fun `a finite column closed by a fallback bound keeps its open side in the model bounds`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(0, 1L shl 40)),
+            factors = arrayOf<Factor>(),
+            openIntHi = booleanArrayOf(true),
+        )
+
+        assertEquals(IntDomain(0, 1L shl 40), problem.intColumns.domainOrNull(0))
+        assertEquals(false, problem.intBounds.hasUpper(0), "the fallback endpoint is not a stated bound")
+        assertEquals(true, problem.intBounds.hasLower(0))
     }
 
     @Test
