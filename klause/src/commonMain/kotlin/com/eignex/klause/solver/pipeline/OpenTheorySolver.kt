@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.solver.ComponentPlan
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
@@ -76,11 +77,15 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
     private val model = model
     private val route = route
 
+    // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
+    // most of what a short budget has. Select it once and hand the same plan to every solve.
+    private val plan: ComponentPlan = model.componentPlan()
+
     init {
         require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {
             "open theory solver requires a supported open source model"
         }
-        require(model.componentPlan().theoryPipeline == route) { "open theory route disagrees with component plan" }
+        require(plan.theoryPipeline == route) { "open theory route disagrees with component plan" }
     }
 
     /** Decides the model through its component plan. */
@@ -88,7 +93,9 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
         val cancellation = Cancellation { params.cancellation() || model.cancellation() }
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
-        val plan = model.componentPlan()
+        // Building the components reads the whole model, so a budget already spent is answered before
+        // that work starts rather than after it.
+        if (cancellation()) return unknown(cancelled = true, stats)
         val cpDomains = plan.cpIntVars.associateWith { column ->
             IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
         }

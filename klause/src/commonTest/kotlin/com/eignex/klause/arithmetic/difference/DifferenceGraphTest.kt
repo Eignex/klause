@@ -98,4 +98,30 @@ class DifferenceGraphTest {
         val g = graph(2, Triple(0, 1, Long.MAX_VALUE), Triple(1, 0, Long.MAX_VALUE))
         assertNull(g.negativeCycle(), "two huge positive bounds are satisfiable")
     }
+
+    @Test
+    fun `a spent budget abandons a sweep instead of answering`() {
+        // Both answers are claims: "no cycle" licenses consistency and "infeasible" licenses a refutation.
+        // Neither may be produced by a sweep that stopped early.
+        val cyclic = graph(2, Triple(1, 0, -1L), Triple(0, 1, -1L))
+
+        assertNull(cyclic.negativeCycle(cancelled = { true }), "an abandoned sweep reports no cycle found")
+        assertEquals(Potentials.Abandoned, cyclic.potentials(cancelled = { true }))
+        assertNotNull(cyclic.negativeCycle(), "the same graph does hold a cycle when the sweep finishes")
+    }
+
+    @Test
+    fun `a budget spent partway through one pass is noticed inside it`() {
+        // Two vertices give three relaxation passes, so a poll that only ran per pass could not land
+        // inside a pass over an edge set this size, and the sweep would run to completion first.
+        val wide = DifferenceGraph(2)
+        repeat(50_000) { wide.addEdge(0, 1, 1L) }
+        var polls = 0
+
+        val cycle = wide.negativeCycle(cancelled = { polls++ >= 2 })
+
+        assertNull(cycle)
+        assertTrue(polls < 50_000, "the sweep stopped on the budget rather than walking every edge")
+        assertTrue(polls > 2, "the budget is looked at more than once per pass")
+    }
 }

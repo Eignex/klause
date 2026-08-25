@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.solver.Lit
@@ -25,26 +26,29 @@ class DifferenceTheorySolver(override val model: ProblemSpec) : Theory<Sample> {
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<Sample> {
         if (!context.consumeCheck()) return TheoryCheck.Cancelled
-        return complete(bools)?.let { TheoryCheck.Sat(it) }
-            ?: TheoryCheck.Infeasible(negativeCycleExplanation(bools))
-    }
-
-    private fun complete(bools: BooleanArray): Sample? {
         val values = if (fragment == null) {
             unconstrainedValues()
         } else {
-            fragment.potentialSample(model.numIntVars, bools) ?: return null
+            when (val outcome = fragment.potentialSample(model.numIntVars, bools, context::cancelled)) {
+                is Potentials.Found -> outcome.values
+
+                // A refutation is claimed only when the sweeps settled on one; a spent budget reports the
+                // budget, never infeasibility.
+                Potentials.Infeasible -> return TheoryCheck.Infeasible(negativeCycleExplanation(bools, context))
+
+                Potentials.Abandoned -> return TheoryCheck.Cancelled
+            }
         }
-        return Sample(bools.copyOf(), values)
+        return TheoryCheck.Sat(Sample(bools.copyOf(), values))
     }
 
-    private fun negativeCycleExplanation(bools: BooleanArray): SearchExplanation? {
+    private fun negativeCycleExplanation(bools: BooleanArray, context: TheoryContext): SearchExplanation? {
         val fragment = fragment ?: return null
         val active = BooleanArray(fragment.edges.size) { edge ->
             val guard = fragment.edges[edge].guard
             guard == DifferenceEdge.ALWAYS || bools[Lit.variable(guard)] == Lit.isPositive(guard)
         }
-        val cycle = fragment.graph().negativeCycle(active) ?: return null
+        val cycle = fragment.graph().negativeCycle(active, context::cancelled) ?: return null
         val guards = cycle.map { fragment.edges[it].guard }
         if (guards.any { it == DifferenceEdge.ALWAYS }) return null
         return SearchExplanation(guards.distinct().map(Lit::negate).toIntArray())

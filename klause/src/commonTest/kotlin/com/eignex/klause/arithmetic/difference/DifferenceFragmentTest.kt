@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -155,8 +156,15 @@ class DifferenceFragmentTest {
     @Test
     fun `potential sample satisfies active difference edges`() {
         val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
-        val values = assertNotNull(fragment.potentialSample(2, BooleanArray(0)))
+        val values = assertIs<Potentials.Found>(fragment.potentialSample(2, BooleanArray(0))).values
 
         assertTrue(values[0] - values[1] <= 3L)
+    }
+
+    @Test
+    fun `a spent budget abandons the sample instead of reporting infeasible`() {
+        val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
+
+        assertEquals(Potentials.Abandoned, fragment.potentialSample(2, BooleanArray(0)) { true })
     }
 }

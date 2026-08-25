@@ -3,6 +3,22 @@ package com.eignex.klause.arithmetic.difference
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
+/** How often a relaxation sweep looks at the budget: often enough to land inside one pass over a large
+ *  edge set, rarely enough that the check does not show up against the relaxation itself. */
+private const val POLL_INTERVAL = 8192
+
+/** Outcome of computing potentials over a difference graph. */
+internal sealed interface Potentials {
+    /** One potential per vertex, so the system is feasible. */
+    class Found(val values: LongArray) : Potentials
+
+    /** A negative cycle: the system has no solution. */
+    data object Infeasible : Potentials
+
+    /** The budget was spent before the sweeps settled, so nothing is claimed either way. */
+    data object Abandoned : Potentials
+}
+
 internal class DifferenceGraph(val numVars: Int) {
     private val from = IntArrayList()
     private val to = IntArrayList()
@@ -17,7 +33,14 @@ internal class DifferenceGraph(val numVars: Int) {
         return from.size - 1
     }
 
-    fun negativeCycle(active: BooleanArray? = null): IntArray? {
+    /**
+     * An edge cycle of negative total weight, or null when none was found.
+     *
+     * A spent [cancelled] budget also reports null. That is the same weakening as a propagation that did
+     * not finish — it claims no conflict, never that there is none — so a caller may treat null as
+     * "nothing deduced" but never as proof of consistency.
+     */
+    fun negativeCycle(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): IntArray? {
         val n = numVars
         if (n == 0 || size == 0) return null
         // The virtual source makes every distance start finite and equal, which is exactly what a
@@ -25,9 +48,15 @@ internal class DifferenceGraph(val numVars: Int) {
         val dist = LongArray(n)
         val predEdge = IntArray(n) { -1 }
         var changed = -1
+        var untilPoll = POLL_INTERVAL
         repeat(n + 1) {
+            if (cancelled()) return null
             changed = -1
             for (e in 0 until size) {
+                if (--untilPoll <= 0) {
+                    untilPoll = POLL_INTERVAL
+                    if (cancelled()) return null
+                }
                 if (active != null && !active[e]) continue
                 val u = from[e]
                 val v = to[e]
@@ -46,11 +75,18 @@ internal class DifferenceGraph(val numVars: Int) {
         return extractCycle(changed, predEdge)
     }
 
-    fun potentials(active: BooleanArray? = null): LongArray? {
+    /** Vertex potentials witnessing feasibility, or why none were produced. */
+    fun potentials(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): Potentials {
         val dist = LongArray(numVars)
+        var untilPoll = POLL_INTERVAL
         repeat(numVars) {
+            if (cancelled()) return Potentials.Abandoned
             var changed = false
             for (e in 0 until size) {
+                if (--untilPoll <= 0) {
+                    untilPoll = POLL_INTERVAL
+                    if (cancelled()) return Potentials.Abandoned
+                }
                 if (active != null && !active[e]) continue
                 val u = from[e]
                 val v = to[e]
@@ -61,9 +97,9 @@ internal class DifferenceGraph(val numVars: Int) {
                     changed = true
                 }
             }
-            if (!changed) return dist
+            if (!changed) return Potentials.Found(dist)
         }
-        return null
+        return Potentials.Infeasible
     }
 
     private fun extractCycle(seed: Int, predEdge: IntArray): IntArray? {
