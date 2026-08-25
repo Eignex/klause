@@ -14,9 +14,11 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntVars
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.LongConstList
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyDoubleArray
@@ -62,49 +64,24 @@ class Linear private constructor(
     override val bound: Long = if (rawOp == LinearOp.GE) -rawBound else rawBound
     val vars: IntArray = terms.vars
 
-    // Integer coefficients, index-aligned with [vars], stored compactly to cut parse/presolve memory on the
-    // Linear-dominated families (MPS, QF_LIRA): when every coefficient fits Int (the common case) only an
-    // [IntArray] is retained (4 B/term), else a [LongArray] (8 B/term). The GE→LE canonicalisation negates
-    // the coefficients here. [coeff] reads the store with no allocation (the per-node LP path); [coeffs]
-    // materialises a full [LongArray] for whole-array sinks.
-    private val coeffsInt: IntArray?
-    private val coeffsLong: LongArray?
-
-    /** Largest `|coefficient|` over the integer terms (0 when there are none), cached at construction so the
-     *  presolve overflow gates (the affine-elimination fold, the small-model bound) need no per-row
-     *  coefficient rescan. A saturated placeholder on a wide/real row (never read as authoritative there). */
-    val maxAbsCoeff: Long
-
-    init {
-        val negate = rawOp == LinearOp.GE
-        val src = terms.coeffs
-        var maxAbs = 0L
-        var fitsInt = true
-        for (raw in src) {
-            val c = if (negate) -raw else raw
-            val a = if (c < 0L) -c else c
-            if (a > maxAbs) maxAbs = a
-            if (c < Int.MIN_VALUE.toLong() || c > Int.MAX_VALUE.toLong()) fitsInt = false
-        }
-        maxAbsCoeff = maxAbs
-        if (fitsInt) {
-            coeffsInt = IntArray(src.size) { (if (negate) -src[it] else src[it]).toInt() }
-            coeffsLong = null
-        } else {
-            coeffsInt = null
-            coeffsLong = if (negate) LongArray(src.size) { -src[it] } else src
-        }
+    // Integer coefficients, index-aligned with [vars]. The width is the store: an all-one row keeps no
+    // per-term storage, a 32-bit-range row keeps 4 B/term, and only a genuinely 64-bit row pays 8 B/term —
+    // which is what keeps parse/presolve memory down on the Linear-dominated families (MPS, QF_LIRA). The
+    // GE→LE canonicalisation negates the coefficients here. [coeff] reads a term with no allocation (the
+    // per-node LP path); [coeffs] materialises a full [LongArray] for whole-array sinks.
+    private val coefficients: LongConstList = run {
+        val src = constsOf(terms.coeffs)
+        if (rawOp == LinearOp.GE) src.negated() else src
     }
 
+    /** Largest `|coefficient|` over the integer terms (0 when there are none), read from the coefficient
+     *  store so the presolve overflow gates (the affine-elimination fold, the small-model bound) need no
+     *  per-row rescan. A saturated placeholder on a wide/real row (never read as authoritative there). */
+    val maxAbsCoeff: Long get() = coefficients.maxAbs
+
     /** Integer coefficients as a [LongArray], index-aligned with [vars], materialised on demand from the
-     *  compact store. Prefer [coeff] for indexed access; this allocates for an [coeffsInt]-backed row. */
-    val coeffs: LongArray
-        get() {
-            val cl = coeffsLong
-            if (cl != null) return cl
-            val ci = checkNotNull(coeffsInt)
-            return LongArray(ci.size) { ci[it].toLong() }
-        }
+     *  compact store. Prefer [coeff] for indexed access; this allocates. */
+    val coeffs: LongArray get() = coefficients.toLongArray()
 
     /**
      * The LP-only payload — real (continuous) terms and/or over-64-bit wide coefficients — held off to the
@@ -367,10 +344,7 @@ class Linear private constructor(
     // integer LinearRow (its content is not integer-valued) and emits a real row instead.
     override val size: Int get() = vars.size
     override fun ref(k: Int): Int = Term.ofIntVar(vars[k])
-    override fun coeff(k: Int): Long {
-        val ci = coeffsInt
-        return if (ci != null) ci[k].toLong() else checkNotNull(coeffsLong)[k]
-    }
+    override fun coeff(k: Int): Long = coefficients.at(k)
     override val relation: LinearOp get() = op
     override val isIntegerOnly: Boolean get() = isIntegerCore
     override val linearRows: List<LinearRow> get() = if (isIntegerCore) listOf(this) else emptyList()
