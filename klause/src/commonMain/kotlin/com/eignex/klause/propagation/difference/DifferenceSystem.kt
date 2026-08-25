@@ -36,9 +36,6 @@ internal class DifferenceSystem(
     private val theoryOnly: Boolean = false,
 ) : Factor {
 
-    /** The fragment is decidable over ℤ with no bounds at all; that is the point of the graph. */
-    override val needsFiniteDomains: Boolean get() = false
-
     override val variables: VarList
 
     init {

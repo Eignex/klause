@@ -192,9 +192,6 @@ class Linear private constructor(
     // Real columns are declared here like any other kind. They were reachable only through the LP
     // payload before, so no consumer scanning a factor's variables could see them.
 
-    /** Bounds reasoning only: this factor never indexes a value set, so its columns need no finite domain. */
-    override val needsFiniteDomains: Boolean get() = false
-
     override val variables: VarList = if (realVars.isEmpty()) {
         IntVars(vars)
     } else {
