@@ -6907,6 +6907,27 @@ public final class com/eignex/klause/presolve/LpHarvestResult {
 	public final fun getReport ()Lcom/eignex/klause/solver/result/LpHarvestReport;
 }
 
+public abstract interface class com/eignex/klause/presolve/OpenPresolveResult {
+}
+
+public final class com/eignex/klause/presolve/OpenPresolveResult$Refuted : com/eignex/klause/presolve/OpenPresolveResult {
+	public static final field INSTANCE Lcom/eignex/klause/presolve/OpenPresolveResult$Refuted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened : com/eignex/klause/presolve/OpenPresolveResult {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;I)V
+	public final fun getClosedSides ()I
+	public final fun getSpec ()Lcom/eignex/klause/solver/ProblemSpec;
+}
+
+public final class com/eignex/klause/presolve/OpenPresolveResultKt {
+	public static final fun presolveOpen (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/presolve/OpenPresolveResult;
+	public static synthetic fun presolveOpen$default (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/OpenPresolveResult;
+}
+
 public final class com/eignex/klause/presolve/PassDelta {
 	public fun <init> ()V
 	public fun <init> ([ILjava/util/List;[Lcom/eignex/klause/solver/IntDomain;Lkotlin/jvm/functions/Function1;Z)V

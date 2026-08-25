@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.presolve.OpenPresolveResult
+import com.eignex.klause.presolve.presolveOpen
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ComponentPlan
 import com.eignex.klause.solver.IntDomain
@@ -96,6 +98,13 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
         // Building the components reads the whole model, so a budget already spent is answered before
         // that work starts rather than after it.
         if (cancellation()) return unknown(cancelled = true, stats)
+        // Presolve the open sides before the theory sees them. A proved bound narrows the box the theory
+        // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
+        // rather than an invented box, and is reportable as unsat.
+        val (model, plan) = when (val presolved = presolveOpen(cancellation)) {
+            OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish())
+            is OpenPresolveResult.Tightened -> adopt(presolved)
+        }
         val cpDomains = plan.cpIntVars.associateWith { column ->
             IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
         }
@@ -121,6 +130,24 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
             SearchResult.Indeterminate -> unknown(planned.session.cancelled(), stats)
         }
     }
+
+    /** Tighten the open sides under [cancellation]; see [com.eignex.klause.presolve.presolveOpen]. */
+    private fun presolveOpen(cancellation: Cancellation): OpenPresolveResult = model.presolveOpen(cancellation)
+
+    /**
+     * The model and plan to decide with, given what the tightening proved.
+     *
+     * The tighter bounds are always adopted; the plan selected from the declared ones is kept. Ownership
+     * is per column and a bound that shrank cannot change it — a theory that could hold an open column
+     * can hold a narrower one — so the original plan stays valid over the tighter model, and the theory
+     * simply searches a smaller box.
+     *
+     * Re-planning is deliberately not done. Closing every open side makes the model finite, and a finite
+     * model's plan is [ProblemPipeline.FINITE_CP] with no theory component at all; adopting that here
+     * would leave nothing to decide with. Routing such a model to the finite lane is the caller's to do.
+     */
+    private fun adopt(presolved: OpenPresolveResult.Tightened): Pair<ProblemSpec, ComponentPlan> =
+        if (presolved.closedSides == 0) model to plan else presolved.spec to plan
 
     private fun unknown(cancelled: Boolean, stats: SolveStatsSink): OpenTheoryResult.Unknown {
         stats.timedOut = true
