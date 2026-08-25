@@ -10,6 +10,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.CnfLowering
+import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
@@ -66,9 +67,7 @@ import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.FloatInterval
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap
@@ -80,9 +79,11 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
 }
 
 internal class Lowering(val config: KlauseConfig) : CnfLowering {
-    override val factors = mutableListOf<Factor>()
-    val boolVarIdByName = mutableMapOf<String, Int>()
-    val intVarIdByName = mutableMapOf<String, Int>()
+    private val problemBuilder = ProblemBuilder()
+
+    override val factors get() = problemBuilder.factors
+    val boolVarIdByName get() = problemBuilder.boolVarIdByName
+    val intVarIdByName get() = problemBuilder.intVarIdByName
 
     // Reverse indices (id → name), kept in lock-step with the two forward maps via
     // [bindIntName] / [bindBoolName]. They turn the per-node/per-edge reverse lookups in the
@@ -90,7 +91,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     // than O(n²) in model size.
     val idToIntName = MutableIntObjectMap<String>()
     val idToBoolName = MutableIntObjectMap<String>()
-    val intDomains = mutableListOf<IntDomain>()
+    val intDomains get() = problemBuilder.intDomains
     val nominalIndicators = mutableMapOf<String, Map<String, Int>>()
 
     // Schema-layer float bookkeeping. `floatDecoders` records bucket parameters per float-var
@@ -108,9 +109,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     // to real [com.eignex.klause.factor.arithmetic.Linear]. `realVarIdByName` maps a float name to its real
     // var id; parallel real bounds by real var id.
     var schemaFloatsLpOnly = false
-    val realVarIdByName = mutableMapOf<String, Int>()
-    val realLo = mutableListOf<Double>()
-    val realHi = mutableListOf<Double>()
+    val realVarIdByName get() = problemBuilder.realVarIdByName
 
     /** Indicator-bool layout per declared set variable. Mirrors FlatZinc's
      *  `SetVarLayout`: for set var `S` over universe `[e_0, …, e_{n-1}]`,
@@ -123,28 +122,30 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     /** Label → universe index for set vars whose universe is a nominal label list.
      *  Empty for int-universe set vars. */
     val setLabelOrder = mutableMapOf<String, List<String>>()
-    var numBoolVars = 0
-    var numIntVars = 0
     internal var auxIntCounter = 0
 
-    fun newBoolVar(): Int = numBoolVars++
+    val numBoolVars get() = problemBuilder.numBoolVars
+    val numIntVars get() = problemBuilder.numIntVars
 
-    // CnfLowering hooks: share the Tseitin gates ([tseitinAnd]/[tseitinOr]/[tseitinIff]) with the format
-    // front-ends instead of re-implementing them here. [trueLitCache] is unused — this class keeps its own
-    // [trueLit] (a fresh forced literal per call) rather than CnfLowering's cached one.
-    override fun newBool(): Int = newBoolVar()
-    override var trueLitCache: Int = -1
+    fun newBoolVar(): Int = problemBuilder.newBool()
 
-    fun newIntVar(domain: IntDomain): Int {
-        val id = numIntVars++
-        intDomains += domain
-        return id
-    }
+    override fun newBool(): Int = problemBuilder.newBool()
+    override var trueLitCache: Int
+        get() = problemBuilder.trueLitCache
+        set(value) {
+            problemBuilder.trueLitCache = value
+        }
+
+    fun newIntVar(domain: IntDomain): Int = problemBuilder.newInt(domain)
+
+    fun newRealVar(lower: Double, upper: Double, name: String): Int = problemBuilder.newReal(lower, upper, name)
+
+    fun buildProblem() = problemBuilder.build()
 
     /** Register `name → id` for an int/float var and the reverse `id → name`. Every write to
      *  [intVarIdByName] must go through here so [idToIntName] stays consistent. */
     fun bindIntName(name: String, id: Int): Int {
-        intVarIdByName[name] = id
+        problemBuilder.bindIntName(name, id)
         idToIntName.put(id, name)
         return id
     }
@@ -152,7 +153,7 @@ internal class Lowering(val config: KlauseConfig) : CnfLowering {
     /** Register `name → id` for a bool var and the reverse `id → name`. Every write to
      *  [boolVarIdByName] must go through here so [idToBoolName] stays consistent. */
     fun bindBoolName(name: String, id: Int): Int {
-        boolVarIdByName[name] = id
+        problemBuilder.bindBoolName(name, id)
         idToBoolName.put(id, name)
         return id
     }
@@ -493,10 +494,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
                 if (schemaFloatsLpOnly) {
                     // LP-only continuous column: a real variable the simplex resolves, no
                     // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
-                    val rid = realLo.size
-                    realVarIdByName[name] = rid
-                    realLo += entry.min
-                    realHi += entry.max
+                    newRealVar(entry.min, entry.max, name)
                 } else {
                     // Bucketed inline so [Problem.factors] stays pure int+bool; the parallel floatMeta*
                     // arrays record the bucket params the float-linear lowering reads.
@@ -527,15 +525,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     // from the presolve config, run in the presolve lane via [RootBaker] (kernel → presolve would
     // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
     return CompiledSchema(
-        problem = Problem(
-            numBoolVars = numBoolVars,
-            numIntVars = numIntVars,
-            intDomains = intDomains.toTypedArray(),
-            factors = factors.toTypedArray(),
-            numRealVars = realLo.size,
-            realLower = realLo.toDoubleArray(),
-            realUpper = realHi.toDoubleArray(),
-        ),
+        problem = buildProblem(),
         boolVarIdByName = boolVarIdByName.toMap(),
         intVarIdByName = intVarIdByName.toMap(),
         nominalIndicators = nominalIndicators.mapValues { it.value.toMap() },
