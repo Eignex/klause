@@ -8,7 +8,7 @@ import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.solver.values
+import com.eignex.klause.solver.randomValue
 
 /**
  * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024) as a [SourceDrivenStrategy]
@@ -113,7 +113,7 @@ class StallPerturbation(private val perturbAfter: Int) : (LocalSearchState) -> M
             if (state.assumptions.isFrozenInt(v)) return null
             val d = state.rootDomains[v]
             if (d.isFixed) return null
-            val nv = d.values.valueAt(state.rng.nextInt(d.values.size)) // sparse-aware: never lands on a hole
+            val nv = d.randomValue(state.rng)
             if (nv == state.assignment.intValue(v)) return null
             return state.synthesizeChannelingMove(v, nv)
         }

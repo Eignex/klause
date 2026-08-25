@@ -85,7 +85,7 @@ internal class TablePropagator(
                 val d = state.intDomains[xs[col]]
                 mins[col] = d.min
                 maxs[col] = d.max
-                if (d.values.size.toLong() != d.max - d.min + 1) contiguous = false
+                if (d.holeCount != 0L) contiguous = false
             }
             if (contiguous && gc.isNoop(mins, maxs)) {
                 // This row sweeps nothing, so it has nothing to filter and needs no live set. A group's
@@ -103,7 +103,7 @@ internal class TablePropagator(
                 if (contiguous && gc.noopMins == null) {
                     var noPrune = true
                     for (col in 0 until arity) {
-                        if (state.intDomains[xs[col]].values.size.toLong() != maxs[col] - mins[col] + 1) {
+                        if (state.intDomains[xs[col]].holeCount != 0L) {
                             noPrune = false
                             break
                         }

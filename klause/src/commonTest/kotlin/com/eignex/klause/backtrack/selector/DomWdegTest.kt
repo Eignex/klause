@@ -4,10 +4,13 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -57,5 +60,21 @@ class DomWdegTest {
             ),
         )
         assertIs<SolveResult.Unsat>(r2)
+    }
+
+    @Test
+    fun `dom-wdeg branches a column whose bounds span more than a Long can count`() {
+        // An unbounded `var int` reaches the search with the full Long range. A domain magnitude that
+        // wrapped to zero would read as fixed, and the column would never be selected — leaving the
+        // engine to call a node complete with the column still open.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+            factors = arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+
+        assertEquals(VarRef.IntVar(0), DomWdeg().pick(session, Random(1)))
     }
 }

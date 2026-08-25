@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.values
 import kotlin.random.Random
 
 /** Uniformly random among undetermined variables. */
@@ -15,7 +14,7 @@ object RandomVariable : VariableSelector {
             if (session.boolValue(v) == null) candidates.add(VarRef.Bool(v))
         }
         for (v in 0 until problem.numIntVars) {
-            if (session.intDomain(v).values.size > 1) candidates.add(VarRef.IntVar(v))
+            if (!session.intDomain(v).isFixed) candidates.add(VarRef.IntVar(v))
         }
         if (candidates.isEmpty()) return null
         return candidates[rng.nextInt(candidates.size)]

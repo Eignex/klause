@@ -7847,6 +7847,7 @@ public abstract interface class com/eignex/klause/solver/IntDomain {
 	public abstract fun getHoleCount ()J
 	public abstract fun getMax ()J
 	public abstract fun getMin ()J
+	public fun getValueCount ()J
 	public fun higher (J)J
 	public abstract fun includeInteriorValue (J)Lcom/eignex/klause/solver/IntDomain;
 	public fun isFixed ()Z
@@ -7864,6 +7865,7 @@ public final class com/eignex/klause/solver/IntDomain$Companion {
 
 public final class com/eignex/klause/solver/IntDomain$DefaultImpls {
 	public static fun clamp (Lcom/eignex/klause/solver/IntDomain;J)J
+	public static fun getValueCount (Lcom/eignex/klause/solver/IntDomain;)J
 	public static fun higher (Lcom/eignex/klause/solver/IntDomain;J)J
 	public static fun isFixed (Lcom/eignex/klause/solver/IntDomain;)Z
 	public static fun lower (Lcom/eignex/klause/solver/IntDomain;J)J
@@ -7873,7 +7875,7 @@ public final class com/eignex/klause/solver/IntDomain$DefaultImpls {
 
 public final class com/eignex/klause/solver/IntDomainKt {
 	public static final fun getValues (Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/IntSpan;
-	public static final fun orderingSize (Lcom/eignex/klause/solver/IntDomain;)J
+	public static final fun randomValue (Lcom/eignex/klause/solver/IntDomain;Lkotlin/random/Random;)J
 }
 
 public abstract interface class com/eignex/klause/solver/IntSpan {

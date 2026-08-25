@@ -947,6 +947,8 @@ abstract interface com.eignex.klause.solver/IntDomain { // com.eignex.klause.sol
         abstract fun <get-min>(): kotlin/Long // com.eignex.klause.solver/IntDomain.min.<get-min>|<get-min>(){}[0]
     open val isFixed // com.eignex.klause.solver/IntDomain.isFixed|{}isFixed[0]
         open fun <get-isFixed>(): kotlin/Boolean // com.eignex.klause.solver/IntDomain.isFixed.<get-isFixed>|<get-isFixed>(){}[0]
+    open val valueCount // com.eignex.klause.solver/IntDomain.valueCount|{}valueCount[0]
+        open fun <get-valueCount>(): kotlin/Long // com.eignex.klause.solver/IntDomain.valueCount.<get-valueCount>|<get-valueCount>(){}[0]
 
     abstract fun contains(kotlin/Long): kotlin/Boolean // com.eignex.klause.solver/IntDomain.contains|contains(kotlin.Long){}[0]
     abstract fun excludeValue(kotlin/Long): com.eignex.klause.solver/IntDomain // com.eignex.klause.solver/IntDomain.excludeValue|excludeValue(kotlin.Long){}[0]
@@ -10383,7 +10385,7 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMin
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>, kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>;kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.theory/theoryComponent(com.eignex.klause.solver/ProblemSpec): com.eignex.klause.solver.search/TheoryComponent? // com.eignex.klause.theory/theoryComponent|theoryComponent@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec){}[0]
-final fun (com.eignex.klause.solver/IntDomain).com.eignex.klause.solver/orderingSize(): kotlin/Long // com.eignex.klause.solver/orderingSize|orderingSize@com.eignex.klause.solver.IntDomain(){}[0]
+final fun (com.eignex.klause.solver/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.solver.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.Problem(){}[0]

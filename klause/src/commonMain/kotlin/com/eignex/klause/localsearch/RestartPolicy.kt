@@ -4,7 +4,7 @@ import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.values
+import com.eignex.klause.solver.randomValue
 import com.eignex.klause.util.LubyIterator
 
 /**
@@ -97,7 +97,7 @@ internal fun anchorAndPerturb(
                         for (b in f.boolVars) state.assignment.flipBool(b)
                         for (i in f.intVars) {
                             val d = problem.intDomains[i]
-                            state.assignment.setInt(i, d.values.valueAt(state.rng.nextInt(d.values.size)))
+                            state.assignment.setInt(i, d.randomValue(state.rng))
                         }
                     }
                 }
@@ -115,7 +115,7 @@ private fun kickRandomVar(state: LocalSearchState, problem: Problem) {
     } else {
         val v = pick - problem.numBoolVars
         val d = problem.intDomains[v]
-        state.assignment.setInt(v, d.values.valueAt(state.rng.nextInt(d.values.size)))
+        state.assignment.setInt(v, d.randomValue(state.rng))
     }
 }
 

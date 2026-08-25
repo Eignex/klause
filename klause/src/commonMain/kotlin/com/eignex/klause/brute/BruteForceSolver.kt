@@ -257,7 +257,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
                 size *= 2
             }
             for (d in problem.intDomains) {
-                val r = d.values.size.toLong()
+                val r = d.valueCount
                 if (r <= 0) return Long.MAX_VALUE
                 if (size > Long.MAX_VALUE / r) return Long.MAX_VALUE
                 size *= r
@@ -272,7 +272,7 @@ class BruteForceSolver(override val problem: BakedProblem) :
             val dims = ArrayList<Dim>(problem.numBoolVars + problem.numIntVars)
             for (b in 0 until problem.numBoolVars) dims.add(Dim(DimKind.BOOL, b, 2L))
             for (i in 0 until problem.numIntVars) {
-                dims.add(Dim(DimKind.INT, i, problem.intDomains[i].values.size.toLong()))
+                dims.add(Dim(DimKind.INT, i, problem.intDomains[i].valueCount))
             }
             val chunks = ArrayList<Chunk>()
 

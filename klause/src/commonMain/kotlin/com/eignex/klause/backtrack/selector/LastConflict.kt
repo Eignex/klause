@@ -3,7 +3,6 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.values
 import kotlin.random.Random
 
 /**
@@ -31,7 +30,7 @@ class LastConflict(private val base: VariableSelector) : VariableSelector {
         if (candidate != null) {
             val stillFree = when (candidate) {
                 is VarRef.Bool -> session.boolValue(candidate.varId) == null
-                is VarRef.IntVar -> session.intDomain(candidate.varId).values.size > 1
+                is VarRef.IntVar -> !session.intDomain(candidate.varId).isFixed
             }
             if (stillFree) return candidate
             pending = null // assigned away (likely via propagation); drop the prioritisation

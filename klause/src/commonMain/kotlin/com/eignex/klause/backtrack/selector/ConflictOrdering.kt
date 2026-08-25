@@ -3,7 +3,6 @@ package com.eignex.klause.backtrack.selector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyLongArray
 import kotlin.random.Random
 
@@ -57,7 +56,7 @@ internal class ConflictOrdering(private val base: VariableSelector) : VariableSe
             }
         }
         for (v in 0 until problem.numIntVars) {
-            if (session.intDomain(v).values.size <= 1) continue
+            if (session.intDomain(v).isFixed) continue
             val s = intStamp[v]
             if (s > bestStamp) {
                 bestStamp = s

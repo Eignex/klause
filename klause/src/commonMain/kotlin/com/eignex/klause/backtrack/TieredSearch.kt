@@ -89,8 +89,8 @@ class TieredVariableSelector(
         when (tier.varSelect) {
             TierVarSelect.InputOrder -> firstFree(tier, session)
             TierVarSelect.RandomOrder -> randomFree(tier, session, rng)
-            TierVarSelect.SmallestDomain -> bestFree(tier, session) { size, _, _ -> -size.toLong() }
-            TierVarSelect.LargestDomain -> bestFree(tier, session) { size, _, _ -> size.toLong() }
+            TierVarSelect.SmallestDomain -> bestFree(tier, session) { size, _, _ -> -size }
+            TierVarSelect.LargestDomain -> bestFree(tier, session) { size, _, _ -> size }
             TierVarSelect.SmallestLowerBound -> bestFree(tier, session) { _, min, _ -> -min }
             TierVarSelect.LargestUpperBound -> bestFree(tier, session) { _, _, max -> max }
             TierVarSelect.MaxRegret -> maxRegretFree(tier, session)
@@ -111,7 +111,7 @@ class TieredVariableSelector(
         for (v in tier.intVars) {
             val d = session.intDomain(v)
             if (d.isFixed) continue
-            val regret = d.values.valueAt(1) - d.values.valueAt(0)
+            val regret = d.higher(d.min) - d.min
             if (regret > bestRegret) {
                 best = VarRef.IntVar(v)
                 bestRegret = regret
@@ -122,14 +122,14 @@ class TieredVariableSelector(
 
     private fun firstFree(tier: SearchTier, session: PropagationSession): VarRef? {
         for (v in tier.boolVars) if (session.boolValue(v) == null) return VarRef.Bool(v)
-        for (v in tier.intVars) if (session.intDomain(v).values.size > 1) return VarRef.IntVar(v)
+        for (v in tier.intVars) if (!session.intDomain(v).isFixed) return VarRef.IntVar(v)
         return null
     }
 
     private fun randomFree(tier: SearchTier, session: PropagationSession, rng: Random): VarRef? {
         val candidates = ArrayList<VarRef>(tier.boolVars.size + tier.intVars.size)
         for (v in tier.boolVars) if (session.boolValue(v) == null) candidates.add(VarRef.Bool(v))
-        for (v in tier.intVars) if (session.intDomain(v).values.size > 1) candidates.add(VarRef.IntVar(v))
+        for (v in tier.intVars) if (!session.intDomain(v).isFixed) candidates.add(VarRef.IntVar(v))
         return if (candidates.isEmpty()) null else candidates[rng.nextInt(candidates.size)]
     }
 
@@ -138,13 +138,13 @@ class TieredVariableSelector(
     private inline fun bestFree(
         tier: SearchTier,
         session: PropagationSession,
-        score: (size: Int, min: Long, max: Long) -> Long,
+        score: (size: Long, min: Long, max: Long) -> Long,
     ): VarRef? {
         var best: VarRef? = null
         var bestScore = Long.MIN_VALUE
         for (v in tier.boolVars) {
             if (session.boolValue(v) != null) continue
-            val s = score(2, 0L, 1L)
+            val s = score(2L, 0L, 1L)
             if (s > bestScore) {
                 bestScore = s
                 best = VarRef.Bool(v)
@@ -153,7 +153,7 @@ class TieredVariableSelector(
         for (v in tier.intVars) {
             val d = session.intDomain(v)
             if (d.isFixed) continue
-            val s = score(d.values.size, d.min, d.max)
+            val s = score(d.valueCount, d.min, d.max)
             if (s > bestScore) {
                 bestScore = s
                 best = VarRef.IntVar(v)
