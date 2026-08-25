@@ -6,7 +6,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.NoVars
+import com.eignex.klause.solver.LitVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 
@@ -55,14 +55,13 @@ class GaussianXor(
     }
 
     /** Union of all variables across the constraints, in stable order. */
-    override val boolVars: IntArray
-    override val variables: VarList = NoVars
+    override val variables: VarList
 
     init {
         require(constraints.isNotEmpty()) { "GaussianXor needs at least one constraint" }
         val order = LinkedHashSet<Int>()
         for (c in constraints) for (lit in c.literals) order.add(Lit.variable(lit))
-        boolVars = order.toIntArray()
+        variables = LitVars(order.toIntArray())
     }
 
     override fun asPropagator(): Propagator = GaussianXorPropagator(constraints, boolVars)

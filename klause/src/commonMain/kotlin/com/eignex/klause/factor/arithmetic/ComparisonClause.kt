@@ -31,8 +31,6 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
 
     override val variables: VarList = MixedVars(boundInts = vars.distinct().toIntArray(), lits = IntArray(0))
 
-    /** Each literal is a comparison against a constant, decided by a bound test rather than a walk. */
-    override val needsFiniteDomains: Boolean get() = false
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ComparisonClause(vars.remapVars(intMap), ops, consts)
