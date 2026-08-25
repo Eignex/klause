@@ -62,8 +62,8 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
             val eta = etaSpike[j]
             val xp = x[p] / eta[p]
             if (xp != 0.0) {
-                koblas.vectorKernels.axpy(x, 0, -xp, eta, 0, p)
-                koblas.vectorKernels.axpy(x, p + 1, -xp, eta, p + 1, m - p - 1)
+                koblas.kernels.axpy(x, 0, -xp, eta, 0, p)
+                koblas.kernels.axpy(x, p + 1, -xp, eta, p + 1, m - p - 1)
             }
             x[p] = xp
         }
@@ -80,13 +80,13 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
         for (j in etaSpike.indices.reversed()) {
             val p = etaRow[j]
             val eta = etaSpike[j]
-            val s = z[p] - koblas.vectorKernels.dot(
+            val s = z[p] - koblas.kernels.dot(
                 eta,
                 0,
                 z,
                 0,
                 p,
-            ) - koblas.vectorKernels.dot(eta, p + 1, z, p + 1, m - p - 1)
+            ) - koblas.kernels.dot(eta, p + 1, z, p + 1, m - p - 1)
             z[p] = s / eta[p]
         }
         val result = base.solveInto(z, out, transpose = true, workspace = scratch)
