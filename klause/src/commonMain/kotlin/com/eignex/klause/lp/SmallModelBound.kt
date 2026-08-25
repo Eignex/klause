@@ -1,6 +1,7 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.IntegralConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
@@ -41,27 +42,13 @@ internal fun smallModelBigIntBound(numIntVars: Int, factors: List<Factor>, intBo
             is Clause -> Unit
 
             is Linear -> {
-                if (f.hasReals) return null
-                val coeffs = f.wideCoeffs
-                if (coeffs == null) {
-                    for (i in f.vars.indices) observe(BigInteger.fromLong(f.coeff(i)))
-                    observe(BigInteger.fromLong(f.bound))
-                } else {
-                    for (coeff in coeffs) observe(coeff)
-                    observe(requireNotNull(f.wideBound))
-                }
+                val constants = f.integralConstants ?: return null
+                observeRow(f.vars.size, constants, ::observe)
                 if (!rows(2)) return null
             }
 
             is ReifiedLinear -> {
-                val coeffs = f.wideCoeffs
-                if (coeffs == null) {
-                    for (i in f.vars.indices) observe(BigInteger.fromLong(f.coeff(i)))
-                    observe(BigInteger.fromLong(f.bound))
-                } else {
-                    for (coeff in coeffs) observe(coeff)
-                    observe(requireNotNull(f.wideBound))
-                }
+                observeRow(f.vars.size, f.constants, ::observe)
                 if (!rows(2)) return null
             }
 
@@ -87,4 +74,10 @@ internal fun smallModelBigIntBound(numIntVars: Int, factors: List<Factor>, intBo
     if (m > Int.MAX_VALUE - numIntVars || m > (Int.MAX_VALUE - 1) / 2) return null
     val rowsBig = BigInteger.fromInt(m)
     return BigInteger.fromInt(numIntVars + m) * (rowsBig * (a + BigInteger.ONE)).pow(2 * m + 1)
+}
+
+/** Feed a row's exact constants to [observe], whatever width they are stored at. */
+private fun observeRow(terms: Int, constants: IntegralConstants, observe: (BigInteger) -> Unit) {
+    for (i in 0 until terms) observe(constants.exactCoeff(i))
+    observe(constants.exactBound)
 }

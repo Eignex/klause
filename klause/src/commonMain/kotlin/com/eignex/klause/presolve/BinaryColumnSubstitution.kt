@@ -171,11 +171,12 @@ internal object BinaryColumnSubstitution {
      * exactly the constant relation it already was.
      */
     private fun lower(f: Linear, boolOf: IntArray, bound: Long): List<Factor> {
+        val row = f.integerConstants ?: return listOf(f)
         val flip = f.op == LinearOp.LE // ≤ → ≥ negates both sides
         val weights = LongArrayList(f.vars.size)
         val literals = IntArrayList(f.vars.size)
         for (i in f.vars.indices) {
-            val raw = f.coeff(i)
+            val raw = row.coeff(i)
             val a = if (flip) -raw else raw
             if (a == 0L) continue
             weights.add(if (a < 0L) -a else a)
@@ -214,11 +215,12 @@ internal object BinaryColumnSubstitution {
      * normalisation leaves the [Long] range is reported unrewritable rather than wrapped.
      */
     private fun normalizedBound(f: Linear): Long? {
-        if (!f.isIntegerCore || f.op == LinearOp.NE || f.vars.isEmpty()) return null
+        val row = f.integerConstants ?: return null
+        if (f.op == LinearOp.NE || f.vars.isEmpty()) return null
         val flip = f.op == LinearOp.LE
-        var bound = if (flip) negateOrNull(f.bound) ?: return null else f.bound
+        var bound = if (flip) negateOrNull(row.bound) ?: return null else row.bound
         for (i in f.vars.indices) {
-            val raw = f.coeff(i)
+            val raw = row.coeff(i)
             val a = if (flip) negateOrNull(raw) ?: return null else raw
             if (a < 0L) bound = addOrNull(bound, negateOrNull(a) ?: return null) ?: return null
         }

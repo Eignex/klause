@@ -98,21 +98,29 @@ internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBo
     factors.forEach { f ->
         when (f) {
             is Linear ->
-                if (f.isIntegerCore) {
-                    appendDifferenceEdges(f.vars, f::coeff, f.op, f.bound, zero, DifferenceEdge.ALWAYS, edges)
+                f.integerConstants?.let { row ->
+                    appendDifferenceEdges(f.vars, row::coeff, f.op, row.bound, zero, DifferenceEdge.ALWAYS, edges)
                 }
 
             is ReifiedLinear ->
                 // The aux is an equivalence, so both polarities constrain: the row under a true aux, its
-                // integer negation under a false one. A wide row's Long coefficients are placeholders, so
-                // its shape cannot be read here at all.
-                if (!f.wide) {
-                    appendDifferenceEdges(f.vars, f::coeff, f.op, f.bound, zero, Lit.make(f.auxBoolVar, true), edges)
+                // integer negation under a false one. A wide row has no 64-bit reading, so its shape
+                // cannot be read here at all.
+                f.integerConstants?.let { row ->
+                    appendDifferenceEdges(
+                        f.vars,
+                        row::coeff,
+                        f.op,
+                        row.bound,
+                        zero,
+                        Lit.make(f.auxBoolVar, true),
+                        edges,
+                    )
                     appendNegatedDifferenceEdges(
                         f.vars,
-                        f::coeff,
+                        row::coeff,
                         f.op,
-                        f.bound,
+                        row.bound,
                         zero,
                         Lit.make(f.auxBoolVar, false),
                         edges,
@@ -149,33 +157,37 @@ internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
         if (factor.intVars.isEmpty()) continue
         scratch.clear()
         when (factor) {
-            is Linear -> if (!factor.isIntegerCore || !appendDifferenceEdges(
-                    factor.vars,
-                    factor::coeff,
-                    factor.op,
-                    factor.bound,
-                    DifferenceFragment.ZERO,
-                    DifferenceEdge.ALWAYS,
-                    scratch,
-                )
-            ) {
-                return false
+            is Linear -> {
+                val row = factor.integerConstants ?: return false
+                if (!appendDifferenceEdges(
+                        factor.vars,
+                        row::coeff,
+                        factor.op,
+                        row.bound,
+                        DifferenceFragment.ZERO,
+                        DifferenceEdge.ALWAYS,
+                        scratch,
+                    )
+                ) {
+                    return false
+                }
             }
 
             is ReifiedLinear -> {
-                if (factor.wide || !appendDifferenceEdges(
+                val row = factor.integerConstants ?: return false
+                if (!appendDifferenceEdges(
                         factor.vars,
-                        factor::coeff,
+                        row::coeff,
                         factor.op,
-                        factor.bound,
+                        row.bound,
                         DifferenceFragment.ZERO,
                         Lit.make(factor.auxBoolVar, true),
                         scratch,
                     ) || !appendNegatedDifferenceEdges(
                         factor.vars,
-                        factor::coeff,
+                        row::coeff,
                         factor.op,
-                        factor.bound,
+                        row.bound,
                         DifferenceFragment.ZERO,
                         Lit.make(factor.auxBoolVar, false),
                         scratch,

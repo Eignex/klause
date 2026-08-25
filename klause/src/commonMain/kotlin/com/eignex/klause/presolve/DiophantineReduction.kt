@@ -70,19 +70,20 @@ internal object DiophantineReduction {
     fun reduce(problem: Problem): PassDelta {
         var out: Array<IntDomain>? = null
         for (f in problem.factors) {
-            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ) continue
-            if (f.vars.size < 2 || !fitsHalfLong(f.bound)) continue
-            if (f.coeffs.any { !fitsHalfLong(it) }) continue
+            if (f !is Linear || f.op != LinearOp.EQ) continue
+            val row = f.integerConstants ?: continue
+            if (f.vars.size < 2 || !fitsHalfLong(row.bound)) continue
+            if (f.vars.indices.any { !fitsHalfLong(row.coeff(it)) }) continue
             val n = f.vars.size
             // Prefix / suffix gcd of |coeffs| so `gcd(aⱼ : j ≠ i)` is O(1) per variable.
             val pre = LongArray(n + 1)
             val suf = LongArray(n + 1)
-            for (i in 0 until n) pre[i + 1] = gcd(pre[i], f.coeff(i))
-            for (i in n - 1 downTo 0) suf[i] = gcd(suf[i + 1], f.coeff(i))
+            for (i in 0 until n) pre[i + 1] = gcd(pre[i], row.coeff(i))
+            for (i in n - 1 downTo 0) suf[i] = gcd(suf[i + 1], row.coeff(i))
             for (j in 0 until n) {
                 val m = gcd(pre[j], suf[j + 1])
                 if (m <= 1L) continue
-                val sol = solveCongruence(f.coeff(j), f.bound, m) ?: return contradiction(problem, f.vars[j])
+                val sol = solveCongruence(row.coeff(j), row.bound, m) ?: return contradiction(problem, f.vars[j])
                 val (root, mod) = sol
                 if (mod <= 1L) continue
                 val v = f.vars[j]

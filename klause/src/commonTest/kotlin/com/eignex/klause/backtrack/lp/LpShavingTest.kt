@@ -96,8 +96,12 @@ class LpShavingTest {
                 for (i in 0 until n) if ((mask shr i) and 1 == 1) sum++
                 for (f in covering) {
                     var s = 0L
-                    for (idx in f.vars.indices) s += f.coeffs[idx] * ((mask shr f.vars[idx]) and 1)
-                    if (s > f.bound) {
+                    for (idx in f.vars.indices) {
+                        s += checkNotNull(
+                            f.integerConstants,
+                        ).coeffs[idx] * ((mask shr f.vars[idx]) and 1)
+                    }
+                    if (s > checkNotNull(f.integerConstants).bound) {
                         ok = false
                         break
                     }
@@ -136,10 +140,10 @@ class LpShavingTest {
             val point = IntArray(n)
             fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
+                for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
                 when (f.op) {
-                    LinearOp.LE -> s <= f.bound
-                    LinearOp.GE -> s >= f.bound
+                    LinearOp.LE -> s <= checkNotNull(f.integerConstants).bound
+                    LinearOp.GE -> s >= checkNotNull(f.integerConstants).bound
                     else -> true
                 }
             }

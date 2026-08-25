@@ -34,16 +34,16 @@ internal class QfLraSystem(private val model: ProblemSpec) {
         }
         for (factor in model.factors) {
             when (factor) {
-                is Linear -> if (factor.hasReals) {
+                is Linear -> factor.realConstants?.let { row ->
                     addRow(
                         builder,
                         positive,
                         negative,
                         factor.realVars,
-                        factor.realCoeffs,
+                        row.realCoefficients.toDoubleArray(),
                         factor.op,
-                        factor.realBound,
-                        factor.strictReal,
+                        row.bound,
+                        row.strict,
                     )
                 }
 

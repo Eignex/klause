@@ -211,17 +211,18 @@ internal class LpEngine(
         val v = objective.singleIntObjective()?.varId ?: return null
         var best: Triple<Int, Long, Long>? = null
         for (f in problem.factors) {
-            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ) continue
+            if (f !is Linear || f.op != LinearOp.EQ) continue
+            val row = f.integerConstants ?: continue
             val vi = f.vars.indexOf(v)
             if (vi < 0) continue
-            val a = f.coeff(vi)
+            val a = row.coeff(vi)
             if (a != 1L && a != -1L) continue
             var g = 0L
-            for (j in f.vars.indices) if (j != vi) g = gcdOfLong(g, f.coeff(j))
+            for (j in f.vars.indices) if (j != vi) g = gcdOfLong(g, row.coeff(j))
             if (g <= 1L) continue
             // a·v ≡ b (mod g); a = ±1 ⇒ v ≡ a·b (mod g). Keep the largest modulus (tightest rounding).
             if (best != null && g <= best.second) continue
-            val residue = (a * f.bound).mod(g)
+            val residue = (a * row.bound).mod(g)
             best = Triple(v, g, residue)
         }
         return best
@@ -378,7 +379,8 @@ internal class LpEngine(
      *  factorization at this row count outruns any node budget and its fill explodes memory, so the
      *  checks decline and the verdict honestly degrades to unknown instead of hanging. */
     val residualOversized: Boolean = params0.lpPlan.realResidual &&
-        problem.factors.count { it is ReifiedRealLinear || (it is Linear && it.hasReals) } > RESIDUAL_MAX_ROWS
+        problem.factors.count { it is ReifiedRealLinear || (it is Linear && it.realConstants != null) } >
+        RESIDUAL_MAX_ROWS
 
     /** The asserting LP backjump clause derived during the last [pruneNode], or null. */
     fun lastBackjump(): Learned? = lpBackjump

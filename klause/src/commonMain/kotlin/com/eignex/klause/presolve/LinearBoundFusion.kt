@@ -42,7 +42,7 @@ internal object LinearBoundFusion {
         val groups = HashMap<List<Long>, Group>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.NE) continue
+            if (f !is Linear || f.integerConstants == null || f.op == LinearOp.NE) continue
             val canon = canonicalize(f) ?: continue
             val g = groups.getOrPut(canon.key) {
                 Group().also {
@@ -98,20 +98,21 @@ internal object LinearBoundFusion {
     )
 
     private fun canonicalize(f: Linear): Canon? {
+        val row = f.integerConstants ?: return null
         val vars = f.vars
         if (vars.isEmpty()) return null
-        val g = PresolveShared.gcdOf(f.coeffs)
+        val g = PresolveShared.gcdOf(row.coeffs)
         if (g < 1L) return null // all-zero coefficients: a trivial row with no support
 
         // The row is stored `≤` (a `≥` was folded to `≤` with negated sides at construction); GCD-reduce
         // on that form (exact, the left side is a multiple of `g`) before choosing the canonical sign.
         val reducedBound = if (f.op == LinearOp.EQ) {
-            if (f.bound % g != 0L) return null
-            f.bound / g
+            if (row.bound % g != 0L) return null
+            row.bound / g
         } else {
-            f.bound.floorDiv(g)
+            row.bound.floorDiv(g)
         }
-        val reduced = LongArray(vars.size) { f.coeff(it) / g }
+        val reduced = LongArray(vars.size) { row.coeff(it) / g }
         val lead = leadingIndex(vars)
         val flip = reduced[lead] < 0L
         val coeffs = if (flip) LongArray(reduced.size) { -reduced[it] } else reduced

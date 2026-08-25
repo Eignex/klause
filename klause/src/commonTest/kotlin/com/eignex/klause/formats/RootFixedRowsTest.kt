@@ -26,7 +26,7 @@ class RootFixedRowsTest {
         val r = rows(unit(0, true), ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5))
         assertEquals(1, r.size)
         assertEquals(LinearOp.LE, r[0].op)
-        assertEquals(5L, r[0].bound)
+        assertEquals(5L, checkNotNull(r[0].integerConstants).bound)
     }
 
     @Test
@@ -35,8 +35,11 @@ class RootFixedRowsTest {
         val r = rows(unit(0, false), ReifiedLinear(0, intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 5))
         assertEquals(1, r.size)
         assertEquals(LinearOp.LE, r[0].op, "GE is canonicalised to LE")
-        assertEquals(-6L, r[0].bound)
-        assertTrue(r[0].coeffs.all { it == -1L }, "the canonicalisation negates the coefficients")
+        assertEquals(-6L, checkNotNull(r[0].integerConstants).bound)
+        assertTrue(
+            checkNotNull(r[0].integerConstants).coeffs.all { it == -1L },
+            "the canonicalisation negates the coefficients",
+        )
     }
 
     @Test
@@ -45,7 +48,7 @@ class RootFixedRowsTest {
         val r = rows(unit(0, false), ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 5))
         assertEquals(1, r.size)
         assertEquals(LinearOp.LE, r[0].op)
-        assertEquals(4L, r[0].bound)
+        assertEquals(4L, checkNotNull(r[0].integerConstants).bound)
     }
 
     @Test

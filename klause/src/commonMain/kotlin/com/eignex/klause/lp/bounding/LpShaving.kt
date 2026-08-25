@@ -103,13 +103,14 @@ internal fun LpEngine.redundantConstraints(token: Cancellation): List<Int> {
     for (i in problem.factors.indices) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
         val f = problem.factors[i]
-        if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.NE) continue
+        if (f !is Linear || f.op == LinearOp.NE) continue
+        val row = f.integerConstants ?: continue
         probes++
         val kept = problem.factors.filterIndexed { idx, _ -> idx != i && !removed.contains(idx) }
         val others = Problem(problem.numBoolVars, problem.numIntVars, problem.requireFiniteIntDomains().copyOf(), kept)
         val a = LongArray(problem.numIntVars)
-        for (k in f.vars.indices) a[f.vars[k]] += f.coeff(k)
-        val b = f.bound.toDouble()
+        for (k in f.vars.indices) a[f.vars[k]] += row.coeff(k)
+        val b = row.bound.toDouble()
         // `≤ b` is redundant when the others' max of a·x is already ≤ b; `≥ b` when their min is ≥ b; an
         // `=` only when both hold. Safe bounds (over-/under-estimates) keep it sound — a loose bound just
         // misses a removal. Each drop is judged against the kept set, so two mutually-implied rows are
@@ -144,9 +145,10 @@ internal fun LpEngine.impliedEqualities(token: Cancellation): List<Linear> {
     var probes = 0
     for (f in problem.factors) {
         if (probes >= SHAVE_MAX_ITERS || token()) break
-        if (f !is Linear || !f.isIntegerCore || f.op == LinearOp.EQ || f.vars.size != 2) continue
-        val c0 = f.coeff(0)
-        val c1 = f.coeff(1)
+        if (f !is Linear || f.op == LinearOp.EQ || f.vars.size != 2) continue
+        val row = f.integerConstants ?: continue
+        val c0 = row.coeff(0)
+        val c1 = row.coeff(1)
         if (!((c0 == 1L && c1 == -1L) || (c0 == -1L && c1 == 1L))) continue // a unit difference ±(v0 − v1)
         val v0 = f.vars[0]
         val v1 = f.vars[1]

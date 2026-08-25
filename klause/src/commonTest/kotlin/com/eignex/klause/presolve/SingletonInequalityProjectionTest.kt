@@ -36,7 +36,7 @@ class SingletonInequalityProjectionTest {
         val kept = d.addedFactors.single() as Linear
         assertEquals(listOf(1), kept.vars.toList())
         assertEquals(LinearOp.LE, kept.op)
-        assertEquals(10L, kept.bound)
+        assertEquals(10L, checkNotNull(kept.integerConstants).bound)
         val rebuilt = d.reconstruct!!(Sample(bools = BooleanArray(0), ints = longArrayOf(99, 5)))
         assertEquals(0L, rebuilt.ints[0], "x rebuilt to its most-permissive bound")
         assertTrue(isFeasible(p, rebuilt), "reconstructed assignment must satisfy the original inequality")

@@ -24,7 +24,7 @@ class LinearSubSumAggregationTest {
 
     private fun theInequality(p: Problem): Linear = linears(p).single { it.op == LinearOp.LE }
 
-    private fun coeffOf(l: Linear, v: Int): Long = l.coeffs[l.vars.indexOf(v)]
+    private fun coeffOf(l: Linear, v: Int): Long = checkNotNull(l.integerConstants).coeffs[l.vars.indexOf(v)]
 
     private fun run(vararg factors: Factor): Problem {
         val p = Problem(0, 4, Array(4) { IntDomain(0, 8) }, factors.toList())
@@ -37,7 +37,7 @@ class LinearSubSumAggregationTest {
         val out = run(sumDef(), Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 10))
         val ineq = theInequality(out)
         assertEquals(setOf(0, 3), ineq.vars.toSet(), "the partner terms collapse into s")
-        assertEquals(10L, ineq.bound)
+        assertEquals(10L, checkNotNull(ineq.integerConstants).bound)
         assertEquals(1L, coeffOf(ineq, 0))
     }
 
@@ -48,7 +48,7 @@ class LinearSubSumAggregationTest {
         val ineq = theInequality(out)
         assertEquals(setOf(0, 3), ineq.vars.toSet())
         assertEquals(2L, coeffOf(ineq, 0), "the multiplier carries onto s")
-        assertEquals(20L, ineq.bound)
+        assertEquals(20L, checkNotNull(ineq.integerConstants).bound)
     }
 
     @Test
@@ -134,12 +134,12 @@ class LinearSubSumAggregationTest {
         fun holds(): Boolean = factors.all { f ->
             f as Linear
             var sum = 0L
-            for (j in f.vars.indices) sum += f.coeffs[j] * assign[f.vars[j]]
+            for (j in f.vars.indices) sum += checkNotNull(f.integerConstants).coeffs[j] * assign[f.vars[j]]
             when (f.op) {
-                LinearOp.LE -> sum <= f.bound
-                LinearOp.EQ -> sum == f.bound
-                LinearOp.NE -> sum != f.bound
-                LinearOp.GE -> sum >= f.bound
+                LinearOp.LE -> sum <= checkNotNull(f.integerConstants).bound
+                LinearOp.EQ -> sum == checkNotNull(f.integerConstants).bound
+                LinearOp.NE -> sum != checkNotNull(f.integerConstants).bound
+                LinearOp.GE -> sum >= checkNotNull(f.integerConstants).bound
             }
         }
         fun recurse(i: Int) {

@@ -131,6 +131,9 @@ fun constsOf(values: IntArray): LongConstList {
     return UnitConsts(values.size)
 }
 
+/** The valid index range of this list. */
+val ConstList.indices: IntRange get() = 0 until size
+
 /** This list read as 64-bit integers, or `null` when its constants are wider than that. */
 fun ConstList.longsOrNull(): LongConstList? = this as? LongConstList
 

@@ -1,6 +1,7 @@
 package com.eignex.klause.theory.lia
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
+import com.eignex.klause.factor.arithmetic.IntegralConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -297,45 +298,33 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
             return bools[variable] == (literal and 1 == 0)
         }
 
-        private fun rowRange(factor: Linear): BigInterval = rowRange(
-            factor.vars,
-            Array(factor.vars.size) { i -> factor.wideCoeffs?.get(i) ?: BigInteger.fromLong(factor.coeff(i)) },
-        )
+        private fun rowRange(factor: Linear): BigInterval = rowRange(factor.vars, exactConstantsOf(factor))
 
-        private fun rowRange(factor: ReifiedLinear): BigInterval = rowRange(
-            factor.vars,
-            Array(factor.vars.size) { i -> factor.wideCoeffs?.get(i) ?: BigInteger.fromLong(factor.coeff(i)) },
-        )
+        private fun rowRange(factor: ReifiedLinear): BigInterval = rowRange(factor.vars, factor.constants)
 
-        private fun rowRange(vars: IntArray, coeffs: Array<BigInteger>): BigInterval {
+        private fun rowRange(vars: IntArray, coeffs: IntegralConstants): BigInterval {
             var lo = BigInteger.ZERO
             var hi = BigInteger.ZERO
             for (i in vars.indices) {
                 val domain = domains[vars[i]]
-                if (coeffs[i] >= BigInteger.ZERO) {
-                    lo += coeffs[i] * domain.lo
-                    hi += coeffs[i] * domain.hi
+                if (coeffs.exactCoeff(i) >= BigInteger.ZERO) {
+                    lo += coeffs.exactCoeff(i) * domain.lo
+                    hi += coeffs.exactCoeff(i) * domain.hi
                 } else {
-                    lo += coeffs[i] * domain.hi
-                    hi += coeffs[i] * domain.lo
+                    lo += coeffs.exactCoeff(i) * domain.hi
+                    hi += coeffs.exactCoeff(i) * domain.lo
                 }
             }
             return BigInterval(lo, hi)
         }
 
-        private fun rowValue(factor: Linear): BigInteger = rowValue(
-            factor.vars,
-            Array(factor.vars.size) { i -> factor.wideCoeffs?.get(i) ?: BigInteger.fromLong(factor.coeff(i)) },
-        )
+        private fun rowValue(factor: Linear): BigInteger = rowValue(factor.vars, exactConstantsOf(factor))
 
-        private fun rowValue(factor: ReifiedLinear): BigInteger = rowValue(
-            factor.vars,
-            Array(factor.vars.size) { i -> factor.wideCoeffs?.get(i) ?: BigInteger.fromLong(factor.coeff(i)) },
-        )
+        private fun rowValue(factor: ReifiedLinear): BigInteger = rowValue(factor.vars, factor.constants)
 
-        private fun rowValue(vars: IntArray, coeffs: Array<BigInteger>): BigInteger {
+        private fun rowValue(vars: IntArray, coeffs: IntegralConstants): BigInteger {
             var sum = BigInteger.ZERO
-            for (i in vars.indices) sum += coeffs[i] * domains[vars[i]].lo
+            for (i in vars.indices) sum += coeffs.exactCoeff(i) * domains[vars[i]].lo
             return sum
         }
     }
@@ -348,9 +337,9 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
         var first = true
     }
 
-    private fun linearBound(factor: Linear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)
+    private fun linearBound(factor: Linear): BigInteger = exactConstantsOf(factor).exactBound
 
-    private fun reifiedBound(factor: ReifiedLinear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)
+    private fun reifiedBound(factor: ReifiedLinear): BigInteger = factor.constants.exactBound
 
     private fun relationPossible(range: BigInterval, op: LinearOp, bound: BigInteger): Boolean = when (op) {
         LinearOp.LE -> range.lo <= bound
@@ -666,55 +655,43 @@ class GeneralLiaSearchComponent(
         }
     }
 
-    private fun rowRange(factor: Linear, domains: Array<BigInterval>): BigInterval = rowRange(
-        factor.vars,
-        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
-        domains,
-    )
+    private fun rowRange(factor: Linear, domains: Array<BigInterval>): BigInterval =
+        rowRange(factor.vars, exactConstantsOf(factor), domains)
 
-    private fun rowRange(factor: ReifiedLinear, domains: Array<BigInterval>): BigInterval = rowRange(
-        factor.vars,
-        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
-        domains,
-    )
+    private fun rowRange(factor: ReifiedLinear, domains: Array<BigInterval>): BigInterval =
+        rowRange(factor.vars, factor.constants, domains)
 
-    private fun rowRange(vars: IntArray, coeffs: Array<BigInteger>, domains: Array<BigInterval>): BigInterval {
+    private fun rowRange(vars: IntArray, coeffs: IntegralConstants, domains: Array<BigInterval>): BigInterval {
         var lo = BigInteger.ZERO
         var hi = BigInteger.ZERO
         for (index in vars.indices) {
             val domain = domains[vars[index]]
-            if (coeffs[index] >= BigInteger.ZERO) {
-                lo += coeffs[index] * domain.lo
-                hi += coeffs[index] * domain.hi
+            if (coeffs.exactCoeff(index) >= BigInteger.ZERO) {
+                lo += coeffs.exactCoeff(index) * domain.lo
+                hi += coeffs.exactCoeff(index) * domain.hi
             } else {
-                lo += coeffs[index] * domain.hi
-                hi += coeffs[index] * domain.lo
+                lo += coeffs.exactCoeff(index) * domain.hi
+                hi += coeffs.exactCoeff(index) * domain.lo
             }
         }
         return BigInterval(lo, hi)
     }
 
-    private fun rowValue(factor: Linear, domains: Array<BigInterval>): BigInteger = rowValue(
-        factor.vars,
-        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
-        domains,
-    )
+    private fun rowValue(factor: Linear, domains: Array<BigInterval>): BigInteger =
+        rowValue(factor.vars, exactConstantsOf(factor), domains)
 
-    private fun rowValue(factor: ReifiedLinear, domains: Array<BigInterval>): BigInteger = rowValue(
-        factor.vars,
-        Array(factor.vars.size) { factor.wideCoeffs?.get(it) ?: BigInteger.fromLong(factor.coeff(it)) },
-        domains,
-    )
+    private fun rowValue(factor: ReifiedLinear, domains: Array<BigInterval>): BigInteger =
+        rowValue(factor.vars, factor.constants, domains)
 
-    private fun rowValue(vars: IntArray, coeffs: Array<BigInteger>, domains: Array<BigInterval>): BigInteger {
+    private fun rowValue(vars: IntArray, coeffs: IntegralConstants, domains: Array<BigInterval>): BigInteger {
         var sum = BigInteger.ZERO
-        for (index in vars.indices) sum += coeffs[index] * domains[vars[index]].lo
+        for (index in vars.indices) sum += coeffs.exactCoeff(index) * domains[vars[index]].lo
         return sum
     }
 
-    private fun linearBound(factor: Linear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)
+    private fun linearBound(factor: Linear): BigInteger = exactConstantsOf(factor).exactBound
 
-    private fun reifiedBound(factor: ReifiedLinear): BigInteger = factor.wideBound ?: BigInteger.fromLong(factor.bound)
+    private fun reifiedBound(factor: ReifiedLinear): BigInteger = factor.constants.exactBound
 
     private fun relationPossible(range: BigInterval, op: LinearOp, bound: BigInteger): Boolean = when (op) {
         LinearOp.LE -> range.lo <= bound
@@ -751,25 +728,21 @@ class GeneralLiaSearchComponent(
     }
 }
 
+/** The exact integer constants of an open-LIA row. A row carrying a continuous constant is routed to the
+ *  LRA theories and never reaches this one. */
+private fun exactConstantsOf(factor: Linear): IntegralConstants =
+    checkNotNull(factor.integralConstants) { "open LIA row carries continuous constants" }
+
 private data class GeneralLiaDecision(val domains: Array<BigInterval>) : SearchTheoryDecision
 
 private data class LiaRow(val vars: IntArray, val coeffs: Array<BigInteger>, val bound: BigInteger) {
     companion object {
-        fun of(factor: Linear): LiaRow = LiaRow(
-            factor.vars,
-            Array(
-                factor.vars.size,
-            ) { index -> factor.wideCoeffs?.get(index) ?: BigInteger.fromLong(factor.coeff(index)) },
-            factor.wideBound ?: BigInteger.fromLong(factor.bound),
-        )
+        fun of(factor: Linear): LiaRow = of(factor.vars, exactConstantsOf(factor))
 
-        fun of(factor: ReifiedLinear): LiaRow = LiaRow(
-            factor.vars,
-            Array(
-                factor.vars.size,
-            ) { index -> factor.wideCoeffs?.get(index) ?: BigInteger.fromLong(factor.coeff(index)) },
-            factor.wideBound ?: BigInteger.fromLong(factor.bound),
-        )
+        fun of(factor: ReifiedLinear): LiaRow = of(factor.vars, factor.constants)
+
+        private fun of(vars: IntArray, constants: IntegralConstants): LiaRow =
+            LiaRow(vars, Array(vars.size) { constants.exactCoeff(it) }, constants.exactBound)
     }
 }
 
@@ -777,17 +750,12 @@ private data class BigInterval(val lo: BigInteger, val hi: BigInteger)
 
 private data class BigRow(val vars: IntArray, val coeffs: Array<BigInteger>, val bound: BigInteger) {
     companion object {
-        fun of(factor: Linear): BigRow = BigRow(
-            factor.vars,
-            Array(factor.vars.size) { i -> factor.wideCoeffs?.get(i) ?: BigInteger.fromLong(factor.coeff(i)) },
-            factor.wideBound ?: BigInteger.fromLong(factor.bound),
-        )
+        fun of(factor: Linear): BigRow = of(factor.vars, exactConstantsOf(factor))
 
-        fun of(factor: ReifiedLinear): BigRow = BigRow(
-            factor.vars,
-            Array(factor.vars.size) { i -> factor.wideCoeffs?.get(i) ?: BigInteger.fromLong(factor.coeff(i)) },
-            factor.wideBound ?: BigInteger.fromLong(factor.bound),
-        )
+        fun of(factor: ReifiedLinear): BigRow = of(factor.vars, factor.constants)
+
+        private fun of(vars: IntArray, constants: IntegralConstants): BigRow =
+            BigRow(vars, Array(vars.size) { constants.exactCoeff(it) }, constants.exactBound)
     }
 }
 

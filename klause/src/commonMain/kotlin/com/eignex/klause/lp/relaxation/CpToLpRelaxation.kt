@@ -913,7 +913,7 @@ internal class CpToLpRelaxation(
 
         /** Whether [factor] involves an LP-only continuous column — the [realResidual] filter. */
         private fun touchesReals(factor: Factor): Boolean = when (factor) {
-            is Linear -> factor.hasReals
+            is Linear -> factor.realConstants != null
             is ReifiedRealLinear -> true
             is RealProduct -> true
             else -> false
@@ -971,9 +971,10 @@ internal class CpToLpRelaxation(
             var rltColumns = 0
             for (f in problem.factors) {
                 if (rltColumns >= MAX_RLT_COLUMNS) break
-                if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.LE) continue
+                if (f !is Linear || f.op != LinearOp.LE) continue
+                val row = f.integerConstants ?: continue
                 if (f.vars.size < 2 || f.vars.size > MAX_RLT_ROW) continue
-                if (f.bound < 0 || f.coeffs.any { it <= 0 }) continue
+                if (row.bound < 0 || f.vars.indices.any { row.coeff(it) <= 0 }) continue
                 if (f.vars.any {
                         problem.requireFiniteIntDomains()[it].min != 0L ||
                             problem.requireFiniteIntDomains()[it].max != 1L
@@ -981,7 +982,7 @@ internal class CpToLpRelaxation(
                 ) {
                     continue
                 }
-                val b = f.bound
+                val b = row.bound
                 for (iIdx in f.vars.indices) {
                     if (rltColumns >= MAX_RLT_COLUMNS) break
                     val xi = f.vars[iIdx]
@@ -989,7 +990,7 @@ internal class CpToLpRelaxation(
                     val rltRow = MutableIntLongMap() // coalesces the wᵢᵢ = xᵢ term with the −b·xᵢ term
                     for (kIdx in f.vars.indices) {
                         val xk = f.vars[kIdx]
-                        val a = f.coeff(kIdx)
+                        val a = row.coeff(kIdx)
                         val wCol = if (kIdx == iIdx) {
                             xiCol // wᵢᵢ = xᵢ²= xᵢ
                         } else {

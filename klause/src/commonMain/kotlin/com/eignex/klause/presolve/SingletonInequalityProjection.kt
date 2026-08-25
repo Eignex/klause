@@ -32,16 +32,18 @@ internal object SingletonInequalityProjection {
         val added = ArrayList<Factor>()
         val pinned = HashMap<Int, Long>()
         problem.factors.forEachIndexed { i, f ->
-            if (f !is Linear || !f.isIntegerCore || (f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) {
+            if (f !is Linear || (f.op != LinearOp.LE && f.op != LinearOp.GE) || f.vars.size < 2) {
                 return@forEachIndexed
             }
-            if (!fitsHalfLong(f.bound)) return@forEachIndexed
+            val row = f.integerConstants ?: return@forEachIndexed
+            if (!fitsHalfLong(row.bound)) return@forEachIndexed
             val j = f.vars.indices.firstOrNull { k ->
                 val x = f.vars[k]
-                occ[x] == 1 && x !in objectiveIntVars && x !in pinned && f.coeff(k) != 0L && fitsHalfLong(f.coeff(k))
+                occ[x] == 1 && x !in objectiveIntVars && x !in pinned &&
+                    row.coeff(k) != 0L && fitsHalfLong(row.coeff(k))
             } ?: return@forEachIndexed
             val x = f.vars[j]
-            val a = f.coeff(j)
+            val a = row.coeff(j)
             val dom = problem.requireFiniteIntDomains()[x]
             if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) return@forEachIndexed
             // The bound of x that leaves `rest` the widest feasible region.
@@ -55,12 +57,12 @@ internal object SingletonInequalityProjection {
             for (k in f.vars.indices) {
                 if (k != j) {
                     restVars[w] = f.vars[k]
-                    restCoeffs[w] = f.coeff(k)
+                    restCoeffs[w] = row.coeff(k)
                     w++
                 }
             }
             dropped.add(i)
-            added.add(Linear(restCoeffs, restVars, f.op, f.bound - a * xBest))
+            added.add(Linear(restCoeffs, restVars, f.op, row.bound - a * xBest))
             pinned[x] = xBest
         }
         if (dropped.isEmpty()) return PassDelta()

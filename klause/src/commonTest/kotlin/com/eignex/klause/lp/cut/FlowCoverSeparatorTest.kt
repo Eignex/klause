@@ -135,8 +135,8 @@ class FlowCoverSeparatorTest {
             fun feasible(): Boolean {
                 for (f in p.factors.filterIsInstance<Linear>()) {
                     var s = 0L
-                    for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
-                    if (s > f.bound) return false // every factor is LE here
+                    for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
+                    if (s > checkNotNull(f.integerConstants).bound) return false // every factor is LE here
                 }
                 return true
             }

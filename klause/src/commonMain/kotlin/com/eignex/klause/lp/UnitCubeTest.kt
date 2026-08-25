@@ -43,7 +43,7 @@ internal fun unitCubeSolution(
     val cb = openColumns(builderOf(), openBounds)
     for (f in rows) {
         val shifted = cubeShiftedBound(f) ?: return null
-        val (cols, vals) = splitTerms(f, cb.posCol, cb.negCol)
+        val (cols, vals) = splitTerms(f, cb.posCol, cb.negCol) ?: return null
         cb.builder.addRow(cols, vals, Relation.LE, shifted)
     }
     val model = try {
@@ -72,16 +72,16 @@ internal fun unitCubeSolution(
  * without wrapping, or when [f] carries coefficients too wide for the `Long` row this builds.
  */
 private fun asLe(f: Linear): Linear? {
-    if (f.wideCoeffs != null) return null
+    val row = f.integerConstants ?: return null
     if (f.op == LinearOp.LE) return f
     if (f.op != LinearOp.GE) return null
-    if (f.bound == Long.MIN_VALUE) return null
+    if (row.bound == Long.MIN_VALUE) return null
     val coeffs = LongArray(f.vars.size) {
-        val c = f.coeff(it)
+        val c = row.coeff(it)
         if (c == Long.MIN_VALUE) return null
         -c
     }
-    return Linear(coeffs, f.vars, LinearOp.LE, -f.bound)
+    return Linear(coeffs, f.vars, LinearOp.LE, -row.bound)
 }
 
 /**
@@ -89,10 +89,10 @@ private fun asLe(f: Linear): Linear? {
  * room than the row has. Null when the norm leaves the `Long` range, where the shift cannot be taken.
  */
 private fun cubeShiftedBound(f: Linear): Long? {
-    if (f.wideCoeffs != null) return null
+    val row = f.integerConstants ?: return null
     var norm = 0L
     for (k in f.vars.indices) {
-        val c = f.coeff(k)
+        val c = row.coeff(k)
         val magnitude = if (c < 0L) {
             if (c == Long.MIN_VALUE) return null
             -c
@@ -104,8 +104,8 @@ private fun cubeShiftedBound(f: Linear): Long? {
     }
     // Half the norm rounded *up*, so the cube asked for is never larger than one the row admits.
     val half = norm / 2L + norm % 2L
-    val shifted = f.bound - half
-    return if (f.bound < 0L && half > 0L && shifted > f.bound) null else shifted
+    val shifted = row.bound - half
+    return if (row.bound < 0L && half > 0L && shifted > row.bound) null else shifted
 }
 
 /** Whether [candidate] satisfies every row and declared bound — the check that makes the test safe. */
@@ -116,19 +116,20 @@ private fun satisfies(candidate: LongArray, openBounds: Array<OpenIntBounds>, co
         if (b.hi != null && candidate[v] > b.hi) return false
     }
     for (f in constraints) {
+        val row = f.integerConstants ?: return false
         var acc = 0L
         for (k in f.vars.indices) {
             val v = f.vars[k]
             if (v >= candidate.size) return false
-            val term = f.coeff(k) * candidate[v]
+            val term = row.coeff(k) * candidate[v]
             // A row whose activity leaves `Long` cannot be checked, so the candidate is not accepted.
-            if (f.coeff(k) != 0L && term / f.coeff(k) != candidate[v]) return false
+            if (row.coeff(k) != 0L && term / row.coeff(k) != candidate[v]) return false
             if ((acc > 0L && term > Long.MAX_VALUE - acc) || (acc < 0L && term < Long.MIN_VALUE - acc)) {
                 return false
             }
             acc += term
         }
-        if (acc > f.bound) return false
+        if (acc > row.bound) return false
     }
     return true
 }

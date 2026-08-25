@@ -95,18 +95,19 @@ internal object ComparisonClauseFold {
      * when more than one variable stays free, the free coefficient is not `±1`, or the bound overflows.
      */
     private fun singleVarComparison(r: ReifiedLinear, domains: Array<IntDomain>): Triple<Int, LinearOp, Long>? {
+        val row = r.integerConstants ?: return null
         var freeVar = -1
         var freeCoeff = 0L
-        var bound = r.bound
+        var bound = row.bound
         try {
             for (i in r.vars.indices) {
                 val v = r.vars[i]
                 val d = domains[v]
                 if (d.min == d.max) {
-                    bound = subExact(bound, mulExact(r.coeff(i), d.min)) // move the fixed term to the RHS
+                    bound = subExact(bound, mulExact(row.coeff(i), d.min)) // move the fixed term to the RHS
                 } else if (freeVar < 0) {
                     freeVar = v
-                    freeCoeff = r.coeff(i)
+                    freeCoeff = row.coeff(i)
                 } else {
                     return null // a second free variable — not a single-variable literal
                 }

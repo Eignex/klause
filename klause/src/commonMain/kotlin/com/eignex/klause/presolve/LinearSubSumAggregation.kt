@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Factor
@@ -43,7 +44,9 @@ internal object LinearSubSumAggregation {
         val rowsByVar = MutableIntObjectMap<IntArrayList>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f is Linear && f.isIntegerCore) for (v in f.vars) rowsByVar.getOrPut(v) { IntArrayList() }.add(i)
+            if (f is Linear && f.integerConstants != null) {
+                for (v in f.vars) rowsByVar.getOrPut(v) { IntArrayList() }.add(i)
+            }
         }
 
         val dropped = IntArrayList()
@@ -55,9 +58,10 @@ internal object LinearSubSumAggregation {
                 val i = anchor[r]
                 if (i == def.defIndex || i in rewritten) continue
                 val row = factors[i] as Linear
-                val k = matchMultiplier(row, def) ?: continue
-                if (overflowsBoundShift(k, def.b, row.bound)) continue
-                added.add(rewrite(row, def, k))
+                val constants = row.integerConstants ?: continue
+                val k = matchMultiplier(row, constants, def) ?: continue
+                if (overflowsBoundShift(k, def.b, constants.bound)) continue
+                added.add(rewrite(row, constants, def, k))
                 dropped.add(i)
                 rewritten.add(i)
             }
@@ -73,26 +77,27 @@ internal object LinearSubSumAggregation {
         val out = ArrayList<Definition>()
         for (i in factors.indices) {
             val f = factors[i]
-            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size < 3) continue
-            val p = unitPivotIndex(f) ?: continue
-            val sign = f.coeff(p) // ±1
+            if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 3) continue
+            val c = f.integerConstants ?: continue
+            val p = unitPivotIndex(f.vars, c) ?: continue
+            val sign = c.coeff(p) // ±1
             val form = HashMap<Int, Long>(f.vars.size)
             // A zero-coefficient term is vacuous (coalescing keeps it, but it names no real partner), so it
             // is not part of the sub-sum — dropping it also keeps [matchMultiplier]'s `c / A_j` well-defined.
-            for (j in f.vars.indices) if (j != p && f.coeff(j) != 0L) form[f.vars[j]] = -sign * f.coeff(j)
+            for (j in f.vars.indices) if (j != p && c.coeff(j) != 0L) form[f.vars[j]] = -sign * c.coeff(j)
             if (form.size < 2) continue // fewer than two real partners is no sub-sum to aggregate
-            out.add(Definition(i, f.vars[p], sign * f.bound, form))
+            out.add(Definition(i, f.vars[p], sign * c.bound, form))
         }
         return out
     }
 
     /** Index of the lowest-id variable with a `±1` coefficient, or `null` if none — the deterministic
      *  pivot whose isolation keeps every folded coefficient integral. */
-    private fun unitPivotIndex(f: Linear): Int? {
+    private fun unitPivotIndex(vars: IntArray, constants: IntegerConstants): Int? {
         var best = -1
-        for (j in f.vars.indices) {
-            if (f.coeff(j) != 1L && f.coeff(j) != -1L) continue
-            if (best < 0 || f.vars[j] < f.vars[best]) best = j
+        for (j in vars.indices) {
+            if (constants.coeff(j) != 1L && constants.coeff(j) != -1L) continue
+            if (best < 0 || vars[j] < vars[best]) best = j
         }
         return if (best < 0) null else best
     }
@@ -110,9 +115,9 @@ internal object LinearSubSumAggregation {
     /** The common integer multiplier `k` with which [row] contains [def]'s whole partner form — every
      *  partner `x_j` present at coefficient `k·A_j`, one nonzero `k` for all — or `null` if the form is
      *  absent, partial, or unevenly scaled (so no exact sub-sum to fold). */
-    private fun matchMultiplier(row: Linear, def: Definition): Long? {
+    private fun matchMultiplier(row: Linear, constants: IntegerConstants, def: Definition): Long? {
         val coeffByVar = MutableIntLongMap(row.vars.size)
-        for (j in row.vars.indices) coeffByVar.put(row.vars[j], row.coeff(j))
+        for (j in row.vars.indices) coeffByVar.put(row.vars[j], constants.coeff(j))
         var k = 0L
         for ((x, a) in def.form) {
             if (!coeffByVar.containsKey(x)) return null // partner missing → not a full sub-sum
@@ -145,16 +150,16 @@ internal object LinearSubSumAggregation {
     /** [row] with `k·Σ A_j·x_j` replaced by the single term `k·y`: drop every partner term, add `k` to
      *  `y`'s coefficient, and shift the bound by `k·B` (moving `k·(y − B)` to the left leaves the same
      *  relation). Coalescing in [Linear]'s constructor folds `k·y` into any existing `y` term. */
-    private fun rewrite(row: Linear, def: Definition, k: Long): Linear {
+    private fun rewrite(row: Linear, constants: IntegerConstants, def: Definition, k: Long): Linear {
         val vars = IntArrayList(row.vars.size)
         val coeffs = ArrayList<Long>(row.vars.size)
         for (j in row.vars.indices) {
             if (def.form.containsKey(row.vars[j])) continue // absorbed into k·y
             vars.add(row.vars[j])
-            coeffs.add(row.coeff(j))
+            coeffs.add(constants.coeff(j))
         }
         vars.add(def.y)
         coeffs.add(k)
-        return Linear(coeffs.toLongArray(), vars.toIntArray(), row.op, row.bound + k * def.b)
+        return Linear(coeffs.toLongArray(), vars.toIntArray(), row.op, constants.bound + k * def.b)
     }
 }

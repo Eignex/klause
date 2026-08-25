@@ -71,7 +71,7 @@ class LinearLinearizerTest {
         assertEquals(5L, builder.rows[0].bound)
         assertEquals(Contribution.CORE, builder.rows[0].contribution)
         assertEquals(linear.vars.toList(), builder.rows[0].vars)
-        assertEquals(linear.coeffs.toList(), builder.rows[0].coeffs)
+        assertEquals(checkNotNull(linear.integerConstants).coeffs.toList(), builder.rows[0].coeffs)
     }
 
     @Test

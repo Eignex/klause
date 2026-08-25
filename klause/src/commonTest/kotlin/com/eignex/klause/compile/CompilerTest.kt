@@ -85,7 +85,7 @@ class CompilerTest {
         assertEquals(1, compiled.problem.numIntVars)
         val f = compiled.problem.factors.single() as Linear
         assertEquals(LinearOp.LE, f.op)
-        assertEquals(50, f.bound)
+        assertEquals(50, checkNotNull(f.integerConstants).bound)
     }
 
     @Test

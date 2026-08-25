@@ -23,8 +23,8 @@ class UnitCubeTestTest {
 
     private fun satisfies(x: LongArray, rows: List<Linear>): Boolean = rows.all { f ->
         var acc = 0L
-        for (k in f.vars.indices) acc += f.coeff(k) * x[f.vars[k]]
-        acc <= f.bound
+        for (k in f.vars.indices) acc += checkNotNull(f.integerConstants).coeff(k) * x[f.vars[k]]
+        acc <= checkNotNull(f.integerConstants).bound
     }
 
     @Test

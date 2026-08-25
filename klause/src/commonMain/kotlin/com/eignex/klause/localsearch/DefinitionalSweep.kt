@@ -114,9 +114,10 @@ class DefinitionalSweep internal constructor(
                     }
                 }
                 for (f in factors) {
-                    if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ) continue
+                    if (f !is Linear || f.op != LinearOp.EQ) continue
+                    val row = f.integerConstants ?: continue
                     val j = f.vars.indices.firstOrNull {
-                        hinted[f.vars[it]] && (f.coeff(it) == 1L || f.coeff(it) == -1L) &&
+                        hinted[f.vars[it]] && (row.coeff(it) == 1L || row.coeff(it) == -1L) &&
                             nonProductOcc[f.vars[it]] == 1 &&
                             f.vars.indices.all { k -> k == it || isProductResult[f.vars[k]] }
                     }
@@ -147,6 +148,7 @@ class DefinitionalSweep internal constructor(
                     inputs = intArrayOf(f.a, f.b)
                 } else {
                     val lin = f as Linear
+                    val linRow = checkNotNull(lin.integerConstants) { "a claimed definition is an integer row" }
                     val j = defOut[v]
                     val ins = ArrayList<FunctionalObjective.Operand>(lin.vars.size - 1)
                     val inc = ArrayList<Long>(lin.vars.size - 1)
@@ -154,10 +156,16 @@ class DefinitionalSweep internal constructor(
                         if (k != j) {
                             visit(lin.vars[k])
                             ins.add(FunctionalObjective.Operand.v(lin.vars[k]))
-                            inc.add(lin.coeff(k))
+                            inc.add(linRow.coeff(k))
                         }
                     }
-                    node = FunctionalObjective.Lin(v, lin.coeff(j), inc.toLongArray(), ins.toTypedArray(), lin.bound)
+                    node = FunctionalObjective.Lin(
+                        v,
+                        linRow.coeff(j),
+                        inc.toLongArray(),
+                        ins.toTypedArray(),
+                        linRow.bound,
+                    )
                     inputs = IntArray(ins.size) { lin.vars[if (it < j) it else it + 1] }
                 }
                 if (!cyclic[v]) nodes.add(SweepNode.IntDef(node, inputs))
@@ -427,13 +435,14 @@ class DefinitionalSweep internal constructor(
         for (f in factors) {
             if (f !is ReifiedLinear) continue
             if (frozenBool(f.auxBoolVar)) continue
+            val row = f.integerConstants ?: continue
             var sum = 0L
-            for (k in f.vars.indices) sum += f.coeff(k) * assignment.intValue(f.vars[k])
+            for (k in f.vars.indices) sum += row.coeff(k) * assignment.intValue(f.vars[k])
             val holds = when (f.op) {
-                LinearOp.LE -> sum <= f.bound
-                LinearOp.GE -> sum >= f.bound
-                LinearOp.EQ -> sum == f.bound
-                LinearOp.NE -> sum != f.bound
+                LinearOp.LE -> sum <= row.bound
+                LinearOp.GE -> sum >= row.bound
+                LinearOp.EQ -> sum == row.bound
+                LinearOp.NE -> sum != row.bound
             }
             assignment.setBool(f.auxBoolVar, holds)
         }

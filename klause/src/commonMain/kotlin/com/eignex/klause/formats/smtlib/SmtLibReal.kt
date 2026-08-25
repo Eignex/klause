@@ -333,17 +333,18 @@ private fun SmtLib.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: B
         return reifyLinear(coeffs, vars, linOp, adjusted)
     }
     val row = realRow(d, linOp, strict)
+    val constants = checkNotNull(row.realConstants) { "a real row carries continuous constants" }
     val w = newBool()
     factors.add(
         ReifiedRealLinear(
             aux = w,
             vars = row.vars,
-            intCoeffs = row.realIntCoeffs,
+            intCoeffs = constants.intCoefficients.toDoubleArray(),
             realVars = row.realVars,
-            realCoeffs = row.realCoeffs,
+            realCoeffs = constants.realCoefficients.toDoubleArray(),
             op = if (row.op == LinearOp.EQ) LinearOp.LE else row.op,
-            bound = row.realBound,
-            strict = row.strictReal,
+            bound = constants.bound,
+            strict = constants.strict,
         ),
     )
     return Lit.make(w, true)

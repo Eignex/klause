@@ -64,7 +64,7 @@ internal class AggregationMirSeparator : CutSeparator {
         for (factor in ctx.problem.factors) {
             when (factor) {
                 // A real or wide row carries no plain-integer Long coefficients to build a cut row from.
-                is Linear -> if (factor.isIntegerCore) {
+                is Linear -> if (factor.integerConstants != null) {
                     when (factor.op) {
                         LinearOp.LE -> addRow(ctx, factor, flip = false, loOf, rows)
 
@@ -160,15 +160,16 @@ internal class AggregationMirSeparator : CutSeparator {
         loOf: MutableIntLongMap,
         out: MutableList<Row>,
     ) {
+        val row = factor.integerConstants ?: return
         val k = factor.vars.size
         val cols = IntArray(k)
         val a = LongArray(k)
         try {
-            var b = if (flip) -factor.bound else factor.bound
+            var b = if (flip) -row.bound else row.bound
             for (idx in 0 until k) {
                 val col = ctx.relaxation.intColOf[factor.vars[idx]]
                 if (col < 0) return // a variable without an LP column ⇒ skip the row
-                val coeff = if (flip) -factor.coeff(idx) else factor.coeff(idx)
+                val coeff = if (flip) -row.coeff(idx) else row.coeff(idx)
                 cols[idx] = col
                 a[idx] = coeff
                 val lo = ctx.problem.requireFiniteIntDomains()[factor.vars[idx]].min

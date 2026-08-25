@@ -323,10 +323,11 @@ private fun fbbtTightenOpenIntBounds(
         pass++
         for (f in rows) {
             if (spent || b.crossed || budgetSpent()) break
-            val coeffs = f.coeffs // materialising accessor: read once per row, never per direction
-            if (propagateRow(coeffs, f.vars, f.bound, sign = 1L, b = b)) changed = true
+            val row = f.integerConstants ?: continue
+            val coeffs = row.coeffs // materialising accessor: read once per row, never per direction
+            if (propagateRow(coeffs, f.vars, row.bound, sign = 1L, b = b)) changed = true
             // An equality also bounds from below: `Σ aⱼ·xⱼ ≥ b`, i.e. `−Σ aⱼ·xⱼ ≤ −b`.
-            if (f.op == LinearOp.EQ && propagateRow(coeffs, f.vars, f.bound, sign = -1L, b = b)) changed = true
+            if (f.op == LinearOp.EQ && propagateRow(coeffs, f.vars, row.bound, sign = -1L, b = b)) changed = true
         }
         for (f in mixed) {
             if (spent || b.crossed || budgetSpent()) break
@@ -457,7 +458,8 @@ private fun propagateRealRow(
     rLo: DoubleArray,
     rUp: DoubleArray,
 ): Boolean {
-    val effBound = sign * f.realBound
+    val row = f.realConstants ?: return false
+    val effBound = sign * row.bound
     if (!effBound.isFinite()) return false
     val terms = f.vars.size + f.realVars.size
     // Minimum activity over the finite terms, its magnitude for the rounding margin, and the open count.
@@ -467,7 +469,7 @@ private fun propagateRealRow(
     var infInt = -1
     var infReal = -1
     for (k in f.vars.indices) {
-        val a = sign * f.realIntCoeffs[k]
+        val a = sign * row.intCoefficients.at(k)
         if (a == 0.0) continue
         if (!a.isFinite()) return false
         val v = f.vars[k]
@@ -483,7 +485,7 @@ private fun propagateRealRow(
         }
     }
     for (j in f.realVars.indices) {
-        val c = sign * f.realCoeffs[j]
+        val c = sign * row.realCoefficients.at(j)
         if (c == 0.0) continue
         if (!c.isFinite()) return false
         val rv = f.realVars[j]
@@ -502,7 +504,7 @@ private fun propagateRealRow(
     for (k in f.vars.indices) {
         // A collapsed pair is tighter than the rows imply, so nothing may be derived off it.
         if (b.crossed) break
-        val a = sign * f.realIntCoeffs[k]
+        val a = sign * row.intCoefficients.at(k)
         if (a == 0.0) continue
         val v = f.vars[k]
         val own = if (numInf == 0) {
@@ -529,7 +531,7 @@ private fun propagateRealRow(
     }
     for (j in f.realVars.indices) {
         if (b.crossed) break
-        val c = sign * f.realCoeffs[j]
+        val c = sign * row.realCoefficients.at(j)
         if (c == 0.0) continue
         val rv = f.realVars[j]
         val own = if (numInf == 0) {

@@ -55,15 +55,16 @@ internal fun boundedRowMask(
             LinearOp.EQ -> Relation.EQ
             else -> continue
         }
-        val (cols, vals) = splitTerms(f, posCol, negCol)
-        builder.addRow(cols, vals, rel, f.bound)
+        val row = f.integerConstants ?: continue
+        val (cols, vals) = splitTerms(f, posCol, negCol) ?: continue
+        builder.addRow(cols, vals, rel, row.bound)
     }
     for (i in constraints.indices) {
         val f = constraints[i]
         if (f.op != LinearOp.LE && f.op != LinearOp.GE && f.op != LinearOp.EQ) continue
         val z = builder.addFreeVar(null, null)
         auxCol[i] = z
-        val (cols, vals) = splitTerms(f, posCol, negCol)
+        val (cols, vals) = splitTerms(f, posCol, negCol) ?: continue
         val eqCols = cols.copyOf(cols.size + 1)
         val eqVals = vals.copyOf(vals.size + 1)
         eqCols[cols.size] = z
@@ -144,8 +145,10 @@ internal fun relationOfLinear(f: Linear): Relation? = when (f.op) {
     else -> null
 }
 
-/** Row terms over the split column pairs: a variable represented `x = x⁺ − x⁻` contributes both halves. */
-internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<IntArray, LongArray> {
+/** Row terms over the split column pairs: a variable represented `x = x⁺ − x⁻` contributes both halves.
+ *  Only a 64-bit integer row has terms this builds. */
+internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<IntArray, LongArray>? {
+    val row = f.integerConstants ?: return null
     var extra = 0
     for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
     val cols = IntArray(f.vars.size + extra)
@@ -154,11 +157,11 @@ internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<Int
     for (k in f.vars.indices) {
         val v = f.vars[k]
         cols[w] = posCol[v]
-        vals[w] = f.coeff(k)
+        vals[w] = row.coeff(k)
         w++
         if (negCol[v] >= 0) {
             cols[w] = negCol[v]
-            vals[w] = -f.coeff(k)
+            vals[w] = -row.coeff(k)
             w++
         }
     }

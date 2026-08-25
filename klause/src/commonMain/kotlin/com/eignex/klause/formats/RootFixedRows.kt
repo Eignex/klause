@@ -1,8 +1,10 @@
 package com.eignex.klause.formats
 
+import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.WideConstants
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
@@ -49,17 +51,27 @@ internal fun rootFixedReifiedRows(factors: List<Factor>): List<Linear> {
  * it yields null rather than a row that claims more than it knows.
  */
 private fun unconditional(f: ReifiedLinear, holds: Boolean): Linear? {
-    val wide = f.wideCoeffs
     val op = if (holds) f.op else negatedOp(f.op) ?: return null
     val shift = if (holds) 0L else negationShift(f.op)
-    if (wide != null) {
-        return Linear(f.vars.copyOf(), wide.copyOf(), op, checkNotNull(f.wideBound) + BigInteger.fromLong(shift))
+    return when (val c = f.constants) {
+        is WideConstants -> Linear(
+            f.vars.copyOf(),
+            c.coefficients.toTypedArray(),
+            op,
+            c.bound + BigInteger.fromLong(shift),
+        )
+
+        is IntegerConstants -> {
+            // The shifted bound of a negation must stay exact; at the extreme of the range it would wrap,
+            // and a wrapped bound is a constraint the model never stated.
+            val shifted = c.bound + shift
+            if (shift != 0L && ((c.bound > 0L && shifted < 0L) || (c.bound < 0L && shifted > 0L))) {
+                null
+            } else {
+                Linear(c.coeffs, f.vars.copyOf(), op, shifted)
+            }
+        }
     }
-    // The shifted bound of a negation must stay exact; at the extreme of the range it would wrap, and a
-    // wrapped bound is a constraint the model never stated.
-    val shifted = f.bound + shift
-    if (shift != 0L && ((f.bound > 0L && shifted < 0L) || (f.bound < 0L && shifted > 0L))) return null
-    return Linear(f.coeffs, f.vars.copyOf(), op, shifted)
 }
 
 /** The relation `¬(Σ ⟨op⟩ k)` uses; null where the negation is a disequality and bounds nothing. */

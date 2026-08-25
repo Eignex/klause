@@ -75,7 +75,7 @@ class Xcsp3Test {
             </instance>
         """.trimIndent()
         val lin = Xcsp3.parse(xml).problem.factors.filterIsInstance<Linear>().single()
-        assertTrue(lin.wide, "the over-Int64 product coefficient must produce a wide Linear row")
+        assertTrue(lin.wideConstants != null, "the over-Int64 product coefficient must produce a wide Linear row")
         assertEquals(listOf(0), sat(xml).toList(), "8e27·x <= 1 forces x = 0")
     }
 
@@ -92,8 +92,12 @@ class Xcsp3Test {
             </instance>
         """.trimIndent()
         val lin = Xcsp3.parse(xml).problem.factors.filterIsInstance<Linear>().single()
-        assertFalse(lin.wide, "2.5e9 fits Long")
-        assertEquals(2_500_000_000L, lin.coeff(0), "the coefficient is exact, not Int-truncated")
+        assertFalse(lin.wideConstants != null, "2.5e9 fits Long")
+        assertEquals(
+            2_500_000_000L,
+            checkNotNull(lin.integerConstants).coeff(0),
+            "the coefficient is exact, not Int-truncated",
+        )
     }
 
     @Test

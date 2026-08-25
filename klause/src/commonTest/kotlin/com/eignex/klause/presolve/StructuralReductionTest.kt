@@ -42,7 +42,7 @@ class StructuralReductionTest {
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
         assertEquals(listOf(1), eq.vars.toList())
-        assertEquals(20L, eq.bound)
+        assertEquals(20L, checkNotNull(eq.integerConstants).bound)
     }
 
     @Test
@@ -58,7 +58,7 @@ class StructuralReductionTest {
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
-        assertEquals(0L, eq.bound)
+        assertEquals(0L, checkNotNull(eq.integerConstants).bound)
         assertEquals(setOf(1, 2), eq.vars.toSet())
     }
 
@@ -86,7 +86,7 @@ class StructuralReductionTest {
         )
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         assertTrue(out.factors.none { it is Element }, "the element global is removed")
-        assertEquals(7L, theLinear(out).bound)
+        assertEquals(7L, checkNotNull(theLinear(out).integerConstants).bound)
         assertEquals(
             1L,
             out.requireFiniteIntDomains()[0].min,
@@ -119,7 +119,7 @@ class StructuralReductionTest {
         val ne = theLinear(out)
         assertEquals(LinearOp.NE, ne.op)
         assertEquals(setOf(0, 1), ne.vars.toSet())
-        assertEquals(0L, ne.bound)
+        assertEquals(0L, checkNotNull(ne.integerConstants).bound)
     }
 
     @Test
@@ -319,7 +319,9 @@ class StructuralReductionTest {
         )
     }
 
-    private fun coeffOf(linear: Linear, v: Int): Long = linear.coeffs[linear.vars.indexOf(v)]
+    private fun coeffOf(linear: Linear, v: Int): Long = checkNotNull(
+        linear.integerConstants,
+    ).coeffs[linear.vars.indexOf(v)]
 
     @Test
     fun `a fixed operand turns a product into a linear equality`() {
@@ -334,7 +336,7 @@ class StructuralReductionTest {
         assertTrue(out.factors.none { it is Product }, "the product is linearised")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
-        assertEquals(0L, eq.bound)
+        assertEquals(0L, checkNotNull(eq.integerConstants).bound)
         assertEquals(1L, coeffOf(eq, 2), "result keeps unit coefficient")
         assertEquals(-3L, coeffOf(eq, 1), "the operand takes the negated fixed value as coefficient")
     }
@@ -350,7 +352,7 @@ class StructuralReductionTest {
         val out = problem.withPassDelta(Presolve.reduceStructural(problem), BakeConfig.NONE)
         val eq = theLinear(out)
         assertEquals(listOf(2), eq.vars.toList(), "only the result remains")
-        assertEquals(0L, eq.bound)
+        assertEquals(0L, checkNotNull(eq.integerConstants).bound)
     }
 
     @Test
@@ -376,7 +378,7 @@ class StructuralReductionTest {
         assertTrue(out.factors.none { it is ArrayMinMax }, "the min/max global is removed")
         val eq = theLinear(out)
         assertEquals(LinearOp.EQ, eq.op)
-        assertEquals(0L, eq.bound)
+        assertEquals(0L, checkNotNull(eq.integerConstants).bound)
         assertEquals(setOf(0, 1), eq.vars.toSet())
     }
 
