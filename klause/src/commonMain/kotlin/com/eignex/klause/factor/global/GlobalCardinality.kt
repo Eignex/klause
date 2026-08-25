@@ -127,7 +127,7 @@ class GlobalCardinality(
             val cv = countVars
             if (cv != null) xs + cv else xs
         },
-        lits = OptPresence.presenceVarIds(presents),
+        boolVars = OptPresence.presenceVarIds(presents),
     )
 
     /** Cover value → its 0-based index in [cover]. Used for O(1) per-probe lookup during

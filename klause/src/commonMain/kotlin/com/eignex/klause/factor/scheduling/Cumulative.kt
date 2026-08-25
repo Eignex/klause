@@ -184,7 +184,7 @@ class Cumulative(
                 out
             }
         },
-        lits = OptPresence.presenceVarIds(presents),
+        boolVars = OptPresence.presenceVarIds(presents),
     )
 
     /** Number of tasks. */

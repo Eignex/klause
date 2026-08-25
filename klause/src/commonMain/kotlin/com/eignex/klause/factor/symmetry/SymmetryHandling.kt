@@ -40,7 +40,7 @@ class SymmetryHandling(
         const val STRONG_GENERATOR_CAP = 64
     }
 
-    override val variables: VarList = MixedVars(spanInts = support { it.first }, lits = support { it.second })
+    override val variables: VarList = MixedVars(spanInts = support { it.first }, boolVars = support { it.second })
 
     private inline fun support(image: (Pair<IntArray, IntArray>) -> IntArray): IntArray {
         val moved = IntHashSet()

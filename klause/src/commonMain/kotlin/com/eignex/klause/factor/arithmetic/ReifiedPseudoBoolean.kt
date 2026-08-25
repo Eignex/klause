@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.LitVars
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
@@ -34,7 +34,7 @@ class ReifiedPseudoBoolean(
     val bound: Long,
 ) : ReifiedFactor {
 
-    override val variables: VarList = LitVars(literals.litVars(auxBoolVar))
+    override val variables: VarList = BoolVars(literals.litVars(auxBoolVar))
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)

@@ -39,7 +39,7 @@ class OrderLiteralSoundnessHarnessTest {
     private class NotEqualOnFix(val a: Int, val b: Int) :
         Factor,
         Propagator {
-        override val variables: VarList = MixedVars(spanInts = intArrayOf(a, b), lits = IntArray(0))
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(a, b), boolVars = IntArray(0))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val da = state.intDomains[a]

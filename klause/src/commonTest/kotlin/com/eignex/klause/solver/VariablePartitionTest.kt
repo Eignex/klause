@@ -66,7 +66,7 @@ class VariablePartitionTest {
         // The default is conservative: a factor that has not considered the question must not
         // silently license dropping a column's domain.
         val unconsidered = object : Factor {
-            override val variables: VarList = MixedVars(spanInts = intArrayOf(0), lits = IntArray(0))
+            override val variables: VarList = MixedVars(spanInts = intArrayOf(0), boolVars = IntArray(0))
             override fun remap(boolMap: IntArray, intMap: IntArray): Factor = this
             override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
             override fun asPropagator(): Propagator = object : Propagator {}

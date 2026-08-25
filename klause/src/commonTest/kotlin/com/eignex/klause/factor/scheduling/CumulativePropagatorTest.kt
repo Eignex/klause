@@ -767,7 +767,7 @@ class CumulativePropagatorTest {
     private class ExcludeOnFix(val src: Int, val dst: Int) :
         Factor,
         Propagator {
-        override val variables: VarList = MixedVars(spanInts = intArrayOf(src, dst), lits = IntArray(0))
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(src, dst), boolVars = IntArray(0))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val d = state.intDomains[src]

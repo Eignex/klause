@@ -2,6 +2,8 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,11 +34,11 @@ class VarListTest {
 
     @Test
     fun `a mixed declaration keeps each role separate while reading as one list`() {
-        val mixed = MixedVars(spanInts = intArrayOf(7), boundInts = intArrayOf(8, 9), lits = intArrayOf(2))
+        val mixed = MixedVars(spanInts = intArrayOf(7), boundInts = intArrayOf(8, 9), boolVars = intArrayOf(2))
 
         assertEquals(listOf(7), mixed.spanInts.toList(), "only the enumerating role demands values")
         assertEquals(listOf(7, 8, 9), mixed.ints.toList(), "an occurrence scan still sees every column")
-        assertEquals(listOf(2), mixed.lits.toList())
+        assertEquals(listOf(2), mixed.boolVars.toList())
     }
 
     @Test
@@ -55,9 +57,31 @@ class VarListTest {
     }
 
     @Test
+    fun `a factor declares every real column it constrains`() {
+        val product = RealProduct(
+            intOperand = 0,
+            realOperand = 1,
+            result = 2,
+            realOperandLo = 0.0,
+            realOperandHi = 4.0,
+        )
+
+        assertEquals(listOf(0), product.variables.spanInts.toList())
+        assertEquals(listOf(1, 2), product.variables.reals.toList(), "both continuous columns are constrained")
+    }
+
+    @Test
+    fun `boolean columns are declared as raw variable ids rather than encoded literals`() {
+        val clause = Clause(intArrayOf(Lit.make(3, true), Lit.make(4, false)))
+
+        assertEquals(listOf(3, 4), clause.variables.boolVars.toList())
+        assertEquals(listOf(3, 4), clause.boolVars.toList())
+    }
+
+    @Test
     fun `a factor with no variables declares that too`() {
         assertTrue(NoVars.ints.isEmpty())
-        assertTrue(NoVars.lits.isEmpty())
+        assertTrue(NoVars.boolVars.isEmpty())
         assertTrue(NoVars.reals.isEmpty())
     }
 }

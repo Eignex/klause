@@ -32,7 +32,7 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
     /** Bounds reasoning only: this factor never indexes a value set, so its columns need no finite domain. */
     override val needsFiniteDomains: Boolean get() = false
 
-    override val variables: VarList = MixedVars(boundInts = vars.distinct().toIntArray(), lits = IntArray(0))
+    override val variables: VarList = MixedVars(boundInts = vars.distinct().toIntArray(), boolVars = IntArray(0))
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ComparisonClause(vars.remapVars(intMap), ops, consts)

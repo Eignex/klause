@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.LitVars
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
@@ -33,7 +33,7 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
-    override val variables: VarList = LitVars(literals.litVars(auxBoolVar))
+    override val variables: VarList = BoolVars(literals.litVars(auxBoolVar))
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)

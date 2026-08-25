@@ -189,7 +189,7 @@ class AllDifferent(
         return FactorReduction.Rewrite(replacement)
     }
 
-    override val variables: VarList = MixedVars(spanInts = vars, lits = OptPresence.presenceVarIds(presents))
+    override val variables: VarList = MixedVars(spanInts = vars, boolVars = OptPresence.presenceVarIds(presents))
 
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the

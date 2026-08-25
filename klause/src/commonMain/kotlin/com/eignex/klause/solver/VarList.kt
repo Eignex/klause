@@ -20,8 +20,8 @@ sealed interface VarList {
     /** Integer columns whose values this factor must be able to enumerate. */
     val spanInts: IntArray get() = EmptyIntArray
 
-    /** Boolean literals this factor reads, `Lit`-encoded. */
-    val lits: IntArray get() = EmptyIntArray
+    /** Boolean columns this factor reads, as raw variable ids — not `Lit`-encoded. */
+    val boolVars: IntArray get() = EmptyIntArray
 
     /** Real columns this factor reads. */
     val reals: IntArray get() = EmptyIntArray
@@ -41,8 +41,8 @@ class SpanIntVars(override val ints: IntArray) : VarList {
     override val spanInts: IntArray get() = ints
 }
 
-/** Boolean literals, `Lit`-encoded. */
-class LitVars(override val lits: IntArray) : VarList
+/** Boolean columns, as raw variable ids. */
+class BoolVars(override val boolVars: IntArray) : VarList
 
 /** Real columns. */
 class RealVars(override val reals: IntArray) : VarList
@@ -56,7 +56,7 @@ class RealVars(override val reals: IntArray) : VarList
 class MixedVars(
     spanInts: IntArray = EmptyIntArray,
     boundInts: IntArray = EmptyIntArray,
-    override val lits: IntArray = EmptyIntArray,
+    override val boolVars: IntArray = EmptyIntArray,
     override val reals: IntArray = EmptyIntArray,
 ) : VarList {
     override val spanInts: IntArray = spanInts

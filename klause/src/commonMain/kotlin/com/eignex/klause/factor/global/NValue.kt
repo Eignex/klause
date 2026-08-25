@@ -118,7 +118,7 @@ class NValue(
 
     override val variables: VarList = MixedVars(
         spanInts = xs + intArrayOf(n),
-        lits = OptPresence.presenceVarIds(presents),
+        boolVars = OptPresence.presenceVarIds(presents),
     )
 
     override fun asPropagator(): Propagator {

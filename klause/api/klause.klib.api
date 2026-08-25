@@ -2704,10 +2704,10 @@ sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.sol
 }
 
 sealed interface com.eignex.klause.solver/VarList { // com.eignex.klause.solver/VarList|null[0]
+    open val boolVars // com.eignex.klause.solver/VarList.boolVars|{}boolVars[0]
+        open fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/VarList.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
     open val ints // com.eignex.klause.solver/VarList.ints|{}ints[0]
         open fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/VarList.ints.<get-ints>|<get-ints>(){}[0]
-    open val lits // com.eignex.klause.solver/VarList.lits|{}lits[0]
-        open fun <get-lits>(): kotlin/IntArray // com.eignex.klause.solver/VarList.lits.<get-lits>|<get-lits>(){}[0]
     open val reals // com.eignex.klause.solver/VarList.reals|{}reals[0]
         open fun <get-reals>(): kotlin/IntArray // com.eignex.klause.solver/VarList.reals.<get-reals>|<get-reals>(){}[0]
     open val spanInts // com.eignex.klause.solver/VarList.spanInts|{}spanInts[0]
@@ -9410,6 +9410,13 @@ final class com.eignex.klause.solver/Assumptions { // com.eignex.klause.solver/A
 
 final class com.eignex.klause.solver/BakedProblem : com.eignex.klause.solver/Problem // com.eignex.klause.solver/BakedProblem|null[0]
 
+final class com.eignex.klause.solver/BoolVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/BoolVars|null[0]
+    constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/BoolVars.<init>|<init>(kotlin.IntArray){}[0]
+
+    final val boolVars // com.eignex.klause.solver/BoolVars.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/BoolVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+}
+
 final class com.eignex.klause.solver/ComponentPlan { // com.eignex.klause.solver/ComponentPlan|null[0]
     final val cpIntVars // com.eignex.klause.solver/ComponentPlan.cpIntVars|{}cpIntVars[0]
         final fun <get-cpIntVars>(): kotlin/IntArray // com.eignex.klause.solver/ComponentPlan.cpIntVars.<get-cpIntVars>|<get-cpIntVars>(){}[0]
@@ -9513,13 +9520,6 @@ final class com.eignex.klause.solver/IntVars : com.eignex.klause.solver/VarList 
         final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/IntVars.ints.<get-ints>|<get-ints>(){}[0]
 }
 
-final class com.eignex.klause.solver/LitVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/LitVars|null[0]
-    constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/LitVars.<init>|<init>(kotlin.IntArray){}[0]
-
-    final val lits // com.eignex.klause.solver/LitVars.lits|{}lits[0]
-        final fun <get-lits>(): kotlin/IntArray // com.eignex.klause.solver/LitVars.lits.<get-lits>|<get-lits>(){}[0]
-}
-
 final class com.eignex.klause.solver/MixedIntColumns : com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/MixedIntColumns|null[0]
     constructor <init>(kotlin/Array<com.eignex.klause.solver/IntColumn>) // com.eignex.klause.solver/MixedIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.solver.IntColumn>){}[0]
 
@@ -9533,10 +9533,10 @@ final class com.eignex.klause.solver/MixedIntColumns : com.eignex.klause.solver/
 final class com.eignex.klause.solver/MixedVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/MixedVars|null[0]
     constructor <init>(kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ...) // com.eignex.klause.solver/MixedVars.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.IntArray;kotlin.IntArray){}[0]
 
+    final val boolVars // com.eignex.klause.solver/MixedVars.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
     final val ints // com.eignex.klause.solver/MixedVars.ints|{}ints[0]
         final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.ints.<get-ints>|<get-ints>(){}[0]
-    final val lits // com.eignex.klause.solver/MixedVars.lits|{}lits[0]
-        final fun <get-lits>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.lits.<get-lits>|<get-lits>(){}[0]
     final val reals // com.eignex.klause.solver/MixedVars.reals|{}reals[0]
         final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.reals.<get-reals>|<get-reals>(){}[0]
     final val spanInts // com.eignex.klause.solver/MixedVars.spanInts|{}spanInts[0]
