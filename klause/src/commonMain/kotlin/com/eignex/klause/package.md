@@ -9,7 +9,7 @@ finite-CP bounding integration.
 decision routes, and `solver.pipeline` chooses one before a frontend enters the finite CP path.
 
 `ProblemSpec.componentPlan()` chooses one immutable ownership plan before search. `Problem` stores typed
-integer columns: `FiniteIntColumns` carry CP domains and `IntColumn.Symbolic` remains theory-owned. The
+integer columns: `FiniteIntColumns` carry CP domains and `IntColumn.Bounded` remains theory-owned. The
 plan builds a compact remapped CP projection plus a theory fragment, so no theory variable is materialized
 as a CP domain.
 
