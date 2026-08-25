@@ -32,9 +32,9 @@ import com.eignex.klause.solver.Problem
  * open edges on every fire, and the sweep was the whole cost — the same instrumentation put 320,000 fires
  * on one instance, with the sweeps switched off costing only ~1.2x. The sweep has since moved to at most
  * one per decision, so the measurement no longer applies and dropping the over-heavy edges is worth
- * re-testing. Re-running it needs the `nec-smt` sample, which is not in the fetched corpora, and a
- * fixed-node comparison, which the CLI has no knob for; both have to exist before this gate is lifted on
- * evidence rather than swapped on a guess.
+ * re-testing. Re-running it needs the `nec-smt` sample, which is not in the fetched corpora; the
+ * fixed-node comparison itself is `--param node-limit=N`. Lift this gate on that evidence rather than on
+ * a guess.
  *
  * The first gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
  * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
