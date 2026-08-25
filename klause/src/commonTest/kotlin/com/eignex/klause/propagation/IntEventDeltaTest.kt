@@ -8,7 +8,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -29,10 +31,10 @@ class IntEventDeltaTest {
      * full-propagation fire) and, for any that is now a singleton, removes its value from the others.
      * Subscribes to every kind on every variable, so the delta is a sound superset of its changes.
      */
-    private class DeltaAllDifferent(override val intVars: IntArray) :
+    private class DeltaAllDifferent(columns: IntArray) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
+        override val variables: VarList = SpanIntVars(columns)
         override val consumesIntEventDelta: Boolean = true
         override val initialIntEventWatches: IntArray = IntArray(intVars.size * IntEvent.COUNT).also { out ->
             var w = 0
@@ -77,8 +79,7 @@ class IntEventDeltaTest {
     private class ExcludeOnFix(val src: Int, val dst: Int) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(src, dst)
+        override val variables: VarList = SpanIntVars(intArrayOf(src, dst))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val d = state.intDomains[src]

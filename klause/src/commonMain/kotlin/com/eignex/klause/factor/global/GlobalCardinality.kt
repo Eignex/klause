@@ -14,7 +14,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -120,11 +122,13 @@ class GlobalCardinality(
         )
     }
 
-    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-    override val intVars: IntArray = run {
-        val cv = countVars
-        if (cv != null) xs + cv else xs
-    }
+    override val variables: VarList = MixedVars(
+        spanInts = run {
+            val cv = countVars
+            if (cv != null) xs + cv else xs
+        },
+        lits = OptPresence.presenceVarIds(presents),
+    )
 
     /** Cover value → its 0-based index in [cover]. Used for O(1) per-probe lookup during
      *  propagation and LS delta computation; `-1` for values outside the cover. */

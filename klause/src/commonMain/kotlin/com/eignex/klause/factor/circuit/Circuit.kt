@@ -8,10 +8,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.abs
 
 /**
@@ -43,8 +44,7 @@ class Circuit(
     /** Number of nodes; equal to `succ.size`. */
     val n: Int = succ.size
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = succ
+    override val variables: VarList = SpanIntVars(succ)
 
     init {
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }

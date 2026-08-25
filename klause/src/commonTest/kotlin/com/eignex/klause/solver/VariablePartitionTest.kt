@@ -6,6 +6,8 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.MixedVars
+import com.eignex.klause.solver.VarList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -64,8 +66,7 @@ class VariablePartitionTest {
         // The default is conservative: a factor that has not considered the question must not
         // silently license dropping a column's domain.
         val unconsidered = object : Factor {
-            override val boolVars: IntArray = IntArray(0)
-            override val intVars: IntArray = intArrayOf(0)
+            override val variables: VarList = MixedVars(spanInts = intArrayOf(0), lits = IntArray(0))
             override fun remap(boolMap: IntArray, intMap: IntArray): Factor = this
             override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
             override fun asPropagator(): Propagator = object : Propagator {}

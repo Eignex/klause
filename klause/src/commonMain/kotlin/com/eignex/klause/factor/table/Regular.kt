@@ -12,11 +12,12 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.values
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -100,8 +101,7 @@ class Regular(
         return Regular(seq, numStates, alphabetSize, newTransitions, q0, accepting)
     }
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = seq
+    override val variables: VarList = SpanIntVars(seq)
 
     override fun asPropagator(): Propagator =
         RegularPropagator(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)

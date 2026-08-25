@@ -6,10 +6,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int
@@ -49,8 +50,7 @@ class LexLess(
         sink.intVars(ys)
     }
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = xs + ys
+    override val variables: VarList = SpanIntVars(xs + ys)
 
     override fun asPropagator(): Propagator = LexLessPropagator(boolVars, intVars, xs, ys, strict)
 

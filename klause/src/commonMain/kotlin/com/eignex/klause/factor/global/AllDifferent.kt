@@ -13,7 +13,9 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
@@ -187,8 +189,7 @@ class AllDifferent(
         return FactorReduction.Rewrite(replacement)
     }
 
-    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-    override val intVars: IntArray = vars
+    override val variables: VarList = MixedVars(spanInts = vars, lits = OptPresence.presenceVarIds(presents))
 
     /** Pre-computed `intVar → number of slots in [vars] holding it`. Used to compute the
      *  delta of changing a single var's value in O(1) without re-scanning [vars]; for the

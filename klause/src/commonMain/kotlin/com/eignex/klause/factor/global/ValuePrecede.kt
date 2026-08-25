@@ -6,10 +6,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `value_precede(s, t, xs)`: value [t] may appear in [xs] only at a position after value [s]
@@ -53,8 +54,7 @@ class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
      *  `value_precede(π(s), π(t))` under a value permutation π. */
     override fun remapValues(valueMap: (Long) -> Long): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = xs
+    override val variables: VarList = SpanIntVars(xs)
 
     override fun asPropagator(): Propagator = ValuePrecedePropagator(boolVars, intVars, s, t, xs)
 

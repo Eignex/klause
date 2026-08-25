@@ -15,9 +15,11 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -79,8 +81,7 @@ class ArithmeticPropagatorTest {
     private class ExcludeOnFix(val src: Int, val dst: Int) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(src, dst)
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(src, dst), lits = IntArray(0))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val d = state.intDomains[src]
@@ -312,8 +313,7 @@ class ArithmeticPropagatorTest {
     private class ExcludeOnFixWithReason(val src: Int, val dst: Int) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(src, dst)
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(src, dst), lits = IntArray(0))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val d = state.intDomains[src]

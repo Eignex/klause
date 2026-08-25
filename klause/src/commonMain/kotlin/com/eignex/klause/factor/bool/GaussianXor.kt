@@ -6,8 +6,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.NoVars
 import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.solver.VarList
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over
@@ -55,7 +56,7 @@ class GaussianXor(
 
     /** Union of all variables across the constraints, in stable order. */
     override val boolVars: IntArray
-    override val intVars: IntArray = EmptyIntArray
+    override val variables: VarList = NoVars
 
     init {
         require(constraints.isNotEmpty()) { "GaussianXor needs at least one constraint" }

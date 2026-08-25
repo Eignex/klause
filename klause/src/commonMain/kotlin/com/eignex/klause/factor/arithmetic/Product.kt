@@ -10,10 +10,11 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -63,8 +64,7 @@ class Product(
         sink.sortedIntVars(intArrayOf(a, b))
     }
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = intArrayOf(a, b, result)
+    override val variables: VarList = SpanIntVars(intArrayOf(a, b, result))
 
     override fun asPropagator(): Propagator = ProductPropagator(a, b, result, boolVars, intVars)
 

@@ -11,10 +11,11 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
@@ -56,8 +57,7 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
         sink.sortedIntVars(xs)
     }
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = xs + intArrayOf(result)
+    override val variables: VarList = SpanIntVars(xs + intArrayOf(result))
 
     override val extendsObjectiveCone: Boolean = true
 
