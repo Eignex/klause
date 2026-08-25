@@ -129,7 +129,8 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
                 return GeneralLiaSearchOutcome.BudgetCapped
             }
             if (context.cancelled()) return GeneralLiaSearchOutcome.Cancelled
-            if (!propagateEqualities()) return GeneralLiaSearchOutcome.Infeasible
+            val narrowed = propagateEqualities() ?: return GeneralLiaSearchOutcome.Cancelled
+            if (!narrowed) return GeneralLiaSearchOutcome.Infeasible
             if (!factorsPossible()) return GeneralLiaSearchOutcome.Infeasible
             val bool = boolAssigned.indexOfFirst { !it }
             if (bool >= 0) {
@@ -162,9 +163,19 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
             for (v in domains.indices) domains[v] = frame.saved[v]
         }
 
-        private fun propagateEqualities(): Boolean {
+        /**
+         * Narrow the domains through the equality rows until nothing moves, or null when the budget was
+         * spent first.
+         *
+         * The fixpoint is unbounded in principle — each pass may narrow an interval and license another —
+         * and every pass walks every factor in [BigInteger], so on a large model one call to this is long
+         * enough that a poll at the node above it never lands. Null is a third answer on purpose: `false`
+         * here means infeasible, and a stopped sweep must not claim that.
+         */
+        private fun propagateEqualities(): Boolean? {
             var changed: Boolean
             do {
+                if (context.cancelled()) return null
                 changed = false
                 for (factor in model.factors) {
                     val row = when (factor) {

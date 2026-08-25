@@ -214,4 +214,28 @@ class OpenTheoryEngineTest {
         assertTrue(ints[parsed.intVarNames.getValue("x")] < ints[parsed.intVarNames.getValue("y")])
         assertTrue(ints[parsed.intVarNames.getValue("y")] < ints[parsed.intVarNames.getValue("z")])
     }
+
+    @Test
+    fun `a cancelled general LIA run reports unknown rather than refuting a satisfiable model`() {
+        // The equality fixpoint narrows domains until nothing moves, and a stop inside it must not read
+        // as the emptiness that means infeasible.
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (= (+ x y) 10))
+                (assert (>= x 0))
+                (assert (>= y 0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve())
+
+        val stopped = OpenTheoryEngine(parsed.model, parsed.sourcePipeline)
+            .solve(TheoryParams(cancellation = Cancellation { true }))
+
+        assertIs<OpenTheoryResult.Unknown>(stopped)
+    }
 }
