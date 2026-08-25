@@ -11,6 +11,7 @@ import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -71,5 +72,28 @@ class UnboundedColumnSolveTest {
         val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
 
         assertEquals(7L, assertIs<SolveResult.Sat>(result).assignment.ints[0])
+    }
+
+    @Test
+    fun `a global over a column no span can enumerate answers instead of walking it`() {
+        // The declared span is `Long.MAX_VALUE`, the width whose successor wraps. A global that indexes a
+        // value window sits on it, so the column reaches a value-enumerating propagator still full width:
+        // if the domain hands out a truncated span here, the walk is 2^31 values long and the answer is
+        // drawn from the wrong set.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, Long.MAX_VALUE), IntDomain(0, Long.MAX_VALUE)),
+            factors = arrayOf<Factor>(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 4),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+            ),
+        )
+
+        val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+
+        val ints = assertIs<SolveResult.Sat>(result).assignment.ints
+        assertTrue(ints[0] <= 3L, "the row bounds the indexed column, got ${'$'}{ints[0]}")
+        assertTrue(ints[0] != ints[1], "the global separates the two columns")
     }
 }
