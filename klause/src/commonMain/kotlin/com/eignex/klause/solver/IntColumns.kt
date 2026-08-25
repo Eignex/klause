@@ -33,13 +33,13 @@ sealed class IntColumns {
     /** Number of source integer columns. */
     abstract val size: Int
 
-    /** Typed capability of source column [v]. */
+    /** Capability of source column [v]. */
     abstract fun column(v: Int): IntColumn
 
     /** Finite domain of [v], or null when a theory owns it and only its bounds are known. */
     fun domainOrNull(v: Int): IntDomain? = (column(v) as? IntColumn.Finite)?.domain
 
-    /** Packed finite domains when every column is CP-owned, or null otherwise. */
+    /** Finite domains when every column is finite-domain owned, otherwise null. */
     abstract fun allFiniteOrNull(): Array<IntDomain>?
 }
 

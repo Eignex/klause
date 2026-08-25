@@ -81,9 +81,7 @@ internal interface KeySink {
 internal fun materializeKey(kind: FactorKind, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind).also(build).toKey()
 
-/** [materializeKey] with a payload-size estimate ([Factor.structuralKeyWeight]), so the builder is sized
- *  once instead of doubling its way up. Worth passing whenever the key splices a whole tuple set or
- *  transition table, where those growth transients dominate ingest memory. */
+/** [materializeKey] with a payload-size estimate ([Factor.structuralKeyWeight]). */
 internal fun materializeKey(kind: FactorKind, expectedWords: Int, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind, expectedWords).also(build).toKey()
 
@@ -96,8 +94,7 @@ internal fun materializeKey(kind: FactorKind, expectedWords: Int, build: (KeySin
 internal fun hashRemappedKey(kind: FactorKind, mapping: VarRemap, build: (KeySink) -> Unit): Int =
     HashingKeySink(kind, mapping).also(build).hash()
 
-/** Builds the canonical [StructuralKey] by delegating to [StructuralKeyBuilder] with the identity remap —
- *  so a migrated factor's key is byte-identical to the former hand-written `StructuralKey.of(kind){…}`. */
+/** Builds the canonical [StructuralKey] with the identity remap. */
 internal class MaterializingKeySink(private val kind: FactorKind, expectedWords: Int = 0) : KeySink {
     private val b = StructuralKeyBuilder(expectedWords)
 
@@ -121,8 +118,6 @@ internal class MaterializingKeySink(private val kind: FactorKind, expectedWords:
     override fun pairsByVarKey(varKeys: IntArray, valueOf: (Int) -> Long) = b.pairsByKey(varKeys, valueOf)
     override fun pairsByLitKey(litKeys: IntArray, valueOf: (Int) -> Long) = b.pairsByKey(litKeys, valueOf)
 
-    // Identity map: a stored factor has distinct variables (Linear coalesces at construction), so there is
-    // nothing to merge — equivalent to the non-coalescing key. Matches `structuralKey()` exactly.
     override fun pairsByVarKeyCoalescing(varKeys: IntArray, valueOf: (Int) -> Long) = b.pairsByKey(varKeys, valueOf)
 
     fun toKey(): StructuralKey = b.build(kind)
@@ -208,7 +203,6 @@ internal class HashingKeySink(private val kind: FactorKind, private val mapping:
         val n = keys.size
         val order = IntArray(n) { it }
         val images = IntArray(n) { image(keys[it]) }
-        // Same ordering as StructuralKeyBuilder.pairsByKey: sort indices by image, ties by index ascending.
         val packed = LongArray(n) { (images[it].toLong() shl Int.SIZE_BITS) or (it.toLong() and LOW_WORD) }
         packed.sort()
         for (i in 0 until n) order[i] = (packed[i] and LOW_WORD).toInt()
@@ -220,9 +214,6 @@ internal class HashingKeySink(private val kind: FactorKind, private val mapping:
 
     override fun pairsByVarKeyCoalescing(varKeys: IntArray, valueOf: (Int) -> Long) {
         val n = varKeys.size
-        // Pack (image high, original index low), sort by image, then walk runs of equal image summing
-        // their values — reproducing `remap()` (whose constructor coalesces same-image terms) followed by
-        // `pairsByKey`: length is the distinct-image count, then each `(image, summed value)` ascending.
         val packed = LongArray(
             n,
         ) { (mapping.int(varKeys[it]).toLong() shl Int.SIZE_BITS) or (it.toLong() and LOW_WORD) }

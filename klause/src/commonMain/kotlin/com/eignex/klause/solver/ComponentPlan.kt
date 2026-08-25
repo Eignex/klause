@@ -8,10 +8,10 @@ import com.eignex.klause.factor.bool.Clause
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
-    /** The finite CP component owns mutable domain state and may branch on this column. */
+    /** Finite-domain search owns the column. */
     CP,
 
-    /** A theory component owns this symbolic column; it has no [IntDomain] in [Problem]. */
+    /** An open theory owns the column. */
     THEORY,
 }
 
@@ -20,25 +20,18 @@ enum class FactorOwner {
     /** A finite-domain propagator owns the factor. */
     CP,
 
-    /** An open theory component owns the factor. */
+    /** An open theory owns the factor. */
     THEORY,
 
-    /** The session's Boolean clause component owns the factor. */
+    /** The shared Boolean clause component owns the factor. */
     SHARED,
 }
 
-/**
- * Immutable build-time decomposition of a [ProblemSpec].
- *
- * The plan is deliberately source-indexed: components retain the model's public variable ids, while
- * each component allocates only the mutable state it owns. This avoids a second id mapping at every
- * theory/CP channel boundary and lets future array, function, and quantifier components retain their
- * native symbols.
- */
+/** Immutable build-time decomposition of a [ProblemSpec]. */
 class ComponentPlan internal constructor(
     private val intOwners: Array<IntVariableOwner>,
     private val factorOwners: Array<FactorOwner>,
-    /** Theory route selected from the theory-owned source fragment, once at build time. */
+    /** Theory route selected from the theory-owned source fragment. */
     val theoryPipeline: ProblemPipeline,
 ) {
     /** Owner of integer column [v]. */
@@ -47,7 +40,7 @@ class ComponentPlan internal constructor(
     /** Owner of source factor [i]. */
     fun factorOwner(i: Int): FactorOwner = factorOwners[i]
 
-    /** Source integer ids requiring finite CP domains. */
+    /** Source integer ids requiring finite domains. */
     val cpIntVars: IntArray get() = intOwners.indices.filter { intOwners[it] == IntVariableOwner.CP }.toIntArray()
 
     /** Source integer ids that remain symbolic for a theory. */
@@ -55,15 +48,15 @@ class ComponentPlan internal constructor(
         intOwners[it] == IntVariableOwner.THEORY
     }.toIntArray()
 
-    /** Whether this composition has finite-domain state. */
+    /** Whether the composition has finite-domain state. */
     val hasCpComponent: Boolean get() = intOwners.any { it == IntVariableOwner.CP } ||
         factorOwners.any { it == FactorOwner.CP }
 
-    /** Whether this composition needs a theory component. */
+    /** Whether the composition needs a theory component. */
     val hasTheoryComponent: Boolean get() =
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY }
 
-    /** Materialize exactly the CP-owned columns, leaving theory columns symbolic. */
+    /** Materialize the finite-domain columns of [spec]. */
     fun materialize(spec: ProblemSpec, cpDomains: Map<Int, IntDomain>): Problem {
         require(cpDomains.keys.all { it in intOwners.indices && intOwners[it] == IntVariableOwner.CP }) {
             "only CP-owned integer columns may receive finite domains"
@@ -80,8 +73,6 @@ class ComponentPlan internal constructor(
                     requireNotNull(cpDomains[v]) { "missing finite domain for CP integer column $v" },
                 )
 
-                // The theory reasons over the source bounds, so the column carries them rather than
-                // standing for their absence and sending every reader to a parallel table.
                 IntVariableOwner.THEORY -> IntColumn.Bounded(
                     lower = if (spec.intBounds.hasLower(v)) spec.intBounds.lower(v) else null,
                     upper = if (spec.intBounds.hasUpper(v)) spec.intBounds.upper(v) else null,
@@ -147,27 +138,19 @@ class ComponentPlan internal constructor(
 
 /** Mapping between source integer ids and the compact finite CP component. */
 class CpProblemProjection internal constructor(
-    /** The finite-domain problem passed to [com.eignex.klause.propagation.PropagationSession]. */
+    /** Finite-domain problem passed to the propagation component. */
     val problem: Problem,
     private val sourceToCp: IntArray,
     private val cpToSource: IntArray,
 ) {
-    /** CP-local id for a source integer column, or `-1` when theory-owned. */
+    /** CP-local id for [sourceIntVar], or `-1` when theory-owned. */
     fun cpId(sourceIntVar: Int): Int = sourceToCp[sourceIntVar]
 
-    /** Source integer id for a CP-local column. */
+    /** Source integer id for [cpIntVar]. */
     fun sourceId(cpIntVar: Int): Int = cpToSource[cpIntVar]
 }
 
-/**
- * Select component ownership from the source model before any finite search domain is invented.
- *
- * When one complete theory covers the entire open source model, every integer stays theory-owned,
- * including declared finite ranges: a finite bound is then a theory constraint, not a CP allocation.
- * Otherwise a variable that reaches a finite-domain global is CP-owned, while arithmetic stays in its
- * theory component and reads CP values only through session-published bounds. Clauses are session-owned
- * shared factors.
- */
+/** Select component ownership from the source model. */
 fun ProblemSpec.componentPlan(): ComponentPlan {
     val partition = variablePartition()
     val completeTheory = when {

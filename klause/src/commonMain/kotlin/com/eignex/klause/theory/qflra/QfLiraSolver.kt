@@ -151,11 +151,7 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
     }
 }
 
-/**
- * Incremental QF_LIRA participant whose exact simplex probes emit their residual integer splits to the
- * shared search engine. The component owns only its branch description and exact tableau assembly;
- * [com.eignex.klause.solver.search.SearchSession] owns the tree, decision levels, and retraction.
- */
+/** Incremental exact QF_LIRA search component. */
 class ExactLiraSearchComponent(
     private val model: ProblemSpec,
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
@@ -305,7 +301,6 @@ private sealed interface IntegerSearchResult {
 
 private data class IntegerBranch(val variable: Int, val lower: BigInteger? = null, val upper: BigInteger? = null)
 
-/** One exact integer branch plus the choices which decompose integer disequalities. */
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),
     val disequalityDirections: Map<Int, LinearOp> = emptyMap(),
@@ -357,10 +352,8 @@ private fun SearchNode.withPublishedBounds(
     return bounded
 }
 
-/** QF_LIRA branch payload opaque to the shared session. */
 private data class ExactLiraDecision(val node: SearchNode) : SearchTheoryDecision
 
-/** Direct exact-simplex assembler for one Boolean/integer branch of a mixed source model. */
 private class QfLiraSystem(private val model: ProblemSpec) {
     fun build(bools: BooleanArray, node: SearchNode): QfLiraLeaf? {
         val builder = LpBuilder()
@@ -731,12 +724,6 @@ private class QfLiraLeaf(
     fun value(witness: List<BigFraction>, positive: Int, negative: Int): BigFraction =
         witness[positive] - witness[negative]
 
-    /**
-     * Separates one exact GMI cut from a fractional extended-integer tableau row.  Source integer
-     * `x` is represented as `p - n`; requiring both nonnegative halves to be integral preserves
-     * every source-integer solution, so this is a valid extended formulation.  A cut is retained
-     * only if every coefficient survives the existing double LP view exactly.
-     */
     fun gmiCut(tableau: List<BigRationalTableauRow>?): ExactGmiCut? {
         if (model.rowStrict.any { it }) return null
         val integral = BooleanArray(model.n)
@@ -766,7 +753,6 @@ private class QfLiraLeaf(
         return null
     }
 
-    /** Eliminate tableau slack columns with `s = rhs - A*x` before adding the cut to the source LP. */
     private fun projectSlacks(columns: List<Int>, coefficients: List<BigFraction>, rhs: BigFraction): ExactCutRow? {
         val terms = HashMap<Int, BigFraction>()
         var cutRhs = rhs
@@ -797,7 +783,6 @@ private class QfLiraLeaf(
     }
 }
 
-/** A GMI inequality in the structural columns, held as doubles only after an exact round-trip check. */
 private class ExactGmiCut(val columns: IntArray, val coefficients: DoubleArray, val rhs: Double) {
     fun sameAs(other: ExactGmiCut): Boolean =
         columns.contentEquals(other.columns) && coefficients.contentEquals(other.coefficients) && rhs == other.rhs
@@ -834,7 +819,6 @@ private fun BigFraction.exactDoubleOrNull(): Double? {
     return value.takeIf { it.isFinite() && BigFraction.ofDouble(it) == this }
 }
 
-/** Exact base-2^40 encoding for branch bounds too large for one IEEE coefficient. */
 private class BigConstantEncoder(private val builder: LpBuilder) {
     private val base = BigInteger.ONE shl 40
     private val columns = ArrayList<Int>()
@@ -847,7 +831,6 @@ private class BigConstantEncoder(private val builder: LpBuilder) {
         builder.addRealRow(rowColumns.toIntArray(), rowValues.toDoubleArray(), relation, 0.0)
     }
 
-    /** Appends `multiplier * coefficient * column` using exact base-2^40 scale columns. */
     fun appendProduct(
         coefficient: BigInteger,
         column: Int,
@@ -862,7 +845,6 @@ private class BigConstantEncoder(private val builder: LpBuilder) {
         }
     }
 
-    /** Appends `value` times the exact constant one. */
     fun appendConstant(value: BigInteger, targetColumns: MutableList<Int>, targetValues: MutableList<Double>) {
         ensureDigits(value)
         for ((digit, part) in digits(value).withIndex()) {
@@ -942,11 +924,6 @@ private fun com.eignex.klause.solver.IntBounds.upperOrNull(variable: Int): Long?
     null
 }
 
-/**
- * A finite witness box for the mixed rational rows, derived by clearing each row's denominators and
- * applying the mixed-integer small-solution bound.  This is theory-local: it preserves existence of
- * a mixed witness and is never materialized as a CP domain or exposed through a frontend clamp.
- */
 private fun ProblemSpec.liraWitnessBound(): BigInteger? {
     val variables = numIntVars + numRealVars
     if (variables == 0) return BigInteger.ONE

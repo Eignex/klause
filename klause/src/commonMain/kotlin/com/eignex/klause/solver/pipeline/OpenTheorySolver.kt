@@ -20,37 +20,37 @@ import com.eignex.klause.theory.qflra.ExactLraAssignment
 sealed interface OpenTheoryAssignment {
     /** A Long-backed integer witness from the difference theory. */
     data class Difference(
-        /** The Long-backed difference-theory witness. */
+        /** Difference-theory witness. */
         val sample: Sample,
     ) : OpenTheoryAssignment
 
     /** An arbitrary-precision integer witness from General LIA. */
     data class GeneralLia(
-        /** The arbitrary-precision integer witness. */
+        /** General LIA witness. */
         val assignment: GeneralLiaAssignment,
     ) : OpenTheoryAssignment
 
     /** A rational real witness from exact QF_LRA. */
     data class ExactLra(
-        /** The rational real witness. */
+        /** Exact QF_LRA witness. */
         val assignment: ExactLraAssignment,
     ) : OpenTheoryAssignment
 
     /** A mixed arbitrary-precision integer and rational witness from exact QF_LIRA. */
     data class ExactLira(
-        /** The mixed exact witness. */
+        /** Exact QF_LIRA witness. */
         val assignment: ExactLiraAssignment,
     ) : OpenTheoryAssignment
 }
 
 /** The common verdict surface of the complete open-model theory routes. */
 sealed interface OpenTheoryResult {
-    /** Statistics collected by the selected theory. */
+    /** Statistics collected while deciding the model. */
     val stats: SolveStats
 
     /** A satisfying witness. */
     data class Sat(
-        /** The complete witness. */
+        /** Satisfying assignment. */
         val assignment: OpenTheoryAssignment,
         override val stats: SolveStats,
     ) : OpenTheoryResult
@@ -60,7 +60,7 @@ sealed interface OpenTheoryResult {
 
     /** An explicit budget or cancellation interrupted exact search. */
     data class Unknown(
-        /** The explicit interruption cause. */
+        /** Reason exact search stopped. */
         val reason: TerminationReason,
         override val stats: SolveStats,
     ) : OpenTheoryResult
@@ -83,14 +83,12 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
         require(model.componentPlan().theoryPipeline == route) { "open theory route disagrees with component plan" }
     }
 
-    /** Decide the model through its immutable component plan and one shared search session. */
+    /** Decides the model through its component plan. */
     fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult {
         val cancellation = Cancellation { params.cancellation() || model.cancellation() }
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
         val plan = model.componentPlan()
-        // A plan may hand finite columns to CP alongside an open theory fragment. Those columns are
-        // bounded by construction, so their domains come straight from the source bounds.
         val cpDomains = plan.cpIntVars.associateWith { column ->
             IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
         }
@@ -117,11 +115,6 @@ class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
         }
     }
 
-    /**
-     * An unknown from a complete theory always means a spent allowance — the cancellation token or the
-     * leaf budget — so the run is reported as timed out. Without it a caller cannot tell an exhausted
-     * budget from a structural stop, and reports the wrong reason for every open run.
-     */
     private fun unknown(cancelled: Boolean, stats: SolveStatsSink): OpenTheoryResult.Unknown {
         stats.timedOut = true
         return OpenTheoryResult.Unknown(

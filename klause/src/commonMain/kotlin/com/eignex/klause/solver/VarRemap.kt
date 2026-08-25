@@ -2,14 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.util.EmptyIntArray
 
-/**
- * A renumbering of a problem's variables: `newId = map[oldId]`, one map per namespace.
- *
- * One value rather than one parameter per namespace, so a factor reading columns from more than one — a
- * row with continuous terms alongside integer ones — is renumbered by the same call as any other, and a
- * pass that renumbers a namespace cannot leave a factor holding stale ids because the signature it
- * implements never mentioned that namespace.
- */
+/** A renumbering of a problem's variables: `newId = map[oldId]`, one map per namespace. */
 class VarRemap(private val bools: IntArray, private val ints: IntArray, private val reals: IntArray = EmptyIntArray) {
     /** Number of Boolean variables this remap covers. */
     val boolCount: Int get() = bools.size
@@ -23,7 +16,7 @@ class VarRemap(private val bools: IntArray, private val ints: IntArray, private 
     /** The new id of integer column [id]. */
     fun int(id: Int): Int = ints[id]
 
-    /** The new id of real column [id]. A remap carrying no real map leaves real columns where they are. */
+    /** The new id of real column [id], or [id] when no real map is supplied. */
     fun real(id: Int): Int = if (reals.isEmpty()) id else reals[id]
 
     /** [ids] with every Boolean variable renumbered. */
@@ -35,7 +28,7 @@ class VarRemap(private val bools: IntArray, private val ints: IntArray, private 
     /** [ids] with every real column renumbered. */
     fun reals(ids: IntArray): IntArray = if (reals.isEmpty()) ids.copyOf() else IntArray(ids.size) { reals[ids[it]] }
 
-    /** [lits] with every literal's variable renumbered, keeping each sign. */
+    /** [lits] with variables renumbered and signs preserved. */
     fun lits(lits: IntArray): IntArray =
         IntArray(lits.size) { Lit.make(bools[Lit.variable(lits[it])], Lit.isPositive(lits[it])) }
 

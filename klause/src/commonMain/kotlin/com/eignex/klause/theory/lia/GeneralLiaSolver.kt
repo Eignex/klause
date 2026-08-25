@@ -162,11 +162,6 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
             for (v in domains.indices) domains[v] = frame.saved[v]
         }
 
-        /**
-         * Exact interval transfer for equality rows. The finite witness theorem makes every endpoint
-         * finite; carrying an equality through those endpoints before splitting avoids turning a simple
-         * wide affine chain into a Cartesian product of its variable ranges.
-         */
         private fun propagateEqualities(): Boolean {
             var changed: Boolean
             do {
@@ -372,13 +367,7 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
     }
 }
 
-/**
- * Incremental General LIA participant.
- *
- * Its finite-witness intervals stay arbitrary precision and theory-local. Each bisection is carried
- * as an opaque [SearchDecision.Theory], so [com.eignex.klause.solver.search.SearchSession] owns the
- * resulting tree, retraction, limits, and restart lifecycle.
- */
+/** Incremental General LIA search component. */
 class GeneralLiaSearchComponent(
     private val model: ProblemSpec,
     theoryIntVars: IntArray = IntArray(model.numIntVars) { it },
@@ -728,8 +717,6 @@ class GeneralLiaSearchComponent(
     }
 }
 
-/** The exact integer constants of an open-LIA row. A row carrying a continuous constant is routed to the
- *  LRA theories and never reaches this one. */
 private fun exactConstantsOf(factor: Linear): IntegralConstants =
     checkNotNull(factor.integralConstants) { "open LIA row carries continuous constants" }
 

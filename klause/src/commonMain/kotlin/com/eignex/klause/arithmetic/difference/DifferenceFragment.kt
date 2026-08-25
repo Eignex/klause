@@ -6,20 +6,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.Lit
 
-/**
- * The difference constraints a model contains, gathered across its factors.
- *
- * Deliberately NOT all-or-nothing. An earlier version demanded that *every* factor be a difference row,
- * which recognised 0 of 30 real QF_IDL instances: they always carry Boolean structure, so one clause
- * disqualified the whole model. Collecting per factor composes with that structure instead — the clauses
- * and any general linear rows stay exactly as they are, and whatever difference rows exist become a graph.
- *
- * [edges] hold the constraints; an edge guarded by a Boolean literal only constrains once the search
- * decides that literal, which is how a reified row participates. An endpoint of [ZERO] is the constant 0,
- * so a one-variable row is a difference like any other.
- */
 internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
-    /** The integer variables the edges mention, ascending. [ZERO] is not among them. */
     val nodes: IntArray = run {
         val seen = HashSet<Int>()
         for (e in edges) {
@@ -29,23 +16,12 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
         seen.toIntArray().sortedArray()
     }
 
-    /** Graph vertices: one per entry of [nodes], plus a final one for [ZERO]. */
     val numNodes: Int get() = nodes.size + 1
 
-    /** The vertex standing for the constant 0. */
     val zeroNode: Int get() = nodes.size
 
-    /**
-     * Vertex index of an edge endpoint. The graph is numbered over [nodes] alone rather than over every
-     * integer variable, so a model with a handful of difference rows among many variables does not pay
-     * for a graph the size of the model.
-     */
     fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
 
-    /**
-     * Whether a graph over these edges could hold a potential, which is what every deduction rests on.
-     * Answers before the factor is built, so a system that could only decline every fire is never posted.
-     */
     fun carriesAPotential(): Boolean {
         var maxAbs = 0L
         for (e in edges) {
@@ -55,7 +31,6 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
         return numNodes > 0 && maxAbs <= Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
     }
 
-    /** A graph over [edges], for a consumer that wants to run a cycle search over the whole set. */
     fun graph(): DifferenceGraph {
         val g = DifferenceGraph(numNodes)
         for (e in edges) g.addEdge(nodeOf(e.source), nodeOf(e.target), e.bound)
@@ -63,12 +38,10 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     }
 
     internal companion object {
-        /** Endpoint value standing for the constant 0, so a one-variable row is still a difference. */
         const val ZERO: Int = -1
     }
 }
 
-/** Position of [value] in the ascending [sorted], which must contain it. */
 internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
     var lo = 0
     var hi = sorted.size - 1
@@ -84,14 +57,6 @@ internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
     return -1
 }
 
-/**
- * Collect [factors]' difference constraints. Returns `null` only when there are none worth a graph.
- *
- * A [Linear] row contributes unconditional edges; a [ReifiedLinear] contributes edges guarded by its aux
- * literal, since it constrains exactly when that literal is true. Declared domains enter as differences
- * against the zero node, marked [DifferenceEdge.domainBound] so a consumer can tell a stated row from a
- * column's own range. An open [IntBounds] side contributes no edge. Any other factor is left alone.
- */
 internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
     val zero = DifferenceFragment.ZERO
     val edges = ArrayList<DifferenceEdge>()
@@ -144,13 +109,6 @@ internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBo
     return DifferenceFragment(edges)
 }
 
-/**
- * Whether every arithmetic factor over integer columns is representable by the difference theory.
- *
- * This is intentionally stricter than [differenceFragmentOf]: finite CP can profit from a partial graph,
- * while an open model may enter the difference pipeline only when no integer factor is left for CP.
- * Boolean-only structure is admitted because guards are native theory inputs.
- */
 internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
     val scratch = ArrayList<DifferenceEdge>(2)
     for (factor in factors) {
@@ -203,12 +161,10 @@ internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
     return true
 }
 
-/** Whether the complete difference fragment also fits the graph's exact `Long` arithmetic. */
 internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): Boolean =
     hasCompleteDifferenceCoverage(factors) &&
         (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)
 
-/** Return a satisfying integer assignment for the edges active under [bools], or `null` on conflict. */
 internal fun DifferenceFragment.potentialSample(numIntVars: Int, bools: BooleanArray): LongArray? {
     val active = BooleanArray(edges.size)
     for (edge in edges.indices) {
