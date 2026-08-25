@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.litVars
-import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -10,6 +9,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -33,15 +33,14 @@ class Xor(
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.XOR, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.XOR, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.XOR, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.int(targetParity)
         sink.sortedBoolLits(literals)
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Xor(literals.remapLits(boolMap), targetParity)
+    override fun remap(mapping: VarRemap): Factor = Xor(mapping.lits(literals), targetParity)
 
     override val variables: VarList = BoolVars(literals.litVars())
 

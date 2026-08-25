@@ -14,6 +14,7 @@ import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.objective.LinearObjective
@@ -91,18 +92,18 @@ internal class ObjectiveBoundFactor(
 
     override val variables: VarList = MixedVars(spanInts = objectiveIntVars, boolVars = objectiveBoolVars)
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ObjectiveBoundFactor(
-        IntArray(boolVars.size) { boolMap[boolVars[it]] },
+    override fun remap(mapping: VarRemap): Factor = ObjectiveBoundFactor(
+        mapping.bools(boolVars),
         boolWeights,
-        IntArray(intVars.size) { intMap[intVars[it]] },
+        mapping.ints(intVars),
         intCoeffs,
         bound,
     )
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.OBJECTIVE_BOUND, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.OBJECTIVE_BOUND, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.OBJECTIVE_BOUND, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.sortedBoolVars(boolVars)

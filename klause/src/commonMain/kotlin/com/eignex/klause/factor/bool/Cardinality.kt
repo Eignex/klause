@@ -2,7 +2,6 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
-import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
@@ -15,6 +14,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -33,8 +33,8 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CARDINALITY, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.CARDINALITY, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.CARDINALITY, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.int(min)
@@ -42,7 +42,7 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
         sink.sortedBoolLits(literals)
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cardinality(literals.remapLits(boolMap), min, max)
+    override fun remap(mapping: VarRemap): Factor = Cardinality(mapping.lits(literals), min, max)
 
     // `min == 0 && max == literals.size` accepts every assignment of the literals, so the constraint
     // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).

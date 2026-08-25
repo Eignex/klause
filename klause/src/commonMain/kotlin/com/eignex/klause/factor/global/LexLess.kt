@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -34,15 +34,13 @@ class LexLess(
     val strict: Boolean,
 ) : Factor {
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        LexLess(xs.remapVars(intMap), ys.remapVars(intMap), strict)
+    override fun remap(mapping: VarRemap): Factor = LexLess(mapping.ints(xs), mapping.ints(ys), strict)
 
     /** Lexicographic order is position-faithful and asymmetric, so [xs] and [ys] are both positional
      *  and kept in their roles; [strict] distinguishes `<` from `≤`. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.LEX_LESS, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.LEX_LESS, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.LEX_LESS, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.bool(strict)

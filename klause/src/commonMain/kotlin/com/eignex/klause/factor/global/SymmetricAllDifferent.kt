@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -34,15 +34,14 @@ class SymmetricAllDifferent(
         require(xs.isNotEmpty()) { "symmetric_all_different: empty xs" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        SymmetricAllDifferent(xs.remapVars(intMap), indexOffset)
+    override fun remap(mapping: VarRemap): Factor = SymmetricAllDifferent(mapping.ints(xs), indexOffset)
 
     /** A self-inverse permutation references positions (`xs(xs(i)) = i`), so [xs] is positional;
      *  [indexOffset] names the value of index 0. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SYMMETRIC_ALL_DIFFERENT, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.SYMMETRIC_ALL_DIFFERENT, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.SYMMETRIC_ALL_DIFFERENT, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.int(indexOffset)

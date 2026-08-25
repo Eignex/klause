@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
@@ -12,6 +11,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -41,13 +41,13 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
 
     override val variables: VarList = SpanIntVars(xs)
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Increasing(xs.remapVars(intMap), strict)
+    override fun remap(mapping: VarRemap): Factor = Increasing(mapping.ints(xs), strict)
 
     /** The chain is position-faithful — its order *is* the constraint — so [xs] is keyed positionally. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.INCREASING, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.INCREASING, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.INCREASING, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.bool(strict)

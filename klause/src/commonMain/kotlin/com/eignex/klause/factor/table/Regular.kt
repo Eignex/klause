@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
@@ -15,6 +14,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.values
@@ -58,16 +58,15 @@ class Regular(
         require(q0 in 1..numStates) { "regular: q0 ($q0) out of [1, $numStates]" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        Regular(seq.remapVars(intMap), numStates, alphabetSize, transitions, q0, accepting)
+    override fun remap(mapping: VarRemap): Factor =
+        Regular(mapping.ints(seq), numStates, alphabetSize, transitions, q0, accepting)
 
     /** Position-faithful (seq position i matters): keeps the sequence vars in order and folds in the
      *  whole automaton — state/alphabet sizes, the transition table, the initial and accepting
      *  states. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REGULAR, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.REGULAR, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.REGULAR, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.int(numStates)

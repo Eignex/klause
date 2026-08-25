@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap
@@ -164,9 +165,10 @@ internal object ImplicationGraph {
         val boolMap = IntArray(problem.numBoolVars) { it }
         for (m in merges) boolMap[m.from] = m.into
         val intMap = IntArray(problem.numIntVars) { it }
+        val mapping = VarRemap(boolMap, intMap)
         val out = ArrayList<Factor>(problem.factors.size)
         for (f in problem.factors) {
-            val remapped = f.remap(boolMap, intMap)
+            val remapped = f.remap(mapping)
             if (remapped is Clause && isTautology(remapped)) continue
             out.add(remapped)
         }

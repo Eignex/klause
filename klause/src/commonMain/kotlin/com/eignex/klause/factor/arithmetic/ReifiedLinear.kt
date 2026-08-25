@@ -5,7 +5,6 @@ import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.bool.internals.linearHolds
 import com.eignex.klause.factor.bool.internals.linearResidual
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
@@ -21,6 +20,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
@@ -97,23 +97,23 @@ class ReifiedLinear private constructor(
     constructor(auxBoolVar: Int, coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = when (val c = constants) {
+    override fun remap(mapping: VarRemap): Factor = when (val c = constants) {
         // A colouring map can collapse two of the row's vars onto one image, so coalesce their exact
         // coefficients (summing) to keep one term per variable, which the interval propagator requires.
         is WideConstants -> {
-            val (rv, rc) = coalesceWide(vars.remapVars(intMap), c.coefficients.toTypedArray())
-            ReifiedLinear(boolMap[auxBoolVar], rv, rc, op, c.bound)
+            val (rv, rc) = coalesceWide(mapping.ints(vars), c.coefficients.toTypedArray())
+            ReifiedLinear(mapping.bool(auxBoolVar), rv, rc, op, c.bound)
         }
 
-        is IntegerConstants -> ReifiedLinear(boolMap[auxBoolVar], c.coeffs, vars.remapVars(intMap), op, c.bound)
+        is IntegerConstants -> ReifiedLinear(mapping.bool(auxBoolVar), c.coeffs, mapping.ints(vars), op, c.bound)
     }
 
     /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the distinct factor kind keeps it disjoint
      *  from a bare linear's key, so a reified row and an asserted one never share a bucket. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_LINEAR, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.REIFIED_LINEAR, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.REIFIED_LINEAR, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.boolVar(auxBoolVar)

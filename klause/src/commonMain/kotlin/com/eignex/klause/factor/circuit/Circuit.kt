@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.factor.circuit.internals.cycleScan
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.Propagator
@@ -11,6 +10,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import kotlin.math.abs
@@ -50,7 +50,7 @@ class Circuit(
         require(succ.isNotEmpty()) { "Circuit needs at least one var, got ${succ.size}" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Circuit(succ.remapVars(intMap), subcircuit)
+    override fun remap(mapping: VarRemap): Factor = Circuit(mapping.ints(succ), subcircuit)
 
     /** Position-faithful: `succ(i)` is node i's successor, so the array order is meaningful — the key
      *  keeps the variables in order rather than sorting them. The [subcircuit] mode is a key field
@@ -58,8 +58,7 @@ class Circuit(
      *  subcircuit over the same successors never share a bucket. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CIRCUIT, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.CIRCUIT, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.CIRCUIT, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.bool(subcircuit)

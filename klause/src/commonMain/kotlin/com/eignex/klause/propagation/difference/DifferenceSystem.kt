@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 
 /**
  * A *system* of difference constraints `x − y ≤ c` propagated jointly as a weighted digraph.
@@ -53,16 +54,16 @@ internal class DifferenceSystem(
         )
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = DifferenceSystem(
+    override fun remap(mapping: VarRemap): Factor = DifferenceSystem(
         edges.map { e ->
             DifferenceEdge(
-                source = if (e.source == DifferenceFragment.ZERO) e.source else intMap[e.source],
-                target = if (e.target == DifferenceFragment.ZERO) e.target else intMap[e.target],
+                source = if (e.source == DifferenceFragment.ZERO) e.source else mapping.int(e.source),
+                target = if (e.target == DifferenceFragment.ZERO) e.target else mapping.int(e.target),
                 bound = e.bound,
                 guard = if (e.guard == DifferenceEdge.ALWAYS) {
                     e.guard
                 } else {
-                    Lit.make(boolMap[Lit.variable(e.guard)], Lit.isPositive(e.guard))
+                    Lit.make(mapping.bool(Lit.variable(e.guard)), Lit.isPositive(e.guard))
                 },
                 domainBound = e.domainBound,
             )

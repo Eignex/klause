@@ -12,6 +12,7 @@ import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -43,7 +44,7 @@ class IntEventWatchTest {
             return state.tightenIntMin(y, state.intDomains[x].min + 1)
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor = StrictLessThan(intMap[x], intMap[y])
+        override fun remap(mapping: VarRemap): Factor = StrictLessThan(mapping.int(x), mapping.int(y))
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
@@ -70,7 +71,7 @@ class IntEventWatchTest {
             return true
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Disequal(intMap[x], intMap[y])
+        override fun remap(mapping: VarRemap): Factor = Disequal(mapping.int(x), mapping.int(y))
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
@@ -155,7 +156,7 @@ class IntEventWatchTest {
             return true
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor = WakeCounter(intMap[v], kind)
+        override fun remap(mapping: VarRemap): Factor = WakeCounter(mapping.int(v), kind)
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 

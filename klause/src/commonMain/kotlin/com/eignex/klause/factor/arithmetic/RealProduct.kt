@@ -11,6 +11,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.materializeKey
 
 /**
@@ -48,8 +49,8 @@ class RealProduct(
 
     // Only the integer operand lives in the CP id space; the real operand and result ids are in the
     // separate real-variable namespace, which presolve carries through unremapped.
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        RealProduct(intMap[intOperand], realOperand, result, realOperandLo, realOperandHi)
+    override fun remap(mapping: VarRemap): Factor =
+        RealProduct(mapping.int(intOperand), realOperand, result, realOperandLo, realOperandHi)
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REAL_PRODUCT, ::buildKey)
 

@@ -63,11 +63,11 @@ class VariablePartitionTest {
 
     @Test
     fun `an unknown factor kind keeps its columns in the search set`() {
-        // The default is conservative: a factor that has not considered the question must not
-        // silently license dropping a column's domain.
+        // A factor kind the partition knows nothing about still has its declaration read: the demand
+        // comes from what the factor states, not from the kind being recognized.
         val unconsidered = object : Factor {
             override val variables: VarList = MixedVars(spanInts = intArrayOf(0), boolVars = IntArray(0))
-            override fun remap(boolMap: IntArray, intMap: IntArray): Factor = this
+            override fun remap(mapping: VarRemap): Factor = this
             override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
             override fun asPropagator(): Propagator = object : Propagator {}
             override fun asInvariant(): Invariant = NoInvariant

@@ -38,8 +38,7 @@ interface Factor {
     val intVars: IntArray get() = variables.ints
 
     /**
-     * A copy of this factor with every Boolean variable id rewritten through [boolMap] and every
-     * integer variable id through [intMap] (`newId = map[oldId]`). Non-variable data — coefficients,
+     * A copy of this factor with every variable id renumbered through [mapping]. Non-variable data — coefficients,
      * bounds, constant arrays, domain offsets, DFA tables — is carried over unchanged. Used by
      * presolve passes that renumber or substitute variables.
      *
@@ -47,7 +46,7 @@ interface Factor {
      * appear in any factor, so a silent miss would leave stale ids in the rewritten problem. A
      * factor that genuinely touches no variables returns `this`.
      */
-    fun remap(boolMap: IntArray, intMap: IntArray): Factor
+    fun remap(mapping: VarRemap): Factor
 
     /**
      * A copy of this factor with integer variable [x] replaced by the affine expression
@@ -88,7 +87,7 @@ interface Factor {
     fun structuralKey(): StructuralKey
 
     /**
-     * `hashCode` of `remap(boolMap, intMap).structuralKey()`, the per-incidence port signature symmetry
+     * `hashCode` of `remap(mapping).structuralKey()`, the per-incidence port signature symmetry
      * refinement computes for every variable–factor arc each round. The default builds the remapped
      * factor and its key; a hot factor type overrides to fold the same hash directly from its remapped
      * variables, skipping the intermediate [Factor] and [StructuralKey] allocations. An override must
@@ -97,8 +96,7 @@ interface Factor {
      * colouring, but the result should match the key hash to keep the colouring (and the symmetries
      * found) unchanged.
      */
-    fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        remap(boolMap, intMap).structuralKey().hashCode()
+    fun remapStructuralHash(mapping: VarRemap): Int = remap(mapping).structuralKey().hashCode()
 
     /**
      * An estimate of [structuralKey]'s size — the cost of building and hashing it once. Symmetry

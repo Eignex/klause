@@ -2,7 +2,6 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.LinearRow
@@ -17,6 +16,7 @@ import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.RealConsts
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
@@ -227,8 +227,7 @@ class Linear private constructor(
     // this once per incident variable each round. `pairsByVarKeyCoalescing` reproduces `remap()` (whose
     // constructor coalesces same-image terms) followed by the key sort, so the port hash stays equal to
     // `remap().structuralKey().hashCode()` even when the colouring map collapses two variables.
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.LINEAR, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.LINEAR, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.enum(op)
@@ -267,14 +266,13 @@ class Linear private constructor(
         }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = when (val c = constants) {
-        // Real var ids live in a separate namespace and are not remapped by [intMap]; the row was
-        // already canonicalised (any `>=` negated) at construction, so re-emit as-is (op is LE/EQ/NE,
-        // never GE) via the double form to preserve the exact continuous-row coefficients and bound.
+    override fun remap(mapping: VarRemap): Factor = when (val c = constants) {
+        // The row was already canonicalised (any `>=` negated) at construction, so re-emit as-is (op is
+        // LE/EQ/NE, never GE) via the double form to preserve the exact continuous coefficients and bound.
         is RealConstants -> Linear(
-            vars.remapVars(intMap),
+            mapping.ints(vars),
             c.intCoefficients.toDoubleArray(),
-            realVars,
+            mapping.reals(realVars),
             c.realCoefficients.toDoubleArray(),
             op,
             c.bound,
@@ -285,11 +283,11 @@ class Linear private constructor(
         // of the row's vars onto one image, so coalesce their exact coefficients (summing) to keep the term
         // set duplicate-free — the propagator's interval reasoning requires one term per variable.
         is WideConstants -> {
-            val (rv, rc) = coalesceWide(vars.remapVars(intMap), c.coefficients.toTypedArray())
+            val (rv, rc) = coalesceWide(mapping.ints(vars), c.coefficients.toTypedArray())
             Linear(rv, rc, op, c.bound)
         }
 
-        is IntegerConstants -> Linear(c.coeffs, vars.remapVars(intMap), op, c.bound)
+        is IntegerConstants -> Linear(c.coeffs, mapping.ints(vars), op, c.bound)
     }
 
     /**

@@ -31,6 +31,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -855,15 +856,16 @@ class SymmetryBreakingTest {
         // change. The map sends one variable to the billion-valued focal marker (high-bit packing), two
         // to a shared image (coalescing), and the linear carries negative coefficients and bound.
         val map = intArrayOf(1_000_000_000, 5, 5, 7)
+        val mapping = VarRemap(map, map)
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(3, false), Lit.make(1, true)))
         assertEquals(
-            clause.remap(map, map).structuralKey().hashCode(),
-            clause.remapStructuralHash(map, map),
+            clause.remap(mapping).structuralKey().hashCode(),
+            clause.remapStructuralHash(mapping),
         )
         val linear = Linear(intArrayOf(2, -3, 4), intArrayOf(1, 2, 3), LinearOp.LE, -8)
         assertEquals(
-            linear.remap(map, map).structuralKey().hashCode(),
-            linear.remapStructuralHash(map, map),
+            linear.remap(mapping).structuralKey().hashCode(),
+            linear.remapStructuralHash(mapping),
         )
     }
 }

@@ -13,6 +13,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -32,7 +33,7 @@ class Product(
     val result: Int,
 ) : Factor {
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Product(intMap[a], intMap[b], intMap[result])
+    override fun remap(mapping: VarRemap): Factor = Product(mapping.int(a), mapping.int(b), mapping.int(result))
 
     // A fixed operand collapses the nonlinear product to a linear equality the LP/affine machinery can
     // then exploit: with `a = c` the constraint is `result = c·b`, i.e. `result − c·b = 0` (and just
@@ -56,8 +57,7 @@ class Product(
     /** Multiplication is commutative, so the operands [a] and [b] are a set; [result] is positional. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PRODUCT, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.PRODUCT, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.PRODUCT, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.intVar(result)

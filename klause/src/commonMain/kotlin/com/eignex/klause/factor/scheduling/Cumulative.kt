@@ -2,8 +2,6 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
-import com.eignex.klause.factor.remapLits
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -14,6 +12,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
@@ -111,15 +110,15 @@ class Cumulative(
         }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Cumulative(
-        starts.remapVars(intMap),
+    override fun remap(mapping: VarRemap): Factor = Cumulative(
+        mapping.ints(starts),
         durations,
         resources,
         capacity,
-        presents.remapLits(boolMap),
-        durationVars.remapVars(intMap),
-        resourceVars.remapVars(intMap),
-        if (capacityVar >= 0) intMap[capacityVar] else capacityVar,
+        mapping.lits(presents),
+        mapping.ints(durationVars),
+        mapping.ints(resourceVars),
+        if (capacityVar >= 0) mapping.int(capacityVar) else capacityVar,
     )
 
     // When no two tasks can run at once — the two smallest resource demands already exceed the capacity
@@ -151,8 +150,8 @@ class Cumulative(
      *  cumulatives never collide. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CUMULATIVE, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.CUMULATIVE, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.CUMULATIVE, mapping, ::buildKey)
 
     // durations/resources/capacity are constant magnitudes; starts/durationVars/resourceVars are int-var
     // ids; capacityVar is an int var or a negative sentinel; presents are Boolean literals.

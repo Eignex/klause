@@ -3,7 +3,6 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.ReifiedFactor
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.litVars
-import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
@@ -16,6 +15,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -35,15 +35,15 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
 
     override val variables: VarList = BoolVars(literals.litVars(auxBoolVar))
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        ReifiedCardinality(boolMap[auxBoolVar], literals.remapLits(boolMap), min, max)
+    override fun remap(mapping: VarRemap): Factor =
+        ReifiedCardinality(mapping.bool(auxBoolVar), mapping.lits(literals), min, max)
 
     /** `Cardinality.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
      *  disjoint from a bare cardinality's key. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_CARDINALITY, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.REIFIED_CARDINALITY, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.REIFIED_CARDINALITY, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.boolVar(auxBoolVar)

@@ -15,6 +15,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -69,18 +70,18 @@ class Element private constructor(
         for (x in arr) long(x)
     }.also { cachedArrKey = it }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (arrIsVars) {
+    override fun remap(mapping: VarRemap): Factor = if (arrIsVars) {
         // Entries are var ids stored as Long; remap through the Int var map and restore to Long.
         Element(
-            intMap[idx],
-            intMap[result],
-            LongArray(arr.size) { intMap[arr[it].toInt()].toLong() },
+            mapping.int(idx),
+            mapping.int(result),
+            LongArray(arr.size) { mapping.int(arr[it].toInt()).toLong() },
             arrIsVars,
             indexOffset,
             null,
         )
     } else {
-        Element(intMap[idx], intMap[result], arr, arrIsVars, indexOffset, arrKey())
+        Element(mapping.int(idx), mapping.int(result), arr, arrIsVars, indexOffset, arrKey())
     }
 
     // Affine substitution `idx = replacement + offset` (a pure shift, scale 1) folds into [indexOffset]:

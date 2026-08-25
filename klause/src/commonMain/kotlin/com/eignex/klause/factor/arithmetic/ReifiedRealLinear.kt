@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.materializeKey
 
 /**
@@ -61,11 +62,11 @@ class ReifiedRealLinear(
     override val variables: VarList =
         MixedVars(boundInts = vars, boolVars = intArrayOf(aux), reals = realVars)
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ReifiedRealLinear(
-        boolMap[aux],
-        IntArray(vars.size) { intMap[vars[it]] },
+    override fun remap(mapping: VarRemap): Factor = ReifiedRealLinear(
+        mapping.bool(aux),
+        mapping.ints(vars),
         intCoeffs,
-        realVars,
+        mapping.reals(realVars),
         realCoeffs,
         op,
         bound,

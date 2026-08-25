@@ -15,6 +15,7 @@ import com.eignex.klause.solver.*
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -63,7 +64,7 @@ class OrderLiteralSoundnessHarnessTest {
             return true
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor = NotEqualOnFix(intMap[a], intMap[b])
+        override fun remap(mapping: VarRemap): Factor = NotEqualOnFix(mapping.int(a), mapping.int(b))
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 

@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -27,14 +27,13 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
         require(xs.isNotEmpty()) { "sort: empty arrays" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Sort(xs.remapVars(intMap), ys.remapVars(intMap))
+    override fun remap(mapping: VarRemap): Factor = Sort(mapping.ints(xs), mapping.ints(ys))
 
     /** `ys` is the sorted permutation of `xs`: the input multiset ignores order (so `xs` is sorted in
      *  the key), while `ys` is position-faithful (`ys(0) <= ys(1) <= ...`) and kept in order. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.SORT, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.SORT, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.SORT, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.sortedIntVars(xs)
