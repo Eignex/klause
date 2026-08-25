@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
@@ -122,5 +123,60 @@ class ProblemTest {
         assertEquals(0, cp.cpId(0))
         assertEquals(-1, cp.cpId(1))
         assertEquals(0, cp.sourceId(0))
+    }
+
+    @Test
+    fun `a bounded column reached only by a factor CP must hold is CP-owned`() {
+        // The reified real atom reasons over its integer column's bounds, so it enumerates nothing —
+        // but no theory lane takes it once its coefficients are not exactly representable, which
+        // leaves CP holding the factor and therefore the column.
+        val spec = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
+            factors = arrayOf(
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = intArrayOf(0),
+                    intCoeffs = doubleArrayOf(0.5),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.LE,
+                    bound = 3.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
+
+        val plan = spec.componentPlan()
+
+        assertEquals(IntVariableOwner.CP, plan.intOwner(0))
+        assertEquals(FactorOwner.CP, plan.factorOwner(0))
+    }
+
+    @Test
+    fun `an open column reached only by a factor CP must hold is unroutable rather than fatal`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val spec = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = arrayOf(
+                ReifiedRealLinear(
+                    aux = 0,
+                    vars = intArrayOf(0),
+                    intCoeffs = doubleArrayOf(0.5),
+                    realVars = intArrayOf(0),
+                    realCoeffs = doubleArrayOf(1.0),
+                    op = LinearOp.LE,
+                    bound = 3.0,
+                ),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(3.0),
+        )
+
+        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
     }
 }

@@ -186,7 +186,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
                 "open integer column $v reaches a finite-domain factor and cannot be theory-owned"
             }
             IntVariableOwner.THEORY
-        } else if (factors.any { factor -> v in factor.variables.spanInts }) {
+        } else if (columnMustBeCpOwned(v, numRealVars != 0)) {
             IntVariableOwner.CP
         } else {
             IntVariableOwner.THEORY
@@ -253,5 +253,5 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
     )
 }
 
-private fun Factor.supportsIntegerTheory(): Boolean = this is Linear || this is ReifiedLinear ||
+internal fun Factor.supportsIntegerTheory(): Boolean = this is Linear || this is ReifiedLinear ||
     this is ComparisonClause

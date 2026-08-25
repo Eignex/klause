@@ -52,11 +52,15 @@ fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
 }
 
 private fun ProblemSpec.openColumnsAreTheoryEligible(): Boolean {
-    val partition = variablePartition()
+    val hasRealColumns = numRealVars != 0
     return (0 until numIntVars).none { v ->
-        (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) && !partition.isTheoryEligible(v)
+        (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) && columnMustBeCpOwned(v, hasRealColumns)
     }
 }
+
+/** True when some factor only CP can hold reads column [v], so no theory can be handed it. */
+internal fun ProblemSpec.columnMustBeCpOwned(v: Int, hasRealColumns: Boolean): Boolean =
+    factors.any { f -> !f.isTheoryOwnable(hasRealColumns) && v in f.variables.ints }
 
 /** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
 internal fun ProblemSpec.supportsExactLra(): Boolean =
@@ -65,6 +69,15 @@ internal fun ProblemSpec.supportsExactLra(): Boolean =
 /** Factors whose mixed rows the exact QF_LIRA branch-and-simplex route decides. */
 internal fun ProblemSpec.supportsExactLira(): Boolean =
     numIntVars != 0 && numRealVars != 0 && factors.all(::supportsExactTheoryFactor)
+
+/**
+ * A factor some lane other than CP can hold, so CP need not own the columns it reads.
+ *
+ * The complement of this is exactly the set of factors [componentPlan] leaves to CP, so column
+ * ownership and factor ownership are decided by one rule rather than by two that can disagree.
+ */
+internal fun Factor.isTheoryOwnable(hasRealColumns: Boolean): Boolean =
+    this is Clause || supportsIntegerTheory() || (hasRealColumns && supportsExactTheoryFactor(this))
 
 internal fun supportsExactTheoryFactor(factor: Factor): Boolean = when (factor) {
     is Clause -> true
