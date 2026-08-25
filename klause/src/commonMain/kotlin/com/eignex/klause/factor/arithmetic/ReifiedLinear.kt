@@ -125,7 +125,7 @@ class ReifiedLinear private constructor(
                 for (ch in c.bound.toString()) sink.long(ch.code.toLong())
                 for (i in vars.indices) {
                     sink.long(Long.MIN_VALUE)
-                    sink.long(vars[i].toLong())
+                    sink.intVar(vars[i])
                     for (ch in c.coefficients.at(i).toString()) sink.long(ch.code.toLong())
                 }
             }

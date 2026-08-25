@@ -85,7 +85,7 @@ class ReifiedRealLinear(
             sink.long(intCoeffs[i].toRawBits())
         }
         for (j in realVars.indices) {
-            sink.long(realVars[j].toLong())
+            sink.realVar(realVars[j])
             sink.long(realCoeffs[j].toRawBits())
         }
     }
