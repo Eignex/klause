@@ -10,7 +10,7 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.values
+import com.eignex.klause.solver.randomValue
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -198,10 +198,11 @@ internal class GreedyConstructionRepair(
             val baseline = currentScore()
             var bestVal = cur
             var bestScore = baseline
-            val candidates: LongArray = if (d.values.size <= intDomainSampleCap) {
-                LongArray(d.values.size) { d.values.valueAt(it) }
+            val few = d.spanOrNull(intDomainSampleCap.toLong())
+            val candidates: LongArray = if (few != null) {
+                LongArray(few.size) { few.valueAt(it) }
             } else {
-                LongArray(intDomainSampleCap) { d.values.valueAt(context.rng.nextInt(d.values.size)) }
+                LongArray(intDomainSampleCap) { d.randomValue(context.rng) }
             }
             for (v in candidates) {
                 if (v == cur) continue
@@ -267,10 +268,11 @@ internal class RegretRepair(
         for (i in context.freed.ints) {
             val d = problem.requireFiniteIntDomains()[i]
             val cur = state.assignment.intValue(i)
-            val cand: LongArray = if (d.values.size <= intDomainSampleCap) {
-                LongArray(d.values.size) { d.values.valueAt(it) }
+            val few = d.spanOrNull(intDomainSampleCap.toLong())
+            val cand: LongArray = if (few != null) {
+                LongArray(few.size) { few.valueAt(it) }
             } else {
-                LongArray(intDomainSampleCap) { d.values.valueAt(context.rng.nextInt(d.values.size)) }
+                LongArray(intDomainSampleCap) { d.randomValue(context.rng) }
             }
             var best = cur
             var bestScore = currentScore()
@@ -339,10 +341,11 @@ internal class BestImprovingRepair(val intDomainSampleCap: Int = 20, val maxIter
             for (i in context.freed.ints) {
                 val d = problem.requireFiniteIntDomains()[i]
                 val cur = state.assignment.intValue(i)
-                val cand: LongArray = if (d.values.size <= intDomainSampleCap) {
-                    LongArray(d.values.size) { d.values.valueAt(it) }
+                val few = d.spanOrNull(intDomainSampleCap.toLong())
+                val cand: LongArray = if (few != null) {
+                    LongArray(few.size) { few.valueAt(it) }
                 } else {
-                    LongArray(intDomainSampleCap) { d.values.valueAt(context.rng.nextInt(d.values.size)) }
+                    LongArray(intDomainSampleCap) { d.randomValue(context.rng) }
                 }
                 for (v in cand) {
                     if (v == cur) continue
