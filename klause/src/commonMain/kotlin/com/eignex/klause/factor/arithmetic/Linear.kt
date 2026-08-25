@@ -132,6 +132,11 @@ class Linear private constructor(
         val wide = wideConstants
         require(wide == null || wide.coefficients.size == vars.size) { "wide coeff/var length mismatch" }
         require(wide == null || realVars.isEmpty()) { "a row cannot be both wide and real" }
+        // A wide or real form passes empty integer terms for the shape it does not use. Reaching the
+        // integer shape with them would read those placeholders as the row's own coefficients, so an
+        // integer row states that its coefficients are its own.
+        val integer = integerConstants
+        require(integer == null || integer.coefficients.size == vars.size) { "int coeff/var length mismatch" }
     }
 
     // Real columns are declared here like any other kind. They were reachable only through the LP
@@ -157,7 +162,6 @@ class Linear private constructor(
     /**
      * Over-64-bit integer form: coefficients and/or bound beyond the [Long] range, carried exactly as
      * [BigInteger]. The row propagates via [WideLinearPropagator] and is excluded from the LP relaxation;
-     * the [Long] `coeffs`/`bound` are saturated placeholders kept only so integer-shape invariants hold.
      * [vars] must be distinct — this form does not coalesce duplicates.
      */
     constructor(vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) : this(
@@ -196,8 +200,7 @@ class Linear private constructor(
      * frontend case, where a row touching a continuous variable may carry fractional coefficients on its
      * integer variables and a fractional bound): `Σ intCoeffs(i)·intVars(i) + Σ realCoeffs(j)·realVars(j)
      * ⟨op⟩ bound`. [realVars] must be non-empty (it is what makes the row LP-only). Terms are kept in the
-     * given order. The [Long] `coeffs`/`bound` become rounded placeholders; the relaxation reads the
-     * double forms.
+     * given order.
      */
     constructor(
         intVars: IntArray,
@@ -550,11 +553,4 @@ internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntAr
         }
     }
     return keptVars.toIntArray() to keptCoeffs.toTypedArray()
-}
-
-/** [Long] clamp of a [BigInteger] to the signed 64-bit range. */
-internal fun BigInteger.saturatedLong(): Long = when {
-    this > BigInteger.fromLong(Long.MAX_VALUE) -> Long.MAX_VALUE
-    this < BigInteger.fromLong(Long.MIN_VALUE) -> Long.MIN_VALUE
-    else -> longValue(exactRequired = false)
 }
