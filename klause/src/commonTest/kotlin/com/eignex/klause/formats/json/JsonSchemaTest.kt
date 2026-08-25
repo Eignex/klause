@@ -55,4 +55,17 @@ class JsonSchemaTest {
     fun `wraps a malformed document as a format exception`() {
         assertFailsWith<FormatException> { JsonSchema.parseProblem("{ not json") }
     }
+
+    @Test
+    fun `wraps invalid schema values as a format exception`() {
+        val text = """
+            {
+              "entries": {
+                "budget": { "${'$'}type": "int", "min": 100, "max": 0 }
+              }
+            }
+        """.trimIndent()
+
+        assertFailsWith<JsonFormatException> { JsonSchema.parseProblem(text) }
+    }
 }
