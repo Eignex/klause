@@ -17,7 +17,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.values
+import com.eignex.klause.solver.randomValue
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
@@ -279,11 +279,12 @@ internal class CumulativeInvariant(
             }
             if (cur < dom.max) sink.addChannelingIntSet(state, v, cur + 1)
             if (cur > dom.min) sink.addChannelingIntSet(state, v, cur - 1)
-            if (dom.values.size <= maxTargets) {
-                dom.values.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
+            val few = dom.spanOrNull(maxTargets.toLong())
+            if (few != null) {
+                few.forEach { target -> if (target != cur) sink.addChannelingIntSet(state, v, target) }
             } else {
                 repeat(maxTargets) {
-                    val pick = dom.values.valueAt(state.rng.nextInt(dom.values.size))
+                    val pick = dom.randomValue(state.rng)
                     if (pick != cur) sink.addChannelingIntSet(state, v, pick)
                 }
             }

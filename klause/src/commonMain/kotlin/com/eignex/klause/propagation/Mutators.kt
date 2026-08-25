@@ -4,7 +4,6 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -432,8 +431,9 @@ internal fun PropagationState.citeCrossedSearchHoles(
     // so walking holes would be O(span); iterate the root's members instead. Identical cited set.
     val lo = maxOf(from, prior.min)
     val hi = minOf(until - 1, prior.max)
-    if (root.values.size.toLong() <= prior.holeCount) {
-        root.values.forEach { value ->
+    val members = if (root.valueCount <= prior.holeCount) root.spanOrNull() else null
+    if (members != null) {
+        members.forEach { value ->
             if (value in lo..hi && value !in prior) cite(value)
         }
     } else {
