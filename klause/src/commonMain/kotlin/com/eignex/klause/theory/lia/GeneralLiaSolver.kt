@@ -32,6 +32,10 @@ data class GeneralLiaAssignment(
     val ints: Array<BigInteger>,
 )
 
+/** Factors walked between budget polls: often enough to land inside one sweep over a large model,
+ *  rarely enough that the check does not show against the BigInteger arithmetic it guards. */
+private const val POLL_FACTORS = 256
+
 /**
  * Complete finite-witness search for open General LIA.
  *
@@ -39,6 +43,7 @@ data class GeneralLiaAssignment(
  * branch intervals, split points, row sums, and witnesses are BigInteger. LP keeps its existing
  * double-based relaxation role in the finite CP path; it is deliberately not used as a certificate here.
  */
+
 class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssignment> {
     private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
 
@@ -131,7 +136,8 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
             if (context.cancelled()) return GeneralLiaSearchOutcome.Cancelled
             val narrowed = propagateEqualities() ?: return GeneralLiaSearchOutcome.Cancelled
             if (!narrowed) return GeneralLiaSearchOutcome.Infeasible
-            if (!factorsPossible()) return GeneralLiaSearchOutcome.Infeasible
+            val possible = factorsPossible() ?: return GeneralLiaSearchOutcome.Cancelled
+            if (!possible) return GeneralLiaSearchOutcome.Infeasible
             val bool = boolAssigned.indexOfFirst { !it }
             if (bool >= 0) {
                 boolAssigned[bool] = true
@@ -172,12 +178,23 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
          * enough that a poll at the node above it never lands. Null is a third answer on purpose: `false`
          * here means infeasible, and a stopped sweep must not claim that.
          */
+
+        // Looks at the budget once per POLL_FACTORS factors, so a sweep over a large model notices it.
+        private var untilPoll = POLL_FACTORS
+
+        private fun budgetSpent(): Boolean {
+            if (--untilPoll > 0) return false
+            untilPoll = POLL_FACTORS
+            return context.cancelled()
+        }
+
         private fun propagateEqualities(): Boolean? {
             var changed: Boolean
             do {
                 if (context.cancelled()) return null
                 changed = false
                 for (factor in model.factors) {
+                    if (budgetSpent()) return null
                     val row = when (factor) {
                         is Linear -> if (factor.op == LinearOp.EQ) BigRow.of(factor) else null
 
@@ -246,7 +263,8 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
             return result
         }
 
-        private fun factorsPossible(): Boolean = model.factors.all { factor ->
+        private fun factorsPossible(): Boolean? = model.factors.all { factor ->
+            if (budgetSpent()) return null
             when (factor) {
                 is Clause -> factor.literals.any(::literalPossible)
 
@@ -456,7 +474,17 @@ class GeneralLiaSearchComponent(
             outcome = ComponentCheck.Infeasible()
             return null
         }
-        if (!propagateEqualities(domains) || !factorsPossible(domains)) {
+        val narrowed = propagateEqualities(domains, context)
+        if (narrowed == null) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        val possible = factorsPossible(domains, context)
+        if (possible == null) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        if (!narrowed || !possible) {
             outcome = ComponentCheck.Infeasible()
             return null
         }
@@ -516,11 +544,24 @@ class GeneralLiaSearchComponent(
     private fun Array<BigInterval>.withInterval(variable: Int, interval: BigInterval): Array<BigInterval> =
         copyOf().also { it[variable] = interval }
 
-    private fun propagateEqualities(domains: Array<BigInterval>): Boolean {
+    /**
+     * Narrow [domains] through the equality rows until nothing moves, or null when the budget was spent.
+     *
+     * Null is a third answer on purpose: `false` means the domains emptied, which licenses infeasible,
+     * and a sweep that stopped early must not claim that. The walk is over every factor in [BigInteger],
+     * so on a large model a single pass runs long enough that a poll at the branch above never lands.
+     */
+    private fun propagateEqualities(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         var changed: Boolean
+        var untilPoll = POLL_FACTORS
         do {
+            if (context.cancelled()) return null
             changed = false
             for (factor in model.factors) {
+                if (--untilPoll <= 0) {
+                    untilPoll = POLL_FACTORS
+                    if (context.cancelled()) return null
+                }
                 val row = when (factor) {
                     is Linear -> if (factor.op == LinearOp.EQ) LiaRow.of(factor) else null
 
@@ -601,33 +642,41 @@ class GeneralLiaSearchComponent(
         return result
     }
 
-    private fun factorsPossible(domains: Array<BigInterval>): Boolean = model.factors.all { factor ->
-        when (factor) {
-            is Clause -> factor.literals.any { literal ->
-                bools[literal ushr 1] == UNASSIGNED ||
-                    bools[literal ushr 1] == truth(
-                        literal,
-                    )
+    /** Whether every factor can still hold over [domains], or null when the budget was spent mid-walk. */
+    private fun factorsPossible(domains: Array<BigInterval>, context: SearchContext): Boolean? {
+        var untilPoll = POLL_FACTORS
+        return model.factors.all { factor ->
+            if (--untilPoll <= 0) {
+                untilPoll = POLL_FACTORS
+                if (context.cancelled()) return null
             }
+            when (factor) {
+                is Clause -> factor.literals.any { literal ->
+                    bools[literal ushr 1] == UNASSIGNED ||
+                        bools[literal ushr 1] == truth(
+                            literal,
+                        )
+                }
 
-            is Linear -> relationPossible(rowRange(factor, domains), factor.op, linearBound(factor))
+                is Linear -> relationPossible(rowRange(factor, domains), factor.op, linearBound(factor))
 
-            is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || relationPossibleForTruth(
-                rowRange(factor, domains),
-                factor.op,
-                reifiedBound(factor),
-                bools[factor.auxBoolVar] == TRUE,
-            )
-
-            is ComparisonClause -> factor.vars.indices.any { index ->
-                relationPossible(
-                    domains[factor.vars[index]],
-                    factor.ops[index],
-                    BigInteger.fromLong(factor.consts[index]),
+                is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || relationPossibleForTruth(
+                    rowRange(factor, domains),
+                    factor.op,
+                    reifiedBound(factor),
+                    bools[factor.auxBoolVar] == TRUE,
                 )
-            }
 
-            else -> false
+                is ComparisonClause -> factor.vars.indices.any { index ->
+                    relationPossible(
+                        domains[factor.vars[index]],
+                        factor.ops[index],
+                        BigInteger.fromLong(factor.consts[index]),
+                    )
+                }
+
+                else -> false
+            }
         }
     }
 
