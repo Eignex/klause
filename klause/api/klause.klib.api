@@ -1776,6 +1776,23 @@ sealed interface com.eignex.klause.portfolio/PortfolioStrategy { // com.eignex.k
     }
 }
 
+sealed interface com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult|null[0]
+    final class Tightened : com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult.Tightened|null[0]
+        constructor <init>(com.eignex.klause.solver/ProblemSpec, kotlin/Int) // com.eignex.klause.presolve/OpenPresolveResult.Tightened.<init>|<init>(com.eignex.klause.solver.ProblemSpec;kotlin.Int){}[0]
+
+        final val closedSides // com.eignex.klause.presolve/OpenPresolveResult.Tightened.closedSides|{}closedSides[0]
+            final fun <get-closedSides>(): kotlin/Int // com.eignex.klause.presolve/OpenPresolveResult.Tightened.closedSides.<get-closedSides>|<get-closedSides>(){}[0]
+        final val spec // com.eignex.klause.presolve/OpenPresolveResult.Tightened.spec|{}spec[0]
+            final fun <get-spec>(): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.presolve/OpenPresolveResult.Tightened.spec.<get-spec>|<get-spec>(){}[0]
+    }
+
+    final object Refuted : com.eignex.klause.presolve/OpenPresolveResult { // com.eignex.klause.presolve/OpenPresolveResult.Refuted|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.presolve/OpenPresolveResult.Refuted.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.presolve/OpenPresolveResult.Refuted.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.presolve/OpenPresolveResult.Refuted.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.propagation/PropagationResult { // com.eignex.klause.propagation/PropagationResult|null[0]
     final class Implied : com.eignex.klause.propagation/PropagationResult { // com.eignex.klause.propagation/PropagationResult.Implied|null[0]
         final val boolKeys // com.eignex.klause.propagation/PropagationResult.Implied.boolKeys|{}boolKeys[0]
@@ -10537,6 +10554,7 @@ final fun (com.eignex.klause.solver/IntDomain).com.eignex.klause.solver/randomVa
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.Problem(){}[0]
+final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.solver/Cancellation = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.solver.ProblemSpec(com.eignex.klause.solver.Cancellation){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/componentPlan(): com.eignex.klause.solver/ComponentPlan // com.eignex.klause.solver/componentPlan|componentPlan@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/sourceRoute(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/sourceRoute|sourceRoute@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.ProblemSpec(){}[0]

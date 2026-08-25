@@ -27,7 +27,6 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
-import com.eignex.klause.solver.values
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
