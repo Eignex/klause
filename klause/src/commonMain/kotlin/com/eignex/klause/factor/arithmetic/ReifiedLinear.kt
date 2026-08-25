@@ -26,7 +26,6 @@ import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.values
-import com.eignex.klause.util.EmptyLongArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -76,7 +75,7 @@ class ReifiedLinear private constructor(
     constructor(auxBoolVar: Int, vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) :
         this(
             auxBoolVar,
-            CoalescedTerms(vars.copyOf(), EmptyLongArray),
+            wideLinearTerms(vars, wideCoeffs),
             op,
             0L,
             wideCoeffsIn = wideCoeffs.copyOf(),

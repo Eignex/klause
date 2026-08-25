@@ -100,9 +100,20 @@ internal class ReifiedLinearPropagator(
             },
             propagateFalse = { a ->
                 when (op) {
-                    LinearOp.LE -> propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1, a, true)
-                    LinearOp.GE -> propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1, a, true)
+                    LinearOp.LE -> if (bnd == Long.MAX_VALUE) {
+                        false
+                    } else {
+                        propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1, a, true)
+                    }
+
+                    LinearOp.GE -> if (bnd == Long.MIN_VALUE) {
+                        false
+                    } else {
+                        propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1, a, true)
+                    }
+
                     LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, a, true)
+
                     LinearOp.NE -> propagateLinearBounds(state, coeffs, vars, LinearOp.EQ, bnd, a, true)
                 }
             },

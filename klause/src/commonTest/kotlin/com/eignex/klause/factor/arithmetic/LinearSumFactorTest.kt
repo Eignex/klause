@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -8,6 +10,8 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class LinearSumFactorTest {
@@ -28,6 +32,26 @@ class LinearSumFactorTest {
         assertTrue(checkNotNull(linear.integerConstants).coeffs.contentEquals(longArrayOf(2 * big)))
         assertTrue(linear.vars.contentEquals(intArrayOf(0)))
         assertEquals(5L, checkNotNull(linear.integerConstants).bound)
+    }
+
+    @Test
+    fun `coalescing coefficients beyond Long range is refused`() {
+        assertFailsWith<IllegalArgumentException> {
+            Linear(longArrayOf(Long.MAX_VALUE, 1L), intArrayOf(0, 0), LinearOp.LE, 0L)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ReifiedLinear(0, longArrayOf(Long.MIN_VALUE, -1L), intArrayOf(0, 0), LinearOp.LE, 0L)
+        }
+    }
+
+    @Test
+    fun `an extremal reified bound bakes as a fixed true indicator`() {
+        val factor = ReifiedLinear(0, longArrayOf(1L), intArrayOf(0), LinearOp.LE, Long.MAX_VALUE)
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), listOf(factor))
+        val session = PropagationSession(problem.bake())
+
+        assertEquals(true, session.boolValue(0))
+        assertIs<PropagationResult.Unsat>(session.pinBool(0, false))
     }
 
     @Test
