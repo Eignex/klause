@@ -13,7 +13,11 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntIntMap
 
 /** LS invariant for [Clause]: watched-literal violation tracking and break/make maintenance. */
-internal class ClauseInvariant(private val boolVars: IntArray, private val literals: IntArray) : Invariant {
+internal class ClauseInvariant(
+    private val boolVars: IntArray,
+    private val literals: IntArray,
+    private val tautological: Boolean,
+) : Invariant {
 
     /** `boolVar → literal index` lookup; sentinel -1 for absent. Built from [literals] in init. */
     private val litIndexByVar: IntIntMap = IntIntMap.build(
@@ -25,6 +29,10 @@ internal class ClauseInvariant(private val boolVars: IntArray, private val liter
     private fun litIndexForVar(v: Int): Int = litIndexByVar[v]
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
+        if (tautological) {
+            state.intPayload[factorId] = 1
+            return
+        }
         val w = state.refPayload[factorId] as? ClauseWatches
             ?: ClauseWatches(0, if (literals.size > 1) 1 else -1)
         var first = -1
@@ -55,6 +63,7 @@ internal class ClauseInvariant(private val boolVars: IntArray, private val liter
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean {
+        if (tautological) return false
         val w = state.refPayload[factorId] as ClauseWatches
         if (litTrueInLsState(state, literals, w.w1)) return false
         if (w.w2 >= 0 && litTrueInLsState(state, literals, w.w2)) return false
@@ -62,6 +71,7 @@ internal class ClauseInvariant(private val boolVars: IntArray, private val liter
     }
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (tautological) return 0
         val li = litIndexForVar(boolVar)
         if (li < 0) return 0
         val w = state.refPayload[factorId] as ClauseWatches
@@ -79,6 +89,7 @@ internal class ClauseInvariant(private val boolVars: IntArray, private val liter
     }
 
     override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
+        if (tautological) return 0
         val w = state.refPayload[factorId] as ClauseWatches
         val w1WasTrue = wasLitTrueInLsState(state, literals, w.w1, boolVar)
         val w2WasTrue = if (w.w2 >= 0) wasLitTrueInLsState(state, literals, w.w2, boolVar) else false
@@ -115,6 +126,7 @@ internal class ClauseInvariant(private val boolVars: IntArray, private val liter
     }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
+        if (tautological) return
         if (!isViolated(state, factorId)) return
         for (v in boolVars) sink.addBoolFlip(v)
     }
@@ -131,6 +143,7 @@ internal class ClauseInvariant(private val boolVars: IntArray, private val liter
      *
      *  Transitions 2↔3, 3↔4, ... touch no break/make state. */
     override fun updateBoolBreakMakeForFlip(state: LocalSearchState, factorId: Int, flippedVar: Int) {
+        if (tautological) return
         val li = litIndexForVar(flippedVar)
         if (li < 0) return
         val newCount = state.intPayload[factorId]
