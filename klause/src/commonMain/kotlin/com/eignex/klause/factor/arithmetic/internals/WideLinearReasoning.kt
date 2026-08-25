@@ -91,6 +91,7 @@ internal fun wideEnforceRow(
     if (op == LinearOp.NE) {
         for (i in 0 until n) {
             val c = coeffs[i]
+            if (c == BigInteger.ZERO) continue
             val other = sumLo - termLo[i]
             if (other != sumHi - termHi[i]) continue // actionable only when every other term is pinned
             val rhs = bound - other
@@ -103,6 +104,7 @@ internal fun wideEnforceRow(
     }
     for (i in 0 until n) {
         val c = coeffs[i]
+        if (c == BigInteger.ZERO) continue
         val v = vars[i]
         val a = ant(i)
         if (op == LinearOp.LE || op == LinearOp.EQ) {

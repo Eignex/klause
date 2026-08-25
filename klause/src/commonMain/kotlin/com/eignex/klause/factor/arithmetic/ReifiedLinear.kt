@@ -1,6 +1,8 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.ReifiedFactor
+import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
+import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.bool.internals.linearHolds
@@ -265,9 +267,6 @@ class ReifiedLinear private constructor(
         }
         val a = builder.boolColumn(auxBoolVar)
         val b = row.bound
-        val boundUp = addExact(b, 1L) // L ≥ bound + 1 is the integer negation of L ≤ bound
-        val boundDown = subExact(b, 1L)
-
         // Emit `Σ coeffs·vars + auxCoeff·aux  op  rhs`, marked [global] when the live M matches the
         // declared-range M; non-global rows cite their [maxSide] live bounds as premises.
         fun emit(auxCoeff: Long, rowOp: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean) {
@@ -286,15 +285,19 @@ class ReifiedLinear private constructor(
             LinearOp.LE -> {
                 val m1 = maxOf(0L, subExact(lMax, b)) // aux=1 ⇒ L ≤ bound
                 emit(m1, LinearOp.LE, addExact(b, m1), m1 == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-                val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
-                emit(m2, LinearOp.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
+                successorOrNull(b)?.let { boundUp ->
+                    val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
+                    emit(m2, LinearOp.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
+                }
             }
 
             LinearOp.GE -> {
                 val m1 = maxOf(0L, subExact(b, lMin)) // aux=1 ⇒ L ≥ bound
                 emit(-m1, LinearOp.GE, subExact(b, m1), m1 == maxOf(0L, subExact(b, lMinD)), maxSide = false)
-                val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
-                emit(-m2, LinearOp.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)), maxSide = true)
+                predecessorOrNull(b)?.let { boundDown ->
+                    val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
+                    emit(-m2, LinearOp.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)), maxSide = true)
+                }
             }
 
             LinearOp.EQ -> {

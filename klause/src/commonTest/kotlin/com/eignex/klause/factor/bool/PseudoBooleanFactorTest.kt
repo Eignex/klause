@@ -2,12 +2,16 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 
 class PseudoBooleanFactorTest {
 
@@ -60,9 +64,11 @@ class PseudoBooleanFactorTest {
     }
 
     @Test
-    fun `reified pseudo Boolean retains an extremal bound`() {
+    fun `an extremal reified pseudo Boolean bound bakes as a fixed true indicator`() {
         val factor = ReifiedPseudoBoolean(0, longArrayOf(1), intArrayOf(Lit.make(1, true)), PbOp.LE, Long.MAX_VALUE)
+        val session = PropagationSession(Problem(2, 0, emptyArray(), listOf(factor)).bake())
 
-        assertEquals(Long.MAX_VALUE, factor.bound)
+        assertEquals(true, session.boolValue(0))
+        assertIs<PropagationResult.Unsat>(session.pinBool(0, false))
     }
 }

@@ -35,12 +35,6 @@ private fun pbAddExact(a: Long, b: Long): Long {
     return result
 }
 
-private fun pbSubExact(a: Long, b: Long): Long {
-    val result = a - b
-    require((a xor b) and (a xor result) >= 0L) { "pseudo-Boolean coefficient overflow: $a - $b" }
-    return result
-}
-
 internal fun linearHolds(sum: Long, op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> sum <= bound
     LinearOp.EQ -> sum == bound

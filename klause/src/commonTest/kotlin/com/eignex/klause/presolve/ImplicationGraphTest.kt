@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
@@ -63,6 +64,23 @@ class ImplicationGraphTest {
         )
         assertTrue(reduced(problem).factors.none { 1 in it.boolVars }, "b1 should be substituted away")
         assertRoundTrip(problem, Presolve.reduceImplicationGraph(problem, cap))
+    }
+
+    @Test
+    fun `keeps equivalent cardinality literals distinct`() {
+        val problem = Problem(
+            numBoolVars = 2,
+            numIntVars = 0,
+            intDomains = emptyArray(),
+            factors = listOf(
+                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
+                Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), min = 0, max = 1),
+            ),
+        )
+
+        val cardinality = reduced(problem).factors.filterIsInstance<Cardinality>().single()
+        assertEquals(intArrayOf(0, 1).toList(), cardinality.boolVars.toList())
     }
 
     @Test
