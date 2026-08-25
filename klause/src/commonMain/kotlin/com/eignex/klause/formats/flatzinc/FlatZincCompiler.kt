@@ -351,7 +351,9 @@ internal class FlatZincCompiler(
     private fun ensureFreshName(name: String) {
         if (name in params || name in boolVars || name in intVars || name in floatVars ||
             name in arrays || name in setVarsByName
-        ) failHere("duplicate declaration of `$name`")
+        ) {
+            failHere("duplicate declaration of `$name`")
+        }
     }
 
     /** Post a trivially unsatisfiable constraint. A [Clause] cannot be empty (an empty clause would

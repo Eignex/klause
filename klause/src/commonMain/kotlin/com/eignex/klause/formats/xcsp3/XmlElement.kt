@@ -152,6 +152,7 @@ fun parseXml(src: String): XmlElement = XmlReader(src).parseDocument()
  */
 internal class XmlReader(private val reader: CharReader) {
     private val openElements = ArrayDeque<String>()
+
     /** Parse an in-memory [String] — the path for tests, the DSL, and an already-decompressed blob. */
     constructor(src: String) : this(CharReader(StringCharSource(src)))
 
