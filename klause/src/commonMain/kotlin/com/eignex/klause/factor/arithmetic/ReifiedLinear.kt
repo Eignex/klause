@@ -27,7 +27,6 @@ import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.solver.values
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -216,7 +215,9 @@ class ReifiedLinear private constructor(
         val c = row.coeff(0)
         if (c == 0L) return false
         val dec = builder.declaredDomain(vars[0])
-        if (dec.values.size != 2) return false // a size-2 domain's two values are exactly its min and max
+        // Only the count is needed, and a wide column has one without being walked: the two values of a
+        // size-2 domain are exactly its min and max.
+        if (dec.valueCount != 2L) return false
         val loValue = mulExact(c, dec.min)
         val hiValue = mulExact(c, dec.max)
         val vCol = builder.intColumn(vars[0])
