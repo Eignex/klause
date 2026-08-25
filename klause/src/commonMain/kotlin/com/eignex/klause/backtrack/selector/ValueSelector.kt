@@ -157,12 +157,15 @@ internal fun probeAndOrder(
     if (ascending) scored.sortBy { it.second } else scored.sortByDescending { it.second }
     if (varRef is VarRef.IntVar) {
         val d = session.intDomain(varRef.varId)
-        if (candidates.size < d.values.size) {
+        // The tail is "every other value the domain holds", so it exists only on a domain that can be
+        // walked. On a wider one the probed candidates are the offer; a bound split covers the rest.
+        val walkable = d.spanOrNull()
+        if (walkable != null && candidates.size < walkable.size) {
             // Already offered (ordered) or deliberately dropped; everything else in the domain follows.
             val ordered = scored.asSequence().map { it.first }
             return ordered + sequence {
-                for (i in 0 until d.values.size) {
-                    val v = d.values.valueAt(i)
+                for (i in 0 until walkable.size) {
+                    val v = walkable.valueAt(i)
                     if (v !in settled) yield(v)
                 }
             }
