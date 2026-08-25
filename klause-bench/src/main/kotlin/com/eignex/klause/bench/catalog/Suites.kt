@@ -605,6 +605,7 @@ internal object Suites {
         vendored("lia-unsat", Category.UNSAT, Expected.Unsat)
         vendored("lia-disjunction", Category.CSP, Expected.Sat)
         vendored("lra-rational", Category.CSP, Expected.Sat)
+        vendored("lia-wide-span", Category.CSP, Expected.Sat)
     }
 
     /** XCSP3 family key: the series prefix before the first `-`. Competition instance names encode
