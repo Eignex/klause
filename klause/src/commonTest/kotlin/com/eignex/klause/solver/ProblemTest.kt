@@ -178,5 +178,25 @@ class ProblemTest {
         )
 
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
+        assertEquals(
+            ProblemPipeline.UNSUPPORTED_OPEN,
+            spec.componentPlan().theoryPipeline,
+            "the plan answers the same verdict rather than asserting the model away",
+        )
+    }
+
+    @Test
+    fun `an unrepresentable model reads the same from either entry point`() {
+        // A CP-only factor over an open column: the route and the plan are two doors onto one model, and
+        // which door a frontend used must not decide whether it gets a verdict or a crash.
+        val openUpper = Bits(2).also { it.set(1) }
+        val spec = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(9, 0), null, openUpper),
+            factors = arrayOf(AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10)),
+        )
+
+        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
+        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.componentPlan().theoryPipeline)
     }
 }

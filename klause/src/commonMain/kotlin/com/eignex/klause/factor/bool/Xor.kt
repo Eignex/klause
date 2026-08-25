@@ -3,10 +3,10 @@ package com.eignex.klause.factor.bool
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap
