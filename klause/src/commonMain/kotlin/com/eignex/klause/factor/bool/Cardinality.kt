@@ -17,16 +17,21 @@ import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
+import com.eignex.klause.util.IntHashSet
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
  * literals. AtMostOne, AtLeastOne, ExactlyOne are special cases.
  */
-class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
+class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
+
+    // Factors may outlive a frontend's scratch buffer.
+    val literals: IntArray = literals.copyOf()
 
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
+        requireDistinctVariables(this.literals)
     }
 
     override val variables: VarList = BoolVars(literals.litVars())
@@ -70,13 +75,22 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
 
     /** Factory methods for this factor. */
     companion object {
-        /** At-most-one: at most one of [literals] is true. */
-        fun atMostOne(literals: IntArray): Cardinality = Cardinality(literals, min = 0, max = 1)
+        /** At-most-one: at most one of [literals] is true; an empty input is vacuously true. */
+        fun atMostOne(literals: IntArray): Cardinality = Cardinality(literals, min = 0, max = minOf(1, literals.size))
 
         /** At-least-one: at least one of [literals] is true. */
         fun atLeastOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = literals.size)
 
         /** Exactly-one: exactly one of [literals] is true. */
         fun exactlyOne(literals: IntArray): Cardinality = Cardinality(literals, min = 1, max = 1)
+
+        private fun requireDistinctVariables(literals: IntArray) {
+            val seen = IntHashSet(literals.size)
+            for (literal in literals) {
+                require(seen.add(com.eignex.klause.solver.Lit.variable(literal))) {
+                    "Cardinality literals must reference distinct Boolean variables"
+                }
+            }
+        }
     }
 }

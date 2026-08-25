@@ -17,6 +17,7 @@ import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
+import com.eignex.klause.util.IntHashSet
 
 /**
  * Disjunction of Boolean literals.
@@ -27,12 +28,17 @@ import com.eignex.klause.solver.materializeKey
  * unwatched literals for a true one to rewatch, finishing in O(1) amortized when most flips
  * leave the watches alone. Single-literal clauses have only one watch (`w2 = -1`).
  *
- * Tautologies (a variable appearing as both `+v` and `-v`) are detected at construction; we
- * pick those two indices as the watches and the clause is permanently satisfied.
+ * Repeated literals are folded at construction. A variable may occur with both polarities, in
+ * which case the clause is tautological.
  */
-class Clause(val literals: IntArray) :
+class Clause(literals: IntArray) :
     Factor,
     LinearRow {
+
+    // Factors may outlive a frontend's scratch buffer.
+    val literals: IntArray = distinctLiterals(literals)
+
+    private val tautological: Boolean = hasComplementaryLiterals(this.literals)
 
     init {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
@@ -86,7 +92,7 @@ class Clause(val literals: IntArray) :
 
     override fun asPropagator(): Propagator = ClausePropagator(boolVars, intVars, literals)
 
-    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals)
+    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals, tautological)
 
     /** LP relaxation: the feasibility-defining row `Σ literals ≥ 1`. */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
@@ -101,4 +107,25 @@ class Clause(val literals: IntArray) :
     override fun coeff(k: Int): Long = 1L
     override val isIntegerOnly: Boolean get() = false
     override val linearRows: List<LinearRow> get() = listOf(this)
+
+    private companion object {
+        fun distinctLiterals(literals: IntArray): IntArray {
+            val seen = IntHashSet(literals.size)
+            var size = 0
+            val copy = IntArray(literals.size)
+            for (literal in literals) {
+                if (seen.add(literal)) copy[size++] = literal
+            }
+            return copy.copyOf(size)
+        }
+
+        fun hasComplementaryLiterals(literals: IntArray): Boolean {
+            val seen = IntHashSet(literals.size)
+            for (literal in literals) {
+                if (Lit.negate(literal) in seen) return true
+                seen.add(literal)
+            }
+            return false
+        }
+    }
 }

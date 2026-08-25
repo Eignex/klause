@@ -6,10 +6,12 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.VarRemap
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
 
 class ClauseInvariantTest {
@@ -141,6 +143,47 @@ class ClauseInvariantTest {
             val expected = naiveIsViolated(literals, state)
             assertEquals(expected, state.factors[0].isViolated(state, 0), "after flip of $v")
         }
+    }
+
+    @Test
+    fun `duplicate literals are folded before local search`() {
+        val input = intArrayOf(Lit.make(0, true), Lit.make(0, true), Lit.make(1, false))
+        val clause = Clause(input)
+        input[0] = Lit.make(2, true)
+
+        assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(1, false)), clause.literals)
+        val state = stateFor(2, clause)
+        state.assignment.setBool(0, false)
+        state.assignment.setBool(1, true)
+        state.recompute()
+        assertTrue(state.factors[0].isViolated(state, 0))
+
+        state.apply(Move.BoolFlip(0))
+
+        assertFalse(state.factors[0].isViolated(state, 0))
+    }
+
+    @Test
+    fun `tautological clause is never violated after flips`() {
+        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)))
+        val state = stateFor(2, clause)
+        state.assignment.setBool(0, false)
+        state.assignment.setBool(1, false)
+        state.recompute()
+
+        state.apply(Move.BoolFlip(0))
+        state.apply(Move.BoolFlip(1))
+
+        assertFalse(state.factors[0].isViolated(state, 0))
+    }
+
+    @Test
+    fun `remapping folds duplicate clause literals`() {
+        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
+
+        val remapped = clause.remap(VarRemap(intArrayOf(0, 0), intArrayOf())) as Clause
+
+        assertContentEquals(intArrayOf(Lit.make(0, true)), remapped.literals)
     }
 
     private fun naiveIsViolated(literals: IntArray, state: LocalSearchState): Boolean {
