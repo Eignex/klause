@@ -3,6 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -102,4 +103,20 @@ class LinearConstantsTest {
         assertNull(wide.integerConstants, "a wide reified row has no 64-bit constants to read")
         assertEquals(huge, wide.constants.exactBound)
     }
+    @Test
+    fun `a real form with no continuous term is refused rather than read as an integer row`() {
+        // The real constructors pass empty integer terms for the shape they do not use; without a
+        // continuous term the row would fall through to the integer shape and read those as its own.
+        assertFailsWith<IllegalArgumentException> {
+            Linear(
+                intVars = intArrayOf(0),
+                intCoeffs = doubleArrayOf(3.0),
+                realVars = IntArray(0),
+                realCoeffs = DoubleArray(0),
+                op = LinearOp.LE,
+                bound = 5.0,
+            )
+        }
+    }
+
 }
