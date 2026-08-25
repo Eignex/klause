@@ -7,8 +7,8 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.IntVars
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap
@@ -39,7 +39,8 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
     /** Minimum gap between adjacent variables: `1` for strict (`<`), `0` for non-decreasing (`≤`). */
     private val gap: Int = if (strict) 1 else 0
 
-    override val variables: VarList = SpanIntVars(xs)
+    // The chain propagates prefix minima and suffix maxima, so it reads bounds and never a value set.
+    override val variables: VarList = IntVars(xs)
 
     override fun remap(mapping: VarRemap): Factor = Increasing(mapping.ints(xs), strict)
 

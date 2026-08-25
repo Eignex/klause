@@ -173,6 +173,12 @@ private fun SmtLib.Builder.collapseToElement(chain: IteChain): Boolean {
     if (span > MAX_CHAIN_SPAN || span > SPAN_PER_ARM * chain.keys.size) return false
     val fill = chain.default.takeIf { it.coeffs.isEmpty() }?.constant
     if (fill == null && chain.default.asSimpleVar() != chain.selector) return false
+    // CP holds the whole global, not just the column it indexes, so every column the [Element] names has
+    // to be finite. With an open result or arm the chain stays as rows a theory can decide.
+    if (intDomains[chain.result] is PresolveDomain.Open) return false
+    if (chain.arms.any { arm -> arm.asSimpleVar()?.let { intDomains[it] is PresolveDomain.Open } == true }) {
+        return false
+    }
     // A key outside the selector's domain names an unreachable position, so its arm is dropped rather
     // than widening the array to hold a case that cannot occur.
     val reachable = chain.keys.indices.filter { chain.keys[it] in lo..hi }

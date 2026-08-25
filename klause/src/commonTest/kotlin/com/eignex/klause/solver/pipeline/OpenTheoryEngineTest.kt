@@ -13,6 +13,7 @@ import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
 
@@ -70,9 +71,10 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `an open column inside a finite global is unroutable rather than fatal`() {
-        // The arms name an open column, so the collapsed Element has no owner: CP cannot index it and
-        // the theory cannot hold the Element. That is a verdict, not a broken invariant.
+    fun `an open column inside a chain keeps the chain the theory can decide`() {
+        // The arms name an open column, so no [Element] is collapsed: CP could not hold one over a column
+        // it cannot own, and the rows the chain lowers to are inside the theory's fragment. Declining the
+        // global is what makes the model routable at all.
         val chain = (0..19).toList().foldRight("0") { k, rest -> "(ite (= s $k) (+ t $k) $rest)" }
         val parsed = SmtLib.parse(
             """
@@ -84,7 +86,14 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+
+        // Deciding it is a search question, tracked as #1579; what matters here is that a spent budget
+        // reports unknown rather than the model being refused as outside coverage.
+        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline)
+            .solve(TheoryParams(cancellation = Cancellation { true }))
+
+        assertIs<OpenTheoryResult.Unknown>(result)
     }
 
     @Test
@@ -179,5 +188,30 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(parsed.model, ProblemPipeline.EXACT_LIRA).solve()
 
         assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `an order chain over open columns stays inside the theory fragment`() {
+        // `x < y < z` over unbounded integers is pure difference logic. Posting it as an Increasing —
+        // a global no theory holds — would have made the model unroutable for no gain.
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int) (declare-const z Int)
+                (assert (< x y z))
+                (assert (> x 100))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(
+            OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve(),
+        ).assignment
+        val ints = assertIs<OpenTheoryAssignment.Difference>(assignment).sample.ints
+
+        assertTrue(ints[parsed.intVarNames.getValue("x")] < ints[parsed.intVarNames.getValue("y")])
+        assertTrue(ints[parsed.intVarNames.getValue("y")] < ints[parsed.intVarNames.getValue("z")])
     }
 }
