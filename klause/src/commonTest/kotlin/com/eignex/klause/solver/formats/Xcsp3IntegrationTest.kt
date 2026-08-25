@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.xcsp3
+package com.eignex.klause.solver.formats
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
@@ -13,6 +13,9 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.xcsp3.FExpr
+import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
+import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
@@ -24,7 +27,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
-class Xcsp3Test {
+class Xcsp3IntegrationTest {
 
     private fun sat(xml: String): IntArray {
         val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())

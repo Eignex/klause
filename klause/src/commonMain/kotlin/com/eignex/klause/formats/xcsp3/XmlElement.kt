@@ -160,7 +160,10 @@ internal class XmlReader(private val reader: CharReader) {
     fun parseDocument(): XmlElement {
         skipMisc()
         require(!reader.eof() && reader.peek() == '<'.code) { "expected root element" }
-        return parseElement()
+        return parseElement().also {
+            skipMisc()
+            require(reader.eof()) { "unexpected content after root element" }
+        }
     }
 
     /** Skip the prolog/comments/doctype and read the root element's start tag, leaving the cursor inside
@@ -178,10 +181,7 @@ internal class XmlReader(private val reader: CharReader) {
         while (true) {
             skipWs()
             require(!reader.eof()) { "unterminated element (expected a child or closing tag)" }
-            if (reader.peek() != '<'.code) {
-                reader.advance() // stray inter-element text: only whitespace occurs here, so skip it
-                continue
-            }
+            if (reader.peek() != '<'.code) error("unexpected text between child elements")
             when {
                 matches("<!--") -> skipUntilAfter("-->")
 
@@ -274,6 +274,8 @@ internal class XmlReader(private val reader: CharReader) {
             if (reader.peek() == '<'.code) {
                 when {
                     matches("<!--") -> skipUntilAfter("-->")
+
+                    matches("<?") -> skipUntilAfter("?>")
 
                     matches("<![CDATA[") -> {
                         repeat(CDATA_OPEN.length) { reader.advance() }
@@ -377,10 +379,42 @@ internal class XmlReader(private val reader: CharReader) {
         reader.advance()
     }
 
-    private fun decodeEntities(t: String): String {
-        if ('&' !in t) return t
-        return t.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-            .replace("&apos;", "'").replace("&amp;", "&")
+    private fun decodeEntities(text: String): String {
+        val first = text.indexOf('&')
+        if (first < 0) return text
+        val out = StringBuilder(text.length)
+        var from = 0
+        var amp = first
+        while (amp >= 0) {
+            out.append(text, from, amp)
+            val semi = text.indexOf(';', amp + 1)
+            require(semi >= 0) { "unterminated entity reference" }
+            val entity = text.substring(amp + 1, semi)
+            out.append(
+                when (entity) {
+                    "lt" -> '<'
+                    "gt" -> '>'
+                    "quot" -> '"'
+                    "apos" -> '\''
+                    "amp" -> '&'
+                    else -> decodeNumericEntity(entity)
+                },
+            )
+            from = semi + 1
+            amp = text.indexOf('&', from)
+        }
+        out.append(text, from, text.length)
+        return out.toString()
+    }
+
+    private fun decodeNumericEntity(entity: String): Char {
+        val value = when {
+            entity.startsWith("#x") -> entity.substring(2).toIntOrNull(16)
+            entity.startsWith('#') -> entity.substring(1).toIntOrNull()
+            else -> null
+        } ?: throw IllegalArgumentException("unknown entity '&$entity;'")
+        require(value in 0..0xffff && value !in 0xd800..0xdfff) { "invalid character entity '&$entity;'" }
+        return value.toChar()
     }
 
     private companion object {

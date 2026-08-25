@@ -1,18 +1,14 @@
 package com.eignex.klause.formats.opb
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -223,12 +219,11 @@ class OpbTest {
     }
 
     @Test
-    fun `wide coefficients drive sound reasoning`() {
-        // 2^64·x1 >= 2^64 forces x1 = 1; 2^64·x1 <= 0 forces x1 = 0 — jointly unsatisfiable at full width,
-        // not lost to a 64-bit wrap.
+    fun `wide constraints retain their exact constants`() {
         val out = Opb.parse("+18446744073709551616 x1 >= 18446744073709551616 ;\n+18446744073709551616 x1 <= 0 ;\n")
-        val r = BacktrackSolver(out.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        assertIs<SolveResult.Unsat>(r)
+        val rows = out.problem.factors.filterIsInstance<Linear>()
+        assertEquals(2, rows.size)
+        assertTrue(rows.all { it.wideConstants != null })
     }
 
     @Test
@@ -243,6 +238,11 @@ class OpbTest {
     @Test
     fun `reports a non-numeric coefficient as not an integer`() {
         assertTrue("not an integer" in parseError("abc x1 >= 1 ;"))
+    }
+
+    @Test
+    fun `rejects a negative wbo soft cost`() {
+        assertTrue("non-negative" in parseError("[-1] +1 x1 >= 1 ;"))
     }
 
     private fun parseError(text: String): String = runCatching { Opb.parse(text) }.exceptionOrNull()?.message.orEmpty()

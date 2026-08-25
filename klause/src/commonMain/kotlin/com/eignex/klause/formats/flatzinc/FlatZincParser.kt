@@ -2,11 +2,8 @@ package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.util.LongArrayList
 
-/** Recursive-descent parser for FlatZinc 1.6. Pulls tokens one at a time from a [FlatZincLexer]
- *  through a single-token lookahead buffer, so the full token list is never materialized. */
+/** Recursive-descent FlatZinc 1.6 parser with one-token lookahead. */
 internal class FlatZincParser(private val lexer: FlatZincLexer) {
-    // One-token lookahead: `null` means "not yet pulled"; refilled from the lexer on demand. The lexer
-    // yields a terminal [FznToken.Eof] indefinitely, so this never underflows past end of input.
     private var lookahead: FznToken? = null
 
     fun parse(): FznModel {
@@ -72,11 +69,9 @@ internal class FlatZincParser(private val lexer: FlatZincLexer) {
             val lo = expectIntLit()
             expect("..", "expected `..` in array index range")
             val hi = expectIntLit()
-            require(lo == 1L) {
-                "FlatZinc arrays are 1-indexed; got [$lo..$hi]"
-            }
-            require(hi in 0..Int.MAX_VALUE.toLong()) {
-                "FlatZinc array length out of range: [$lo..$hi]"
+            if (lo != 1L) failHere("FlatZinc arrays must use a 1-based index range, got [$lo..$hi]")
+            if (hi !in 0..Int.MAX_VALUE.toLong()) {
+                failHere("FlatZinc array length out of range: [$lo..$hi]")
             }
             expect("]", "expected `]` closing index range")
             expectKw("of")
@@ -121,6 +116,7 @@ internal class FlatZincParser(private val lexer: FlatZincLexer) {
             advance()
             expect("..", "expected `..` in int range")
             val hi = expectIntLit()
+            if (lo > hi) failHere("empty int range $lo..$hi is not supported")
             return FznType.IntRange(lo, hi)
         }
         if (tok is FznToken.FloatLit) {
@@ -128,6 +124,7 @@ internal class FlatZincParser(private val lexer: FlatZincLexer) {
             advance()
             expect("..", "expected `..` in float range")
             val hi = expectFloatOrIntAsDouble()
+            if (lo > hi) failHere("empty float range $lo..$hi is not supported")
             return FznType.FloatRange(lo, hi)
         }
         if (tok is FznToken.Punct && tok.symbol == "{") {
@@ -270,6 +267,9 @@ internal class FlatZincParser(private val lexer: FlatZincLexer) {
                 advance()
                 val idx = expectIntLit()
                 expect("]", "expected `]` closing array access")
+                if (idx !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
+                    failHere("array index $idx is outside the supported integer range")
+                }
                 FznExpr.ArrayAccess(name, idx.toInt())
             } else if (peek() is FznToken.Punct && (peek() as FznToken.Punct).symbol == "(") {
                 advance()

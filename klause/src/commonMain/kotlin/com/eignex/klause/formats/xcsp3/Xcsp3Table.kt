@@ -375,7 +375,7 @@ private fun parseLongIn(text: String, from: Int, to: Int): Long {
 }
 
 /** Invoke [cell] with each trimmed comma-separated field of every `(...)` group in [text], then [endRow]
- *  after the group — one linear scan, no per-tuple Regex match. */
+ *  after the group — one linear scan per tuple. */
 internal inline fun forEachTuple(text: String, cell: (String) -> Unit, endRow: () -> Unit) {
     val n = text.length
     var i = 0

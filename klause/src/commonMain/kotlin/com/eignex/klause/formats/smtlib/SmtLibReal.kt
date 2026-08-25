@@ -63,7 +63,7 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
                 if (macros[node.text]?.isReal == true) return true
             }
 
-            is SExpr.SList -> when (val head = (node.items[0] as? SExpr.Atom)?.text) {
+            is SExpr.SList -> when (val head = (node.items.firstOrNull() as? SExpr.Atom)?.text) {
                 "to_real", "/" -> return true
 
                 "to_int" -> Unit
@@ -72,11 +72,11 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
 
                 // Either branch decides the ite's sort: a real may hide in the else-branch alone.
                 "ite" -> {
-                    work.addLast(node.items[2])
-                    if (node.items.size > 3) work.addLast(node.items[3])
+                    work.addLast(node.argAt(2, "ite then branch"))
+                    work.addLast(node.argAt(3, "ite else branch"))
                 }
 
-                "let" -> work.addLast(node.items[2])
+                "let" -> work.addLast(node.argAt(2, "let body"))
 
                 else -> if (macros[head]?.isReal == true) return true
             }

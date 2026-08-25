@@ -257,4 +257,14 @@ class MpsTest {
         val text = "ROWS\n X BADROW\nENDATA"
         assertFailsWith<MpsFormatException> { Mps.parse(text) }
     }
+
+    @Test
+    fun `rejects duplicate row names`() {
+        assertFailsWith<MpsFormatException> { Mps.parse("ROWS\n L C1\n G C1\nENDATA") }
+    }
+
+    @Test
+    fun `rejects non-finite numeric fields`() {
+        assertFailsWith<MpsFormatException> { Mps.parse("ROWS\n L C1\nCOLUMNS\n X1 C1 NaN\nENDATA") }
+    }
 }

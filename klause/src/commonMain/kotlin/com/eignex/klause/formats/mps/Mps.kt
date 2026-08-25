@@ -244,8 +244,10 @@ object Mps {
             else -> throw MpsFormatException("unknown ROWS type '${fields[0]}'")
         }
         val row = Row(fields[1], type)
+        if (rowByName.put(fields[1], row) != null) {
+            mpsError("duplicate ROWS name '${fields[1]}'")
+        }
         rows.add(row)
-        rowByName[fields[1]] = row
         return hasObjective || type == RowType.OBJECTIVE
     }
 
@@ -325,6 +327,7 @@ object Mps {
             0.0 -> false
             else -> mpsError("INDICATORS value must be 0 or 1, got '${rest[2]}'")
         }
+        mpsErrorIf(row.indicator != null) { "INDICATORS has more than one entry for row '${row.name}'" }
         row.indicator = MpsIndicator(v.index, whenOne)
     }
 
@@ -466,6 +469,10 @@ object Mps {
         }
     }
 
-    private fun parseNum(token: String, role: String): Double =
-        token.toDoubleOrNull() ?: throw MpsFormatException("$role not a number: '$token'")
+    private fun parseNum(token: String, role: String): Double = token.toDoubleOrNull()?.takeIf { it.isFinite() }
+        ?: throw MpsFormatException("$role must be a finite number: '$token'")
+}
+
+private inline fun mpsErrorIf(condition: Boolean, message: () -> String) {
+    if (condition) mpsError(message())
 }

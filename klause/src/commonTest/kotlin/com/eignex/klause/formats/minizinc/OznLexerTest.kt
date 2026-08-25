@@ -40,4 +40,10 @@ class OznLexerTest {
         assertEquals(OznTokenKind.FLOAT, nums[0].kind)
         assertEquals("1.5e-8", nums[0].text)
     }
+
+    @Test
+    fun `a parameter declaration parses as a declaration`() {
+        val items = OznParser(OznLexer("par int: size = 2;").tokenize()).parse()
+        assertEquals(listOf(OznItem.VarDecl("size", OznExpr.IntLit(2))), items)
+    }
 }

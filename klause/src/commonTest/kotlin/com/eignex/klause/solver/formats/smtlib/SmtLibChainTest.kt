@@ -1,8 +1,9 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.solver.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.global.Increasing
+import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult

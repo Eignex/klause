@@ -1,7 +1,10 @@
-package com.eignex.klause.formats
+package com.eignex.klause.solver.formats
 
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
+import com.eignex.klause.formats.CnfLowering
+import com.eignex.klause.formats.allDifferentWindowSize
+import com.eignex.klause.formats.reifyAllDifferentWitness
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -10,7 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
-class AllDifferentReificationTest {
+class AllDifferentReificationIntegrationTest {
 
     private class Sink : CnfLowering {
         override val factors = mutableListOf<Factor>()
