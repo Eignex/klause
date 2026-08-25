@@ -16,6 +16,31 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 
+/** Reject a pseudo-Boolean row whose finite assignment range cannot be represented in [Long]. */
+internal fun validatePseudoBoolean(weights: LongArray, literals: IntArray) {
+    require(weights.size == literals.size) {
+        "pseudo-Boolean weights/literals length mismatch: ${weights.size} weights for ${literals.size} literals"
+    }
+    var sumLo = 0L
+    var sumHi = 0L
+    for (weight in weights) {
+        sumLo = pbAddExact(sumLo, minOf(0L, weight))
+        sumHi = pbAddExact(sumHi, maxOf(0L, weight))
+    }
+}
+
+private fun pbAddExact(a: Long, b: Long): Long {
+    val result = a + b
+    require((a xor result) and (b xor result) >= 0L) { "pseudo-Boolean coefficient overflow: $a + $b" }
+    return result
+}
+
+private fun pbSubExact(a: Long, b: Long): Long {
+    val result = a - b
+    require((a xor b) and (a xor result) >= 0L) { "pseudo-Boolean coefficient overflow: $a - $b" }
+    return result
+}
+
 internal fun linearHolds(sum: Long, op: LinearOp, bound: Long): Boolean = when (op) {
     LinearOp.LE -> sum <= bound
     LinearOp.EQ -> sum == bound
@@ -87,7 +112,12 @@ internal fun coalesceLinearTerms(vars: IntArray, coeffs: LongArray): CoalescedTe
             slotOf.put(v, slot)
             order.add(v)
         }
-        sums[slot] += coeffs[i]
+        val previous = sums[slot]
+        val next = previous + coeffs[i]
+        require((previous xor next) and (coeffs[i] xor next) >= 0L) {
+            "linear coefficient sum overflows Long for variable $v"
+        }
+        sums[slot] = next
     }
     val outVars = order.toIntArray()
     val outCoeffs = LongArray(outVars.size) { sums[it] }

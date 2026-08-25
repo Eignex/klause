@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.solver.VarRemap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -118,5 +119,45 @@ class LinearConstantsTest {
                 bound = 5.0,
             )
         }
+    }
+
+    @Test
+    fun `a real row rejects nonfinite constants`() {
+        assertFailsWith<IllegalArgumentException> {
+            Linear(
+                intVars = intArrayOf(0),
+                intCoeffs = doubleArrayOf(Double.NaN),
+                realVars = intArrayOf(0),
+                realCoeffs = doubleArrayOf(1.0),
+                op = LinearOp.LE,
+                bound = 5.0,
+            )
+        }
+    }
+
+    @Test
+    fun `a wide row requires distinct variables`() {
+        val coefficient = BigInteger.ONE
+
+        assertFailsWith<IllegalArgumentException> {
+            Linear(intArrayOf(0, 0), arrayOf(coefficient, coefficient), LinearOp.LE, coefficient)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            ReifiedLinear(0, intArrayOf(0, 0), arrayOf(coefficient, coefficient), LinearOp.LE, coefficient)
+        }
+    }
+
+    @Test
+    fun `a collapsing wide remap retains a constant row`() {
+        val coefficient = BigInteger.fromLong(Long.MAX_VALUE) * 4
+        val map = VarRemap(intArrayOf(0), intArrayOf(0, 0))
+        val linear = Linear(intArrayOf(0, 1), arrayOf(coefficient, -coefficient), LinearOp.EQ, BigInteger.ZERO)
+        val reified = ReifiedLinear(0, intArrayOf(0, 1), arrayOf(coefficient, -coefficient), LinearOp.EQ, BigInteger.ZERO)
+
+        val remappedLinear = assertIs<Linear>(linear.remap(map))
+        val remappedReified = assertIs<ReifiedLinear>(reified.remap(map))
+
+        assertEquals(BigInteger.ZERO, checkNotNull(remappedLinear.wideConstants).coefficients.at(0))
+        assertEquals(BigInteger.ZERO, checkNotNull(remappedReified.wideConstants).coefficients.at(0))
     }
 }

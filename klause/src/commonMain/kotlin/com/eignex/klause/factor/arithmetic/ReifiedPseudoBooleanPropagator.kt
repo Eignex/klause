@@ -49,8 +49,18 @@ internal class ReifiedPseudoBooleanPropagator(
             propagateTrue = { a -> propagatePbBounds(state, weights, literals, op, bnd, extraLit = a) },
             propagateFalse = { a ->
                 when (op) {
-                    PbOp.LE -> propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = a)
-                    PbOp.GE -> propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = a)
+                    PbOp.LE -> if (bnd == Long.MAX_VALUE) {
+                        false
+                    } else {
+                        propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = a)
+                    }
+
+                    PbOp.GE -> if (bnd == Long.MIN_VALUE) {
+                        false
+                    } else {
+                        propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = a)
+                    }
+
                     PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = a)
                 }
             },

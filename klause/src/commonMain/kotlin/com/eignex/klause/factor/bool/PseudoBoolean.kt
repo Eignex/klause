@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.bool.internals.validatePseudoBoolean
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
@@ -25,9 +26,16 @@ import com.eignex.klause.solver.materializeKey
  * true, 0 when false). Payload at `intPayload(factorId)` is the current weighted sum. Terms pair
  * [weights] with [literals]; the sum is compared by [op] against [bound].
  */
-class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp, override val bound: Long) :
+class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, override val bound: Long) :
     Factor,
     LinearRow {
+
+    val weights: LongArray = weights.copyOf()
+    val literals: IntArray = literals.copyOf()
+
+    init {
+        validatePseudoBoolean(this.weights, this.literals)
+    }
 
     override val variables: VarList = BoolVars(literals.litVars())
 

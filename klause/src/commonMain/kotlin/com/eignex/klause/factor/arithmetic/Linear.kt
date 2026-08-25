@@ -25,6 +25,7 @@ import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.IntHashSet
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.nextDown
 import kotlin.math.nextUp
@@ -129,6 +130,14 @@ class Linear private constructor(
         val real = realConstants
         require(real == null || real.realCoefficients.size == realVars.size) { "real vars/coeffs length mismatch" }
         require(real == null || real.intCoefficients.size == vars.size) { "real int-coeff/var length mismatch" }
+        require(real == null || realVars.isNotEmpty()) { "a real linear row needs at least one real variable" }
+        require(real == null || real.bound.isFinite()) { "real linear bound must be finite" }
+        require(real == null || real.intCoefficients.toDoubleArray().all { it.isFinite() }) {
+            "real linear integer coefficients must be finite"
+        }
+        require(real == null || real.realCoefficients.toDoubleArray().all { it.isFinite() }) {
+            "real linear coefficients must be finite"
+        }
         require(real == null || !real.strict || op == LinearOp.LE) { "strictness needs an LP-only inequality row" }
         val wide = wideConstants
         require(wide == null || wide.coefficients.size == vars.size) { "wide coeff/var length mismatch" }
@@ -183,7 +192,7 @@ class Linear private constructor(
      * [vars] must be distinct — this form does not coalesce duplicates.
      */
     constructor(vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) : this(
-        CoalescedTerms(vars.copyOf(), EmptyLongArray),
+        wideLinearTerms(vars, wideCoeffs),
         op,
         0L,
         wideCoeffsIn = wideCoeffs.copyOf(),
@@ -544,9 +553,17 @@ internal fun fitsInt32(coeffs: LongArray, bound: Long): Boolean =
  *  except-set) declines value symmetry (`null`) when wide, to avoid truncating two values into one. */
 internal fun fitsInt32(values: LongArray): Boolean = values.all { it in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }
 
-/** Sum the exact coefficients of any repeated variable and drop zero-sum terms, preserving first-seen
- *  order — the wide analogue of [coalesceLinearTerms], so a wide row always has one term per variable. */
+// Wide coefficients are exact, so callers must not lose a duplicate term before construction.
+internal fun wideLinearTerms(vars: IntArray, coeffs: Array<BigInteger>): CoalescedTerms {
+    require(vars.size == coeffs.size) { "wide coeffs/vars length mismatch" }
+    val seen = IntHashSet(vars.size)
+    for (variable in vars) require(seen.add(variable)) { "wide linear vars must be distinct" }
+    return CoalescedTerms(vars.copyOf(), EmptyLongArray)
+}
+
+// Keep zero coefficients: a remap can cancel every nonzero term, but the factor stays representable.
 internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntArray, Array<BigInteger>> {
+    require(vars.size == coeffs.size) { "wide coeffs/vars length mismatch" }
     val order = ArrayList<Int>(vars.size)
     val sum = HashMap<Int, BigInteger>(vars.size)
     for (i in vars.indices) {
@@ -559,16 +576,7 @@ internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntAr
             sum[v] = prev + coeffs[i]
         }
     }
-    val keptVars = ArrayList<Int>(order.size)
-    val keptCoeffs = ArrayList<BigInteger>(order.size)
-    for (v in order) {
-        val c = sum.getValue(v)
-        if (c != BigInteger.ZERO) {
-            keptVars.add(v)
-            keptCoeffs.add(c)
-        }
-    }
-    return keptVars.toIntArray() to keptCoeffs.toTypedArray()
+    return order.toIntArray() to Array(order.size) { sum.getValue(order[it]) }
 }
 
 /** True when [value] is an integer a `Double` states exactly. */

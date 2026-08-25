@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.ReifiedFactor
+import com.eignex.klause.factor.bool.internals.validatePseudoBoolean
 import com.eignex.klause.factor.bool.internals.pbDegree
 import com.eignex.klause.factor.bool.internals.pbHolds
 import com.eignex.klause.factor.litVars
@@ -28,11 +29,24 @@ import com.eignex.klause.solver.materializeKey
  */
 class ReifiedPseudoBoolean(
     override val auxBoolVar: Int,
-    val weights: LongArray,
-    val literals: IntArray,
+    weights: LongArray,
+    literals: IntArray,
     val op: PbOp,
     val bound: Long,
 ) : ReifiedFactor {
+
+    init {
+        require(literals.none { com.eignex.klause.solver.Lit.variable(it) == auxBoolVar }) {
+            "reified pseudo-Boolean auxiliary variable $auxBoolVar occurs in its body"
+        }
+    }
+
+    val weights: LongArray = weights.copyOf()
+    val literals: IntArray = literals.copyOf()
+
+    init {
+        validatePseudoBoolean(this.weights, this.literals)
+    }
 
     override val variables: VarList = BoolVars(literals.litVars(auxBoolVar))
 
@@ -78,15 +92,21 @@ class ReifiedPseudoBoolean(
             PbOp.LE -> {
                 val m1 = maxOf(0L, subExact(sum.lMax, b)) // aux=1 ⇒ L ≤ bound
                 sum.reifiedRow(builder, a, m1, LinearOp.LE, addExact(b, m1))
-                val m2 = maxOf(0L, subExact(addExact(b, 1L), sum.lMin)) // aux=0 ⇒ L ≥ bound+1
-                sum.reifiedRow(builder, a, m2, LinearOp.GE, addExact(b, 1L))
+                if (b != Long.MAX_VALUE) {
+                    val falseBound = addExact(b, 1L)
+                    val m2 = maxOf(0L, subExact(falseBound, sum.lMin)) // aux=0 ⇒ L ≥ bound+1
+                    sum.reifiedRow(builder, a, m2, LinearOp.GE, falseBound)
+                }
             }
 
             PbOp.GE -> {
                 val m1 = maxOf(0L, subExact(b, sum.lMin)) // aux=1 ⇒ L ≥ bound
                 sum.reifiedRow(builder, a, -m1, LinearOp.GE, subExact(b, m1))
-                val m2 = maxOf(0L, subExact(sum.lMax, subExact(b, 1L))) // aux=0 ⇒ L ≤ bound-1
-                sum.reifiedRow(builder, a, -m2, LinearOp.LE, subExact(b, 1L))
+                if (b != Long.MIN_VALUE) {
+                    val falseBound = subExact(b, 1L)
+                    val m2 = maxOf(0L, subExact(sum.lMax, falseBound)) // aux=0 ⇒ L ≤ bound-1
+                    sum.reifiedRow(builder, a, -m2, LinearOp.LE, falseBound)
+                }
             }
 
             PbOp.EQ -> {
