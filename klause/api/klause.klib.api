@@ -909,7 +909,7 @@ abstract interface com.eignex.klause.solver.search/TheoryComponent : com.eignex.
 
 abstract interface com.eignex.klause.solver/Factor { // com.eignex.klause.solver/Factor|null[0]
     abstract val variables // com.eignex.klause.solver/Factor.variables|{}variables[0]
-        abstract fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.solver/Factor.variables.<get-variables>|<get-variables>(){}[0]
+        abstract fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.solver/Factor.variables.<get-variables>|<get-variables>(){}[0]
     open val boolVars // com.eignex.klause.solver/Factor.boolVars|{}boolVars[0]
         open fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/Factor.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
     open val exactTheoryOwnable // com.eignex.klause.solver/Factor.exactTheoryOwnable|{}exactTheoryOwnable[0]
@@ -929,14 +929,14 @@ abstract interface com.eignex.klause.solver/Factor { // com.eignex.klause.solver
 
     abstract fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.solver/Factor.asInvariant|asInvariant(){}[0]
     abstract fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.solver/Factor.asPropagator|asPropagator(){}[0]
-    abstract fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.solver/Factor.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    abstract fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.solver/Factor.structuralKey|structuralKey(){}[0]
+    abstract fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.solver/Factor.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    abstract fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.solver/Factor.structuralKey|structuralKey(){}[0]
     open fun canSubstituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Factor.canSubstituteAffine|canSubstituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     open fun hullFamilyEnabled(com.eignex.klause.lp/HullFlags): kotlin/Boolean // com.eignex.klause.solver/Factor.hullFamilyEnabled|hullFamilyEnabled(com.eignex.klause.lp.HullFlags){}[0]
     open fun isValueAnonymous(): kotlin/Boolean // com.eignex.klause.solver/Factor.isValueAnonymous|isValueAnonymous(){}[0]
     open fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.solver/Factor.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     open fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.solver/Factor.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    open fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.solver/Factor.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    open fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.solver/Factor.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     open fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.solver/Factor.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     open fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.solver/Factor.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
     open fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.solver/Factor? // com.eignex.klause.solver/Factor.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
@@ -1404,6 +1404,17 @@ sealed interface com.eignex.klause.formats.xcsp3/FExpr { // com.eignex.klause.fo
         final fun parse(kotlin/String): com.eignex.klause.formats.xcsp3/FExpr // com.eignex.klause.formats.xcsp3/FExpr.Companion.parse|parse(kotlin.String){}[0]
         final fun substitute(com.eignex.klause.formats.xcsp3/FExpr, kotlin.collections/List<kotlin/String>): com.eignex.klause.formats.xcsp3/FExpr // com.eignex.klause.formats.xcsp3/FExpr.Companion.substitute|substitute(com.eignex.klause.formats.xcsp3.FExpr;kotlin.collections.List<kotlin.String>){}[0]
     }
+}
+
+sealed interface com.eignex.klause.ir/VarList { // com.eignex.klause.ir/VarList|null[0]
+    open val boolVars // com.eignex.klause.ir/VarList.boolVars|{}boolVars[0]
+        open fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/VarList.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+    open val ints // com.eignex.klause.ir/VarList.ints|{}ints[0]
+        open fun <get-ints>(): kotlin/IntArray // com.eignex.klause.ir/VarList.ints.<get-ints>|<get-ints>(){}[0]
+    open val reals // com.eignex.klause.ir/VarList.reals|{}reals[0]
+        open fun <get-reals>(): kotlin/IntArray // com.eignex.klause.ir/VarList.reals.<get-reals>|<get-reals>(){}[0]
+    open val spanInts // com.eignex.klause.ir/VarList.spanInts|{}spanInts[0]
+        open fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.ir/VarList.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
 }
 
 sealed interface com.eignex.klause.localsearch.acceptance/AcceptanceRule { // com.eignex.klause.localsearch.acceptance/AcceptanceRule|null[0]
@@ -2728,17 +2739,6 @@ sealed interface com.eignex.klause.solver/SolveResult { // com.eignex.klause.sol
     }
 }
 
-sealed interface com.eignex.klause.solver/VarList { // com.eignex.klause.solver/VarList|null[0]
-    open val boolVars // com.eignex.klause.solver/VarList.boolVars|{}boolVars[0]
-        open fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/VarList.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
-    open val ints // com.eignex.klause.solver/VarList.ints|{}ints[0]
-        open fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/VarList.ints.<get-ints>|<get-ints>(){}[0]
-    open val reals // com.eignex.klause.solver/VarList.reals|{}reals[0]
-        open fun <get-reals>(): kotlin/IntArray // com.eignex.klause.solver/VarList.reals.<get-reals>|<get-reals>(){}[0]
-    open val spanInts // com.eignex.klause.solver/VarList.spanInts|{}spanInts[0]
-        open fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.solver/VarList.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
-}
-
 abstract class com.eignex.klause.localsearch.schedule/AbstractSchedule : com.eignex.klause.localsearch.schedule/Schedule { // com.eignex.klause.localsearch.schedule/AbstractSchedule|null[0]
     constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double = ...) // com.eignex.klause.localsearch.schedule/AbstractSchedule.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
 
@@ -3485,16 +3485,16 @@ final class com.eignex.klause.factor.arithmetic/ArrayMinMax : com.eignex.klause.
     final val result // com.eignex.klause.factor.arithmetic/ArrayMinMax.result|{}result[0]
         final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ArrayMinMax.result.<get-result>|<get-result>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ArrayMinMax.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/ArrayMinMax.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ArrayMinMax.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.arithmetic/ArrayMinMax.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ArrayMinMax.xs.<get-xs>|<get-xs>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.arithmetic/ArrayMinMax.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/ArrayMinMax.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/ArrayMinMax.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ArrayMinMax.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ArrayMinMax.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/ArrayMinMax.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ArrayMinMax.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ArrayMinMax.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ArrayMinMax.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.arithmetic/ArrayMinMax.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 }
 
@@ -3516,15 +3516,15 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
     final val ops // com.eignex.klause.factor.arithmetic/ComparisonClause.ops|{}ops[0]
         final fun <get-ops>(): kotlin/Array<com.eignex.klause.factor.arithmetic/LinearOp> // com.eignex.klause.factor.arithmetic/ComparisonClause.ops.<get-ops>|<get-ops>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ComparisonClause.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/ComparisonClause.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ComparisonClause.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ComparisonClause.vars|{}vars[0]
         final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ComparisonClause.vars.<get-vars>|<get-vars>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.arithmetic/ComparisonClause.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/ComparisonClause.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ComparisonClause.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ComparisonClause.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/ComparisonClause.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ComparisonClause.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ComparisonClause.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ComparisonClause.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/IntegerConstants : com.eignex.klause.factor.arithmetic/IntegralConstants, com.eignex.klause.lp/LinearRow { // com.eignex.klause.factor.arithmetic/IntegerConstants|null[0]
@@ -3580,7 +3580,7 @@ final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.solve
     final val realVars // com.eignex.klause.factor.arithmetic/Linear.realVars|{}realVars[0]
         final fun <get-realVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/Linear.realVars.<get-realVars>|<get-realVars>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/Linear.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/Linear.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/Linear.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/Linear.vars|{}vars[0]
         final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/Linear.vars.<get-vars>|<get-vars>(){}[0]
     final val wideConstants // com.eignex.klause.factor.arithmetic/Linear.wideConstants|{}wideConstants[0]
@@ -3590,10 +3590,10 @@ final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.solve
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/Linear.asPropagator|asPropagator(){}[0]
     final fun isValueAnonymous(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/Linear.isValueAnonymous|isValueAnonymous(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/Linear.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/Linear.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Linear.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/Linear.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Linear.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.arithmetic/Linear.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/Linear.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/Linear.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/Product : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.arithmetic/Product|null[0]
@@ -3608,14 +3608,14 @@ final class com.eignex.klause.factor.arithmetic/Product : com.eignex.klause.solv
     final val result // com.eignex.klause.factor.arithmetic/Product.result|{}result[0]
         final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/Product.result.<get-result>|<get-result>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/Product.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/Product.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/Product.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.arithmetic/Product.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/Product.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/Product.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/Product.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Product.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/Product.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/Product.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Product.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/Product.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.arithmetic/Product.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 }
 
@@ -3646,13 +3646,13 @@ final class com.eignex.klause.factor.arithmetic/RealProduct : com.eignex.klause.
     final val result // com.eignex.klause.factor.arithmetic/RealProduct.result|{}result[0]
         final fun <get-result>(): kotlin/Int // com.eignex.klause.factor.arithmetic/RealProduct.result.<get-result>|<get-result>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/RealProduct.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/RealProduct.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/RealProduct.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.arithmetic/RealProduct.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/RealProduct.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/RealProduct.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/RealProduct.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/RealProduct.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/RealProduct.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/RealProduct.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/ReifiedCardinality : com.eignex.klause.factor/ReifiedFactor { // com.eignex.klause.factor.arithmetic/ReifiedCardinality|null[0]
@@ -3667,16 +3667,16 @@ final class com.eignex.klause.factor.arithmetic/ReifiedCardinality : com.eignex.
     final val min // com.eignex.klause.factor.arithmetic/ReifiedCardinality.min|{}min[0]
         final fun <get-min>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedCardinality.min.<get-min>|<get-min>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ReifiedCardinality.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/ReifiedCardinality.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ReifiedCardinality.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.arithmetic/ReifiedCardinality.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/ReifiedCardinality.asPropagator|asPropagator(){}[0]
     final fun holdsNow(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ReifiedCardinality.holdsNow|holdsNow(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/ReifiedCardinality.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedCardinality.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedCardinality.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedCardinality.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedCardinality.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun residualNow(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedCardinality.residualNow|residualNow(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedCardinality.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedCardinality.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/ReifiedLinear : com.eignex.klause.factor/ReifiedFactor { // com.eignex.klause.factor.arithmetic/ReifiedLinear|null[0]
@@ -3697,7 +3697,7 @@ final class com.eignex.klause.factor.arithmetic/ReifiedLinear : com.eignex.klaus
     final val op // com.eignex.klause.factor.arithmetic/ReifiedLinear.op|{}op[0]
         final fun <get-op>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/ReifiedLinear.op.<get-op>|<get-op>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ReifiedLinear.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/ReifiedLinear.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ReifiedLinear.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ReifiedLinear.vars|{}vars[0]
         final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ReifiedLinear.vars.<get-vars>|<get-vars>(){}[0]
     final val wideConstants // com.eignex.klause.factor.arithmetic/ReifiedLinear.wideConstants|{}wideConstants[0]
@@ -3707,10 +3707,10 @@ final class com.eignex.klause.factor.arithmetic/ReifiedLinear : com.eignex.klaus
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/ReifiedLinear.asPropagator|asPropagator(){}[0]
     final fun holdsNow(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ReifiedLinear.holdsNow|holdsNow(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/ReifiedLinear.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedLinear.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedLinear.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedLinear.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedLinear.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun residualNow(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedLinear.residualNow|residualNow(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedLinear.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedLinear.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean : com.eignex.klause.factor/ReifiedFactor { // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean|null[0]
@@ -3725,7 +3725,7 @@ final class com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean : com.eigne
     final val op // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.op|{}op[0]
         final fun <get-op>(): com.eignex.klause.model/PbOp // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.op.<get-op>|<get-op>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.variables.<get-variables>|<get-variables>(){}[0]
     final val weights // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.weights|{}weights[0]
         final fun <get-weights>(): kotlin/LongArray // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.weights.<get-weights>|<get-weights>(){}[0]
 
@@ -3733,10 +3733,10 @@ final class com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean : com.eigne
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.asPropagator|asPropagator(){}[0]
     final fun holdsNow(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.holdsNow|holdsNow(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun residualNow(com.eignex.klause.localsearch/LocalSearchState, kotlin/Int, kotlin/Int): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.residualNow|residualNow(com.eignex.klause.localsearch.LocalSearchState;kotlin.Int;kotlin.Int){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/ReifiedRealLinear : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.arithmetic/ReifiedRealLinear|null[0]
@@ -3759,15 +3759,15 @@ final class com.eignex.klause.factor.arithmetic/ReifiedRealLinear : com.eignex.k
     final val strict // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.strict|{}strict[0]
         final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.strict.<get-strict>|<get-strict>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.vars|{}vars[0]
         final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.vars.<get-vars>|<get-vars>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/WideConstants : com.eignex.klause.factor.arithmetic/IntegralConstants { // com.eignex.klause.factor.arithmetic/WideConstants|null[0]
@@ -3797,14 +3797,14 @@ final class com.eignex.klause.factor.bool/Cardinality : com.eignex.klause.solver
     final val min // com.eignex.klause.factor.bool/Cardinality.min|{}min[0]
         final fun <get-min>(): kotlin/Int // com.eignex.klause.factor.bool/Cardinality.min.<get-min>|<get-min>(){}[0]
     final val variables // com.eignex.klause.factor.bool/Cardinality.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.bool/Cardinality.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.bool/Cardinality.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.bool/Cardinality.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.bool/Cardinality.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.bool/Cardinality.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Cardinality.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Cardinality.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.bool/Cardinality.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Cardinality.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Cardinality.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/Cardinality.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.bool/Cardinality.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 
     final object Companion { // com.eignex.klause.factor.bool/Cardinality.Companion|null[0]
@@ -3836,7 +3836,7 @@ final class com.eignex.klause.factor.bool/Clause : com.eignex.klause.lp/LinearRo
     final val size // com.eignex.klause.factor.bool/Clause.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.bool/Clause.size.<get-size>|<get-size>(){}[0]
     final val variables // com.eignex.klause.factor.bool/Clause.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.bool/Clause.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.bool/Clause.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun allLiteralsBool(kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.bool/Clause.allLiteralsBool|allLiteralsBool(kotlin.Int){}[0]
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.bool/Clause.asInvariant|asInvariant(){}[0]
@@ -3844,9 +3844,9 @@ final class com.eignex.klause.factor.bool/Clause : com.eignex.klause.lp/LinearRo
     final fun coeff(kotlin/Int): kotlin/Long // com.eignex.klause.factor.bool/Clause.coeff|coeff(kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.bool/Clause.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.factor.bool/Clause.ref|ref(kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Clause.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Clause.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.bool/Clause.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Clause.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Clause.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/Clause.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.bool/GaussianXor : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.bool/GaussianXor|null[0]
@@ -3855,12 +3855,12 @@ final class com.eignex.klause.factor.bool/GaussianXor : com.eignex.klause.solver
     final val constraints // com.eignex.klause.factor.bool/GaussianXor.constraints|{}constraints[0]
         final fun <get-constraints>(): kotlin.collections/List<com.eignex.klause.factor.bool/Xor> // com.eignex.klause.factor.bool/GaussianXor.constraints.<get-constraints>|<get-constraints>(){}[0]
     final val variables // com.eignex.klause.factor.bool/GaussianXor.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.bool/GaussianXor.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.bool/GaussianXor.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.bool/GaussianXor.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.bool/GaussianXor.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/GaussianXor.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.bool/GaussianXor.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/GaussianXor.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/GaussianXor.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.lp/LinearRow, com.eignex.klause.solver/Factor { // com.eignex.klause.factor.bool/PseudoBoolean|null[0]
@@ -3883,7 +3883,7 @@ final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.lp/L
     final val size // com.eignex.klause.factor.bool/PseudoBoolean.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.bool/PseudoBoolean.size.<get-size>|<get-size>(){}[0]
     final val variables // com.eignex.klause.factor.bool/PseudoBoolean.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.bool/PseudoBoolean.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.bool/PseudoBoolean.variables.<get-variables>|<get-variables>(){}[0]
     final val weights // com.eignex.klause.factor.bool/PseudoBoolean.weights|{}weights[0]
         final fun <get-weights>(): kotlin/LongArray // com.eignex.klause.factor.bool/PseudoBoolean.weights.<get-weights>|<get-weights>(){}[0]
 
@@ -3892,9 +3892,9 @@ final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.lp/L
     final fun coeff(kotlin/Int): kotlin/Long // com.eignex.klause.factor.bool/PseudoBoolean.coeff|coeff(kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.bool/PseudoBoolean.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.factor.bool/PseudoBoolean.ref|ref(kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/PseudoBoolean.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/PseudoBoolean.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.bool/PseudoBoolean.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/PseudoBoolean.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/PseudoBoolean.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/PseudoBoolean.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.bool/PseudoBoolean.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 }
 
@@ -3906,13 +3906,13 @@ final class com.eignex.klause.factor.bool/Xor : com.eignex.klause.solver/Factor 
     final val targetParity // com.eignex.klause.factor.bool/Xor.targetParity|{}targetParity[0]
         final fun <get-targetParity>(): kotlin/Int // com.eignex.klause.factor.bool/Xor.targetParity.<get-targetParity>|<get-targetParity>(){}[0]
     final val variables // com.eignex.klause.factor.bool/Xor.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.bool/Xor.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.bool/Xor.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.bool/Xor.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.bool/Xor.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Xor.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Xor.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.bool/Xor.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Xor.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Xor.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/Xor.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.circuit/Circuit : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.circuit/Circuit|null[0]
@@ -3925,13 +3925,13 @@ final class com.eignex.klause.factor.circuit/Circuit : com.eignex.klause.solver/
     final val succ // com.eignex.klause.factor.circuit/Circuit.succ|{}succ[0]
         final fun <get-succ>(): kotlin/IntArray // com.eignex.klause.factor.circuit/Circuit.succ.<get-succ>|<get-succ>(){}[0]
     final val variables // com.eignex.klause.factor.circuit/Circuit.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.circuit/Circuit.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.circuit/Circuit.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.circuit/Circuit.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.circuit/Circuit.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.circuit/Circuit.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.circuit/Circuit.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.circuit/Circuit.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.circuit/Circuit.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.circuit/Circuit.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.circuit/Circuit.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/AllDifferent : com.eignex.klause.factor/OptionalFactor, com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/AllDifferent|null[0]
@@ -3948,17 +3948,17 @@ final class com.eignex.klause.factor.global/AllDifferent : com.eignex.klause.fac
     final val presents // com.eignex.klause.factor.global/AllDifferent.presents|{}presents[0]
         final fun <get-presents>(): kotlin/IntArray // com.eignex.klause.factor.global/AllDifferent.presents.<get-presents>|<get-presents>(){}[0]
     final val variables // com.eignex.klause.factor.global/AllDifferent.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/AllDifferent.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/AllDifferent.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.global/AllDifferent.vars|{}vars[0]
         final fun <get-vars>(): kotlin/IntArray // com.eignex.klause.factor.global/AllDifferent.vars.<get-vars>|<get-vars>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/AllDifferent.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/AllDifferent.asPropagator|asPropagator(){}[0]
     final fun isValueAnonymous(): kotlin/Boolean // com.eignex.klause.factor.global/AllDifferent.isValueAnonymous|isValueAnonymous(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/AllDifferent.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/AllDifferent.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/AllDifferent.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/AllDifferent.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.global/AllDifferent.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/AllDifferent.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/AllDifferent.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.global/AllDifferent.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 }
 
@@ -3980,7 +3980,7 @@ final class com.eignex.klause.factor.global/GlobalCardinality : com.eignex.klaus
     final val presents // com.eignex.klause.factor.global/GlobalCardinality.presents|{}presents[0]
         final fun <get-presents>(): kotlin/IntArray // com.eignex.klause.factor.global/GlobalCardinality.presents.<get-presents>|<get-presents>(){}[0]
     final val variables // com.eignex.klause.factor.global/GlobalCardinality.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/GlobalCardinality.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/GlobalCardinality.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/GlobalCardinality.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/GlobalCardinality.xs.<get-xs>|<get-xs>(){}[0]
 
@@ -3988,9 +3988,9 @@ final class com.eignex.klause.factor.global/GlobalCardinality : com.eignex.klaus
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/GlobalCardinality.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/GlobalCardinality.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/GlobalCardinality.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/GlobalCardinality.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/GlobalCardinality.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.global/GlobalCardinality.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/GlobalCardinality.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/GlobalCardinality.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/Increasing : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/Increasing|null[0]
@@ -4001,16 +4001,16 @@ final class com.eignex.klause.factor.global/Increasing : com.eignex.klause.solve
     final val strict // com.eignex.klause.factor.global/Increasing.strict|{}strict[0]
         final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.global/Increasing.strict.<get-strict>|<get-strict>(){}[0]
     final val variables // com.eignex.klause.factor.global/Increasing.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/Increasing.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/Increasing.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/Increasing.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/Increasing.xs.<get-xs>|<get-xs>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/Increasing.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/Increasing.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/Increasing.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/Increasing.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Increasing.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/Increasing.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/Increasing.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Increasing.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/Increasing.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/Inverse : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/Inverse|null[0]
@@ -4025,13 +4025,13 @@ final class com.eignex.klause.factor.global/Inverse : com.eignex.klause.solver/F
     final val gOffset // com.eignex.klause.factor.global/Inverse.gOffset|{}gOffset[0]
         final fun <get-gOffset>(): kotlin/Int // com.eignex.klause.factor.global/Inverse.gOffset.<get-gOffset>|<get-gOffset>(){}[0]
     final val variables // com.eignex.klause.factor.global/Inverse.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/Inverse.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/Inverse.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/Inverse.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/Inverse.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/Inverse.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Inverse.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/Inverse.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/Inverse.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Inverse.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/Inverse.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/LexLess : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/LexLess|null[0]
@@ -4040,7 +4040,7 @@ final class com.eignex.klause.factor.global/LexLess : com.eignex.klause.solver/F
     final val strict // com.eignex.klause.factor.global/LexLess.strict|{}strict[0]
         final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.global/LexLess.strict.<get-strict>|<get-strict>(){}[0]
     final val variables // com.eignex.klause.factor.global/LexLess.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/LexLess.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/LexLess.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/LexLess.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/LexLess.xs.<get-xs>|<get-xs>(){}[0]
     final val ys // com.eignex.klause.factor.global/LexLess.ys|{}ys[0]
@@ -4048,9 +4048,9 @@ final class com.eignex.klause.factor.global/LexLess : com.eignex.klause.solver/F
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/LexLess.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/LexLess.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/LexLess.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/LexLess.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/LexLess.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/LexLess.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/LexLess.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/LexLess.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/NValue : com.eignex.klause.factor/OptionalFactor, com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/NValue|null[0]
@@ -4065,7 +4065,7 @@ final class com.eignex.klause.factor.global/NValue : com.eignex.klause.factor/Op
     final val presents // com.eignex.klause.factor.global/NValue.presents|{}presents[0]
         final fun <get-presents>(): kotlin/IntArray // com.eignex.klause.factor.global/NValue.presents.<get-presents>|<get-presents>(){}[0]
     final val variables // com.eignex.klause.factor.global/NValue.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/NValue.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/NValue.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/NValue.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/NValue.xs.<get-xs>|<get-xs>(){}[0]
 
@@ -4073,8 +4073,8 @@ final class com.eignex.klause.factor.global/NValue : com.eignex.klause.factor/Op
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/NValue.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/NValue.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/NValue.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/NValue.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/NValue.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/NValue.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/NValue.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.global/NValue.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 
     final enum class Mode : kotlin/Enum<com.eignex.klause.factor.global/NValue.Mode> { // com.eignex.klause.factor.global/NValue.Mode|null[0]
@@ -4094,7 +4094,7 @@ final class com.eignex.klause.factor.global/Sort : com.eignex.klause.solver/Fact
     constructor <init>(kotlin/IntArray, kotlin/IntArray) // com.eignex.klause.factor.global/Sort.<init>|<init>(kotlin.IntArray;kotlin.IntArray){}[0]
 
     final val variables // com.eignex.klause.factor.global/Sort.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/Sort.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/Sort.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/Sort.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/Sort.xs.<get-xs>|<get-xs>(){}[0]
     final val ys // com.eignex.klause.factor.global/Sort.ys|{}ys[0]
@@ -4102,9 +4102,9 @@ final class com.eignex.klause.factor.global/Sort : com.eignex.klause.solver/Fact
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/Sort.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/Sort.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/Sort.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Sort.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/Sort.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/Sort.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/Sort.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/Sort.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/SymmetricAllDifferent : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/SymmetricAllDifferent|null[0]
@@ -4113,15 +4113,15 @@ final class com.eignex.klause.factor.global/SymmetricAllDifferent : com.eignex.k
     final val indexOffset // com.eignex.klause.factor.global/SymmetricAllDifferent.indexOffset|{}indexOffset[0]
         final fun <get-indexOffset>(): kotlin/Int // com.eignex.klause.factor.global/SymmetricAllDifferent.indexOffset.<get-indexOffset>|<get-indexOffset>(){}[0]
     final val variables // com.eignex.klause.factor.global/SymmetricAllDifferent.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/SymmetricAllDifferent.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/SymmetricAllDifferent.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/SymmetricAllDifferent.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/SymmetricAllDifferent.xs.<get-xs>|<get-xs>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/SymmetricAllDifferent.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/SymmetricAllDifferent.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/SymmetricAllDifferent.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/SymmetricAllDifferent.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/SymmetricAllDifferent.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/SymmetricAllDifferent.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/SymmetricAllDifferent.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/SymmetricAllDifferent.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.global/ValuePrecede : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/ValuePrecede|null[0]
@@ -4132,16 +4132,16 @@ final class com.eignex.klause.factor.global/ValuePrecede : com.eignex.klause.sol
     final val t // com.eignex.klause.factor.global/ValuePrecede.t|{}t[0]
         final fun <get-t>(): kotlin/Long // com.eignex.klause.factor.global/ValuePrecede.t.<get-t>|<get-t>(){}[0]
     final val variables // com.eignex.klause.factor.global/ValuePrecede.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.global/ValuePrecede.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.global/ValuePrecede.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.global/ValuePrecede.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/ValuePrecede.xs.<get-xs>|<get-xs>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/ValuePrecede.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/ValuePrecede.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/ValuePrecede.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.global/ValuePrecede.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/ValuePrecede.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/ValuePrecede.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/ValuePrecede.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.global/ValuePrecede.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/ValuePrecede.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.scheduling.internals/CumulativeEff { // com.eignex.klause.factor.scheduling.internals/CumulativeEff|null[0]
@@ -4225,16 +4225,16 @@ final class com.eignex.klause.factor.scheduling/Cumulative : com.eignex.klause.f
     final val unary // com.eignex.klause.factor.scheduling/Cumulative.unary|{}unary[0]
         final fun <get-unary>(): kotlin/Boolean // com.eignex.klause.factor.scheduling/Cumulative.unary.<get-unary>|<get-unary>(){}[0]
     final val variables // com.eignex.klause.factor.scheduling/Cumulative.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.scheduling/Cumulative.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.scheduling/Cumulative.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.scheduling/Cumulative.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.scheduling/Cumulative.asPropagator|asPropagator(){}[0]
     final fun durPosOf(kotlin/Int): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.durPosOf|durPosOf(kotlin.Int){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.scheduling/Cumulative.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.scheduling/Cumulative.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun resPosOf(kotlin/Int): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.resPosOf|resPosOf(kotlin.Int){}[0]
     final fun startPosOf(kotlin/Int): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.startPosOf|startPosOf(kotlin.Int){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.scheduling/Cumulative.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.scheduling/Cumulative.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.scheduling/Cumulative.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 
     final object Companion { // com.eignex.klause.factor.scheduling/Cumulative.Companion|null[0]
@@ -4256,7 +4256,7 @@ final class com.eignex.klause.factor.scheduling/Diffn : com.eignex.klause.solver
     final val varSize // com.eignex.klause.factor.scheduling/Diffn.varSize|{}varSize[0]
         final fun <get-varSize>(): kotlin/Boolean // com.eignex.klause.factor.scheduling/Diffn.varSize.<get-varSize>|<get-varSize>(){}[0]
     final val variables // com.eignex.klause.factor.scheduling/Diffn.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.scheduling/Diffn.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.scheduling/Diffn.variables.<get-variables>|<get-variables>(){}[0]
     final val widthVars // com.eignex.klause.factor.scheduling/Diffn.widthVars|{}widthVars[0]
         final fun <get-widthVars>(): kotlin/IntArray? // com.eignex.klause.factor.scheduling/Diffn.widthVars.<get-widthVars>|<get-widthVars>(){}[0]
     final val widths // com.eignex.klause.factor.scheduling/Diffn.widths|{}widths[0]
@@ -4268,9 +4268,9 @@ final class com.eignex.klause.factor.scheduling/Diffn : com.eignex.klause.solver
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.scheduling/Diffn.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.scheduling/Diffn.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.scheduling/Diffn.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.scheduling/Diffn.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.scheduling/Diffn.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.scheduling/Diffn.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.scheduling/Diffn.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.scheduling/Diffn.structuralKey|structuralKey(){}[0]
     final fun varToRectOf(kotlin/Int): kotlin/Int // com.eignex.klause.factor.scheduling/Diffn.varToRectOf|varToRectOf(kotlin.Int){}[0]
 }
 
@@ -4280,12 +4280,12 @@ final class com.eignex.klause.factor.symmetry/SymmetryHandling : com.eignex.klau
     final val generators // com.eignex.klause.factor.symmetry/SymmetryHandling.generators|{}generators[0]
         final fun <get-generators>(): kotlin.collections/List<kotlin/Pair<kotlin/IntArray, kotlin/IntArray>> // com.eignex.klause.factor.symmetry/SymmetryHandling.generators.<get-generators>|<get-generators>(){}[0]
     final val variables // com.eignex.klause.factor.symmetry/SymmetryHandling.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.symmetry/SymmetryHandling.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.symmetry/SymmetryHandling.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.symmetry/SymmetryHandling.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.symmetry/SymmetryHandling.asPropagator|asPropagator(){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.symmetry/SymmetryHandling.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.symmetry/SymmetryHandling.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.symmetry/SymmetryHandling.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.symmetry/SymmetryHandling.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.table/Element : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.table/Element|null[0]
@@ -4306,14 +4306,14 @@ final class com.eignex.klause.factor.table/Element : com.eignex.klause.solver/Fa
     final val structuralKeyWeight // com.eignex.klause.factor.table/Element.structuralKeyWeight|{}structuralKeyWeight[0]
         final fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.factor.table/Element.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
     final val variables // com.eignex.klause.factor.table/Element.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.table/Element.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Element.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.table/Element.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Element.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Element.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Element.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Element.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.table/Element.structuralKey|structuralKey(){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Element.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Element.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Element.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
     final fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.table/Element.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
@@ -4342,16 +4342,16 @@ final class com.eignex.klause.factor.table/Mdd : com.eignex.klause.solver/Factor
     final val transitions // com.eignex.klause.factor.table/Mdd.transitions|{}transitions[0]
         final fun <get-transitions>(): kotlin/LongArray // com.eignex.klause.factor.table/Mdd.transitions.<get-transitions>|<get-transitions>(){}[0]
     final val variables // com.eignex.klause.factor.table/Mdd.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.table/Mdd.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Mdd.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.table/Mdd.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Mdd.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Mdd.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Mdd.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Mdd.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Mdd.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Mdd.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Mdd.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Mdd.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.table/Mdd.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Mdd.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Mdd.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
 }
 
@@ -4373,16 +4373,16 @@ final class com.eignex.klause.factor.table/Regular : com.eignex.klause.solver/Fa
     final val transitions // com.eignex.klause.factor.table/Regular.transitions|{}transitions[0]
         final fun <get-transitions>(): kotlin/LongArray // com.eignex.klause.factor.table/Regular.transitions.<get-transitions>|<get-transitions>(){}[0]
     final val variables // com.eignex.klause.factor.table/Regular.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.table/Regular.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Regular.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.table/Regular.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Regular.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Regular.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Regular.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Regular.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Regular.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Regular.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Regular.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.table/Regular.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.table/Regular.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Regular.structuralKey|structuralKey(){}[0]
 }
 
 final class com.eignex.klause.factor.table/Table : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.table/Table|null[0]
@@ -4402,7 +4402,7 @@ final class com.eignex.klause.factor.table/Table : com.eignex.klause.solver/Fact
     final val tuples // com.eignex.klause.factor.table/Table.tuples|{}tuples[0]
         final fun <get-tuples>(): kotlin/LongArray // com.eignex.klause.factor.table/Table.tuples.<get-tuples>|<get-tuples>(){}[0]
     final val variables // com.eignex.klause.factor.table/Table.variables|{}variables[0]
-        final fun <get-variables>(): com.eignex.klause.solver/VarList // com.eignex.klause.factor.table/Table.variables.<get-variables>|<get-variables>(){}[0]
+        final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Table.variables.<get-variables>|<get-variables>(){}[0]
     final val xs // com.eignex.klause.factor.table/Table.xs|{}xs[0]
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.table/Table.xs.<get-xs>|<get-xs>(){}[0]
 
@@ -4411,10 +4411,10 @@ final class com.eignex.klause.factor.table/Table : com.eignex.klause.solver/Fact
     final fun canSubstituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.table/Table.canSubstituteAffine|canSubstituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Table.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
     final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Table.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-    final fun remap(com.eignex.klause.solver/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Table.remap|remap(com.eignex.klause.solver.VarRemap){}[0]
-    final fun remapStructuralHash(com.eignex.klause.solver/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Table.remapStructuralHash|remapStructuralHash(com.eignex.klause.solver.VarRemap){}[0]
+    final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Table.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
+    final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Table.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Table.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    final fun structuralKey(): com.eignex.klause.solver/StructuralKey // com.eignex.klause.factor.table/Table.structuralKey|structuralKey(){}[0]
+    final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Table.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Table.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
     final fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.table/Table.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
@@ -4810,6 +4810,74 @@ final class com.eignex.klause.formats/FloatBucketing { // com.eignex.klause.form
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats/FloatBucketing.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats/FloatBucketing.toString|toString(){}[0]
     final fun valueOf(kotlin/Int): kotlin/Double // com.eignex.klause.formats/FloatBucketing.valueOf|valueOf(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.ir/BoolVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/BoolVars|null[0]
+    constructor <init>(kotlin/IntArray) // com.eignex.klause.ir/BoolVars.<init>|<init>(kotlin.IntArray){}[0]
+
+    final val boolVars // com.eignex.klause.ir/BoolVars.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/BoolVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+}
+
+final class com.eignex.klause.ir/IntVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/IntVars|null[0]
+    constructor <init>(kotlin/IntArray) // com.eignex.klause.ir/IntVars.<init>|<init>(kotlin.IntArray){}[0]
+
+    final val ints // com.eignex.klause.ir/IntVars.ints|{}ints[0]
+        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.ir/IntVars.ints.<get-ints>|<get-ints>(){}[0]
+}
+
+final class com.eignex.klause.ir/MixedVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/MixedVars|null[0]
+    constructor <init>(kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ...) // com.eignex.klause.ir/MixedVars.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.IntArray;kotlin.IntArray){}[0]
+
+    final val boolVars // com.eignex.klause.ir/MixedVars.boolVars|{}boolVars[0]
+        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
+    final val ints // com.eignex.klause.ir/MixedVars.ints|{}ints[0]
+        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.ints.<get-ints>|<get-ints>(){}[0]
+    final val reals // com.eignex.klause.ir/MixedVars.reals|{}reals[0]
+        final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.reals.<get-reals>|<get-reals>(){}[0]
+    final val spanInts // com.eignex.klause.ir/MixedVars.spanInts|{}spanInts[0]
+        final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.ir/MixedVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
+}
+
+final class com.eignex.klause.ir/RealVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/RealVars|null[0]
+    constructor <init>(kotlin/IntArray) // com.eignex.klause.ir/RealVars.<init>|<init>(kotlin.IntArray){}[0]
+
+    final val reals // com.eignex.klause.ir/RealVars.reals|{}reals[0]
+        final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.ir/RealVars.reals.<get-reals>|<get-reals>(){}[0]
+}
+
+final class com.eignex.klause.ir/SpanIntVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/SpanIntVars|null[0]
+    constructor <init>(kotlin/IntArray) // com.eignex.klause.ir/SpanIntVars.<init>|<init>(kotlin.IntArray){}[0]
+
+    final val ints // com.eignex.klause.ir/SpanIntVars.ints|{}ints[0]
+        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.ir/SpanIntVars.ints.<get-ints>|<get-ints>(){}[0]
+    final val spanInts // com.eignex.klause.ir/SpanIntVars.spanInts|{}spanInts[0]
+        final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.ir/SpanIntVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
+}
+
+final class com.eignex.klause.ir/StructuralKey : kotlin/Comparable<com.eignex.klause.ir/StructuralKey> { // com.eignex.klause.ir/StructuralKey|null[0]
+    final fun compareTo(com.eignex.klause.ir/StructuralKey): kotlin/Int // com.eignex.klause.ir/StructuralKey.compareTo|compareTo(com.eignex.klause.ir.StructuralKey){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/StructuralKey.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/StructuralKey.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/StructuralKey.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.ir/VarRemap { // com.eignex.klause.ir/VarRemap|null[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray, kotlin/IntArray = ...) // com.eignex.klause.ir/VarRemap.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.IntArray){}[0]
+
+    final val boolCount // com.eignex.klause.ir/VarRemap.boolCount|{}boolCount[0]
+        final fun <get-boolCount>(): kotlin/Int // com.eignex.klause.ir/VarRemap.boolCount.<get-boolCount>|<get-boolCount>(){}[0]
+    final val intCount // com.eignex.klause.ir/VarRemap.intCount|{}intCount[0]
+        final fun <get-intCount>(): kotlin/Int // com.eignex.klause.ir/VarRemap.intCount.<get-intCount>|<get-intCount>(){}[0]
+
+    final fun bool(kotlin/Int): kotlin/Int // com.eignex.klause.ir/VarRemap.bool|bool(kotlin.Int){}[0]
+    final fun bools(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.ir/VarRemap.bools|bools(kotlin.IntArray){}[0]
+    final fun int(kotlin/Int): kotlin/Int // com.eignex.klause.ir/VarRemap.int|int(kotlin.Int){}[0]
+    final fun ints(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.ir/VarRemap.ints|ints(kotlin.IntArray){}[0]
+    final fun lit(kotlin/Int): kotlin/Int // com.eignex.klause.ir/VarRemap.lit|lit(kotlin.Int){}[0]
+    final fun lits(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.ir/VarRemap.lits|lits(kotlin.IntArray){}[0]
+    final fun real(kotlin/Int): kotlin/Int // com.eignex.klause.ir/VarRemap.real|real(kotlin.Int){}[0]
+    final fun reals(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.ir/VarRemap.reals|reals(kotlin.IntArray){}[0]
 }
 
 final class com.eignex.klause.localsearch.movesource/ArgminJump : com.eignex.klause.localsearch.movesource/MoveSource { // com.eignex.klause.localsearch.movesource/ArgminJump|null[0]
@@ -9466,13 +9534,6 @@ final class com.eignex.klause.solver/Assumptions { // com.eignex.klause.solver/A
 
 final class com.eignex.klause.solver/BakedProblem : com.eignex.klause.solver/Problem // com.eignex.klause.solver/BakedProblem|null[0]
 
-final class com.eignex.klause.solver/BoolVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/BoolVars|null[0]
-    constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/BoolVars.<init>|<init>(kotlin.IntArray){}[0]
-
-    final val boolVars // com.eignex.klause.solver/BoolVars.boolVars|{}boolVars[0]
-        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/BoolVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
-}
-
 final class com.eignex.klause.solver/ComponentPlan { // com.eignex.klause.solver/ComponentPlan|null[0]
     final val cpIntVars // com.eignex.klause.solver/ComponentPlan.cpIntVars|{}cpIntVars[0]
         final fun <get-cpIntVars>(): kotlin/IntArray // com.eignex.klause.solver/ComponentPlan.cpIntVars.<get-cpIntVars>|<get-cpIntVars>(){}[0]
@@ -9582,13 +9643,6 @@ final class com.eignex.klause.solver/IntConsts : com.eignex.klause.solver/LongCo
     final fun toLongArray(): kotlin/LongArray // com.eignex.klause.solver/IntConsts.toLongArray|toLongArray(){}[0]
 }
 
-final class com.eignex.klause.solver/IntVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/IntVars|null[0]
-    constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/IntVars.<init>|<init>(kotlin.IntArray){}[0]
-
-    final val ints // com.eignex.klause.solver/IntVars.ints|{}ints[0]
-        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/IntVars.ints.<get-ints>|<get-ints>(){}[0]
-}
-
 final class com.eignex.klause.solver/LongConsts : com.eignex.klause.solver/LongConstList { // com.eignex.klause.solver/LongConsts|null[0]
     constructor <init>(kotlin/LongArray) // com.eignex.klause.solver/LongConsts.<init>|<init>(kotlin.LongArray){}[0]
 
@@ -9610,19 +9664,6 @@ final class com.eignex.klause.solver/MixedIntColumns : com.eignex.klause.solver/
 
     final fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.solver/IntDomain>? // com.eignex.klause.solver/MixedIntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
     final fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/MixedIntColumns.column|column(kotlin.Int){}[0]
-}
-
-final class com.eignex.klause.solver/MixedVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/MixedVars|null[0]
-    constructor <init>(kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ...) // com.eignex.klause.solver/MixedVars.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.IntArray;kotlin.IntArray){}[0]
-
-    final val boolVars // com.eignex.klause.solver/MixedVars.boolVars|{}boolVars[0]
-        final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
-    final val ints // com.eignex.klause.solver/MixedVars.ints|{}ints[0]
-        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.ints.<get-ints>|<get-ints>(){}[0]
-    final val reals // com.eignex.klause.solver/MixedVars.reals|{}reals[0]
-        final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.reals.<get-reals>|<get-reals>(){}[0]
-    final val spanInts // com.eignex.klause.solver/MixedVars.spanInts|{}spanInts[0]
-        final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.solver/MixedVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
 }
 
 final class com.eignex.klause.solver/OccurrenceIndex { // com.eignex.klause.solver/OccurrenceIndex|null[0]
@@ -9688,13 +9729,6 @@ final class com.eignex.klause.solver/RealConsts : com.eignex.klause.solver/Const
     final fun toDoubleArray(): kotlin/DoubleArray // com.eignex.klause.solver/RealConsts.toDoubleArray|toDoubleArray(){}[0]
 }
 
-final class com.eignex.klause.solver/RealVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/RealVars|null[0]
-    constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/RealVars.<init>|<init>(kotlin.IntArray){}[0]
-
-    final val reals // com.eignex.klause.solver/RealVars.reals|{}reals[0]
-        final fun <get-reals>(): kotlin/IntArray // com.eignex.klause.solver/RealVars.reals.<get-reals>|<get-reals>(){}[0]
-}
-
 final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample|null[0]
     constructor <init>(kotlin/BooleanArray, kotlin/LongArray, kotlin/DoubleArray = ...) // com.eignex.klause.solver/Sample.<init>|<init>(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray){}[0]
 
@@ -9715,22 +9749,6 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
     final fun toString(): kotlin/String // com.eignex.klause.solver/Sample.toString|toString(){}[0]
 }
 
-final class com.eignex.klause.solver/SpanIntVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/SpanIntVars|null[0]
-    constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/SpanIntVars.<init>|<init>(kotlin.IntArray){}[0]
-
-    final val ints // com.eignex.klause.solver/SpanIntVars.ints|{}ints[0]
-        final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.solver/SpanIntVars.ints.<get-ints>|<get-ints>(){}[0]
-    final val spanInts // com.eignex.klause.solver/SpanIntVars.spanInts|{}spanInts[0]
-        final fun <get-spanInts>(): kotlin/IntArray // com.eignex.klause.solver/SpanIntVars.spanInts.<get-spanInts>|<get-spanInts>(){}[0]
-}
-
-final class com.eignex.klause.solver/StructuralKey : kotlin/Comparable<com.eignex.klause.solver/StructuralKey> { // com.eignex.klause.solver/StructuralKey|null[0]
-    final fun compareTo(com.eignex.klause.solver/StructuralKey): kotlin/Int // com.eignex.klause.solver/StructuralKey.compareTo|compareTo(com.eignex.klause.solver.StructuralKey){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/StructuralKey.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.solver/StructuralKey.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.solver/StructuralKey.toString|toString(){}[0]
-}
-
 final class com.eignex.klause.solver/UnitConsts : com.eignex.klause.solver/LongConstList { // com.eignex.klause.solver/UnitConsts|null[0]
     constructor <init>(kotlin/Int) // com.eignex.klause.solver/UnitConsts.<init>|<init>(kotlin.Int){}[0]
 
@@ -9742,24 +9760,6 @@ final class com.eignex.klause.solver/UnitConsts : com.eignex.klause.solver/LongC
     final fun at(kotlin/Int): kotlin/Long // com.eignex.klause.solver/UnitConsts.at|at(kotlin.Int){}[0]
     final fun negated(): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/UnitConsts.negated|negated(){}[0]
     final fun toLongArray(): kotlin/LongArray // com.eignex.klause.solver/UnitConsts.toLongArray|toLongArray(){}[0]
-}
-
-final class com.eignex.klause.solver/VarRemap { // com.eignex.klause.solver/VarRemap|null[0]
-    constructor <init>(kotlin/IntArray, kotlin/IntArray, kotlin/IntArray = ...) // com.eignex.klause.solver/VarRemap.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.IntArray){}[0]
-
-    final val boolCount // com.eignex.klause.solver/VarRemap.boolCount|{}boolCount[0]
-        final fun <get-boolCount>(): kotlin/Int // com.eignex.klause.solver/VarRemap.boolCount.<get-boolCount>|<get-boolCount>(){}[0]
-    final val intCount // com.eignex.klause.solver/VarRemap.intCount|{}intCount[0]
-        final fun <get-intCount>(): kotlin/Int // com.eignex.klause.solver/VarRemap.intCount.<get-intCount>|<get-intCount>(){}[0]
-
-    final fun bool(kotlin/Int): kotlin/Int // com.eignex.klause.solver/VarRemap.bool|bool(kotlin.Int){}[0]
-    final fun bools(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.solver/VarRemap.bools|bools(kotlin.IntArray){}[0]
-    final fun int(kotlin/Int): kotlin/Int // com.eignex.klause.solver/VarRemap.int|int(kotlin.Int){}[0]
-    final fun ints(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.solver/VarRemap.ints|ints(kotlin.IntArray){}[0]
-    final fun lit(kotlin/Int): kotlin/Int // com.eignex.klause.solver/VarRemap.lit|lit(kotlin.Int){}[0]
-    final fun lits(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.solver/VarRemap.lits|lits(kotlin.IntArray){}[0]
-    final fun real(kotlin/Int): kotlin/Int // com.eignex.klause.solver/VarRemap.real|real(kotlin.Int){}[0]
-    final fun reals(kotlin/IntArray): kotlin/IntArray // com.eignex.klause.solver/VarRemap.reals|reals(kotlin.IntArray){}[0]
 }
 
 final class com.eignex.klause.solver/VariablePartition { // com.eignex.klause.solver/VariablePartition|null[0]
@@ -10297,6 +10297,20 @@ final object com.eignex.klause.formats.xcsp3/Xcsp3 { // com.eignex.klause.format
     final fun parse(kotlin/String): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3.parse|parse(kotlin.String){}[0]
 }
 
+final object com.eignex.klause.ir/Lit { // com.eignex.klause.ir/Lit|null[0]
+    final fun evaluate(kotlin/Int, kotlin/Boolean): kotlin/Boolean // com.eignex.klause.ir/Lit.evaluate|evaluate(kotlin.Int;kotlin.Boolean){}[0]
+    final fun isPositive(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/Lit.isPositive|isPositive(kotlin.Int){}[0]
+    final fun make(kotlin/Int, kotlin/Boolean): kotlin/Int // com.eignex.klause.ir/Lit.make|make(kotlin.Int;kotlin.Boolean){}[0]
+    final fun negate(kotlin/Int): kotlin/Int // com.eignex.klause.ir/Lit.negate|negate(kotlin.Int){}[0]
+    final fun variable(kotlin/Int): kotlin/Int // com.eignex.klause.ir/Lit.variable|variable(kotlin.Int){}[0]
+}
+
+final object com.eignex.klause.ir/NoVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/NoVars|null[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/NoVars.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/NoVars.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/NoVars.toString|toString(){}[0]
+}
+
 final object com.eignex.klause.localsearch.movesource/MoveSourceCatalog { // com.eignex.klause.localsearch.movesource/MoveSourceCatalog|null[0]
     final val labels // com.eignex.klause.localsearch.movesource/MoveSourceCatalog.labels|{}labels[0]
         final fun <get-labels>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.localsearch.movesource/MoveSourceCatalog.labels.<get-labels>|<get-labels>(){}[0]
@@ -10426,20 +10440,6 @@ final object com.eignex.klause.presolve/RootBaker { // com.eignex.klause.presolv
 }
 
 final object com.eignex.klause.propagation/NoPropagator : com.eignex.klause.propagation/Propagator // com.eignex.klause.propagation/NoPropagator|null[0]
-
-final object com.eignex.klause.solver/Lit { // com.eignex.klause.solver/Lit|null[0]
-    final fun evaluate(kotlin/Int, kotlin/Boolean): kotlin/Boolean // com.eignex.klause.solver/Lit.evaluate|evaluate(kotlin.Int;kotlin.Boolean){}[0]
-    final fun isPositive(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Lit.isPositive|isPositive(kotlin.Int){}[0]
-    final fun make(kotlin/Int, kotlin/Boolean): kotlin/Int // com.eignex.klause.solver/Lit.make|make(kotlin.Int;kotlin.Boolean){}[0]
-    final fun negate(kotlin/Int): kotlin/Int // com.eignex.klause.solver/Lit.negate|negate(kotlin.Int){}[0]
-    final fun variable(kotlin/Int): kotlin/Int // com.eignex.klause.solver/Lit.variable|variable(kotlin.Int){}[0]
-}
-
-final object com.eignex.klause.solver/NoVars : com.eignex.klause.solver/VarList { // com.eignex.klause.solver/NoVars|null[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/NoVars.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.solver/NoVars.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.solver/NoVars.toString|toString(){}[0]
-}
 
 final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]
     final fun orbit(kotlin.collections/List<kotlin/IntArray>, kotlin/Int): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.util/PermutationGroup.orbit|orbit(kotlin.collections.List<kotlin.IntArray>;kotlin.Int){}[0]

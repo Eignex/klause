@@ -1,10 +1,10 @@
 package com.eignex.klause.ir
 
 /**
- * A single declaration of a [Factor]'s structural key, consumed twice: [MaterializingKeySink] builds the
- * canonical [StructuralKey] ([Factor.structuralKey]); [HashingKeySink] folds the hash of the key the same
+ * A single declaration of a factor's structural key, consumed twice: [MaterializingKeySink] builds the
+ * canonical [StructuralKey]; [HashingKeySink] folds the hash of the key the same
  * factor would have *after* a variable remap, without allocating either the remapped factor or the key
- * ([Factor.remapStructuralHash]). The two sinks emit the identical word sequence for the same remap, so a
+ * (`remapStructuralHash`). The two sinks emit the identical word sequence for the same remap, so a
  * factor gets both behaviours from one `buildKey` description via [materializeKey] and [hashRemappedKey].
  *
  * Methods split arguments into constants (carried verbatim) and variable references (remapped by
@@ -76,19 +76,19 @@ internal interface KeySink {
 
 /**
  * The canonical [StructuralKey] of [kind] whose payload is emitted by [build] — the materialising half
- * of a factor's single key declaration. A factor's [Factor.structuralKey] is `materializeKey(KIND, ::buildKey)`.
+ * of a factor's single key declaration. A factor's `structuralKey` is `materializeKey(KIND, ::buildKey)`.
  */
 internal fun materializeKey(kind: FactorKind, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind).also(build).toKey()
 
-/** [materializeKey] with a payload-size estimate ([Factor.structuralKeyWeight]). */
+/** [materializeKey] with a factor-provided payload-size estimate. */
 internal fun materializeKey(kind: FactorKind, expectedWords: Int, build: (KeySink) -> Unit): StructuralKey =
     MaterializingKeySink(kind, expectedWords).also(build).toKey()
 
 /**
  * The `hashCode` of the key `build` describes *after* renumbering variables through [mapping] — the
  * hashing half, allocation-free (no `remap()` copy, no key object). Equals
- * `remap(mapping).structuralKey().hashCode()`. A factor's [Factor.remapStructuralHash] is
+ * `remap(mapping).structuralKey().hashCode()`. A factor's `remapStructuralHash` is
  * `hashRemappedKey(KIND, mapping, ::buildKey)`, sharing the same `buildKey` as [materializeKey].
  */
 internal fun hashRemappedKey(kind: FactorKind, mapping: VarRemap, build: (KeySink) -> Unit): Int =
