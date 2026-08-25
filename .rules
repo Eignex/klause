@@ -44,6 +44,11 @@ Read `klause-bench/README.md` before benchmarking. In short:
 
 ## Solver boundaries
 
+- `ir` owns engine-neutral literals, variable descriptions, remapping, and structural keys. It does not
+  depend on engines, compilation, or input formats.
+- `lowering` owns generic Boolean and constraint encodings shared by schema compilation and input formats.
+  It does not depend on either caller. Input formats parse and lower source syntax; they are not compiler
+  dependencies.
 - `propagation` owns finite-domain state, explanations, and incremental propagators. Its difference
   system follows the trail and can pin literals back into the propagation fixpoint.
 - `arithmetic.difference` owns immutable difference-constraint representation, fragment extraction,
