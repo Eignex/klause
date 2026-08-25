@@ -151,8 +151,19 @@ class LinearConstantsTest {
     fun `a collapsing wide remap retains a constant row`() {
         val coefficient = BigInteger.fromLong(Long.MAX_VALUE) * 4
         val map = VarRemap(intArrayOf(0), intArrayOf(0, 0))
-        val linear = Linear(intArrayOf(0, 1), arrayOf(coefficient, -coefficient), LinearOp.EQ, BigInteger.ZERO)
-        val reified = ReifiedLinear(0, intArrayOf(0, 1), arrayOf(coefficient, -coefficient), LinearOp.EQ, BigInteger.ZERO)
+        val linear = Linear(
+            intArrayOf(0, 1),
+            arrayOf(coefficient, -coefficient),
+            LinearOp.EQ,
+            BigInteger.ZERO,
+        )
+        val reified = ReifiedLinear(
+            0,
+            intArrayOf(0, 1),
+            arrayOf(coefficient, -coefficient),
+            LinearOp.EQ,
+            BigInteger.ZERO,
+        )
 
         val remappedLinear = assertIs<Linear>(linear.remap(map))
         val remappedReified = assertIs<ReifiedLinear>(reified.remap(map))
