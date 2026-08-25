@@ -127,7 +127,7 @@ internal class OznLexer(private val source: String) {
         val kind = when (text) {
             "true", "false" -> OznTokenKind.BOOL
 
-            "output", "array", "set", "of", "var", "int", "bool", "float", "string",
+            "output", "array", "set", "of", "var", "par", "int", "bool", "float", "string",
             "if", "then", "elseif", "else", "endif", "in", "where", "let", "not", "xor",
             "div", "mod",
             "show", "show2d", "show3d", "show_int", "show_float", "fix",

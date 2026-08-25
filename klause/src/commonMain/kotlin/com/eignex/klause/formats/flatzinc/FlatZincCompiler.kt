@@ -364,7 +364,7 @@ internal class FlatZincCompiler(
     /** Allocate int var with an explicit sparse domain. */
     internal fun allocIntSet(name: String, t: FznType.IntSet): Int {
         val sorted = t.values.distinct().sorted()
-        require(sorted.isNotEmpty()) { "IntSet domain for `$name` is empty" }
+        if (sorted.isEmpty()) failHere("int variable `$name` has an empty domain")
         val id = allocInt(name, sorted.first(), sorted.last())
         var dom = intDomains[id]
         var prev = sorted.first()
@@ -399,11 +399,23 @@ internal class FlatZincCompiler(
 
     internal fun universeElements(elem: FznType, ownerName: String): IntArray = when (elem) {
         is FznType.IntRange -> {
-            require(elem.lo <= elem.hi) { "set `$ownerName`: empty universe ${elem.lo}..${elem.hi}" }
+            if (elem.lo > elem.hi) failHere("set `$ownerName` has an empty universe ${elem.lo}..${elem.hi}")
+            if (elem.lo !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() ||
+                elem.hi !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()
+            ) {
+                failHere("set `$ownerName` universe must fit in 32-bit integers")
+            }
+            val size = elem.hi - elem.lo + 1
+            if (size > Int.MAX_VALUE) failHere("set `$ownerName` universe is too large: $size elements")
             IntArray((elem.hi - elem.lo + 1).toInt()) { (elem.lo + it).toInt() }
         }
 
-        is FznType.IntSet -> elem.values.map { it.toInt() }.toIntArray().also { it.sort() }
+        is FznType.IntSet -> {
+            if (elem.values.any { it !in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong() }) {
+                failHere("set `$ownerName` universe must fit in 32-bit integers")
+            }
+            elem.values.distinct().sorted().map { it.toInt() }.toIntArray()
+        }
 
         else -> failHere("set `$ownerName`: universe must be an int range or int set, got ${elem::class.simpleName}")
     }

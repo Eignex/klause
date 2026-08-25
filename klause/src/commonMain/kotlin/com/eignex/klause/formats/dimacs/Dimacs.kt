@@ -44,6 +44,8 @@ object Dimacs {
     /** Parse a DIMACS CNF/WCNF [source] into a [Problem], consuming it line by line. */
     fun parse(source: CharSource): Problem {
         var numVars = -1
+        var declaredClauses = -1
+        var parsedClauses = 0
         val clauses = mutableListOf<Clause>()
         // A bare `0` with no accumulated literals is the empty clause (⊥) — an unsatisfiable instance —
         // unless it sits in the legacy trailing `%` block, where a lone `0` is an end-of-file sentinel.
@@ -64,10 +66,14 @@ object Dimacs {
             }
             if (line.startsWith("p ") || line.startsWith("p\t")) {
                 val parts = line.splitWhitespace()
-                dimacsRequire(parts.size >= 4 && parts[1] == "cnf") {
+                dimacsRequire(numVars < 0) { "DIMACS file has more than one `p cnf` header" }
+                dimacsRequire(parts.size == 4 && parts[1] == "cnf") {
                     "Expected `p cnf <nvars> <nclauses>` header, got: '$rawLine'"
                 }
                 numVars = dimacsInt(parts[2], "`p cnf` variable count")
+                declaredClauses = dimacsInt(parts[3], "`p cnf` clause count")
+                dimacsRequire(numVars >= 0) { "DIMACS `p cnf` variable count must be non-negative" }
+                dimacsRequire(declaredClauses >= 0) { "DIMACS `p cnf` clause count must be non-negative" }
                 continue
             }
             if (numVars < 0) dimacsError("DIMACS body before `p cnf` header: '$rawLine'")
@@ -80,8 +86,15 @@ object Dimacs {
                     // A `0` terminates the clause; with no literals it is the empty clause (⊥), except in
                     // the trailing `%` block where a lone `0` is a sentinel to ignore.
                     when {
-                        acc != null && !acc.isEmpty() -> clauses += Clause(acc.toIntArray())
-                        !sawTrailer -> triviallyUnsat = true
+                        acc != null && !acc.isEmpty() -> {
+                            clauses += Clause(acc.toIntArray())
+                            parsedClauses++
+                        }
+
+                        !sawTrailer -> {
+                            triviallyUnsat = true
+                            parsedClauses++
+                        }
                     }
                     current = null
                 } else {
@@ -96,6 +109,9 @@ object Dimacs {
         }
         dimacsRequire(current == null) { "DIMACS file ends mid-clause (no terminating 0)" }
         dimacsRequire(numVars >= 0) { "DIMACS file has no `p cnf` header" }
+        dimacsRequire(parsedClauses == declaredClauses) {
+            "DIMACS header declares $declaredClauses clauses, found $parsedClauses"
+        }
         // The empty clause is ⊥; a [Clause] needs a non-empty literal set, so force a contradiction on a
         // fresh marker variable (as the WCNF path does) to reject the instance.
         val totalVars = numVars + if (triviallyUnsat) 1 else 0
@@ -131,6 +147,8 @@ object Dimacs {
     /** Parse a `.wcnf` [source] into hard clauses plus weighted soft clauses, consuming it line by line. */
     fun parseWcnf(source: CharSource): WcnfProblem {
         var numVars = -1
+        var declaredClauses = -1
+        var parsedClauses = 0
         var top: Long? = null
         var hasOldHeader = false
         val hardClauses = mutableListOf<Clause>()
@@ -146,10 +164,14 @@ object Dimacs {
             if (line.startsWith("c") || line.startsWith("%")) continue
             if (line.startsWith("p ") || line.startsWith("p\t")) {
                 val parts = line.splitWhitespace()
-                dimacsRequire(parts.size >= 4 && parts[1] == "wcnf") {
+                dimacsRequire(!hasOldHeader) { "DIMACS file has more than one `p wcnf` header" }
+                dimacsRequire((parts.size == 4 || parts.size == 5) && parts[1] == "wcnf") {
                     "Expected `p wcnf <nvars> <nclauses> [<top>]` header, got: '$rawLine'"
                 }
                 numVars = dimacsInt(parts[2], "`p wcnf` variable count")
+                declaredClauses = dimacsInt(parts[3], "`p wcnf` clause count")
+                dimacsRequire(numVars >= 0) { "DIMACS `p wcnf` variable count must be non-negative" }
+                dimacsRequire(declaredClauses >= 0) { "DIMACS `p wcnf` clause count must be non-negative" }
                 if (parts.size >= 5) {
                     top = parts[4].toLongOrNull() ?: dimacsError(
                         "DIMACS `p wcnf` top is not a 64-bit integer: '${parts[4]}'",
@@ -199,6 +221,7 @@ object Dimacs {
             dimacsRequire(terminated) { "wcnf clause not terminated by 0: '$rawLine'" }
             dimacsRequire(i == tokens.size) { "wcnf clause has trailing tokens after 0: '$rawLine'" }
             val clauseLits = lits.toIntArray()
+            parsedClauses++
             when {
                 isHard && clauseLits.isEmpty() -> triviallyUnsat = true
 
@@ -215,6 +238,11 @@ object Dimacs {
         // New-format instances carry no header, so an instance with no variable-bearing clause
         // (only empty/degenerate clauses) leaves numVars unset — it simply has zero variables.
         if (numVars < 0) numVars = 0
+        if (hasOldHeader) {
+            dimacsRequire(parsedClauses == declaredClauses) {
+                "DIMACS header declares $declaredClauses clauses, found $parsedClauses"
+            }
+        }
 
         val numOriginal = numVars
         // Relaxation variables follow the originals; an unsat marker (if any) follows the relaxations.

@@ -302,6 +302,9 @@ object Opb {
             if (tokens.matches(from, "soft:")) {
                 // `soft: top` bounds total violated cost strictly below top; the top is optional.
                 softTop = if (from + 1 < end) parseLong(tokens, from + 1, "soft top") else null
+                opbRequire(from + 1 == end || from + 2 == end) {
+                    "OPB soft header has unexpected tokens: ${tokens.join(from, end)}"
+                }
                 continue
             }
 
@@ -346,6 +349,7 @@ object Opb {
         // A `soft: top` header rejects any assignment whose total violated cost reaches top.
         softTop?.let { top ->
             if (softViolations.size > 0) {
+                opbRequire(top != Long.MIN_VALUE) { "OPB soft top is too small: $top" }
                 builder.factors.add(
                     PseudoBoolean(softCosts.toLongArray(), softViolations.toIntArray(), PbOp.LE, top - 1),
                 )
@@ -419,7 +423,9 @@ object Opb {
         val start = tokens.startOf(t)
         val end = tokens.endOf(t)
         if (end - start < 2 || tokens.charAt(start) != '[' || tokens.charAt(end - 1) != ']') return null
-        return parseLongIn(tokens, start + 1, end - 1, "soft cost")
+        return parseLongIn(tokens, start + 1, end - 1, "soft cost").also {
+            opbRequire(it >= 0) { "OPB soft cost must be non-negative: $it" }
+        }
     }
 
     /** Parse the OPB integer token [t] naming a [role]; see [parseLongIn]. */

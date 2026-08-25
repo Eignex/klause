@@ -19,8 +19,7 @@ import com.eignex.klause.util.StringCharSource
 /** Raised when an SMT-LIB construct outside the supported linear-arithmetic subset is encountered. */
 class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB", msg)
 
-/** Reject an unsupported construct with a clean [UnsupportedSmtException]; `Nothing`-typed so call
- *  sites stay expression-friendly and per-function throw counts stay flat. */
+/** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
 
 /** One lowered linear relation `Σ coeffs·vars ⟨op⟩ bound` (shared by bound inference and lowering). */
@@ -207,16 +206,40 @@ object SmtLib {
         internal fun SExpr.SList.argAt(i: Int, what: String): SExpr =
             items.getOrNull(i) ?: throw UnsupportedSmtException("malformed $what")
 
+        internal fun SExpr.SList.requireSize(size: Int, what: String) {
+            if (items.size != size) {
+                throw UnsupportedSmtException("$what expects ${size - 1} argument${if (size == 2) "" else "s"}")
+            }
+        }
+
         fun command(e: SExpr) {
-            if (e !is SExpr.SList || e.items.isEmpty()) return
-            val head = (e.items[0] as? SExpr.Atom)?.text ?: return
+            val command = e as? SExpr.SList ?: throw UnsupportedSmtException("expected a parenthesized command")
+            val head = command.atomAt(0, "command")
             when (head) {
-                "declare-const" -> declare(e.atomAt(1, "declare-const name"), e.atomAt(2, "declare-const sort"))
-                "declare-fun" -> declareFun(e)
-                "define-fun" -> defineFun(e)
-                "assert" -> asserts.add(e.argAt(1, "assert"))
-                "minimize" -> objectiveSpec = e.argAt(1, "minimize") to false
-                "maximize" -> objectiveSpec = e.argAt(1, "maximize") to true
+                "declare-const" -> {
+                    command.requireSize(3, "declare-const")
+                    declare(command.atomAt(1, "declare-const name"), command.atomAt(2, "declare-const sort"))
+                }
+
+                "declare-fun" -> declareFun(command)
+
+                "define-fun" -> defineFun(command)
+
+                "assert" -> {
+                    command.requireSize(2, "assert")
+                    asserts.add(command.argAt(1, "assert"))
+                }
+
+                "minimize" -> {
+                    command.requireSize(2, "minimize")
+                    objectiveSpec = command.argAt(1, "minimize") to false
+                }
+
+                "maximize" -> {
+                    command.requireSize(2, "maximize")
+                    objectiveSpec = command.argAt(1, "maximize") to true
+                }
+
                 else -> Unit // set-logic / set-info / check-sat / get-* / exit — ignored
             }
         }
@@ -225,6 +248,7 @@ object SmtLib {
          *  supported; a non-empty argument list is a genuine function symbol, which QF_LIA-as-solved
          *  here cannot treat as a variable, so reject it rather than silently declaring a constant. */
         private fun declareFun(e: SExpr.SList) {
+            e.requireSize(4, "declare-fun")
             val name = e.atomAt(1, "declare-fun name")
             val argSorts = e.argAt(2, "declare-fun '$name' argument sorts")
             if (argSorts !is SExpr.SList || argSorts.items.isNotEmpty()) {
@@ -237,14 +261,27 @@ object SmtLib {
 
         // Record a non-recursive `(define-fun name ((p T)…) retSort body)` as an inlinable macro.
         private fun defineFun(e: SExpr.SList) {
+            e.requireSize(5, "define-fun")
             val name = e.atomAt(1, "define-fun name")
             val paramList = e.items.getOrNull(2) as? SExpr.SList
-                ?: throw UnsupportedSmtException("define-fun '$name': bad params")
+                ?: smtUnsupported("define-fun '$name': bad params")
             val params = paramList.items.map { p ->
-                ((p as? SExpr.SList)?.items?.getOrNull(0) as? SExpr.Atom)?.text
-                    ?: throw UnsupportedSmtException("define-fun '$name': bad parameter")
+                val param = p as? SExpr.SList
+                    ?: smtUnsupported("define-fun '$name': bad parameter")
+                param.requireSize(2, "define-fun '$name' parameter")
+                val paramName = param.atomAt(0, "define-fun '$name' parameter")
+                requireSort(
+                    param.atomAt(1, "define-fun '$name' parameter sort"),
+                    "define-fun '$name' parameter '$paramName'",
+                )
+                paramName
             }
             val retSort = e.atomAt(3, "define-fun '$name' return sort")
+            requireSort(retSort, "define-fun '$name'")
+            if (params.size != params.toSet().size) {
+                smtUnsupported("define-fun '$name' has duplicate parameter names")
+            }
+            requireFreshName(name)
             macros[name] = Macro(
                 params,
                 e.argAt(4, "define-fun '$name' body"),
@@ -254,11 +291,24 @@ object SmtLib {
         }
 
         private fun declare(name: String, sort: String) {
+            requireFreshName(name)
             when (sort) {
                 "Int" -> intNames[name] = newInt()
                 "Bool" -> boolNames[name] = newBool()
                 "Real" -> realNames[name] = nextReal++
                 else -> throw UnsupportedSmtException("unsupported sort '$sort' for '$name'")
+            }
+        }
+
+        private fun requireFreshName(name: String) {
+            if (name in boolNames || name in intNames || name in realNames || name in macros) {
+                throw UnsupportedSmtException("duplicate declaration of '$name'")
+            }
+        }
+
+        private fun requireSort(sort: String, what: String) {
+            if (sort != "Int" && sort != "Bool" && sort != "Real") {
+                throw UnsupportedSmtException("unsupported sort '$sort' for $what")
             }
         }
 

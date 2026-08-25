@@ -54,9 +54,7 @@ data class Xcsp3Problem(
     val definedVars: IntArray = IntArray(0),
 )
 
-/** Split on runs of whitespace into non-blank tokens. A manual scan replacing an inline
- *  `split(Regex("\\s+")).filter { it.isNotBlank() }`, whose per-call `Regex` compilation dominated
- *  group instantiation over hundreds of thousands of `<args>` rows. */
+/** Split on runs of whitespace into non-blank tokens without allocating matcher state per call. */
 internal fun String.splitWs(): List<String> {
     val out = ArrayList<String>()
     val n = length
@@ -85,8 +83,10 @@ internal fun bracketInts(s: String): IntArray {
         val start = i + 1
         var j = start
         while (j < n && s[j] != ']') j++
+        require(j < n) { "unterminated bracket index in '$s'" }
+        require(j > start) { "empty bracket index in '$s'" }
         out.add(s.substring(start, j).toInt())
-        i = if (j < n) j + 1 else j
+        i = j + 1
     }
     return out.toIntArray()
 }
@@ -266,9 +266,17 @@ object Xcsp3 {
             // [IntDomain] needs just the holes, which a contiguous range has none of.
             val intervals = ArrayList<LongArray>()
             for (tok in text.splitWs()) {
-                val r = tok.split("..")
-                val a = if (r.size == 2) r[0].toLong() else tok.toLong()
-                val b = if (r.size == 2) r[1].toLong() else a
+                val separator = tok.indexOf("..")
+                val a: Long
+                val b: Long
+                if (separator < 0) {
+                    a = tok.toLong()
+                    b = a
+                } else {
+                    require(tok.indexOf("..", separator + 2) < 0) { "invalid domain range '$tok'" }
+                    a = tok.substring(0, separator).toLong()
+                    b = tok.substring(separator + 2).toLong()
+                }
                 require(a <= b) { "invalid domain range '$tok'" }
                 intervals.add(longArrayOf(a, b))
             }
@@ -282,7 +290,9 @@ object Xcsp3 {
             for (k in 1 until intervals.size) {
                 val a = intervals[k][0]
                 val b = intervals[k][1]
-                if (a > prevEnd + 1) for (v in prevEnd + 1 until a) holes.add(v)
+                if (prevEnd != Long.MAX_VALUE && a > prevEnd + 1) {
+                    for (v in prevEnd + 1 until a) holes.add(v)
+                }
                 if (b > prevEnd) prevEnd = b
                 if (b > hi) hi = b
             }

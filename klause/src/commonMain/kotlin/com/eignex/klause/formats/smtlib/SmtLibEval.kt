@@ -175,16 +175,22 @@ private fun SmtLib.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: 
 
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
 private fun SmtLib.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
-    val head = (node.items[0] as? SExpr.Atom)?.text
+    val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+        ?: smtUnsupported("malformed operator")
     val args = node.items.drop(1)
     val kids = when (sort) {
         Sort.BOOL -> when (head) {
-            "not", "and", "or", "xor", "=>" -> args.map { it to Sort.BOOL }
+            "not" -> {
+                requireArgCount(head, args, 1)
+                args.map { it to Sort.BOOL }
+            }
+
+            "and", "or", "xor", "=>" -> args.map { it to Sort.BOOL }
 
             "<=", "<", ">=", ">" ->
                 args.map { it to (if (isRealRelation(node)) Sort.REAL else Sort.INT) }
 
-            "ite" -> args.map { it to Sort.BOOL }
+            "ite" -> iteChildren(args, Sort.BOOL)
 
             "distinct" -> args.map { arg ->
                 val argSort = when {
@@ -206,25 +212,54 @@ private fun SmtLib.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<
 
         Sort.INT -> when (head) {
             "+", "-", "*" -> args.map { it to Sort.INT }
-            "to_real" -> args.map { it to Sort.INT }
-            "to_int" -> args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
-            "abs" -> args.map { it to Sort.INT }
-            "div", "mod" -> args.map { it to Sort.INT }
-            "ite" -> listOf(args[0] to Sort.BOOL, args[1] to Sort.INT, args[2] to Sort.INT)
+
+            "to_real", "abs" -> {
+                requireArgCount(head, args, 1)
+                args.map { it to Sort.INT }
+            }
+
+            "to_int" -> {
+                requireArgCount(head, args, 1)
+                args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
+            }
+
+            "div", "mod" -> {
+                requireArgCount(head, args, 2)
+                args.map { it to Sort.INT }
+            }
+
+            "ite" -> iteChildren(args, Sort.INT)
+
             "/" -> smtUnsupported("real division '/' in an integer context")
+
             else -> null
         }
 
         Sort.REAL -> when (head) {
             "+", "-", "*", "/" -> args.map { it to (if (isRealExpr(it)) Sort.REAL else Sort.INT) }
-            "to_real" -> args.map { it to Sort.INT }
-            "ite" -> listOf(args[0] to Sort.BOOL, args[1] to Sort.REAL, args[2] to Sort.REAL)
+
+            "to_real" -> {
+                requireArgCount(head, args, 1)
+                args.map { it to Sort.INT }
+            }
+
+            "ite" -> iteChildren(args, Sort.REAL)
+
             else -> null
         }
     }
     return kids ?: smtUnsupported(
         "unsupported ${if (sort == Sort.BOOL) "boolean" else "int"} op '$head'",
     )
+}
+
+private fun iteChildren(args: List<SExpr>, resultSort: Sort): List<Pair<SExpr, Sort>> {
+    if (args.size != 3) smtUnsupported("ite expects 3 arguments")
+    return listOf(args[0] to Sort.BOOL, args[1] to resultSort, args[2] to resultSort)
+}
+
+private fun requireArgCount(head: String, args: List<SExpr>, count: Int) {
+    if (args.size != count) smtUnsupported("$head expects $count argument${if (count == 1) "" else "s"}")
 }
 
 /** Combine a list node's already-folded child results [args] into this node's [Res]. */

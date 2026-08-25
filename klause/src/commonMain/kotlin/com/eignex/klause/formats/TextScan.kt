@@ -2,7 +2,7 @@ package com.eignex.klause.formats
 
 /**
  * Split [this] into whitespace-separated non-empty tokens with a single character scan, shared by the
- * line-oriented format readers (DIMACS / OPB / MPS) in place of a per-reader `Regex("\\s+")`. Runs of
+ * line-oriented format readers (DIMACS / OPB / MPS). Runs of
  * whitespace separate tokens; leading and trailing whitespace produce no empty tokens. Scanning by
  * [Char.isWhitespace] rather than a `\s` regex is deterministic across the Kotlin targets and needs no
  * compiled pattern per line.

@@ -60,6 +60,12 @@ class DimacsTest {
     }
 
     @Test
+    fun `rejects a header whose clause count differs from the body`() {
+        val ex = assertFailsWith<DimacsFormatException> { Dimacs.parse("p cnf 2 2\n1 0\n") }
+        assertTrue(ex.message?.contains("declares 2 clauses, found 1") == true)
+    }
+
+    @Test
     fun `rejects a non-integer cnf variable count with a header diagnostic`() {
         // An over-Int count must surface a message naming the header field, not a bare
         // NumberFormatException from toInt().
@@ -131,6 +137,12 @@ class DimacsTest {
         assertFails {
             Dimacs.parseWcnf("p wcnf 2 1\n1 -1 -2\n")
         }
+    }
+
+    @Test
+    fun `wcnf validates the declared clause count`() {
+        val ex = assertFailsWith<DimacsFormatException> { Dimacs.parseWcnf("p wcnf 1 2 10\n1 1 0\n") }
+        assertTrue(ex.message?.contains("declares 2 clauses, found 1") == true)
     }
 
     @Test

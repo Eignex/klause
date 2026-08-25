@@ -138,11 +138,11 @@ internal fun SmtLib.Builder.isBoolExpr(t: SExpr): Boolean {
                     node.text in boolNames || (lookup(node.text)?.isBool == true)
             }
 
-            is SExpr.SList -> when (val head = (node.items[0] as? SExpr.Atom)?.text) {
+            is SExpr.SList -> when (val head = (node.items.firstOrNull() as? SExpr.Atom)?.text) {
                 "and", "or", "not", "=>", "xor", "=", "distinct", "<", "<=", ">", ">=" -> return true
                 "+", "-", "*", "to_real", "to_int", "abs", "div", "mod" -> return false
-                "ite" -> node = node.items[2]
-                "let" -> node = node.items[2]
+                "ite" -> node = node.argAt(2, "ite then branch")
+                "let" -> node = node.argAt(2, "let body")
                 else -> return macros[head]?.isBool ?: false
             }
         }

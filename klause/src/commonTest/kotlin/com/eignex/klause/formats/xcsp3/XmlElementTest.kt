@@ -60,6 +60,12 @@ class XmlElementTest {
     }
 
     @Test
+    fun `decodes numeric entities`() {
+        val e = parseXml("<e>&#65; &#x42;</e>")
+        assertEquals("A B", e.textContent)
+    }
+
+    @Test
     fun `reads CDATA verbatim`() {
         val e = parseXml("<e><![CDATA[ raw < & > text ]]></e>")
         assertEquals(" raw < & > text ", e.textContent)
@@ -89,5 +95,17 @@ class XmlElementTest {
     fun `rejects a mismatched closing tag`() {
         val e = assertFailsWith<IllegalArgumentException> { parseXml("<a><b>1</c></a>") }
         assertTrue("mismatched closing tag" in e.message.orEmpty(), e.message.orEmpty())
+    }
+
+    @Test
+    fun `rejects content after the root element`() {
+        val e = assertFailsWith<IllegalArgumentException> { parseXml("<a/> trailing") }
+        assertTrue("after root" in e.message.orEmpty(), e.message.orEmpty())
+    }
+
+    @Test
+    fun `rejects unknown entity references`() {
+        val e = assertFailsWith<IllegalArgumentException> { parseXml("<a>&unknown;</a>") }
+        assertTrue("unknown entity" in e.message.orEmpty(), e.message.orEmpty())
     }
 }
