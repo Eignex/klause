@@ -7639,14 +7639,6 @@ public final class com/eignex/klause/solver/Assumptions$Companion {
 public final class com/eignex/klause/solver/BakedProblem : com/eignex/klause/solver/Problem {
 }
 
-public final class com/eignex/klause/solver/BoolVars : com/eignex/klause/solver/VarList {
-	public fun <init> ([I)V
-	public fun getBoolVars ()[I
-	public fun getInts ()[I
-	public fun getReals ()[I
-	public fun getSpanInts ()[I
-}
-
 public abstract interface class com/eignex/klause/solver/Cancellation {
 	public static final field Companion Lcom/eignex/klause/solver/Cancellation$Companion;
 	public fun and (Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/solver/Cancellation;
@@ -7686,6 +7678,17 @@ public final class com/eignex/klause/solver/ComponentPlan {
 
 public final class com/eignex/klause/solver/ComponentPlanKt {
 	public static final fun componentPlan (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ComponentPlan;
+}
+
+public abstract interface class com/eignex/klause/solver/ConstList {
+	public abstract fun getSize ()I
+}
+
+public final class com/eignex/klause/solver/ConstListKt {
+	public static final fun constsOf ([I)Lcom/eignex/klause/solver/LongConstList;
+	public static final fun constsOf ([J)Lcom/eignex/klause/solver/LongConstList;
+	public static final fun getNoConsts ()Lcom/eignex/klause/solver/LongConstList;
+	public static final fun longsOrNull (Lcom/eignex/klause/solver/ConstList;)Lcom/eignex/klause/solver/LongConstList;
 }
 
 public final class com/eignex/klause/solver/CpProblemProjection {
@@ -7843,9 +7846,19 @@ public final class com/eignex/klause/solver/IntColumn$Finite : com/eignex/klause
 
 public abstract class com/eignex/klause/solver/IntColumns {
 	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
+	public final fun boundsOf (I)Lcom/eignex/klause/solver/IntColumn$Bounded;
 	public abstract fun column (I)Lcom/eignex/klause/solver/IntColumn;
 	public final fun domainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
 	public abstract fun getSize ()I
+}
+
+public final class com/eignex/klause/solver/IntConsts : com/eignex/klause/solver/LongConstList {
+	public fun <init> ([I)V
+	public fun at (I)J
+	public fun getMaxAbs ()J
+	public fun getSize ()I
+	public fun negated ()Lcom/eignex/klause/solver/LongConstList;
+	public fun toLongArray ()[J
 }
 
 public abstract interface class com/eignex/klause/solver/IntConsumer {
@@ -7910,8 +7923,8 @@ public final class com/eignex/klause/solver/IntVariableOwner : java/lang/Enum {
 
 public final class com/eignex/klause/solver/IntVars : com/eignex/klause/solver/VarList {
 	public fun <init> ([I)V
-	public fun getBoolVars ()[I
 	public fun getInts ()[I
+	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -7925,6 +7938,30 @@ public final class com/eignex/klause/solver/Lit {
 	public final fun variable (I)I
 }
 
+public final class com/eignex/klause/solver/LitVars : com/eignex/klause/solver/VarList {
+	public fun <init> ([I)V
+	public fun getInts ()[I
+	public fun getLits ()[I
+	public fun getReals ()[I
+	public fun getSpanInts ()[I
+}
+
+public abstract interface class com/eignex/klause/solver/LongConstList : com/eignex/klause/solver/ConstList {
+	public abstract fun at (I)J
+	public abstract fun getMaxAbs ()J
+	public abstract fun negated ()Lcom/eignex/klause/solver/LongConstList;
+	public abstract fun toLongArray ()[J
+}
+
+public final class com/eignex/klause/solver/LongConsts : com/eignex/klause/solver/LongConstList {
+	public fun <init> ([J)V
+	public fun at (I)J
+	public fun getMaxAbs ()J
+	public fun getSize ()I
+	public fun negated ()Lcom/eignex/klause/solver/LongConstList;
+	public fun toLongArray ()[J
+}
+
 public final class com/eignex/klause/solver/MixedIntColumns : com/eignex/klause/solver/IntColumns {
 	public fun <init> ([Lcom/eignex/klause/solver/IntColumn;)V
 	public fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
@@ -7936,8 +7973,8 @@ public final class com/eignex/klause/solver/MixedVars : com/eignex/klause/solver
 	public fun <init> ()V
 	public fun <init> ([I[I[I[I)V
 	public synthetic fun <init> ([I[I[I[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun getBoolVars ()[I
 	public fun getInts ()[I
+	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -7945,8 +7982,8 @@ public final class com/eignex/klause/solver/MixedVars : com/eignex/klause/solver
 public final class com/eignex/klause/solver/NoVars : com/eignex/klause/solver/VarList {
 	public static final field INSTANCE Lcom/eignex/klause/solver/NoVars;
 	public fun equals (Ljava/lang/Object;)Z
-	public fun getBoolVars ()[I
 	public fun getInts ()[I
+	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 	public fun hashCode ()I
@@ -8063,10 +8100,18 @@ public final class com/eignex/klause/solver/ProblemSpec {
 	public final fun materializeFiniteBounds ()Lcom/eignex/klause/solver/Problem;
 }
 
+public final class com/eignex/klause/solver/RealConsts : com/eignex/klause/solver/ConstList {
+	public fun <init> ([D)V
+	public final fun at (I)D
+	public fun getSize ()I
+	public final fun negated ()Lcom/eignex/klause/solver/RealConsts;
+	public final fun toDoubleArray ()[D
+}
+
 public final class com/eignex/klause/solver/RealVars : com/eignex/klause/solver/VarList {
 	public fun <init> ([I)V
-	public fun getBoolVars ()[I
 	public fun getInts ()[I
+	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -8241,8 +8286,8 @@ public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
 
 public final class com/eignex/klause/solver/SpanIntVars : com/eignex/klause/solver/VarList {
 	public fun <init> ([I)V
-	public fun getBoolVars ()[I
 	public fun getInts ()[I
+	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -8276,16 +8321,25 @@ public final class com/eignex/klause/solver/StructuralKey : java/lang/Comparable
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/UnitConsts : com/eignex/klause/solver/LongConstList {
+	public fun <init> (I)V
+	public fun at (I)J
+	public fun getMaxAbs ()J
+	public fun getSize ()I
+	public fun negated ()Lcom/eignex/klause/solver/LongConstList;
+	public fun toLongArray ()[J
+}
+
 public abstract interface class com/eignex/klause/solver/VarList {
-	public fun getBoolVars ()[I
 	public fun getInts ()[I
+	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
 
 public final class com/eignex/klause/solver/VarList$DefaultImpls {
-	public static fun getBoolVars (Lcom/eignex/klause/solver/VarList;)[I
 	public static fun getInts (Lcom/eignex/klause/solver/VarList;)[I
+	public static fun getLits (Lcom/eignex/klause/solver/VarList;)[I
 	public static fun getReals (Lcom/eignex/klause/solver/VarList;)[I
 	public static fun getSpanInts (Lcom/eignex/klause/solver/VarList;)[I
 }
@@ -8301,6 +8355,14 @@ public final class com/eignex/klause/solver/VariablePartition {
 public final class com/eignex/klause/solver/VariablePartitionKt {
 	public static final fun variablePartition (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/solver/VariablePartition;
 	public static final fun variablePartition (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/VariablePartition;
+}
+
+public final class com/eignex/klause/solver/WideConsts : com/eignex/klause/solver/ConstList {
+	public fun <init> ([Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public final fun at (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun getSize ()I
+	public final fun negated ()Lcom/eignex/klause/solver/WideConsts;
+	public final fun toTypedArray ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 }
 
 public abstract interface class com/eignex/klause/solver/objective/IncrementalObjective : com/eignex/klause/solver/objective/Objective {

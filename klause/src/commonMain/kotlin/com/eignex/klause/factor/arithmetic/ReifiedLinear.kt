@@ -18,9 +18,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.LongConstList
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.values
@@ -48,51 +50,22 @@ class ReifiedLinear private constructor(
 
     val vars: IntArray = terms.vars
 
-    // Integer coefficients, index-aligned with [vars], stored compactly to cut parse/presolve memory on the
-    // Linear-dominated families (MPS, QF_LIRA): an [IntArray] (4 B/term) when every coefficient fits Int, else
-    // a [LongArray] (8 B/term). [coeff] reads the store with no allocation; [coeffs] materialises a full
-    // [LongArray] for whole-array consumers. A reified row keeps its op, so no `>=` negation here.
-    private val coeffsInt: IntArray?
-    private val coeffsLong: LongArray?
+    // Integer coefficients, index-aligned with [vars]. The width is the store: an all-one row keeps no
+    // per-term storage, a 32-bit-range row 4 B/term, and only a genuinely 64-bit row 8 B/term — what keeps
+    // parse/presolve memory down on the Linear-dominated families. A reified row keeps its op, so there is
+    // no `>=` negation here. [coeff] reads a term with no allocation; [coeffs] materialises a [LongArray].
+    private val coefficients: LongConstList = constsOf(terms.coeffs)
 
-    /** Largest `|coefficient|` over the integer terms (0 when there are none), cached at construction so the
-     *  small-model bound reads it instead of rescanning. A saturated placeholder on a wide row. */
-    val maxAbsCoeff: Long
-
-    init {
-        val src = terms.coeffs
-        var maxAbs = 0L
-        var fitsInt = true
-        for (c in src) {
-            val a = if (c < 0L) -c else c
-            if (a > maxAbs) maxAbs = a
-            if (c < Int.MIN_VALUE.toLong() || c > Int.MAX_VALUE.toLong()) fitsInt = false
-        }
-        maxAbsCoeff = maxAbs
-        if (fitsInt) {
-            coeffsInt = IntArray(src.size) { src[it].toInt() }
-            coeffsLong = null
-        } else {
-            coeffsInt = null
-            coeffsLong = src
-        }
-    }
+    /** Largest `|coefficient|` over the integer terms (0 when there are none), read from the coefficient
+     *  store so the small-model bound needs no rescan. A saturated placeholder on a wide row. */
+    val maxAbsCoeff: Long get() = coefficients.maxAbs
 
     /** Integer coefficient at term [k], read from the compact store with no allocation. */
-    fun coeff(k: Int): Long {
-        val ci = coeffsInt
-        return if (ci != null) ci[k].toLong() else checkNotNull(coeffsLong)[k]
-    }
+    fun coeff(k: Int): Long = coefficients.at(k)
 
     /** Integer coefficients as a [LongArray], materialised on demand from the compact store; prefer [coeff]
      *  for indexed access. */
-    val coeffs: LongArray
-        get() {
-            val cl = coeffsLong
-            if (cl != null) return cl
-            val ci = checkNotNull(coeffsInt)
-            return LongArray(ci.size) { ci[it].toLong() }
-        }
+    val coeffs: LongArray get() = coefficients.toLongArray()
 
     /** Wide (>64-bit) integer coefficients, index-aligned with [vars]; null unless [wide].
      *  [WideReifiedLinearPropagator] reads these exact values, not [coeffs]. */
