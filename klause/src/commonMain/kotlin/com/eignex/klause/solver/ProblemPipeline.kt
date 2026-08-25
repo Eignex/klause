@@ -45,25 +45,8 @@ enum class ProblemPipeline {
  */
 fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
     (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) } -> ProblemPipeline.FINITE_CP
-
-    // An open column a finite-domain factor reaches has no owner: CP cannot index it and the theory
-    // cannot hold the factor. That is a verdict about the model, so it is answered here rather than
-    // left to the plan, which states it as an invariant it may assume.
-    !openColumnsAreTheoryEligible() -> ProblemPipeline.UNSUPPORTED_OPEN
-
     else -> componentPlan().theoryPipeline
 }
-
-private fun ProblemSpec.openColumnsAreTheoryEligible(): Boolean {
-    val hasRealColumns = numRealVars != 0
-    return (0 until numIntVars).none { v ->
-        (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) && columnMustBeCpOwned(v, hasRealColumns)
-    }
-}
-
-/** True when some factor only CP can hold reads column [v], so no theory can be handed it. */
-internal fun ProblemSpec.columnMustBeCpOwned(v: Int, hasRealColumns: Boolean): Boolean =
-    factors.any { f -> !f.isTheoryOwnable(hasRealColumns) && v in f.variables.ints }
 
 /** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
 internal fun ProblemSpec.supportsExactLra(): Boolean =
@@ -76,8 +59,8 @@ internal fun ProblemSpec.supportsExactLira(): Boolean =
 /**
  * A factor some lane other than CP can hold, so CP need not own the columns it reads.
  *
- * The complement of this is exactly the set of factors [componentPlan] leaves to CP, so column
- * ownership and factor ownership are decided by one rule rather than by two that can disagree.
+ * The one rule the plan reads: [variablePartition] marks a column search-required from it, [componentPlan]
+ * assigns factor ownership from it, and an open column it marks has no owner at all — the model's verdict.
  */
 internal fun Factor.isTheoryOwnable(hasRealColumns: Boolean): Boolean =
     this is Clause || supportsIntegerTheory() || (hasRealColumns && supportsExactTheoryFactor(this))

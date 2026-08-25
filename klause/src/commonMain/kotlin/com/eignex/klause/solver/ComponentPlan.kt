@@ -161,15 +161,17 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         generalLiaWitnessBound() != null -> ProblemPipeline.GENERAL_LIA
         else -> null
     }
+    // An open column some CP-only factor reads has no owner: CP cannot index it and no theory can hold
+    // the factor. The plan says so rather than asserting it away, so one model has one verdict however
+    // it was reached.
+    var unownedOpenColumn = false
     val intOwners = Array(numIntVars) { v ->
         if (completeTheory != null) {
             IntVariableOwner.THEORY
         } else if (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) {
-            require(partition.isTheoryEligible(v)) {
-                "open integer column $v reaches a finite-domain factor and cannot be theory-owned"
-            }
+            if (partition.isSearchVariable(v)) unownedOpenColumn = true
             IntVariableOwner.THEORY
-        } else if (columnMustBeCpOwned(v, numRealVars != 0)) {
+        } else if (partition.isSearchVariable(v)) {
             IntVariableOwner.CP
         } else {
             IntVariableOwner.THEORY
@@ -179,17 +181,8 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         val factor = factors[i]
         when {
             factor is Clause -> FactorOwner.SHARED
-
-            factor.supportsIntegerTheory() -> FactorOwner.THEORY
-
-            numRealVars != 0 && supportsExactTheoryFactor(factor) -> FactorOwner.THEORY
-
-            else -> {
-                require(factor.intVars.all { intOwners[it] == IntVariableOwner.CP }) {
-                    "finite-domain factor $i mentions a symbolic integer column"
-                }
-                FactorOwner.CP
-            }
+            factor.isTheoryOwnable(numRealVars != 0) -> FactorOwner.THEORY
+            else -> FactorOwner.CP
         }
     }
     val theoryFragment = ProblemSpec(
@@ -207,6 +200,8 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         realUpper = realUpper,
     )
     val route = when {
+        unownedOpenColumn -> ProblemPipeline.UNSUPPORTED_OPEN
+
         theoryFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
 
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY } -> when {

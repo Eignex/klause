@@ -103,6 +103,7 @@ class LinearConstantsTest {
         assertNull(wide.integerConstants, "a wide reified row has no 64-bit constants to read")
         assertEquals(huge, wide.constants.exactBound)
     }
+
     @Test
     fun `a real form with no continuous term is refused rather than read as an integer row`() {
         // The real constructors pass empty integer terms for the shape they do not use; without a
@@ -118,5 +119,4 @@ class LinearConstantsTest {
             )
         }
     }
-
 }

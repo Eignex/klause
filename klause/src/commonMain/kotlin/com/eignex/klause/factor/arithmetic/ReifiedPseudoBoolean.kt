@@ -11,10 +11,10 @@ import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap

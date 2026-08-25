@@ -65,13 +65,27 @@ class VariablePartitionTest {
     fun `an unknown factor kind keeps its columns in the search set`() {
         // A factor kind the partition knows nothing about still has its declaration read: the demand
         // comes from what the factor states, not from the kind being recognized.
-        val unconsidered = object : Factor {
-            override val variables: VarList = MixedVars(spanInts = intArrayOf(0), boolVars = IntArray(0))
-            override fun remap(mapping: VarRemap): Factor = this
-            override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
-            override fun asPropagator(): Propagator = object : Propagator {}
-            override fun asInvariant(): Invariant = NoInvariant
-        }
-        assertFalse(problemOf(1, unconsidered).variablePartition().isTheoryEligible(0))
+        assertFalse(
+            problemOf(1, cpOnlyFactor(MixedVars(spanInts = intArrayOf(0)))).variablePartition().isTheoryEligible(0),
+        )
+    }
+
+    @Test
+    fun `a column a CP-only factor merely bounds must still be searched`() {
+        // CP has to own every column of a factor it is left holding, whether that factor enumerates the
+        // column or only reads its bounds — otherwise the column is handed to a theory that cannot see
+        // the constraint.
+        val boundsOnly = cpOnlyFactor(MixedVars(boundInts = intArrayOf(0)))
+
+        assertFalse(problemOf(1, boundsOnly).variablePartition().isTheoryEligible(0))
+    }
+
+    /** A factor no theory lane can hold, declaring exactly [variables]. */
+    private fun cpOnlyFactor(variables: VarList) = object : Factor {
+        override val variables: VarList = variables
+        override fun remap(mapping: VarRemap): Factor = this
+        override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
+        override fun asPropagator(): Propagator = object : Propagator {}
+        override fun asInvariant(): Invariant = NoInvariant
     }
 }
