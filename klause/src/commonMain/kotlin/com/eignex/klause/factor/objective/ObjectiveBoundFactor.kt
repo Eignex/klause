@@ -89,7 +89,7 @@ internal class ObjectiveBoundFactor(
     private val bound: MutableObjectiveBound,
 ) : Factor {
 
-    override val variables: VarList = MixedVars(boundInts = objectiveIntVars, lits = objectiveBoolVars)
+    override val variables: VarList = MixedVars(spanInts = objectiveIntVars, lits = objectiveBoolVars)
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ObjectiveBoundFactor(
         IntArray(boolVars.size) { boolMap[boolVars[it]] },
