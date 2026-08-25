@@ -33,9 +33,23 @@ data class GeneralLiaAssignment(
     val ints: Array<BigInteger>,
 )
 
-/** Factors walked between budget polls: often enough to land inside one sweep over a large model,
- *  rarely enough that the check does not show against the BigInteger arithmetic it guards. */
-private const val POLL_FACTORS = 256
+/**
+ * Factors walked between budget polls, chosen from how wide the witness box is.
+ *
+ * A fixed stride cannot serve both ends of this route. The work per factor is `BigInteger` arithmetic over
+ * the domain endpoints, so on a box of a few hundred thousand bits one factor already costs milliseconds
+ * and a stride of 256 overshoots a budget many times over; on a narrow box the same stride is what keeps
+ * the check from showing against the arithmetic it guards. Scaling the stride by the bit width tracks the
+ * cost it is amortising.
+ */
+internal fun pollStrideFor(witnessBits: Int): Int = (POLL_BIT_BUDGET / witnessBits.coerceAtLeast(1))
+    .coerceIn(1, MAX_POLL_FACTORS)
+
+/** Bits of endpoint arithmetic a single poll interval is allowed to cover. */
+private const val POLL_BIT_BUDGET = 65_536
+
+/** Stride ceiling, used where the endpoints are narrow enough that the poll itself is the cost. */
+private const val MAX_POLL_FACTORS = 256
 
 /**
  * Complete finite-witness search for open General LIA.
@@ -47,6 +61,7 @@ private const val POLL_FACTORS = 256
 
 class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssignment> {
     private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
+    private val pollStride = pollStrideFor(witnessBound.bitLength())
 
     init {
         require(model.componentPlan().theoryPipeline == ProblemPipeline.GENERAL_LIA) {
@@ -180,12 +195,12 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
          * here means infeasible, and a stopped sweep must not claim that.
          */
 
-        // Looks at the budget once per POLL_FACTORS factors, so a sweep over a large model notices it.
-        private var untilPoll = POLL_FACTORS
+        // Looks at the budget once per pollStride factors, so a sweep over a large model notices it.
+        private var untilPoll = pollStride
 
         private fun budgetSpent(): Boolean {
             if (--untilPoll > 0) return false
-            untilPoll = POLL_FACTORS
+            untilPoll = pollStride
             return context.cancelled()
         }
 
@@ -405,6 +420,7 @@ class GeneralLiaSearchComponent(
 ) : TheoryComponent,
     SearchBrancher {
     private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
+    private val pollStride = pollStrideFor(witnessBound.bitLength())
     private val theoryIntVars = theoryIntVars.copyOf()
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
@@ -554,13 +570,13 @@ class GeneralLiaSearchComponent(
      */
     private fun propagateEqualities(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         var changed: Boolean
-        var untilPoll = POLL_FACTORS
+        var untilPoll = pollStride
         do {
             if (context.cancelled()) return null
             changed = false
             for (factor in model.factors) {
                 if (--untilPoll <= 0) {
-                    untilPoll = POLL_FACTORS
+                    untilPoll = pollStride
                     if (context.cancelled()) return null
                 }
                 val row = when (factor) {
@@ -645,10 +661,10 @@ class GeneralLiaSearchComponent(
 
     /** Whether every factor can still hold over [domains], or null when the budget was spent mid-walk. */
     private fun factorsPossible(domains: Array<BigInterval>, context: SearchContext): Boolean? {
-        var untilPoll = POLL_FACTORS
+        var untilPoll = pollStride
         return model.factors.all { factor ->
             if (--untilPoll <= 0) {
-                untilPoll = POLL_FACTORS
+                untilPoll = pollStride
                 if (context.cancelled()) return null
             }
             when (factor) {
