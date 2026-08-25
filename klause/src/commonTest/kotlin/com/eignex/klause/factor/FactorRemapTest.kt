@@ -28,6 +28,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -44,14 +45,15 @@ class FactorRemapTest {
     // Injective shifts so the var-set image is unambiguous; ids used below stay < 64.
     private val intMap = IntArray(64) { it + 100 }
     private val boolMap = IntArray(64) { it + 50 }
+    private val mapping = VarRemap(boolMap, intMap)
 
     private fun pos(v: Int) = Lit.make(v, true)
     private fun neg(v: Int) = Lit.make(v, false)
 
     private fun assertVarsShifted(name: String, f: Factor) {
-        val out = f.remap(boolMap, intMap)
-        assertEquals(f.intVars.map { intMap[it] }.toSet(), out.intVars.toSet(), "$name int vars")
-        assertEquals(f.boolVars.map { boolMap[it] }.toSet(), out.boolVars.toSet(), "$name bool vars")
+        val out = f.remap(mapping)
+        assertEquals(f.intVars.map { mapping.int(it) }.toSet(), out.intVars.toSet(), "$name int vars")
+        assertEquals(f.boolVars.map { mapping.bool(it) }.toSet(), out.boolVars.toSet(), "$name bool vars")
     }
 
     @Test
@@ -121,13 +123,13 @@ class FactorRemapTest {
 
     @Test
     fun `lit polarity is preserved`() {
-        val out = Clause(intArrayOf(pos(0), neg(1))).remap(boolMap, intMap) as Clause
+        val out = Clause(intArrayOf(pos(0), neg(1))).remap(mapping) as Clause
         assertEquals(listOf(Lit.make(50, true), Lit.make(51, false)).toSet(), out.literals.toSet())
     }
 
     @Test
     fun `constant element array is not remapped`() {
-        val out = Element(0, 1, longArrayOf(5, 6), arrIsVars = false, indexOffset = 1).remap(boolMap, intMap) as Element
+        val out = Element(0, 1, longArrayOf(5, 6), arrIsVars = false, indexOffset = 1).remap(mapping) as Element
         assertEquals(100, out.idx)
         assertEquals(101, out.result)
         assertTrue(out.arr.contentEquals(longArrayOf(5, 6)), "constant array must be untouched: ${out.arr.toList()}")
@@ -141,7 +143,7 @@ class FactorRemapTest {
             intArrayOf(2, 3),
             fOffset = 7,
             gOffset = 9,
-        ).remap(boolMap, intMap) as Inverse
+        ).remap(mapping) as Inverse
         assertEquals(7, out.fOffset)
         assertEquals(9, out.gOffset)
     }
@@ -149,16 +151,51 @@ class FactorRemapTest {
     @Test
     fun `cumulative capacityVar sentinel survives and a real one remaps`() {
         val constCap =
-            Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L).remap(boolMap, intMap) as Cumulative
+            Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L).remap(mapping) as Cumulative
         assertEquals(-1, constCap.capacityVar)
         val varCap = Cumulative(intArrayOf(0), longArrayOf(2), longArrayOf(1), 3L, capacityVar = 6)
-            .remap(boolMap, intMap) as Cumulative
+            .remap(mapping) as Cumulative
         assertEquals(106, varCap.capacityVar)
     }
 
     @Test
+    fun `real columns are renumbered by the same remap`() {
+        val realMap = IntArray(64) { it + 20 }
+        val withReals = VarRemap(boolMap, intMap, realMap)
+        val row = Linear(
+            intVars = intArrayOf(0),
+            intCoeffs = doubleArrayOf(1.0),
+            realVars = intArrayOf(3),
+            realCoeffs = doubleArrayOf(2.0),
+            op = LinearOp.LE,
+            bound = 1.5,
+        )
+
+        val out = row.remap(withReals) as Linear
+
+        assertEquals(listOf(100), out.vars.toList())
+        assertEquals(listOf(23), out.realVars.toList())
+    }
+
+    @Test
+    fun `a remap without a real map leaves real columns where they are`() {
+        val row = Linear(
+            intVars = intArrayOf(0),
+            intCoeffs = doubleArrayOf(1.0),
+            realVars = intArrayOf(3),
+            realCoeffs = doubleArrayOf(2.0),
+            op = LinearOp.LE,
+            bound = 1.5,
+        )
+
+        val out = row.remap(mapping) as Linear
+
+        assertEquals(listOf(3), out.realVars.toList())
+    }
+
+    @Test
     fun `null diffn size-vars stay null`() {
-        val out = Diffn(intArrayOf(0), intArrayOf(1), longArrayOf(1), longArrayOf(1)).remap(boolMap, intMap) as Diffn
+        val out = Diffn(intArrayOf(0), intArrayOf(1), longArrayOf(1), longArrayOf(1)).remap(mapping) as Diffn
         assertNull(out.widthVars)
         assertNull(out.heightVars)
     }

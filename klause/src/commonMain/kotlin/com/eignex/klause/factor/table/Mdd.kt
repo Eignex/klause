@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
@@ -17,6 +16,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.IntArrayList
@@ -76,15 +76,15 @@ class Mdd(
         if (recordStride == 4) require(cost >= 0) { "Mdd: cost-MDD requires cost var" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Mdd(
-        seq.remapVars(intMap),
+    override fun remap(mapping: VarRemap): Factor = Mdd(
+        mapping.ints(seq),
         numStatesPerLayer,
         layerStarts,
         transitions,
         initial,
         accepting,
         recordStride,
-        if (cost >= 0) intMap[cost] else cost,
+        if (cost >= 0) mapping.int(cost) else cost,
     ).also { it.transitionIndex = transitionIndex }
 
     /** Position-faithful (layer i matters): keeps the sequence vars in order and folds in the whole
@@ -97,8 +97,7 @@ class Mdd(
     override val structuralKeyWeight: Int
         get() = seq.size + numStatesPerLayer.size + layerStarts.size + transitions.size + accepting.size
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.MDD, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.MDD, mapping, ::buildKey)
 
     // The diagram (states, layer offsets, transition records, accepting set) is constant structure;
     // seq are the sequence's int-var ids; cost is an int var or a negative sentinel.

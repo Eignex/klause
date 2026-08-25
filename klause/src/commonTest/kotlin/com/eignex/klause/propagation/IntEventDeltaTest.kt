@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -64,8 +65,8 @@ class IntEventDeltaTest {
             return true
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-            DeltaAllDifferent(IntArray(intVars.size) { intMap[intVars[it]] })
+        override fun remap(mapping: VarRemap): Factor =
+            DeltaAllDifferent(IntArray(intVars.size) { mapping.int(intVars[it]) })
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
@@ -86,7 +87,7 @@ class IntEventDeltaTest {
             return if (d.min == d.max) state.excludeIntValue(dst, d.min) else true
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
+        override fun remap(mapping: VarRemap): Factor = ExcludeOnFix(mapping.int(src), mapping.int(dst))
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 

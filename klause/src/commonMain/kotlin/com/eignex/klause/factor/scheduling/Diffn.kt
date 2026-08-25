@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.scheduling
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
@@ -53,13 +53,13 @@ class Diffn(
         require(heightVars == null || heightVars.size == n) { "diffn: heightVars size mismatch" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Diffn(
-        xs.remapVars(intMap),
-        ys.remapVars(intMap),
+    override fun remap(mapping: VarRemap): Factor = Diffn(
+        mapping.ints(xs),
+        mapping.ints(ys),
         widths,
         heights,
-        widthVars?.remapVars(intMap),
-        heightVars?.remapVars(intMap),
+        widthVars?.let(mapping::ints),
+        heightVars?.let(mapping::ints),
         nonStrict,
     )
 
@@ -67,8 +67,7 @@ class Diffn(
      *  folds in the constant sizes, the var-size split, and the [nonStrict] flag. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.DIFFN, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.DIFFN, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.DIFFN, mapping, ::buildKey)
 
     // widths/heights are constant sizes; xs/ys and the optional width/height var arrays are int-var ids.
     private fun buildKey(sink: KeySink) {

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet
@@ -409,6 +410,8 @@ internal object SymmetryBreaking {
         // Working colour maps reused across all port queries in a round (rebuilt each round).
         val intMap = IntArray(nInt)
         val boolMap = IntArray(nBool)
+        // The remap reads these arrays, so loading a round's colours into them re-aims it in place.
+        val mapping = VarRemap(boolMap, intMap)
         repeat(nInt + nBool + 1) {
             // Bail before a fresh round once the search's work budget is spent — returning the current
             // (possibly not-yet-stable) partition. Callers treat a spent budget as "stop", so a partial
@@ -418,11 +421,11 @@ internal object SymmetryBreaking {
             for (v in 0 until nBool) boolMap[v] = boolColour[v]
             val sigInt = Array(
                 nInt,
-            ) { v -> portSignature(problem, intInc[v], v, isBool = false, intMap, boolMap, intColour[v]) }
+            ) { v -> portSignature(problem, intInc[v], v, isBool = false, intMap, boolMap, mapping, intColour[v]) }
             val sigBool =
                 Array(
                     nBool,
-                ) { v -> portSignature(problem, boolInc[v], v, isBool = true, intMap, boolMap, boolColour[v]) }
+                ) { v -> portSignature(problem, boolInc[v], v, isBool = true, intMap, boolMap, mapping, boolColour[v]) }
             // Charge the real per-round work, not just the arc count: each round also builds an
             // O(nInt + nBool) signature array per variable space and re-groups them in [assignColours]
             // (a sort over the distinct colours). On a sparse model — few factors over many variables,
@@ -457,6 +460,7 @@ internal object SymmetryBreaking {
         isBool: Boolean,
         intMap: IntArray,
         boolMap: IntArray,
+        mapping: VarRemap,
         oldColour: Int,
     ): RefineKey {
         val portHashes = LongArray(incident.size)
@@ -470,7 +474,7 @@ internal object SymmetryBreaking {
                 saved = intMap[v]
                 intMap[v] = WL_FOCAL
             }
-            portHashes[n++] = problem.factors[fi].remapStructuralHash(boolMap, intMap).toLong()
+            portHashes[n++] = problem.factors[fi].remapStructuralHash(mapping).toLong()
             if (isBool) boolMap[v] = saved else intMap[v] = saved
         }
         portHashes.sort() // canonical order: the signature is the multiset of port hashes
@@ -781,7 +785,9 @@ internal object SymmetryBreaking {
         base: Map<StructuralKey, Int>,
         boolMap: IntArray,
         intMap: IntArray,
-    ): Boolean = PresolveShared.matchesMultiset(problem.factors.asList(), base) { it.remap(boolMap, intMap) }
+    ): Boolean = PresolveShared.matchesMultiset(problem.factors.asList(), base) {
+        it.remap(VarRemap(boolMap, intMap))
+    }
 
     /** Test every unordered pair within [scope] with [verify] (skipping pairs already connected) and
      *  union the verified ones in [ds]. The shared inner step of every verified-orbit grouping. */

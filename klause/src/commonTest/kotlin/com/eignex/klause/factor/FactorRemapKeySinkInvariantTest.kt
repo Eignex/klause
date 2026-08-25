@@ -29,6 +29,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -45,6 +46,7 @@ class FactorRemapKeySinkInvariantTest {
     // collisions (remap stays injective) yet image order ≠ original order.
     private val intMap = IntArray(64) { (it * 45) % 64 }
     private val boolMap = IntArray(64) { (it * 45) % 64 }
+    private val mapping = VarRemap(boolMap, intMap)
     private val identity = IntArray(64) { it }
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -129,8 +131,8 @@ class FactorRemapKeySinkInvariantTest {
     fun `remapStructuralHash equals the remapped key hash for every factor`() {
         for ((name, f) in factors) {
             assertEquals(
-                f.remap(boolMap, intMap).structuralKey().hashCode(),
-                f.remapStructuralHash(boolMap, intMap),
+                f.remap(mapping).structuralKey().hashCode(),
+                f.remapStructuralHash(mapping),
                 "$name: allocation-free remap hash must match remap().structuralKey().hashCode()",
             )
         }
@@ -141,7 +143,7 @@ class FactorRemapKeySinkInvariantTest {
         for ((name, f) in factors) {
             assertEquals(
                 f.structuralKey().hashCode(),
-                f.remapStructuralHash(identity, identity),
+                f.remapStructuralHash(VarRemap(identity, identity)),
                 "$name: identity remap hash must match structuralKey().hashCode()",
             )
         }

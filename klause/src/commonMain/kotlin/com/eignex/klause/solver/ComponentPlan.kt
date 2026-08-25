@@ -112,7 +112,7 @@ class ComponentPlan internal constructor(
                 require(sourceFactor.intVars.all { sourceToCp[it] >= 0 }) {
                     "CP factor $factor mentions a theory-owned integer column"
                 }
-                sourceFactor.remap(boolMap, sourceToCp)
+                sourceFactor.remap(VarRemap(boolMap, sourceToCp))
             }
             .toList()
             .toTypedArray()

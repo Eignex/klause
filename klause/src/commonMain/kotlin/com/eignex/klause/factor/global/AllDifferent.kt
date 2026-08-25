@@ -4,8 +4,6 @@ import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapLits
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -16,6 +14,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
@@ -90,8 +89,8 @@ class AllDifferent(
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.ALL_DIFFERENT, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.ALL_DIFFERENT, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.ALL_DIFFERENT, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.long(domainMin)
@@ -121,11 +120,11 @@ class AllDifferent(
         )
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = AllDifferent(
-        vars.remapVars(intMap),
+    override fun remap(mapping: VarRemap): Factor = AllDifferent(
+        mapping.ints(vars),
         domainMin,
         domainSize,
-        presents.remapLits(boolMap),
+        mapping.lits(presents),
         exceptSet,
         boundsConsistent,
     )

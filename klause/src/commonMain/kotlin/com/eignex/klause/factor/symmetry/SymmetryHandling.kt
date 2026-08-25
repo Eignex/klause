@@ -8,6 +8,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.PermutationGroup
@@ -101,37 +102,33 @@ class SymmetryHandling(
         return SymmetryPropagator.Generator(left, right, isBool)
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor {
+    override fun remap(mapping: VarRemap): Factor {
         // Conjugate each generator by the remap: σ' = m ∘ σ ∘ m⁻¹. A remap that is not injective on a
         // generator's support (variable elimination / column merge) cannot carry the permutation, so
         // that generator is dropped — sound, since dropping a symmetry break only forgoes pruning.
-        val remapped = generators.mapNotNull { conjugate(it, boolMap, intMap) }
+        val remapped = generators.mapNotNull { conjugate(it, mapping) }
         if (remapped.isEmpty()) {
-            val identity = IntArray(intMap.size) { it } to IntArray(boolMap.size) { it }
+            val identity = IntArray(mapping.intCount) { it } to IntArray(mapping.boolCount) { it }
             return SymmetryHandling(listOf(identity))
         }
         return SymmetryHandling(remapped)
     }
 
-    private fun conjugate(
-        g: Pair<IntArray, IntArray>,
-        boolMap: IntArray,
-        intMap: IntArray,
-    ): Pair<IntArray, IntArray>? {
-        val newInt = conjugateOne(g.first, intMap, IntArray(intMap.size) { it }) ?: return null
-        val newBool = conjugateOne(g.second, boolMap, IntArray(boolMap.size) { it }) ?: return null
+    private fun conjugate(g: Pair<IntArray, IntArray>, mapping: VarRemap): Pair<IntArray, IntArray>? {
+        val newInt = conjugateOne(g.first, mapping::int, IntArray(mapping.intCount) { it }) ?: return null
+        val newBool = conjugateOne(g.second, mapping::bool, IntArray(mapping.boolCount) { it }) ?: return null
         return newInt to newBool
     }
 
-    /** Conjugate one permutation [perm] by [map] (`out[map[v]] = map[perm[v]]`); `null` if the result
-     *  is not a permutation — a remap that merges or sends a moved variable out of range (variable
+    /** Conjugate one permutation [perm] by [imageOf] (`out[imageOf(v)] = imageOf(perm[v])`); `null` if the
+     *  result is not a permutation — a remap that merges or sends a moved variable out of range (variable
      *  elimination / column merge) cannot carry the symmetry. [identity] is the new identity array. */
-    private fun conjugateOne(perm: IntArray, map: IntArray, identity: IntArray): IntArray? {
+    private fun conjugateOne(perm: IntArray, imageOf: (Int) -> Int, identity: IntArray): IntArray? {
         val out = identity
         for (v in perm.indices) {
             if (perm[v] == v) continue
-            val nv = map[v]
-            val image = map[perm[v]]
+            val nv = imageOf(v)
+            val image = imageOf(perm[v])
             if (nv !in out.indices || image !in out.indices) return null
             out[nv] = image
         }

@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -35,14 +35,14 @@ import com.eignex.klause.solver.materializeKey
  */
 class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ValuePrecede(s, t, xs.remapVars(intMap))
+    override fun remap(mapping: VarRemap): Factor = ValuePrecede(s, t, mapping.ints(xs))
 
     // Positional: the sequence order decides "before", so xs is not sorted. Encodes the values and
     // the full var sequence — collision-free up to variable identity (sound for symmetry checks).
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.VALUE_PRECEDE, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.VALUE_PRECEDE, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.VALUE_PRECEDE, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.long(s)

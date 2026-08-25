@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
@@ -14,6 +13,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -32,8 +32,7 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
         require(xs.isNotEmpty()) { "ArrayMinMax needs at least one operand" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        ArrayMinMax(intMap[result], xs.remapVars(intMap), max)
+    override fun remap(mapping: VarRemap): Factor = ArrayMinMax(mapping.int(result), mapping.ints(xs), max)
 
     // A single operand makes min/max degenerate to the plain equality `result = xs[0]`; the dedicated
     // propagator and relaxation carry no strength over the equality once the array is a singleton.
@@ -48,8 +47,8 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
      *  (min/max is symmetric in them), so they are sorted. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.ARRAY_MIN_MAX, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.ARRAY_MIN_MAX, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.ARRAY_MIN_MAX, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.bool(max)

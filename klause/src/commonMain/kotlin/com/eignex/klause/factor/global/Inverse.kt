@@ -1,6 +1,5 @@
 package com.eignex.klause.factor.global
 
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.IntIntMap
@@ -39,8 +39,7 @@ class Inverse(
         require(f.isNotEmpty()) { "inverse: empty arrays" }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        Inverse(f.remapVars(intMap), g.remapVars(intMap), fOffset, gOffset)
+    override fun remap(mapping: VarRemap): Factor = Inverse(mapping.ints(f), mapping.ints(g), fOffset, gOffset)
 
     // Positional: f(i)/g(i) are channelled by index, so neither array is sorted. Encodes both
     // offsets and the ordered f / g var sequences — fine enough that two non-equivalent Inverses
@@ -48,8 +47,7 @@ class Inverse(
     // (not canonicalised against each other); at worst this misses an f↔g symmetry, never unsound.
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.INVERSE, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.INVERSE, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.INVERSE, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.int(fOffset)

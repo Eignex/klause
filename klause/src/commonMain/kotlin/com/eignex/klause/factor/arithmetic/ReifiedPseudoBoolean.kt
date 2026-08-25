@@ -4,7 +4,6 @@ import com.eignex.klause.factor.ReifiedFactor
 import com.eignex.klause.factor.bool.internals.pbDegree
 import com.eignex.klause.factor.bool.internals.pbHolds
 import com.eignex.klause.factor.litVars
-import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
@@ -18,6 +17,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -36,15 +36,15 @@ class ReifiedPseudoBoolean(
 
     override val variables: VarList = BoolVars(literals.litVars(auxBoolVar))
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
+    override fun remap(mapping: VarRemap): Factor =
+        ReifiedPseudoBoolean(mapping.bool(auxBoolVar), weights, mapping.lits(literals), op, bound)
 
     /** `PseudoBoolean.structuralKey` plus the reifying [auxBoolVar]; the distinct factor kind keeps it
      *  disjoint from a bare pseudo-Boolean's key. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.boolVar(auxBoolVar)

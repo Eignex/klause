@@ -4,8 +4,6 @@ import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapLits
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
@@ -20,6 +18,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -69,8 +68,8 @@ class NValue(
         }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        NValue(intMap[n], xs.remapVars(intMap), mode, presents.remapLits(boolMap))
+    override fun remap(mapping: VarRemap): Factor =
+        NValue(mapping.int(n), mapping.ints(xs), mode, mapping.lits(presents))
 
     // A fixed distinct-count target degenerates the exact `nvalue` into a simpler global: `n = |xs|`
     // forces all values distinct (an [AllDifferent] over the union domain), and `n = 1` forces them all

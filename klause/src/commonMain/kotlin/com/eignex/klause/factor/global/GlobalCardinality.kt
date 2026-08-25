@@ -3,8 +3,6 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapLits
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
@@ -17,6 +15,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
@@ -73,14 +72,14 @@ class GlobalCardinality(
         }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = GlobalCardinality(
-        xs.remapVars(intMap),
+    override fun remap(mapping: VarRemap): Factor = GlobalCardinality(
+        mapping.ints(xs),
         cover,
-        countVars?.remapVars(intMap),
+        countVars?.let(mapping::ints),
         countLow,
         countHigh,
         closed,
-        presents.remapLits(boolMap),
+        mapping.lits(presents),
     )
 
     // xs is a set (counts are per cover value, order-independent) so xs/presents pairs are sorted by

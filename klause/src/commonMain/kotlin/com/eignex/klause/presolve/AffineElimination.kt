@@ -12,6 +12,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -1185,6 +1186,7 @@ internal object AffineSingletons {
             val intMap = IntArray(problem.numIntVars) { it }
             val y = c.termVars[0]
             intMap[c.x] = y
+            val mapping = VarRemap(boolMap, intMap)
             // Snapshot the ids that mention `x` before remapping — their occurrence entries for `x` and
             // `y` are re-derived from the remapped factor's own [Factor.intVars] below (a factor holding
             // both `x` and `y` coalesces to a single `y`, matching what a fresh CSR rebuild would list).
@@ -1203,7 +1205,7 @@ internal object AffineSingletons {
                 // its at-cap count from x to y in lockstep with its [intOcc] entry (below). x is eliminated,
                 // so its count is cleared wholesale afterwards.
                 val atCap = absorbed[id] >= FOLD_ABSORB_CAP && isCappable(f)
-                val remapped = f.remap(boolMap, intMap)
+                val remapped = f.remap(mapping)
                 slots[id] = remapped
                 intOcc[y].removeValue(id)
                 val hasY = remapped.intVars.contains(y)

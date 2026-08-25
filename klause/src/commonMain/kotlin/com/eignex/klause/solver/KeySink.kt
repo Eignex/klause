@@ -85,13 +85,13 @@ internal fun materializeKey(kind: FactorKind, expectedWords: Int, build: (KeySin
     MaterializingKeySink(kind, expectedWords).also(build).toKey()
 
 /**
- * The `hashCode` of the key `build` describes *after* remapping variables through [boolMap] / [intMap] —
- * the hashing half, allocation-free (no `remap()` copy, no key object). Equals
- * `remap(boolMap, intMap).structuralKey().hashCode()`. A factor's [Factor.remapStructuralHash] is
- * `hashRemappedKey(KIND, boolMap, intMap, ::buildKey)`, sharing the same `buildKey` as [materializeKey].
+ * The `hashCode` of the key `build` describes *after* renumbering variables through [mapping] — the
+ * hashing half, allocation-free (no `remap()` copy, no key object). Equals
+ * `remap(mapping).structuralKey().hashCode()`. A factor's [Factor.remapStructuralHash] is
+ * `hashRemappedKey(KIND, mapping, ::buildKey)`, sharing the same `buildKey` as [materializeKey].
  */
-internal fun hashRemappedKey(kind: FactorKind, boolMap: IntArray, intMap: IntArray, build: (KeySink) -> Unit): Int =
-    HashingKeySink(kind, boolMap, intMap).also(build).hash()
+internal fun hashRemappedKey(kind: FactorKind, mapping: VarRemap, build: (KeySink) -> Unit): Int =
+    HashingKeySink(kind, mapping).also(build).hash()
 
 /** Builds the canonical [StructuralKey] by delegating to [StructuralKeyBuilder] with the identity remap —
  *  so a migrated factor's key is byte-identical to the former hand-written `StructuralKey.of(kind){…}`. */
@@ -125,23 +125,19 @@ internal class MaterializingKeySink(private val kind: FactorKind, expectedWords:
 }
 
 /**
- * Folds the hash of the key the factor would have after remapping variables through [boolMap] / [intMap],
+ * Folds the hash of the key the factor would have after renumbering variables through [mapping],
  * mirroring [StructuralKeyBuilder]'s word layout without allocating. The fold matches
- * `remap(boolMap, intMap).structuralKey().hashCode()`: `contentHashCode` over the payload words
+ * `remap(mapping).structuralKey().hashCode()`: `contentHashCode` over the payload words
  * (seed 1, `h = 31*h + longWordHash(w)`), then `31*kind.ordinal + h`.
  */
-internal class HashingKeySink(
-    private val kind: FactorKind,
-    private val boolMap: IntArray,
-    private val intMap: IntArray,
-) : KeySink {
+internal class HashingKeySink(private val kind: FactorKind, private val mapping: VarRemap) : KeySink {
     private var h = 1
 
     private fun word(w: Long) {
         h = 31 * h + (w xor (w ushr Int.SIZE_BITS)).toInt()
     }
 
-    private fun mapLit(lit: Int): Int = Lit.make(boolMap[Lit.variable(lit)], Lit.isPositive(lit))
+    private fun mapLit(lit: Int): Int = Lit.make(mapping.bool(Lit.variable(lit)), Lit.isPositive(lit))
 
     override fun int(value: Int) = word(value.toLong())
     override fun long(value: Long) = word(value)
@@ -162,20 +158,20 @@ internal class HashingKeySink(
         for (w in fragment) word(w)
     }
 
-    override fun intVar(id: Int) = word(intMap[id].toLong())
+    override fun intVar(id: Int) = word(mapping.int(id).toLong())
 
-    override fun intVarOrSelf(id: Int) = word((if (id >= 0) intMap[id] else id).toLong())
+    override fun intVarOrSelf(id: Int) = word((if (id >= 0) mapping.int(id) else id).toLong())
 
     override fun intVars(ids: IntArray) {
         word(ids.size.toLong())
-        for (x in ids) word(intMap[x].toLong())
+        for (x in ids) word(mapping.int(x).toLong())
     }
 
-    override fun sortedIntVars(ids: IntArray) = sortedImages(ids) { intMap[it] }
+    override fun sortedIntVars(ids: IntArray) = sortedImages(ids) { mapping.int(it) }
 
-    override fun boolVar(id: Int) = word(boolMap[id].toLong())
+    override fun boolVar(id: Int) = word(mapping.bool(id).toLong())
 
-    override fun sortedBoolVars(ids: IntArray) = sortedImages(ids) { boolMap[it] }
+    override fun sortedBoolVars(ids: IntArray) = sortedImages(ids) { mapping.bool(it) }
 
     override fun boolLit(lit: Int) = word(mapLit(lit).toLong())
 
@@ -186,7 +182,7 @@ internal class HashingKeySink(
 
     override fun sortedBoolLits(lits: IntArray) = sortedImages(lits) { mapLit(it) }
 
-    override fun pairsByVarKey(varKeys: IntArray, valueOf: (Int) -> Long) = pairs(varKeys, { intMap[it] }, valueOf)
+    override fun pairsByVarKey(varKeys: IntArray, valueOf: (Int) -> Long) = pairs(varKeys, { mapping.int(it) }, valueOf)
 
     override fun pairsByLitKey(litKeys: IntArray, valueOf: (Int) -> Long) = pairs(litKeys, { mapLit(it) }, valueOf)
 
@@ -221,7 +217,9 @@ internal class HashingKeySink(
         // Pack (image high, original index low), sort by image, then walk runs of equal image summing
         // their values — reproducing `remap()` (whose constructor coalesces same-image terms) followed by
         // `pairsByKey`: length is the distinct-image count, then each `(image, summed value)` ascending.
-        val packed = LongArray(n) { (intMap[varKeys[it]].toLong() shl Int.SIZE_BITS) or (it.toLong() and LOW_WORD) }
+        val packed = LongArray(
+            n,
+        ) { (mapping.int(varKeys[it]).toLong() shl Int.SIZE_BITS) or (it.toLong() and LOW_WORD) }
         packed.sort()
         var distinct = 0
         var i = 0

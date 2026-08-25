@@ -20,6 +20,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -88,7 +89,7 @@ class ArithmeticPropagatorTest {
             return if (d.min == d.max) state.excludeIntValue(dst, d.min) else true
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ExcludeOnFix(intMap[src], intMap[dst])
+        override fun remap(mapping: VarRemap): Factor = ExcludeOnFix(mapping.int(src), mapping.int(dst))
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
@@ -327,8 +328,7 @@ class ArithmeticPropagatorTest {
             }
         }
 
-        override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-            ExcludeOnFixWithReason(intMap[src], intMap[dst])
+        override fun remap(mapping: VarRemap): Factor = ExcludeOnFixWithReason(mapping.int(src), mapping.int(dst))
 
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 

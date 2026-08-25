@@ -2,7 +2,6 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
-import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
@@ -15,6 +14,7 @@ import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -42,14 +42,13 @@ class Clause(val literals: IntArray) :
 
     // Allocation-free per-incidence key hash via the two-mode [KeySink]: symmetry refinement rebuilds
     // this once per incident variable each round, so avoiding the remapped clause + its key matters.
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.CLAUSE, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.CLAUSE, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.sortedBoolLits(literals)
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
+    override fun remap(mapping: VarRemap): Factor = Clause(mapping.lits(literals))
 
     override val variables: VarList = BoolVars(literals.litVars())
 

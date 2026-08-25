@@ -2,7 +2,6 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
-import com.eignex.klause.factor.remapLits
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
@@ -17,6 +16,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -33,8 +33,8 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PSEUDO_BOOLEAN, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.enum(op)
@@ -42,8 +42,7 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
         sink.pairsByLitKey(literals) { weights[it] }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
-        PseudoBoolean(weights, literals.remapLits(boolMap), op, bound)
+    override fun remap(mapping: VarRemap): Factor = PseudoBoolean(weights, mapping.lits(literals), op, bound)
 
     // Unit weights make `Σ 1·lit ⟨op⟩ bound` a plain count of true literals, i.e. a [Cardinality] — a
     // single canonical form that shares its dedicated counting propagator and lets an equivalent

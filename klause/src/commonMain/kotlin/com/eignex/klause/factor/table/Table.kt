@@ -2,7 +2,6 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.factor.remapVars
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
@@ -18,6 +17,7 @@ import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.IntArrayList
@@ -120,8 +120,8 @@ class Table private constructor(
     // O(tuples) row sort on every table, which on a float-derived table over a wide scaled domain (a
     // bucket-index table with one row per bucket) is seconds. Pass the cached value (possibly `null`); the
     // remapped table computes it lazily, and identically, only when something actually reads the key.
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Table(
-        xs.remapVars(intMap),
+    override fun remap(mapping: VarRemap): Factor = Table(
+        mapping.ints(xs),
         tuples,
         hi,
         cachedTupleKey,
@@ -169,8 +169,7 @@ class Table private constructor(
     // varies under a remap; the tuple part is the cached [tupleKey] fragment.
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.TABLE, structuralKeyWeight, ::buildKey)
 
-    override fun remapStructuralHash(boolMap: IntArray, intMap: IntArray): Int =
-        hashRemappedKey(FactorKind.TABLE, boolMap, intMap, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.TABLE, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.intVars(xs)
