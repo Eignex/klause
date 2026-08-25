@@ -197,8 +197,6 @@ class Linear private constructor(
         MixedVars(boundInts = vars, reals = realVars)
     }
 
-    /** Interval reasoning over the row's terms; an endpoint it cannot bound simply yields no deduction. */
-    override val needsFiniteDomains: Boolean get() = false
 
     /**
      * `Σ coeffs(i) * vars(i) ⟨op⟩ bound`. Duplicate variables are coalesced (their coefficients

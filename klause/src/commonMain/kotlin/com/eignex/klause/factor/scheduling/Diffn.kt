@@ -6,7 +6,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.NoVars
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
@@ -81,9 +81,9 @@ class Diffn(
         sink.intVars(heightVars ?: EmptyIntArray)
     }
 
-    override val variables: VarList = NoVars
-    override val intVars: IntArray =
-        xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray)
+    override val variables: VarList = SpanIntVars(
+        xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray),
+    )
 
     /** Whether the search can resize rectangles (var dimensions present). */
     val varSize: Boolean = widthVars != null || heightVars != null

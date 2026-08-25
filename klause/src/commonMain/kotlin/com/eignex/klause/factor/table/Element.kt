@@ -12,7 +12,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.NoVars
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.util.IntArrayList
@@ -117,10 +117,10 @@ class Element private constructor(
     // must conservatively return `null` (the default). Regular/Mdd are sound because their seq values
     // *are* the relabelable symbols, with no such positional coupling.
 
-    override val variables: VarList = NoVars
-    override val intVars: IntArray =
+    override val variables: VarList = SpanIntVars(
         // When arrIsVars the entries are var ids stored as Long; narrow each back to an Int var id.
-        if (arrIsVars) intArrayOf(idx, result) + IntArray(arr.size) { arr[it].toInt() } else intArrayOf(idx, result)
+        if (arrIsVars) intArrayOf(idx, result) + IntArray(arr.size) { arr[it].toInt() } else intArrayOf(idx, result),
+    )
 
     // A constant array is embedded in the key but is not part of [intVars], so its size must be added
     // explicitly; a variable array is already counted via [intVars].
