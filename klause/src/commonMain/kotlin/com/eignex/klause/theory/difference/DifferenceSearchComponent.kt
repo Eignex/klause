@@ -2,6 +2,7 @@ package com.eignex.klause.theory.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
+import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.solver.Lit
@@ -31,7 +32,8 @@ class DifferenceSearchComponent(
             val guard = fragment.edges[edge].guard
             guard == DifferenceEdge.ALWAYS || context.boolValue(Lit.variable(guard)) == Lit.isPositive(guard)
         }
-        val cycle = fragment.graph().negativeCycle(active) ?: return ComponentResult.Consistent
+        val cycle = fragment.graph().negativeCycle(active, context::cancelled)
+            ?: return ComponentResult.Consistent
         return ComponentResult.Conflict(cycleExplanation(fragment, cycle))
     }
 
@@ -44,7 +46,13 @@ class DifferenceSearchComponent(
         val values = if (fragment == null) {
             unconstrainedValues(context)
         } else {
-            fragment.potentialSample(model.numIntVars, bools) ?: return ComponentCheck.Infeasible()
+            // A spent budget is not a refutation: the check says it does not know, and the engine keeps
+            // whatever verdict it already had rather than reading abandonment as infeasibility.
+            when (val outcome = fragment.potentialSample(model.numIntVars, bools, context::cancelled)) {
+                is Potentials.Found -> outcome.values
+                Potentials.Infeasible -> return ComponentCheck.Infeasible()
+                Potentials.Abandoned -> return ComponentCheck.Indeterminate
+            }
         }
         assignment = Sample(bools, values)
         return ComponentCheck.Feasible

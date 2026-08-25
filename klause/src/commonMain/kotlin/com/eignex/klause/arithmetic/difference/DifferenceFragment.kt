@@ -165,16 +165,26 @@ internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars
     hasCompleteDifferenceCoverage(factors) &&
         (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)
 
-internal fun DifferenceFragment.potentialSample(numIntVars: Int, bools: BooleanArray): LongArray? {
+/** One value per integer column witnessing feasibility, or why none was produced. */
+internal fun DifferenceFragment.potentialSample(
+    numIntVars: Int,
+    bools: BooleanArray,
+    cancelled: () -> Boolean = { false },
+): Potentials {
     val active = BooleanArray(edges.size)
     for (edge in edges.indices) {
         val guard = edges[edge].guard
         if (guard != DifferenceEdge.ALWAYS && bools[Lit.variable(guard)] != Lit.isPositive(guard)) continue
         active[edge] = true
     }
-    val potential = graph().potentials(active) ?: return null
-    val zero = potential[zeroNode]
-    return LongArray(numIntVars).also { values ->
-        for (node in nodes.indices) values[nodes[node]] = potential[node] - zero
+    val potential = when (val outcome = graph().potentials(active, cancelled)) {
+        is Potentials.Found -> outcome.values
+        else -> return outcome
     }
+    val zero = potential[zeroNode]
+    return Potentials.Found(
+        LongArray(numIntVars).also { values ->
+            for (node in nodes.indices) values[nodes[node]] = potential[node] - zero
+        },
+    )
 }
