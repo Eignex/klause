@@ -1,6 +1,8 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Cancellation
@@ -48,7 +50,10 @@ internal object ImplicationGraph {
         if (problem.numBoolVars == 0) return PassDelta()
 
         val implications = harvestImplications(problem, maxCandidates, cancellation)
-        val merges = equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars)
+        val merges = compatibleMerges(
+            problem,
+            equivalentVariableMerges(problem.numBoolVars, implications, objectiveBoolVars),
+        )
 
         val original = problem.factors.asList()
         val substituted = if (merges.isEmpty()) original else applyMerges(problem, merges)
@@ -173,6 +178,44 @@ internal object ImplicationGraph {
             out.add(remapped)
         }
         return out
+    }
+
+    /** Keep an SCC substitution within the factor representations supported by this pass. */
+    private fun compatibleMerges(problem: Problem, candidates: List<BoolMerge>): List<BoolMerge> {
+        if (candidates.isEmpty()) return candidates
+        val boolMap = IntArray(problem.numBoolVars) { it }
+        for (merge in candidates) boolMap[merge.from] = merge.into
+        for (factor in problem.factors) {
+            when (factor) {
+                is Cardinality -> restoreDistinctLiteralVariables(factor, boolMap)
+                is ReifiedPseudoBoolean -> restoreAuxiliarySeparation(factor, boolMap)
+            }
+        }
+        return candidates.filter { boolMap[it.from] == it.into }
+    }
+
+    private fun restoreDistinctLiteralVariables(factor: Cardinality, boolMap: IntArray) {
+        for (i in factor.literals.indices) {
+            val first = Lit.variable(factor.literals[i])
+            for (j in 0 until i) {
+                val second = Lit.variable(factor.literals[j])
+                if (boolMap[first] == boolMap[second]) {
+                    boolMap[first] = first
+                    boolMap[second] = second
+                }
+            }
+        }
+    }
+
+    private fun restoreAuxiliarySeparation(factor: ReifiedPseudoBoolean, boolMap: IntArray) {
+        val auxiliary = factor.auxBoolVar
+        for (literal in factor.literals) {
+            val bodyVariable = Lit.variable(literal)
+            if (boolMap[auxiliary] == boolMap[bodyVariable]) {
+                boolMap[auxiliary] = auxiliary
+                boolMap[bodyVariable] = bodyVariable
+            }
+        }
     }
 
     /** A clause that holds in every assignment because some variable appears in both polarities. */

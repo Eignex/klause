@@ -132,10 +132,10 @@ class Linear private constructor(
         require(real == null || real.intCoefficients.size == vars.size) { "real int-coeff/var length mismatch" }
         require(real == null || realVars.isNotEmpty()) { "a real linear row needs at least one real variable" }
         require(real == null || real.bound.isFinite()) { "real linear bound must be finite" }
-        require(real == null || real.intCoefficients.toDoubleArray().all { it.isFinite() }) {
+        require(real == null || (0 until real.intCoefficients.size).all { real.intCoefficients.at(it).isFinite() }) {
             "real linear integer coefficients must be finite"
         }
-        require(real == null || real.realCoefficients.toDoubleArray().all { it.isFinite() }) {
+        require(real == null || (0 until real.realCoefficients.size).all { real.realCoefficients.at(it).isFinite() }) {
             "real linear coefficients must be finite"
         }
         require(real == null || !real.strict || op == LinearOp.LE) { "strictness needs an LP-only inequality row" }

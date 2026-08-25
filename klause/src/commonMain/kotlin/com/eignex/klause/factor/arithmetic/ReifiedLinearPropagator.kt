@@ -3,8 +3,10 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
+import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
+import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -100,17 +102,13 @@ internal class ReifiedLinearPropagator(
             },
             propagateFalse = { a ->
                 when (op) {
-                    LinearOp.LE -> if (bnd == Long.MAX_VALUE) {
-                        false
-                    } else {
-                        propagateLinearBounds(state, coeffs, vars, LinearOp.GE, bnd + 1, a, true)
-                    }
+                    LinearOp.LE -> successorOrNull(bnd)?.let {
+                        propagateLinearBounds(state, coeffs, vars, LinearOp.GE, it, a, true)
+                    } ?: false
 
-                    LinearOp.GE -> if (bnd == Long.MIN_VALUE) {
-                        false
-                    } else {
-                        propagateLinearBounds(state, coeffs, vars, LinearOp.LE, bnd - 1, a, true)
-                    }
+                    LinearOp.GE -> predecessorOrNull(bnd)?.let {
+                        propagateLinearBounds(state, coeffs, vars, LinearOp.LE, it, a, true)
+                    } ?: false
 
                     LinearOp.EQ -> propagateLinearBounds(state, coeffs, vars, LinearOp.NE, bnd, a, true)
 

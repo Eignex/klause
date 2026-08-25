@@ -3,6 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.mulExact
@@ -676,6 +677,7 @@ internal object AffineSingletons {
             // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
             // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
             val isAlias = termVars.size == 1 && termCoeffs[0] == 1L && constTerm == 0L
+            if (isAlias && ws.aliasOverflowsLong(di, x, termVars[0])) continue
             // Defer a fold that would inflate rather than simplify (leave the variable). Aliases are pure
             // renames that never inflate, so they always proceed. Otherwise skip a pivot whose fold would
             // rewrite a row that has already absorbed [FOLD_ABSORB_CAP] folds (bounding the accumulating-row
@@ -794,6 +796,9 @@ internal object AffineSingletons {
             cancellation: Cancellation = Cancellation.Never,
         ): Boolean
 
+        /** Whether renaming [x] to [replacement] would coalesce an integer linear row past [Long]. */
+        fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean
+
         /** The smallest stable id `>= from` that could head a pivot — a live [Linear] equality of arity
          *  `>= 2` — or [size] if none remains, in ascending order. Lets the candidate scan skip the
          *  inequality/global bulk (which can never be a candidate) instead of testing every id, while
@@ -806,6 +811,24 @@ internal object AffineSingletons {
     /** Whether [f] could head an affine or residue pivot: a [Linear] equality of arity >= 2. */
     private fun isEqCand(f: Factor?): Boolean =
         f is Linear && f.integerConstants != null && f.op == LinearOp.EQ && f.vars.size >= 2
+
+    private fun aliasOverflowsLong(factor: Factor?, x: Int, replacement: Int): Boolean {
+        val (vars, coefficients) = when (factor) {
+            is Linear -> factor.integerConstants?.let { factor.vars to it }
+            is ReifiedLinear -> factor.integerConstants?.let { factor.vars to it }
+            else -> null
+        } ?: return false
+        var xCoeff = 0L
+        var replacementCoeff = 0L
+        for (i in vars.indices) {
+            when (vars[i]) {
+                x -> xCoeff = coefficients.coeff(i)
+                replacement -> replacementCoeff = coefficients.coeff(i)
+            }
+        }
+        val sum = xCoeff + replacementCoeff
+        return ((xCoeff xor sum) and (replacementCoeff xor sum)) < 0L
+    }
 
     /** Stable ids (ascending) of the pristine [factors] that could ever head an affine/residue pivot. */
     private fun eqPivotIds(factors: Array<Factor>): IntArray {
@@ -891,6 +914,14 @@ internal object AffineSingletons {
                 ) {
                     return true
                 }
+            }
+            return false
+        }
+
+        override fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean {
+            for (k in occ.offsets[x] until occ.offsets[x + 1]) {
+                val id = occ.flat[k]
+                if (id != defIdx && aliasOverflowsLong(factors[id], x, replacement)) return true
             }
             return false
         }
@@ -1089,6 +1120,15 @@ internal object AffineSingletons {
                 ) {
                     return true
                 }
+            }
+            return false
+        }
+
+        override fun aliasOverflowsLong(defIdx: Int, x: Int, replacement: Int): Boolean {
+            val occ = intOcc[x]
+            for (k in 0 until occ.size) {
+                val id = occ[k]
+                if (id != defIdx && aliasOverflowsLong(slots[id], x, replacement)) return true
             }
             return false
         }

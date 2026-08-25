@@ -8,6 +8,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.VarRemap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -51,6 +52,22 @@ class WideLinearPropagatorTest {
         val s = PropagationSession(problem(row))
         assertTrue(s.pinInt(1, 1) !is PropagationResult.Unsat)
         assertEquals(1L, s.intDomain(0).max, "x's max must be tightened to 1 through the wide coefficient")
+    }
+
+    @Test
+    fun `a collapsed wide coefficient bakes and propagates`() {
+        val original = Linear(intArrayOf(0, 1), arrayOf(w, -w), LinearOp.EQ, BigInteger.ZERO)
+        val remapped = original.remap(VarRemap(IntArray(0), intArrayOf(0, 0)))
+        val p = Problem(
+            numBoolVars = 0,
+            numIntVars = 1,
+            intDomains = arrayOf(IntDomain(-1, 1)),
+            factors = arrayOf(remapped),
+        )
+
+        val session = PropagationSession(p.bake())
+
+        assertEquals(IntDomain(-1, 1), session.intDomain(0))
     }
 
     @Test

@@ -48,23 +48,26 @@ internal class ReifiedPseudoBooleanPropagator(
             pinAntecedent = { pbFalseFormAntecedents(state, literals, excludeVar = auxBoolVar, extraLit = 0) },
             propagateTrue = { a -> propagatePbBounds(state, weights, literals, op, bnd, extraLit = a) },
             propagateFalse = { a ->
-                when (op) {
-                    PbOp.LE -> if (bnd == Long.MAX_VALUE) {
-                        false
-                    } else {
-                        propagatePbBounds(state, weights, literals, PbOp.GE, bnd + 1, extraLit = a)
-                    }
-
-                    PbOp.GE -> if (bnd == Long.MIN_VALUE) {
-                        false
-                    } else {
-                        propagatePbBounds(state, weights, literals, PbOp.LE, bnd - 1, extraLit = a)
-                    }
-
-                    PbOp.EQ -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = a)
+                when (val falseForm = falseForm(op, bnd)) {
+                    null -> false
+                    is FalseForm.Inequality ->
+                        propagatePbBounds(state, weights, literals, falseForm.op, falseForm.bound, extraLit = a)
+                    FalseForm.NotEqual -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = a)
                 }
             },
         )
+    }
+
+    private fun falseForm(op: PbOp, bound: Long): FalseForm? = when (op) {
+        PbOp.LE -> if (bound == Long.MAX_VALUE) null else FalseForm.Inequality(PbOp.GE, bound + 1L)
+        PbOp.GE -> if (bound == Long.MIN_VALUE) null else FalseForm.Inequality(PbOp.LE, bound - 1L)
+        PbOp.EQ -> FalseForm.NotEqual
+    }
+
+    private sealed interface FalseForm {
+        data class Inequality(val op: PbOp, val bound: Long) : FalseForm
+
+        data object NotEqual : FalseForm
     }
 
     private fun propagatePbNotEqual(

@@ -222,6 +222,21 @@ class AffineEliminationTest {
     }
 
     @Test
+    fun `leaves an alias when remapping its linear row would overflow`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 1)),
+            factors = listOf(
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE), intArrayOf(0, 1), LinearOp.LE, Long.MAX_VALUE),
+            ),
+        )
+
+        assertTrue(Presolve.eliminateAffineSingletons(problem).isEmpty)
+    }
+
+    @Test
     fun `chained aliases keep a non-linear factor renamed through both steps`() {
         // m = max(a, b), then m = x, then x = y: aliasing m -> x renames the ArrayMinMax result, and the
         // second alias x -> y must still see and rewrite that factor. If the first alias fails to register
