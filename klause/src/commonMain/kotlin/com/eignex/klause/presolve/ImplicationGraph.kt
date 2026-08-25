@@ -1,7 +1,6 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
@@ -187,24 +186,10 @@ internal object ImplicationGraph {
         for (merge in candidates) boolMap[merge.from] = merge.into
         for (factor in problem.factors) {
             when (factor) {
-                is Cardinality -> restoreDistinctLiteralVariables(factor, boolMap)
                 is ReifiedPseudoBoolean -> restoreAuxiliarySeparation(factor, boolMap)
             }
         }
         return candidates.filter { boolMap[it.from] == it.into }
-    }
-
-    private fun restoreDistinctLiteralVariables(factor: Cardinality, boolMap: IntArray) {
-        for (i in factor.literals.indices) {
-            val first = Lit.variable(factor.literals[i])
-            for (j in 0 until i) {
-                val second = Lit.variable(factor.literals[j])
-                if (boolMap[first] == boolMap[second]) {
-                    boolMap[first] = first
-                    boolMap[second] = second
-                }
-            }
-        }
     }
 
     private fun restoreAuxiliarySeparation(factor: ReifiedPseudoBoolean, boolMap: IntArray) {

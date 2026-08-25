@@ -11,18 +11,16 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
+import kotlin.test.assertContentEquals
 import kotlin.test.assertIs
 
 class CardinalityPropagatorTest {
 
     @Test
-    fun `cardinality rejects multiple literals for one Boolean variable`() {
-        val error = assertFailsWith<IllegalArgumentException> {
-            Cardinality(intArrayOf(Lit.make(0, true), Lit.make(0, false)), min = 0, max = 1)
-        }
+    fun `cardinality preserves multiple literals for one Boolean variable`() {
+        val factor = Cardinality(intArrayOf(Lit.make(0, true), Lit.make(0, false)), min = 0, max = 1)
 
-        assertEquals("Cardinality literals must reference distinct Boolean variables", error.message)
+        assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(0, false)), factor.literals)
     }
 
     @Test
@@ -35,14 +33,12 @@ class CardinalityPropagatorTest {
     }
 
     @Test
-    fun `remapping a cardinality rejects collapsed Boolean variables`() {
+    fun `remapping a cardinality preserves collapsed Boolean variables`() {
         val factor = Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), min = 0, max = 1)
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            factor.remap(VarRemap(intArrayOf(0, 0), intArrayOf()))
-        }
+        val remapped = factor.remap(VarRemap(intArrayOf(0, 0), intArrayOf())) as Cardinality
 
-        assertEquals("Cardinality literals must reference distinct Boolean variables", error.message)
+        assertContentEquals(intArrayOf(Lit.make(0, true), Lit.make(0, true)), remapped.literals)
     }
 
     @Test

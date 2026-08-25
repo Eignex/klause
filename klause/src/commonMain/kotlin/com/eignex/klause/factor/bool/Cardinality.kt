@@ -17,7 +17,6 @@ import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.IntHashSet
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -31,10 +30,6 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
     init {
         require(min in 0..max) { "Cardinality bounds invalid: $min..$max" }
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
-        val variables = IntHashSet(literals.size)
-        require(literals.all { variables.add(com.eignex.klause.solver.Lit.variable(it)) }) {
-            "Cardinality literals must reference distinct Boolean variables"
-        }
     }
 
     override val variables: VarList = BoolVars(literals.litVars())
