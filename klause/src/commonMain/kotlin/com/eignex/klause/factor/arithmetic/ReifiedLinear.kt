@@ -267,6 +267,7 @@ class ReifiedLinear private constructor(
         }
         val a = builder.boolColumn(auxBoolVar)
         val b = row.bound
+
         // Emit `Σ coeffs·vars + auxCoeff·aux  op  rhs`, marked [global] when the live M matches the
         // declared-range M; non-global rows cite their [maxSide] live bounds as premises.
         fun emit(auxCoeff: Long, rowOp: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean) {

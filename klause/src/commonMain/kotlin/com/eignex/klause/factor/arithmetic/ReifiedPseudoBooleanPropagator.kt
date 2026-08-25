@@ -50,8 +50,10 @@ internal class ReifiedPseudoBooleanPropagator(
             propagateFalse = { a ->
                 when (val falseForm = falseForm(op, bnd)) {
                     null -> false
+
                     is FalseForm.Inequality ->
                         propagatePbBounds(state, weights, literals, falseForm.op, falseForm.bound, extraLit = a)
+
                     FalseForm.NotEqual -> propagatePbNotEqual(state, weights, literals, bnd, extraLit = a)
                 }
             },

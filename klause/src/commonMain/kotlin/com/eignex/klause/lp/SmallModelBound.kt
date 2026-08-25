@@ -16,13 +16,15 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  * preferred where they apply.
  */
 /**
- * Exact arbitrary-precision version of the General LIA witness bound.
+ * The theorem's inputs for this system — largest entry `a` and row count `m` — or null when some factor
+ * is outside the admitted fragment.
  *
- * Unlike the finite-CP helper, this keeps the theorem bound in [BigInteger] and includes each
- * model-declared finite integer side as an inequality row. The latter is necessary: intersecting a
- * theorem box with a declared side after computing it can exclude every witness.
+ * Separate from [smallModelBigIntBound] because the two questions have wildly different costs. Whether
+ * the lane admits a model is one walk over its factors; the bound itself raises `m·a` to the `2m+1`, so
+ * on a model with a few hundred thousand rows it is a multi-megabyte integer that takes minutes to form.
+ * Routing only ever needed the first question.
  */
-internal fun smallModelBigIntBound(numIntVars: Int, factors: List<Factor>, intBounds: IntBounds): BigInteger? {
+internal fun smallModelInputs(numIntVars: Int, factors: List<Factor>, intBounds: IntBounds): Pair<BigInteger, Int>? {
     var a = BigInteger.ONE
     var m = 0
 
@@ -70,10 +72,29 @@ internal fun smallModelBigIntBound(numIntVars: Int, factors: List<Factor>, intBo
             if (!rows(1)) return null
         }
     }
-    if (numIntVars <= 0 || m == 0) return BigInteger.ONE
+    if (numIntVars <= 0 || m == 0) return BigInteger.ONE to 0
     if (m > Int.MAX_VALUE - numIntVars || m > (Int.MAX_VALUE - 1) / 2) return null
-    val rowsBig = BigInteger.fromInt(m)
-    return BigInteger.fromInt(numIntVars + m) * (rowsBig * (a + BigInteger.ONE)).pow(2 * m + 1)
+    return a to m
+}
+
+/** Whether the General LIA lane admits this system at all — the cheap half of [smallModelBigIntBound]. */
+internal fun admitsSmallModelBound(numIntVars: Int, factors: List<Factor>, intBounds: IntBounds): Boolean =
+    smallModelInputs(numIntVars, factors, intBounds) != null
+
+/**
+ * Exact arbitrary-precision General LIA witness bound, or null when the system is outside the fragment.
+ *
+ * Keeps the theorem bound in [BigInteger] and includes each model-declared finite integer side as an
+ * inequality row — necessary, because intersecting a theorem box with a declared side after computing it
+ * can exclude every witness.
+ *
+ * Forms `n(ma)^(2m+1)`, so it is exponential in the row count by construction. Ask for it only when the
+ * box is about to be searched, never to decide a route.
+ */
+internal fun smallModelBigIntBound(numIntVars: Int, factors: List<Factor>, intBounds: IntBounds): BigInteger? {
+    val (a, m) = smallModelInputs(numIntVars, factors, intBounds) ?: return null
+    if (m == 0) return BigInteger.ONE
+    return BigInteger.fromInt(numIntVars + m) * (BigInteger.fromInt(m) * (a + BigInteger.ONE)).pow(2 * m + 1)
 }
 
 /** Feed a row's exact constants to [observe], whatever width they are stored at. */

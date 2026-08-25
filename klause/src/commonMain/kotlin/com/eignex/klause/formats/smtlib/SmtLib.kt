@@ -31,8 +31,6 @@ data class SmtLibProblem(
     val model: ProblemSpec,
     /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
-    /** Pipeline selected from the source model before any finite digit lowering. */
-    val sourcePipeline: ProblemPipeline = model.sourceRoute(),
     /** Declared `Int` variable name to int id. */
     val intVarNames: Map<String, Int> = emptyMap(),
     /** Declared `Bool` variable name to bool id. */
@@ -41,7 +39,19 @@ data class SmtLibProblem(
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-)
+) {
+    /**
+     * Pipeline selected from the source model before any finite digit lowering.
+     *
+     * Computed on first read, not at construction. Classifying an open model walks every factor — the
+     * General LIA witness bound is a `BigInteger` pass over all of them — so a parse that did it eagerly
+     * charged every caller for a question many never ask.
+     */
+    val sourcePipeline: ProblemPipeline by lazy(LazyThreadSafetyMode.NONE) {
+        // A pure-real model is settled by the cheap check; anything else asks the router.
+        if (model.supportsExactLra()) ProblemPipeline.EXACT_LRA else model.sourceRoute()
+    }
+}
 
 /** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
  *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
@@ -337,11 +347,6 @@ object SmtLib {
             )
             return SmtLibProblem(
                 model,
-                sourcePipeline = if (model.supportsExactLra()) {
-                    ProblemPipeline.EXACT_LRA
-                } else {
-                    model.sourceRoute()
-                },
                 objective = objective,
                 intVarNames = LinkedHashMap(intNames),
                 boolVarNames = LinkedHashMap(boolNames),
