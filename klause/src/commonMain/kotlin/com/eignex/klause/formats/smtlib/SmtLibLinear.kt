@@ -54,6 +54,10 @@ private fun SmtLib.Builder.postOrderChain(op: String, terms: List<IntComb>): Boo
         narrow.lin.asSimpleVar() ?: return false
     }
     if (vars.toHashSet().size != vars.size) return false
+    // No theory holds an [Increasing], so an open column in the chain would leave the model with no owner
+    // for it. The pairwise rows the caller falls back to are difference constraints a theory decides, so
+    // declining costs nothing — the same trade the open `distinct` makes.
+    if (vars.any { intDomains[it] is PresolveDomain.Open }) return false
     // `a ≥ b ≥ c` is the ascending chain over the reversed sequence; [Increasing] only represents ascending.
     factors.add(Increasing(if (descending) vars.reversedArray() else vars, strict = strictDelta(op) != 0))
     return true
