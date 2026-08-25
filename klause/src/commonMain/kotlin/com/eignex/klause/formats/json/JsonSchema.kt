@@ -24,7 +24,11 @@ object JsonSchema {
     fun parseProblem(text: String): Problem = parseCompiled(text).problem
 
     /** Parse and compile, returning the full [CompiledSchema]. */
-    fun parseCompiled(text: String): CompiledSchema = Compiler().compile(decode(text))
+    fun parseCompiled(text: String): CompiledSchema = try {
+        Compiler().compile(decode(text))
+    } catch (e: IllegalArgumentException) {
+        throw JsonFormatException(e.message ?: "invalid schema", e)
+    }
 
     private fun decode(text: String): SchemaDef<SchemaEntry> = try {
         json.decodeFromString(SchemaDef.serializer(SchemaEntry.serializer()), text)
