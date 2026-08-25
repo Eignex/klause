@@ -2,17 +2,6 @@ package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.factor.arithmetic.LinearOp
 
-/**
- * One difference constraint `target − source ≤ bound`, the edge `source → target` of the constraint
- * graph. [guard] is the Boolean literal that must hold for it to be asserted, or [ALWAYS] when the row is
- * unconditional — a reified row only constrains once the search has decided its aux variable.
- *
- * [domainBound] marks an edge that states a declared domain side rather than a row of the model. Both
- * endpoints of such an edge are the constant node and one variable, so a model whose columns are all
- * bounded makes that node a hub of degree `2n` and every shortest-path search spans the whole graph. The
- * propagator therefore keeps these out of the graph and folds them into the distance query instead; see
- * [com.eignex.klause.propagation.difference.DifferenceSystemPropagator].
- */
 internal class DifferenceEdge(
     val source: Int,
     val target: Int,
@@ -21,21 +10,10 @@ internal class DifferenceEdge(
     val domainBound: Boolean = false,
 ) {
     internal companion object {
-        /** [guard] value for a row that holds unconditionally. */
         const val ALWAYS: Int = -1
     }
 }
 
-/**
- * The `target − source ≤ bound` form of a two-term row, or `null` when its shape is not a difference.
- *
- * A row qualifies when, after dividing out the coefficients' common factor, the pair is exactly `+1` and
- * `−1`. A one-term row qualifies too, as a difference against [zero] — the node standing for the constant.
- * Everything else (three terms, a sum, mismatched magnitudes, a disequality) is outside the fragment.
- *
- * Emits into [out] because an equality contributes both directions. Returns false when the row does not
- * qualify, leaving [out] untouched.
- */
 @Suppress("ReturnCount")
 internal fun appendDifferenceEdges(
     vars: IntArray,
@@ -99,13 +77,6 @@ internal fun appendDifferenceEdges(
     return true
 }
 
-/**
- * The same for the row's *negation*, which a reified row asserts when its aux is false.
- *
- * Over the integers `¬(Σ ≤ b)` is `Σ ≥ b + 1` and `¬(Σ ≥ b)` is `Σ ≤ b − 1`, both differences again — so
- * a reified difference constrains under either polarity, and the false branch is as informative as the
- * true one. `=` negates to a disequality, which is not a difference, so it contributes nothing.
- */
 internal fun appendNegatedDifferenceEdges(
     vars: IntArray,
     coeff: (Int) -> Long,

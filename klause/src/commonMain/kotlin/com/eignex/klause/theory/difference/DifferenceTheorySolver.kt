@@ -13,7 +13,7 @@ import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 
-/** Complete DPLL(T) satisfiability search for an open integer difference-logic [ProblemSpec]. */
+/** Complete open integer difference-logic solver. */
 class DifferenceTheorySolver(override val model: ProblemSpec) : Theory<Sample> {
     private val fragment = differenceFragmentOf(model.factors, model.numIntVars, model.intBounds)
 

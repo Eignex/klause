@@ -14,17 +14,17 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.theory.theoryComponent
 
-/** Components and single session built from one immutable [ComponentPlan]. */
+/** Components and session built from a [ComponentPlan]. */
 class PlannedSearch internal constructor(
-    /** The session that owns every decision level and component lifecycle. */
+    /** Shared search session. */
     val session: SearchSession,
-    /** Finite-domain participant, when the plan selected one. */
+    /** Finite-domain participant, if selected. */
     val cp: CpSearchComponent?,
-    /** Theory participant, when the plan selected one. */
+    /** Theory participant, if selected. */
     val theory: TheoryComponent?,
 )
 
-/** Build the selected CP, shared-clause, and theory components exactly once. */
+/** Builds the selected search components. */
 fun ComponentPlan.search(
     spec: ProblemSpec,
     cpDomains: Map<Int, IntDomain>,

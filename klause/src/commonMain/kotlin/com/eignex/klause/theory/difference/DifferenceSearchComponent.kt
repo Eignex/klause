@@ -15,7 +15,7 @@ import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.TheoryComponent
 
-/** Incremental difference-logic participant over the shared Boolean and integer-bound trail. */
+/** Incremental difference-logic search component. */
 class DifferenceSearchComponent(
     private val model: ProblemSpec,
     private val modelIntVars: IntArray = IntArray(model.numIntVars) { it },
@@ -72,7 +72,6 @@ class DifferenceSearchComponent(
         return DifferenceFragment(edges)
     }
 
-    /** A guarded negative cycle proves that at least one asserted guard must be false. */
     private fun cycleExplanation(fragment: DifferenceFragment, cycle: IntArray): SearchExplanation? {
         val guards = cycle.map { fragment.edges[it].guard }
         if (guards.any { it == DifferenceEdge.ALWAYS }) return null

@@ -9,7 +9,6 @@ import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.Sense
 import com.eignex.klause.solver.ProblemSpec
 
-/** Exact-simplex input assembled directly from a QF_LRA source model. */
 internal class QfLraSystem(private val model: ProblemSpec) {
     fun build(bools: BooleanArray): QfLraLeaf {
         val builder = LpBuilder()

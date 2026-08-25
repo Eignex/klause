@@ -11,7 +11,7 @@ import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraSolver
 
-/** Builds the theory participant chosen by a source [ComponentPlan]. */
+/** Builds the theory component selected by this plan. */
 fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
