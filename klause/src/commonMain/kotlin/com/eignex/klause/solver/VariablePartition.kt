@@ -33,7 +33,7 @@ class VariablePartition(private val searchRequired: BooleanArray) {
  * Classify this problem's integer variables; see [VariablePartition].
  *
  * One pass rather than a fixpoint, because the rule reads only the factors as they stand: a variable is
- * search-required exactly when some factor that [Factor.needsFiniteDomains] mentions it. A fixpoint
+ * search-required exactly when some factor declares it among the columns it enumerates. A fixpoint
  * becomes necessary only once a *lowering* decision depends on the classification — splitting a global
  * by boundedness would reclassify the variables it stops mentioning — and no such decision exists here.
  *
@@ -47,8 +47,7 @@ fun ProblemSpec.variablePartition(): VariablePartition = variablePartition(numIn
 private fun variablePartition(numIntVars: Int, factors: Array<Factor>): VariablePartition {
     val searchRequired = BooleanArray(numIntVars)
     for (f in factors) {
-        if (!f.needsFiniteDomains) continue
-        for (v in f.intVars) if (v < numIntVars) searchRequired[v] = true
+        for (v in f.variables.spanInts) if (v < numIntVars) searchRequired[v] = true
     }
     return VariablePartition(searchRequired)
 }

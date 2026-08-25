@@ -79,6 +79,24 @@ class VarListTest {
     }
 
     @Test
+    fun `the partition marks exactly the columns some factor enumerates`() {
+        val spec = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(9, 9, 9), null, null),
+            factors = arrayOf(
+                AllDifferent(intArrayOf(0, 1), domainMin = 0, domainSize = 10),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 5),
+            ),
+        )
+
+        val partition = spec.variablePartition()
+
+        assertTrue(!partition.isTheoryEligible(0), "an enumerated column must be searched")
+        assertTrue(!partition.isTheoryEligible(1), "shared with the enumerating factor")
+        assertTrue(partition.isTheoryEligible(2), "only a bounds reader touches it")
+    }
+
+    @Test
     fun `a factor with no variables declares that too`() {
         assertTrue(NoVars.ints.isEmpty())
         assertTrue(NoVars.boolVars.isEmpty())

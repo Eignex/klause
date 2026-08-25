@@ -186,7 +186,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
                 "open integer column $v reaches a finite-domain factor and cannot be theory-owned"
             }
             IntVariableOwner.THEORY
-        } else if (factors.any { factor -> factor.needsFiniteDomains && v in factor.intVars }) {
+        } else if (factors.any { factor -> v in factor.variables.spanInts }) {
             IntVariableOwner.CP
         } else {
             IntVariableOwner.THEORY
