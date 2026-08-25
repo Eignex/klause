@@ -1,10 +1,7 @@
-package com.eignex.klause.solver.formats
+package com.eignex.klause.lowering
 
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
-import com.eignex.klause.lowering.CnfLowering
-import com.eignex.klause.lowering.allDifferentWindowSize
-import com.eignex.klause.lowering.reifyAllDifferentWitness
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
