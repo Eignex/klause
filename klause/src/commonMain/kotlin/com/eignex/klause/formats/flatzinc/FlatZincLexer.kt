@@ -150,9 +150,9 @@ internal class FlatZincLexer(private val reader: CharReader) {
         val text = sb.toString()
         return if (sawDot || sawExp) {
             val value = text.toDoubleOrNull()
-                ?: throw FlatZincParseException("malformed float literal '$text'", startLine, startCol)
+                ?: numberError("malformed float literal '$text'", startLine, startCol)
             if (!value.isFinite()) {
-                throw FlatZincParseException(
+                numberError(
                     "float literal '$text' is outside the finite range",
                     startLine,
                     startCol,
@@ -161,10 +161,13 @@ internal class FlatZincLexer(private val reader: CharReader) {
             FznToken.FloatLit(value, startLine, startCol)
         } else {
             val value = text.toLongOrNull()
-                ?: throw FlatZincParseException("malformed int literal '$text'", startLine, startCol)
+                ?: numberError("malformed int literal '$text'", startLine, startCol)
             FznToken.IntLit(value, startLine, startCol)
         }
     }
+
+    private fun numberError(message: String, line: Int, column: Int): Nothing =
+        throw FlatZincParseException(message, line, column)
 
     private fun readString(startLine: Int, startCol: Int): FznToken {
         advance() // opening "
