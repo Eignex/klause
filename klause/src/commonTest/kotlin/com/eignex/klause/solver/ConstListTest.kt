@@ -3,6 +3,7 @@ package com.eignex.klause.solver
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -67,4 +68,12 @@ class ConstListTest {
 
         assertEquals(Long.MAX_VALUE, consts.maxAbs)
     }
+    @Test
+    fun `every width refuses an index the row does not have`() {
+        assertFailsWith<IndexOutOfBoundsException> { UnitConsts(3).at(3) }
+        assertFailsWith<IndexOutOfBoundsException> { UnitConsts(3).at(-1) }
+        assertFailsWith<IndexOutOfBoundsException> { constsOf(intArrayOf(2, 3)).at(2) }
+        assertFailsWith<IndexOutOfBoundsException> { constsOf(longArrayOf(9_000_000_000L, 2L)).at(2) }
+    }
+
 }

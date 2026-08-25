@@ -18,10 +18,16 @@ sealed interface ConstList {
 
 /** Constants that all fit [Long] — the only form integer reasoning may read term by term. */
 sealed interface LongConstList : ConstList {
-    /** The constant at [index]. */
+    /** The constant at [index]; throws when [index] is outside `0 until `[size]. */
     fun at(index: Int): Long
 
-    /** Largest `|constant|`, 0 when empty. */
+    /**
+     * Largest `|constant|`, 0 when empty, saturating at [Long.MAX_VALUE].
+     *
+     * `|`[Long.MIN_VALUE]`|` is one past what a `Long` states, so a row holding it reports
+     * [Long.MAX_VALUE] — never less than the true magnitude, which is what the overflow guards that
+     * read this need.
+     */
     val maxAbs: Long
 
     /** A fresh [LongArray] of every constant, for a whole-array sink; prefer [at] for indexed reads. */
@@ -33,7 +39,12 @@ sealed interface LongConstList : ConstList {
 
 /** Every constant is 1, so no per-term storage is kept: a clause-shaped row, a cardinality bound. */
 class UnitConsts(override val size: Int) : LongConstList {
-    override fun at(index: Int): Long = 1L
+    // Checked explicitly: there is no backing array whose own bounds check would catch a stray index,
+    // and silently answering 1 for one would read as a term this row does not have.
+    override fun at(index: Int): Long {
+        if (index < 0 || index >= size) throw IndexOutOfBoundsException("index $index, size $size")
+        return 1L
+    }
 
     override val maxAbs: Long get() = if (size == 0) 0L else 1L
 
