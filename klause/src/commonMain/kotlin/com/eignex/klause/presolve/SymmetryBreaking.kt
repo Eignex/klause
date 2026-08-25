@@ -5,13 +5,13 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntDisjointSet

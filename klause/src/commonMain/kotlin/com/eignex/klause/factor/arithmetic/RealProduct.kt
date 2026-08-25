@@ -1,18 +1,18 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.MixedVars
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorKind
-import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.MixedVars
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
-import com.eignex.klause.solver.materializeKey
 
 /**
  * `result = intOperand · realOperand`: a mixed integer·continuous product where

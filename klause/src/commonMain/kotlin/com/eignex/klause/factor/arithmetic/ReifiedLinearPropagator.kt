@@ -7,10 +7,10 @@ import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
 import com.eignex.klause.factor.arithmetic.internals.successorOrNull
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Lit
 
 /** CP propagator for [ReifiedLinear]: reification propagation and conflict reasons. */
 internal class ReifiedLinearPropagator(

@@ -1,11 +1,11 @@
-package com.eignex.klause.solver
+package com.eignex.klause.ir
 
 /**
- * A canonical identity for a [Factor] up to variable identity: same factor type, same constants
+ * A canonical identity for a constraint up to variable identity: same factor type, same constants
  * (coefficients, bounds, polarities), and the same multiset of variables — independent of internal
  * ordering — compare equal. [equals] / [hashCode] are structural and [compareTo] is a total order, so
  * keys serve as hash-bucket keys and can be sorted into a canonical multiset. Built with `StructuralKey.of`;
- * [Factor.structuralKey] returns `null` for an unkeyed factor.
+ * A constraint's `structuralKey` returns `null` for an unkeyed factor.
  */
 class StructuralKey internal constructor(private val kind: FactorKind, private val payload: LongArray) :
     Comparable<StructuralKey> {

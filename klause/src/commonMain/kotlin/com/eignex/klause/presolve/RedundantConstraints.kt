@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
@@ -13,7 +14,6 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntLongMap

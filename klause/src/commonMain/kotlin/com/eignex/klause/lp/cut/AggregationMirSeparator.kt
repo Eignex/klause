@@ -4,12 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap

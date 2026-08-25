@@ -14,6 +14,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LpBuilder
@@ -33,7 +34,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective

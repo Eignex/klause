@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.And
 import com.eignex.klause.model.BoolExpr
 import com.eignex.klause.model.BoolRef
@@ -28,7 +29,6 @@ import com.eignex.klause.model.SetRef
 import com.eignex.klause.model.SetSubsetOf
 import com.eignex.klause.model.SetUnion
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 
 /**
  * Materialise a [SetExpr] into a [SetLayout]. Looks up named set vars; for compound

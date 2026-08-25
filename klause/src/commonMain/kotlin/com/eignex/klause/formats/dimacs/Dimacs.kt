@@ -3,8 +3,8 @@ package com.eignex.klause.formats.dimacs
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource

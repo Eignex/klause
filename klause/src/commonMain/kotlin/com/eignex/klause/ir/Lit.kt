@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.ir
 
 /**
  * Literal encoding: `lit = (variable shl 1) or (if negated 1 else 0)`.

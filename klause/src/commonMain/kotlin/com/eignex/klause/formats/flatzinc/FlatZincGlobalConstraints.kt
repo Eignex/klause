@@ -19,7 +19,7 @@ import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.packLayeredMdd
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

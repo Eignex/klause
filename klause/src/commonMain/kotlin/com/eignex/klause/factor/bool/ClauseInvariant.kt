@@ -6,10 +6,10 @@ import com.eignex.klause.factor.bool.internals.findTrueLitExcept
 import com.eignex.klause.factor.bool.internals.findTrueLitExceptIndex
 import com.eignex.klause.factor.bool.internals.litTrueInLsState
 import com.eignex.klause.factor.bool.internals.wasLitTrueInLsState
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntIntMap
 
 /** LS invariant for [Clause]: watched-literal violation tracking and break/make maintenance. */

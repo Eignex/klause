@@ -2,11 +2,11 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.global.internals.countPresentOccurrences
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap

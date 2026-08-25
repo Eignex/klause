@@ -1,6 +1,6 @@
 package com.eignex.klause.factor
 
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
 
 internal fun IntArray.litVars(vararg extra: Int): IntArray {
     val seen = LinkedHashSet<Int>()

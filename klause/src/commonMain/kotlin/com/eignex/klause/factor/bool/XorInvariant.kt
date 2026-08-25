@@ -2,10 +2,10 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.CoeffLookup
 import com.eignex.klause.factor.bool.internals.buildParityByVar
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.Lit
 
 /** LS invariant for [Xor]: parity violation tracking and break/make maintenance. */
 internal class XorInvariant(

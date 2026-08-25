@@ -1,6 +1,9 @@
 package com.eignex.klause.formats
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.lowering.CnfLowering
+import com.eignex.klause.lowering.tseitinAnd
+import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test

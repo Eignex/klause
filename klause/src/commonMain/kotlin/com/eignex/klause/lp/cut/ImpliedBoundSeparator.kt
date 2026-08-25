@@ -1,9 +1,9 @@
 package com.eignex.klause.lp.cut
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.Lit
 
 /**
  * Implied-bound cuts from the binary **implication graph**. Probing

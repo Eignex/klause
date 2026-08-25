@@ -8,10 +8,11 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
-import com.eignex.klause.formats.CnfLowering
-import com.eignex.klause.formats.tseitinAnd
-import com.eignex.klause.formats.tseitinIff
-import com.eignex.klause.formats.tseitinOr
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.CnfLowering
+import com.eignex.klause.lowering.tseitinAnd
+import com.eignex.klause.lowering.tseitinIff
+import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.model.AllDifferent
 import com.eignex.klause.model.AllDifferentOpt
 import com.eignex.klause.model.And
@@ -67,7 +68,6 @@ import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.FloatInterval
 import com.eignex.klause.util.IntArrayList

@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

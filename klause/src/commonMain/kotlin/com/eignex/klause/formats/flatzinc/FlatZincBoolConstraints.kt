@@ -9,10 +9,10 @@ import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.formats.channelBoolTo01
-import com.eignex.klause.formats.tseitinAnd
-import com.eignex.klause.formats.tseitinOr
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.channelBoolTo01
+import com.eignex.klause.lowering.tseitinAnd
+import com.eignex.klause.lowering.tseitinOr
 
 internal fun FlatZincCompiler.emitBoolClause(c: FznConstraint) {
     expectArity(c, 2)

@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.bool.internals
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Lit
 
 /** Mutable two-watch index pair for a clause. Stored in [LocalSearchState.refPayload] and
  *  also shared by the CP path via [PropagationState.refPayload]. */

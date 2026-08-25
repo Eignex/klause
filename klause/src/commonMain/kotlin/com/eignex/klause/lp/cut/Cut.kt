@@ -7,6 +7,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.SymmetricAllDifferent
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.Relation
@@ -16,7 +17,6 @@ import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList

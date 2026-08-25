@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher

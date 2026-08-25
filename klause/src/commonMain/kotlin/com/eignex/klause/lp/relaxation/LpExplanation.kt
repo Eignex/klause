@@ -1,11 +1,11 @@
 package com.eignex.klause.lp.relaxation
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.Int128
 import com.eignex.klause.lp.IntegerCertificate
 import com.eignex.klause.lp.LpModel
 import com.eignex.klause.lp.integerFarkasRay
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
