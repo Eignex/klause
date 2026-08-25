@@ -210,6 +210,12 @@ class OpbTest {
     }
 
     @Test
+    fun `rejects tokens after a constraint right hand side`() {
+        val error = parseError("+1 x1 >= 1 unexpected ;")
+        assertTrue("after its right-hand side" in error, error)
+    }
+
+    @Test
     fun `a wide coefficient or bound is routed to a wide linear row`() {
         // 2^63 (one past signed Long) as a coefficient, and an over-Int64 bound: both kept in the wide lane.
         val out = Opb.parse("+9223372036854775808 x1 +1 x2 >= 99999999999999999999 ;")

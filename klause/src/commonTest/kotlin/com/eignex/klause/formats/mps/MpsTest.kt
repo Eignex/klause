@@ -117,6 +117,37 @@ class MpsTest {
     }
 
     @Test
+    fun `reads a named rhs set whose name matches a row`() {
+        val text = "ROWS\n N COST\n L C1\n L C2\nCOLUMNS\n X1 C1 1 C2 1\n" +
+            "RHS\n C1 C2 3\nENDATA"
+
+        val constraints = Mps.parse(text).constraints.associateBy { it.name }
+
+        assertEquals(0.0, constraints.getValue("C1").upper)
+        assertEquals(3.0, constraints.getValue("C2").upper)
+    }
+
+    @Test
+    fun `accepts mps d exponent numeric fields`() {
+        val text = "ROWS\n N COST\n L C1\nCOLUMNS\n X1 COST 1D+1 C1 2d+0\n" +
+            "RHS\n RHS C1 3D+0\nENDATA"
+
+        val model = Mps.parse(text)
+
+        assertEquals(10.0, model.objective.coeffs.single())
+        assertEquals(2.0, model.constraints.single().coeffs.single())
+        assertEquals(3.0, model.constraints.single().upper)
+    }
+
+    @Test
+    fun `rejects a value bound with no value`() {
+        val ex = assertFailsWith<MpsFormatException> {
+            Mps.parse("ROWS\n N COST\nCOLUMNS\n X1 COST 1\nBOUNDS\n UP X1\nENDATA")
+        }
+        assertTrue("needs a column and a value" in ex.message.orEmpty(), ex.message.orEmpty())
+    }
+
+    @Test
     fun `defaults a variable to the zero to positive-infinity range`() {
         val text = """
             ROWS

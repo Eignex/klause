@@ -46,4 +46,25 @@ class OznLexerTest {
         val items = OznParser(OznLexer("par int: size = 2;").tokenize()).parse()
         assertEquals(listOf(OznItem.VarDecl("size", OznExpr.IntLit(2))), items)
     }
+
+    @Test
+    fun `duplicate declarations are rejected instead of silently replacing output bindings`() {
+        assertFailsWith<OznParseException> {
+            OznParser(OznLexer("par int: x = 1; par int: x = 2;").tokenize()).parse()
+        }
+    }
+
+    @Test
+    fun `a second output item is rejected instead of being ignored during rendering`() {
+        assertFailsWith<OznParseException> {
+            OznParser(OznLexer("output [\"a\"]; output [\"b\"];").tokenize()).parse()
+        }
+    }
+
+    @Test
+    fun `a nonfinite float literal is rejected before evaluation`() {
+        assertFailsWith<OznParseException> {
+            OznParser(OznLexer("output [show(1e999)];").tokenize()).parse()
+        }
+    }
 }

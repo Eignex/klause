@@ -57,4 +57,13 @@ class SmtLibConstructionTest {
 
         assertTrue(error.message!!.contains("unsupported sort 'BitVec'"))
     }
+
+    @Test
+    fun `an unknown command is rejected instead of being ignored`() {
+        val error = assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("(declare-const x Int) (asert (= x 1))")
+        }
+
+        assertTrue(error.message!!.contains("unsupported command 'asert'"))
+    }
 }

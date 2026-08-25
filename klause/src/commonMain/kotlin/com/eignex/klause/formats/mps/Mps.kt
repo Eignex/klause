@@ -300,8 +300,10 @@ object Mps {
         section: String,
         apply: (Row, Double) -> Unit,
     ) {
-        // Heuristic for the optional set name: if the first token is a known row, there is no set name.
-        val start = if (fields.isNotEmpty() && rowByName.containsKey(fields[0])) 0 else 1
+        if (fields.size < 2) mpsError("$section line needs a row and a value: '${fields.joinToString(" ")}'")
+        // Set names are optional, and may coincide with row names. Field parity is unambiguous: an
+        // optional name followed by row/value pairs has an odd field count.
+        val start = if (fields.size % 2 == 0) 0 else 1
         var i = start
         while (i < fields.size) {
             val rowName = fields[i]
@@ -338,6 +340,9 @@ object Mps {
         // A value-less bound (FR/MI/PL/BV) ends at the column; the rest carry a trailing value. This
         // tolerates the optional bound-set name between the type and the column.
         val valueless = type == "FR" || type == "MI" || type == "PL" || type == "BV"
+        if (!valueless && fields.size < 3) {
+            mpsError("BOUNDS $type entry needs a column and a value: '${fields.joinToString(" ")}'")
+        }
         // A value-less type usually ends at the column, but writers do emit a redundant trailing value
         // (`BV BOUND1 C_000047 1.0`). Resolving by name keeps a column that looks numeric winning over
         // such a stray value.
@@ -469,7 +474,11 @@ object Mps {
         }
     }
 
-    private fun parseNum(token: String, role: String): Double = token.toDoubleOrNull()?.takeIf { it.isFinite() }
+    private fun parseNum(token: String, role: String): Double = token
+        .replace('D', 'E')
+        .replace('d', 'E')
+        .toDoubleOrNull()
+        ?.takeIf { it.isFinite() }
         ?: throw MpsFormatException("$role must be a finite number: '$token'")
 }
 

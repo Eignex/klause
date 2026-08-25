@@ -8,8 +8,21 @@ internal class OznParser(private val tokens: List<OznToken>) {
 
     fun parse(): List<OznItem> {
         val items = ArrayList<OznItem>()
+        val declaredNames = HashSet<String>()
+        var sawOutput = false
         while (peek().kind != OznTokenKind.EOF) {
-            items.add(parseItem())
+            val item = parseItem()
+            when (item) {
+                is OznItem.Output -> {
+                    if (sawOutput) throw OznParseException("duplicate output item at line ${peek().line}")
+                    sawOutput = true
+                }
+
+                is OznItem.VarDecl -> if (!declaredNames.add(item.name)) {
+                    throw OznParseException("duplicate declaration of `${item.name}` at line ${peek().line}")
+                }
+            }
+            items.add(item)
         }
         return items
     }
@@ -35,6 +48,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
         expectPunct(":")
         val name = expectIdent()
         while (peekPunct("::")) {
+            val annotationLine = peek().line
             advance()
             expectIdent()
             if (peekPunct("(")) {
@@ -49,6 +63,7 @@ internal class OznParser(private val tokens: List<OznToken>) {
                         }
                     }
                 }
+                if (depth != 0) throw OznParseException("unterminated annotation at line $annotationLine")
             }
         }
         val init = if (peekPunct("=")) {
@@ -455,8 +470,14 @@ internal class OznParser(private val tokens: List<OznToken>) {
     private fun parseLongLiteral(t: OznToken): Long = t.text.toLongOrNull()
         ?: throw OznParseException("integer literal `${t.text}` out of 64-bit range at line ${t.line}")
 
-    private fun parseDoubleLiteral(t: OznToken): Double = t.text.toDoubleOrNull()
-        ?: throw OznParseException("float literal `${t.text}` is malformed at line ${t.line}")
+    private fun parseDoubleLiteral(t: OznToken): Double {
+        val value = t.text.toDoubleOrNull()
+            ?: throw OznParseException("float literal `${t.text}` is malformed at line ${t.line}")
+        if (!value.isFinite()) {
+            throw OznParseException("float literal `${t.text}` is outside the finite range at line ${t.line}")
+        }
+        return value
+    }
 }
 
 /** Raised when parsing or evaluating MiniZinc `.ozn` output fails — the single catchable exception for
