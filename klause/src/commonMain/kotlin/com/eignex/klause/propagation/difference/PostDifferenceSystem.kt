@@ -16,22 +16,25 @@ import com.eignex.klause.solver.Problem
  *
  * The second gate is arithmetic. A system whose weights cannot be summed once per vertex inside `Long`
  * holds no potential, so its propagator returns at its first line on every fire — 320,000 times on one
- * `nec-smt` instance, for nothing. An unbounded model invents a ±2^62 clamp for each open column and
- * posts it as a declared range, which is exactly such a weight, so the whole family paid for a factor
- * that could not deduce. Declining to post it is worth ~1.2x there.
+ * `nec-smt` instance, for nothing. Declining to post it was worth ~1.2x there.
  *
- * This gate is arithmetic, not a cost cap: the graph could not hold a potential, so the factor could not
+ * The family that motivated the gate is gone: open columns once reached CP as an invented ±2^62 clamp,
+ * and that clamp no longer exists — an open column is owned by a theory and never materialized as a CP
+ * range. What still trips the gate is a model that genuinely declares bounds that large, which is a
+ * smaller and more legitimate set than the one measured.
+ *
+ * The gate is arithmetic, not a cost cap: the graph could not hold a potential, so the factor could not
  * deduce whatever it was scheduled to do. What is *not* settled is whether those models should be carried
- * at all. Dropping only the over-heavy edges does make the system usable — the clamp states nothing a
- * difference system needs, since the fragment is decidable over ℤ without bounds — and that was measured
- * a loss: 5-10x fewer nodes in a fixed budget, deciding nothing extra over a 10-instance `nec-smt` sample.
+ * at all. Dropping only the over-heavy edges does make the system usable, and that was measured a loss:
+ * 5-10x fewer nodes in a fixed budget, deciding nothing extra over a 10-instance `nec-smt` sample.
  *
- * Read that as a fact about *scheduling*, because it was measured under the present arrangement, where
- * the refutation sweep runs inside the CP fixpoint and searches buckets of open edges on every fire. The
- * same instrumentation put 320,000 fires on one instance with the sweeps switched off costing only ~1.2x,
- * so the sweep is the whole cost. Move it to a decision or restart boundary, or trigger it on assertion
- * rather than sweeping open buckets, and the measurement above no longer applies — at which point
- * dropping the over-heavy edges is worth re-testing and this gate is what to lift.
+ * That measurement was taken when the refutation sweep ran inside the CP fixpoint and searched buckets of
+ * open edges on every fire, and the sweep was the whole cost — the same instrumentation put 320,000 fires
+ * on one instance, with the sweeps switched off costing only ~1.2x. The sweep has since moved to at most
+ * one per decision, so the measurement no longer applies and dropping the over-heavy edges is worth
+ * re-testing. Re-running it needs the `nec-smt` sample, which is not in the fetched corpora, and a
+ * fixed-node comparison, which the CLI has no knob for; both have to exist before this gate is lifted on
+ * evidence rather than swapped on a guess.
  *
  * The first gate is a *guarded* edge — a reified difference row. Unconditional difference rows already
  * propagate exactly through their own [com.eignex.klause.factor.arithmetic.Linear] factors, so a system
