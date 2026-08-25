@@ -116,7 +116,7 @@ private fun liveIntervalsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
  *  declared one, so equal sizes mean equal value sets. */
 private fun liveDomainsAreDeclared(ctx: CutContext, vars: IntArray): Boolean {
     for (v in vars) {
-        if (ctx.session.intDomain(v).values.size != ctx.problem.intDomains[v].values.size) return false
+        if (ctx.session.intDomain(v).valueCount != ctx.problem.intDomains[v].valueCount) return false
     }
     return true
 }

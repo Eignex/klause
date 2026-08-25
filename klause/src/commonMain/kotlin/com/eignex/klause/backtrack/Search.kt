@@ -287,7 +287,7 @@ internal class BacktrackBrancher(
 
     private fun isOpen(variable: VarRef): Boolean = when (variable) {
         is VarRef.Bool -> session.boolValue(variable.varId) == null
-        is VarRef.IntVar -> session.intDomain(variable.varId).values.size > 1
+        is VarRef.IntVar -> !session.intDomain(variable.varId).isFixed
     }
 
     override fun onCommit(decision: SearchDecision, decisionLevel: Int) {

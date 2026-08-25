@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.orderingSize
+import com.eignex.klause.solver.randomValue
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.LongHashSet
@@ -71,16 +71,6 @@ internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = 
     }
 }
 
-/** Uniform random value in `[min(d), max(d)]`, overflow-safe on spans wider than `Long.MAX_VALUE`.
- *  Snap to a present value with [IntDomain.clamp]; positional sampling via a span's
- *  [com.eignex.klause.solver.IntSpan.valueAt] is
- *  wrong on a domain with no span (it only ever reaches the first 2^31 values). */
-internal fun randomInBounds(d: IntDomain, rng: Random): Long {
-    val span = d.max - d.min
-    if (span < 0L || span == Long.MAX_VALUE) return rng.nextLong()
-    return d.min + rng.nextLong(span + 1)
-}
-
 /** `max(d) - min(d)`, saturated at `Long.MAX_VALUE` instead of wrapping on a full-`Long` span. */
 internal fun saturatingSpan(d: IntDomain): Long = (d.max - d.min).let { if (it < 0L) Long.MAX_VALUE else it }
 
@@ -113,8 +103,9 @@ internal fun probeAndOrder(
 
         is VarRef.IntVar -> {
             val d = session.intDomain(varRef.varId)
-            if (d.values.size <= maxProbes) {
-                LongArray(d.values.size) { d.values.valueAt(it) }
+            val few = d.spanOrNull(maxProbes.toLong())
+            if (few != null) {
+                LongArray(few.size) { few.valueAt(it) }
             } else {
                 val seen = LongHashSet(maxProbes * 2)
                 val sample = LongArray(maxProbes)
@@ -123,11 +114,7 @@ internal fun probeAndOrder(
                 while (i < maxProbes && guard < maxProbes * 8) {
                     // Positional sampling is uniform only over an enumerable domain; a saturated
                     // index space never reaches values past the first 2^31, so sample the bounds.
-                    val candidate = if ((d.spanOrNull() != null)) {
-                        d.values.valueAt(rng.nextInt(d.values.size))
-                    } else {
-                        d.clamp(randomInBounds(d, rng))
-                    }
+                    val candidate = d.randomValue(rng)
                     if (seen.add(candidate)) {
                         sample[i] = candidate
                         i++
@@ -192,7 +179,7 @@ internal fun logRemainingDomainProduct(session: PropagationSession): Double {
     val ln2 = ln(2.0)
     for (v in 0 until p.numBoolVars) if (session.boolValue(v) == null) s += ln2
     for (v in 0 until p.numIntVars) {
-        val sz = session.intDomain(v).orderingSize()
+        val sz = session.intDomain(v).valueCount
         if (sz > 1) s += ln(sz.toDouble())
     }
     return s

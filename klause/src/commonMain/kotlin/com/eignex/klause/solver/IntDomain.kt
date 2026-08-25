@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.solver.intdomain.ContiguousDomain
+import kotlin.random.Random
 
 /** Primitive-`Int` visitor for the [IntDomain] iteration methods. A `fun interface` (not
  *  `(Int) -> Unit`) so `action(v)` passes a primitive `int` with no `Integer` boxing on the
@@ -108,6 +109,22 @@ interface IntDomain {
     /** True when exactly one value remains. O(1) on every representation. */
     val isFixed: Boolean get() = min == max
 
+    /**
+     * Number of present values, saturating at [Long.MAX_VALUE] when the bounds span more than a
+     * `Long` can count.
+     *
+     * A magnitude, not an enumeration: derived from the bounds and [holeCount], so it answers for
+     * every domain however wide, where [spanOrNull] declines. Callers ordering domains by size, or
+     * comparing two domains' value counts, want this rather than a span they cannot obtain.
+     */
+    val valueCount: Long get() {
+        val span = max - min
+        // A negative span means the subtraction wrapped, and a full-width one has no successor:
+        // either way the count is past what a Long states, so saturate rather than wrap.
+        if (span < 0L || span == Long.MAX_VALUE) return Long.MAX_VALUE
+        return span + 1L - holeCount
+    }
+
     /** Invoke [action] for each value excluded strictly between [min] and [max], ascending.
      *  No-op for a contiguous domain. */
     fun forEachHole(action: IntConsumer)
@@ -192,11 +209,20 @@ interface IntDomain {
 val IntDomain.values: IntSpan get() = span()
 
 /**
- * A magnitude for domain-ordering heuristics: the exact value count when the domain is enumerable,
- * else the width of its bounds. Deliberately approximate — a first-fail order only needs to compare
- * domains, and a domain too wide to count is large under either reading.
+ * A uniformly random value of the domain, never a hole.
+ *
+ * Indexes the values when they can be indexed. A wider domain has no index space that reaches past
+ * its first 2^31 values, so it is sampled over the bounds and snapped to the nearest present value
+ * instead — approximately uniform rather than exactly so, which is what a randomized restart or an
+ * initial assignment wants from a domain it cannot enumerate.
  */
-fun IntDomain.orderingSize(): Long = spanOrNull()?.size?.toLong() ?: (max - min + 1)
+fun IntDomain.randomValue(rng: Random): Long {
+    val indexable = spanOrNull()
+    if (indexable != null) return indexable.valueAt(rng.nextInt(indexable.size))
+    val width = max - min
+    val sample = if (width < 0L || width == Long.MAX_VALUE) rng.nextLong() else min + rng.nextLong(width + 1L)
+    return clamp(sample)
+}
 
 /**
  * The values of an [IntDomain], in ascending order, when there are few enough of them to index.

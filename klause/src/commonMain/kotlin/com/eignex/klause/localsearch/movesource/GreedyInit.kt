@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.solver.values
+import com.eignex.klause.solver.randomValue
 
 /**
  * Greedy-repair restart initializer. Walks variables in randomized order; for each, commits the
@@ -50,9 +50,10 @@ class GreedyInit {
                 val maxTries = 16
                 var bestCost = state.cost
                 var bestVal = cur
-                if (d.values.size <= maxTries) {
-                    for (idx in 0 until d.values.size) {
-                        val candidate = d.values.valueAt(idx)
+                val few = d.spanOrNull(maxTries.toLong())
+                if (few != null) {
+                    for (idx in 0 until few.size) {
+                        val candidate = few.valueAt(idx)
                         if (candidate == cur) continue
                         state.apply(Move.IntSet(intId, candidate))
                         if (state.cost < bestCost) {
@@ -63,7 +64,7 @@ class GreedyInit {
                     }
                 } else {
                     repeat(maxTries) {
-                        val candidate = d.values.valueAt(state.rng.nextInt(d.values.size))
+                        val candidate = d.randomValue(state.rng)
                         if (candidate == cur) return@repeat
                         state.apply(Move.IntSet(intId, candidate))
                         if (state.cost < bestCost) {

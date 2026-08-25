@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.solver.randomValue
 import com.eignex.klause.util.MutableIntIntMap
 import kotlin.random.Random
 
@@ -42,7 +43,7 @@ object IndomainRandom : ValueSelector {
                     // A positional shuffle cannot reach values past index 2^31 on a domain with more
                     // values than an index addresses, so draw the head — the value a bound split
                     // actually consumes — uniformly from the bounds.
-                    yield(d.clamp(randomInBounds(d, rng)))
+                    yield(d.randomValue(rng))
                 }
 
                 else -> sequence {

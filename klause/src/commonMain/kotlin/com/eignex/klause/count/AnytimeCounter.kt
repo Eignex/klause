@@ -49,7 +49,7 @@ internal object AnytimeCounter {
             ) {
                 2.0
             } else {
-                problem.intDomains[intVars[d - boolVars.size]].values.size.toDouble()
+                problem.intDomains[intVars[d - boolVars.size]].valueCount.toDouble()
             }
             suffix[d] = sizeAtD * suffix[d + 1]
         }

@@ -22,22 +22,14 @@ internal class ContiguousDomain(override val min: Long, override val max: Long) 
         val span = max - min
         // Never past Int range whatever the caller asks for: a span indexes its values with an Int.
         val cap = minOf(maxValues, Int.MAX_VALUE.toLong())
-        return if (span >= 0 && span + 1 <= cap) this else null
+        // `span < cap` rather than `span + 1 <= cap`: a full-width span is Long.MAX_VALUE, whose
+        // successor wraps negative and would read as comfortably under the cap.
+        return if (span >= 0 && span < cap) this else null
     }
 
     override val size: Int get() {
         val span = max - min
         return if (span < 0L || span >= Int.MAX_VALUE.toLong()) Int.MAX_VALUE else (span + 1L).toInt()
-    }
-
-    private val enumerable: Boolean get() {
-        val span = max - min
-        return span in 0L until Int.MAX_VALUE.toLong()
-    }
-
-    private val exactValueCount: Long get() {
-        val span = max - min
-        return if (span < 0L || span == Long.MAX_VALUE) Long.MAX_VALUE else span + 1
     }
 
     override val holeCount: Long get() = 0

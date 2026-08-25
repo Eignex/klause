@@ -23,4 +23,20 @@ class SmallestDomainTest {
         assertEquals(VarRef.IntVar(1), SmallestDomain.pick(session, Random(1)))
         assertEquals(VarRef.IntVar(0), LargestDomain.pick(session, Random(1)))
     }
+
+    @Test
+    fun `first-fail still orders a column whose bounds span more than a Long can count`() {
+        // The full-width column holds the most values of any domain; a count that wrapped would
+        // make it look like the smallest and invert the first-fail order.
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 2,
+            intDomains = arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE), IntDomain(0, 9)),
+            factors = arrayOf<Factor>(),
+        )
+        val session = PropagationSession(problem)
+
+        assertEquals(VarRef.IntVar(1), SmallestDomain.pick(session, Random(1)))
+        assertEquals(VarRef.IntVar(0), LargestDomain.pick(session, Random(1)))
+    }
 }

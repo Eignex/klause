@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -65,8 +66,43 @@ class IntSpanTest {
     }
 
     @Test
-    fun `an ordering size falls back to the bounds width when values cannot be counted`() {
-        assertEquals(4L, IntDomain(3, 6).orderingSize())
-        assertEquals(5_000_000_001L, IntDomain(0, 5_000_000_000L).orderingSize())
+    fun `a value count is exact when the values can be counted`() {
+        assertEquals(4L, IntDomain(3, 6).valueCount)
+        assertEquals(5_000_000_001L, IntDomain(0, 5_000_000_000L).valueCount)
+        assertEquals(3L, IntDomain(1, 5).excludeValue(2).excludeValue(4).valueCount)
+    }
+
+    @Test
+    fun `a value count saturates rather than wrapping on a span wider than it can state`() {
+        assertEquals(Long.MAX_VALUE, IntDomain(Long.MIN_VALUE, Long.MAX_VALUE).valueCount)
+        assertEquals(Long.MAX_VALUE, IntDomain(0, Long.MAX_VALUE).valueCount)
+        assertEquals(Long.MAX_VALUE, IntDomain(-(1L shl 62), 1L shl 62).valueCount)
+    }
+
+    @Test
+    fun `a domain wider than an index space declines to hand over its values`() {
+        assertNull(IntDomain(0, Long.MAX_VALUE).spanOrNull())
+        assertNull(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE).spanOrNull())
+        assertNull(IntDomain(-(1L shl 62), 1L shl 62).spanOrNull())
+    }
+
+    @Test
+    fun `excluding a value from a domain too wide to enumerate keeps its far bound`() {
+        val carved = assertNotNull(IntDomain(0, Long.MAX_VALUE).excludeValues(longArrayOf(5L)))
+
+        assertEquals(Long.MAX_VALUE, carved.max)
+        assertEquals(0L, carved.min)
+        assertEquals(false, carved.contains(5L))
+    }
+
+    @Test
+    fun `a random value of a domain too wide to enumerate stays inside it`() {
+        val d = IntDomain(Long.MIN_VALUE, Long.MAX_VALUE).excludeValue(0L)
+        val rng = Random(1234)
+
+        repeat(64) {
+            val v = d.randomValue(rng)
+            assertEquals(true, d.contains(v), "randomValue produced ${'$'}v, which is not in the domain")
+        }
     }
 }

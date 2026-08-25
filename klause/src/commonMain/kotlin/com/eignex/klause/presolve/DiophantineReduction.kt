@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongArrayList
 import kotlin.math.abs
 
@@ -91,10 +90,11 @@ internal object DiophantineReduction {
                 // Carve interior off-residue values — the reduction bound propagation cannot make (it
                 // keeps only intervals). Iterate the domain's live values (O(size), never O(span)) and
                 // gate on [SIZE_CAP] so a wide contiguous domain is skipped rather than enumerated.
-                if (dom.values.size > SIZE_CAP || !fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) continue
+                val live = dom.spanOrNull(SIZE_CAP.toLong()) ?: continue
+                if (!fitsHalfLong(dom.min) || !fitsHalfLong(dom.max)) continue
                 val remove = LongArrayList()
-                for (k in 0 until dom.values.size) {
-                    val x = dom.values.valueAt(k)
+                for (k in 0 until live.size) {
+                    val x = live.valueAt(k)
                     if (((x - root) % mod + mod) % mod != 0L) remove.add(x)
                 }
                 if (remove.isEmpty()) continue
