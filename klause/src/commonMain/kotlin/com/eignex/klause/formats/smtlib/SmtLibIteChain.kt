@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.LinComb
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
 
 /** Fewest arms worth reading as a table; below it the chain is a decision tree (see [IteChain]). */
 private const val MIN_CHAIN_DEPTH = 16

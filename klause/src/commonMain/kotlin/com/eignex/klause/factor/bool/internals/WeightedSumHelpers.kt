@@ -5,10 +5,10 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntLongMap

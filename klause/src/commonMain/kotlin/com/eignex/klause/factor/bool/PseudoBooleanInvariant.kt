@@ -5,12 +5,12 @@ import com.eignex.klause.factor.bool.internals.nonReifiedBoolUpdateBreakMakeLoop
 import com.eignex.klause.factor.bool.internals.pbDegree
 import com.eignex.klause.factor.bool.internals.pbDistance
 import com.eignex.klause.factor.bool.internals.pbHolds
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntLongMap
 import com.eignex.klause.util.MutableLongObjectMap

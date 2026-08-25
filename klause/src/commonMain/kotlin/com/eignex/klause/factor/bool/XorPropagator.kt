@@ -2,9 +2,9 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.CoeffLookup
 import com.eignex.klause.factor.bool.internals.buildParityByVar
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntHashSet
 
 /** CP propagator for [Xor]: parity propagation over a list of Boolean literals. */

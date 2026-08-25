@@ -17,9 +17,9 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.LayeredMddData
 import com.eignex.klause.formats.packLayeredMdd
-import com.eignex.klause.formats.reifyLinear
-import com.eignex.klause.formats.tseitinOr
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.reifyLinear
+import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
 

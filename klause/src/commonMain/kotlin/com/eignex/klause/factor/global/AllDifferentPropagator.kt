@@ -4,10 +4,10 @@ import com.eignex.klause.factor.global.internals.ReginCache
 import com.eignex.klause.factor.global.internals.antecedentsWithPremises
 import com.eignex.klause.factor.global.internals.boundsAllDifferentFilter
 import com.eignex.klause.factor.global.internals.reginFilter
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet

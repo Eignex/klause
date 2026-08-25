@@ -1,6 +1,14 @@
 package com.eignex.klause.factor.objective
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.MixedVars
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.hashRemappedKey
+import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
@@ -8,15 +16,7 @@ import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorKind
-import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
-import com.eignex.klause.solver.hashRemappedKey
-import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**

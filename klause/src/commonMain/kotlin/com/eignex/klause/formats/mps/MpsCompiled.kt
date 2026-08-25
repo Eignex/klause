@@ -7,11 +7,11 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.ObjectiveSense
-import com.eignex.klause.formats.channelBoolTo01
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntBounds
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits

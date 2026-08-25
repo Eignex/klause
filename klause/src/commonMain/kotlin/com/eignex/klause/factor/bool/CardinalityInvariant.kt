@@ -3,11 +3,11 @@ package com.eignex.klause.factor.bool
 import com.eignex.klause.factor.bool.internals.buildSignedLitsByVar
 import com.eignex.klause.factor.bool.internals.nonReifiedBoolUpdateBreakMakeLoop
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntLongMap
 
 /** LS invariant for [Cardinality]: violation scoring and break/make maintenance for `min ≤ count ≤ max`. */

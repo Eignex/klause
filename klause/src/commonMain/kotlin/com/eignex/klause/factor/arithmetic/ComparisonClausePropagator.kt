@@ -1,11 +1,11 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.excludeIntValueImpl
 import com.eignex.klause.propagation.tightenIntMaxImpl
 import com.eignex.klause.propagation.tightenIntMinImpl
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.IntArrayList
 
 /**

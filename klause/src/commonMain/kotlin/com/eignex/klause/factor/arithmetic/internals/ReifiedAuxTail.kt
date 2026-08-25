@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.arithmetic.internals
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Lit
 
 /**
  * The reification protocol shared by the reified arithmetic propagators (linear, pseudo-Boolean,

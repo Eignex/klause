@@ -6,13 +6,13 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
-import com.eignex.klause.formats.allDifferentWindowSize
-import com.eignex.klause.formats.channelBoolTo01
-import com.eignex.klause.formats.reifyLinear
-import com.eignex.klause.formats.trueLit
-import com.eignex.klause.formats.tseitinAnd
-import com.eignex.klause.formats.tseitinOr
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.allDifferentWindowSize
+import com.eignex.klause.lowering.channelBoolTo01
+import com.eignex.klause.lowering.reifyLinear
+import com.eignex.klause.lowering.trueLit
+import com.eignex.klause.lowering.tseitinAnd
+import com.eignex.klause.lowering.tseitinOr
 
 /** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
  *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities

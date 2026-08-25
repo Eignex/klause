@@ -6,11 +6,11 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.WideLinComb
 import com.eignex.klause.formats.isConstant
-import com.eignex.klause.formats.reifyLinear
-import com.eignex.klause.formats.trueLit
-import com.eignex.klause.formats.tseitinAnd
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.reifyLinear
+import com.eignex.klause.lowering.trueLit
+import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.objective.LinearObjective
 import com.ionspin.kotlin.bignum.integer.BigInteger
 

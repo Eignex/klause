@@ -7,13 +7,13 @@ import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.LinRelation
 import com.eignex.klause.formats.addExact
-import com.eignex.klause.formats.constRelationHolds
 import com.eignex.klause.formats.intCombDiff
 import com.eignex.klause.formats.linCombDiff
-import com.eignex.klause.formats.reifyLinear
-import com.eignex.klause.formats.trueLit
 import com.eignex.klause.formats.wideConstHolds
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.constRelationHolds
+import com.eignex.klause.lowering.reifyLinear
+import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.solver.objective.LinearObjective
 
 // `=` is an arithmetic (integer) equality iff its operands are integer-sorted — i.e. not

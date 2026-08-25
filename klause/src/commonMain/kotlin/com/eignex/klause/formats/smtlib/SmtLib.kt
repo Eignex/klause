@@ -3,10 +3,10 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.factor.arithmetic.LinearOp
-import com.eignex.klause.formats.CnfLowering
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec

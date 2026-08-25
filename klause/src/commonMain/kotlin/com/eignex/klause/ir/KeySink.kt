@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.ir
 
 /**
  * A single declaration of a [Factor]'s structural key, consumed twice: [MaterializingKeySink] builds the

@@ -1,9 +1,10 @@
 package com.eignex.klause.compile
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.ALL_DIFFERENT_WITNESS_MIN_ARITY
-import com.eignex.klause.formats.allDifferentWindowSize
-import com.eignex.klause.formats.reifyAllDifferentWitness
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.ALL_DIFFERENT_WITNESS_MIN_ARITY
+import com.eignex.klause.lowering.allDifferentWindowSize
+import com.eignex.klause.lowering.reifyAllDifferentWitness
 import com.eignex.klause.model.AllDifferentOpt
 import com.eignex.klause.model.And
 import com.eignex.klause.model.BoolExpr
@@ -27,7 +28,6 @@ import com.eignex.klause.model.Not
 import com.eignex.klause.model.Or
 import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.LongHashSet
 
 /*

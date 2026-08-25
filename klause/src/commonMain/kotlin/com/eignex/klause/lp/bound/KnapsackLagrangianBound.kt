@@ -1,13 +1,13 @@
 package com.eignex.klause.lp.bound
 
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray

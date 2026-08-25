@@ -1,8 +1,8 @@
 package com.eignex.klause.factor
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

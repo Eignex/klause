@@ -3,23 +3,23 @@ package com.eignex.klause.factor.bool
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.internals.validatePseudoBoolean
 import com.eignex.klause.factor.litVars
+import com.eignex.klause.ir.BoolVars
+import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.hashRemappedKey
+import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
-import com.eignex.klause.solver.hashRemappedKey
-import com.eignex.klause.solver.materializeKey
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when

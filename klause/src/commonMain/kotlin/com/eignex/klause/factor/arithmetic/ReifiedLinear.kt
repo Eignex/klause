@@ -7,6 +7,14 @@ import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.bool.internals.linearHolds
 import com.eignex.klause.factor.bool.internals.linearResidual
+import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.MixedVars
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.hashRemappedKey
+import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
@@ -17,16 +25,9 @@ import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorKind
-import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.MixedVars
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
-import com.eignex.klause.solver.hashRemappedKey
-import com.eignex.klause.solver.materializeKey
+import com.eignex.klause.solver.values
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

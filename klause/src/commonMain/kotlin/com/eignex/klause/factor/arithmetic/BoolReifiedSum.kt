@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.addExact
-import com.eignex.klause.solver.Lit
 
 /**
  * The Boolean fan-in of a reified weighted sum folded over its LP columns: `Σ coeffs·x_col + constant`,

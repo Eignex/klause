@@ -1,8 +1,8 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList

@@ -4,10 +4,10 @@ import com.eignex.klause.factor.bool.internals.findNonFalseLitExcept
 import com.eignex.klause.factor.bool.internals.litFalseInPropState
 import com.eignex.klause.factor.bool.internals.litTrueInPropState
 import com.eignex.klause.factor.bool.internals.pinUnitLit
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.LearnedPropagator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.moveBoolWatcher
-import com.eignex.klause.solver.Lit
 
 /** CP propagator for [Clause]: two-watched-literal propagation over a disjunction of literals. */
 internal class ClausePropagator(

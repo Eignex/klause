@@ -5,10 +5,10 @@ import com.eignex.klause.factor.bool.internals.pbFalseFormAntecedents
 import com.eignex.klause.factor.bool.internals.pbLitRanges
 import com.eignex.klause.factor.bool.internals.pbSumRange
 import com.eignex.klause.factor.bool.internals.propagatePbBounds
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Lit
 
 /** CP propagator for [ReifiedPseudoBoolean]: reified pseudo-Boolean propagation. */
 internal class ReifiedPseudoBooleanPropagator(

@@ -4,9 +4,9 @@ import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.TableGroupCache
-import com.eignex.klause.formats.reifyLinear
-import com.eignex.klause.formats.trueLit
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.reifyLinear
+import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet

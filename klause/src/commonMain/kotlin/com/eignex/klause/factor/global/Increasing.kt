@@ -1,19 +1,19 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.IntVars
+import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.ir.hashRemappedKey
+import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorKind
-import com.eignex.klause.solver.IntVars
-import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
-import com.eignex.klause.solver.hashRemappedKey
-import com.eignex.klause.solver.materializeKey
 
 /**
  * `increasing(xs)` — the integer chain `xs(0) ⟨≤|<⟩ xs(1) ⟨≤|<⟩ … ⟨≤|<⟩ xs(n−1)`. [strict] selects

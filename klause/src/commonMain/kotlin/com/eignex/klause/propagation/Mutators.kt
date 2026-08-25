@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
