@@ -12,8 +12,11 @@ import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
+import com.eignex.klause.solver.IntVars
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyDoubleArray
@@ -186,7 +189,13 @@ class Linear private constructor(
         require(!(wide && hasReals)) { "a row cannot be both wide and real" }
     }
 
-    override val intVars: IntArray = vars
+    // Real columns are declared here like any other kind. They were reachable only through the LP
+    // payload before, so no consumer scanning a factor's variables could see them.
+    override val variables: VarList = if (realVars.isEmpty()) {
+        IntVars(vars)
+    } else {
+        MixedVars(boundInts = vars, reals = realVars)
+    }
 
     /** Interval reasoning over the row's terms; an endpoint it cannot bound simply yields no deduction. */
     override val needsFiniteDomains: Boolean get() = false
@@ -337,8 +346,6 @@ class Linear private constructor(
 
     // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself.
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (isBinaryValueRelation()) this else null
-
-    override val boolVars: IntArray = EmptyIntArray
 
     // A continuous row connects the objective through its integer terms via the LP double view, not the
     // integer objective cone; keep it out of the cone probe (which reasons over integer CORE rows only).

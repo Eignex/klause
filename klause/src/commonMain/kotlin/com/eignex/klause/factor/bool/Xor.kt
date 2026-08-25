@@ -7,10 +7,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.LitVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals
@@ -42,8 +43,7 @@ class Xor(
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Xor(literals.remapLits(boolMap), targetParity)
 
-    override val boolVars: IntArray = literals.litVars()
-    override val intVars: IntArray = EmptyIntArray
+    override val variables: VarList = LitVars(literals.litVars())
 
     override fun asPropagator(): Propagator = XorPropagator(boolVars, intVars, literals, targetParity)
 

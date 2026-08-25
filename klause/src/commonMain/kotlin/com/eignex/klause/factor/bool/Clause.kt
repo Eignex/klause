@@ -12,10 +12,11 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.LitVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * Disjunction of Boolean literals.
@@ -50,10 +51,9 @@ class Clause(val literals: IntArray) :
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
 
-    override val boolVars: IntArray = literals.litVars()
+    override val variables: VarList = LitVars(literals.litVars())
 
     override val extendsObjectiveCone: Boolean = true
-    override val intVars: IntArray = EmptyIntArray
 
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
      *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read

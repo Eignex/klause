@@ -11,7 +11,9 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
@@ -165,23 +167,25 @@ class Cumulative(
         sink.intVars(resourceVars)
     }
 
-    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-    override val intVars: IntArray = run {
-        val extra = (if (durationVars.isNotEmpty()) durationVars.size else 0) +
-            (if (resourceVars.isNotEmpty()) resourceVars.size else 0) +
-            (if (capacityVar >= 0) 1 else 0)
-        if (extra == 0) {
-            starts
-        } else {
-            val out = IntArray(starts.size + extra)
-            var k = 0
-            for (v in starts) out[k++] = v
-            if (durationVars.isNotEmpty()) for (v in durationVars) out[k++] = v
-            if (resourceVars.isNotEmpty()) for (v in resourceVars) out[k++] = v
-            if (capacityVar >= 0) out[k++] = capacityVar
-            out
-        }
-    }
+    override val variables: VarList = MixedVars(
+        spanInts = run {
+            val extra = (if (durationVars.isNotEmpty()) durationVars.size else 0) +
+                (if (resourceVars.isNotEmpty()) resourceVars.size else 0) +
+                (if (capacityVar >= 0) 1 else 0)
+            if (extra == 0) {
+                starts
+            } else {
+                val out = IntArray(starts.size + extra)
+                var k = 0
+                for (v in starts) out[k++] = v
+                if (durationVars.isNotEmpty()) for (v in durationVars) out[k++] = v
+                if (resourceVars.isNotEmpty()) for (v in resourceVars) out[k++] = v
+                if (capacityVar >= 0) out[k++] = capacityVar
+                out
+            }
+        },
+        lits = OptPresence.presenceVarIds(presents),
+    )
 
     /** Number of tasks. */
     val n: Int = starts.size

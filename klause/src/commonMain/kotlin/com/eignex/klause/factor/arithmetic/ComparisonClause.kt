@@ -6,7 +6,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 
@@ -27,9 +29,7 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
         require(vars.size == ops.size && vars.size == consts.size) { "literal arrays must be parallel" }
     }
 
-    override val boolVars: IntArray = IntArray(0)
-
-    override val intVars: IntArray = vars.distinct().toIntArray()
+    override val variables: VarList = MixedVars(boundInts = vars.distinct().toIntArray(), lits = IntArray(0))
 
     /** Each literal is a comparison against a constant, decided by a bound test rather than a walk. */
     override val needsFiniteDomains: Boolean get() = false

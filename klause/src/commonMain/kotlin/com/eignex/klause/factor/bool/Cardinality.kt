@@ -12,10 +12,11 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.LitVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -28,7 +29,7 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
-    override val intVars: IntArray = EmptyIntArray
+    override val variables: VarList = LitVars(literals.litVars())
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CARDINALITY, ::buildKey)
 
@@ -47,8 +48,6 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
     // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
         if (min == 0 && max == literals.size) FactorReduction.Rewrite(emptyList()) else FactorReduction.Unchanged
-
-    override val boolVars: IntArray = literals.litVars()
 
     override val extendsObjectiveCone: Boolean = true
 

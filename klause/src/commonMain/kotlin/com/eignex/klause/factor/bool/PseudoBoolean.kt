@@ -14,10 +14,11 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.LitVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -28,7 +29,7 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
     Factor,
     LinearRow {
 
-    override val intVars: IntArray = EmptyIntArray
+    override val variables: VarList = LitVars(literals.litVars())
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PSEUDO_BOOLEAN, ::buildKey)
 
@@ -81,8 +82,6 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
             }
         }
     }
-
-    override val boolVars: IntArray = literals.litVars()
 
     override val extendsObjectiveCone: Boolean = true
 

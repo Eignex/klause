@@ -15,10 +15,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.LitVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
@@ -33,7 +34,7 @@ class ReifiedPseudoBoolean(
     val bound: Long,
 ) : ReifiedFactor {
 
-    override val intVars: IntArray = EmptyIntArray
+    override val variables: VarList = LitVars(literals.litVars(auxBoolVar))
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor =
         ReifiedPseudoBoolean(boolMap[auxBoolVar], weights, literals.remapLits(boolMap), op, bound)
@@ -51,8 +52,6 @@ class ReifiedPseudoBoolean(
         sink.long(bound)
         sink.pairsByLitKey(literals) { weights[it] }
     }
-
-    override val boolVars: IntArray = literals.litVars(auxBoolVar)
 
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
         pbHolds(state.longPayload[factorId], op, bound)

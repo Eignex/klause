@@ -6,10 +6,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -57,8 +58,7 @@ class Inverse(
         sink.intVars(g)
     }
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = f + g
+    override val variables: VarList = SpanIntVars(f + g)
 
     /** var id → its 0-based index in [f], or `-1` when absent. Maps dirty-variable ids to
      *  channel rows during propagation and LS delta computation without an O(n) scan. */

@@ -22,11 +22,20 @@ import com.eignex.klause.propagation.Propagator
  * leave [boolVars] empty; reified or mixed factors populate both.
  */
 interface Factor {
-    /** Boolean variables this factor constrains, as raw variable ids (0-based). */
-    val boolVars: IntArray
+    /**
+     * The variables this factor reads and what it needs from them.
+     *
+     * The one place a factor states its variables. Its kind carries the demand: [IntVars] reasons over
+     * bounds, [SpanIntVars] enumerates values, [MixedVars] composes the two per role. Real columns are
+     * declared here like any other kind rather than riding along in a factor-specific payload.
+     */
+    val variables: VarList
 
-    /** Integer variables this factor constrains, as raw variable ids (0-based). */
-    val intVars: IntArray
+    /** Boolean variables this factor constrains, as raw variable ids (0-based). Derived from [variables]. */
+    val boolVars: IntArray get() = variables.lits
+
+    /** Integer variables this factor constrains, as raw variable ids (0-based). Derived from [variables]. */
+    val intVars: IntArray get() = variables.ints
 
     /**
      * A copy of this factor with every Boolean variable id rewritten through [boolMap] and every

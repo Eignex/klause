@@ -18,7 +18,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.values
@@ -121,7 +123,7 @@ class ReifiedLinear private constructor(
             wideBoundIn = wideBound,
         )
 
-    override val intVars: IntArray = vars
+    override val variables: VarList = MixedVars(boundInts = vars, lits = intArrayOf(auxBoolVar))
 
     /** Interval reasoning under a guard, on the same terms as [Linear]; no value set is enumerated. */
     override val needsFiniteDomains: Boolean get() = false
@@ -172,8 +174,6 @@ class ReifiedLinear private constructor(
             sink.pairsByVarKey(vars) { coeff(it) }
         }
     }
-
-    override val boolVars: IntArray = intArrayOf(auxBoolVar)
 
     // A wide row's [longPayload] is the sum of the saturated Long placeholders, not the true wide sum, so
     // it must not be trusted. Local search is gated off entirely for a problem with any wide factor

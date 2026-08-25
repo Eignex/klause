@@ -14,10 +14,11 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -128,8 +129,7 @@ class Mdd(
             .also { it.transitionIndex = transitionIndex }
     }
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf()
+    override val variables: VarList = SpanIntVars(if (cost >= 0) seq + intArrayOf(cost) else seq.copyOf())
 
     /**
      * Minimize the diagram under the current domains: drop states not forward-reachable from [initial]

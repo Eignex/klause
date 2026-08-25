@@ -17,7 +17,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -114,8 +116,10 @@ class NValue(
         pairsByKey(xs) { presents.getOrElse(it) { -1 }.toLong() }
     }
 
-    override val boolVars: IntArray = OptPresence.presenceVarIds(presents)
-    override val intVars: IntArray = xs + intArrayOf(n)
+    override val variables: VarList = MixedVars(
+        spanInts = xs + intArrayOf(n),
+        lits = OptPresence.presenceVarIds(presents),
+    )
 
     override fun asPropagator(): Propagator {
         // Advisor subscription for the non-optional variant: the distinct-count bounds read each

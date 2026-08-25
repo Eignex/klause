@@ -12,8 +12,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.NoVars
 import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -116,7 +117,7 @@ class Element private constructor(
     // must conservatively return `null` (the default). Regular/Mdd are sound because their seq values
     // *are* the relabelable symbols, with no such positional coupling.
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val variables: VarList = NoVars
     override val intVars: IntArray =
         // When arrIsVars the entries are var ids stored as Long; narrow each back to an Int var id.
         if (arrIsVars) intArrayOf(idx, result) + IntArray(arr.size) { arr[it].toInt() } else intArrayOf(idx, result)

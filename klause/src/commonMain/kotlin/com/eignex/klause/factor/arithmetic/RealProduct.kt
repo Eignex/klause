@@ -8,9 +8,10 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `result = intOperand · realOperand`: a mixed integer·continuous product where
@@ -42,8 +43,7 @@ class RealProduct(
     val realOperandHi: Double,
 ) : Factor {
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = intArrayOf(intOperand)
+    override val variables: VarList = SpanIntVars(intArrayOf(intOperand))
 
     // Only the integer operand lives in the CP id space; the real operand and result ids are in the
     // separate real-variable namespace, which presolve carries through unremapped.

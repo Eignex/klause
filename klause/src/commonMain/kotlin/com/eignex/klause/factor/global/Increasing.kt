@@ -9,10 +9,11 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.SpanIntVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
-import com.eignex.klause.util.EmptyIntArray
 
 /**
  * `increasing(xs)` — the integer chain `xs(0) ⟨≤|<⟩ xs(1) ⟨≤|<⟩ … ⟨≤|<⟩ xs(n−1)`. [strict] selects
@@ -38,8 +39,7 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
     /** Minimum gap between adjacent variables: `1` for strict (`<`), `0` for non-decreasing (`≤`). */
     private val gap: Int = if (strict) 1 else 0
 
-    override val boolVars: IntArray = EmptyIntArray
-    override val intVars: IntArray = xs
+    override val variables: VarList = SpanIntVars(xs)
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Increasing(xs.remapVars(intMap), strict)
 

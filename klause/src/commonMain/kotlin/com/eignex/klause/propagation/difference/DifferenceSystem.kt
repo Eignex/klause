@@ -8,7 +8,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 
 /**
  * A *system* of difference constraints `x − y ≤ c` propagated jointly as a weighted digraph.
@@ -34,11 +36,10 @@ internal class DifferenceSystem(
     private val theoryOnly: Boolean = false,
 ) : Factor {
 
-    override val intVars: IntArray
-
     /** The fragment is decidable over ℤ with no bounds at all; that is the point of the graph. */
     override val needsFiniteDomains: Boolean get() = false
-    override val boolVars: IntArray
+
+    override val variables: VarList
 
     init {
         require(edges.isNotEmpty()) { "DifferenceSystem needs at least one edge" }
@@ -49,8 +50,10 @@ internal class DifferenceSystem(
             if (e.target != DifferenceFragment.ZERO) ints.add(e.target)
             if (e.guard != DifferenceEdge.ALWAYS) bools.add(Lit.variable(e.guard))
         }
-        intVars = if (theoryOnly) IntArray(0) else ints.toIntArray()
-        boolVars = bools.toIntArray()
+        variables = MixedVars(
+            boundInts = if (theoryOnly) IntArray(0) else ints.toIntArray(),
+            lits = bools.toIntArray(),
+        )
     }
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = DifferenceSystem(

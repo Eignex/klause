@@ -10,8 +10,10 @@ import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.objective.LinearObjective
@@ -80,12 +82,14 @@ internal class MutableObjectiveBound(private val objectiveConstant: Long) {
  * is already enforced there through branch-and-bound), so this factor belongs only in an LS overlay.
  */
 internal class ObjectiveBoundFactor(
-    override val boolVars: IntArray,
+    private val objectiveBoolVars: IntArray,
     private val boolWeights: LongArray,
-    override val intVars: IntArray,
+    private val objectiveIntVars: IntArray,
     private val intCoeffs: LongArray,
     private val bound: MutableObjectiveBound,
 ) : Factor {
+
+    override val variables: VarList = MixedVars(boundInts = objectiveIntVars, lits = objectiveBoolVars)
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ObjectiveBoundFactor(
         IntArray(boolVars.size) { boolMap[boolVars[it]] },

@@ -6,7 +6,9 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
+import com.eignex.klause.solver.NoVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyIntArray
@@ -79,7 +81,7 @@ class Diffn(
         sink.intVars(heightVars ?: EmptyIntArray)
     }
 
-    override val boolVars: IntArray = EmptyIntArray
+    override val variables: VarList = NoVars
     override val intVars: IntArray =
         xs + ys + (widthVars ?: EmptyIntArray) + (heightVars ?: EmptyIntArray)
 

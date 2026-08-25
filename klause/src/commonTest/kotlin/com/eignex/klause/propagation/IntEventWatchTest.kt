@@ -8,8 +8,10 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -32,8 +34,7 @@ class IntEventWatchTest {
     private class StrictLessThan(val x: Int, val y: Int) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(x, y)
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(x, y), lits = IntArray(0))
         override val initialIntEventWatches: IntArray =
             intArrayOf(IntEvent.pack(x, IntEvent.LB_RAISED), IntEvent.pack(y, IntEvent.UB_LOWERED))
 
@@ -57,8 +58,7 @@ class IntEventWatchTest {
     private class Disequal(val x: Int, val y: Int) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(x, y)
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(x, y), lits = IntArray(0))
         override val initialIntEventWatches: IntArray =
             intArrayOf(IntEvent.pack(x, IntEvent.FIXED), IntEvent.pack(y, IntEvent.FIXED))
 
@@ -147,8 +147,7 @@ class IntEventWatchTest {
         Factor,
         Propagator {
         var fires: Int = 0
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(v)
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(v), lits = IntArray(0))
         override val initialIntEventWatches: IntArray = intArrayOf(IntEvent.pack(v, kind))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {

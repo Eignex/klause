@@ -12,7 +12,9 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.*
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -37,8 +39,7 @@ class OrderLiteralSoundnessHarnessTest {
     private class NotEqualOnFix(val a: Int, val b: Int) :
         Factor,
         Propagator {
-        override val boolVars: IntArray = IntArray(0)
-        override val intVars: IntArray = intArrayOf(a, b)
+        override val variables: VarList = MixedVars(spanInts = intArrayOf(a, b), lits = IntArray(0))
 
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val da = state.intDomains[a]

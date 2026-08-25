@@ -9,7 +9,9 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.Lit
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
+import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.materializeKey
 
 /**
@@ -56,8 +58,8 @@ class ReifiedRealLinear(
         require(realVars.isNotEmpty()) { "a real atom needs a continuous term" }
     }
 
-    override val boolVars: IntArray = intArrayOf(aux)
-    override val intVars: IntArray = vars
+    override val variables: VarList =
+        MixedVars(boundInts = vars, lits = intArrayOf(aux), reals = realVars)
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ReifiedRealLinear(
         boolMap[aux],
