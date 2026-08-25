@@ -12,7 +12,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.LitVars
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
@@ -51,7 +51,7 @@ class Clause(val literals: IntArray) :
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = Clause(literals.remapLits(boolMap))
 
-    override val variables: VarList = LitVars(literals.litVars())
+    override val variables: VarList = BoolVars(literals.litVars())
 
     override val extendsObjectiveCone: Boolean = true
 

@@ -7671,6 +7671,14 @@ public final class com/eignex/klause/solver/Assumptions$Companion {
 public final class com/eignex/klause/solver/BakedProblem : com/eignex/klause/solver/Problem {
 }
 
+public final class com/eignex/klause/solver/BoolVars : com/eignex/klause/solver/VarList {
+	public fun <init> ([I)V
+	public fun getBoolVars ()[I
+	public fun getInts ()[I
+	public fun getReals ()[I
+	public fun getSpanInts ()[I
+}
+
 public abstract interface class com/eignex/klause/solver/Cancellation {
 	public static final field Companion Lcom/eignex/klause/solver/Cancellation$Companion;
 	public fun and (Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/solver/Cancellation;
@@ -7936,8 +7944,8 @@ public final class com/eignex/klause/solver/IntVariableOwner : java/lang/Enum {
 
 public final class com/eignex/klause/solver/IntVars : com/eignex/klause/solver/VarList {
 	public fun <init> ([I)V
+	public fun getBoolVars ()[I
 	public fun getInts ()[I
-	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -7951,14 +7959,6 @@ public final class com/eignex/klause/solver/Lit {
 	public final fun variable (I)I
 }
 
-public final class com/eignex/klause/solver/LitVars : com/eignex/klause/solver/VarList {
-	public fun <init> ([I)V
-	public fun getInts ()[I
-	public fun getLits ()[I
-	public fun getReals ()[I
-	public fun getSpanInts ()[I
-}
-
 public final class com/eignex/klause/solver/MixedIntColumns : com/eignex/klause/solver/IntColumns {
 	public fun <init> ([Lcom/eignex/klause/solver/IntColumn;)V
 	public fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
@@ -7970,8 +7970,8 @@ public final class com/eignex/klause/solver/MixedVars : com/eignex/klause/solver
 	public fun <init> ()V
 	public fun <init> ([I[I[I[I)V
 	public synthetic fun <init> ([I[I[I[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun getBoolVars ()[I
 	public fun getInts ()[I
-	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -7979,8 +7979,8 @@ public final class com/eignex/klause/solver/MixedVars : com/eignex/klause/solver
 public final class com/eignex/klause/solver/NoVars : com/eignex/klause/solver/VarList {
 	public static final field INSTANCE Lcom/eignex/klause/solver/NoVars;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun getBoolVars ()[I
 	public fun getInts ()[I
-	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 	public fun hashCode ()I
@@ -8099,8 +8099,8 @@ public final class com/eignex/klause/solver/ProblemSpec {
 
 public final class com/eignex/klause/solver/RealVars : com/eignex/klause/solver/VarList {
 	public fun <init> ([I)V
+	public fun getBoolVars ()[I
 	public fun getInts ()[I
-	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -8275,8 +8275,8 @@ public final class com/eignex/klause/solver/SolverParams$DefaultImpls {
 
 public final class com/eignex/klause/solver/SpanIntVars : com/eignex/klause/solver/VarList {
 	public fun <init> ([I)V
+	public fun getBoolVars ()[I
 	public fun getInts ()[I
-	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
@@ -8311,15 +8311,15 @@ public final class com/eignex/klause/solver/StructuralKey : java/lang/Comparable
 }
 
 public abstract interface class com/eignex/klause/solver/VarList {
+	public fun getBoolVars ()[I
 	public fun getInts ()[I
-	public fun getLits ()[I
 	public fun getReals ()[I
 	public fun getSpanInts ()[I
 }
 
 public final class com/eignex/klause/solver/VarList$DefaultImpls {
+	public static fun getBoolVars (Lcom/eignex/klause/solver/VarList;)[I
 	public static fun getInts (Lcom/eignex/klause/solver/VarList;)[I
-	public static fun getLits (Lcom/eignex/klause/solver/VarList;)[I
 	public static fun getReals (Lcom/eignex/klause/solver/VarList;)[I
 	public static fun getSpanInts (Lcom/eignex/klause/solver/VarList;)[I
 }

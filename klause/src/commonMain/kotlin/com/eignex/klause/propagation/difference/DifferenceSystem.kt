@@ -52,7 +52,7 @@ internal class DifferenceSystem(
         }
         variables = MixedVars(
             boundInts = if (theoryOnly) IntArray(0) else ints.toIntArray(),
-            lits = bools.toIntArray(),
+            boolVars = bools.toIntArray(),
         )
     }
 

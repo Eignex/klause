@@ -59,7 +59,7 @@ class ReifiedRealLinear(
     }
 
     override val variables: VarList =
-        MixedVars(boundInts = vars, lits = intArrayOf(aux), reals = realVars)
+        MixedVars(boundInts = vars, boolVars = intArrayOf(aux), reals = realVars)
 
     override fun remap(boolMap: IntArray, intMap: IntArray): Factor = ReifiedRealLinear(
         boolMap[aux],

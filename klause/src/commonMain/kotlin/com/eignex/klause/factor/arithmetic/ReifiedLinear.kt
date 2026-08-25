@@ -126,7 +126,7 @@ class ReifiedLinear private constructor(
     /** Bounds reasoning only: this factor never indexes a value set, so its columns need no finite domain. */
     override val needsFiniteDomains: Boolean get() = false
 
-    override val variables: VarList = MixedVars(boundInts = vars, lits = intArrayOf(auxBoolVar))
+    override val variables: VarList = MixedVars(boundInts = vars, boolVars = intArrayOf(auxBoolVar))
 
     /**
      * `auxBoolVar ↔ (Σ coeffs(i) * vars(i) ⟨op⟩ bound)`. Duplicate variables are coalesced

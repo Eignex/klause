@@ -32,7 +32,7 @@ interface Factor {
     val variables: VarList
 
     /** Boolean variables this factor constrains, as raw variable ids (0-based). Derived from [variables]. */
-    val boolVars: IntArray get() = variables.lits
+    val boolVars: IntArray get() = variables.boolVars
 
     /** Integer variables this factor constrains, as raw variable ids (0-based). Derived from [variables]. */
     val intVars: IntArray get() = variables.ints

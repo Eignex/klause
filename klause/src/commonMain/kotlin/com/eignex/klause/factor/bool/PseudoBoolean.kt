@@ -14,7 +14,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.LitVars
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
@@ -29,7 +29,7 @@ class PseudoBoolean(val weights: LongArray, val literals: IntArray, val op: PbOp
     Factor,
     LinearRow {
 
-    override val variables: VarList = LitVars(literals.litVars())
+    override val variables: VarList = BoolVars(literals.litVars())
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PSEUDO_BOOLEAN, ::buildKey)
 

@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.SpanIntVars
+import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.materializeKey
@@ -43,7 +43,8 @@ class RealProduct(
     val realOperandHi: Double,
 ) : Factor {
 
-    override val variables: VarList = SpanIntVars(intArrayOf(intOperand))
+    override val variables: VarList =
+        MixedVars(spanInts = intArrayOf(intOperand), reals = intArrayOf(realOperand, result))
 
     // Only the integer operand lives in the CP id space; the real operand and result ids are in the
     // separate real-variable namespace, which presolve carries through unremapped.

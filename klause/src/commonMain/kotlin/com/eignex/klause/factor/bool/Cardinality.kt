@@ -12,7 +12,7 @@ import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.LitVars
+import com.eignex.klause.solver.BoolVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.hashRemappedKey
@@ -29,7 +29,7 @@ class Cardinality(val literals: IntArray, val min: Int, val max: Int) : Factor {
         require(max <= literals.size) { "max ($max) exceeds literal count (${literals.size})" }
     }
 
-    override val variables: VarList = LitVars(literals.litVars())
+    override val variables: VarList = BoolVars(literals.litVars())
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.CARDINALITY, ::buildKey)
 
