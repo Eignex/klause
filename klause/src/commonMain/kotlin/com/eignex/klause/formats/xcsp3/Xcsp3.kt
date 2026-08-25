@@ -490,12 +490,24 @@ object Xcsp3 {
         }
 
         /** Parse a `{...}` set body into its members, expanding `lo..hi` ranges. */
-        internal fun parseSetMembers(body: String): List<Int> =
-            body.split(",").map { it.trim() }.filter { it.isNotEmpty() }.flatMap { tok ->
-                tok.split(
-                    "..",
-                ).let { if (it.size == 2) (it[0].toInt()..it[1].toInt()).toList() else listOf(tok.toInt()) }
+        internal fun parseSetMembers(body: String): List<Int> {
+            val members = ArrayList<Int>()
+            for (raw in body.split(',')) {
+                val tok = raw.trim()
+                if (tok.isEmpty()) continue
+                val separator = tok.indexOf("..")
+                if (separator < 0) {
+                    members.add(tok.toInt())
+                    continue
+                }
+                require(tok.indexOf("..", separator + 2) < 0) { "invalid set range '$tok'" }
+                val lo = tok.substring(0, separator).trim().toInt()
+                val hi = tok.substring(separator + 2).trim().toInt()
+                require(lo <= hi) { "invalid set range '$tok'" }
+                for (v in lo..hi) members.add(v)
             }
+            return members
+        }
 
         /** Coalesce parallel `coeffs`/`vars` arrays into a single variable-keyed linear map. */
         internal fun linMap(coeffs: IntArray, vars: IntArray): Map<Int, Long> {

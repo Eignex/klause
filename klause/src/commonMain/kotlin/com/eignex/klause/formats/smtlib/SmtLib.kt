@@ -240,7 +240,12 @@ object SmtLib {
                     objectiveSpec = command.argAt(1, "maximize") to true
                 }
 
-                else -> Unit // set-logic / set-info / check-sat / get-* / exit — ignored
+                // These commands do not change the asserted model. Keep accepting common solver-driver
+                // commands, but reject every other head: silently ignoring a misspelled assertion command
+                // constructs a different problem from the source script.
+                "set-logic", "set-info", "set-option", "check-sat", "get-model", "get-objectives", "exit" -> Unit
+
+                else -> throw UnsupportedSmtException("unsupported command '$head'")
             }
         }
 

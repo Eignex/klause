@@ -130,9 +130,13 @@ sealed interface FExpr {
                 val tok = elem.toString().trim()
                 elem.clear()
                 if (tok.isEmpty()) return
-                val range = tok.split("..")
-                if (range.size == 2) {
-                    for (v in range[0].toInt()..range[1].toInt()) {
+                val separator = tok.indexOf("..")
+                if (separator >= 0) {
+                    require(tok.indexOf("..", separator + 2) < 0) { "invalid set range '$tok'" }
+                    val lo = tok.substring(0, separator).toInt()
+                    val hi = tok.substring(separator + 2).toInt()
+                    require(lo <= hi) { "invalid set range '$tok'" }
+                    for (v in lo..hi) {
                         values.add(
                             v,
                         )

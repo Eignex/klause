@@ -189,6 +189,18 @@ class DimacsTest {
     }
 
     @Test
+    fun `rejects a negative wcnf weight instead of creating a negative relaxation cost`() {
+        val ex = assertFailsWith<DimacsFormatException> { Dimacs.parseWcnf("p wcnf 1 1 10\n-1 1 0\n") }
+        assertTrue("non-negative" in ex.message.orEmpty(), ex.message.orEmpty())
+    }
+
+    @Test
+    fun `rejects a non-positive wcnf top`() {
+        val ex = assertFailsWith<DimacsFormatException> { Dimacs.parseWcnf("p wcnf 1 0 0\n") }
+        assertTrue("top must be positive" in ex.message.orEmpty(), ex.message.orEmpty())
+    }
+
+    @Test
     fun `an empty hard clause makes the instance unsatisfiable`() {
         // The empty hard clause forces a contradiction on a fresh marker variable.
         val w = Dimacs.parseWcnf("h 0\n2 -1 0\n")

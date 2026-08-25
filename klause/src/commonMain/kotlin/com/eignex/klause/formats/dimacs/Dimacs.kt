@@ -176,6 +176,7 @@ object Dimacs {
                     top = parts[4].toLongOrNull() ?: dimacsError(
                         "DIMACS `p wcnf` top is not a 64-bit integer: '${parts[4]}'",
                     )
+                    dimacsRequire(top > 0) { "DIMACS `p wcnf` top must be positive: $top" }
                 }
                 hasOldHeader = true
                 continue
@@ -192,6 +193,7 @@ object Dimacs {
             } else {
                 weight = tokens[0].toLongOrNull()
                     ?: dimacsError("Unparseable wcnf weight: '${tokens[0]}'")
+                dimacsRequire(weight >= 0) { "DIMACS wcnf weight must be non-negative: $weight" }
                 // Keep explicit hard clauses hard when `top` is omitted.
                 isHard = weight >= (top ?: HARD_WEIGHT_SENTINEL)
                 litStart = 1

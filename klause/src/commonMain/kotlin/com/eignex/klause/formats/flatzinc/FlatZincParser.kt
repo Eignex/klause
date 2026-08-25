@@ -26,6 +26,7 @@ internal class FlatZincParser(private val lexer: FlatZincLexer) {
         if (peek() is FznToken.Kw && (peek() as FznToken.Kw).keyword == "output") {
             output = parseOutput()
         }
+        if (peek() !is FznToken.Eof) failHere("expected end of input after solve item")
         return FznModel(decls, constraints, solve, output)
     }
 
@@ -375,5 +376,6 @@ internal class FlatZincParser(private val lexer: FlatZincLexer) {
             val t = advance()
             if (t is FznToken.Punct && t.symbol == ";") return
         }
+        failHere("expected `;` ending declaration")
     }
 }

@@ -403,6 +403,9 @@ object Opb {
         opbRequire(opIdx + 1 < to) {
             "OPB constraint missing right-hand side: ${tokens.join(from, to)}"
         }
+        opbRequire(opIdx + 2 == to) {
+            "OPB constraint has tokens after its right-hand side: ${tokens.join(from, to)}"
+        }
         val rhs = parseBigInteger(tokens, opIdx + 1, "constraint rhs")
         val op = when {
             tokens.matches(opIdx, ">=") -> PbOp.GE

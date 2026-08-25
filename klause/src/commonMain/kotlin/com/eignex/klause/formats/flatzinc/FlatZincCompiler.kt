@@ -135,8 +135,10 @@ internal class FlatZincCompiler(
     }
 
     internal fun processDecl(d: FznVarDecl) {
-        if (!d.isVar && d.value != null) {
-            params[d.name] = evaluateParam(d.value, d.type)
+        ensureFreshName(d.name)
+        if (!d.isVar) {
+            val value = d.value ?: failHere("parameter `${d.name}` requires an initializer")
+            params[d.name] = evaluateParam(value, d.type)
             (params[d.name] as? ParamValue.Array)?.let { arr ->
                 arrays[d.name] = arr.arr
             }
@@ -225,8 +227,8 @@ internal class FlatZincCompiler(
         if (type.element is FznType.SetOfInt) {
             val layouts = ArrayList<SetVarLayout>(type.length)
             if (value is FznExpr.ArrayLit) {
-                require(value.elements.size == type.length) {
-                    "array `$name`: initializer length ${value.elements.size} ≠ declared ${type.length}"
+                if (value.elements.size != type.length) {
+                    failHere("array `$name`: initializer length ${value.elements.size} != declared ${type.length}")
                 }
                 val sharedUniverse: IntArray? = run {
                     val acc = IntHashSet()
@@ -286,8 +288,8 @@ internal class FlatZincCompiler(
             null
         }
         if (value is FznExpr.ArrayLit) {
-            require(value.elements.size == length) {
-                "array `$name`: initializer length ${value.elements.size} ≠ declared $length"
+            if (value.elements.size != length) {
+                failHere("array `$name`: initializer length ${value.elements.size} != declared $length")
             }
             for ((i, e) in value.elements.withIndex()) {
                 varIds[i] = resolveVarRef(e, type.element).also { _ ->
@@ -342,6 +344,14 @@ internal class FlatZincCompiler(
         val id = numBoolVars++
         boolVars[name] = id
         return id
+    }
+
+    /** FlatZinc has one identifier namespace. Rejecting duplicates prevents later lookup from
+     *  silently selecting a different solver variable than already-emitted factors reference. */
+    private fun ensureFreshName(name: String) {
+        if (name in params || name in boolVars || name in intVars || name in floatVars ||
+            name in arrays || name in setVarsByName
+        ) failHere("duplicate declaration of `$name`")
     }
 
     /** Post a trivially unsatisfiable constraint. A [Clause] cannot be empty (an empty clause would

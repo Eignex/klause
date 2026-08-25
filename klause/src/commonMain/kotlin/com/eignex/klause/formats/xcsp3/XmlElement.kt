@@ -151,6 +151,7 @@ fun parseXml(src: String): XmlElement = XmlReader(src).parseDocument()
  * so the containers themselves are never materialized.
  */
 internal class XmlReader(private val reader: CharReader) {
+    private val openElements = ArrayDeque<String>()
     /** Parse an in-memory [String] — the path for tests, the DSL, and an already-decompressed blob. */
     constructor(src: String) : this(CharReader(StringCharSource(src)))
 
@@ -171,7 +172,7 @@ internal class XmlReader(private val reader: CharReader) {
     fun openRoot() {
         skipMisc()
         require(!reader.eof() && reader.peek() == '<'.code) { "expected root element" }
-        enterPeeked()
+        require(enterPeeked()) { "root element must not be empty" }
     }
 
     /** Advance to the next child of the currently open element: its tag name (cursor left at the child's
@@ -187,10 +188,15 @@ internal class XmlReader(private val reader: CharReader) {
 
                 matches("<![CDATA[") -> skipUntilAfter("]]>")
 
+                matches("<?") -> skipUntilAfter("?>")
+
                 matches("</") -> {
                     reader.advance()
                     reader.advance()
-                    readName()
+                    val closeName = readName()
+                    val openName = openElements.removeLastOrNull()
+                        ?: throw IllegalArgumentException("unexpected closing tag </$closeName>")
+                    require(closeName == openName) { "mismatched closing tag </$closeName> for <$openName>" }
                     skipWs()
                     expect('>')
                     return null
@@ -209,7 +215,7 @@ internal class XmlReader(private val reader: CharReader) {
      *  (empty) element — already fully consumed — and true for one with a body. */
     fun enterPeeked(): Boolean {
         expect('<')
-        readName()
+        val tag = readName()
         while (true) {
             skipWs()
             require(!reader.eof()) { "unterminated start tag" }
@@ -221,6 +227,7 @@ internal class XmlReader(private val reader: CharReader) {
             }
             if (c == '>'.code) {
                 reader.advance()
+                openElements.addLast(tag)
                 return true
             }
             readName()

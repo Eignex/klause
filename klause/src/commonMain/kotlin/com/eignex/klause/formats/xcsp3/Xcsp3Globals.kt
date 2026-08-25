@@ -728,9 +728,13 @@ private fun matrixAxis(base: String, spec: String, dimSize: Int?): IntArray = wh
         IntArray(n) { it }
     }
 
-    ".." in spec -> spec.split("..").let { (lo, hi) ->
-        val from = lo.trim().toInt()
-        IntArray(hi.trim().toInt() - from + 1) { from + it }
+    ".." in spec -> {
+        val separator = spec.indexOf("..")
+        require(spec.indexOf("..", separator + 2) < 0) { "<matrix> index range '$spec'" }
+        val from = spec.substring(0, separator).trim().toInt()
+        val to = spec.substring(separator + 2).trim().toInt()
+        require(from <= to) { "<matrix> index range '$spec'" }
+        IntArray(to - from + 1) { from + it }
     }
 
     else -> intArrayOf(spec.toInt())

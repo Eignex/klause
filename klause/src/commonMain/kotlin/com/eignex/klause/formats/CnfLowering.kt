@@ -34,7 +34,7 @@ internal fun CnfLowering.tseitinAnd(lits: List<Int>): Int = tseitinAnd(lits, Lit
 /** Tseitin gate for conjunction reified onto the caller-provided [target] literal. */
 internal fun CnfLowering.tseitinAnd(lits: List<Int>, target: Int): Int {
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(target), l)))
-    factors.add(Clause((lits.map { Lit.negate(it) } + target).toIntArray()))
+    factors.add(Clause(IntArray(lits.size + 1) { i -> if (i == lits.size) target else Lit.negate(lits[i]) }))
     return target
 }
 
@@ -43,7 +43,7 @@ internal fun CnfLowering.tseitinOr(lits: List<Int>): Int = tseitinOr(lits, Lit.m
 
 /** Tseitin gate for disjunction reified onto the caller-provided [target] literal. */
 internal fun CnfLowering.tseitinOr(lits: List<Int>, target: Int): Int {
-    factors.add(Clause((lits + Lit.negate(target)).toIntArray()))
+    factors.add(Clause(IntArray(lits.size + 1) { i -> if (i == lits.size) Lit.negate(target) else lits[i] }))
     for (l in lits) factors.add(Clause(intArrayOf(Lit.negate(l), target)))
     return target
 }
