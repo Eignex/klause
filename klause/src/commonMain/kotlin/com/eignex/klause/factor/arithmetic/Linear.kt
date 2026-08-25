@@ -7,33 +7,33 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.Term
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.IntVars
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.LongConstList
 import com.eignex.klause.solver.MixedVars
+import com.eignex.klause.solver.RealConsts
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
+import com.eignex.klause.util.EmptyLongArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.nextDown
 import kotlin.math.nextUp
-import kotlin.math.roundToLong
 
 /**
  * `Σ coeffs(i) * intVars(i) ⟨op⟩ bound`. Payload at `intPayload(factorId)` is the current
  * weighted sum, kept in sync incrementally by [Invariant.applyIntSet]. Repair moves propose, for each
  * variable, the integer value that on its own would put the sum on the right side of `bound`,
- * clamped to the variable's domain. Terms pair [coeffs] with [vars]; the sum is compared by [op]
- * against [bound].
+ * clamped to the variable's domain. Terms pair [vars] with the coefficients in [constants]; the sum is
+ * compared by [op] against that shape's bound.
  */
 class Linear private constructor(
     terms: CoalescedTerms,
@@ -48,122 +48,90 @@ class Linear private constructor(
     intCoeffsRealIn: DoubleArray = EmptyDoubleArray,
     realBoundIn: Double = 0.0,
     strictRealIn: Boolean = false,
-    // Wide (>64-bit) integer coefficients and bound, carried exactly as BigInteger. Present only on a wide
-    // row, where the Long [coeffs]/[bound] are saturated placeholders and [WideLinearPropagator] reads
-    // these. Null for the integer core and for real rows.
+    // Over-64-bit integer coefficients and bound, carried exactly. Null for the integer core and for real
+    // rows.
     wideCoeffsIn: Array<BigInteger>? = null,
     wideBoundIn: BigInteger? = null,
-) : Factor,
-    LinearRow {
+) : Factor {
 
     // Canonicalise inequalities to ≤ at construction — the LP/MIP convention the cut separators
     // (FlowCoverSeparator, knapsack cover) expect. A ≥ becomes ≤ by negating the coefficients and bound;
     // = / ≠ keep their orientation. So an inequality [Linear] always reports [op] `LE`, and a constraint
     // and its negation share a structural key (so the two dedup as one).
     val op: LinearOp = if (rawOp == LinearOp.GE) LinearOp.LE else rawOp
-    override val bound: Long = if (rawOp == LinearOp.GE) -rawBound else rawBound
     val vars: IntArray = terms.vars
 
-    // Integer coefficients, index-aligned with [vars]. The width is the store: an all-one row keeps no
-    // per-term storage, a 32-bit-range row keeps 4 B/term, and only a genuinely 64-bit row pays 8 B/term —
-    // which is what keeps parse/presolve memory down on the Linear-dominated families (MPS, QF_LIRA). The
-    // GE→LE canonicalisation negates the coefficients here. [coeff] reads a term with no allocation (the
-    // per-node LP path); [coeffs] materialises a full [LongArray] for whole-array sinks.
-    private val coefficients: LongConstList = run {
-        val src = constsOf(terms.coeffs)
-        if (rawOp == LinearOp.GE) src.negated() else src
+    /**
+     * The row's coefficients and right-hand side, at the width that holds them exactly. Their shape is the
+     * row's shape: a consumer narrows to [integerConstants], [wideConstants] or [realConstants] and reads
+     * exact values, so no reading is a stand-in for constants that do not fit it.
+     *
+     * The GE→LE canonicalisation negates the constants here, once.
+     */
+    val constants: LinearConstants = run {
+        val negate = rawOp == LinearOp.GE
+        val canonicalBound = if (negate) -rawBound else rawBound
+        when {
+            wideCoeffsIn != null -> {
+                val wide = WideConsts(wideCoeffsIn)
+                WideConstants(if (negate) wide.negated() else wide, if (negate) -wideBoundIn!! else wideBoundIn!!)
+            }
+
+            realVarsIn.isNotEmpty() -> {
+                val intCoeffs = RealConsts(intCoeffsRealIn)
+                val realCoeffs = RealConsts(realCoeffsIn)
+                RealConstants(
+                    intCoefficients = if (negate) intCoeffs.negated() else intCoeffs,
+                    realCoefficients = if (negate) realCoeffs.negated() else realCoeffs,
+                    bound = if (negate) -realBoundIn else realBoundIn,
+                    strict = strictRealIn,
+                )
+            }
+
+            else -> {
+                val integerCoeffs = constsOf(terms.coeffs)
+                IntegerConstants(
+                    vars,
+                    if (negate) integerCoeffs.negated() else integerCoeffs,
+                    op,
+                    canonicalBound,
+                )
+            }
+        }
     }
 
-    /** Largest `|coefficient|` over the integer terms (0 when there are none), read from the coefficient
-     *  store so the presolve overflow gates (the affine-elimination fold, the small-model bound) need no
-     *  per-row rescan. A saturated placeholder on a wide/real row (never read as authoritative there). */
-    val maxAbsCoeff: Long get() = coefficients.maxAbs
+    /** The row read as plain 64-bit integer arithmetic — its terms, coefficients and bound — or `null`
+     *  when its constants are wider than that ([wideConstants], [realConstants]). */
+    val integerConstants: IntegerConstants? get() = constants as? IntegerConstants
 
-    /** Integer coefficients as a [LongArray], index-aligned with [vars], materialised on demand from the
-     *  compact store. Prefer [coeff] for indexed access; this allocates. */
-    val coeffs: LongArray get() = coefficients.toLongArray()
+    /** The row read as exact integer arithmetic of any width, or `null` when it carries a continuous
+     *  constant ([realConstants]). */
+    val integralConstants: IntegralConstants? get() = constants as? IntegralConstants
 
-    /**
-     * The LP-only payload — real (continuous) terms and/or over-64-bit wide coefficients — held off to the
-     * side. It is `null` for a plain integer row (the common case), so an integer [Linear] carries a single
-     * null reference here instead of the seven empty/zero/false fields the payload would otherwise occupy on
-     * every row. The GE→LE canonicalisation (negating real/wide coefficients and bounds) happens here so the
-     * accessors below can expose the payload without re-deriving it.
-     */
-    private val lpExtra: LinearLpExtra? =
-        if (realVarsIn.isNotEmpty() || wideCoeffsIn != null) {
-            val negate = rawOp == LinearOp.GE
-            LinearLpExtra(
-                realVars = realVarsIn,
-                realCoeffs = if (negate) DoubleArray(realCoeffsIn.size) { -realCoeffsIn[it] } else realCoeffsIn,
-                realIntCoeffs =
-                if (negate) DoubleArray(intCoeffsRealIn.size) { -intCoeffsRealIn[it] } else intCoeffsRealIn,
-                realBound = if (negate) -realBoundIn else realBoundIn,
-                strictReal = strictRealIn,
-                wideCoeffs = when {
-                    wideCoeffsIn == null -> null
-                    negate -> Array(wideCoeffsIn.size) { -wideCoeffsIn[it] }
-                    else -> wideCoeffsIn
-                },
-                wideBound = if (wideBoundIn != null && negate) -wideBoundIn else wideBoundIn,
-            )
-        } else {
-            null
-        }
+    /** The row's over-64-bit constants, or `null` when it is not one. */
+    val wideConstants: WideConstants? get() = constants as? WideConstants
+
+    /** The row's continuous constants, or `null` when it is not an LP-only row. */
+    val realConstants: RealConstants? get() = constants as? RealConstants
 
     /**
      * LP-only continuous (real) variable terms, additional to the integer terms: real var ids paired with
-     * double coefficients in [realCoeffs]. Empty for the integer/Boolean core. When present the row
-     * `Σ coeffs(i)·vars(i) + Σ realCoeffs(j)·realVars(j) ⟨op⟩ bound` reasons over a continuous variable, so
-     * it is absent from CP propagation ([asPropagator] is [NoPropagator]) and its feasibility is enforced by
-     * the LP relaxation and the search leaf. A `>=` row negates these coefficients alongside the integer ones.
+     * the double coefficients in [RealConstants.realCoefficients]. Empty for the integer/Boolean core. When
+     * present the row reasons over a continuous variable, so it is absent from CP propagation
+     * ([asPropagator] is [NoPropagator]) and its feasibility is enforced by the LP relaxation and the
+     * search leaf.
      */
-    val realVars: IntArray get() = lpExtra?.realVars ?: EmptyIntArray
-
-    /** Double coefficient of each [realVars] term, index-aligned; a `>=` row negates them with the
-     *  integer coefficients (see [realVars]). */
-    val realCoeffs: DoubleArray get() = lpExtra?.realCoeffs ?: EmptyDoubleArray
-
-    /** Double coefficient of each integer term [vars] on an LP-only row (index-aligned with [vars]); the
-     *  authoritative value the relaxation reads, since [coeffs] is only a rounded placeholder here. Empty
-     *  for the integer core. A `>=` row negates these with the rest. */
-    val realIntCoeffs: DoubleArray get() = lpExtra?.realIntCoeffs ?: EmptyDoubleArray
-
-    /** Double right-hand side of an LP-only row ([bound] is only a rounded placeholder here); `>=` negates. */
-    val realBound: Double get() = lpExtra?.realBound ?: 0.0
-
-    /** Whether this row carries a continuous (real) term, making it an LP-only row (see [realVars]). */
-    val hasReals: Boolean get() = lpExtra?.realVars?.isNotEmpty() == true
-
-    /** Wide (>64-bit) integer coefficients, index-aligned with [vars]; null unless [wide]. A `>=` row
-     *  negates them (with [wideBound]); [WideLinearPropagator] reads these exact values, not [coeffs]. */
-    val wideCoeffs: Array<BigInteger>? get() = lpExtra?.wideCoeffs
-
-    /** Wide (>64-bit) right-hand side; null unless [wide]. `>=` negates it (with [wideCoeffs]). */
-    val wideBound: BigInteger? get() = lpExtra?.wideBound
-
-    /** True when a coefficient or the bound exceeds the 64-bit range: the row propagates via
-     *  [WideLinearPropagator] (exact arbitrary precision), is excluded from the LP relaxation, and its
-     *  Long [coeffs]/[bound] are saturated placeholders never read as authoritative. */
-    val wide: Boolean get() = lpExtra?.wideCoeffs != null
-
-    /** A plain 64-bit integer CP row — neither LP-only real ([hasReals]) nor [wide]. The only shape whose
-     *  Long [coeffs]/[bound] the integer-reasoning passes (presolve, cuts, LP, LS) may read directly. */
-    val isIntegerCore: Boolean get() = !hasReals && !wide
-
-    /** Strict inequality over reals (`Σ … < bound` after the ≤ canonicalisation). Only meaningful on an
-     *  LP-only row: the float relaxation treats it as non-strict (a sound relaxation), and the exact
-     *  deciders enforce the strictness (delta-rational feasibility, boundary-rejecting point checks). */
-    val strictReal: Boolean get() = lpExtra?.strictReal == true
+    val realVars: IntArray = realVarsIn
 
     init {
         require(vars.isNotEmpty() || realVars.isNotEmpty()) { "linear sum must have at least one term" }
-        require(realVars.size == realCoeffs.size) { "real vars/coeffs length mismatch" }
-        require(!hasReals || realIntCoeffs.size == vars.size) { "real int-coeff/var length mismatch" }
-        require(!strictReal || (hasReals && op == LinearOp.LE)) { "strictness needs an LP-only inequality row" }
-        val wc = wideCoeffs
-        require(wc == null || wc.size == vars.size) { "wide coeff/var length mismatch" }
-        require(!(wide && hasReals)) { "a row cannot be both wide and real" }
+        val real = realConstants
+        require(real == null || real.realCoefficients.size == realVars.size) { "real vars/coeffs length mismatch" }
+        require(real == null || real.intCoefficients.size == vars.size) { "real int-coeff/var length mismatch" }
+        require(real == null || !real.strict || op == LinearOp.LE) { "strictness needs an LP-only inequality row" }
+        val wide = wideConstants
+        require(wide == null || wide.coefficients.size == vars.size) { "wide coeff/var length mismatch" }
+        require(wide == null || realVars.isEmpty()) { "a row cannot be both wide and real" }
     }
 
     // Real columns are declared here like any other kind. They were reachable only through the LP
@@ -193,9 +161,9 @@ class Linear private constructor(
      * [vars] must be distinct — this form does not coalesce duplicates.
      */
     constructor(vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) : this(
-        CoalescedTerms(vars.copyOf(), LongArray(wideCoeffs.size) { wideCoeffs[it].saturatedLong() }),
+        CoalescedTerms(vars.copyOf(), EmptyLongArray),
         op,
-        wideBound.saturatedLong(),
+        0L,
         wideCoeffsIn = wideCoeffs.copyOf(),
         wideBoundIn = wideBound,
     )
@@ -214,9 +182,9 @@ class Linear private constructor(
         op: LinearOp,
         bound: Long,
     ) : this(
-        CoalescedTerms(intVars.copyOf(), intCoeffs.copyOf()),
+        CoalescedTerms(intVars.copyOf(), EmptyLongArray),
         op,
-        bound,
+        0L,
         realVars.copyOf(),
         realCoeffs.copyOf(),
         DoubleArray(intCoeffs.size) { intCoeffs[it].toDouble() },
@@ -240,9 +208,9 @@ class Linear private constructor(
         bound: Double,
         strict: Boolean = false,
     ) : this(
-        CoalescedTerms(intVars.copyOf(), LongArray(intCoeffs.size) { intCoeffs[it].roundToLong() }),
+        CoalescedTerms(intVars.copyOf(), EmptyLongArray),
         op,
-        bound.roundToLong(),
+        0L,
         realVars.copyOf(),
         realCoeffs.copyOf(),
         intCoeffs.copyOf(),
@@ -261,49 +229,64 @@ class Linear private constructor(
 
     private fun buildKey(sink: KeySink) {
         sink.enum(op)
-        // A continuous row keys on its exact double bound / integer coefficients (the [Long] forms are
-        // rounded placeholders); an integer row keys on the [Long] bound and coalesced integer terms.
-        if (hasReals) {
-            sink.long(if (strictReal) 1L else 0L)
-            sink.long(realBound.toRawBits())
-            for (i in vars.indices) {
-                sink.long(vars[i].toLong())
-                sink.long(realIntCoeffs[i].toRawBits())
+        // Each shape keys on its own constants: a continuous row on its exact doubles, a wide row on its
+        // exact BigIntegers, an integer row on its bound and coalesced terms. No shape's key can collide
+        // with another's, since only one of them is ever fed.
+        when (val c = constants) {
+            is RealConstants -> {
+                sink.long(if (c.strict) 1L else 0L)
+                sink.long(c.bound.toRawBits())
+                for (i in vars.indices) {
+                    sink.long(vars[i].toLong())
+                    sink.long(c.intCoefficients.at(i).toRawBits())
+                }
+                for (j in realVars.indices) {
+                    sink.long(realVars[j].toLong())
+                    sink.long(c.realCoefficients.at(j).toRawBits())
+                }
             }
-            for (j in realVars.indices) {
-                sink.long(realVars[j].toLong())
-                sink.long(realCoeffs[j].toRawBits())
+
+            is WideConstants -> {
+                // Feed the decimal strings char-by-char with an out-of-char-range separator; unambiguous,
+                // so different wide rows never share a key.
+                for (ch in c.bound.toString()) sink.long(ch.code.toLong())
+                for (i in vars.indices) {
+                    sink.long(Long.MIN_VALUE)
+                    sink.long(vars[i].toLong())
+                    for (ch in c.coefficients.at(i).toString()) sink.long(ch.code.toLong())
+                }
             }
-        } else if (wide) {
-            // Key on the exact BigInteger coeffs/bound (the Long forms are saturated placeholders, so
-            // distinct wide values would otherwise collide). Feed the decimal strings char-by-char with an
-            // out-of-char-range separator; unambiguous, so different wide rows never share a key.
-            val wc = checkNotNull(wideCoeffs)
-            for (ch in checkNotNull(wideBound).toString()) sink.long(ch.code.toLong())
-            for (i in vars.indices) {
-                sink.long(Long.MIN_VALUE)
-                sink.long(vars[i].toLong())
-                for (ch in wc[i].toString()) sink.long(ch.code.toLong())
+
+            is IntegerConstants -> {
+                sink.long(c.bound)
+                sink.pairsByVarKeyCoalescing(vars) { c.coeff(it) }
             }
-        } else {
-            sink.long(bound)
-            sink.pairsByVarKeyCoalescing(vars) { coeff(it) }
         }
     }
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (hasReals) {
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = when (val c = constants) {
         // Real var ids live in a separate namespace and are not remapped by [intMap]; the row was
         // already canonicalised (any `>=` negated) at construction, so re-emit as-is (op is LE/EQ/NE,
         // never GE) via the double form to preserve the exact continuous-row coefficients and bound.
-        Linear(vars.remapVars(intMap), realIntCoeffs, realVars, realCoeffs, op, realBound, strictReal)
-    } else if (wide) {
+        is RealConstants -> Linear(
+            vars.remapVars(intMap),
+            c.intCoefficients.toDoubleArray(),
+            realVars,
+            c.realCoefficients.toDoubleArray(),
+            op,
+            c.bound,
+            c.strict,
+        )
+
         // Already canonical (op is LE/EQ/NE); re-emit over remapped vars. A colouring map can collapse two
         // of the row's vars onto one image, so coalesce their exact coefficients (summing) to keep the term
         // set duplicate-free — the propagator's interval reasoning requires one term per variable.
-        val (rv, rc) = coalesceWide(vars.remapVars(intMap), checkNotNull(wideCoeffs))
-        Linear(rv, rc, op, checkNotNull(wideBound))
-    } else {
-        Linear(coeffs, vars.remapVars(intMap), op, bound)
+        is WideConstants -> {
+            val (rv, rc) = coalesceWide(vars.remapVars(intMap), c.coefficients.toTypedArray())
+            Linear(rv, rc, op, c.bound)
+        }
+
+        is IntegerConstants -> Linear(c.coeffs, vars.remapVars(intMap), op, c.bound)
     }
 
     /**
@@ -313,9 +296,11 @@ class Linear private constructor(
      * other linear is value-meaningful: an ordering (`≤`/`≥`) is not relabeling-invariant, and a
      * nonzero bound or non-opposite coefficients tie the variables to specific magnitudes.
      */
-    private fun isBinaryValueRelation(): Boolean = isIntegerCore &&
-        (op == LinearOp.EQ || op == LinearOp.NE) && bound == 0L &&
-        vars.size == 2 && coeff(0) != 0L && coeff(0) == -coeff(1)
+    private fun isBinaryValueRelation(): Boolean {
+        val c = integerConstants ?: return false
+        return (op == LinearOp.EQ || op == LinearOp.NE) && c.bound == 0L &&
+            vars.size == 2 && c.coeff(0) != 0L && c.coeff(0) == -c.coeff(1)
+    }
 
     override fun isValueAnonymous(): Boolean = isBinaryValueRelation()
 
@@ -324,55 +309,50 @@ class Linear private constructor(
 
     // A continuous row connects the objective through its integer terms via the LP double view, not the
     // integer objective cone; keep it out of the cone probe (which reasons over integer CORE rows only).
-    override val extendsObjectiveCone: Boolean get() = isIntegerCore
+    override val extendsObjectiveCone: Boolean get() = constants is IntegerConstants
 
     // A continuous row is LP-only: it does not propagate in CP ([NoPropagator], so the occurrence index
     // never wakes it) — its feasibility is enforced by the LP relaxation and the search leaf. The
     // local-search engine is gated off for problems with real variables, so its invariant is never
     // consulted; an inert one keeps the factory total without pretending to evaluate the real terms.
-    override fun asPropagator(): Propagator = when {
-        hasReals -> NoPropagator
-        wide -> WideLinearPropagator(intVars, vars, checkNotNull(wideCoeffs), op, checkNotNull(wideBound))
-        else -> LinearPropagator(boolVars, intVars, coeffs, vars, op, bound)
+    override fun asPropagator(): Propagator = when (val c = constants) {
+        is RealConstants -> NoPropagator
+        is WideConstants -> WideLinearPropagator(intVars, vars, c.coefficients.toTypedArray(), op, c.bound)
+        is IntegerConstants -> LinearPropagator(boolVars, intVars, c.coeffs, vars, op, c.bound)
     }
 
-    override fun asInvariant(): Invariant = if (isIntegerCore) LinearInvariant(coeffs, vars, op, bound) else NoInvariant
+    override fun asInvariant(): Invariant = integerConstants?.let { LinearInvariant(it.coeffs, vars, op, it.bound) }
+        ?: NoInvariant
 
-    // The factor *is* its own exact linear row (integer terms), so presolve reads it with no extra
-    // allocation. [linearize] emits the row over the factor's arrays directly rather than through the
-    // interface accessors, keeping the per-node LP path allocation-free. A continuous row exposes no
-    // integer LinearRow (its content is not integer-valued) and emits a real row instead.
-    override val size: Int get() = vars.size
-    override fun ref(k: Int): Int = Term.ofIntVar(vars[k])
-    override fun coeff(k: Int): Long = coefficients.at(k)
-    override val relation: LinearOp get() = op
-    override val isIntegerOnly: Boolean get() = isIntegerCore
-    override val linearRows: List<LinearRow> get() = if (isIntegerCore) listOf(this) else emptyList()
+    // The integer reading is itself the exact [LinearRow], held by the row's own constants, so presolve
+    // reads it with no extra allocation. A wide or continuous row has no integer LinearRow — its content
+    // is not integer-valued — and emits a relaxation row instead.
+    override val linearRows: List<LinearRow> get() = listOfNotNull(integerConstants)
 
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        // A wide row enters the LP as directionally-rounded double outer-relaxation rows (see
-        // [emitWideOuterRows]); its exact Long coeffs/bound are placeholders and never enter the LP.
-        if (wide) {
-            emitWideOuterRows(builder)
-            return
+        when (val c = constants) {
+            // A wide row enters the LP only as directionally-rounded double outer-relaxation rows; its
+            // exact coefficients never enter the LP (see [emitWideOuterRows]).
+            is WideConstants -> emitWideOuterRows(builder, c)
+
+            is IntegerConstants -> builder.linearRow(op, vars, c.coeffs, c.bound)
+
+            // Mixed integer + real row: map integer vars to their LP columns and real vars to their LP-only
+            // continuous columns, and emit one double-precision row over the combined columns.
+            is RealConstants -> {
+                val cols = IntArray(vars.size + realVars.size)
+                val dcoeffs = DoubleArray(cols.size)
+                for (i in vars.indices) {
+                    cols[i] = builder.intColumn(vars[i])
+                    dcoeffs[i] = c.intCoefficients.at(i)
+                }
+                for (j in realVars.indices) {
+                    cols[vars.size + j] = builder.realColumn(realVars[j])
+                    dcoeffs[vars.size + j] = c.realCoefficients.at(j)
+                }
+                builder.realRow(cols, dcoeffs, op, c.bound, c.strict)
+            }
         }
-        if (!hasReals) {
-            builder.linearRow(op, vars, coeffs, bound)
-            return
-        }
-        // Mixed integer + real row: map integer vars to their LP columns and real vars to their LP-only
-        // continuous columns, and emit one double-precision row over the combined columns.
-        val cols = IntArray(vars.size + realVars.size)
-        val dcoeffs = DoubleArray(cols.size)
-        for (i in vars.indices) {
-            cols[i] = builder.intColumn(vars[i])
-            dcoeffs[i] = realIntCoeffs[i]
-        }
-        for (j in realVars.indices) {
-            cols[vars.size + j] = builder.realColumn(realVars[j])
-            dcoeffs[vars.size + j] = realCoeffs[j]
-        }
-        builder.realRow(cols, dcoeffs, op, realBound, strictReal)
     }
 
     /**
@@ -383,13 +363,13 @@ class Linear private constructor(
      * integer certificate declines (no certified prune ever reads these rounded coefficients; the row only
      * tightens the rigorous float objective bound). A `≠` row has no LP relaxation, so nothing is emitted.
      */
-    private fun emitWideOuterRows(builder: RelaxationBuilder) {
+    private fun emitWideOuterRows(builder: RelaxationBuilder, constants: WideConstants) {
         // GE is canonicalised to LE at construction; NE has no single LP row.
         if (op != LinearOp.LE && op != LinearOp.EQ) return
         // A value past the `Double` range has no finite double to round outward to. The row is still
         // enforced exactly by its wide propagator, and a relaxation is only ever a bound, so leaving this
         // one out weakens the LP and nothing else.
-        val rounded = wideRounding() ?: return
+        val rounded = wideRounding(constants) ?: return
         // A sign-straddling variable cannot be single-rounded to weaken both signs, so split it into
         // nonnegative parts `x = x⁺ − x⁻` (each roundable like a nonnegative variable). Decline only the
         // pathological var whose negative extent `−min` overflows Long — then leave the whole row CP-only.
@@ -431,20 +411,20 @@ class Linear private constructor(
      *  wide coefficients, while a relaxation is rebuilt per node, so they are computed once: an
      *  arbitrary-precision conversion costs a pass over the whole magnitude and there are two per
      *  coefficient. */
-    private fun wideRounding(): WideRounding? {
+    private fun wideRounding(constants: WideConstants): WideRounding? {
         if (wideExceedsDouble) return null
         wideRoundingMemo?.let { return it }
-        val bound = checkNotNull(wideBound)
-        val coeffs = checkNotNull(wideCoeffs)
-        if (!fitsDouble(bound) || !coeffs.all { fitsDouble(it) }) {
+        val exactBound = constants.bound
+        val exactCoeffs = constants.coefficients.toTypedArray()
+        if (!fitsDouble(exactBound) || !exactCoeffs.all { fitsDouble(it) }) {
             wideExceedsDouble = true
             return null
         }
         return WideRounding(
-            DoubleArray(coeffs.size) { floorToDouble(coeffs[it]) },
-            DoubleArray(coeffs.size) { ceilToDouble(coeffs[it]) },
-            floorToDouble(bound),
-            ceilToDouble(bound),
+            DoubleArray(exactCoeffs.size) { floorToDouble(exactCoeffs[it]) },
+            DoubleArray(exactCoeffs.size) { ceilToDouble(exactCoeffs[it]) },
+            floorToDouble(exactBound),
+            ceilToDouble(exactBound),
         ).also { wideRoundingMemo = it }
     }
 
@@ -493,21 +473,7 @@ class Linear private constructor(
     }
 }
 
-/** The LP-only payload of a [Linear] row — real (continuous) terms and/or over-64-bit wide coefficients —
- *  held off to the side so a plain integer row (which has none of these) carries a single null reference
- *  rather than the seven fields these values would otherwise occupy on every [Linear]. Values are already
- *  GE→LE-canonicalised by the [Linear] constructor. */
-private class LinearLpExtra(
-    val realVars: IntArray,
-    val realCoeffs: DoubleArray,
-    val realIntCoeffs: DoubleArray,
-    val realBound: Double,
-    val strictReal: Boolean,
-    val wideCoeffs: Array<BigInteger>?,
-    val wideBound: BigInteger?,
-)
-
-/** A wide row's coefficients and bound rounded outward, index-aligned with `Linear.wideCoeffs`: the
+/** A wide row's coefficients and bound rounded outward, index-aligned with the row's variables: the
  *  direction each term needs is only known per emitted row, so both are kept. */
 private class WideRounding(
     val floorCoeffs: DoubleArray,
@@ -586,8 +552,7 @@ internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntAr
     return keptVars.toIntArray() to keptCoeffs.toTypedArray()
 }
 
-/** [Long] clamp of a [BigInteger] to the signed 64-bit range — the saturated placeholder a wide row keeps
- *  in its Long `coeffs`/`bound`, never read as authoritative (the exact value lives in [Linear.wideCoeffs]). */
+/** [Long] clamp of a [BigInteger] to the signed 64-bit range. */
 internal fun BigInteger.saturatedLong(): Long = when {
     this > BigInteger.fromLong(Long.MAX_VALUE) -> Long.MAX_VALUE
     this < BigInteger.fromLong(Long.MIN_VALUE) -> Long.MIN_VALUE

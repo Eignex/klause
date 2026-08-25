@@ -54,8 +54,11 @@ internal object CoefficientStrengthening {
                 continue
             }
             val rewritten = when {
-                factor is Linear && factor.isIntegerCore -> strengthenLinear(factor, problem.requireFiniteIntDomains())
+                factor is Linear && factor.integerConstants != null ->
+                    strengthenLinear(factor, problem.requireFiniteIntDomains())
+
                 factor is PseudoBoolean -> strengthenPb(factor)
+
                 else -> factor
             }
             // A rewrite replaces the input factor; a `null` drops it (always satisfied); an unchanged
@@ -78,12 +81,13 @@ internal object CoefficientStrengthening {
      *  Replacing the original by a contradiction is sound — an infeasible problem has no solutions
      *  regardless of which constraint witnesses the conflict. */
     private fun equalityContradiction(factor: Factor, domains: Array<IntDomain>): List<Factor>? = when (factor) {
-        is Linear ->
-            if (factor.isIntegerCore && factor.op == LinearOp.EQ && indivisible(factor.coeffs, factor.bound)) {
+        is Linear -> factor.integerConstants.let { row ->
+            if (row != null && factor.op == LinearOp.EQ && indivisible(row.coeffs, row.bound)) {
                 intContradiction(factor.vars[0], domains)
             } else {
                 null
             }
+        }
 
         is PseudoBoolean ->
             if (factor.op == PbOp.EQ && indivisible(factor.weights, factor.bound)) {
@@ -140,13 +144,14 @@ internal object CoefficientStrengthening {
     }
 
     private fun strengthenLinear(factor: Linear, domains: Array<IntDomain>): Factor? {
-        val g = PresolveShared.gcdOf(factor.coeffs)
+        val row = factor.integerConstants ?: return factor
+        val g = PresolveShared.gcdOf(row.coeffs)
         val gcdReduced: Linear = if (g <= 1L) {
             factor
         } else {
-            when (val reduced = reduceBound(toRel(factor.op), factor.bound, g)) {
+            when (val reduced = reduceBound(toRel(factor.op), row.bound, g)) {
                 is Reduced.Bound -> Linear(
-                    PresolveShared.divAll(factor.coeffs, g),
+                    PresolveShared.divAll(row.coeffs, g),
                     factor.vars.copyOf(),
                     factor.op,
                     reduced.bound,
@@ -193,18 +198,19 @@ internal object CoefficientStrengthening {
     }
 
     private fun liftLinearExact(l: Linear, domains: Array<IntDomain>): Factor? {
+        val row = l.integerConstants ?: return l
         // Only ≤ / ≥ lift by clamping; complement ≥ to ≤ by negating coeffs and bound.
         val coeffs: LongArray
         val bound: Long
         when (l.op) {
             LinearOp.LE -> {
-                coeffs = LongArray(l.vars.size) { l.coeff(it) }
-                bound = l.bound
+                coeffs = LongArray(l.vars.size) { row.coeff(it) }
+                bound = row.bound
             }
 
             LinearOp.GE -> {
-                coeffs = LongArray(l.vars.size) { -l.coeff(it) }
-                bound = -l.bound
+                coeffs = LongArray(l.vars.size) { -row.coeff(it) }
+                bound = -row.bound
             }
 
             else -> return l

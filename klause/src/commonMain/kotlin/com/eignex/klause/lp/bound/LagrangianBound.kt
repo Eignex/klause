@@ -98,7 +98,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
             val lr = LongArrayList()
             val ls = IntArrayList()
             for (f in problem.factors) {
-                if (f !is Linear || !f.isIntegerCore) continue
+                if (f !is Linear) continue
+                val row = f.integerConstants ?: continue
                 val sign = when (f.op) {
                     LinearOp.LE -> 1
                     LinearOp.GE -> -1
@@ -107,8 +108,8 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                 }
                 if (f.vars.any { !inV[it] }) continue // only constraints over the chosen blocks are dualized
                 lv.add(f.vars.copyOf())
-                lc.add(f.coeffs.copyOf())
-                lr.add(f.bound)
+                lc.add(row.coeffs)
+                lr.add(row.bound)
                 ls.add(sign)
             }
             linkVars = lv.toTypedArray()

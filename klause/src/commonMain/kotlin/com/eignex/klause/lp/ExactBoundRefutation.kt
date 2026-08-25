@@ -71,14 +71,15 @@ private class Row(val coeffs: MutableMap<Int, BigInteger>, var bound: BigInteger
 /** The exact form of [f], or null when it is outside the fragment (a `≠` row constrains no interval). */
 private fun rowOf(f: Linear, n: Int): Row? {
     if (f.op != LinearOp.LE && f.op != LinearOp.EQ) return null
+    val constants = f.integralConstants ?: return null
     val coeffs = HashMap<Int, BigInteger>(f.vars.size)
     for (k in f.vars.indices) {
         val v = f.vars[k]
         if (v >= n) return null
-        val c = f.wideCoeffs?.get(k) ?: BigInteger.fromLong(f.coeff(k))
+        val c = constants.exactCoeff(k)
         if (!c.isZero()) coeffs[v] = (coeffs[v] ?: BigInteger.ZERO) + c
     }
-    return Row(coeffs, f.wideBound ?: BigInteger.fromLong(f.bound), f.op == LinearOp.EQ)
+    return Row(coeffs, constants.exactBound, f.op == LinearOp.EQ)
 }
 
 /**

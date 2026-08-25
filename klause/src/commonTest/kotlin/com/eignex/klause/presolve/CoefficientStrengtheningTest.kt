@@ -48,21 +48,33 @@ class CoefficientStrengtheningTest {
         }
         // Probing off: root propagation leaves x0 in [0,3] ⇒ d = 2*3 + 5*1 - 8 = 3, x2's 5 clamps to 3.
         val off = strengthenedTarget(probe = false)
-        assertEquals(3L, off.coeffs[off.vars.indexOf(2)], "without probing, x2's coefficient clamps to 3")
+        assertEquals(
+            3L,
+            checkNotNull(off.integerConstants).coeffs[off.vars.indexOf(2)],
+            "without probing, x2's coefficient clamps to 3",
+        )
         // Probing on: SAC tightens x0 to [0,2] ⇒ d = 2*2 + 5*1 - 8 = 1, both coefficients clamp to 1.
         val on = strengthenedTarget(probe = true)
-        assertEquals(1L, on.coeffs[on.vars.indexOf(2)], "with probing, x2's coefficient clamps to 1")
-        assertEquals(1L, on.coeffs[on.vars.indexOf(0)], "with probing, x0's coefficient clamps to 1")
+        assertEquals(
+            1L,
+            checkNotNull(on.integerConstants).coeffs[on.vars.indexOf(2)],
+            "with probing, x2's coefficient clamps to 1",
+        )
+        assertEquals(
+            1L,
+            checkNotNull(on.integerConstants).coeffs[on.vars.indexOf(0)],
+            "with probing, x0's coefficient clamps to 1",
+        )
     }
 
     private fun evalLinear(f: Linear, assign: IntArray): Boolean {
         var sum = 0L
-        for (i in f.vars.indices) sum += f.coeffs[i] * assign[f.vars[i]]
+        for (i in f.vars.indices) sum += checkNotNull(f.integerConstants).coeffs[i] * assign[f.vars[i]]
         return when (f.op) {
-            LinearOp.LE -> sum <= f.bound
-            LinearOp.GE -> sum >= f.bound
-            LinearOp.EQ -> sum == f.bound
-            LinearOp.NE -> sum != f.bound
+            LinearOp.LE -> sum <= checkNotNull(f.integerConstants).bound
+            LinearOp.GE -> sum >= checkNotNull(f.integerConstants).bound
+            LinearOp.EQ -> sum == checkNotNull(f.integerConstants).bound
+            LinearOp.NE -> sum != checkNotNull(f.integerConstants).bound
         }
     }
 

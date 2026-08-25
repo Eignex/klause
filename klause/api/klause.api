@@ -1025,7 +1025,27 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
 }
 
-public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/lp/LinearRow, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/eignex/klause/factor/arithmetic/IntegralConstants, com/eignex/klause/lp/LinearRow {
+	public fun <init> ([ILcom/eignex/klause/solver/LongConstList;Lcom/eignex/klause/factor/arithmetic/LinearOp;J)V
+	public fun coeff (I)J
+	public fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun getBound ()J
+	public final fun getCoefficients ()Lcom/eignex/klause/solver/LongConstList;
+	public final fun getCoeffs ()[J
+	public fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getMaxAbsCoeff ()J
+	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public fun getSize ()I
+	public fun isIntegerOnly ()Z
+	public fun ref (I)I
+}
+
+public abstract interface class com/eignex/klause/factor/arithmetic/IntegralConstants : com/eignex/klause/factor/arithmetic/LinearConstants {
+	public abstract fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public abstract fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+}
+
+public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/solver/Factor {
 	public fun <init> ([I[D[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ)V
 	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> ([I[ILcom/eignex/klause/factor/arithmetic/LinearOp;I)V
@@ -1035,43 +1055,34 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
-	public fun coeff (I)J
 	public fun getBoolVars ()[I
-	public fun getBound ()J
-	public final fun getCoeffs ()[J
+	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/LinearConstants;
 	public fun getExtendsObjectiveCone ()Z
-	public final fun getHasReals ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
+	public final fun getIntegralConstants ()Lcom/eignex/klause/factor/arithmetic/IntegralConstants;
 	public fun getLinearRows ()Ljava/util/List;
-	public final fun getMaxAbsCoeff ()J
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public final fun getRealBound ()D
-	public final fun getRealCoeffs ()[D
-	public final fun getRealIntCoeffs ()[D
+	public final fun getRealConstants ()Lcom/eignex/klause/factor/arithmetic/RealConstants;
 	public final fun getRealVars ()[I
-	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public fun getSize ()I
-	public final fun getStrictReal ()Z
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
 	public final fun getVars ()[I
-	public final fun getWide ()Z
-	public final fun getWideBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun getWideCoeffs ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getWideConstants ()Lcom/eignex/klause/factor/arithmetic/WideConstants;
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
-	public final fun isIntegerCore ()Z
-	public fun isIntegerOnly ()Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun ref (I)I
 	public fun remap ([I[I)Lcom/eignex/klause/solver/Factor;
 	public fun remapStructuralHash ([I[I)I
 	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/solver/StructuralKey;
 	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
 	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+}
+
+public abstract interface class com/eignex/klause/factor/arithmetic/LinearConstants {
 }
 
 public final class com/eignex/klause/factor/arithmetic/LinearOp : java/lang/Enum {
@@ -1109,6 +1120,14 @@ public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klau
 	public fun structuralKey ()Lcom/eignex/klause/solver/StructuralKey;
 	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
 	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+}
+
+public final class com/eignex/klause/factor/arithmetic/RealConstants : com/eignex/klause/factor/arithmetic/LinearConstants {
+	public fun <init> (Lcom/eignex/klause/solver/RealConsts;Lcom/eignex/klause/solver/RealConsts;DZ)V
+	public final fun getBound ()D
+	public final fun getIntCoefficients ()Lcom/eignex/klause/solver/RealConsts;
+	public final fun getRealCoefficients ()Lcom/eignex/klause/solver/RealConsts;
+	public final fun getStrict ()Z
 }
 
 public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/klause/solver/Factor {
@@ -1177,23 +1196,19 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
-	public final fun coeff (I)J
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
-	public final fun getBound ()J
-	public final fun getCoeffs ()[J
+	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/IntegralConstants;
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
 	public fun getLinearRows ()Ljava/util/List;
-	public final fun getMaxAbsCoeff ()J
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
 	public final fun getVars ()[I
-	public final fun getWide ()Z
-	public final fun getWideBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
-	public final fun getWideCoeffs ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getWideConstants ()Lcom/eignex/klause/factor/arithmetic/WideConstants;
 	public fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
@@ -1270,6 +1285,14 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public fun structuralKey ()Lcom/eignex/klause/solver/StructuralKey;
 	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
 	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+}
+
+public final class com/eignex/klause/factor/arithmetic/WideConstants : com/eignex/klause/factor/arithmetic/IntegralConstants {
+	public fun <init> (Lcom/eignex/klause/solver/WideConsts;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getCoefficients ()Lcom/eignex/klause/solver/WideConsts;
+	public fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 }
 
 public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause/solver/Factor {
@@ -7695,6 +7718,7 @@ public abstract interface class com/eignex/klause/solver/ConstList {
 public final class com/eignex/klause/solver/ConstListKt {
 	public static final fun constsOf ([I)Lcom/eignex/klause/solver/LongConstList;
 	public static final fun constsOf ([J)Lcom/eignex/klause/solver/LongConstList;
+	public static final fun getIndices (Lcom/eignex/klause/solver/ConstList;)Lkotlin/ranges/IntRange;
 	public static final fun getNoConsts ()Lcom/eignex/klause/solver/LongConstList;
 	public static final fun longsOrNull (Lcom/eignex/klause/solver/ConstList;)Lcom/eignex/klause/solver/LongConstList;
 }

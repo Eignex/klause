@@ -18,70 +18,57 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorKind
 import com.eignex.klause.solver.KeySink
-import com.eignex.klause.solver.LongConstList
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
+import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.solver.values
+import com.eignex.klause.util.EmptyLongArray
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
  * `auxBoolVar ↔ (Σ coeffs[i] * intVars[i] ⟨op⟩ bound)`. Created by the compiler when a
  * multi-variable [com.eignex.klause.model.IntCompare] appears non-top-level so the rest of the
  * Tseitin lowering can treat its truth as a Boolean literal. Payload at `intPayload[factorId]`
- * is the current weighted sum, mirrored from [Linear]. Terms pair [coeffs] with [vars]; the sum
- * is compared by [op] against [bound].
+ * is the current weighted sum, mirrored from [Linear]. Terms pair [vars] with the coefficients in
+ * [constants]; the sum is compared by [op] against that shape's bound.
  */
 class ReifiedLinear private constructor(
     override val auxBoolVar: Int,
     terms: CoalescedTerms,
     val op: LinearOp,
-    val bound: Long,
-    // Wide (>64-bit) integer coefficients and bound, carried exactly as BigInteger. Present only on a wide
-    // reified row, where the Long [coeffs]/[bound] are saturated placeholders and
-    // [WideReifiedLinearPropagator] reads these. Null for the plain integer form. No `>=` negation — a
-    // reified row keeps its op (see the class doc).
-    private val wideCoeffsIn: Array<BigInteger>? = null,
-    private val wideBoundIn: BigInteger? = null,
+    rawBound: Long,
+    // Over-64-bit integer coefficients and bound, carried exactly. Null for the plain integer form.
+    wideCoeffsIn: Array<BigInteger>? = null,
+    wideBoundIn: BigInteger? = null,
 ) : ReifiedFactor {
 
     val vars: IntArray = terms.vars
 
-    // Integer coefficients, index-aligned with [vars]. The width is the store: an all-one row keeps no
-    // per-term storage, a 32-bit-range row 4 B/term, and only a genuinely 64-bit row 8 B/term — what keeps
-    // parse/presolve memory down on the Linear-dominated families. A reified row keeps its op, so there is
-    // no `>=` negation here. [coeff] reads a term with no allocation; [coeffs] materialises a [LongArray].
-    private val coefficients: LongConstList = constsOf(terms.coeffs)
+    /**
+     * The row's coefficients and right-hand side, at the width that holds them exactly. A consumer narrows
+     * to [integerConstants] to reason in 64 bits, or reads [IntegralConstants] for exact arbitrary
+     * precision; a reified row keeps its op, so nothing is negated here.
+     */
+    val constants: IntegralConstants = if (wideCoeffsIn != null) {
+        WideConstants(WideConsts(wideCoeffsIn), wideBoundIn!!)
+    } else {
+        IntegerConstants(vars, constsOf(terms.coeffs), op, rawBound)
+    }
 
-    /** Largest `|coefficient|` over the integer terms (0 when there are none), read from the coefficient
-     *  store so the small-model bound needs no rescan. A saturated placeholder on a wide row. */
-    val maxAbsCoeff: Long get() = coefficients.maxAbs
+    /** The row read as plain 64-bit integer arithmetic, or `null` when its constants are wider. */
+    val integerConstants: IntegerConstants? get() = constants as? IntegerConstants
 
-    /** Integer coefficient at term [k], read from the compact store with no allocation. */
-    fun coeff(k: Int): Long = coefficients.at(k)
-
-    /** Integer coefficients as a [LongArray], materialised on demand from the compact store; prefer [coeff]
-     *  for indexed access. */
-    val coeffs: LongArray get() = coefficients.toLongArray()
-
-    /** Wide (>64-bit) integer coefficients, index-aligned with [vars]; null unless [wide].
-     *  [WideReifiedLinearPropagator] reads these exact values, not [coeffs]. */
-    val wideCoeffs: Array<BigInteger>? = wideCoeffsIn
-
-    /** Wide (>64-bit) right-hand side; null unless [wide]. */
-    val wideBound: BigInteger? = wideBoundIn
-
-    /** True when a coefficient or the bound exceeds the 64-bit range: the row propagates via
-     *  [WideReifiedLinearPropagator] and is excluded from the LP relaxation; its Long [coeffs]/[bound]
-     *  are saturated placeholders never read as authoritative. */
-    val wide: Boolean get() = wideCoeffs != null
+    /** The row's over-64-bit constants, or `null` when it is not one. */
+    val wideConstants: WideConstants? get() = constants as? WideConstants
 
     init {
         require(vars.isNotEmpty()) { "linear sum must have at least one term" }
-        require(wideCoeffs == null || wideCoeffs.size == vars.size) { "wide coeff/var length mismatch" }
+        val wide = wideConstants
+        require(wide == null || wide.coefficients.size == vars.size) { "wide coeff/var length mismatch" }
     }
 
     /** Wide form: `auxBoolVar ↔ (Σ wideCoeffs·vars ⟨op⟩ wideBound)` with coefficients or a bound beyond the
@@ -89,9 +76,9 @@ class ReifiedLinear private constructor(
     constructor(auxBoolVar: Int, vars: IntArray, wideCoeffs: Array<BigInteger>, op: LinearOp, wideBound: BigInteger) :
         this(
             auxBoolVar,
-            CoalescedTerms(vars.copyOf(), LongArray(wideCoeffs.size) { wideCoeffs[it].saturatedLong() }),
+            CoalescedTerms(vars.copyOf(), EmptyLongArray),
             op,
-            wideBound.saturatedLong(),
+            0L,
             wideCoeffsIn = wideCoeffs.copyOf(),
             wideBoundIn = wideBound,
         )
@@ -110,13 +97,15 @@ class ReifiedLinear private constructor(
     constructor(auxBoolVar: Int, coeffs: LongArray, vars: IntArray, op: LinearOp, bound: Long) :
         this(auxBoolVar, coalesceLinearTerms(vars, coeffs), op, bound)
 
-    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = if (wide) {
+    override fun remap(boolMap: IntArray, intMap: IntArray): Factor = when (val c = constants) {
         // A colouring map can collapse two of the row's vars onto one image, so coalesce their exact
         // coefficients (summing) to keep one term per variable, which the interval propagator requires.
-        val (rv, rc) = coalesceWide(vars.remapVars(intMap), checkNotNull(wideCoeffs))
-        ReifiedLinear(boolMap[auxBoolVar], rv, rc, op, checkNotNull(wideBound))
-    } else {
-        ReifiedLinear(boolMap[auxBoolVar], coeffs, vars.remapVars(intMap), op, bound)
+        is WideConstants -> {
+            val (rv, rc) = coalesceWide(vars.remapVars(intMap), c.coefficients.toTypedArray())
+            ReifiedLinear(boolMap[auxBoolVar], rv, rc, op, c.bound)
+        }
+
+        is IntegerConstants -> ReifiedLinear(boolMap[auxBoolVar], c.coeffs, vars.remapVars(intMap), op, c.bound)
     }
 
     /** [Linear.structuralKey] plus the reifying [auxBoolVar]; the distinct factor kind keeps it disjoint
@@ -129,41 +118,51 @@ class ReifiedLinear private constructor(
     private fun buildKey(sink: KeySink) {
         sink.boolVar(auxBoolVar)
         sink.enum(op)
-        if (wide) {
-            // Key on the exact BigInteger coeffs/bound (the Long forms are saturated placeholders); feed the
-            // decimal strings char-by-char with an out-of-char separator so distinct wide rows never collide.
-            val wc = checkNotNull(wideCoeffs)
-            for (ch in checkNotNull(wideBound).toString()) sink.long(ch.code.toLong())
-            for (i in vars.indices) {
-                sink.long(Long.MIN_VALUE)
-                sink.long(vars[i].toLong())
-                for (ch in wc[i].toString()) sink.long(ch.code.toLong())
+        when (val c = constants) {
+            // A wide row keys on its exact BigIntegers: feed the decimal strings char-by-char with an
+            // out-of-char separator so distinct wide rows never collide.
+            is WideConstants -> {
+                for (ch in c.bound.toString()) sink.long(ch.code.toLong())
+                for (i in vars.indices) {
+                    sink.long(Long.MIN_VALUE)
+                    sink.long(vars[i].toLong())
+                    for (ch in c.coefficients.at(i).toString()) sink.long(ch.code.toLong())
+                }
             }
-        } else {
-            sink.long(bound)
-            sink.pairsByVarKey(vars) { coeff(it) }
+
+            is IntegerConstants -> {
+                sink.long(c.bound)
+                sink.pairsByVarKey(vars) { c.coeff(it) }
+            }
         }
     }
 
-    // A wide row's [longPayload] is the sum of the saturated Long placeholders, not the true wide sum, so
-    // it must not be trusted. Local search is gated off entirely for a problem with any wide factor
-    // (LocalSearchSolver bails on hasWideFactor), so these are unreachable for a wide row; the conservative
-    // "always violated" / max-residual values below cannot let LS accept an assignment that breaks it.
+    // A wide row has no 64-bit [longPayload] to read: local search is gated off entirely for a problem
+    // with any wide factor (LocalSearchSolver bails on hasWideFactor), so these are unreachable for one;
+    // the conservative "always violated" / max-residual values cannot let LS accept an assignment that
+    // breaks it.
     override fun holdsNow(state: LocalSearchState, factorId: Int): Boolean =
-        if (wide) false else linearHolds(state.longPayload[factorId], op, bound)
+        integerConstants?.let { linearHolds(state.longPayload[factorId], op, it.bound) } ?: false
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
-        if (wide) softCap else linearResidual(state.longPayload[factorId], op, bound, softCap)
+        integerConstants?.let { linearResidual(state.longPayload[factorId], op, it.bound, softCap) } ?: softCap
 
-    override fun asPropagator(): Propagator = if (wide) {
-        val wc = checkNotNull(wideCoeffs)
-        WideReifiedLinearPropagator(auxBoolVar, boolVars, intVars, wc, vars, op, checkNotNull(wideBound))
-    } else {
-        ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, coeffs, vars, op, bound)
+    override fun asPropagator(): Propagator = when (val c = constants) {
+        is WideConstants -> WideReifiedLinearPropagator(
+            auxBoolVar,
+            boolVars,
+            intVars,
+            c.coefficients.toTypedArray(),
+            vars,
+            op,
+            c.bound,
+        )
+
+        is IntegerConstants -> ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, c.coeffs, vars, op, c.bound)
     }
 
     override fun asInvariant(): Invariant =
-        if (wide) NoInvariant else ReifiedLinearInvariant(auxBoolVar, coeffs, vars, op, bound)
+        integerConstants?.let { ReifiedLinearInvariant(auxBoolVar, it.coeffs, vars, op, it.bound) } ?: NoInvariant
 
     /**
      * Indicator rows for `auxBoolVar ↔ (L op bound)`, where `L = Σ coeffs·vars`. The big-Ms are the
@@ -180,14 +179,14 @@ class ReifiedLinear private constructor(
      * propagator/invariant still enforce it). Sound to skip.
      */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        // A wide reified row is excluded from the LP relaxation entirely — its Long coeffs/bound are
-        // placeholders that must not enter the LP; [WideReifiedLinearPropagator] is the sole enforcer.
-        if (wide) return
+        // A wide reified row is excluded from the LP relaxation entirely — no 64-bit reading of it may
+        // enter the LP; [WideReifiedLinearPropagator] is the sole enforcer.
+        val row = integerConstants ?: return
         // Best-effort: a reified row whose activity or big-M overflows Long is left unrelaxed (the
         // exact helpers below signal it); the propagator and invariant still enforce the constraint.
         try {
-            if (emitExactBinaryEquality(builder)) return
-            emitBigMRows(builder)
+            if (emitExactBinaryEquality(builder, row)) return
+            emitBigMRows(builder, row)
         } catch (_: LpOverflowException) {
             return
         }
@@ -202,9 +201,9 @@ class ReifiedLinear private constructor(
      * It covers the ubiquitous bool↔`{0,1}` channel (`channelBoolTo01`) as well as `±1` product encodings.
      * Returns whether it emitted (and the caller should skip the big-M rows).
      */
-    private fun emitExactBinaryEquality(builder: RelaxationBuilder): Boolean {
+    private fun emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerConstants): Boolean {
         if (op != LinearOp.EQ || vars.size != 1) return false
-        val c = coeff(0)
+        val c = row.coeff(0)
         if (c == 0L) return false
         val dec = builder.declaredDomain(vars[0])
         if (dec.values.size != 2) return false // a size-2 domain's two values are exactly its min and max
@@ -212,7 +211,7 @@ class ReifiedLinear private constructor(
         val hiValue = mulExact(c, dec.max)
         val vCol = builder.intColumn(vars[0])
         val auxCol = builder.boolColumn(auxBoolVar)
-        when (bound) {
+        when (row.bound) {
             // aux ⇔ (c·v == hi): c·v − (hi − lo)·aux = lo.
             hiValue -> builder.row(
                 intArrayOf(vCol, auxCol),
@@ -235,13 +234,13 @@ class ReifiedLinear private constructor(
         return true
     }
 
-    private fun emitBigMRows(builder: RelaxationBuilder) {
+    private fun emitBigMRows(builder: RelaxationBuilder, row: IntegerConstants) {
         var lMin = 0L
         var lMax = 0L
         var lMinD = 0L
         var lMaxD = 0L
         for (k in vars.indices) {
-            val c = coeff(k)
+            val c = row.coeff(k)
             val dom = builder.liveDomain(vars[k])
             val dec = builder.declaredDomain(vars[k])
             if (c >= 0L) {
@@ -257,7 +256,7 @@ class ReifiedLinear private constructor(
             }
         }
         val a = builder.boolColumn(auxBoolVar)
-        val b = bound
+        val b = row.bound
         val boundUp = addExact(b, 1L) // L ≥ bound + 1 is the integer negation of L ≤ bound
         val boundDown = subExact(b, 1L)
 
@@ -268,7 +267,7 @@ class ReifiedLinear private constructor(
             val vals = LongArray(vars.size + 1)
             for (k in vars.indices) {
                 cols[k] = builder.intColumn(vars[k])
-                vals[k] = coeff(k)
+                vals[k] = row.coeff(k)
             }
             cols[vars.size] = a
             vals[vars.size] = auxCoeff

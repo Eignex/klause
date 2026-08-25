@@ -16,7 +16,7 @@ class LinearSumFactorTest {
     fun `vars and coeffs are set from constructor`() {
         val linear = Linear(intArrayOf(3, -2, 5), intArrayOf(0, 1, 2), LinearOp.LE, 10)
         assertTrue(linear.vars.contentEquals(intArrayOf(0, 1, 2)))
-        assertTrue(linear.coeffs.contentEquals(longArrayOf(3, -2, 5)))
+        assertTrue(checkNotNull(linear.integerConstants).coeffs.contentEquals(longArrayOf(3, -2, 5)))
     }
 
     @Test
@@ -25,9 +25,9 @@ class LinearSumFactorTest {
         // exact Long total: the coalescer may not narrow the running sum to Int.
         val big = Int.MAX_VALUE.toLong()
         val linear = Linear(longArrayOf(big, big), intArrayOf(0, 0), LinearOp.LE, 5L)
-        assertTrue(linear.coeffs.contentEquals(longArrayOf(2 * big)))
+        assertTrue(checkNotNull(linear.integerConstants).coeffs.contentEquals(longArrayOf(2 * big)))
         assertTrue(linear.vars.contentEquals(intArrayOf(0)))
-        assertEquals(5L, linear.bound)
+        assertEquals(5L, checkNotNull(linear.integerConstants).bound)
     }
 
     @Test

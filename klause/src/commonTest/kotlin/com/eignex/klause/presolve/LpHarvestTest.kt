@@ -68,10 +68,10 @@ class LpHarvestTest {
             val point = IntArray(n)
             fun feasible(): Boolean = factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
+                for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
                 when (f.op) {
-                    LinearOp.LE -> s <= f.bound
-                    LinearOp.GE -> s >= f.bound
+                    LinearOp.LE -> s <= checkNotNull(f.integerConstants).bound
+                    LinearOp.GE -> s >= checkNotNull(f.integerConstants).bound
                     else -> true
                 }
             }
@@ -442,11 +442,11 @@ class LpHarvestTest {
             for (v in 0 until n) if (point[v].toLong() !in p.requireFiniteIntDomains()[v]) return false
             return p.factors.filterIsInstance<Linear>().all { f ->
                 var s = 0L
-                for (i in f.vars.indices) s += f.coeffs[i] * point[f.vars[i]]
+                for (i in f.vars.indices) s += checkNotNull(f.integerConstants).coeffs[i] * point[f.vars[i]]
                 when (f.op) {
-                    LinearOp.LE -> s <= f.bound
-                    LinearOp.GE -> s >= f.bound
-                    LinearOp.EQ -> s == f.bound
+                    LinearOp.LE -> s <= checkNotNull(f.integerConstants).bound
+                    LinearOp.GE -> s >= checkNotNull(f.integerConstants).bound
+                    LinearOp.EQ -> s == checkNotNull(f.integerConstants).bound
                     else -> true
                 }
             }

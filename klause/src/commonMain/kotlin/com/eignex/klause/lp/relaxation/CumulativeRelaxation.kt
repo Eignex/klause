@@ -320,7 +320,7 @@ internal class CumulativeRelaxation(
         init {
             for (f in problem.factors) {
                 when (f) {
-                    is Linear -> if (f.isIntegerCore && f.vars.size == 2) addLinearLinks(f)
+                    is Linear -> if (f.integerConstants != null && f.vars.size == 2) addLinearLinks(f)
 
                     is ArrayMinMax -> if (f.max) {
                         for (x in f.xs) maxResultsOf.getOrPut(x) { IntArrayList() }.add(f.result)
@@ -335,11 +335,12 @@ internal class CumulativeRelaxation(
         private fun addLinearLinks(f: Linear) {
             // Only ±1-coefficient rows produce a link; a coefficient outside ±1 (including any beyond
             // Int range) matches neither pattern below and adds nothing.
+            val row = f.integerConstants ?: return
             val a = f.vars[0]
             val b = f.vars[1]
-            val ca = f.coeff(0)
-            val cb = f.coeff(1)
-            val bound = f.bound
+            val ca = row.coeff(0)
+            val cb = row.coeff(1)
+            val bound = row.bound
             // "≥ bound" holds for GE/EQ; "≤ bound" (⇔ "≥ −bound" after negating) holds for LE/EQ.
             if (f.op == LinearOp.GE || f.op == LinearOp.EQ) addGeForm(a, ca, b, cb, bound)
             if (f.op == LinearOp.LE || f.op == LinearOp.EQ) addGeForm(a, -ca, b, -cb, -bound)

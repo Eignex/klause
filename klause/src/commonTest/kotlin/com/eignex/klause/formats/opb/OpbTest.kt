@@ -218,7 +218,7 @@ class OpbTest {
         // 2^63 (one past signed Long) as a coefficient, and an over-Int64 bound: both kept in the wide lane.
         val out = Opb.parse("+9223372036854775808 x1 +1 x2 >= 99999999999999999999 ;")
         val lin = out.problem.factors.filterIsInstance<Linear>().single()
-        assertTrue(lin.wide, "the over-Int64 values must produce a wide Linear row")
+        assertTrue(lin.wideConstants != null, "the over-Int64 values must produce a wide Linear row")
         assertEquals(2, out.problem.numIntVars, "each literal is channeled to a {0,1} int var")
     }
 

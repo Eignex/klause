@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.LpOverflowException
@@ -337,11 +338,12 @@ internal object AffineSingletons {
             val f = ws.factorAt(id) ?: return 0L
             val vars = f.intVars
             if (vars.size < 2) return 0L
-            if (f is Linear) {
+            val row = (f as? Linear)?.integerConstants
+            if (row != null) {
                 for (xi in f.vars.indices) {
                     val x = f.vars[xi]
                     if (eliminated[x] || x in objectiveIntVars) continue
-                    val cx = f.coeff(xi)
+                    val cx = row.coeff(xi)
                     if (cx != 1L && cx != -1L) continue
                     return (ws.degreeOf(x) - 1).toLong() * (f.vars.size - 1)
                 }
@@ -510,13 +512,14 @@ internal object AffineSingletons {
         domains: Array<IntDomain>,
     ): ResidueCandidate? {
         val f = ws.factorAt(di) ?: return null
-        if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size != 2) return null
-        val fBound = f.bound
+        if (f !is Linear || f.op != LinearOp.EQ || f.vars.size != 2) return null
+        val row = f.integerConstants ?: return null
+        val fBound = row.bound
         for (xi in 0..1) {
             val x = f.vars[xi]
             val y = f.vars[1 - xi]
-            val a = f.coeff(xi)
-            val b = f.coeff(1 - xi)
+            val a = row.coeff(xi)
+            val b = row.coeff(1 - xi)
             // The unit-pivot loop already ran, so a remaining 2-term EQ has no unit coefficient;
             // guard anyway. `x` must be contained (a non-unit fold can't stay integral) and free.
             // `y`'s domain is restricted below, so it too must stay clear of the objective — the
@@ -635,13 +638,14 @@ internal object AffineSingletons {
         cancellation: Cancellation = Cancellation.Never,
     ): AffineCandidate? {
         val f = ws.factorAt(di) ?: return null
-        if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.EQ || f.vars.size < 2) return null
+        if (f !is Linear || f.op != LinearOp.EQ || f.vars.size < 2) return null
+        val row = f.integerConstants ?: return null
         for (xi in f.vars.indices) {
             // A single wide row can carry thousands of pivot candidates each running an O(occurrences)
             // overflow check, so poll the deadline between them (and inside the check below).
             if ((xi and CANCEL_POLL_MASK) == 0 && cancellation()) return null
             val x = f.vars[xi]
-            val cx = f.coeff(xi)
+            val cx = row.coeff(xi)
             if (eliminated[x] || x in objectiveIntVars) continue
             // The substitution `x = (bound − Σ c_j·y_j) / c_x` stays integral for *every*
             // assignment of the partners only when `c_x` divides each `c_j` and the bound — for a
@@ -650,7 +654,7 @@ internal object AffineSingletons {
             // non-unit pivot that fails the divisibility test would fold non-integral coefficients,
             // so it is left for the residue-class doubleton pass or for propagation.
             val isUnit = cx == 1L || cx == -1L
-            if (!isUnit && !dividesAllPartnersAndBound(f, xi)) continue
+            if (!isUnit && !dividesAllPartnersAndBound(f.vars, row, xi)) continue
             if (!isUnit && !ws.isContained(di, x)) continue
             // x = B + Σ A_j·y_j, with B = bound / c_x and A_j = −c_j / c_x for the other terms y_j;
             // for a unit pivot the divisions are exact by definition.
@@ -662,11 +666,11 @@ internal object AffineSingletons {
                 if (j == xi) continue
                 if (eliminated[f.vars[j]]) partnerEliminated = true
                 termVars[w] = f.vars[j]
-                termCoeffs[w] = -f.coeff(j) / cx
+                termCoeffs[w] = -row.coeff(j) / cx
                 w++
             }
             if (partnerEliminated) continue
-            val constTerm = f.bound / cx
+            val constTerm = row.bound / cx
             // The alias case (n = 2, A = 1, B = 0, i.e. x = y) substitutes into ANY factor via
             // remap; otherwise x must occur only in foldable Linear factors. A contained non-unit
             // pivot has no other occurrences, so `otherOccurrencesAllLinear` holds vacuously.
@@ -739,14 +743,13 @@ internal object AffineSingletons {
         return false
     }
 
-    /** Whether the pivot coefficient `f.coeffs(xi)` divides every other coefficient and the bound of
-     *  [f], so substituting out the pivot variable keeps all folded coefficients and the constant term
-     *  integral. */
-    private fun dividesAllPartnersAndBound(f: Linear, xi: Int): Boolean {
-        val cx = f.coeff(xi)
+    /** Whether the pivot coefficient at [xi] divides every other coefficient and the bound of the row, so
+     *  substituting out the pivot variable keeps all folded coefficients and the constant term integral. */
+    private fun dividesAllPartnersAndBound(vars: IntArray, row: IntegerConstants, xi: Int): Boolean {
+        val cx = row.coeff(xi)
         if (cx == 0L) return false
-        if (f.bound % cx != 0L) return false
-        for (j in f.vars.indices) if (j != xi && f.coeff(j) % cx != 0L) return false
+        if (row.bound % cx != 0L) return false
+        for (j in vars.indices) if (j != xi && row.coeff(j) % cx != 0L) return false
         return true
     }
 
@@ -801,7 +804,7 @@ internal object AffineSingletons {
 
     /** Whether [f] could head an affine or residue pivot: a [Linear] equality of arity >= 2. */
     private fun isEqCand(f: Factor?): Boolean =
-        f is Linear && f.isIntegerCore && f.op == LinearOp.EQ && f.vars.size >= 2
+        f is Linear && f.integerConstants != null && f.op == LinearOp.EQ && f.vars.size >= 2
 
     /** Stable ids (ascending) of the pristine [factors] that could ever head an affine/residue pivot. */
     private fun eqPivotIds(factors: Array<Factor>): IntArray {
@@ -855,7 +858,7 @@ internal object AffineSingletons {
                 val f = factors[id]
                 // A continuous (real-bearing) Linear folds through the real double view, not the integer
                 // path this pass rewrites, so it is not "plain linear" for elimination purposes.
-                if (id != defIdx && (f !is Linear || !f.isIntegerCore)) return false
+                if (id != defIdx && (f !is Linear || f.integerConstants == null)) return false
             }
             return true
         }
@@ -876,7 +879,7 @@ internal object AffineSingletons {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ.flat[k]
                 val f = factors[id]
-                if (id != defIdx && f is Linear && f.isIntegerCore && foldRowOverflowsLong(
+                if (id != defIdx && f is Linear && f.integerConstants != null && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -905,7 +908,13 @@ internal object AffineSingletons {
                 // A real-bearing Linear cannot be folded on the integer path and does not override
                 // substituteAffine, so it is treated like any non-Linear factor — the var is eliminated
                 // only if every such occurrence can absorb the affine substitution exactly.
-                if ((f !is Linear || !f.isIntegerCore) && !f.canSubstituteAffine(x, scale, offset, replacement)) {
+                if ((f !is Linear || f.integerConstants == null) && !f.canSubstituteAffine(
+                        x,
+                        scale,
+                        offset,
+                        replacement,
+                    )
+                ) {
                     return false
                 }
             }
@@ -975,7 +984,7 @@ internal object AffineSingletons {
         // of every candidate pivot. Only integer-core [Linear] rows are counted, matching that predicate.
         private val atCapCount = IntArray(nVars)
 
-        private fun isCappable(f: Factor?): Boolean = f is Linear && f.isIntegerCore
+        private fun isCappable(f: Factor?): Boolean = f is Linear && f.integerConstants != null
 
         init {
             // The seed's CSR is over the pristine input in input (= stable-id) order, so its dense indices
@@ -1046,7 +1055,7 @@ internal object AffineSingletons {
             for (k in 0 until occ.size) {
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && (f !is Linear || !f.isIntegerCore)) return false
+                if (id != defIdx && (f !is Linear || f.integerConstants == null)) return false
             }
             return true
         }
@@ -1068,7 +1077,7 @@ internal object AffineSingletons {
                 if ((polled++ and CANCEL_POLL_MASK) == 0 && cancellation()) return true
                 val id = occ[k]
                 val f = slots[id]
-                if (id != defIdx && f is Linear && f.isIntegerCore && foldRowOverflowsLong(
+                if (id != defIdx && f is Linear && f.integerConstants != null && foldRowOverflowsLong(
                         f,
                         x,
                         termVars,
@@ -1098,7 +1107,13 @@ internal object AffineSingletons {
                 val id = occ[k]
                 if (id == defIdx) continue
                 val f = slots[id] ?: continue
-                if ((f !is Linear || !f.isIntegerCore) && !f.canSubstituteAffine(x, scale, offset, replacement)) {
+                if ((f !is Linear || f.integerConstants == null) && !f.canSubstituteAffine(
+                        x,
+                        scale,
+                        offset,
+                        replacement,
+                    )
+                ) {
                     return false
                 }
             }
@@ -1136,7 +1151,7 @@ internal object AffineSingletons {
                 if (id == c.defIdx) continue
                 val f = slots[id] ?: continue
                 val next = when {
-                    f is Linear && f.isIntegerCore && c.x in f.vars -> foldAffineIntoLinear(f, c)
+                    f is Linear && f.integerConstants != null && c.x in f.vars -> foldAffineIntoLinear(f, c)
 
                     // Single-partner affine into a global the gate accepted (non-null substitute). The
                     // gate only admits this path for an Int-range scale/offset, so the narrowing is safe.
@@ -1224,8 +1239,9 @@ internal object AffineSingletons {
      *  term var `y_j`, shift the bound by `−coeff_x·constTerm`. The [Linear] constructor re-coalesces
      *  any term var that already occurs in [l]. */
     private fun foldAffineIntoLinear(l: Linear, c: AffineCandidate): Linear {
+        val row = checkNotNull(l.integerConstants) { "only an integer row is folded" }
         val ix = l.vars.indexOf(c.x)
-        val cX = l.coeff(ix)
+        val cX = row.coeff(ix)
         val newVars = IntArray(l.vars.size - 1 + c.termVars.size)
         // Long throughout: both [l]'s coefficients and the fold candidate's are wide-capable, and the
         // candidate gate declined any pivot whose fold would overflow, so the products below are safe.
@@ -1234,7 +1250,7 @@ internal object AffineSingletons {
         for (j in l.vars.indices) {
             if (j == ix) continue
             newVars[w] = l.vars[j]
-            newCoeffs[w] = l.coeff(j)
+            newCoeffs[w] = row.coeff(j)
             w++
         }
         for (k in c.termVars.indices) {
@@ -1242,7 +1258,7 @@ internal object AffineSingletons {
             newCoeffs[w] = cX * c.termCoeffs[k]
             w++
         }
-        return Linear(newCoeffs, newVars, l.op, l.bound - cX * c.constTerm)
+        return Linear(newCoeffs, newVars, l.op, row.bound - cX * c.constTerm)
     }
 
     /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within
@@ -1304,19 +1320,20 @@ private fun foldRowOverflowsLong(
 ): Boolean {
     // Fast path, no `indexOf`: when the pivot's own terms are all below 2^31 ([termsSmall], pivot-global so
     // the caller hoists it) and this row's magnitudes are too, no product `cX·c` reaches 2^62 and no sum
-    // reaches 2^63 — the pivot coefficient `cX ≤ f.maxAbsCoeff`, so `fitsHalfLong(f.maxAbsCoeff)` already
+    // reaches 2^63 — the pivot coefficient `cX ≤ maxAbsCoeff`, so `fitsHalfLong(maxAbsCoeff)` already
     // bounds it and `cX` is never needed. So x's position is not looked up, which is the whole
     // small-coefficient bulk (Coprime/FAPP). The exact path below runs only when some magnitude is huge.
-    if (termsSmall && fitsHalfLong(f.bound) && fitsHalfLong(f.maxAbsCoeff)) return false
+    val row = f.integerConstants ?: return true
+    if (termsSmall && fitsHalfLong(row.bound) && fitsHalfLong(row.maxAbsCoeff)) return false
     val xi = f.vars.indexOf(x)
     if (xi < 0) return false
-    val cX = f.coeff(xi)
+    val cX = row.coeff(xi)
     return try {
-        subExact(f.bound, mulExact(cX, constTerm))
+        subExact(row.bound, mulExact(cX, constTerm))
         for (k in termVars.indices) {
             val prod = mulExact(cX, termCoeffs[k])
             val yi = f.vars.indexOf(termVars[k])
-            if (yi >= 0) addExact(f.coeff(yi), prod)
+            if (yi >= 0) addExact(row.coeff(yi), prod)
         }
         false
     } catch (_: LpOverflowException) {

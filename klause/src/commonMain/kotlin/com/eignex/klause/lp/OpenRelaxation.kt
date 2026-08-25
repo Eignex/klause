@@ -57,6 +57,7 @@ internal fun openRelaxation(
     }
     for (f in constraints) {
         val rel = relationOfRow(f) ?: continue
+        val row = f.integerConstants ?: continue
         var extra = 0
         for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
         val cols = IntArray(f.vars.size + extra)
@@ -65,15 +66,15 @@ internal fun openRelaxation(
         for (k in f.vars.indices) {
             val v = f.vars[k]
             cols[w] = posCol[v]
-            vals[w] = f.coeff(k)
+            vals[w] = row.coeff(k)
             w++
             if (negCol[v] >= 0) {
                 cols[w] = negCol[v]
-                vals[w] = -f.coeff(k)
+                vals[w] = -row.coeff(k)
                 w++
             }
         }
-        builder.addRow(cols, vals, rel, f.bound)
+        builder.addRow(cols, vals, rel, row.bound)
     }
     // Mixed integer/real rows join through LP-only continuous columns, so a variable whose only definition
     // rides a real row (a floor definition, a to_real bridge) is still reachable. A strict row enters
@@ -82,6 +83,7 @@ internal fun openRelaxation(
     val realNeg = HashMap<Int, Int>()
     for (f in realConstraints) {
         val rel = relationOfRow(f) ?: continue
+        val row = f.realConstants ?: continue
         var extra = 0
         for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
         for (j in f.realVars.indices) {
@@ -97,27 +99,27 @@ internal fun openRelaxation(
         for (k in f.vars.indices) {
             val v = f.vars[k]
             cols[w] = posCol[v]
-            vals[w] = f.realIntCoeffs[k]
+            vals[w] = row.intCoefficients.at(k)
             w++
             if (negCol[v] >= 0) {
                 cols[w] = negCol[v]
-                vals[w] = -f.realIntCoeffs[k]
+                vals[w] = -row.intCoefficients.at(k)
                 w++
             }
         }
         for (j in f.realVars.indices) {
             val rv = f.realVars[j]
             cols[w] = realPos.getValue(rv)
-            vals[w] = f.realCoeffs[j]
+            vals[w] = row.realCoefficients.at(j)
             w++
             val neg = realNeg[rv]
             if (neg != null) {
                 cols[w] = neg
-                vals[w] = -f.realCoeffs[j]
+                vals[w] = -row.realCoefficients.at(j)
                 w++
             }
         }
-        builder.addRealRow(cols, vals, rel, f.realBound)
+        builder.addRealRow(cols, vals, rel, row.bound)
     }
     return OpenRelaxation(builder, posCol, negCol, realPos, realNeg)
 }

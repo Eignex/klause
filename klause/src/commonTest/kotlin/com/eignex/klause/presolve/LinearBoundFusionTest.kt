@@ -33,7 +33,7 @@ class LinearBoundFusionTest {
         val out = p.withPassDelta(Presolve.fuseLinearBounds(p), BakeConfig.NONE)
         val eqs = equalities(out)
         assertEquals(1, eqs.size, "the pair collapses to one equality")
-        assertEquals(5L, eqs.single().bound)
+        assertEquals(5L, checkNotNull(eqs.single().integerConstants).bound)
         assertEquals(setOf(0, 1), eqs.single().vars.toSet())
         assertTrue(out.factors.none { it is Linear && it.op == LinearOp.LE }, "the inequalities are dropped")
     }

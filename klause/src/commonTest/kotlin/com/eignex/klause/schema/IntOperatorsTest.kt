@@ -28,9 +28,9 @@ class IntOperatorsTest {
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
         assertEquals(LinearOp.LE, linear.op)
-        assertEquals(7L, linear.bound)
-        assertEquals(2, linear.coeffs.size)
-        assertTrue(linear.coeffs.all { it == 1L })
+        assertEquals(7L, checkNotNull(linear.integerConstants).bound)
+        assertEquals(2, checkNotNull(linear.integerConstants).coeffs.size)
+        assertTrue(checkNotNull(linear.integerConstants).coeffs.all { it == 1L })
     }
 
     @Test
@@ -42,8 +42,8 @@ class IntOperatorsTest {
         }
         val compiled = S().compile()
         val linear = compiled.problem.factors.single { it is Linear } as Linear
-        assertEquals(setOf(2L, 3L), linear.coeffs.toSet())
-        assertEquals(10L, linear.bound)
+        assertEquals(setOf(2L, 3L), checkNotNull(linear.integerConstants).coeffs.toSet())
+        assertEquals(10L, checkNotNull(linear.integerConstants).bound)
     }
 
     @Test
@@ -58,8 +58,8 @@ class IntOperatorsTest {
 
         // `x - y ≥ 2` is canonicalised to `≤` at construction: `−x + y ≤ −2`.
         assertEquals(LinearOp.LE, linear.op)
-        assertEquals(-2L, linear.bound)
-        assertEquals(setOf(1L, -1L), linear.coeffs.toSet())
+        assertEquals(-2L, checkNotNull(linear.integerConstants).bound)
+        assertEquals(setOf(1L, -1L), checkNotNull(linear.integerConstants).coeffs.toSet())
     }
 
     @Test
@@ -73,7 +73,7 @@ class IntOperatorsTest {
 
         val lin = compiled.problem.factors.single { it is Linear } as Linear
         assertEquals(LinearOp.LE, lin.op)
-        assertEquals(10, lin.bound)
+        assertEquals(10, checkNotNull(lin.integerConstants).bound)
         assertEquals(1, lin.vars.size)
     }
 

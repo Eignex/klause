@@ -1,9 +1,11 @@
 package com.eignex.klause.lp.cut
 
+import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.UnitConsts
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
@@ -40,8 +42,10 @@ internal class FlowCoverSeparator : CutSeparator {
         val indicator = MutableIntIntMap()
         val vubCap = MutableIntLongMap()
         for (f in problem.factors) {
-            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.LE || f.vars.size != 2 || f.bound != 0L) continue
-            val (y, x, u) = matchVub(f) ?: continue
+            if (f !is Linear || f.op != LinearOp.LE || f.vars.size != 2) continue
+            val row = f.integerConstants ?: continue
+            if (row.bound != 0L) continue
+            val (y, x, u) = matchVub(f.vars, row) ?: continue
             if (problem.requireFiniteIntDomains()[x].min != 0L ||
                 problem.requireFiniteIntDomains()[x].max != 1L
             ) {
@@ -55,36 +59,38 @@ internal class FlowCoverSeparator : CutSeparator {
 
         val cuts = ArrayList<Cut>()
         for (f in problem.factors) {
-            if (f !is Linear || !f.isIntegerCore || f.op != LinearOp.LE || f.vars.size < 2) continue
-            val arcs = explicitArcs(f, indicator, vubCap, intColOf)
-                ?: implicitArcs(f, problem, intColOf)
+            if (f !is Linear || f.op != LinearOp.LE || f.vars.size < 2) continue
+            val row = f.integerConstants ?: continue
+            val arcs = explicitArcs(f.vars, row, indicator, vubCap, intColOf)
+                ?: implicitArcs(f.vars, row, problem, intColOf)
                 ?: continue
-            separateCover(ctx, arcs, f.bound)?.let { cuts.add(it) }
+            separateCover(ctx, arcs, row.bound)?.let { cuts.add(it) }
         }
         return cuts
     }
 
     /** Match `a₀·v₀ + a₁·v₁ ≤ 0` to `y − u·x ≤ 0`: the `+1` term is the flow `y`, the negative term the
      *  indicator `x` with capacity `u = −coeff`. Returns `(y, x, u)` or null when it is not that shape. */
-    private fun matchVub(f: Linear): Triple<Int, Int, Long>? {
-        val (c0, c1) = f.coeff(0) to f.coeff(1)
+    private fun matchVub(vars: IntArray, row: IntegerConstants): Triple<Int, Int, Long>? {
+        val (c0, c1) = row.coeff(0) to row.coeff(1)
         return when {
-            c0 == 1L && c1 < 0 -> Triple(f.vars[0], f.vars[1], -c1)
-            c1 == 1L && c0 < 0 -> Triple(f.vars[1], f.vars[0], -c0)
+            c0 == 1L && c1 < 0 -> Triple(vars[0], vars[1], -c1)
+            c1 == 1L && c0 < 0 -> Triple(vars[1], vars[0], -c0)
             else -> null
         }
     }
 
     /** Arcs for an explicit capacity row `Σ yⱼ ≤ b` (unit coefficients) whose every flow variable carries
-     *  a registered VUB, or null when [f] is not that row. */
+     *  a registered VUB, or null when the row is not that shape. */
     private fun explicitArcs(
-        f: Linear,
+        vars: IntArray,
+        row: IntegerConstants,
         indicator: MutableIntIntMap,
         vubCap: MutableIntLongMap,
         intColOf: IntArray,
     ): List<Arc>? {
-        if (f.coeffs.any { it != 1L } || f.vars.any { !indicator.containsKey(it) }) return null
-        return f.vars.map { y ->
+        if (row.coefficients !is UnitConsts || vars.any { !indicator.containsKey(it) }) return null
+        return vars.map { y ->
             val x = indicator.getOrDefault(y, -1)
             if (intColOf[y] < 0 || intColOf[x] < 0) return null
             Arc(flowCol = intColOf[y], flowCoeff = 1L, indicatorCol = intColOf[x], cap = vubCap.getOrDefault(y, 0L))
@@ -92,16 +98,16 @@ internal class FlowCoverSeparator : CutSeparator {
     }
 
     /** Arcs for an implicit bin-packing knapsack `Σ wⱼ·xⱼ ≤ C` (`xⱼ ∈ {0,1}`, `wⱼ > 0`), each term a flow
-     *  `yⱼ = wⱼ·xⱼ` over the indicator's own column, or null when [f] is not that shape. */
-    private fun implicitArcs(f: Linear, problem: Problem, intColOf: IntArray): List<Arc>? {
-        for (i in f.vars.indices) {
-            if (f.coeff(i) <= 0) return null
-            val d = problem.requireFiniteIntDomains()[f.vars[i]]
-            if (d.min != 0L || d.max != 1L || intColOf[f.vars[i]] < 0) return null
+     *  `yⱼ = wⱼ·xⱼ` over the indicator's own column, or null when the row is not that shape. */
+    private fun implicitArcs(vars: IntArray, row: IntegerConstants, problem: Problem, intColOf: IntArray): List<Arc>? {
+        for (i in vars.indices) {
+            if (row.coeff(i) <= 0) return null
+            val d = problem.requireFiniteIntDomains()[vars[i]]
+            if (d.min != 0L || d.max != 1L || intColOf[vars[i]] < 0) return null
         }
-        return f.vars.indices.map { i ->
-            val col = intColOf[f.vars[i]]
-            val w = f.coeff(i)
+        return vars.indices.map { i ->
+            val col = intColOf[vars[i]]
+            val w = row.coeff(i)
             Arc(flowCol = col, flowCoeff = w, indicatorCol = col, cap = w)
         }
     }

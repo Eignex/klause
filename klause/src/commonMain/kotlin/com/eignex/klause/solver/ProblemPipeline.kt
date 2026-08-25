@@ -1,8 +1,11 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.RealConstants
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.arithmetic.WideConstants
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.smallModelBigIntBound
 
@@ -81,19 +84,33 @@ internal fun Factor.isTheoryOwnable(hasRealColumns: Boolean): Boolean =
 
 internal fun supportsExactTheoryFactor(factor: Factor): Boolean = when (factor) {
     is Clause -> true
-    is Linear -> factor.wide || factor.coefficientsAreExactlyRepresentable()
-    is ReifiedLinear -> factor.wide || factor.coefficientsAreExactlyRepresentable()
+    is Linear -> factor.coefficientsAreExactlyRepresentable()
+    is ReifiedLinear -> factor.coefficientsAreExactlyRepresentable()
     is ReifiedRealLinear -> factor.coefficientsAreExactlyRepresentable()
     else -> false
 }
 
-private fun Linear.coefficientsAreExactlyRepresentable(): Boolean =
-    realBound.isFinite() && realIntCoeffs.all(Double::isFinite) && realCoeffs.all(Double::isFinite) &&
-        (!hasReals || realIntCoeffs.all(::isExactInteger)) &&
-        (hasReals || (vars.indices.all { isExactInteger(coeff(it).toDouble()) } && isExactInteger(bound.toDouble())))
+private fun Linear.coefficientsAreExactlyRepresentable(): Boolean = when (val c = constants) {
+    // A continuous row is exact when every double is finite and its integer terms carry integral
+    // coefficients; the real terms may be fractional, which is what makes the row continuous.
+    is RealConstants -> c.bound.isFinite() &&
+        c.intCoefficients.indices.all { c.intCoefficients.at(it).isFinite() } &&
+        c.realCoefficients.indices.all { c.realCoefficients.at(it).isFinite() } &&
+        c.intCoefficients.indices.all { isExactInteger(c.intCoefficients.at(it)) }
 
-private fun ReifiedLinear.coefficientsAreExactlyRepresentable(): Boolean =
-    vars.indices.all { isExactInteger(coeff(it).toDouble()) } && isExactInteger(bound.toDouble())
+    is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
+        isExactInteger(c.bound.toDouble())
+
+    // A wide row is carried exactly by the theory, never through a double reading.
+    is WideConstants -> true
+}
+
+private fun ReifiedLinear.coefficientsAreExactlyRepresentable(): Boolean = when (val c = constants) {
+    is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
+        isExactInteger(c.bound.toDouble())
+
+    is WideConstants -> true
+}
 
 private fun ReifiedRealLinear.coefficientsAreExactlyRepresentable(): Boolean = bound.isFinite() && intCoeffs.all(
     Double::isFinite,

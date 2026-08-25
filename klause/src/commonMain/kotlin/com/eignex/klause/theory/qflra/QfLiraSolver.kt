@@ -1,9 +1,12 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.factor.arithmetic.RealConstants
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.arithmetic.WideConstants
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.Relation
@@ -414,10 +417,11 @@ private class QfLiraSystem(private val model: ProblemSpec) {
         }
         for ((index, factor) in model.factors.withIndex()) {
             when (factor) {
-                is Linear -> if (factor.wide) {
+                is Linear -> if (factor.constants is WideConstants) {
+                    val wide = factor.constants
                     addWide(
                         builder, intsPositive, intsNegative, constants, factor.vars,
-                        checkNotNull(factor.wideCoeffs), factor.op, checkNotNull(factor.wideBound),
+                        wide.coefficients.toTypedArray(), factor.op, wide.bound,
                         node.disequalityDirections[index],
                     )
                 } else {
@@ -430,20 +434,21 @@ private class QfLiraSystem(private val model: ProblemSpec) {
                         factor.vars,
                         factor.coefficients(),
                         factor.realVars,
-                        factor.realCoeffs,
+                        factor.realCoefficientsForTheory(),
                         factor.op,
                         factor.boundForTheory(),
-                        factor.strictReal,
+                        factor.realConstants?.strict == true,
                         node.disequalityDirections[index],
-                        factor.hasReals,
+                        factor.realConstants != null,
                     )
                 }
 
-                is ReifiedLinear -> if (factor.wide) {
+                is ReifiedLinear -> if (factor.constants is WideConstants) {
+                    val wide = factor.constants
                     val op = if (bools[factor.auxBoolVar]) factor.op else factor.op.complement()
                     addWide(
                         builder, intsPositive, intsNegative, constants, factor.vars,
-                        checkNotNull(factor.wideCoeffs), op, checkNotNull(factor.wideBound),
+                        wide.coefficients.toTypedArray(), op, wide.bound,
                         node.disequalityDirections[index],
                     )
                 } else {
@@ -458,7 +463,7 @@ private class QfLiraSystem(private val model: ProblemSpec) {
                         realVars = IntArray(0),
                         realCoeffs = DoubleArray(0),
                         op = factor.op,
-                        bound = factor.bound.toDouble(),
+                        bound = factor.boundForTheory(),
                         strict = false,
                         truth = bools[factor.auxBoolVar],
                         disequalityDirection = node.disequalityDirections[index],
@@ -637,15 +642,32 @@ private class QfLiraSystem(private val model: ProblemSpec) {
         builder.addRealRow(columns, values, relation(op), bound, strict)
     }
 
-    private fun Linear.coefficients(): DoubleArray = if (hasReals) {
-        realIntCoeffs
-    } else {
-        DoubleArray(
-            vars.size,
-        ) { coeff(it).toDouble() }
+    // A wide row is added to the theory through its exact constants ([addWide]), never through these
+    // double readings.
+    private fun Linear.coefficients(): DoubleArray = when (val c = constants) {
+        is RealConstants -> c.intCoefficients.toDoubleArray()
+        is IntegerConstants -> DoubleArray(vars.size) { c.coeff(it).toDouble() }
+        is WideConstants -> error("a wide row has no double coefficients")
     }
 
-    private fun Linear.boundForTheory(): Double = if (hasReals) realBound else bound.toDouble()
+    private fun Linear.realCoefficientsForTheory(): DoubleArray =
+        realConstants?.realCoefficients?.toDoubleArray() ?: DoubleArray(0)
+
+    private fun Linear.boundForTheory(): Double = when (val c = constants) {
+        is RealConstants -> c.bound
+        is IntegerConstants -> c.bound.toDouble()
+        is WideConstants -> error("a wide row has no double bound")
+    }
+
+    private fun ReifiedLinear.boundForTheory(): Double = when (val c = constants) {
+        is IntegerConstants -> c.bound.toDouble()
+        is WideConstants -> error("a wide row has no double bound")
+    }
+
+    private fun ReifiedLinear.coefficients(): DoubleArray = when (val c = constants) {
+        is IntegerConstants -> DoubleArray(vars.size) { c.coeff(it).toDouble() }
+        is WideConstants -> error("a wide row has no double coefficients")
+    }
 
     private fun lowerDisequality(
         op: LinearOp,
@@ -672,8 +694,6 @@ private class QfLiraSystem(private val model: ProblemSpec) {
     } else {
         Triple(op, bound, strict)
     }
-
-    private fun ReifiedLinear.coefficients(): DoubleArray = DoubleArray(vars.size) { coeff(it).toDouble() }
 
     private fun relation(op: LinearOp): Relation = when (op) {
         LinearOp.LE -> Relation.LE
@@ -974,28 +994,31 @@ private fun ProblemSpec.liraWitnessBound(): BigInteger? {
         when (factor) {
             is Clause -> Unit
 
-            is Linear -> {
-                if (factor.wide) {
-                    wideRow(checkNotNull(factor.wideCoeffs), checkNotNull(factor.wideBound), factor.op == LinearOp.NE)
-                } else if (factor.hasReals) {
-                    integerRow(factor.realIntCoeffs, factor.realCoeffs, factor.realBound, factor.op == LinearOp.NE)
-                } else {
-                    integerRow(
-                        DoubleArray(factor.vars.size) { factor.coeff(it).toDouble() },
-                        DoubleArray(0),
-                        factor.bound.toDouble(),
-                        factor.op == LinearOp.NE,
-                    )
-                }
+            is Linear -> when (val c = factor.constants) {
+                is WideConstants -> wideRow(c.coefficients.toTypedArray(), c.bound, factor.op == LinearOp.NE)
+
+                is RealConstants -> integerRow(
+                    c.intCoefficients.toDoubleArray(),
+                    c.realCoefficients.toDoubleArray(),
+                    c.bound,
+                    factor.op == LinearOp.NE,
+                )
+
+                is IntegerConstants -> integerRow(
+                    DoubleArray(factor.vars.size) { c.coeff(it).toDouble() },
+                    DoubleArray(0),
+                    c.bound.toDouble(),
+                    factor.op == LinearOp.NE,
+                )
             }
 
-            is ReifiedLinear -> if (factor.wide) {
-                wideRow(checkNotNull(factor.wideCoeffs), checkNotNull(factor.wideBound), factor.op == LinearOp.NE)
-            } else {
-                integerRow(
-                    DoubleArray(factor.vars.size) { factor.coeff(it).toDouble() },
+            is ReifiedLinear -> when (val c = factor.constants) {
+                is WideConstants -> wideRow(c.coefficients.toTypedArray(), c.bound, factor.op == LinearOp.NE)
+
+                is IntegerConstants -> integerRow(
+                    DoubleArray(factor.vars.size) { c.coeff(it).toDouble() },
                     DoubleArray(0),
-                    factor.bound.toDouble(),
+                    c.bound.toDouble(),
                     factor.op == LinearOp.NE,
                 )
             }

@@ -131,7 +131,8 @@ internal object DuplicateColumns {
      *  in that row). A row mentioning no dropped variable, and every non-[Linear] factor (none mention
      *  a dropped variable — they were ineligible), is returned unchanged. */
     private fun aggregateColumns(factor: Factor, keepOf: IntArray): Factor {
-        if (factor !is Linear || !factor.isIntegerCore) return factor
+        if (factor !is Linear) return factor
+        val row = factor.integerConstants ?: return factor
         if (factor.vars.none { keepOf[it] != it }) return factor
         val keptVars = IntArrayList(factor.vars.size)
         val keptCoeffs = LongArrayList(factor.vars.size)
@@ -139,9 +140,9 @@ internal object DuplicateColumns {
             val v = factor.vars[i]
             if (keepOf[v] != v) continue // a dropped duplicate: its term is absorbed by the representative's
             keptVars.add(v)
-            keptCoeffs.add(factor.coeff(i))
+            keptCoeffs.add(row.coeff(i))
         }
-        return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), factor.op, factor.bound)
+        return Linear(keptCoeffs.toLongArray(), keptVars.toIntArray(), factor.op, row.bound)
     }
 
     /** Whether any variable in [touched] is column-eligible with at least one [Linear] occurrence — the
@@ -163,7 +164,7 @@ internal object DuplicateColumns {
             var onlyLinear = true
             for (k in start until end) {
                 val g = problem.factors[occ.flat[k]]
-                if (g !is Linear || !g.isIntegerCore) {
+                if (g !is Linear || g.integerConstants == null) {
                     onlyLinear = false
                     break
                 }
@@ -189,7 +190,7 @@ internal object DuplicateColumns {
         for (f in factors) {
             // Only integer [Linear] columns are aggregatable; a variable in any other factor — including a
             // continuous (real-bearing) Linear, whose reals the integer rewrite would drop — is ineligible.
-            if (f is Linear && f.isIntegerCore) continue
+            if (f is Linear && f.integerConstants != null) continue
             for (v in f.intVars) eligible[v] = false
         }
         return eligible
@@ -202,9 +203,10 @@ internal object DuplicateColumns {
     private fun columnSignatures(factors: Array<Factor>, numIntVars: Int, eligible: BooleanArray): Array<List<Long>?> {
         val entries = Array(numIntVars) { if (eligible[it]) ArrayList<Long>() else null }
         factors.forEachIndexed { fid, f ->
-            if (f !is Linear || !f.isIntegerCore) return@forEachIndexed
+            if (f !is Linear) return@forEachIndexed
+            val row = f.integerConstants ?: return@forEachIndexed
             val coeffByVar = MutableIntLongMap(f.vars.size)
-            for (i in f.vars.indices) coeffByVar.put(f.vars[i], f.coeff(i))
+            for (i in f.vars.indices) coeffByVar.put(f.vars[i], row.coeff(i))
             for (v in f.intVars) {
                 entries[v]?.apply {
                     add(fid.toLong())
