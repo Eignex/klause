@@ -950,9 +950,11 @@ public abstract interface class com/eignex/klause/factor/ReifiedFactor : com/eig
 public final class com/eignex/klause/factor/ReifiedFactor$DefaultImpls {
 	public static fun canSubstituteAffine (Lcom/eignex/klause/factor/ReifiedFactor;IIII)Z
 	public static fun getBoolVars (Lcom/eignex/klause/factor/ReifiedFactor;)[I
+	public static fun getExactTheoryOwnable (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun getExtendsObjectiveCone (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun getHullFamily (Lcom/eignex/klause/factor/ReifiedFactor;)Lcom/eignex/klause/lp/HullFamily;
 	public static fun getIntVars (Lcom/eignex/klause/factor/ReifiedFactor;)[I
+	public static fun getIntegerTheoryOwnable (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun getLinearRows (Lcom/eignex/klause/factor/ReifiedFactor;)Ljava/util/List;
 	public static fun getStructuralKeyWeight (Lcom/eignex/klause/factor/ReifiedFactor;)I
 	public static fun hullFamilyEnabled (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/lp/HullFlags;)Z
@@ -971,9 +973,11 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getMax ()Z
 	public final fun getResult ()I
@@ -1005,9 +1009,11 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getConsts ()[J
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getOps ()[Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getStructuralKeyWeight ()I
@@ -1057,10 +1063,12 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/LinearConstants;
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
+	public fun getIntegerTheoryOwnable ()Z
 	public final fun getIntegralConstants ()Lcom/eignex/klause/factor/arithmetic/IntegralConstants;
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
@@ -1103,9 +1111,11 @@ public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klau
 	public final fun getA ()I
 	public final fun getB ()I
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
@@ -1136,10 +1146,12 @@ public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIntOperand ()I
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getRealOperand ()I
 	public final fun getRealOperandHi ()D
@@ -1166,9 +1178,11 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 	public fun canSubstituteAffine (IIII)Z
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public final fun getMax ()I
@@ -1199,10 +1213,12 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
 	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/IntegralConstants;
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public fun getStructuralKeyWeight ()I
@@ -1231,9 +1247,11 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
 	public final fun getBound ()J
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
@@ -1263,10 +1281,12 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public final fun getAux ()I
 	public fun getBoolVars ()[I
 	public final fun getBound ()D
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIntCoeffs ()[D
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
 	public final fun getRealCoeffs ()[D
@@ -1302,9 +1322,11 @@ public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public final fun getMax ()I
@@ -1338,9 +1360,11 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/lp/L
 	public fun coeff (I)J
 	public fun getBoolVars ()[I
 	public fun getBound ()J
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
@@ -1368,9 +1392,11 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getConstraints ()Ljava/util/List;
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
@@ -1394,9 +1420,11 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 	public fun coeff (I)J
 	public fun getBoolVars ()[I
 	public fun getBound ()J
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
@@ -1425,9 +1453,11 @@ public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/solver/
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public fun getStructuralKeyWeight ()I
@@ -1452,9 +1482,11 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getN ()I
 	public fun getStructuralKeyWeight ()I
@@ -1485,10 +1517,12 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public final fun getBoundsConsistent ()Z
 	public final fun getDomainMin ()J
 	public final fun getDomainSize ()I
+	public fun getExactTheoryOwnable ()Z
 	public final fun getExceptSet ()[J
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getPresents ()[I
 	public fun getStructuralKeyWeight ()I
@@ -1521,9 +1555,11 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public final fun getCountLow ()[I
 	public final fun getCountVars ()[I
 	public final fun getCover ()[J
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getPresents ()[I
 	public fun getStructuralKeyWeight ()I
@@ -1548,9 +1584,11 @@ public final class com/eignex/klause/factor/global/Increasing : com/eignex/klaus
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getStrict ()Z
 	public fun getStructuralKeyWeight ()I
@@ -1575,6 +1613,7 @@ public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/s
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public final fun getF ()[I
 	public final fun getFOffset ()I
@@ -1582,6 +1621,7 @@ public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/s
 	public final fun getGOffset ()I
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
@@ -1603,9 +1643,11 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/s
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getStrict ()Z
 	public fun getStructuralKeyWeight ()I
@@ -1633,9 +1675,11 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getMode ()Lcom/eignex/klause/factor/global/NValue$Mode;
 	public final fun getN ()I
@@ -1671,9 +1715,11 @@ public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/solv
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
@@ -1698,10 +1744,12 @@ public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/e
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIndexOffset ()I
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
@@ -1724,9 +1772,11 @@ public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/kla
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getS ()J
 	public fun getStructuralKeyWeight ()I
@@ -1761,9 +1811,11 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public final fun getConstantEnergyAndCap ()Z
 	public final fun getDurationVars ()[I
 	public final fun getDurations ()[J
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getN ()I
 	public fun getPresents ()[I
@@ -1801,11 +1853,13 @@ public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public final fun getHeightVars ()[I
 	public final fun getHeights ()[J
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getN ()I
 	public final fun getNonStrict ()Z
@@ -1886,10 +1940,12 @@ public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eign
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public final fun getGenerators ()Ljava/util/List;
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/solver/VarList;
@@ -1914,11 +1970,13 @@ public final class com/eignex/klause/factor/table/Element : com/eignex/klause/so
 	public final fun getArr ()[J
 	public final fun getArrIsVars ()Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIdx ()I
 	public final fun getIndexOffset ()I
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
@@ -1944,10 +2002,12 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/solver
 	public final fun getAccepting ()[I
 	public fun getBoolVars ()[I
 	public final fun getCost ()I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getInitial ()I
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public final fun getLayerStarts ()[I
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getNumStatesPerLayer ()[I
@@ -1976,9 +2036,11 @@ public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/so
 	public final fun getAccepting ()[I
 	public final fun getAlphabetSize ()I
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getNumStates ()I
 	public final fun getQ0 ()I
@@ -2006,10 +2068,12 @@ public final class com/eignex/klause/factor/table/Table : com/eignex/klause/solv
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getArity ()I
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public final fun getHi ()[J
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getNumTuples ()I
 	public fun getStructuralKeyWeight ()I
@@ -7766,9 +7830,11 @@ public abstract interface class com/eignex/klause/solver/Factor {
 	public abstract fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
 	public fun getExtendsObjectiveCone ()Z
 	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public abstract fun getVariables ()Lcom/eignex/klause/solver/VarList;
@@ -7787,9 +7853,11 @@ public abstract interface class com/eignex/klause/solver/Factor {
 public final class com/eignex/klause/solver/Factor$DefaultImpls {
 	public static fun canSubstituteAffine (Lcom/eignex/klause/solver/Factor;IIII)Z
 	public static fun getBoolVars (Lcom/eignex/klause/solver/Factor;)[I
+	public static fun getExactTheoryOwnable (Lcom/eignex/klause/solver/Factor;)Z
 	public static fun getExtendsObjectiveCone (Lcom/eignex/klause/solver/Factor;)Z
 	public static fun getHullFamily (Lcom/eignex/klause/solver/Factor;)Lcom/eignex/klause/lp/HullFamily;
 	public static fun getIntVars (Lcom/eignex/klause/solver/Factor;)[I
+	public static fun getIntegerTheoryOwnable (Lcom/eignex/klause/solver/Factor;)Z
 	public static fun getLinearRows (Lcom/eignex/klause/solver/Factor;)Ljava/util/List;
 	public static fun getStructuralKeyWeight (Lcom/eignex/klause/solver/Factor;)I
 	public static fun hullFamilyEnabled (Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/lp/HullFlags;)Z

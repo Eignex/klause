@@ -20,6 +20,7 @@ import com.eignex.klause.solver.VarRemap
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.solver.hashRemappedKey
+import com.eignex.klause.solver.indices
 import com.eignex.klause.solver.materializeKey
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -141,6 +142,23 @@ class Linear private constructor(
 
     // Real columns are declared here like any other kind. They were reachable only through the LP
     // payload before, so no consumer scanning a factor's variables could see them.
+
+    override val integerTheoryOwnable: Boolean get() = true
+
+    // Exactness is a question about this row's data, not its kind: a continuous row is exact when every
+    // double is finite and its integer terms are integral, an integer row when its constants survive a
+    // double reading, and a wide row always, since the theory carries its BigIntegers directly.
+    override val exactTheoryOwnable: Boolean get() = when (val c = constants) {
+        is RealConstants -> c.bound.isFinite() &&
+            c.intCoefficients.indices.all { c.intCoefficients.at(it).isFinite() } &&
+            c.realCoefficients.indices.all { c.realCoefficients.at(it).isFinite() } &&
+            c.intCoefficients.indices.all { isExactInteger(c.intCoefficients.at(it)) }
+
+        is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
+            isExactInteger(c.bound.toDouble())
+
+        is WideConstants -> true
+    }
 
     override val variables: VarList = if (realVars.isEmpty()) {
         IntVars(vars)
@@ -552,3 +570,6 @@ internal fun coalesceWide(vars: IntArray, coeffs: Array<BigInteger>): Pair<IntAr
     }
     return keptVars.toIntArray() to keptCoeffs.toTypedArray()
 }
+
+/** True when [value] is an integer a `Double` states exactly. */
+internal fun isExactInteger(value: Double): Boolean = value.isFinite() && value == value.toLong().toDouble()

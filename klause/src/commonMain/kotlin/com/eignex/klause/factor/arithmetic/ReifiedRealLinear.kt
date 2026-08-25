@@ -59,6 +59,11 @@ class ReifiedRealLinear(
         require(realVars.isNotEmpty()) { "a real atom needs a continuous term" }
     }
 
+    override val exactTheoryOwnable: Boolean get() = bound.isFinite() &&
+        intCoeffs.all(Double::isFinite) &&
+        realCoeffs.all(Double::isFinite) &&
+        intCoeffs.all(::isExactInteger)
+
     override val variables: VarList =
         MixedVars(boundInts = vars, boolVars = intArrayOf(aux), reals = realVars)
 

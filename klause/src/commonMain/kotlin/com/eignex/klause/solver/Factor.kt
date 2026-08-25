@@ -38,6 +38,24 @@ interface Factor {
     val intVars: IntArray get() = variables.ints
 
     /**
+     * Whether an integer-linear theory can hold this factor whole, so CP need not own its columns.
+     *
+     * Declared by the factor, which knows its own shape, rather than decided by the plan naming classes.
+     * The default is `false`: a factor that has not said a theory can take it is held by CP, which is the
+     * conservative direction — CP can always index a finite column, while a theory handed a constraint it
+     * cannot represent would simply not see it.
+     */
+    val integerTheoryOwnable: Boolean get() = false
+
+    /**
+     * Whether the exact rational lane can hold this factor whole, once the model has continuous columns.
+     *
+     * Separate from [integerTheoryOwnable] because it is a question about the factor's *data*, not only its
+     * shape: a row whose coefficients are not exactly representable is not exact whatever its kind.
+     */
+    val exactTheoryOwnable: Boolean get() = false
+
+    /**
      * A copy of this factor with every variable id renumbered through [mapping]. Non-variable data — coefficients,
      * bounds, constant arrays, domain offsets, DFA tables — is carried over unchanged. Used by
      * presolve passes that renumber or substitute variables.

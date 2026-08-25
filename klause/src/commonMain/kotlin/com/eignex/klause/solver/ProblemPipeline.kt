@@ -1,12 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.factor.arithmetic.IntegerConstants
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.RealConstants
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
-import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.factor.arithmetic.WideConstants
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lp.smallModelBigIntBound
 
 /** The solver pipeline selected once from a source [ProblemSpec]. */
@@ -50,11 +43,11 @@ fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
 
 /** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
 internal fun ProblemSpec.supportsExactLra(): Boolean =
-    numIntVars == 0 && numRealVars != 0 && factors.all(::supportsExactTheoryFactor)
+    numIntVars == 0 && numRealVars != 0 && factors.all { it.exactTheoryOwnable }
 
 /** Factors whose mixed rows the exact QF_LIRA branch-and-simplex route decides. */
 internal fun ProblemSpec.supportsExactLira(): Boolean =
-    numIntVars != 0 && numRealVars != 0 && factors.all(::supportsExactTheoryFactor)
+    numIntVars != 0 && numRealVars != 0 && factors.all { it.exactTheoryOwnable }
 
 /**
  * A factor some lane other than CP can hold, so CP need not own the columns it reads.
@@ -63,43 +56,7 @@ internal fun ProblemSpec.supportsExactLira(): Boolean =
  * assigns factor ownership from it, and an open column it marks has no owner at all — the model's verdict.
  */
 internal fun Factor.isTheoryOwnable(hasRealColumns: Boolean): Boolean =
-    this is Clause || supportsIntegerTheory() || (hasRealColumns && supportsExactTheoryFactor(this))
-
-internal fun supportsExactTheoryFactor(factor: Factor): Boolean = when (factor) {
-    is Clause -> true
-    is Linear -> factor.coefficientsAreExactlyRepresentable()
-    is ReifiedLinear -> factor.coefficientsAreExactlyRepresentable()
-    is ReifiedRealLinear -> factor.coefficientsAreExactlyRepresentable()
-    else -> false
-}
-
-private fun Linear.coefficientsAreExactlyRepresentable(): Boolean = when (val c = constants) {
-    // A continuous row is exact when every double is finite and its integer terms carry integral
-    // coefficients; the real terms may be fractional, which is what makes the row continuous.
-    is RealConstants -> c.bound.isFinite() &&
-        c.intCoefficients.indices.all { c.intCoefficients.at(it).isFinite() } &&
-        c.realCoefficients.indices.all { c.realCoefficients.at(it).isFinite() } &&
-        c.intCoefficients.indices.all { isExactInteger(c.intCoefficients.at(it)) }
-
-    is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
-        isExactInteger(c.bound.toDouble())
-
-    // A wide row is carried exactly by the theory, never through a double reading.
-    is WideConstants -> true
-}
-
-private fun ReifiedLinear.coefficientsAreExactlyRepresentable(): Boolean = when (val c = constants) {
-    is IntegerConstants -> vars.indices.all { isExactInteger(c.coeff(it).toDouble()) } &&
-        isExactInteger(c.bound.toDouble())
-
-    is WideConstants -> true
-}
-
-private fun ReifiedRealLinear.coefficientsAreExactlyRepresentable(): Boolean = bound.isFinite() && intCoeffs.all(
-    Double::isFinite,
-) && realCoeffs.all(Double::isFinite) && intCoeffs.all(::isExactInteger)
-
-private fun isExactInteger(value: Double): Boolean = value.isFinite() && value == value.toLong().toDouble()
+    integerTheoryOwnable || (hasRealColumns && exactTheoryOwnable)
 
 /**
  * A finite [com.ionspin.kotlin.bignum.integer.BigInteger] box which preserves satisfiability of this
