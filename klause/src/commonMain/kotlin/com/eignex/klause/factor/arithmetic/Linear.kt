@@ -239,11 +239,11 @@ class Linear private constructor(
                 sink.long(if (c.strict) 1L else 0L)
                 sink.long(c.bound.toRawBits())
                 for (i in vars.indices) {
-                    sink.long(vars[i].toLong())
+                    sink.intVar(vars[i])
                     sink.long(c.intCoefficients.at(i).toRawBits())
                 }
                 for (j in realVars.indices) {
-                    sink.long(realVars[j].toLong())
+                    sink.realVar(realVars[j])
                     sink.long(c.realCoefficients.at(j).toRawBits())
                 }
             }
@@ -254,7 +254,7 @@ class Linear private constructor(
                 for (ch in c.bound.toString()) sink.long(ch.code.toLong())
                 for (i in vars.indices) {
                     sink.long(Long.MIN_VALUE)
-                    sink.long(vars[i].toLong())
+                    sink.intVar(vars[i])
                     for (ch in c.coefficients.at(i).toString()) sink.long(ch.code.toLong())
                 }
             }

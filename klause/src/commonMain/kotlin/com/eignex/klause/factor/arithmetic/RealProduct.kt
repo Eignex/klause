@@ -47,19 +47,22 @@ class RealProduct(
     override val variables: VarList =
         MixedVars(spanInts = intArrayOf(intOperand), reals = intArrayOf(realOperand, result))
 
-    // Only the integer operand lives in the CP id space; the real operand and result ids are in the
-    // separate real-variable namespace, which presolve carries through unremapped.
-    override fun remap(mapping: VarRemap): Factor =
-        RealProduct(mapping.int(intOperand), realOperand, result, realOperandLo, realOperandHi)
+    override fun remap(mapping: VarRemap): Factor = RealProduct(
+        mapping.int(intOperand),
+        mapping.real(realOperand),
+        mapping.real(result),
+        realOperandLo,
+        realOperandHi,
+    )
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REAL_PRODUCT, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.intVar(intOperand)
-        // Real ids and bounds are constants (not CP ports), keyed so two products over the same integer
-        // operand but different real operands / results / envelopes do not collide into a false symmetry.
-        sink.long(realOperand.toLong())
-        sink.long(result.toLong())
+        // Keyed so two products over the same integer operand but different real operands / results /
+        // envelopes do not collide into a false symmetry.
+        sink.realVar(realOperand)
+        sink.realVar(result)
         sink.long(realOperandLo.toRawBits())
         sink.long(realOperandHi.toRawBits())
     }

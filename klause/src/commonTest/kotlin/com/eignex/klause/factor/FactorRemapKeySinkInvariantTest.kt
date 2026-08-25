@@ -4,9 +4,11 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
@@ -30,6 +32,7 @@ import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.VarRemap
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -46,7 +49,8 @@ class FactorRemapKeySinkInvariantTest {
     // collisions (remap stays injective) yet image order ≠ original order.
     private val intMap = IntArray(64) { (it * 45) % 64 }
     private val boolMap = IntArray(64) { (it * 45) % 64 }
-    private val mapping = VarRemap(boolMap, intMap)
+    private val realMap = IntArray(64) { (it * 45) % 64 }
+    private val mapping = VarRemap(boolMap, intMap, realMap)
     private val identity = IntArray(64) { it }
 
     private fun pos(v: Int) = Lit.make(v, true)
@@ -62,6 +66,40 @@ class FactorRemapKeySinkInvariantTest {
         "Product" to Product(8, 1, 4),
         "ReifiedLinear" to ReifiedLinear(2, intArrayOf(3, -1, 2), intArrayOf(5, 0, 7), LinearOp.LE, 3),
         "Linear" to Linear(intArrayOf(3, -1, 2), intArrayOf(5, 0, 7), LinearOp.LE, 3),
+        "Linear(wide)" to Linear(
+            intArrayOf(5, 0, 7),
+            arrayOf(
+                BigInteger.parseString("170141183460469231731687303715884105727"),
+                BigInteger.fromLong(-3),
+                BigInteger.fromLong(2),
+            ),
+            LinearOp.LE,
+            BigInteger.parseString("340282366920938463463374607431768211455"),
+        ),
+        "Linear(real)" to Linear(
+            intVars = intArrayOf(5, 0),
+            intCoeffs = doubleArrayOf(1.5, -2.0),
+            realVars = intArrayOf(3, 6),
+            realCoeffs = doubleArrayOf(0.25, 4.0),
+            op = LinearOp.LE,
+            bound = 7.5,
+        ),
+        "ReifiedRealLinear" to ReifiedRealLinear(
+            aux = 1,
+            vars = intArrayOf(5, 0),
+            intCoeffs = doubleArrayOf(1.5, -2.0),
+            realVars = intArrayOf(3, 6),
+            realCoeffs = doubleArrayOf(0.25, 4.0),
+            op = LinearOp.LE,
+            bound = 7.5,
+        ),
+        "RealProduct" to RealProduct(
+            intOperand = 2,
+            realOperand = 4,
+            result = 9,
+            realOperandLo = 0.0,
+            realOperandHi = 8.0,
+        ),
         "Cardinality" to Cardinality(intArrayOf(pos(4), neg(1), pos(6)), 1, 2),
         "Clause" to Clause(intArrayOf(pos(4), neg(1), pos(6))),
         "Xor" to Xor(intArrayOf(pos(3), neg(5), pos(0)), 1),

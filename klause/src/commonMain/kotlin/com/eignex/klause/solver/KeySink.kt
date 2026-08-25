@@ -40,6 +40,9 @@ internal interface KeySink {
     /** Set-semantics integer-variable ids (order insignificant): remapped, then sorted ascending. */
     fun sortedIntVars(ids: IntArray)
 
+    /** One real-variable id. */
+    fun realVar(id: Int)
+
     /** One Boolean-variable id. */
     fun boolVar(id: Int)
 
@@ -109,6 +112,7 @@ internal class MaterializingKeySink(private val kind: FactorKind, expectedWords:
     override fun intVarOrSelf(id: Int) = b.int(id)
     override fun intVars(ids: IntArray) = b.ints(ids)
     override fun sortedIntVars(ids: IntArray) = b.sortedInts(ids)
+    override fun realVar(id: Int) = b.int(id)
     override fun boolVar(id: Int) = b.int(id)
     override fun sortedBoolVars(ids: IntArray) = b.sortedInts(ids)
     override fun boolLit(lit: Int) = b.int(lit)
@@ -168,6 +172,8 @@ internal class HashingKeySink(private val kind: FactorKind, private val mapping:
     }
 
     override fun sortedIntVars(ids: IntArray) = sortedImages(ids) { mapping.int(it) }
+
+    override fun realVar(id: Int) = word(mapping.real(id).toLong())
 
     override fun boolVar(id: Int) = word(mapping.bool(id).toLong())
 
