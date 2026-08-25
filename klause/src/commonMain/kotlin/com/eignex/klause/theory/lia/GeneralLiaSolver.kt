@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.admitsGeneralLia
 import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.generalLiaWitnessBound
 import com.eignex.klause.solver.search.ComponentCheck
@@ -412,7 +413,7 @@ class GeneralLiaSearchComponent(
     private var outcome: ComponentCheck? = null
 
     init {
-        require(model.generalLiaWitnessBound() != null) {
+        require(model.admitsGeneralLia()) {
             "general LIA component requires a pure-integer linear model with a finite witness bound"
         }
         require(this.theoryIntVars.all { it in 0 until model.numIntVars }) {

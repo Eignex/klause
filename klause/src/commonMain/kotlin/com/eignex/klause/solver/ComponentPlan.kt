@@ -155,7 +155,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         supportsExactLira() -> ProblemPipeline.EXACT_LIRA
         numRealVars != 0 -> null
         supportsCompleteDifferenceTheory(factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
-        generalLiaWitnessBound() != null -> ProblemPipeline.GENERAL_LIA
+        admitsGeneralLia() -> ProblemPipeline.GENERAL_LIA
         else -> null
     }
     // An open column some CP-only factor reads has no owner: CP cannot index it and no theory can hold
@@ -214,7 +214,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
                 theoryFragment.intBounds,
             ) -> ProblemPipeline.DIFFERENCE_THEORY
 
-            theoryFragment.generalLiaWitnessBound() != null -> ProblemPipeline.GENERAL_LIA
+            theoryFragment.admitsGeneralLia() -> ProblemPipeline.GENERAL_LIA
 
             else -> ProblemPipeline.UNSUPPORTED_OPEN
         }

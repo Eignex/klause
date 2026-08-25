@@ -1,9 +1,9 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.ReifiedFactor
-import com.eignex.klause.factor.bool.internals.validatePseudoBoolean
 import com.eignex.klause.factor.bool.internals.pbDegree
 import com.eignex.klause.factor.bool.internals.pbHolds
+import com.eignex.klause.factor.bool.internals.validatePseudoBoolean
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState

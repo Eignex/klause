@@ -9,9 +9,9 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.VarRemap
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertContentEquals
 import kotlin.test.assertTrue
 
 class ClauseInvariantTest {

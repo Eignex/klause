@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.lp.admitsSmallModelBound
 import com.eignex.klause.lp.smallModelBigIntBound
 
 /** The solver pipeline selected once from a source [ProblemSpec]. */
@@ -57,6 +58,11 @@ internal fun ProblemSpec.supportsExactLira(): Boolean =
  */
 internal fun Factor.isTheoryOwnable(hasRealColumns: Boolean): Boolean =
     integerTheoryOwnable || (hasRealColumns && exactTheoryOwnable)
+
+/** Whether the General LIA lane admits this model. Asks only the admissibility half of the witness
+ *  theorem: forming the bound itself is exponential in the row count, and a route never needs its value. */
+internal fun ProblemSpec.admitsGeneralLia(): Boolean =
+    numRealVars == 0 && admitsSmallModelBound(numIntVars, factors.asList(), intBounds)
 
 /**
  * A finite [com.ionspin.kotlin.bignum.integer.BigInteger] box which preserves satisfiability of this
