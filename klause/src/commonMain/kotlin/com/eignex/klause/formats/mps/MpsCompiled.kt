@@ -17,10 +17,12 @@ import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
+import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.nextUp
 
 /** One MPS column in declaration order, for rendering a solution value back by name. */
 data class MpsColumn(
@@ -49,6 +51,10 @@ data class MpsCompiled(
     /** Maximum absolute difference between the reported retained objective and the source objective,
      *  over the declared integer-column bounds; null when no objective term was dropped. */
     val objectiveErrorBound: Double?,
+    /** True when an integer row was tightened to an inner approximation after a term underflowed.
+     *  A satisfying assignment is sound for the source model, while exhaustion leaves its boundary
+     *  unresolved. */
+    val hasInnerConstraintApproximation: Boolean,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
 )
@@ -93,6 +99,7 @@ fun MpsModel.toProblem(): MpsCompiled {
 
     val factors = ArrayList<Factor>()
     val guards = IndicatorGuards(variables, intVarOf, factors)
+    var hasInnerConstraintApproximation = false
     for (c in constraints) {
         if (c.indices.isEmpty()) {
             if (!emptyRowHolds(c.lower, c.upper)) {
@@ -106,14 +113,17 @@ fun MpsModel.toProblem(): MpsCompiled {
             if (touchesFloat) {
                 emitRealRow(factors, c, isFloat, intVarOf, realVarOf)
             } else {
-                emitIntRow(factors, c, intVarOf)
+                hasInnerConstraintApproximation = emitIntRow(factors, c, variables, intVarOf) ||
+                    hasInnerConstraintApproximation
             }
         } else {
             val guard = guards.guardFor(indicator, c.name)
             if (touchesFloat) {
                 emitIndicatedRealRow(factors, c, isFloat, intVarOf, realVarOf, guard, guards)
             } else {
-                emitIndicatedIntRow(factors, c, intVarOf, guard, guards)
+                hasInnerConstraintApproximation =
+                    emitIndicatedIntRow(factors, c, variables, intVarOf, guard, guards) ||
+                    hasInnerConstraintApproximation
             }
         }
     }
@@ -165,38 +175,98 @@ fun MpsModel.toProblem(): MpsCompiled {
         columns,
         objScale,
         objectiveErrorBound,
+        hasInnerConstraintApproximation,
         numReal,
     )
 }
 
 /** Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its
  *  coefficients and bounds onto whole numbers. */
-private fun emitIntRow(factors: MutableList<Factor>, c: MpsConstraint, intVarOf: IntArray) {
+private fun emitIntRow(
+    factors: MutableList<Factor>,
+    c: MpsConstraint,
+    variables: List<MpsVar>,
+    intVarOf: IntArray,
+): Boolean {
     val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
     val scale = c.integerRowScale()
     val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
-    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
-        factors.add(Linear(coeffs, vars, op, bound))
-    }
+    return emitInnerRow(
+        c,
+        scale,
+        variables,
+        post = { op, bound -> factors.add(Linear(coeffs, vars, op, bound)) },
+        postImpossible = { factors.add(Linear(EmptyLongArray, EmptyIntArray, LinearOp.LE, -1L)) },
+    )
 }
 
 /**
  * The scale carrying a purely-integer row onto whole numbers.
  *
- * A row whose smallest term rounds to zero at every usable scale is rejected rather than emitted: the
- * term would leave the row entirely, which states a different constraint instead of an approximate one.
+ * A row whose smallest term rounds to zero at every usable scale is emitted as an inner approximation:
+ * every finite side is tightened enough that a satisfying retained row also satisfies the source row.
  */
 private fun MpsConstraint.integerRowScale(): RowScale {
     val builder = RowScaleBuilder()
     for (coeff in coeffs) builder.observe(coeff)
     rowBound(lower)?.let { builder.observe(it) }
     rowBound(upper)?.let { builder.observe(it) }
-    return when (val scale = builder.resolve()) {
-        is RowScale.Unrepresentable ->
-            mpsError("row '$name' spans a wider range than an integer row holds: its smallest term rounds to zero")
+    return builder.resolve()
+}
 
-        else -> scale
+/**
+ * Emits the inner side of an underflowing integer row. `R` is the retained integral row and `S` the
+ * source row in scaled units. With `|R - S| <= error`, `R <= floor(bound - error)` and
+ * `R >= ceil(bound + error)` imply their respective source sides. A missing finite bound makes the
+ * inner condition empty instead of making an unsound claim about a candidate.
+ */
+private fun emitInnerRow(
+    c: MpsConstraint,
+    scale: RowScale,
+    variables: List<MpsVar>,
+    post: (LinearOp, Long) -> Unit,
+    postImpossible: () -> Unit,
+): Boolean {
+    if (scale !is RowScale.Unrepresentable) {
+        emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale, post)
+        return false
     }
+    val error = c.innerApproximationError(variables, scale)
+    if (error == null) {
+        postImpossible()
+        return true
+    }
+    c.upper?.let { upper ->
+        val bound = floor(upper * scale.multiplier - error)
+        if (bound < Long.MIN_VALUE) {
+            postImpossible()
+        } else {
+            post(LinearOp.LE, bound.toLong())
+        }
+    }
+    c.lower?.let { lower ->
+        val bound = ceil(lower * scale.multiplier + error)
+        if (bound > Long.MAX_VALUE) {
+            postImpossible()
+        } else {
+            post(LinearOp.GE, bound.toLong())
+        }
+    }
+    return true
+}
+
+/** Error bound in the retained row's integral units, or null when an underflowing term is unbounded. */
+private fun MpsConstraint.innerApproximationError(variables: List<MpsVar>, scale: RowScale): Double? {
+    var error = 0.0
+    indices.forEachIndexed { k, index ->
+        val delta = abs(scale.scale(coeffs[k]).toDouble() - coeffs[k] * scale.multiplier)
+        if (delta == 0.0) return@forEachIndexed
+        val variable = variables[index]
+        val lower = intLowerOrNull(variable.lower) ?: return null
+        val upper = intUpperOrNull(variable.upper) ?: return null
+        error = (error + (delta * maxOf(abs(lower.toDouble()), abs(upper.toDouble()))).nextUp()).nextUp()
+    }
+    return error
 }
 
 /** A row's terms split into its integer and its continuous part, each variable-id/coefficient parallel. */
@@ -304,18 +374,26 @@ private fun postGuardImplies(factors: MutableList<Factor>, guard: Int, cond: Int
 private fun emitIndicatedIntRow(
     factors: MutableList<Factor>,
     c: MpsConstraint,
+    variables: List<MpsVar>,
     intVarOf: IntArray,
     guard: Int,
     guards: IndicatorGuards,
-) {
+): Boolean {
     val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
     val scale = c.integerRowScale()
     val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
-    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
+    fun post(op: LinearOp, bound: Long, rowCoeffs: LongArray = coeffs, rowVars: IntArray = vars) {
         val cond = guards.newBool()
-        factors.add(ReifiedLinear(cond, coeffs, vars, op, bound))
+        factors.add(ReifiedLinear(cond, rowCoeffs, rowVars, op, bound))
         postGuardImplies(factors, guard, cond)
     }
+    return emitInnerRow(
+        c,
+        scale,
+        variables,
+        post = { op, bound -> post(op, bound) },
+        postImpossible = { post(LinearOp.LE, -1L, EmptyLongArray, EmptyIntArray) },
+    )
 }
 
 /** Emit an indicated row touching a continuous column. [ReifiedRealLinear] carries inequalities only, so

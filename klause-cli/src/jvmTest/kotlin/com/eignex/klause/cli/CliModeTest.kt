@@ -275,6 +275,16 @@ class CliModeTest {
     }
 
     @Test
+    fun `an exhausted inner MPS constraint approximation is qualified`() {
+        val output = MpsOutput(hasInnerConstraintApproximation = true)
+
+        val out = capture { output.onComplete(Verdict.UNSATISFIABLE) }
+
+        assertTrue("s UNKNOWN" in out, out)
+        assertTrue("source boundary is unresolved" in out, out)
+    }
+
+    @Test
     fun `an open mixed MPS model decides through the exact LIRA core`() {
         val mps = File.createTempFile("clilira", ".mps").apply {
             writeText(
