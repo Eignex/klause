@@ -65,9 +65,12 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     final override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
         println("$commentPrefix solveTime=${solveTimeMs / 1000.0}")
         println("$commentPrefix solutions=$solutions")
+        // The search block is unconditional counters, so it is worth printing only for an engine that
+        // ran; the LP block reports nothing unless the LP did work, so it gates itself and must not sit
+        // behind the backend check — a run that records no backend can still have solved relaxations.
         if (stats.run.backend.isNotEmpty()) {
             printStatPairs(commentPrefix, searchStatPairs(stats).filter { (k, _) -> keepStat(k) })
-            printStatPairs(commentPrefix, lpStatPairs(stats))
         }
+        printStatPairs(commentPrefix, lpStatPairs(stats))
     }
 }

@@ -1007,6 +1007,8 @@ abstract interface com.eignex.klause.solver/IntSpan { // com.eignex.klause.solve
 abstract interface com.eignex.klause.solver/ResumableSearch : kotlin/AutoCloseable { // com.eignex.klause.solver/ResumableSearch|null[0]
     abstract val isDone // com.eignex.klause.solver/ResumableSearch.isDone|{}isDone[0]
         abstract fun <get-isDone>(): kotlin/Boolean // com.eignex.klause.solver/ResumableSearch.isDone.<get-isDone>|<get-isDone>(){}[0]
+    abstract val stats // com.eignex.klause.solver/ResumableSearch.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver/ResumableSearch.stats.<get-stats>|<get-stats>(){}[0]
 
     abstract fun runSlice(com.eignex.klause.util/Cancellation, kotlin/Long, kotlin/Function1<com.eignex.klause.solver.result/MinimizeResult.WithSample, kotlin/Unit>): com.eignex.klause.solver.result/MinimizeResult? // com.eignex.klause.solver/ResumableSearch.runSlice|runSlice(com.eignex.klause.util.Cancellation;kotlin.Long;kotlin.Function1<com.eignex.klause.solver.result.MinimizeResult.WithSample,kotlin.Unit>){}[0]
     open fun close() // com.eignex.klause.solver/ResumableSearch.close|close(){}[0]

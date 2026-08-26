@@ -8311,6 +8311,7 @@ public final class com/eignex/klause/solver/ResumableOptimizer$DefaultImpls {
 
 public abstract interface class com/eignex/klause/solver/ResumableSearch : java/lang/AutoCloseable {
 	public fun close ()V
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public abstract fun isDone ()Z
 	public abstract fun runSlice (Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
 }
