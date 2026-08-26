@@ -2,7 +2,6 @@ package com.eignex.klause.propagation.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.lowering.differenceFragmentOf
-import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Problem
 
 /**
@@ -29,15 +28,5 @@ internal fun Problem.withDifferenceSystem(): Problem {
     if (fragment.edges.none { it.guard != DifferenceEdge.ALWAYS }) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
     // `alreadyFolded` reuses that fold and `seedDeductions` carries the proven deductions forward.
-    return BakedProblem(
-        numBoolVars = numBoolVars,
-        numIntVars = numIntVars,
-        intDomains = requireFiniteIntDomains(),
-        factors = factors + DifferenceSystem(fragment.edges),
-        seedDeductions = baked,
-        cancellation = cancellation,
-        impliedFactorMask = impliedFactorMask?.let { it + false },
-        hasSymmetryBreaking = hasSymmetryBreaking,
-        alreadyFolded = true,
-    )
+    return withAppendedFactor(DifferenceSystem(fragment.edges))
 }
