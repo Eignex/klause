@@ -4,9 +4,9 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

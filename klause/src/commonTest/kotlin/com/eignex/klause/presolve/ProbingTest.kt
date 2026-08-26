@@ -1,8 +1,8 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions

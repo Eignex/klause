@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey

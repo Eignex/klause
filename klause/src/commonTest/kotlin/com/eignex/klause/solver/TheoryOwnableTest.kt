@@ -1,8 +1,8 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.Propagator

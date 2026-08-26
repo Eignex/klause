@@ -1,9 +1,9 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation

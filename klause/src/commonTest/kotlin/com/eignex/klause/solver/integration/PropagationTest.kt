@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -12,6 +11,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.reifiedIntCompare
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationResult

@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList

@@ -1,6 +1,6 @@
-package com.eignex.klause.factor.arithmetic
+package com.eignex.klause.ir
 
-/** Relational operator for a [Linear] constraint. */
+/** Relational operator for a linear constraint. */
 enum class LinearOp {
     /** `≤`. */
     LE,

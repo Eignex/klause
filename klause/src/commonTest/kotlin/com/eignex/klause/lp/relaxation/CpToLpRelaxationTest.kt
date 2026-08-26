@@ -1,11 +1,11 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.LpSolution
 import com.eignex.klause.lp.LpStatus
 import com.eignex.klause.lp.solveLp

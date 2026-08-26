@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
 import com.eignex.klause.factor.arithmetic.internals.reifiedAuxTail
 import com.eignex.klause.factor.arithmetic.internals.successorOrNull
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState

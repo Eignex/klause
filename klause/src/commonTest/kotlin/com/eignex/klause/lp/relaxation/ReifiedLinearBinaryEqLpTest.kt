@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.LpStatus
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession

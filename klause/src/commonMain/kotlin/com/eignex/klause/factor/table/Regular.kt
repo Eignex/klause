@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.table
 
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.SpanIntVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList

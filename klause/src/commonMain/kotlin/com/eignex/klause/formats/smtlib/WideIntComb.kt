@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 
 /** The strict-inequality bound offset for a folded relation operator (`< / >` tighten by ∓1). */
 internal fun strictDelta(op: String): Int = when (op) {

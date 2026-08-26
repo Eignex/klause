@@ -2,7 +2,7 @@ package com.eignex.klause.backtrack.lp
 
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor

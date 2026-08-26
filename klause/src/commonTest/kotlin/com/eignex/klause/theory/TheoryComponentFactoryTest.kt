@@ -1,8 +1,8 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.componentPlan

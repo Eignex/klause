@@ -3,7 +3,6 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
@@ -19,6 +18,7 @@ import com.eignex.klause.formats.scaleByConst
 import com.eignex.klause.formats.scaleIntComb
 import com.eignex.klause.formats.sumIntCombs
 import com.eignex.klause.formats.wideConstHolds
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.constRelationHolds

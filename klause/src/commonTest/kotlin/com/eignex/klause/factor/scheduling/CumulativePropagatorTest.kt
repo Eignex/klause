@@ -4,9 +4,9 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.FactorPropagationOracle
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.scheduling.internals.CumulativeThetaTree
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult

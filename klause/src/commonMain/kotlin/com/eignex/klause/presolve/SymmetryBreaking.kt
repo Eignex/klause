@@ -1,10 +1,10 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.symmetry.SymmetryHandling
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarRemap

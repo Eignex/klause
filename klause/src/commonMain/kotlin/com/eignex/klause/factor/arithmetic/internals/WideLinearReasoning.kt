@@ -1,6 +1,6 @@
 package com.eignex.klause.factor.arithmetic.internals
 
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.PropagationState
 import com.ionspin.kotlin.bignum.integer.BigInteger
 

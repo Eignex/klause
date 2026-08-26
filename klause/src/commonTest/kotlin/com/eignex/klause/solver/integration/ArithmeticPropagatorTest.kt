@@ -5,8 +5,8 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult

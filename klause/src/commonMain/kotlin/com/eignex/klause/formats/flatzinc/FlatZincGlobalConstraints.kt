@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
@@ -19,6 +18,7 @@ import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.packLayeredMdd
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray

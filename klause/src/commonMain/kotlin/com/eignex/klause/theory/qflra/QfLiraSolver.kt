@@ -2,12 +2,12 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.RealConstants
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.arithmetic.WideConstants
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.Sense
