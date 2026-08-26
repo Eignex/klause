@@ -405,6 +405,7 @@ internal class LpEngine(
             cancellation = params.cancellation,
             componentSplit = params.lpPlan.componentSplit,
         )
+        certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {
             LpVerdict.OPTIMAL -> {
                 val primal = certified.exactPrimal ?: certified.float?.primal

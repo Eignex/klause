@@ -668,7 +668,14 @@ internal class ResumableMinimize(
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
-                val real = leafRealFeasibility(problem, objective, sample, Cancellation { sliceCancelled() })
+                val real = leafRealFeasibility(
+                    problem,
+                    objective,
+                    sample,
+                    Cancellation { sliceCancelled() },
+                    componentSplit = params.lpPlan.componentSplit,
+                    sink = sink.lp,
+                )
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 
