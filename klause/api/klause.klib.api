@@ -365,8 +365,6 @@ final enum class com.eignex.klause.solver.pipeline/FiniteEngine : kotlin/Enum<co
         final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/FiniteEngine> // com.eignex.klause.solver.pipeline/FiniteEngine.entries.<get-entries>|<get-entries>#static(){}[0]
     final val id // com.eignex.klause.solver.pipeline/FiniteEngine.id|{}id[0]
         final fun <get-id>(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteEngine.id.<get-id>|<get-id>(){}[0]
-    final val portfolioMix // com.eignex.klause.solver.pipeline/FiniteEngine.portfolioMix|{}portfolioMix[0]
-        final fun <get-portfolioMix>(): com.eignex.klause.portfolio/EngineMix? // com.eignex.klause.solver.pipeline/FiniteEngine.portfolioMix.<get-portfolioMix>|<get-portfolioMix>(){}[0]
     final val pureLocalSearch // com.eignex.klause.solver.pipeline/FiniteEngine.pureLocalSearch|{}pureLocalSearch[0]
         final fun <get-pureLocalSearch>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteEngine.pureLocalSearch.<get-pureLocalSearch>|<get-pureLocalSearch>(){}[0]
 
@@ -10698,6 +10696,7 @@ final object com.eignex.klause.presolve/RootBaker { // com.eignex.klause.presolv
 final object com.eignex.klause.propagation/NoPropagator : com.eignex.klause.propagation/Propagator // com.eignex.klause.propagation/NoPropagator|null[0]
 
 final object com.eignex.klause.solver.pipeline/FinitePipeline { // com.eignex.klause.solver.pipeline/FinitePipeline|null[0]
+    final fun portfolioMix(com.eignex.klause.solver.pipeline/FiniteEngine): com.eignex.klause.portfolio/EngineMix // com.eignex.klause.solver.pipeline/FinitePipeline.portfolioMix|portfolioMix(com.eignex.klause.solver.pipeline.FiniteEngine){}[0]
     final fun prepare(com.eignex.klause.solver.pipeline/FinitePipelineRequest): com.eignex.klause.solver.pipeline/FinitePipelinePreparation // com.eignex.klause.solver.pipeline/FinitePipeline.prepare|prepare(com.eignex.klause.solver.pipeline.FinitePipelineRequest){}[0]
 }
 

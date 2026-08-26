@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -14,6 +15,14 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class FinitePipelineTest {
+
+    @Test
+    fun `selects the portfolio composition for a finite route`() {
+        assertEquals(EngineMix.BACKTRACK, FinitePipeline.portfolioMix(FiniteEngine.BACKTRACK))
+        assertEquals(EngineMix.LOCAL_SEARCH, FinitePipeline.portfolioMix(FiniteEngine.LOCAL_SEARCH))
+        assertEquals(EngineMix.MIXED, FinitePipeline.portfolioMix(FiniteEngine.MIXED))
+        assertEquals(EngineMix.ALNS, FinitePipeline.portfolioMix(FiniteEngine.ALNS))
+    }
 
     @Test
     fun `keeps an unchanged finite model for the selected route`() {

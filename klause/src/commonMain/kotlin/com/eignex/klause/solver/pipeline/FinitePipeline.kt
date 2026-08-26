@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
@@ -43,6 +44,15 @@ class FinitePipelinePreparation(
 
 /** Owns finite-route presolve policy before a concrete engine is constructed. */
 object FinitePipeline {
+    /** Portfolio composition selected for a finite route that does not use the fixed search annotation. */
+    fun portfolioMix(engine: FiniteEngine): EngineMix = when (engine) {
+        FiniteEngine.FIXED -> error("the fixed route does not execute through a portfolio")
+        FiniteEngine.BACKTRACK -> EngineMix.BACKTRACK
+        FiniteEngine.LOCAL_SEARCH -> EngineMix.LOCAL_SEARCH
+        FiniteEngine.MIXED -> EngineMix.MIXED
+        FiniteEngine.ALNS -> EngineMix.ALNS
+    }
+
     /** Apply finite-route presolve policy and return the model ready for engine construction. */
     fun prepare(request: FinitePipelineRequest): FinitePipelinePreparation {
         val config = if (request.engine.pureLocalSearch && !request.explicitPresolveConfig) {

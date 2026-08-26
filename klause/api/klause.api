@@ -8586,7 +8586,6 @@ public final class com/eignex/klause/solver/pipeline/FiniteEngine : java/lang/En
 	public static final field MIXED Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getId ()Ljava/lang/String;
-	public final fun getPortfolioMix ()Lcom/eignex/klause/portfolio/EngineMix;
 	public final fun getPureLocalSearch ()Z
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public static fun values ()[Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -8598,6 +8597,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteEngine$Companion {
 
 public final class com/eignex/klause/solver/pipeline/FinitePipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/FinitePipeline;
+	public final fun portfolioMix (Lcom/eignex/klause/solver/pipeline/FiniteEngine;)Lcom/eignex/klause/portfolio/EngineMix;
 	public final fun prepare (Lcom/eignex/klause/solver/pipeline/FinitePipelineRequest;)Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;
 }
 

@@ -1,7 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.portfolio.EngineMix
-
 /**
  * A finite-domain solve route selected by the orchestration layer.
  *
@@ -13,27 +11,24 @@ enum class FiniteEngine(
     val id: String,
     /** Whether solution-set-altering presolve passes should be omitted for this route. */
     val pureLocalSearch: Boolean = false,
-    /** Portfolio composition for routes that execute through the portfolio. */
-    val portfolioMix: EngineMix? = null,
 ) {
     /** A single backtrack solver following the model's search annotation. */
     FIXED("fixed"),
 
     /** A portfolio containing only complete backtrack solvers. */
-    BACKTRACK("backtrack", portfolioMix = EngineMix.BACKTRACK),
+    BACKTRACK("backtrack"),
 
     /** A portfolio containing only local-search solvers. */
     LOCAL_SEARCH(
         "localsearch",
         pureLocalSearch = true,
-        portfolioMix = EngineMix.LOCAL_SEARCH,
     ),
 
     /** A portfolio combining backtrack and local-search solvers. */
-    MIXED("mixed", portfolioMix = EngineMix.MIXED),
+    MIXED("mixed"),
 
     /** A hybrid large-neighbourhood portfolio with CP repair. */
-    ALNS("alns", portfolioMix = EngineMix.ALNS),
+    ALNS("alns"),
     ;
 
     /** Defaults shared by finite-engine route consumers. */
