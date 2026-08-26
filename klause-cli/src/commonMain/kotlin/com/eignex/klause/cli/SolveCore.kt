@@ -192,7 +192,7 @@ internal object SolveCore {
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
             // single resolved arm runs as a one-arm pool.
             FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
-                runPortfolio(solvable, common, output, cores, requireNotNull(engine.portfolioMix), cancel, nodeBudget)
+                runPortfolio(solvable, common, output, cores, FinitePipeline.portfolioMix(engine), cancel, nodeBudget)
         }
     }
 
