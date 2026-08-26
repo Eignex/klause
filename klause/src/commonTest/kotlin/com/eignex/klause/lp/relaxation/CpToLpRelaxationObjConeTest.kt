@@ -5,9 +5,9 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.lp.solveLp
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

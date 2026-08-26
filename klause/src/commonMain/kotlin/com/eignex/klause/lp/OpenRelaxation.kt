@@ -2,6 +2,8 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**

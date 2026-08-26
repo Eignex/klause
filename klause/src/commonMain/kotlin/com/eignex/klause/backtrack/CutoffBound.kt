@@ -1,6 +1,6 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.lp.Int128
+import com.eignex.klause.lp.engine.Int128
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 

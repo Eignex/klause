@@ -1,7 +1,7 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.lp.LpModel
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.ionspin.kotlin.bignum.integer.BigInteger

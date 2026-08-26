@@ -7,7 +7,6 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.BakedProblem
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RepairSearch
@@ -21,6 +20,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
 /**

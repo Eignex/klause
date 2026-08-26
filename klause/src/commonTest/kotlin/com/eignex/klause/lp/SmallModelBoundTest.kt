@@ -2,10 +2,10 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

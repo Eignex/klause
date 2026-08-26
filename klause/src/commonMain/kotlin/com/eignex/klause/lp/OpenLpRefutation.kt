@@ -1,7 +1,11 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.util.Cancellation
 
 /**
  * Whether the relaxation of [constraints] over the genuinely open [openBounds] is certifiably infeasible.

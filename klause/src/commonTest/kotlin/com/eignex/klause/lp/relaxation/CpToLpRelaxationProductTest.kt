@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.Product
-import com.eignex.klause.lp.LpVerdict
-import com.eignex.klause.lp.solveLp
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

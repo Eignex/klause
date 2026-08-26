@@ -2,11 +2,11 @@
 
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.kumulant.stream.lock
 import kotlin.concurrent.atomics.AtomicBoolean

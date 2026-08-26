@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList

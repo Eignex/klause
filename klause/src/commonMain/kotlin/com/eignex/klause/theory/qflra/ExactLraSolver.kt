@@ -3,12 +3,12 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.util.Cancellation
 
 /** An exact QF_LRA assignment, independent of the finite CP [com.eignex.klause.solver.Sample]. */
 data class ExactLraAssignment(

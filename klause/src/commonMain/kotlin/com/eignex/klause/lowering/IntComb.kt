@@ -1,6 +1,8 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.lp.engine.addExact
+import com.eignex.klause.lp.engine.mulExact
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

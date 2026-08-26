@@ -10,8 +10,8 @@ import com.eignex.klause.presolve.structural.ComparisonClauseFold
 import com.eignex.klause.presolve.structural.DuplicateColumns
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.StructuralReduction
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.Cancellation
 
 /**
  * Problem-level presolve transforms. Each takes a [Problem] and returns an equivalent one with

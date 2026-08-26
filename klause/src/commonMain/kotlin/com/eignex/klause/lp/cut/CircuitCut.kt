@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.cut
 
-import com.eignex.klause.lp.Relation
+import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongHashSet

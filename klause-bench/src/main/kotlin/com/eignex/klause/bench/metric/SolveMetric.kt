@@ -9,7 +9,7 @@ import com.eignex.klause.bench.tools.ProfileConfig
 import com.eignex.klause.bench.tools.Profiler
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import java.io.File

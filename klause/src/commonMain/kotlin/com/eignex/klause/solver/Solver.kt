@@ -16,6 +16,7 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.util.Cancellation
 
 /**
  * Marker for backend-specific solver params. Each solver backend ships its own data class

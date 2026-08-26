@@ -1,8 +1,8 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.presolve.Presolve
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 
 /**

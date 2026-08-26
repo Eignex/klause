@@ -15,6 +15,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit
@@ -263,7 +264,7 @@ internal class Alns(
      * seed it with a *budget-bounded complete solve*: complete search reaches a first feasible fast on both
      * easy and feasibility-tight problems — where local search flails and leaves ALNS with no incumbent at
      * all (bench-mined) — and hands over a CP-quality start. It is capped to a fraction of the run's budget
-     * (via [com.eignex.klause.solver.Cancellation.shorten]) so destroy/repair keeps the rest, with
+     * (via [com.eignex.klause.util.Cancellation.shorten]) so destroy/repair keeps the rest, with
      * [BOOTSTRAP_DECISIONS] as the safeguard for a budget-less (deadline-free) run. A pure-LS ALNS (no
      * backtrack engine), or a fragment the bootstrap can't seed, falls back to local search.
      */
@@ -314,7 +315,7 @@ internal class Alns(
     }
 
     private companion object {
-        /** Budget slice ([com.eignex.klause.solver.Cancellation.shorten]) the complete-engine bootstrap may
+        /** Budget slice ([com.eignex.klause.util.Cancellation.shorten]) the complete-engine bootstrap may
          *  use before yielding to destroy/repair. Calibration knob. */
         const val BT_BOOTSTRAP_FRACTION = 0.5
 

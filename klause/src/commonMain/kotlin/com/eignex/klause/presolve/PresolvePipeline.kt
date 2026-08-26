@@ -3,12 +3,12 @@ package com.eignex.klause.presolve
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.difference.withDifferenceSystem
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.PresolveStats
+import com.eignex.klause.util.Cancellation
 import kotlin.time.TimeSource
 
 /** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop

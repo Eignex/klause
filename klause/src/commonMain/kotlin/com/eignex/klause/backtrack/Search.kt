@@ -3,9 +3,9 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult

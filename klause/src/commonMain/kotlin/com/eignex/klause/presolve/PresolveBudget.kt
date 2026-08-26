@@ -1,6 +1,6 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 
 /**
  * The presolve phase's remaining wall-clock allowance, and the means to hand each pass a slice of it.

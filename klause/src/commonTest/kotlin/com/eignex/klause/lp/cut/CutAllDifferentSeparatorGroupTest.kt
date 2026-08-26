@@ -2,9 +2,9 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.SymmetricAllDifferent
-import com.eignex.klause.lp.FloatLpResult
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.engine.FloatLpResult
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession

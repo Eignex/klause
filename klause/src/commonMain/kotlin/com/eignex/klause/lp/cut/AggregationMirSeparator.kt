@@ -5,10 +5,11 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.LpOverflowException
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.addExact
-import com.eignex.klause.lp.mulExact
+import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.addExact
+import com.eignex.klause.lp.engine.mulExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList

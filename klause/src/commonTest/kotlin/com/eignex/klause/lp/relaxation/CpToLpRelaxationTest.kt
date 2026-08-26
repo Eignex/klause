@@ -6,9 +6,9 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpVerdict
-import com.eignex.klause.lp.solveLp
+import com.eignex.klause.lp.engine.LpSolution
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor

@@ -19,11 +19,11 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.addExact
-import com.eignex.klause.lp.mulExact
-import com.eignex.klause.lp.subExact
+import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.lp.engine.addExact
+import com.eignex.klause.lp.engine.mulExact
+import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.WideConsts

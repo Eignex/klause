@@ -14,9 +14,9 @@ import com.eignex.klause.lp.longOrNull
 import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.structuralIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 
 /** What the open-model presolve phase concluded. */
 sealed interface OpenPresolveResult {

@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.IntegralConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.ir.IntBounds
 import com.ionspin.kotlin.bignum.integer.BigInteger
