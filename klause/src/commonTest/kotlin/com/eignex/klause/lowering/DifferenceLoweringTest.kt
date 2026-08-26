@@ -1,11 +1,14 @@
-package com.eignex.klause.arithmetic.difference
+package com.eignex.klause.lowering
 
+import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.Potentials
+import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
@@ -21,7 +24,7 @@ import kotlin.test.assertTrue
  * instance is clauses and reified rows around a core of differences, so collecting must compose with
  * structure it does not understand rather than refusing the model.
  */
-class DifferenceFragmentTest {
+class DifferenceLoweringTest {
 
     private fun open(n: Int) = Array(n) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) }
 
