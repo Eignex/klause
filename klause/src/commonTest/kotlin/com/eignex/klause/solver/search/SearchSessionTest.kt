@@ -72,6 +72,20 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `traversal-only brancher supplies alternatives beside one fixpoint component`() {
+        val brancher = object : SearchBrancher {
+            override fun nextBranch(context: SearchContext): List<SearchDecision> =
+                listOf(SearchDecision.Bool(0))
+        }
+        val session = SearchComponentSet(
+            components = listOf(object : SearchComponent {}),
+            branchers = listOf(brancher),
+        ).session()
+
+        assertEquals(listOf(SearchDecision.Bool(0)), session.branchAlternatives())
+    }
+
+    @Test
     fun `component implication reaches peers and retracts with its decision level`() {
         var observed: Boolean? = null
         val source = object : SearchComponent {

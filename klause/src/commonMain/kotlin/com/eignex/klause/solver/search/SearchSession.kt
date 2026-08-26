@@ -18,8 +18,10 @@ class SearchSession(
     private val maxChecks: Long = Long.MAX_VALUE,
     private val cancellation: Cancellation = Cancellation.Never,
     private val learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
+    private val branchers: List<SearchBrancher> = emptyList(),
 ) : SearchContext,
     ClauseWatchHost {
+    private val singleComponent = components.singleOrNull()
     private val trail = ArrayList<SearchDecision>()
     private val boolValues = MutableIntIntMap()
     private val boolLevels = MutableIntIntMap()
@@ -175,7 +177,15 @@ class SearchSession(
 
             is SearchDecision.Theory -> Unit
         }
-        for (component in components) {
+        if (singleComponent != null) {
+            val component = singleComponent
+            if (component !== source) {
+                activeComponent = component
+                val result = component.assert(decision, this)
+                activeComponent = null
+                if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+            }
+        } else for (component in components) {
             if (component === source) continue
             activeComponent = component
             val result = component.assert(decision, this)
@@ -215,7 +225,7 @@ class SearchSession(
         // may have become unassigned again.
         unitsPending = learned.units.size > 0
         pendingAssertions.clear()
-        for (component in components) component.retract(decisionLevel)
+        singleComponent?.retract(decisionLevel) ?: components.forEach { it.retract(decisionLevel) }
     }
 
     /** Run all components until each has observed the current shared state once. */
@@ -223,7 +233,15 @@ class SearchSession(
         while (true) {
             while (pendingAssertions.isNotEmpty()) {
                 val pending = pendingAssertions.removeFirst()
-                for (component in components) {
+                if (singleComponent != null) {
+                    val component = singleComponent
+                    if (component !== pending.source) {
+                        activeComponent = component
+                        val result = component.assert(pending.decision, this)
+                        activeComponent = null
+                        if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+                    }
+                } else for (component in components) {
                     if (component === pending.source) continue
                     activeComponent = component
                     val result = component.assert(pending.decision, this)
@@ -368,21 +386,26 @@ class SearchSession(
         boolValues.forEach { variable, value ->
             model.put(SearchBoolValue(variable), value == TRUE)
         }
-        for (component in components) component.contributeModel(model, this)
+        singleComponent?.contributeModel(model, this) ?: components.forEach { it.contributeModel(model, this) }
         return AssembledSearchModel(values)
     }
 
     /** First component-owned exhaustive split available at the current shared level. */
-    internal fun branchAlternatives(): List<SearchDecision>? = components.asSequence()
-        .filterIsInstance<SearchBrancher>()
-        .mapNotNull { it.nextBranch(this) }
-        .firstOrNull()
+    internal fun branchAlternatives(): List<SearchDecision>? {
+        singleComponent?.let { component ->
+            if (component is SearchBrancher) component.nextBranch(this)?.let { return it }
+        } ?: components.forEach { component ->
+            if (component is SearchBrancher) component.nextBranch(this)?.let { return it }
+        }
+        for (brancher in branchers) brancher.nextBranch(this)?.let { return it }
+        return null
+    }
 
     /** Return to root, notify components, and propagate retained learned clauses. */
     fun restart(): ComponentResult {
         popTo(0)
         reduceLearnedDb()
-        for (component in components) component.onRestart(this)
+        singleComponent?.onRestart(this) ?: components.forEach { it.onRestart(this) }
         return propagate()
     }
 
@@ -479,7 +502,15 @@ class SearchSession(
 
     internal fun blockModelAtRoot(model: AssembledSearchModel): ComponentResult {
         popTo(0)
-        for (component in components) {
+        if (singleComponent != null) {
+            val component = singleComponent
+            if (component is SearchModelBlocker) {
+                activeComponent = component
+                val result = component.blockModel(model, this)
+                activeComponent = null
+                if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+            }
+        } else for (component in components) {
             if (component !is SearchModelBlocker) continue
             activeComponent = component
             val result = component.blockModel(model, this)
@@ -543,6 +574,12 @@ class SearchSession(
     }
 
     private fun runComponents(call: (SearchComponent) -> ComponentResult): ComponentResult {
+        singleComponent?.let { component ->
+            activeComponent = component
+            val result = call(component)
+            activeComponent = null
+            return if (result is ComponentResult.Consistent) ComponentResult.Consistent else recordConflict(component, result)
+        }
         for (component in components) {
             activeComponent = component
             val result = call(component)
