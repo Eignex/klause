@@ -1,7 +1,7 @@
 package com.eignex.klause.bench
 
 import com.eignex.klause.bench.catalog.Format
-import com.eignex.klause.compile.compile
+import com.eignex.klause.compile.compileSchema
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.mps.Mps
@@ -12,9 +12,9 @@ import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.lowering.opb.toProblem
 import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.sourceRoute
 import java.io.File
 
@@ -62,7 +62,7 @@ internal object OpbFormat : ProblemFormat {
 internal object JsonSchemaFormat : ProblemFormat {
     override val format = Format.JSON_SCHEMA
     override val inProcess = true
-    override fun ingest(file: File) = Ingested(JsonSchema.parse(file.readText()).compile().problem)
+    override fun ingest(file: File) = Ingested(compileSchema(JsonSchema.decode(file.readText())).problem)
 }
 
 /** Compiled by the `minizinc` CLI, then parsed in-process — see `runner.MiniZincRunner`. */

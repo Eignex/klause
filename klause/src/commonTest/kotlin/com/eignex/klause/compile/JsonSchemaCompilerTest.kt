@@ -9,10 +9,10 @@ import kotlin.test.assertTrue
 
 class JsonSchemaCompilerTest {
 
-    private fun compile(text: String) = JsonSchema.parse(text).compile()
+    private fun compile(text: String) = compileSchema(JsonSchema.decode(text))
 
     @Test
-    fun `parses minimal schema with bool var`() {
+    fun `decodes minimal schema with bool var`() {
         val text = """
             {
               "entries": {
@@ -26,7 +26,7 @@ class JsonSchemaCompilerTest {
     }
 
     @Test
-    fun `parses int and nominal entries`() {
+    fun `decodes int and nominal entries`() {
         val text = """
             {
               "entries": {
@@ -51,12 +51,12 @@ class JsonSchemaCompilerTest {
               }
             }
         """.trimIndent()
-        assertFailsWith<FormatException> { JsonSchema.parse(text) }
+        assertFailsWith<FormatException> { JsonSchema.decode(text) }
     }
 
     @Test
     fun `wraps a malformed document as a format exception`() {
-        assertFailsWith<FormatException> { JsonSchema.parse("{ not json") }
+        assertFailsWith<FormatException> { JsonSchema.decode("{ not json") }
     }
 
     @Test
