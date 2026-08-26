@@ -19,7 +19,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.cut.CutExchange
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PROPAGATION_CANCEL_FLOOR
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.result.SearchEvent

@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.propagation
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

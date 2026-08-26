@@ -7,7 +7,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective

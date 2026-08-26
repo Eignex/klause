@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.propagatedImplicationGraph
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample

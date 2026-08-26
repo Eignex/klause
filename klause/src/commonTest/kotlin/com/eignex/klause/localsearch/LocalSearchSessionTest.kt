@@ -5,7 +5,7 @@ import com.eignex.klause.localsearch.schedule.AdaptiveCooling
 import com.eignex.klause.localsearch.strategy.Cbls
 import com.eignex.klause.localsearch.strategy.SimulatedAnnealing
 import com.eignex.klause.localsearch.strategy.SourceDrivenStrategy
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem

@@ -6,7 +6,7 @@ import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
