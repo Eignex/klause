@@ -2,10 +2,86 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.TaskAction
+
+abstract class VerifyPackageBoundaries : DefaultTask() {
+    @get:InputDirectory
+    abstract val sourceRoot: DirectoryProperty
+
+    @TaskAction
+    fun verify() {
+        val root = sourceRoot.get().asFile
+        val violations = buildList {
+            for ((directory, forbiddenPrefixes) in rules) {
+                root.resolve(directory).walkTopDown()
+                    .filter { it.isFile && it.extension == "kt" }
+                    .forEach { file ->
+                        file.readLines().forEachIndexed { index, line ->
+                            val imported = line.removePrefix("import ").trim()
+                            if (line.startsWith("import ") && forbiddenPrefixes.any(imported::startsWith)) {
+                                add("${file.relativeTo(root)}:${index + 1}: $imported")
+                            }
+                        }
+                    }
+            }
+        }
+        check(violations.isEmpty()) {
+            "Package-boundary violations:\n${violations.joinToString("\n")}"
+        }
+    }
+
+    private companion object {
+        val rules = listOf(
+            "ir" to listOf(
+                "com.eignex.klause.formats.",
+                "com.eignex.klause.lowering.",
+                "com.eignex.klause.propagation.",
+                "com.eignex.klause.backtrack.",
+                "com.eignex.klause.lp.",
+                "com.eignex.klause.localsearch.",
+                "com.eignex.klause.theory.",
+                "com.eignex.klause.presolve.",
+                "com.eignex.klause.solver.pipeline.",
+                "com.eignex.klause.cli.",
+            ),
+            "arithmetic" to listOf(
+                "com.eignex.klause.formats.",
+                "com.eignex.klause.lowering.",
+                "com.eignex.klause.propagation.",
+                "com.eignex.klause.backtrack.",
+                "com.eignex.klause.lp.",
+                "com.eignex.klause.localsearch.",
+                "com.eignex.klause.theory.",
+                "com.eignex.klause.presolve.",
+                "com.eignex.klause.solver.pipeline.",
+                "com.eignex.klause.cli.",
+            ),
+            "solver/pipeline" to listOf(
+                "com.eignex.klause.formats.",
+                "com.eignex.klause.lowering.",
+                "com.eignex.klause.cli.",
+            ),
+        )
+    }
+}
 
 plugins {
     id("com.eignex.kmp") version "1.3.1"
     kotlin("plugin.serialization")
+}
+
+val verifyPackageBoundaries = tasks.register<VerifyPackageBoundaries>("verifyPackageBoundaries") {
+    group = "verification"
+    description = "Reject imports that cross established package-layer boundaries."
+
+    sourceRoot.set(layout.projectDirectory.dir("src/commonMain/kotlin/com/eignex/klause"))
+}
+
+tasks.named("check") {
+    dependsOn(verifyPackageBoundaries)
 }
 
 eignexPublish {
