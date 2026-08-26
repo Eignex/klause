@@ -8,6 +8,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.opb.Opb
+import com.eignex.klause.lowering.opb.toProblem
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +22,7 @@ class InProcessEvalTest {
 
     /** A CSP instance from a constraints-only OPB (no `min:`) — parsed in-process, objective null. */
     private fun csp(name: String, opb: String): ResolvedProblem {
-        val parsed = Opb.parse(opb)
+        val parsed = Opb.parse(opb).toProblem()
         return ResolvedProblem(
             ref = ProblemRef(name, Format.OPB, ProblemSource.Vendored("test/$name"), Category.CSP, Expected.Unknown),
             ingest = lazyOf(parsed.problem),

@@ -1,23 +1,15 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.opb.OpbDocument
+import com.eignex.klause.lowering.opb.OpbRelation
+import com.eignex.klause.lowering.opb.OpbStatement
+import com.eignex.klause.lowering.opb.OpbTerm
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.lineSequence
 import com.ionspin.kotlin.bignum.integer.BigInteger
-
-internal data class OpbDocument(val numDeclaredVars: Int, val statements: List<OpbStatement>)
-
-internal sealed interface OpbStatement {
-    data class Objective(val terms: List<OpbTerm>) : OpbStatement
-    data class SoftHeader(val top: Long?) : OpbStatement
-    data class Constraint(val softCost: Long?, val relation: OpbRelation) : OpbStatement
-}
-
-internal data class OpbTerm(val coefficient: BigInteger, val literals: IntArray)
-
-internal data class OpbRelation(val terms: List<OpbTerm>, val op: PbOp, val bound: BigInteger)
 
 /** Syntax parser for OPB/WBO. It only validates and represents the input; lowering is format-neutral. */
 internal object OpbSyntax {

@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.opb
+package com.eignex.klause.lowering.opb
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -12,6 +12,7 @@ import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -22,6 +23,21 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 private val longMinBig = BigInteger.fromLong(Long.MIN_VALUE)
 private val longMaxBig = BigInteger.fromLong(Long.MAX_VALUE)
 private fun BigInteger.fitsLong(): Boolean = this in longMinBig..longMaxBig
+
+/** An OPB source document lowered to a solver problem. */
+data class OpbProblem(
+    /** Compiled solver problem. */
+    val problem: Problem,
+    /** Objective, or null for satisfaction instances. */
+    val objective: LinearObjective?,
+    /** AND-indicator definitions for product terms. */
+    val boolFolds: List<BoolFoldDefinition> = emptyList(),
+    /** Number of source Boolean variables, excluding auxiliary indicators. */
+    val numDeclaredVars: Int = 0,
+)
+
+/** Raised when a parsed OPB document cannot be represented by the lowering. */
+class OpbLoweringException(msg: String) : IllegalArgumentException("OPB: $msg")
 
 /** Decodes an OPB syntax document into solver data. */
 internal object OpbDecoder {
@@ -56,7 +72,7 @@ internal object OpbDecoder {
                     val relation = lowerRelation(builder, statement.relation)
                     when {
                         relation.wide && statement.softCost != null ->
-                            throw OpbFormatException(
+                            throw OpbLoweringException(
                                 "OPB wide coefficients in a soft constraint are not supported",
                             )
 
@@ -111,7 +127,7 @@ internal object OpbDecoder {
 
         softTop?.let { top ->
             if (softViolations.size > 0) {
-                if (top == Long.MIN_VALUE) throw OpbFormatException("OPB soft top is too small: $top")
+                if (top == Long.MIN_VALUE) throw OpbLoweringException("OPB soft top is too small: $top")
                 builder.factors += PseudoBoolean(
                     softCosts.toLongArray(),
                     softViolations.toIntArray(),
@@ -215,7 +231,7 @@ internal object OpbDecoder {
 
     private fun requireLong(value: BigInteger, role: String): Long {
         if (!value.fitsLong()) {
-            throw OpbFormatException("OPB $role exceeds the supported 64-bit range: '$value'")
+            throw OpbLoweringException("OPB $role exceeds the supported 64-bit range: '$value'")
         }
         return value.longValue()
     }
@@ -226,3 +242,6 @@ internal object OpbDecoder {
         PbOp.EQ -> LinearOp.EQ
     }
 }
+
+/** Lower this parsed OPB document to a solver problem. */
+fun OpbDocument.toProblem(): OpbProblem = OpbDecoder.decode(this)

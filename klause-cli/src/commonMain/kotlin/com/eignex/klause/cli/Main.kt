@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.lowering.mps.MpsLoweringException
+import com.eignex.klause.lowering.opb.OpbLoweringException
 
 /*
  * Unified klause CLI entry point. The CLI is a registry of CliMode front-ends
@@ -48,6 +49,9 @@ internal fun runCli(args: Array<String>): Int = try {
     errPrintln(e.message.orEmpty())
     EXIT_ERROR
 } catch (e: MpsLoweringException) {
+    errPrintln("klause ${e.message.orEmpty()}")
+    EXIT_ERROR
+} catch (e: OpbLoweringException) {
     errPrintln("klause ${e.message.orEmpty()}")
     EXIT_ERROR
 }

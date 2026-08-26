@@ -7,6 +7,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.opb.Opb
+import com.eignex.klause.lowering.opb.toProblem
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,7 +18,7 @@ class BoTuningTest {
     /** A COP instance from an OPB `min:` objective — parsed in-process (no MiniZinc), so the ask-tell
      *  loop runs fast and hermetically, no Vizier service. */
     private fun cop(name: String, opb: String): ResolvedProblem {
-        val parsed = Opb.parse(opb)
+        val parsed = Opb.parse(opb).toProblem()
         return ResolvedProblem(
             ref = ProblemRef(
                 name,
@@ -34,7 +35,7 @@ class BoTuningTest {
     /** A CSP instance from a constraints-only OPB (no `min:`) — objective null, so the loop scores it by
      *  time-to-first-feasible rather than gap-to-optimum. */
     private fun csp(name: String, opb: String): ResolvedProblem {
-        val parsed = Opb.parse(opb)
+        val parsed = Opb.parse(opb).toProblem()
         return ResolvedProblem(
             ref = ProblemRef(name, Format.OPB, ProblemSource.Vendored("test/$name"), Category.CSP, Expected.Unknown),
             ingest = lazyOf(parsed.problem),
