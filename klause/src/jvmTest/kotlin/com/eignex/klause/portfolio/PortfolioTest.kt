@@ -6,9 +6,9 @@ import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.bounding.LpConfig

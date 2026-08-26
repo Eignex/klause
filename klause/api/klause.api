@@ -1003,7 +1003,7 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMaxState {
 }
 
 public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/eignex/klause/solver/Factor {
-	public fun <init> ([I[Lcom/eignex/klause/factor/arithmetic/LinearOp;[J)V
+	public fun <init> ([I[Lcom/eignex/klause/ir/LinearOp;[J)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
@@ -1015,7 +1015,7 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
-	public final fun getOps ()[Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public final fun getOps ()[Lcom/eignex/klause/ir/LinearOp;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
@@ -1032,7 +1032,7 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 }
 
 public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/eignex/klause/factor/arithmetic/IntegralConstants, com/eignex/klause/lp/LinearRow {
-	public fun <init> ([ILcom/eignex/klause/solver/LongConstList;Lcom/eignex/klause/factor/arithmetic/LinearOp;J)V
+	public fun <init> ([ILcom/eignex/klause/solver/LongConstList;Lcom/eignex/klause/ir/LinearOp;J)V
 	public fun coeff (I)J
 	public fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 	public fun getBound ()J
@@ -1040,7 +1040,7 @@ public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/ei
 	public final fun getCoeffs ()[J
 	public fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 	public final fun getMaxAbsCoeff ()J
-	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
 	public fun getSize ()I
 	public fun isIntegerOnly ()Z
 	public fun ref (I)I
@@ -1052,12 +1052,12 @@ public abstract interface class com/eignex/klause/factor/arithmetic/IntegralCons
 }
 
 public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/solver/Factor {
-	public fun <init> ([I[D[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ)V
-	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> ([I[ILcom/eignex/klause/factor/arithmetic/LinearOp;I)V
-	public fun <init> ([I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/factor/arithmetic/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
-	public fun <init> ([J[ILcom/eignex/klause/factor/arithmetic/LinearOp;J)V
-	public fun <init> ([J[I[D[ILcom/eignex/klause/factor/arithmetic/LinearOp;J)V
+	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
+	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> ([I[ILcom/eignex/klause/ir/LinearOp;I)V
+	public fun <init> ([I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun <init> ([J[ILcom/eignex/klause/ir/LinearOp;J)V
+	public fun <init> ([J[I[D[ILcom/eignex/klause/ir/LinearOp;J)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
@@ -1071,7 +1071,7 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun getIntegerTheoryOwnable ()Z
 	public final fun getIntegralConstants ()Lcom/eignex/klause/factor/arithmetic/IntegralConstants;
 	public fun getLinearRows ()Ljava/util/List;
-	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public final fun getOp ()Lcom/eignex/klause/ir/LinearOp;
 	public final fun getRealConstants ()Lcom/eignex/klause/factor/arithmetic/RealConstants;
 	public final fun getRealVars ()[I
 	public fun getStructuralKeyWeight ()I
@@ -1091,16 +1091,6 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 }
 
 public abstract interface class com/eignex/klause/factor/arithmetic/LinearConstants {
-}
-
-public final class com/eignex/klause/factor/arithmetic/LinearOp : java/lang/Enum {
-	public static final field EQ Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public static final field GE Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public static final field LE Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public static final field NE Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/factor/arithmetic/LinearOp;
-	public static fun values ()[Lcom/eignex/klause/factor/arithmetic/LinearOp;
 }
 
 public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klause/solver/Factor {
@@ -1204,9 +1194,9 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 }
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eignex/klause/factor/ReifiedFactor {
-	public fun <init> (I[I[ILcom/eignex/klause/factor/arithmetic/LinearOp;I)V
-	public fun <init> (I[I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/factor/arithmetic/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
-	public fun <init> (I[J[ILcom/eignex/klause/factor/arithmetic/LinearOp;J)V
+	public fun <init> (I[I[ILcom/eignex/klause/ir/LinearOp;I)V
+	public fun <init> (I[I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public fun <init> (I[J[ILcom/eignex/klause/ir/LinearOp;J)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
@@ -1220,7 +1210,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
-	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public final fun getOp ()Lcom/eignex/klause/ir/LinearOp;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
@@ -1273,8 +1263,8 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 }
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/eignex/klause/solver/Factor {
-	public fun <init> (I[I[D[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ)V
-	public synthetic fun <init> (I[I[D[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (I[I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
+	public synthetic fun <init> (I[I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
 	public fun canSubstituteAffine (IIII)Z
@@ -1288,7 +1278,7 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
-	public final fun getOp ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public final fun getOp ()Lcom/eignex/klause/ir/LinearOp;
 	public final fun getRealCoeffs ()[D
 	public final fun getRealVars ()[I
 	public final fun getStrict ()Z
@@ -1367,7 +1357,7 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/lp/L
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
-	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
 	public fun getSize ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
@@ -1428,7 +1418,7 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getLiterals ()[I
 	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
-	public fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
 	public fun getSize ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
@@ -2776,6 +2766,16 @@ public final class com/eignex/klause/ir/IntVars : com/eignex/klause/ir/VarList {
 	public fun getSpanInts ()[I
 }
 
+public final class com/eignex/klause/ir/LinearOp : java/lang/Enum {
+	public static final field EQ Lcom/eignex/klause/ir/LinearOp;
+	public static final field GE Lcom/eignex/klause/ir/LinearOp;
+	public static final field LE Lcom/eignex/klause/ir/LinearOp;
+	public static final field NE Lcom/eignex/klause/ir/LinearOp;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/LinearOp;
+	public static fun values ()[Lcom/eignex/klause/ir/LinearOp;
+}
+
 public final class com/eignex/klause/ir/Lit {
 	public static final field INSTANCE Lcom/eignex/klause/ir/Lit;
 	public final fun evaluate (IZ)Z
@@ -3083,7 +3083,7 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Boo
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$CmpReif : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
-	public fun <init> (I[J[IJLcom/eignex/klause/factor/arithmetic/LinearOp;)V
+	public fun <init> (I[J[IJLcom/eignex/klause/ir/LinearOp;)V
 	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
 	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
 	public fun getBoolInputs ()[I
@@ -4271,16 +4271,16 @@ public abstract interface class com/eignex/klause/lp/LinearRow {
 	public static final field Companion Lcom/eignex/klause/lp/LinearRow$Companion;
 	public abstract fun coeff (I)J
 	public abstract fun getBound ()J
-	public abstract fun getRelation ()Lcom/eignex/klause/factor/arithmetic/LinearOp;
+	public abstract fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
 	public abstract fun getSize ()I
 	public fun isIntegerOnly ()Z
 	public abstract fun ref (I)I
 }
 
 public final class com/eignex/klause/lp/LinearRow$Companion {
-	public final fun ofBools ([ILcom/eignex/klause/factor/arithmetic/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
-	public final fun ofBools ([I[JLcom/eignex/klause/factor/arithmetic/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
-	public final fun ofInts ([I[JLcom/eignex/klause/factor/arithmetic/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
+	public final fun ofBools ([ILcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
+	public final fun ofBools ([I[JLcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
+	public final fun ofInts ([I[JLcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
 }
 
 public final class com/eignex/klause/lp/LinearRow$DefaultImpls {
@@ -4296,33 +4296,33 @@ public final class com/eignex/klause/lp/LpSizeEstimate {
 public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public abstract fun auxColumn (JJ[J)I
 	public static synthetic fun auxColumn$default (Lcom/eignex/klause/lp/RelaxationBuilder;JJ[JILjava/lang/Object;)I
-	public abstract fun bigMRow ([I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JZZ)V
+	public abstract fun bigMRow ([I[JLcom/eignex/klause/ir/LinearOp;JZZ)V
 	public abstract fun boolColumn (I)I
-	public abstract fun boolRow ([I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
-	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public abstract fun boolRow ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
+	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public abstract fun declaredDomain (I)Lcom/eignex/klause/solver/IntDomain;
 	public abstract fun hullEnabled ()Z
 	public abstract fun intColumn (I)I
-	public abstract fun linearRow (Lcom/eignex/klause/factor/arithmetic/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;)V
-	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/factor/arithmetic/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public abstract fun linearRow (Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;)V
+	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public fun liveBool (I)Ljava/lang/Boolean;
 	public abstract fun liveDomain (I)Lcom/eignex/klause/solver/IntDomain;
 	public fun realColumn (I)I
-	public fun realRow ([I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ[I)V
-	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ[IILjava/lang/Object;)V
-	public abstract fun row ([I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
-	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public fun realRow ([I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
+	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
+	public abstract fun row ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
+	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 }
 
 public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static synthetic fun auxColumn$default (Lcom/eignex/klause/lp/RelaxationBuilder;JJ[JILjava/lang/Object;)I
-	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
-	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/factor/arithmetic/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public static fun liveBool (Lcom/eignex/klause/lp/RelaxationBuilder;I)Ljava/lang/Boolean;
 	public static fun realColumn (Lcom/eignex/klause/lp/RelaxationBuilder;I)I
-	public static fun realRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ[I)V
-	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/factor/arithmetic/LinearOp;DZ[IILjava/lang/Object;)V
-	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/factor/arithmetic/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
+	public static fun realRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
+	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
+	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 }
 
 public final class com/eignex/klause/lp/Term {

@@ -3,7 +3,6 @@ package com.eignex.klause.bench.catalog
 import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.LibminizincExpected
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Cardinality
@@ -11,6 +10,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

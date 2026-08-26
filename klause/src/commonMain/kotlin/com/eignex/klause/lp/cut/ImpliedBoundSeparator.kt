@@ -62,12 +62,7 @@ internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MA
         return Array(adjacency.size) { adjacency[it].toIntArray() }
     }
 
-    private fun recordImplications(
-        problem: Problem,
-        variable: Int,
-        value: Boolean,
-        adjacency: Array<IntArrayList>,
-    ) {
+    private fun recordImplications(problem: Problem, variable: Int, value: Boolean, adjacency: Array<IntArrayList>) {
         val implied = problem.propagate(
             Assumptions.None.withBool(variable, value),
             Cancellation.Never,
