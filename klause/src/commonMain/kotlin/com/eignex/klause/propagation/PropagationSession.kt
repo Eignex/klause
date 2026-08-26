@@ -49,9 +49,12 @@ class PropagationSession(
      *  with integer variables. */
     pbLearning: Boolean = false,
 ) {
+    /** Engine projection shared by this session and its state. */
+    val projection: PropagationProblem = PropagationProblem(problem)
+
     private val state: PropagationState =
         PropagationState(
-            problem,
+            projection,
             Assumptions.None,
             nativeSat = nativeSat,
             pbLearning = pbLearning,

@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.BakedProblem
@@ -165,7 +166,7 @@ object RootBaker {
             val hi = acc.intMaxOrNullCompat(v) ?: orig.max
             val dom = (hi - lo + 1).coerceAtLeast(1)
             var wdeg = 0.0
-            val occ = problem.intOccurrences[v]
+            val occ = PropagationProblem(problem).intOccurrences[v]
             for (i in occ.indices) wdeg += factorWeights[occ[i]]
             wdeg / dom
         }

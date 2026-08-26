@@ -2,8 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.ClauseArena
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
@@ -144,22 +143,6 @@ open class Problem(
             packedOpenHi = packedOpenIntHi,
         )
     }
-
-    /** Propagator objects for the CP engine, one per factor. Factors that have been structurally
-     *  split return a dedicated propagator instance from [Factor.asPropagator]; unsplit factors
-     *  return themselves. Built lazily on first access so presolve (which rebuilds a [Problem] after
-     *  every pass) doesn't allocate one propagator per factor. Thread-safe init: parallel portfolio
-     *  arms first-touch this concurrently on their own worker threads, so it must publish the array
-     *  safely — same as [invariants]. Computed once, then cached. */
-    val propagators: Array<out Propagator> by lazy { Array(factors.size) { factors[it].asPropagator() } }
-
-    /** Invariant objects for the LS engine, one per factor. Factors that have been structurally
-     *  split return a dedicated invariant instance from [Factor.asInvariant]; unsplit factors
-     *  return themselves. Built lazily on first access: only the local-search engine reads them, so
-     *  presolve (which rebuilds a [Problem] after every pass) and the backtrack/CP solver never pay
-     *  to allocate one invariant per factor — material on a model with hundreds of thousands of
-     *  factors. Computed once, then cached. */
-    val invariants: Array<out Invariant> by lazy { Array(factors.size) { factors[it].asInvariant() } }
 
     init {
         require(intColumns.size == numIntVars) {
@@ -308,40 +291,6 @@ open class Problem(
         )
     }
 
-    /**
-     * Variable → factor occurrence lists, split by engine (CP vs local search) and wakeup mode. The
-     * LS-side lists force [invariants] lazily, so a presolve/CP-only problem never builds them. The
-     * individual lists below delegate here; access them by name or through this index directly.
-     */
-    val occurrences: OccurrenceIndex by lazy(LazyThreadSafetyMode.NONE) {
-        OccurrenceIndex(numBoolVars, numIntVars, factors, propagators) { invariants }
-    }
-
-    /** Deductive occurrence lists over Boolean variables. See [OccurrenceIndex.boolOccurrences]. */
-    val boolOccurrences: Array<IntArray> get() = occurrences.boolOccurrences
-
-    /** Deductive occurrence lists over integer variables. See [OccurrenceIndex.intOccurrences]. */
-    val intOccurrences: Array<IntArray> get() = occurrences.intOccurrences
-
-    /** Local-search occurrence lists over Boolean variables. See [OccurrenceIndex.lsBoolOccurrences]. */
-    val lsBoolOccurrences: Array<IntArray> get() = occurrences.lsBoolOccurrences
-
-    /** Local-search occurrence lists over integer variables. See [OccurrenceIndex.lsIntOccurrences]. */
-    val lsIntOccurrences: Array<IntArray> get() = occurrences.lsIntOccurrences
-
-    /** Occurrence-driven Boolean wakeup lists. See [OccurrenceIndex.nonBoolWatcherBoolOccurrences]. */
-    val nonBoolWatcherBoolOccurrences: Array<IntArray> get() = occurrences.nonBoolWatcherBoolOccurrences
-
-    /** True iff some factor opts into typed int-domain event wakeup. See [OccurrenceIndex.usesIntEventWatchers]. */
-    val usesIntEventWatchers: Boolean get() = occurrences.usesIntEventWatchers
-
-    /** True iff some factor consumes the per-factor dirty-variable delta.
-     *  See [OccurrenceIndex.usesIntEventDeltaConsumers]. */
-    val usesIntEventDeltaConsumers: Boolean get() = occurrences.usesIntEventDeltaConsumers
-
-    /** Occurrence-driven int wakeup lists. See [OccurrenceIndex.nonIntEventWatcherIntOccurrences]. */
-    val nonIntEventWatcherIntOccurrences: Array<IntArray> get() = occurrences.nonIntEventWatcherIntOccurrences
-
     /** Total number of factors. */
     val numFactors: Int get() = factors.size
 
@@ -354,11 +303,6 @@ open class Problem(
     val isNativeSatEligible: Boolean by lazy(LazyThreadSafetyMode.NONE) {
         numIntVars == 0 && numBoolVars > 0 && factors.isNotEmpty() && factors.all { it is Clause }
     }
-
-    /** Arena-packed clauses for the native-SAT lane, valid only when [isNativeSatEligible]. Built on
-     *  first access and cached; the general LCG path never touches it, so nothing outside the native
-     *  lane pays to construct it. */
-    internal val clauseArena: ClauseArena by lazy(LazyThreadSafetyMode.NONE) { ClauseArena.of(this) }
 
     /**
      * Result of running [propagate] once with empty assumptions at construction time, merged with
@@ -478,7 +422,7 @@ open class Problem(
         cancellation: Cancellation = Cancellation.Never,
         skipExpensiveBake: Boolean = false,
     ): PropagationResult {
-        val state = PropagationState(this, assumptions)
+        val state = PropagationState(PropagationProblem(this), assumptions)
         if (!state.seeded) {
             val lvls = state.conflictLevels ?: EmptyIntArray
             // Seed contradiction — no factor invocation was the trigger, so the factor

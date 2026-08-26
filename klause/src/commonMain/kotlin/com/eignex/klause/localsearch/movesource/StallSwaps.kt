@@ -39,7 +39,7 @@ class StallSwaps(
             val w = if (vars.size >= 2 && rng.nextBoolean()) {
                 vars[rng.nextInt(vars.size)]
             } else {
-                val occ = problem.lsIntOccurrences[u]
+                val occ = state.projection.intOccurrences[u]
                 if (occ.isEmpty()) continue
                 val nvars = state.problem.factors[occ[rng.nextInt(occ.size)]].intVars
                 if (nvars.isEmpty()) continue

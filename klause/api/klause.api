@@ -3148,8 +3148,8 @@ public final class com/eignex/klause/localsearch/FixedCadenceRestart : com/eigne
 }
 
 public final class com/eignex/klause/localsearch/ImplicitSeeding {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/localsearch/LocalSearchProblem;I)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/localsearch/LocalSearchProblem;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getElectedImplicit ()[I
 	public final fun getImplicationGraph ()[[I
 	public final fun getImplicitSeedFactors ()[I
@@ -3289,6 +3289,14 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 	public synthetic fun withCancellation (Lcom/eignex/klause/solver/Cancellation;)Lcom/eignex/klause/solver/SolverParams;
 }
 
+public final class com/eignex/klause/localsearch/LocalSearchProblem {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;)V
+	public final fun getBoolOccurrences ()[[I
+	public final fun getIntOccurrences ()[[I
+	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+}
+
 public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex/klause/solver/Session {
 	public fun <init> (Lcom/eignex/klause/localsearch/LocalSearchSolver;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
@@ -3360,8 +3368,8 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchState {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/random/Random;Lcom/eignex/klause/solver/Assumptions;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/random/Random;Lcom/eignex/klause/solver/Assumptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/random/Random;Lcom/eignex/klause/solver/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/random/Random;Lcom/eignex/klause/solver/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun apply (Lcom/eignex/klause/localsearch/Move;)V
 	public final fun breakScore (Lcom/eignex/klause/localsearch/Move;)I
 	public final fun getAssignment ()Lcom/eignex/klause/solver/Assignment;
@@ -3377,6 +3385,7 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun getLongPayload ()[J
 	public final fun getMoveSink ()Lcom/eignex/klause/localsearch/MoveSink;
 	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProjection ()Lcom/eignex/klause/localsearch/LocalSearchProblem;
 	public final fun getRefPayload ()[Ljava/lang/Object;
 	public final fun getRng ()Lkotlin/random/Random;
 	public final fun getRootDomains ()[Lcom/eignex/klause/solver/IntDomain;
@@ -7258,6 +7267,18 @@ public final class com/eignex/klause/propagation/NoPropagator : com/eignex/klaus
 	public fun propagate (Lcom/eignex/klause/propagation/PropagationState;I)Z
 }
 
+public final class com/eignex/klause/propagation/PropagationProblem {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;)V
+	public final fun getBoolOccurrences ()[[I
+	public final fun getIntOccurrences ()[[I
+	public final fun getNonBoolWatcherBoolOccurrences ()[[I
+	public final fun getNonIntEventWatcherIntOccurrences ()[[I
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getPropagators ()[Lcom/eignex/klause/propagation/Propagator;
+	public final fun getUsesIntEventDeltaConsumers ()Z
+	public final fun getUsesIntEventWatchers ()Z
+}
+
 public abstract interface class com/eignex/klause/propagation/PropagationResult {
 }
 
@@ -7344,6 +7365,7 @@ public final class com/eignex/klause/propagation/PropagationSession {
 	public final fun getFixpointCancelled ()Z
 	public final fun getLearnedClauseCount ()I
 	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProjection ()Lcom/eignex/klause/propagation/PropagationProblem;
 	public final fun getPropagationCount ()J
 	public final fun getUnassignListener ()Lkotlin/jvm/functions/Function1;
 	public final fun getUsesNativeSat ()Z
@@ -7374,6 +7396,8 @@ public final class com/eignex/klause/propagation/PropagationSession {
 }
 
 public final class com/eignex/klause/propagation/PropagationState {
+	public fun <init> (Lcom/eignex/klause/propagation/PropagationProblem;Lcom/eignex/klause/solver/Assumptions;ZZZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/propagation/PropagationProblem;Lcom/eignex/klause/solver/Assumptions;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/Assumptions;ZZZ)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/Assumptions;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun atomVarEq (IJ)I
@@ -7398,6 +7422,7 @@ public final class com/eignex/klause/propagation/PropagationState {
 	public final fun getIntMinReason ()[I
 	public final fun getNumDecisions ()I
 	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProjection ()Lcom/eignex/klause/propagation/PropagationProblem;
 	public final fun getRefPayload ()Ljava/util/List;
 	public final fun getRootDomains ()[Lcom/eignex/klause/solver/IntDomain;
 	public final fun getSeeded ()Z
@@ -8153,18 +8178,6 @@ public final class com/eignex/klause/solver/MixedIntColumns : com/eignex/klause/
 	public fun getSize ()I
 }
 
-public final class com/eignex/klause/solver/OccurrenceIndex {
-	public fun <init> (II[Lcom/eignex/klause/solver/Factor;[Lcom/eignex/klause/propagation/Propagator;Lkotlin/jvm/functions/Function0;)V
-	public final fun getBoolOccurrences ()[[I
-	public final fun getIntOccurrences ()[[I
-	public final fun getLsBoolOccurrences ()[[I
-	public final fun getLsIntOccurrences ()[[I
-	public final fun getNonBoolWatcherBoolOccurrences ()[[I
-	public final fun getNonIntEventWatcherIntOccurrences ()[[I
-	public final fun getUsesIntEventDeltaConsumers ()Z
-	public final fun getUsesIntEventWatchers ()Z
-}
-
 public abstract interface class com/eignex/klause/solver/Optimizer : com/eignex/klause/solver/Solver {
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public abstract fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -8193,7 +8206,6 @@ public class com/eignex/klause/solver/Problem {
 	protected final fun foldIntoDomains (Lcom/eignex/klause/propagation/PropagationResult;)V
 	public final fun getBakeElapsed-UwyO8pc ()J
 	public final fun getBaked ()Lcom/eignex/klause/propagation/PropagationResult;
-	public final fun getBoolOccurrences ()[[I
 	public final fun getCancellation ()Lcom/eignex/klause/solver/Cancellation;
 	public final fun getFactors ()[Lcom/eignex/klause/solver/Factor;
 	public final fun getHasFiniteIntDomains ()Z
@@ -8201,23 +8213,13 @@ public class com/eignex/klause/solver/Problem {
 	public final fun getImpliedFactorMask ()[Z
 	public final fun getIntBounds ()Lcom/eignex/klause/solver/IntBounds;
 	public final fun getIntColumns ()Lcom/eignex/klause/solver/IntColumns;
-	public final fun getIntOccurrences ()[[I
-	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
-	public final fun getLsBoolOccurrences ()[[I
-	public final fun getLsIntOccurrences ()[[I
-	public final fun getNonBoolWatcherBoolOccurrences ()[[I
-	public final fun getNonIntEventWatcherIntOccurrences ()[[I
 	public final fun getNumBoolVars ()I
 	public final fun getNumFactors ()I
 	public final fun getNumIntVars ()I
 	public final fun getNumRealVars ()I
-	public final fun getOccurrences ()Lcom/eignex/klause/solver/OccurrenceIndex;
-	public final fun getPropagators ()[Lcom/eignex/klause/propagation/Propagator;
 	public final fun getRealLower ()[D
 	public final fun getRealUpper ()[D
 	public final fun getSharedDomains ()Z
-	public final fun getUsesIntEventDeltaConsumers ()Z
-	public final fun getUsesIntEventWatchers ()Z
 	public final fun intDomainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
 	public final fun isNativeSatEligible ()Z
 	public final fun propagate (Lcom/eignex/klause/solver/Assumptions;Lcom/eignex/klause/solver/Cancellation;Z)Lcom/eignex/klause/propagation/PropagationResult;

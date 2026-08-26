@@ -9,6 +9,7 @@ import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -42,7 +43,7 @@ internal object ComparisonClauseFold {
         }
         if (defByAux.isEmpty()) return PassDelta()
 
-        val occ = problem.boolOccurrences
+        val occ = PropagationProblem(problem).boolOccurrences
         val dropped = IntArrayList()
         val added = ArrayList<Factor>()
         for (i in factors.indices) {

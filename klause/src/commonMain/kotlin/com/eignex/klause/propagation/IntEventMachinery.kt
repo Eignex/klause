@@ -13,12 +13,14 @@ import com.eignex.klause.util.MutableIntObjectMap
  * [incremental] mode forces them live so a mid-life factor subscribing to typed events (or
  * consuming the delta) wakes correctly even when the initial problem had none.
  */
-internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
+internal class IntEventMachinery(projection: PropagationProblem, incremental: Boolean) {
+    private val problem: Problem = projection.problem
+
     /** Whether the typed int-event machinery ([dirtyKinds] / [baseFlat]) is live. */
-    val on: Boolean = problem.usesIntEventWatchers || incremental
+    val on: Boolean = projection.usesIntEventWatchers || incremental
 
     /** Whether the per-factor dirty-variable delta accumulators are live. */
-    val deltaOn: Boolean = problem.usesIntEventDeltaConsumers || incremental
+    val deltaOn: Boolean = projection.usesIntEventDeltaConsumers || incremental
 
     /**
      * Per-`(intVar, kind)` advisor index, the int-side analog of [BoolWatcherIndex.byLit]: slot
@@ -46,13 +48,18 @@ internal class IntEventMachinery(problem: Problem, incremental: Boolean) {
             val numSlots = problem.numIntVars * IntEvent.COUNT
             val offsets = IntArray(numSlots + 1)
             for (fid in 0 until problem.numFactors) {
-                problem.propagators[fid].initialIntEventWatches?.let { for (packed in it) offsets[packed + 1]++ }
+                projection.propagators[fid].initialIntEventWatches?.let { for (packed in it) offsets[packed + 1]++ }
             }
             for (s in 1..numSlots) offsets[s] += offsets[s - 1]
             val flat = IntArray(offsets[numSlots])
             val cursor = offsets.copyOf()
             for (fid in 0 until problem.numFactors) {
-                problem.propagators[fid].initialIntEventWatches?.let { for (packed in it) flat[cursor[packed]++] = fid }
+                projection.propagators[fid].initialIntEventWatches?.let {
+                    for (packed in it) {
+                        flat[cursor[packed]++] =
+                        fid
+                    }
+                }
             }
             baseOffsets = offsets
             baseFlat = flat

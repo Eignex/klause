@@ -1,5 +1,6 @@
 package com.eignex.klause.meta.alns
 
+import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.solver.Problem
@@ -70,6 +71,7 @@ internal fun interface DestroyOperator {
          *  connected component before reaching the target size, it re-seeds from an
          *  unvisited variable. */
         val AdjacencyRelated: DestroyOperator = DestroyOperator { rng, problem, _, _, fraction ->
+            val projection = LocalSearchProblem(problem)
             val totalVars = problem.numBoolVars + problem.numIntVars
             val k = (fraction * totalVars).toInt().coerceIn(1, totalVars)
             if (totalVars == 0) return@DestroyOperator FreedVars(EmptyIntArray, EmptyIntArray)
@@ -89,9 +91,9 @@ internal fun interface DestroyOperator {
                 freedCount++
                 if (freedCount >= k) break
                 val factorIds = if (v < problem.numBoolVars) {
-                    problem.lsBoolOccurrences[v]
+                    projection.boolOccurrences[v]
                 } else {
-                    problem.lsIntOccurrences[v - problem.numBoolVars]
+                    projection.intOccurrences[v - problem.numBoolVars]
                 }
                 for (fid in factorIds) {
                     val f = problem.factors[fid]

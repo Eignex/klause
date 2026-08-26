@@ -12,6 +12,7 @@ import com.eignex.klause.util.IntArrayList
  */
 class ImplicitSeeding(
     private val problem: Problem,
+    private val projection: LocalSearchProblem = LocalSearchProblem(problem),
     /** Free-Boolean probe cap for [implicationGraph]. */
     private val maxImplicationCandidates: Int = IMPLICATION_SEED_MAX_CANDIDATES,
 ) {
@@ -54,7 +55,7 @@ class ImplicitSeeding(
     private fun electImplicitFactors(): IntArray {
         val out = IntArrayList()
         for (id in 0 until problem.numFactors) {
-            if (problem.invariants[id].providesImplicitNeighbourhood) out.add(id)
+            if (projection.invariants[id].providesImplicitNeighbourhood) out.add(id)
         }
         return IntArray(out.size) { out[it] }
     }
@@ -96,7 +97,7 @@ class ImplicitSeeding(
             // Own a global's variables only when it actually seeded feasible: a failed seed (e.g. an
             // all-different with no perfect matching) leaves its vars infeasible, so they must stay in
             // the generic neighbourhood to be repaired rather than be frozen out as "implicitly solved".
-            if (problem.invariants[fid].seedFeasible(state, fid)) {
+            if (projection.invariants[fid].seedFeasible(state, fid)) {
                 for (v in problem.factors[fid].intVars) owners[v] = fid
             }
         }

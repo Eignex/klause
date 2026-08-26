@@ -135,9 +135,9 @@ class RegressionVariableSelector private constructor(
         val problem = session.problem
         val isBool = c.ref is VarRef.Bool
         val degree = if (isBool) {
-            problem.boolOccurrences[c.ref.varId].size
+            session.projection.boolOccurrences[c.ref.varId].size
         } else {
-            problem.intOccurrences[c.ref.varId].size
+            session.projection.intOccurrences[c.ref.varId].size
         }
         val slot = if (isBool) c.ref.varId else numBoolVars + c.ref.varId
         val act = checkNotNull(activity)[slot] / maxActivity // VSIDS-style decayed activity, ∈ [0,1]
@@ -165,8 +165,8 @@ class RegressionVariableSelector private constructor(
         activity = DoubleArray(n)
         lastConflict = LongArray(n) { -1L }
         var maxDegree = 1
-        for (v in 0 until problem.numBoolVars) maxDegree = maxOf(maxDegree, problem.boolOccurrences[v].size)
-        for (v in 0 until problem.numIntVars) maxDegree = maxOf(maxDegree, problem.intOccurrences[v].size)
+        for (v in 0 until problem.numBoolVars) maxDegree = maxOf(maxDegree, session.projection.boolOccurrences[v].size)
+        for (v in 0 until problem.numIntVars) maxDegree = maxOf(maxDegree, session.projection.intOccurrences[v].size)
         degreeScale = maxDegree.toDouble()
         var maxDom = 2
         val domains = problem.requireFiniteIntDomains()

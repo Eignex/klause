@@ -5601,7 +5601,7 @@ final class com.eignex.klause.localsearch/FixedCadenceRestart : com.eignex.klaus
 }
 
 final class com.eignex.klause.localsearch/ImplicitSeeding { // com.eignex.klause.localsearch/ImplicitSeeding|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, kotlin/Int = ...) // com.eignex.klause.localsearch/ImplicitSeeding.<init>|<init>(com.eignex.klause.solver.Problem;kotlin.Int){}[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.localsearch/LocalSearchProblem = ..., kotlin/Int = ...) // com.eignex.klause.localsearch/ImplicitSeeding.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.localsearch.LocalSearchProblem;kotlin.Int){}[0]
 
     final val electedImplicit // com.eignex.klause.localsearch/ImplicitSeeding.electedImplicit|{}electedImplicit[0]
         final fun <get-electedImplicit>(): kotlin/IntArray // com.eignex.klause.localsearch/ImplicitSeeding.electedImplicit.<get-electedImplicit>|<get-electedImplicit>(){}[0]
@@ -5732,6 +5732,19 @@ final class com.eignex.klause.localsearch/LocalSearchParams : com.eignex.klause.
     final fun withCancellation(com.eignex.klause.solver/Cancellation): com.eignex.klause.localsearch/LocalSearchParams // com.eignex.klause.localsearch/LocalSearchParams.withCancellation|withCancellation(com.eignex.klause.solver.Cancellation){}[0]
 }
 
+final class com.eignex.klause.localsearch/LocalSearchProblem { // com.eignex.klause.localsearch/LocalSearchProblem|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem) // com.eignex.klause.localsearch/LocalSearchProblem.<init>|<init>(com.eignex.klause.solver.Problem){}[0]
+
+    final val boolOccurrences // com.eignex.klause.localsearch/LocalSearchProblem.boolOccurrences|{}boolOccurrences[0]
+        final fun <get-boolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.localsearch/LocalSearchProblem.boolOccurrences.<get-boolOccurrences>|<get-boolOccurrences>(){}[0]
+    final val intOccurrences // com.eignex.klause.localsearch/LocalSearchProblem.intOccurrences|{}intOccurrences[0]
+        final fun <get-intOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.localsearch/LocalSearchProblem.intOccurrences.<get-intOccurrences>|<get-intOccurrences>(){}[0]
+    final val invariants // com.eignex.klause.localsearch/LocalSearchProblem.invariants|{}invariants[0]
+        final fun <get-invariants>(): kotlin/Array<out com.eignex.klause.localsearch/Invariant> // com.eignex.klause.localsearch/LocalSearchProblem.invariants.<get-invariants>|<get-invariants>(){}[0]
+    final val problem // com.eignex.klause.localsearch/LocalSearchProblem.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.localsearch/LocalSearchProblem.problem.<get-problem>|<get-problem>(){}[0]
+}
+
 final class com.eignex.klause.localsearch/LocalSearchSession : com.eignex.klause.solver/Session<com.eignex.klause.localsearch/LocalSearchParams> { // com.eignex.klause.localsearch/LocalSearchSession|null[0]
     constructor <init>(com.eignex.klause.localsearch/LocalSearchSolver) // com.eignex.klause.localsearch/LocalSearchSession.<init>|<init>(com.eignex.klause.localsearch.LocalSearchSolver){}[0]
 
@@ -5787,7 +5800,7 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
 }
 
 final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klause.localsearch/LocalSearchState|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, kotlin.random/Random, com.eignex.klause.solver/Assumptions = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.solver.Problem;kotlin.random.Random;com.eignex.klause.solver.Assumptions){}[0]
+    constructor <init>(com.eignex.klause.solver/Problem, kotlin.random/Random, com.eignex.klause.solver/Assumptions = ..., com.eignex.klause.localsearch/LocalSearchProblem = ...) // com.eignex.klause.localsearch/LocalSearchState.<init>|<init>(com.eignex.klause.solver.Problem;kotlin.random.Random;com.eignex.klause.solver.Assumptions;com.eignex.klause.localsearch.LocalSearchProblem){}[0]
 
     final val assignment // com.eignex.klause.localsearch/LocalSearchState.assignment|{}assignment[0]
         final fun <get-assignment>(): com.eignex.klause.solver/Assignment // com.eignex.klause.localsearch/LocalSearchState.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -5807,6 +5820,8 @@ final class com.eignex.klause.localsearch/LocalSearchState { // com.eignex.klaus
         final fun <get-moveSink>(): com.eignex.klause.localsearch/MoveSink // com.eignex.klause.localsearch/LocalSearchState.moveSink.<get-moveSink>|<get-moveSink>(){}[0]
     final val problem // com.eignex.klause.localsearch/LocalSearchState.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.localsearch/LocalSearchState.problem.<get-problem>|<get-problem>(){}[0]
+    final val projection // com.eignex.klause.localsearch/LocalSearchState.projection|{}projection[0]
+        final fun <get-projection>(): com.eignex.klause.localsearch/LocalSearchProblem // com.eignex.klause.localsearch/LocalSearchState.projection.<get-projection>|<get-projection>(){}[0]
     final val refPayload // com.eignex.klause.localsearch/LocalSearchState.refPayload|{}refPayload[0]
         final fun <get-refPayload>(): kotlin/Array<kotlin/Any?> // com.eignex.klause.localsearch/LocalSearchState.refPayload.<get-refPayload>|<get-refPayload>(){}[0]
     final val rng // com.eignex.klause.localsearch/LocalSearchState.rng|{}rng[0]
@@ -8605,6 +8620,27 @@ final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.
     final fun sharedLevelForNative(kotlin/Int): kotlin/Int // com.eignex.klause.propagation/CpSearchComponent.sharedLevelForNative|sharedLevelForNative(kotlin.Int){}[0]
 }
 
+final class com.eignex.klause.propagation/PropagationProblem { // com.eignex.klause.propagation/PropagationProblem|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem) // com.eignex.klause.propagation/PropagationProblem.<init>|<init>(com.eignex.klause.solver.Problem){}[0]
+
+    final val boolOccurrences // com.eignex.klause.propagation/PropagationProblem.boolOccurrences|{}boolOccurrences[0]
+        final fun <get-boolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.propagation/PropagationProblem.boolOccurrences.<get-boolOccurrences>|<get-boolOccurrences>(){}[0]
+    final val intOccurrences // com.eignex.klause.propagation/PropagationProblem.intOccurrences|{}intOccurrences[0]
+        final fun <get-intOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.propagation/PropagationProblem.intOccurrences.<get-intOccurrences>|<get-intOccurrences>(){}[0]
+    final val nonBoolWatcherBoolOccurrences // com.eignex.klause.propagation/PropagationProblem.nonBoolWatcherBoolOccurrences|{}nonBoolWatcherBoolOccurrences[0]
+        final fun <get-nonBoolWatcherBoolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.propagation/PropagationProblem.nonBoolWatcherBoolOccurrences.<get-nonBoolWatcherBoolOccurrences>|<get-nonBoolWatcherBoolOccurrences>(){}[0]
+    final val nonIntEventWatcherIntOccurrences // com.eignex.klause.propagation/PropagationProblem.nonIntEventWatcherIntOccurrences|{}nonIntEventWatcherIntOccurrences[0]
+        final fun <get-nonIntEventWatcherIntOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.propagation/PropagationProblem.nonIntEventWatcherIntOccurrences.<get-nonIntEventWatcherIntOccurrences>|<get-nonIntEventWatcherIntOccurrences>(){}[0]
+    final val problem // com.eignex.klause.propagation/PropagationProblem.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.propagation/PropagationProblem.problem.<get-problem>|<get-problem>(){}[0]
+    final val propagators // com.eignex.klause.propagation/PropagationProblem.propagators|{}propagators[0]
+        final fun <get-propagators>(): kotlin/Array<out com.eignex.klause.propagation/Propagator> // com.eignex.klause.propagation/PropagationProblem.propagators.<get-propagators>|<get-propagators>(){}[0]
+    final val usesIntEventDeltaConsumers // com.eignex.klause.propagation/PropagationProblem.usesIntEventDeltaConsumers|{}usesIntEventDeltaConsumers[0]
+        final fun <get-usesIntEventDeltaConsumers>(): kotlin/Boolean // com.eignex.klause.propagation/PropagationProblem.usesIntEventDeltaConsumers.<get-usesIntEventDeltaConsumers>|<get-usesIntEventDeltaConsumers>(){}[0]
+    final val usesIntEventWatchers // com.eignex.klause.propagation/PropagationProblem.usesIntEventWatchers|{}usesIntEventWatchers[0]
+        final fun <get-usesIntEventWatchers>(): kotlin/Boolean // com.eignex.klause.propagation/PropagationProblem.usesIntEventWatchers.<get-usesIntEventWatchers>|<get-usesIntEventWatchers>(){}[0]
+}
+
 final class com.eignex.klause.propagation/PropagationSession { // com.eignex.klause.propagation/PropagationSession|null[0]
     constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver/Cancellation = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.propagation/PropagationSession.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.Cancellation;kotlin.Int;kotlin.Boolean;kotlin.Boolean){}[0]
 
@@ -8618,6 +8654,8 @@ final class com.eignex.klause.propagation/PropagationSession { // com.eignex.kla
         final fun <get-learnedClauseCount>(): kotlin/Int // com.eignex.klause.propagation/PropagationSession.learnedClauseCount.<get-learnedClauseCount>|<get-learnedClauseCount>(){}[0]
     final val problem // com.eignex.klause.propagation/PropagationSession.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.propagation/PropagationSession.problem.<get-problem>|<get-problem>(){}[0]
+    final val projection // com.eignex.klause.propagation/PropagationSession.projection|{}projection[0]
+        final fun <get-projection>(): com.eignex.klause.propagation/PropagationProblem // com.eignex.klause.propagation/PropagationSession.projection.<get-projection>|<get-projection>(){}[0]
     final val propagationCount // com.eignex.klause.propagation/PropagationSession.propagationCount|{}propagationCount[0]
         final fun <get-propagationCount>(): kotlin/Long // com.eignex.klause.propagation/PropagationSession.propagationCount.<get-propagationCount>|<get-propagationCount>(){}[0]
     final val usesNativeSat // com.eignex.klause.propagation/PropagationSession.usesNativeSat|{}usesNativeSat[0]
@@ -8665,6 +8703,7 @@ final class com.eignex.klause.propagation/PropagationSession { // com.eignex.kla
 }
 
 final class com.eignex.klause.propagation/PropagationState { // com.eignex.klause.propagation/PropagationState|null[0]
+    constructor <init>(com.eignex.klause.propagation/PropagationProblem, com.eignex.klause.solver/Assumptions, kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.propagation/PropagationState.<init>|<init>(com.eignex.klause.propagation.PropagationProblem;com.eignex.klause.solver.Assumptions;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
     constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver/Assumptions, kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.propagation/PropagationState.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.Assumptions;kotlin.Boolean;kotlin.Boolean;kotlin.Boolean){}[0]
 
     final val boolAntecedents // com.eignex.klause.propagation/PropagationState.boolAntecedents|{}boolAntecedents[0]
@@ -8693,6 +8732,8 @@ final class com.eignex.klause.propagation/PropagationState { // com.eignex.klaus
         final fun <get-numDecisions>(): kotlin/Int // com.eignex.klause.propagation/PropagationState.numDecisions.<get-numDecisions>|<get-numDecisions>(){}[0]
     final val problem // com.eignex.klause.propagation/PropagationState.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.propagation/PropagationState.problem.<get-problem>|<get-problem>(){}[0]
+    final val projection // com.eignex.klause.propagation/PropagationState.projection|{}projection[0]
+        final fun <get-projection>(): com.eignex.klause.propagation/PropagationProblem // com.eignex.klause.propagation/PropagationState.projection.<get-projection>|<get-projection>(){}[0]
     final val refPayload // com.eignex.klause.propagation/PropagationState.refPayload|{}refPayload[0]
         final fun <get-refPayload>(): kotlin.collections/MutableList<kotlin/Any?> // com.eignex.klause.propagation/PropagationState.refPayload.<get-refPayload>|<get-refPayload>(){}[0]
     final val rootDomains // com.eignex.klause.propagation/PropagationState.rootDomains|{}rootDomains[0]
@@ -9689,27 +9730,6 @@ final class com.eignex.klause.solver/MixedIntColumns : com.eignex.klause.solver/
     final fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/MixedIntColumns.column|column(kotlin.Int){}[0]
 }
 
-final class com.eignex.klause.solver/OccurrenceIndex { // com.eignex.klause.solver/OccurrenceIndex|null[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/Factor>, kotlin/Array<out com.eignex.klause.propagation/Propagator>, kotlin/Function0<kotlin/Array<out com.eignex.klause.localsearch/Invariant>>) // com.eignex.klause.solver/OccurrenceIndex.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.Factor>;kotlin.Array<out|com.eignex.klause.propagation.Propagator>;kotlin.Function0<kotlin.Array<out|com.eignex.klause.localsearch.Invariant>>){}[0]
-
-    final val boolOccurrences // com.eignex.klause.solver/OccurrenceIndex.boolOccurrences|{}boolOccurrences[0]
-        final fun <get-boolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/OccurrenceIndex.boolOccurrences.<get-boolOccurrences>|<get-boolOccurrences>(){}[0]
-    final val intOccurrences // com.eignex.klause.solver/OccurrenceIndex.intOccurrences|{}intOccurrences[0]
-        final fun <get-intOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/OccurrenceIndex.intOccurrences.<get-intOccurrences>|<get-intOccurrences>(){}[0]
-    final val lsBoolOccurrences // com.eignex.klause.solver/OccurrenceIndex.lsBoolOccurrences|{}lsBoolOccurrences[0]
-        final fun <get-lsBoolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/OccurrenceIndex.lsBoolOccurrences.<get-lsBoolOccurrences>|<get-lsBoolOccurrences>(){}[0]
-    final val lsIntOccurrences // com.eignex.klause.solver/OccurrenceIndex.lsIntOccurrences|{}lsIntOccurrences[0]
-        final fun <get-lsIntOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/OccurrenceIndex.lsIntOccurrences.<get-lsIntOccurrences>|<get-lsIntOccurrences>(){}[0]
-    final val nonBoolWatcherBoolOccurrences // com.eignex.klause.solver/OccurrenceIndex.nonBoolWatcherBoolOccurrences|{}nonBoolWatcherBoolOccurrences[0]
-        final fun <get-nonBoolWatcherBoolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/OccurrenceIndex.nonBoolWatcherBoolOccurrences.<get-nonBoolWatcherBoolOccurrences>|<get-nonBoolWatcherBoolOccurrences>(){}[0]
-    final val nonIntEventWatcherIntOccurrences // com.eignex.klause.solver/OccurrenceIndex.nonIntEventWatcherIntOccurrences|{}nonIntEventWatcherIntOccurrences[0]
-        final fun <get-nonIntEventWatcherIntOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/OccurrenceIndex.nonIntEventWatcherIntOccurrences.<get-nonIntEventWatcherIntOccurrences>|<get-nonIntEventWatcherIntOccurrences>(){}[0]
-    final val usesIntEventDeltaConsumers // com.eignex.klause.solver/OccurrenceIndex.usesIntEventDeltaConsumers|{}usesIntEventDeltaConsumers[0]
-        final fun <get-usesIntEventDeltaConsumers>(): kotlin/Boolean // com.eignex.klause.solver/OccurrenceIndex.usesIntEventDeltaConsumers.<get-usesIntEventDeltaConsumers>|<get-usesIntEventDeltaConsumers>(){}[0]
-    final val usesIntEventWatchers // com.eignex.klause.solver/OccurrenceIndex.usesIntEventWatchers|{}usesIntEventWatchers[0]
-        final fun <get-usesIntEventWatchers>(): kotlin/Boolean // com.eignex.klause.solver/OccurrenceIndex.usesIntEventWatchers.<get-usesIntEventWatchers>|<get-usesIntEventWatchers>(){}[0]
-}
-
 final class com.eignex.klause.solver/ProblemSpec { // com.eignex.klause.solver/ProblemSpec|null[0]
     constructor <init>(kotlin/Int, com.eignex.klause.solver/IntBounds, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver/ProblemSpec.<init>|<init>(kotlin.Int;com.eignex.klause.solver.IntBounds;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
 
@@ -10096,8 +10116,6 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
 
     final val baked // com.eignex.klause.solver/Problem.baked|{}baked[0]
         final fun <get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.baked.<get-baked>|<get-baked>(){}[0]
-    final val boolOccurrences // com.eignex.klause.solver/Problem.boolOccurrences|{}boolOccurrences[0]
-        final fun <get-boolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.boolOccurrences.<get-boolOccurrences>|<get-boolOccurrences>(){}[0]
     final val cancellation // com.eignex.klause.solver/Problem.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.solver/Cancellation // com.eignex.klause.solver/Problem.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
     final val factors // com.eignex.klause.solver/Problem.factors|{}factors[0]
@@ -10112,20 +10130,8 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
         final fun <get-intBounds>(): com.eignex.klause.solver/IntBounds // com.eignex.klause.solver/Problem.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
     final val intColumns // com.eignex.klause.solver/Problem.intColumns|{}intColumns[0]
         final fun <get-intColumns>(): com.eignex.klause.solver/IntColumns // com.eignex.klause.solver/Problem.intColumns.<get-intColumns>|<get-intColumns>(){}[0]
-    final val intOccurrences // com.eignex.klause.solver/Problem.intOccurrences|{}intOccurrences[0]
-        final fun <get-intOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.intOccurrences.<get-intOccurrences>|<get-intOccurrences>(){}[0]
-    final val invariants // com.eignex.klause.solver/Problem.invariants|{}invariants[0]
-        final fun <get-invariants>(): kotlin/Array<out com.eignex.klause.localsearch/Invariant> // com.eignex.klause.solver/Problem.invariants.<get-invariants>|<get-invariants>(){}[0]
     final val isNativeSatEligible // com.eignex.klause.solver/Problem.isNativeSatEligible|{}isNativeSatEligible[0]
         final fun <get-isNativeSatEligible>(): kotlin/Boolean // com.eignex.klause.solver/Problem.isNativeSatEligible.<get-isNativeSatEligible>|<get-isNativeSatEligible>(){}[0]
-    final val lsBoolOccurrences // com.eignex.klause.solver/Problem.lsBoolOccurrences|{}lsBoolOccurrences[0]
-        final fun <get-lsBoolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.lsBoolOccurrences.<get-lsBoolOccurrences>|<get-lsBoolOccurrences>(){}[0]
-    final val lsIntOccurrences // com.eignex.klause.solver/Problem.lsIntOccurrences|{}lsIntOccurrences[0]
-        final fun <get-lsIntOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.lsIntOccurrences.<get-lsIntOccurrences>|<get-lsIntOccurrences>(){}[0]
-    final val nonBoolWatcherBoolOccurrences // com.eignex.klause.solver/Problem.nonBoolWatcherBoolOccurrences|{}nonBoolWatcherBoolOccurrences[0]
-        final fun <get-nonBoolWatcherBoolOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.nonBoolWatcherBoolOccurrences.<get-nonBoolWatcherBoolOccurrences>|<get-nonBoolWatcherBoolOccurrences>(){}[0]
-    final val nonIntEventWatcherIntOccurrences // com.eignex.klause.solver/Problem.nonIntEventWatcherIntOccurrences|{}nonIntEventWatcherIntOccurrences[0]
-        final fun <get-nonIntEventWatcherIntOccurrences>(): kotlin/Array<kotlin/IntArray> // com.eignex.klause.solver/Problem.nonIntEventWatcherIntOccurrences.<get-nonIntEventWatcherIntOccurrences>|<get-nonIntEventWatcherIntOccurrences>(){}[0]
     final val numBoolVars // com.eignex.klause.solver/Problem.numBoolVars|{}numBoolVars[0]
         final fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.solver/Problem.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
     final val numFactors // com.eignex.klause.solver/Problem.numFactors|{}numFactors[0]
@@ -10134,20 +10140,12 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
         final fun <get-numIntVars>(): kotlin/Int // com.eignex.klause.solver/Problem.numIntVars.<get-numIntVars>|<get-numIntVars>(){}[0]
     final val numRealVars // com.eignex.klause.solver/Problem.numRealVars|{}numRealVars[0]
         final fun <get-numRealVars>(): kotlin/Int // com.eignex.klause.solver/Problem.numRealVars.<get-numRealVars>|<get-numRealVars>(){}[0]
-    final val occurrences // com.eignex.klause.solver/Problem.occurrences|{}occurrences[0]
-        final fun <get-occurrences>(): com.eignex.klause.solver/OccurrenceIndex // com.eignex.klause.solver/Problem.occurrences.<get-occurrences>|<get-occurrences>(){}[0]
-    final val propagators // com.eignex.klause.solver/Problem.propagators|{}propagators[0]
-        final fun <get-propagators>(): kotlin/Array<out com.eignex.klause.propagation/Propagator> // com.eignex.klause.solver/Problem.propagators.<get-propagators>|<get-propagators>(){}[0]
     final val realLower // com.eignex.klause.solver/Problem.realLower|{}realLower[0]
         final fun <get-realLower>(): kotlin/DoubleArray // com.eignex.klause.solver/Problem.realLower.<get-realLower>|<get-realLower>(){}[0]
     final val realUpper // com.eignex.klause.solver/Problem.realUpper|{}realUpper[0]
         final fun <get-realUpper>(): kotlin/DoubleArray // com.eignex.klause.solver/Problem.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
     final val sharedDomains // com.eignex.klause.solver/Problem.sharedDomains|{}sharedDomains[0]
         final fun <get-sharedDomains>(): kotlin/Boolean // com.eignex.klause.solver/Problem.sharedDomains.<get-sharedDomains>|<get-sharedDomains>(){}[0]
-    final val usesIntEventDeltaConsumers // com.eignex.klause.solver/Problem.usesIntEventDeltaConsumers|{}usesIntEventDeltaConsumers[0]
-        final fun <get-usesIntEventDeltaConsumers>(): kotlin/Boolean // com.eignex.klause.solver/Problem.usesIntEventDeltaConsumers.<get-usesIntEventDeltaConsumers>|<get-usesIntEventDeltaConsumers>(){}[0]
-    final val usesIntEventWatchers // com.eignex.klause.solver/Problem.usesIntEventWatchers|{}usesIntEventWatchers[0]
-        final fun <get-usesIntEventWatchers>(): kotlin/Boolean // com.eignex.klause.solver/Problem.usesIntEventWatchers.<get-usesIntEventWatchers>|<get-usesIntEventWatchers>(){}[0]
 
     final var bakeElapsed // com.eignex.klause.solver/Problem.bakeElapsed|{}bakeElapsed[0]
         final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.solver/Problem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
