@@ -2,7 +2,6 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
-import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
@@ -31,6 +30,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.portfolioExecutor
+import com.eignex.klause.solver.pipeline.backtrackSolver
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
@@ -322,7 +322,7 @@ internal object SolveCore {
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
-        val solver = BacktrackSolver(solvable.finiteProblem.bake())
+        val solver = FinitePipeline.backtrackSolver(solvable.finiteProblem)
         if (dryRunSolver) {
             errPrintln("solver dry-run:")
             errPrintln(solver.describe(params))
@@ -352,7 +352,7 @@ internal object SolveCore {
     private fun printBtPool(problem: Problem, pool: List<() -> BacktrackRecipe>?, kind: Kind) {
         val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
         errPrintln("solver dry-run: ${recipes.size} backtrack arm(s)")
-        val solver = BacktrackSolver(problem.bake())
+        val solver = FinitePipeline.backtrackSolver(problem)
         for (r in recipes) {
             errPrintln("  ${r.label}:")
             for (line in solver.describe(r.build(0L, null)).lines()) errPrintln("    $line")

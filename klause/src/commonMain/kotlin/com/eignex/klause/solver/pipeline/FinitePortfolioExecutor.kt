@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.portfolio.PortfolioBuilder
 import com.eignex.klause.portfolio.PortfolioExecutor
@@ -32,3 +33,6 @@ fun FinitePipeline.portfolioExecutor(
 }
 
 internal expect fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor
+
+/** Creates the fixed finite-domain solver over [problem]. */
+fun FinitePipeline.backtrackSolver(problem: Problem): BacktrackSolver = BacktrackSolver(problem.bake())
