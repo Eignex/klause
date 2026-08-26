@@ -37,6 +37,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -239,12 +240,15 @@ internal fun leafRealFeasibility(
     objective: LinearObjective?,
     sample: Sample,
     cancellation: Cancellation = Cancellation.Never,
+    componentSplit: Boolean = true,
+    sink: LpStatsSink? = null,
 ): LeafRealResult {
     val relaxation = CpToLpRelaxation(problem, objective).build(SampleDomains(sample))
     // Bound the residual-LP solve by the search deadline: on a continuous-heavy model a single leaf LP is a
     // large factorization, so an unbounded solve could outlast the whole budget. A solve cut short returns
     // INDETERMINATE, degrading the leaf to `unknown` — never an unsound SAT/UNSAT.
-    val certified = solveAndCertify(relaxation.model, cancellation = cancellation)
+    val certified = solveAndCertify(relaxation.model, cancellation = cancellation, componentSplit = componentSplit)
+    certified.float?.let { sink?.observeComponentSplit(it.blocks) }
     if (certified.verdict != LpVerdict.OPTIMAL) return LeafRealResult(certified.verdict, EmptyDoubleArray)
     val primal = certified.exactPrimal ?: certified.float?.primal
         ?: return LeafRealResult(LpVerdict.INDETERMINATE, EmptyDoubleArray)

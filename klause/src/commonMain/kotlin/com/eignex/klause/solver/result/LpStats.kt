@@ -42,6 +42,11 @@ data class LpStats(
     /** Node LP solves that started from a seeded tableau (the cheapest warm start) instead of a basis
      *  reload or cold start — the hot-tableau hit rate. */
     val seeded: SumResult = ZERO_COUNT,
+    /** Certified LP solves whose model decomposed into column components (`lp-component-split`); the
+     *  denominator for judging the split is [solves] on the paths that carry a sink. */
+    val componentSplits: SumResult = ZERO_COUNT,
+    /** Largest component count any one decomposed solve produced; 0 when none decomposed. */
+    val componentBlocks: MaxResult = NO_MAX,
 ) {
     /** Combine two workers' LP stats: counts add, LU maxes take the larger, wall time sums, and the
      *  root bound (same root across workers) keeps the tightest finite reading (NaN defers). */
@@ -58,6 +63,8 @@ data class LpStats(
         cuts = SumResult(cuts.sum + o.cuts.sum),
         backjumps = SumResult(backjumps.sum + o.backjumps.sum),
         seeded = SumResult(seeded.sum + o.seeded.sum),
+        componentSplits = SumResult(componentSplits.sum + o.componentSplits.sum),
+        componentBlocks = MaxResult(maxOf(componentBlocks.max, o.componentBlocks.max)),
     )
 }
 
@@ -73,6 +80,8 @@ internal class LpStatsSink {
     val cuts: CountStat = CountStat()
     val backjumps: CountStat = CountStat()
     val seeded: CountStat = CountStat()
+    val componentSplits: CountStat = CountStat()
+    val componentBlocks: MaxStat = MaxStat()
 
     private var rootBound: Double = Double.NaN
     private var ms: Long = 0L
@@ -143,6 +152,14 @@ internal class LpStatsSink {
         seeded.update(1.0)
     }
 
+    /** One certified LP solve that decomposed into [blocks] column components. A monolithic solve
+     *  (`blocks == 1`) is not recorded, so [componentSplits] counts only the split ones. */
+    fun observeComponentSplit(blocks: Int) {
+        if (blocks <= 1) return
+        componentSplits.update(1.0)
+        componentBlocks.update(blocks.toDouble())
+    }
+
     fun snapshot(): LpStats = LpStats(
         solves = solves.read(),
         pruned = pruned.read(),
@@ -156,5 +173,7 @@ internal class LpStatsSink {
         cuts = cuts.read(),
         backjumps = backjumps.read(),
         seeded = seeded.read(),
+        componentSplits = componentSplits.read(),
+        componentBlocks = componentBlocks.read(),
     )
 }

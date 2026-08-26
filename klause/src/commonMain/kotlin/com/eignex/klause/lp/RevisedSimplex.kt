@@ -27,6 +27,8 @@ internal class FloatLpResult(
     val luMaxFill: Double = 0.0,
     /** Max LU density `(nnz L+U)/m²` — approaching 1.0 means the sparse LU filled in to dense. */
     val luMaxDensity: Double = 0.0,
+    /** Column components this solve decomposed into ([ComponentLpSolver]); 1 for a monolithic solve. */
+    val blocks: Int = 1,
 )
 
 /**

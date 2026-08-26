@@ -7,7 +7,8 @@ import kotlin.math.round
 /**
  * LP-relaxation success metrics for `-s`, as ordered `key`/`value` pairs each mode prints with its
  * own comment prefix. Returns empty when no LP-family technique ran (so non-LP solves print nothing
- * extra), keyed off [LpStats.solves] plus the standalone Lagrangian / energetic prunes.
+ * extra), keyed off [LpStats.solves] plus the standalone Lagrangian / energetic prunes and the
+ * component splits (which the certify paths record without a node solve).
  *
  * The headline measure is the prune *rate* (`lpPruneRate = lpPruned / lpSolves`) against the cost
  * (`lpPivotsPerSolve`, `lpMs`): a relaxation earns its place only if it prunes often enough to repay
@@ -22,7 +23,8 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     val solves = stats.lp.solves.sum
     val lagrangian = stats.scheduling.lagrangianPruned.sum
     val energetic = stats.scheduling.energeticPruned.sum
-    if (solves == 0.0 && lagrangian == 0.0 && energetic == 0.0) return emptyList()
+    val splits = stats.lp.componentSplits.sum
+    if (solves == 0.0 && lagrangian == 0.0 && energetic == 0.0 && splits == 0.0) return emptyList()
 
     val pruned = stats.lp.pruned.sum
     val infeasible = stats.lp.infeasible.sum
@@ -41,6 +43,10 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpPivots" to "${stats.lp.pivots.sum.toLong()}"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
     if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
+    if (splits > 0.0) {
+        out += "lpComponentSplits" to "${splits.toLong()}"
+        out += "lpComponentBlocksMax" to "${stats.lp.componentBlocks.max.toLong()}"
+    }
     out += "lpBackjumps" to "${stats.lp.backjumps.sum.toLong()}"
     out += "lpLagrangianPruned" to "${lagrangian.toLong()}"
     out += "lpEnergeticPruned" to "${energetic.toLong()}"

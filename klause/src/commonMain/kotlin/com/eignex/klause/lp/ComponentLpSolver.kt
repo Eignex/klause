@@ -93,6 +93,7 @@ internal class ComponentLpSolver(
             pivots = pivots,
             luMaxFill = maxFill,
             luMaxDensity = maxDensity,
+            blocks = parts.size,
         )
     }
 }

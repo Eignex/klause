@@ -122,4 +122,20 @@ class LpComponentsTest {
         assertEquals(mono.primal[free], split.primal[free], 1e-3)
         assertEquals(mono.objective, split.objective, 1e-3)
     }
+
+    @Test
+    fun `a solve should report how many components it decomposed into`() {
+        val b = LpBuilder()
+        val x = b.addVar(0L, 10L, cost = 3L)
+        val y = b.addVar(0L, 10L, cost = 2L)
+        b.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 4L)
+        b.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 5L)
+        val model = b.build(Sense.MINIMIZE)
+
+        val split = assertNotNull(newLpSolver(model).solve(null))
+        val mono = assertNotNull(newLpSolver(model, componentSplit = false).solve(null))
+
+        assertEquals(2, split.blocks)
+        assertEquals(1, mono.blocks, "a monolithic solve reports one block")
+    }
 }
