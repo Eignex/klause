@@ -2679,7 +2679,6 @@ public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getRealVarNames ()Ljava/util/Map;
 	public final fun getSense ()Lcom/eignex/klause/formats/ObjectiveSense;
-	public final fun getSourcePipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

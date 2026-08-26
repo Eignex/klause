@@ -4876,8 +4876,6 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klaus
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
     final val sense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense|{}sense[0]
         final fun <get-sense>(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
-    final val sourcePipeline // com.eignex.klause.formats.smtlib/SmtLibProblem.sourcePipeline|{}sourcePipeline[0]
-        final fun <get-sourcePipeline>(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.formats.smtlib/SmtLibProblem.sourcePipeline.<get-sourcePipeline>|<get-sourcePipeline>(){}[0]
 
     final fun component1(): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.formats.smtlib/SmtLibProblem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.smtlib/SmtLibProblem.component2|component2(){}[0]
