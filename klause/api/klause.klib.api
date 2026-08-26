@@ -33,19 +33,6 @@ final enum class com.eignex.klause.count/SampleQuality : kotlin/Enum<com.eignex.
     final fun values(): kotlin/Array<com.eignex.klause.count/SampleQuality> // com.eignex.klause.count/SampleQuality.values|values#static(){}[0]
 }
 
-final enum class com.eignex.klause.factor.arithmetic/LinearOp : kotlin/Enum<com.eignex.klause.factor.arithmetic/LinearOp> { // com.eignex.klause.factor.arithmetic/LinearOp|null[0]
-    enum entry EQ // com.eignex.klause.factor.arithmetic/LinearOp.EQ|null[0]
-    enum entry GE // com.eignex.klause.factor.arithmetic/LinearOp.GE|null[0]
-    enum entry LE // com.eignex.klause.factor.arithmetic/LinearOp.LE|null[0]
-    enum entry NE // com.eignex.klause.factor.arithmetic/LinearOp.NE|null[0]
-
-    final val entries // com.eignex.klause.factor.arithmetic/LinearOp.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.factor.arithmetic/LinearOp> // com.eignex.klause.factor.arithmetic/LinearOp.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/LinearOp.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.eignex.klause.factor.arithmetic/LinearOp> // com.eignex.klause.factor.arithmetic/LinearOp.values|values#static(){}[0]
-}
-
 final enum class com.eignex.klause.formats/ObjectiveSense : kotlin/Enum<com.eignex.klause.formats/ObjectiveSense> { // com.eignex.klause.formats/ObjectiveSense|null[0]
     enum entry MAXIMIZE // com.eignex.klause.formats/ObjectiveSense.MAXIMIZE|null[0]
     enum entry MINIMIZE // com.eignex.klause.formats/ObjectiveSense.MINIMIZE|null[0]
@@ -55,6 +42,19 @@ final enum class com.eignex.klause.formats/ObjectiveSense : kotlin/Enum<com.eign
 
     final fun valueOf(kotlin/String): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats/ObjectiveSense.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.eignex.klause.formats/ObjectiveSense> // com.eignex.klause.formats/ObjectiveSense.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.ir/LinearOp : kotlin/Enum<com.eignex.klause.ir/LinearOp> { // com.eignex.klause.ir/LinearOp|null[0]
+    enum entry EQ // com.eignex.klause.ir/LinearOp.EQ|null[0]
+    enum entry GE // com.eignex.klause.ir/LinearOp.GE|null[0]
+    enum entry LE // com.eignex.klause.ir/LinearOp.LE|null[0]
+    enum entry NE // com.eignex.klause.ir/LinearOp.NE|null[0]
+
+    final val entries // com.eignex.klause.ir/LinearOp.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.ir/LinearOp> // com.eignex.klause.ir/LinearOp.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.ir/LinearOp // com.eignex.klause.ir/LinearOp.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.ir/LinearOp> // com.eignex.klause.ir/LinearOp.values|values#static(){}[0]
 }
 
 final enum class com.eignex.klause.localsearch.movesource/Phase : kotlin/Enum<com.eignex.klause.localsearch.movesource/Phase> { // com.eignex.klause.localsearch.movesource/Phase|null[0]
@@ -693,7 +693,7 @@ abstract interface com.eignex.klause.lp/LinearRow { // com.eignex.klause.lp/Line
     abstract val bound // com.eignex.klause.lp/LinearRow.bound|{}bound[0]
         abstract fun <get-bound>(): kotlin/Long // com.eignex.klause.lp/LinearRow.bound.<get-bound>|<get-bound>(){}[0]
     abstract val relation // com.eignex.klause.lp/LinearRow.relation|{}relation[0]
-        abstract fun <get-relation>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.lp/LinearRow.relation.<get-relation>|<get-relation>(){}[0]
+        abstract fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.lp/LinearRow.relation.<get-relation>|<get-relation>(){}[0]
     abstract val size // com.eignex.klause.lp/LinearRow.size|{}size[0]
         abstract fun <get-size>(): kotlin/Int // com.eignex.klause.lp/LinearRow.size.<get-size>|<get-size>(){}[0]
     open val isIntegerOnly // com.eignex.klause.lp/LinearRow.isIntegerOnly|{}isIntegerOnly[0]
@@ -703,26 +703,26 @@ abstract interface com.eignex.klause.lp/LinearRow { // com.eignex.klause.lp/Line
     abstract fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.lp/LinearRow.ref|ref(kotlin.Int){}[0]
 
     final object Companion { // com.eignex.klause.lp/LinearRow.Companion|null[0]
-        final fun ofBools(kotlin/IntArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
-        final fun ofBools(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
-        final fun ofInts(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofInts|ofInts(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
+        final fun ofBools(kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
+        final fun ofBools(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
+        final fun ofInts(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofInts|ofInts(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
     }
 }
 
 abstract interface com.eignex.klause.lp/RelaxationBuilder { // com.eignex.klause.lp/RelaxationBuilder|null[0]
     abstract fun auxColumn(kotlin/Long, kotlin/Long, kotlin/LongArray? = ...): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.auxColumn|auxColumn(kotlin.Long;kotlin.Long;kotlin.LongArray?){}[0]
-    abstract fun bigMRow(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long, kotlin/Boolean, kotlin/Boolean) // com.eignex.klause.lp/RelaxationBuilder.bigMRow|bigMRow(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long;kotlin.Boolean;kotlin.Boolean){}[0]
+    abstract fun bigMRow(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long, kotlin/Boolean, kotlin/Boolean) // com.eignex.klause.lp/RelaxationBuilder.bigMRow|bigMRow(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long;kotlin.Boolean;kotlin.Boolean){}[0]
     abstract fun boolColumn(kotlin/Int): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.boolColumn|boolColumn(kotlin.Int){}[0]
-    abstract fun boolRow(kotlin/IntArray, kotlin/LongArray?, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.boolRow|boolRow(kotlin.IntArray;kotlin.LongArray?;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
+    abstract fun boolRow(kotlin/IntArray, kotlin/LongArray?, com.eignex.klause.ir/LinearOp, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.boolRow|boolRow(kotlin.IntArray;kotlin.LongArray?;com.eignex.klause.ir.LinearOp;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
     abstract fun declaredDomain(kotlin/Int): com.eignex.klause.solver/IntDomain // com.eignex.klause.lp/RelaxationBuilder.declaredDomain|declaredDomain(kotlin.Int){}[0]
     abstract fun hullEnabled(): kotlin/Boolean // com.eignex.klause.lp/RelaxationBuilder.hullEnabled|hullEnabled(){}[0]
     abstract fun intColumn(kotlin/Int): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.intColumn|intColumn(kotlin.Int){}[0]
-    abstract fun linearRow(com.eignex.klause.factor.arithmetic/LinearOp, kotlin/IntArray, kotlin/LongArray, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.linearRow|linearRow(com.eignex.klause.factor.arithmetic.LinearOp;kotlin.IntArray;kotlin.LongArray;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
+    abstract fun linearRow(com.eignex.klause.ir/LinearOp, kotlin/IntArray, kotlin/LongArray, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.linearRow|linearRow(com.eignex.klause.ir.LinearOp;kotlin.IntArray;kotlin.LongArray;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
     abstract fun liveDomain(kotlin/Int): com.eignex.klause.solver/IntDomain // com.eignex.klause.lp/RelaxationBuilder.liveDomain|liveDomain(kotlin.Int){}[0]
-    abstract fun row(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.row|row(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
+    abstract fun row(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long, com.eignex.klause.lp/Contribution = ...) // com.eignex.klause.lp/RelaxationBuilder.row|row(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long;com.eignex.klause.lp.Contribution){}[0]
     open fun liveBool(kotlin/Int): kotlin/Boolean? // com.eignex.klause.lp/RelaxationBuilder.liveBool|liveBool(kotlin.Int){}[0]
     open fun realColumn(kotlin/Int): kotlin/Int // com.eignex.klause.lp/RelaxationBuilder.realColumn|realColumn(kotlin.Int){}[0]
-    open fun realRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Double, kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.lp/RelaxationBuilder.realRow|realRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.IntArray){}[0]
+    open fun realRow(kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ..., kotlin/IntArray = ...) // com.eignex.klause.lp/RelaxationBuilder.realRow|realRow(kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.IntArray){}[0]
 }
 
 abstract interface com.eignex.klause.model/BoolTerm { // com.eignex.klause.model/BoolTerm|null[0]
@@ -3524,14 +3524,14 @@ final class com.eignex.klause.factor.arithmetic/ArrayMinMaxState { // com.eignex
 }
 
 final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.arithmetic/ComparisonClause|null[0]
-    constructor <init>(kotlin/IntArray, kotlin/Array<com.eignex.klause.factor.arithmetic/LinearOp>, kotlin/LongArray) // com.eignex.klause.factor.arithmetic/ComparisonClause.<init>|<init>(kotlin.IntArray;kotlin.Array<com.eignex.klause.factor.arithmetic.LinearOp>;kotlin.LongArray){}[0]
+    constructor <init>(kotlin/IntArray, kotlin/Array<com.eignex.klause.ir/LinearOp>, kotlin/LongArray) // com.eignex.klause.factor.arithmetic/ComparisonClause.<init>|<init>(kotlin.IntArray;kotlin.Array<com.eignex.klause.ir.LinearOp>;kotlin.LongArray){}[0]
 
     final val consts // com.eignex.klause.factor.arithmetic/ComparisonClause.consts|{}consts[0]
         final fun <get-consts>(): kotlin/LongArray // com.eignex.klause.factor.arithmetic/ComparisonClause.consts.<get-consts>|<get-consts>(){}[0]
     final val integerTheoryOwnable // com.eignex.klause.factor.arithmetic/ComparisonClause.integerTheoryOwnable|{}integerTheoryOwnable[0]
         final fun <get-integerTheoryOwnable>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ComparisonClause.integerTheoryOwnable.<get-integerTheoryOwnable>|<get-integerTheoryOwnable>(){}[0]
     final val ops // com.eignex.klause.factor.arithmetic/ComparisonClause.ops|{}ops[0]
-        final fun <get-ops>(): kotlin/Array<com.eignex.klause.factor.arithmetic/LinearOp> // com.eignex.klause.factor.arithmetic/ComparisonClause.ops.<get-ops>|<get-ops>(){}[0]
+        final fun <get-ops>(): kotlin/Array<com.eignex.klause.ir/LinearOp> // com.eignex.klause.factor.arithmetic/ComparisonClause.ops.<get-ops>|<get-ops>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ComparisonClause.variables|{}variables[0]
         final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ComparisonClause.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ComparisonClause.vars|{}vars[0]
@@ -3545,7 +3545,7 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
 }
 
 final class com.eignex.klause.factor.arithmetic/IntegerConstants : com.eignex.klause.factor.arithmetic/IntegralConstants, com.eignex.klause.lp/LinearRow { // com.eignex.klause.factor.arithmetic/IntegerConstants|null[0]
-    constructor <init>(kotlin/IntArray, com.eignex.klause.solver/LongConstList, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/IntegerConstants.<init>|<init>(kotlin.IntArray;com.eignex.klause.solver.LongConstList;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
+    constructor <init>(kotlin/IntArray, com.eignex.klause.solver/LongConstList, com.eignex.klause.ir/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/IntegerConstants.<init>|<init>(kotlin.IntArray;com.eignex.klause.solver.LongConstList;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
 
     final val bound // com.eignex.klause.factor.arithmetic/IntegerConstants.bound|{}bound[0]
         final fun <get-bound>(): kotlin/Long // com.eignex.klause.factor.arithmetic/IntegerConstants.bound.<get-bound>|<get-bound>(){}[0]
@@ -3560,7 +3560,7 @@ final class com.eignex.klause.factor.arithmetic/IntegerConstants : com.eignex.kl
     final val maxAbsCoeff // com.eignex.klause.factor.arithmetic/IntegerConstants.maxAbsCoeff|{}maxAbsCoeff[0]
         final fun <get-maxAbsCoeff>(): kotlin/Long // com.eignex.klause.factor.arithmetic/IntegerConstants.maxAbsCoeff.<get-maxAbsCoeff>|<get-maxAbsCoeff>(){}[0]
     final val relation // com.eignex.klause.factor.arithmetic/IntegerConstants.relation|{}relation[0]
-        final fun <get-relation>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/IntegerConstants.relation.<get-relation>|<get-relation>(){}[0]
+        final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/IntegerConstants.relation.<get-relation>|<get-relation>(){}[0]
     final val size // com.eignex.klause.factor.arithmetic/IntegerConstants.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.arithmetic/IntegerConstants.size.<get-size>|<get-size>(){}[0]
 
@@ -3570,11 +3570,11 @@ final class com.eignex.klause.factor.arithmetic/IntegerConstants : com.eignex.kl
 }
 
 final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.arithmetic/Linear|null[0]
-    constructor <init>(kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, com.eignex.klause.factor.arithmetic/LinearOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;com.eignex.klause.factor.arithmetic.LinearOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
-    constructor <init>(kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Double, kotlin/Boolean = ...) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Double;kotlin.Boolean){}[0]
-    constructor <init>(kotlin/IntArray, kotlin/IntArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Int) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.IntArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Int){}[0]
-    constructor <init>(kotlin/LongArray, kotlin/IntArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.LongArray;kotlin.IntArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
-    constructor <init>(kotlin/LongArray, kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.LongArray;kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
+    constructor <init>(kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, com.eignex.klause.ir/LinearOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;com.eignex.klause.ir.LinearOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+    constructor <init>(kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ...) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/IntArray, kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Int) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.IntArray;kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Int){}[0]
+    constructor <init>(kotlin/LongArray, kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.LongArray;kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
+    constructor <init>(kotlin/LongArray, kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/Linear.<init>|<init>(kotlin.LongArray;kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
 
     final val constants // com.eignex.klause.factor.arithmetic/Linear.constants|{}constants[0]
         final fun <get-constants>(): com.eignex.klause.factor.arithmetic/LinearConstants // com.eignex.klause.factor.arithmetic/Linear.constants.<get-constants>|<get-constants>(){}[0]
@@ -3591,7 +3591,7 @@ final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.solve
     final val linearRows // com.eignex.klause.factor.arithmetic/Linear.linearRows|{}linearRows[0]
         final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.arithmetic/Linear.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val op // com.eignex.klause.factor.arithmetic/Linear.op|{}op[0]
-        final fun <get-op>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/Linear.op.<get-op>|<get-op>(){}[0]
+        final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/Linear.op.<get-op>|<get-op>(){}[0]
     final val realConstants // com.eignex.klause.factor.arithmetic/Linear.realConstants|{}realConstants[0]
         final fun <get-realConstants>(): com.eignex.klause.factor.arithmetic/RealConstants? // com.eignex.klause.factor.arithmetic/Linear.realConstants.<get-realConstants>|<get-realConstants>(){}[0]
     final val realVars // com.eignex.klause.factor.arithmetic/Linear.realVars|{}realVars[0]
@@ -3697,9 +3697,9 @@ final class com.eignex.klause.factor.arithmetic/ReifiedCardinality : com.eignex.
 }
 
 final class com.eignex.klause.factor.arithmetic/ReifiedLinear : com.eignex.klause.factor/ReifiedFactor { // com.eignex.klause.factor.arithmetic/ReifiedLinear|null[0]
-    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, com.eignex.klause.factor.arithmetic/LinearOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.factor.arithmetic/ReifiedLinear.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;com.eignex.klause.factor.arithmetic.LinearOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
-    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/IntArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Int) // com.eignex.klause.factor.arithmetic/ReifiedLinear.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.IntArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Int){}[0]
-    constructor <init>(kotlin/Int, kotlin/LongArray, kotlin/IntArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/ReifiedLinear.<init>|<init>(kotlin.Int;kotlin.LongArray;kotlin.IntArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Long){}[0]
+    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, com.eignex.klause.ir/LinearOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.factor.arithmetic/ReifiedLinear.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;com.eignex.klause.ir.LinearOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Int) // com.eignex.klause.factor.arithmetic/ReifiedLinear.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Int){}[0]
+    constructor <init>(kotlin/Int, kotlin/LongArray, kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/ReifiedLinear.<init>|<init>(kotlin.Int;kotlin.LongArray;kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
 
     final val auxBoolVar // com.eignex.klause.factor.arithmetic/ReifiedLinear.auxBoolVar|{}auxBoolVar[0]
         final fun <get-auxBoolVar>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedLinear.auxBoolVar.<get-auxBoolVar>|<get-auxBoolVar>(){}[0]
@@ -3712,7 +3712,7 @@ final class com.eignex.klause.factor.arithmetic/ReifiedLinear : com.eignex.klaus
     final val integerTheoryOwnable // com.eignex.klause.factor.arithmetic/ReifiedLinear.integerTheoryOwnable|{}integerTheoryOwnable[0]
         final fun <get-integerTheoryOwnable>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ReifiedLinear.integerTheoryOwnable.<get-integerTheoryOwnable>|<get-integerTheoryOwnable>(){}[0]
     final val op // com.eignex.klause.factor.arithmetic/ReifiedLinear.op|{}op[0]
-        final fun <get-op>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/ReifiedLinear.op.<get-op>|<get-op>(){}[0]
+        final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/ReifiedLinear.op.<get-op>|<get-op>(){}[0]
     final val variables // com.eignex.klause.factor.arithmetic/ReifiedLinear.variables|{}variables[0]
         final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.arithmetic/ReifiedLinear.variables.<get-variables>|<get-variables>(){}[0]
     final val vars // com.eignex.klause.factor.arithmetic/ReifiedLinear.vars|{}vars[0]
@@ -3757,7 +3757,7 @@ final class com.eignex.klause.factor.arithmetic/ReifiedPseudoBoolean : com.eigne
 }
 
 final class com.eignex.klause.factor.arithmetic/ReifiedRealLinear : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.arithmetic/ReifiedRealLinear|null[0]
-    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.factor.arithmetic/LinearOp, kotlin/Double, kotlin/Boolean = ...) // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.factor.arithmetic.LinearOp;kotlin.Double;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean = ...) // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean){}[0]
 
     final val aux // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.aux|{}aux[0]
         final fun <get-aux>(): kotlin/Int // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.aux.<get-aux>|<get-aux>(){}[0]
@@ -3768,7 +3768,7 @@ final class com.eignex.klause.factor.arithmetic/ReifiedRealLinear : com.eignex.k
     final val intCoeffs // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.intCoeffs|{}intCoeffs[0]
         final fun <get-intCoeffs>(): kotlin/DoubleArray // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.intCoeffs.<get-intCoeffs>|<get-intCoeffs>(){}[0]
     final val op // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.op|{}op[0]
-        final fun <get-op>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.op.<get-op>|<get-op>(){}[0]
+        final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.op.<get-op>|<get-op>(){}[0]
     final val realCoeffs // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.realCoeffs|{}realCoeffs[0]
         final fun <get-realCoeffs>(): kotlin/DoubleArray // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.realCoeffs.<get-realCoeffs>|<get-realCoeffs>(){}[0]
     final val realVars // com.eignex.klause.factor.arithmetic/ReifiedRealLinear.realVars|{}realVars[0]
@@ -3849,7 +3849,7 @@ final class com.eignex.klause.factor.bool/Clause : com.eignex.klause.lp/LinearRo
     final val literals // com.eignex.klause.factor.bool/Clause.literals|{}literals[0]
         final fun <get-literals>(): kotlin/IntArray // com.eignex.klause.factor.bool/Clause.literals.<get-literals>|<get-literals>(){}[0]
     final val relation // com.eignex.klause.factor.bool/Clause.relation|{}relation[0]
-        final fun <get-relation>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.bool/Clause.relation.<get-relation>|<get-relation>(){}[0]
+        final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.bool/Clause.relation.<get-relation>|<get-relation>(){}[0]
     final val size // com.eignex.klause.factor.bool/Clause.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.bool/Clause.size.<get-size>|<get-size>(){}[0]
     final val variables // com.eignex.klause.factor.bool/Clause.variables|{}variables[0]
@@ -3896,7 +3896,7 @@ final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.lp/L
     final val op // com.eignex.klause.factor.bool/PseudoBoolean.op|{}op[0]
         final fun <get-op>(): com.eignex.klause.model/PbOp // com.eignex.klause.factor.bool/PseudoBoolean.op.<get-op>|<get-op>(){}[0]
     final val relation // com.eignex.klause.factor.bool/PseudoBoolean.relation|{}relation[0]
-        final fun <get-relation>(): com.eignex.klause.factor.arithmetic/LinearOp // com.eignex.klause.factor.bool/PseudoBoolean.relation.<get-relation>|<get-relation>(){}[0]
+        final fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.bool/PseudoBoolean.relation.<get-relation>|<get-relation>(){}[0]
     final val size // com.eignex.klause.factor.bool/PseudoBoolean.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.factor.bool/PseudoBoolean.size.<get-size>|<get-size>(){}[0]
     final val variables // com.eignex.klause.factor.bool/PseudoBoolean.variables|{}variables[0]
@@ -5497,7 +5497,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
         }
 
         final class CmpReif : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif|null[0]
-            constructor <init>(kotlin/Int, kotlin/LongArray, kotlin/IntArray, kotlin/Long, com.eignex.klause.factor.arithmetic/LinearOp) // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.<init>|<init>(kotlin.Int;kotlin.LongArray;kotlin.IntArray;kotlin.Long;com.eignex.klause.factor.arithmetic.LinearOp){}[0]
+            constructor <init>(kotlin/Int, kotlin/LongArray, kotlin/IntArray, kotlin/Long, com.eignex.klause.ir/LinearOp) // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.<init>|<init>(kotlin.Int;kotlin.LongArray;kotlin.IntArray;kotlin.Long;com.eignex.klause.ir.LinearOp){}[0]
 
             final val boolInputs // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.boolInputs|{}boolInputs[0]
                 final fun <get-boolInputs>(): kotlin/IntArray // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.boolInputs.<get-boolInputs>|<get-boolInputs>(){}[0]

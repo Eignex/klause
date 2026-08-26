@@ -2,7 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
