@@ -47,10 +47,9 @@ class PostDifferenceSystemTest {
     }
 
     @Test
-    fun `a model whose clamped columns make the system unusable is left alone`() {
-        // An unbounded model invents a ±2^62 range per open column and posts it as a declared range.
-        // A potential cannot be summed over weights that size, so the propagator would decline on every
-        // fire — 320,000 times on one nec-smt instance — and the factor is pure cost.
+    fun `a model with over-heavy declared ranges keeps its guarded difference system`() {
+        // The range edges are redundant with CP's domains, so the joint graph drops only those it cannot
+        // represent and still refutes guarded model rows from the remaining graph.
         val clamp = 1L shl 62
         val problem = Problem(
             numBoolVars = 4,
@@ -58,7 +57,7 @@ class PostDifferenceSystemTest {
             intDomains = Array(3) { IntDomain(-clamp, clamp) },
             factors = arrayOf<Factor>(reified(0, 1, 0, -1L), reified(1, 2, 1, -1L)),
         )
-        assertSame(problem, problem.withDifferenceSystem())
+        assertTrue(problem.withDifferenceSystem().factors.last() is DifferenceSystem)
     }
 
     @Test
