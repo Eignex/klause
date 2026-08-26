@@ -33,17 +33,6 @@ final enum class com.eignex.klause.count/SampleQuality : kotlin/Enum<com.eignex.
     final fun values(): kotlin/Array<com.eignex.klause.count/SampleQuality> // com.eignex.klause.count/SampleQuality.values|values#static(){}[0]
 }
 
-final enum class com.eignex.klause.formats/ObjectiveSense : kotlin/Enum<com.eignex.klause.formats/ObjectiveSense> { // com.eignex.klause.formats/ObjectiveSense|null[0]
-    enum entry MAXIMIZE // com.eignex.klause.formats/ObjectiveSense.MAXIMIZE|null[0]
-    enum entry MINIMIZE // com.eignex.klause.formats/ObjectiveSense.MINIMIZE|null[0]
-
-    final val entries // com.eignex.klause.formats/ObjectiveSense.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.formats/ObjectiveSense> // com.eignex.klause.formats/ObjectiveSense.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats/ObjectiveSense.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.eignex.klause.formats/ObjectiveSense> // com.eignex.klause.formats/ObjectiveSense.values|values#static(){}[0]
-}
-
 final enum class com.eignex.klause.ir/LinearOp : kotlin/Enum<com.eignex.klause.ir/LinearOp> { // com.eignex.klause.ir/LinearOp|null[0]
     enum entry EQ // com.eignex.klause.ir/LinearOp.EQ|null[0]
     enum entry GE // com.eignex.klause.ir/LinearOp.GE|null[0]
@@ -55,6 +44,17 @@ final enum class com.eignex.klause.ir/LinearOp : kotlin/Enum<com.eignex.klause.i
 
     final fun valueOf(kotlin/String): com.eignex.klause.ir/LinearOp // com.eignex.klause.ir/LinearOp.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.eignex.klause.ir/LinearOp> // com.eignex.klause.ir/LinearOp.values|values#static(){}[0]
+}
+
+final enum class com.eignex.klause.ir/ObjectiveSense : kotlin/Enum<com.eignex.klause.ir/ObjectiveSense> { // com.eignex.klause.ir/ObjectiveSense|null[0]
+    enum entry MAXIMIZE // com.eignex.klause.ir/ObjectiveSense.MAXIMIZE|null[0]
+    enum entry MINIMIZE // com.eignex.klause.ir/ObjectiveSense.MINIMIZE|null[0]
+
+    final val entries // com.eignex.klause.ir/ObjectiveSense.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.ir/ObjectiveSense> // com.eignex.klause.ir/ObjectiveSense.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.ir/ObjectiveSense.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.ir/ObjectiveSense> // com.eignex.klause.ir/ObjectiveSense.values|values#static(){}[0]
 }
 
 final enum class com.eignex.klause.localsearch.movesource/Phase : kotlin/Enum<com.eignex.klause.localsearch.movesource/Phase> { // com.eignex.klause.localsearch.movesource/Phase|null[0]
@@ -4758,7 +4758,7 @@ final class com.eignex.klause.formats.mps/MpsIndicator { // com.eignex.klause.fo
 }
 
 final class com.eignex.klause.formats.mps/MpsModel { // com.eignex.klause.formats.mps/MpsModel|null[0]
-    constructor <init>(kotlin/String, com.eignex.klause.formats/ObjectiveSense, com.eignex.klause.formats.mps/MpsObjective, kotlin.collections/List<com.eignex.klause.formats.mps/MpsVar>, kotlin.collections/List<com.eignex.klause.formats.mps/MpsConstraint>) // com.eignex.klause.formats.mps/MpsModel.<init>|<init>(kotlin.String;com.eignex.klause.formats.ObjectiveSense;com.eignex.klause.formats.mps.MpsObjective;kotlin.collections.List<com.eignex.klause.formats.mps.MpsVar>;kotlin.collections.List<com.eignex.klause.formats.mps.MpsConstraint>){}[0]
+    constructor <init>(kotlin/String, com.eignex.klause.ir/ObjectiveSense, com.eignex.klause.formats.mps/MpsObjective, kotlin.collections/List<com.eignex.klause.formats.mps/MpsVar>, kotlin.collections/List<com.eignex.klause.formats.mps/MpsConstraint>) // com.eignex.klause.formats.mps/MpsModel.<init>|<init>(kotlin.String;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.formats.mps.MpsObjective;kotlin.collections.List<com.eignex.klause.formats.mps.MpsVar>;kotlin.collections.List<com.eignex.klause.formats.mps.MpsConstraint>){}[0]
 
     final val constraints // com.eignex.klause.formats.mps/MpsModel.constraints|{}constraints[0]
         final fun <get-constraints>(): kotlin.collections/List<com.eignex.klause.formats.mps/MpsConstraint> // com.eignex.klause.formats.mps/MpsModel.constraints.<get-constraints>|<get-constraints>(){}[0]
@@ -4767,16 +4767,16 @@ final class com.eignex.klause.formats.mps/MpsModel { // com.eignex.klause.format
     final val objective // com.eignex.klause.formats.mps/MpsModel.objective|{}objective[0]
         final fun <get-objective>(): com.eignex.klause.formats.mps/MpsObjective // com.eignex.klause.formats.mps/MpsModel.objective.<get-objective>|<get-objective>(){}[0]
     final val sense // com.eignex.klause.formats.mps/MpsModel.sense|{}sense[0]
-        final fun <get-sense>(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.mps/MpsModel.sense.<get-sense>|<get-sense>(){}[0]
+        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.mps/MpsModel.sense.<get-sense>|<get-sense>(){}[0]
     final val variables // com.eignex.klause.formats.mps/MpsModel.variables|{}variables[0]
         final fun <get-variables>(): kotlin.collections/List<com.eignex.klause.formats.mps/MpsVar> // com.eignex.klause.formats.mps/MpsModel.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun component1(): kotlin/String // com.eignex.klause.formats.mps/MpsModel.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.mps/MpsModel.component2|component2(){}[0]
+    final fun component2(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.mps/MpsModel.component2|component2(){}[0]
     final fun component3(): com.eignex.klause.formats.mps/MpsObjective // com.eignex.klause.formats.mps/MpsModel.component3|component3(){}[0]
     final fun component4(): kotlin.collections/List<com.eignex.klause.formats.mps/MpsVar> // com.eignex.klause.formats.mps/MpsModel.component4|component4(){}[0]
     final fun component5(): kotlin.collections/List<com.eignex.klause.formats.mps/MpsConstraint> // com.eignex.klause.formats.mps/MpsModel.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., com.eignex.klause.formats/ObjectiveSense = ..., com.eignex.klause.formats.mps/MpsObjective = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsVar> = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsConstraint> = ...): com.eignex.klause.formats.mps/MpsModel // com.eignex.klause.formats.mps/MpsModel.copy|copy(kotlin.String;com.eignex.klause.formats.ObjectiveSense;com.eignex.klause.formats.mps.MpsObjective;kotlin.collections.List<com.eignex.klause.formats.mps.MpsVar>;kotlin.collections.List<com.eignex.klause.formats.mps.MpsConstraint>){}[0]
+    final fun copy(kotlin/String = ..., com.eignex.klause.ir/ObjectiveSense = ..., com.eignex.klause.formats.mps/MpsObjective = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsVar> = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsConstraint> = ...): com.eignex.klause.formats.mps/MpsModel // com.eignex.klause.formats.mps/MpsModel.copy|copy(kotlin.String;com.eignex.klause.ir.ObjectiveSense;com.eignex.klause.formats.mps.MpsObjective;kotlin.collections.List<com.eignex.klause.formats.mps.MpsVar>;kotlin.collections.List<com.eignex.klause.formats.mps.MpsConstraint>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsModel.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsModel.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsModel.toString|toString(){}[0]
@@ -4862,7 +4862,7 @@ final class com.eignex.klause.formats.smtlib/SExprReader { // com.eignex.klause.
 }
 
 final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klause.formats.smtlib/SmtLibProblem|null[0]
-    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ...) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense){}[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...) // com.eignex.klause.formats.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
 
     final val boolVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
@@ -4875,15 +4875,15 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klaus
     final val realVarNames // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
     final val sense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense|{}sense[0]
-        final fun <get-sense>(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
+        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
 
     final fun component1(): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.formats.smtlib/SmtLibProblem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.smtlib/SmtLibProblem.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component4|component4(){}[0]
     final fun component5(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.component5|component5(){}[0]
-    final fun component6(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.component6|component6(){}[0]
-    final fun copy(com.eignex.klause.solver/ProblemSpec = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense){}[0]
+    final fun component6(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.component6|component6(){}[0]
+    final fun copy(com.eignex.klause.solver/ProblemSpec = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtLibProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibProblem.toString|toString(){}[0]
@@ -4898,7 +4898,7 @@ final class com.eignex.klause.formats.xcsp3/UnsupportedXcsp3Exception : com.eign
 }
 
 final class com.eignex.klause.formats.xcsp3/Xcsp3Problem { // com.eignex.klause.formats.xcsp3/Xcsp3Problem|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.formats.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense;kotlin.IntArray){}[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.formats.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
 
     final val definedVars // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definedVars|{}definedVars[0]
         final fun <get-definedVars>(): kotlin/IntArray // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definedVars.<get-definedVars>|<get-definedVars>(){}[0]
@@ -4909,14 +4909,14 @@ final class com.eignex.klause.formats.xcsp3/Xcsp3Problem { // com.eignex.klause.
     final val problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.problem.<get-problem>|<get-problem>(){}[0]
     final val sense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.sense|{}sense[0]
-        final fun <get-sense>(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.sense.<get-sense>|<get-sense>(){}[0]
+        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.sense.<get-sense>|<get-sense>(){}[0]
 
     final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component3|component3(){}[0]
-    final fun component4(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component4|component4(){}[0]
+    final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component4|component4(){}[0]
     final fun component5(): kotlin/IntArray // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component5|component5(){}[0]
-    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.formats/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.formats.ObjectiveSense;kotlin.IntArray){}[0]
+    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.xcsp3/Xcsp3Problem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.xcsp3/Xcsp3Problem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.xcsp3/Xcsp3Problem.toString|toString(){}[0]

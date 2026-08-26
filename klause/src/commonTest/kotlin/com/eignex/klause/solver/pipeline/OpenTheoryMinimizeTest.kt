@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.mps.MpsConstraint
 import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.MpsObjective
@@ -13,6 +12,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class OpenTheoryMinimizeTest {
 
@@ -95,7 +95,7 @@ class OpenTheoryMinimizeTest {
         // objective existed on that route the front-end refused the model outright.
         val compiled = MpsModel(
             "m",
-            ObjectiveSense.MINIMIZE,
+            ObjectiveDirection.MINIMIZE,
             MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
             listOf(MpsVar("x", integer = true, lower = null, upper = null)),
             listOf(MpsConstraint("c", intArrayOf(0), doubleArrayOf(1.0), lower = 7.0, upper = null)),

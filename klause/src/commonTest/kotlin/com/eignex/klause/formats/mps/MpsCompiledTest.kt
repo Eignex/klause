@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.ir.ObjectiveSense
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.formats.ObjectiveSense
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.sourceRoute
 import kotlin.test.Test

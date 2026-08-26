@@ -1,4 +1,4 @@
-package com.eignex.klause.formats
+package com.eignex.klause.ir
 
 /**
  * The optimisation direction of a parsed objective, shared across the input formats (MPS `OBJSENSE`,
