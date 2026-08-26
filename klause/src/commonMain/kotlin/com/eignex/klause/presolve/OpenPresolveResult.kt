@@ -2,6 +2,8 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
+import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -114,13 +116,17 @@ private fun ProblemSpec.openPresolveRows(): List<Linear> {
         truth[variable] = value
     }
     val rows = ArrayList<Linear>()
-    for (factor in factors) when (factor) {
+    for (factor in factors) {
+        when (factor) {
         is Linear -> rows += roundIntegerRow(factor)
+
         is ReifiedLinear -> if (fixed[factor.auxBoolVar] && truth[factor.auxBoolVar]) {
             val constants = factor.integerConstants ?: continue
             rows += roundIntegerRow(Linear(constants.coeffs, factor.vars.copyOf(), factor.op, constants.bound))
         }
+
         else -> Unit
+    }
     }
     return rows
 }
@@ -131,8 +137,8 @@ private fun roundIntegerRow(row: Linear): Linear {
     val gcd = PresolveShared.gcdOf(constants.coeffs)
     if (gcd <= 1L) return row
     val bound = when (row.op) {
-        LinearOp.LE -> Math.floorDiv(constants.bound, gcd)
-        LinearOp.GE -> -Math.floorDiv(-constants.bound, gcd)
+        LinearOp.LE -> floorDivLong(constants.bound, gcd)
+        LinearOp.GE -> ceilDivLong(constants.bound, gcd)
         else -> return row
     }
     return Linear(
