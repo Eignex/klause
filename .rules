@@ -9,6 +9,12 @@ Run `./gradlew check lintDocs`.
 - check runs tests and some light checks.
 - lintDocs runs detekt and dokka linting.
 - For new/edited files add `--rerun-tasks`, detekt caches per source-set and skips them otherwise.
+- detekt and dokka run on alpha analysis engines and fail intermittently. A detekt failure reporting
+  **zero findings**, or a dokka `Error in translating of symbol`, with a stack frame inside the Kotlin
+  analysis API rather than a file of yours, is a flake: re-run the task before investigating. Seen as
+  `No receiver found in qualified expression`, `AsyncExecutionService.getService must not return null`,
+  and a dokka failure on an untouched file that passes locally. A genuine violation names your file and
+  the rule.
 
 ## Tests
 
