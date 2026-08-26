@@ -42,10 +42,6 @@ internal const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
 internal const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
 internal const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
 
-/** Diminishing-returns abort threshold: a round that reduces the problem by less
- *  than this fraction ends the loop. Tiny, so it only trips on marginal spinning, never real work. */
-private const val PRESOLVE_ABORT_FRACTION = 0.001
-
 /** Cheap problem-complexity measure for the effectiveness abort: constraint count plus total domain
  *  span. Drops when a pass removes a constraint or tightens a domain; a round that instead grows the
  *  problem (symmetry breaking adding ordering constraints) simply doesn't trip the abort. */
@@ -210,21 +206,6 @@ object Presolver {
         )
     }
 
-    /**
-     * The slice the next pass gets: at most half of what is left while other passes are still to run, and
-     * all of it for the last one. Splitting the remainder *equally* was tried and is far too flat — the
-     * passes differ in cost by orders of magnitude, so an even share starves the expensive ones without
-     * the cheap ones needing theirs. Halving lets a hungry pass take most of the budget while still
-     * leaving a geometric tail for everything behind it. The pass also stops on the phase-wide
-     * [cancellation], which carries the solve deadline.
-     */
-    private fun sliceOf(budget: PresolveBudget, cancellation: Cancellation, eligible: Int): Cancellation {
-        val left = budget.remaining()
-        val share = if (eligible > 1) left / 2 else left
-        val slice = budget.slice(share)
-        return Cancellation { cancellation() || slice() }
-    }
-
     /** The per-path operations the shared [runRounds] scheduler drives: where a pass reads its input,
      *  how its context is specialised, where a firing pass's delta lands, and the complexity measure
      *  for the diminishing-returns abort. [run] backs it with a rebuilt [Problem] per firing pass,
@@ -267,64 +248,22 @@ object Presolver {
         cancellation: Cancellation,
         host: RoundHost,
         budget: PresolveBudget? = null,
-    ): RoundResult {
-        val reconstructs = ArrayList<(Sample) -> Sample>() // in application order
-        var version = 0
-        val ranAtVersion = HashMap<PresolvePass, Int>()
-        val fired = LinkedHashSet<PresolvePass>() // passes that changed the problem, in first-fire order
-        val exhausted = HashSet<PresolvePass>()
-        var round = 0
-        var roundStartComplexity = host.complexity()
-        while (round < maxRounds && !cancellation()) {
-            var ranAny = false
-            // Passes still eligible this round. Each one is given an equal share of what is left *at the
-            // moment it starts*, so a pass that returns early hands its remainder to those behind it
-            // instead of the share being a fixed quantum.
-            var eligible = passes.count { it !in exhausted && ranAtVersion[it] != version }
-            for (pass in passes) {
-                if (cancellation()) break
-                if (pass in exhausted) continue
-                if (ranAtVersion[pass] == version) continue
-                ranAtVersion[pass] = version
-                ranAny = true
-                // [passInput] first, always: it refreshes the live-id mapping that [passContext]'s shared
-                // occurrence view is keyed against. Building the context first hands the pass an index
-                // derived from the previous round's live set.
-                val input = host.passInput()
-                val ctx = host.passContext(pass)
-                val sliced = budget?.let { b ->
-                    ctx.withCancellation(sliceOf(b, cancellation, eligible))
-                } ?: ctx
-                eligible--
-                val delta = pass.apply(input, sliced)
-                if (!delta.isEmpty) {
-                    delta.reconstruct?.let { reconstructs.add(it) }
-                    host.applyDelta(delta)
-                    fired.add(pass)
-                    version++
-                } else if (pass.skipAfterEmpty) {
-                    exhausted.add(pass)
-                }
-                host.afterPass(pass)
-            }
-            if (!ranAny) break // every enabled pass has run at the current version → fixpoint
-            round++
-            val now = host.complexity()
-            val reduced = roundStartComplexity - now
-            if (reduced > 0 && reduced.toDouble() < PRESOLVE_ABORT_FRACTION * roundStartComplexity) break
-            roundStartComplexity = now
-        }
-        return RoundResult(fired.toList(), reconstructs)
-    }
+    ): RoundResult = PresolveRoundEngine.run(
+        passes,
+        maxRounds,
+        cancellation,
+        budget,
+        host::passInput,
+        host::passContext,
+        host::applyDelta,
+        host::afterPass,
+        host::complexity,
+    ).let { RoundResult(it.fired, it.reconstructs) }
 
     /** Compose per-pass reconstructs (application order) into the single solution-mapping function,
      *  applied in reverse so a final-problem solution maps all the way back to the original. */
     private fun composeReconstructs(reconstructs: List<(Sample) -> Sample>): (Sample) -> Sample =
-        if (reconstructs.isEmpty()) {
-            { it }
-        } else {
-            { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
-        }
+        PresolveRoundEngine.compose(reconstructs)
 
     /** Build subsume's incremental input from the session: a full rebuild when it has no prior mark or the
      *  mark predates a reseed, else the factors added / dropped since. A factor added then dropped between
