@@ -103,7 +103,7 @@ internal class IntegerCertificate(
     private val numerator: Int128,
 ) {
     /** The scale exponent `k`: the objective is `objectiveNumerator / 2ᵏ`. Lets a caller summing several
-     *  certificates' objectives (e.g. [componentLowerBoundCeil]) bring them to a common denominator. */
+     *  certificates' objectives bring them to a common denominator. */
     val objectiveScaleBits: Int get() = scaleBits
 
     /** A copy of `N = 2ᵏ · objective` (the exact scaled objective numerator); see [objectiveScaleBits]. */
