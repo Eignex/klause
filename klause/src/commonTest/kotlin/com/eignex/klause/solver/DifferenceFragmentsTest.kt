@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering
+package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.Potentials
@@ -8,9 +8,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -19,13 +16,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Gathering a model's difference constraints. The cases that matter are the mixed ones: a real QF_IDL
- * instance is clauses and reified rows around a core of differences, so collecting must compose with
- * structure it does not understand rather than refusing the model.
- */
-class DifferenceLoweringTest {
-
+class DifferenceFragmentsTest {
     private fun open(n: Int) = Array(n) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) }
 
     private fun frag(factors: List<Factor>, n: Int, domains: Array<IntDomain> = open(n)) =
@@ -50,7 +41,6 @@ class DifferenceLoweringTest {
 
     @Test
     fun `an open model side does not become a difference range edge`() {
-        val domains = arrayOf(IntDomain(-8, 8))
         val bounds = IntBounds.fromFiniteBounds(
             longArrayOf(-8),
             longArrayOf(8),
@@ -59,11 +49,9 @@ class DifferenceLoweringTest {
             null,
             null,
         )
-
         val fragment = assertNotNull(
             differenceFragmentOf(arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)), 1, bounds),
         )
-
         assertTrue(fragment.edges.none { it.domainBound })
     }
 
@@ -77,7 +65,6 @@ class DifferenceLoweringTest {
 
     @Test
     fun `a reified row also contributes the negation its false aux asserts`() {
-        // `¬(x0 − x1 ≤ 3)` is `x1 − x0 ≤ −4` over the integers, a difference in its own right.
         val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         val f = assertNotNull(frag(listOf(r), 2))
         val negated = f.edges.single { it.guard == Lit.make(7, false) }
@@ -86,7 +73,6 @@ class DifferenceLoweringTest {
 
     @Test
     fun `a reified equality contributes nothing under a false aux`() {
-        // Its negation is a disequality, which is outside the fragment.
         val r = ReifiedLinear(7, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 3)
         val f = assertNotNull(frag(listOf(r), 2))
         assertTrue(f.edges.none { it.guard == Lit.make(7, false) })
@@ -94,10 +80,7 @@ class DifferenceLoweringTest {
 
     @Test
     fun `a clause does not disqualify the model`() {
-        // The all-or-nothing predecessor recognised 0 of 30 real instances for exactly this reason.
-        val f = assertNotNull(
-            frag(listOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))), 2),
-        )
+        val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))), 2))
         assertTrue(f.edges.any { it.guard == DifferenceEdge.ALWAYS })
     }
 
@@ -111,17 +94,13 @@ class DifferenceLoweringTest {
 
     @Test
     fun `a contradictory pair is refuted by the graph`() {
-        val f = assertNotNull(
-            frag(listOf(diff(0, 1, LinearOp.LE, -1), diff(1, 0, LinearOp.LE, -1)), 2),
-        )
-        assertNotNull(f.graph().negativeCycle(), "the pair sums to 0 ≤ −2")
+        val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, -1), diff(1, 0, LinearOp.LE, -1)), 2))
+        assertNotNull(f.graph().negativeCycle(), "the pair sums to 0 <= -2")
     }
 
     @Test
     fun `an equality contributes both directions`() {
-        val f = assertNotNull(
-            frag(listOf(diff(0, 1, LinearOp.EQ, 2), diff(0, 1, LinearOp.LE, 1)), 2),
-        )
+        val f = assertNotNull(frag(listOf(diff(0, 1, LinearOp.EQ, 2), diff(0, 1, LinearOp.LE, 1)), 2))
         assertNotNull(f.graph().negativeCycle())
     }
 
@@ -140,19 +119,13 @@ class DifferenceLoweringTest {
     @Test
     fun `complete difference coverage permits boolean structure`() {
         assertTrue(
-            hasCompleteDifferenceCoverage(
-                arrayOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))),
-            ),
+            hasCompleteDifferenceCoverage(arrayOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true))))),
         )
     }
 
     @Test
     fun `complete difference coverage rejects a general linear row`() {
-        assertFalse(
-            hasCompleteDifferenceCoverage(
-                arrayOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)),
-            ),
-        )
+        assertFalse(hasCompleteDifferenceCoverage(arrayOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3))))
     }
 
     @Test
@@ -168,14 +141,12 @@ class DifferenceLoweringTest {
     fun `potential sample satisfies active difference edges`() {
         val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
         val values = assertIs<Potentials.Found>(fragment.potentialSample(2, BooleanArray(0))).values
-
         assertTrue(values[0] - values[1] <= 3L)
     }
 
     @Test
     fun `a spent budget abandons the sample instead of reporting infeasible`() {
         val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
-
         assertEquals(Potentials.Abandoned, fragment.potentialSample(2, BooleanArray(0)) { true })
     }
 }
