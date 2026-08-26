@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
@@ -23,6 +23,7 @@ import com.eignex.klause.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.util.IntArrayList
 
 /** Map `solve :: *_search(...)` annotations to [BacktrackParams]. */

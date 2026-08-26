@@ -1,8 +1,9 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.flatzinc.FlatZincCompiler.ParamValue
+import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.flatzinc.FlatZincCompiler.ParamValue
 import com.eignex.klause.solver.values
 
 internal fun FlatZincCompiler.evaluateParam(e: FznExpr, declaredType: FznType): ParamValue = when (e) {

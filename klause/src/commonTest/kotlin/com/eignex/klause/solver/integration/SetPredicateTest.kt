@@ -2,9 +2,9 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.formats.flatzinc.SetVarLayout
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
-import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
+import com.eignex.klause.lowering.flatzinc.SetVarLayout
+import com.eignex.klause.lowering.flatzinc.parseFlatZinc
+import com.eignex.klause.lowering.flatzinc.writeFlatZincSolution
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
