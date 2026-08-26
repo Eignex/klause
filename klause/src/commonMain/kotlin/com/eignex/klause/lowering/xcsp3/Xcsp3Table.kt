@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.xcsp3
+package com.eignex.klause.lowering.xcsp3
+
+import com.eignex.klause.formats.xcsp3.*
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
