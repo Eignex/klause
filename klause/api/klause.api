@@ -8079,24 +8079,6 @@ public final class com/eignex/klause/solver/Assumptions$Companion {
 public final class com/eignex/klause/solver/BakedProblem : com/eignex/klause/solver/Problem {
 }
 
-public final class com/eignex/klause/solver/ComponentPlan {
-	public final fun cpProjection (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/CpProblemProjection;
-	public final fun factorOwner (I)Lcom/eignex/klause/solver/FactorOwner;
-	public final fun getCpIntVars ()[I
-	public final fun getHasCpComponent ()Z
-	public final fun getHasTheoryComponent ()Z
-	public final fun getTheoryIntVars ()[I
-	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
-	public final fun getUnplaceable ()Lcom/eignex/klause/solver/UnplaceableColumn;
-	public final fun intOwner (I)Lcom/eignex/klause/solver/IntVariableOwner;
-	public final fun materialize (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/Problem;
-	public final fun theoryFragment (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemSpec;
-}
-
-public final class com/eignex/klause/solver/ComponentPlanKt {
-	public static final fun componentPlan (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ComponentPlan;
-}
-
 public abstract interface class com/eignex/klause/solver/ConstList {
 	public abstract fun getSize ()I
 }
@@ -8107,12 +8089,6 @@ public final class com/eignex/klause/solver/ConstListKt {
 	public static final fun getIndices (Lcom/eignex/klause/solver/ConstList;)Lkotlin/ranges/IntRange;
 	public static final fun getNoConsts ()Lcom/eignex/klause/solver/LongConstList;
 	public static final fun longsOrNull (Lcom/eignex/klause/solver/ConstList;)Lcom/eignex/klause/solver/LongConstList;
-}
-
-public final class com/eignex/klause/solver/CpProblemProjection {
-	public final fun cpId (I)I
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
-	public final fun sourceId (I)I
 }
 
 public final class com/eignex/klause/solver/DeducedRestrictions {
@@ -8190,15 +8166,6 @@ public final class com/eignex/klause/solver/Factor$DefaultImpls {
 	public static fun remapValues (Lcom/eignex/klause/solver/Factor;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
 	public static fun structuralReduce (Lcom/eignex/klause/solver/Factor;[Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
 	public static fun substituteAffine (Lcom/eignex/klause/solver/Factor;IIII)Lcom/eignex/klause/solver/Factor;
-}
-
-public final class com/eignex/klause/solver/FactorOwner : java/lang/Enum {
-	public static final field CP Lcom/eignex/klause/solver/FactorOwner;
-	public static final field SHARED Lcom/eignex/klause/solver/FactorOwner;
-	public static final field THEORY Lcom/eignex/klause/solver/FactorOwner;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/FactorOwner;
-	public static fun values ()[Lcom/eignex/klause/solver/FactorOwner;
 }
 
 public abstract interface class com/eignex/klause/solver/FactorReduction {
@@ -8318,14 +8285,6 @@ public abstract interface class com/eignex/klause/solver/IntSpan {
 	public abstract fun valueAt (I)J
 }
 
-public final class com/eignex/klause/solver/IntVariableOwner : java/lang/Enum {
-	public static final field CP Lcom/eignex/klause/solver/IntVariableOwner;
-	public static final field THEORY Lcom/eignex/klause/solver/IntVariableOwner;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/IntVariableOwner;
-	public static fun values ()[Lcom/eignex/klause/solver/IntVariableOwner;
-}
-
 public abstract interface class com/eignex/klause/solver/LongConstList : com/eignex/klause/solver/ConstList {
 	public abstract fun at (I)J
 	public abstract fun getMaxAbs ()J
@@ -8398,23 +8357,6 @@ public class com/eignex/klause/solver/Problem {
 	protected final fun setBakeElapsed-LRDsOJo (J)V
 	public final fun withIntDomains ([Lcom/eignex/klause/solver/IntDomain;[Z[Z)Lcom/eignex/klause/solver/Problem;
 	public static synthetic fun withIntDomains$default (Lcom/eignex/klause/solver/Problem;[Lcom/eignex/klause/solver/IntDomain;[Z[ZILjava/lang/Object;)Lcom/eignex/klause/solver/Problem;
-}
-
-public final class com/eignex/klause/solver/ProblemPipeline : java/lang/Enum {
-	public static final field DIFFERENCE_THEORY Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field EXACT_LIRA Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field EXACT_LRA Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field FINITE_CP Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field GENERAL_LIA Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field UNSUPPORTED_OPEN Lcom/eignex/klause/solver/ProblemPipeline;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/ProblemPipeline;
-	public static fun values ()[Lcom/eignex/klause/solver/ProblemPipeline;
-}
-
-public final class com/eignex/klause/solver/ProblemPipelineKt {
-	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final fun supportsExactLra (Lcom/eignex/klause/solver/ProblemSpec;)Z
 }
 
 public final class com/eignex/klause/solver/ProblemSpec {
@@ -8643,26 +8585,6 @@ public final class com/eignex/klause/solver/UnitConsts : com/eignex/klause/solve
 	public fun toLongArray ()[J
 }
 
-public final class com/eignex/klause/solver/UnplaceableColumn {
-	public fun <init> (ILjava/lang/Integer;Ljava/lang/String;)V
-	public final fun getColumn ()I
-	public final fun getFactorIndex ()Ljava/lang/Integer;
-	public final fun getFactorKind ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/solver/VariablePartition {
-	public fun <init> ([Z)V
-	public final fun getSize ()I
-	public final fun getTheoryEligibleCount ()I
-	public final fun isSearchVariable (I)Z
-	public final fun isTheoryEligible (I)Z
-}
-
-public final class com/eignex/klause/solver/VariablePartitionKt {
-	public static final fun variablePartition (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/solver/VariablePartition;
-	public static final fun variablePartition (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/VariablePartition;
-}
-
 public final class com/eignex/klause/solver/WideConsts : com/eignex/klause/solver/ConstList {
 	public fun <init> ([Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
 	public final fun at (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
@@ -8730,6 +8652,39 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/ComponentPlan {
+	public final fun cpProjection (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/pipeline/CpProblemProjection;
+	public final fun factorOwner (I)Lcom/eignex/klause/solver/pipeline/FactorOwner;
+	public final fun getCpIntVars ()[I
+	public final fun getHasCpComponent ()Z
+	public final fun getHasTheoryComponent ()Z
+	public final fun getTheoryIntVars ()[I
+	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public final fun getUnplaceable ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
+	public final fun intOwner (I)Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
+	public final fun materialize (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/Problem;
+	public final fun theoryFragment (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemSpec;
+}
+
+public final class com/eignex/klause/solver/pipeline/ComponentPlanKt {
+	public static final fun componentPlan (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
+}
+
+public final class com/eignex/klause/solver/pipeline/CpProblemProjection {
+	public final fun cpId (I)I
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun sourceId (I)I
+}
+
+public final class com/eignex/klause/solver/pipeline/FactorOwner : java/lang/Enum {
+	public static final field CP Lcom/eignex/klause/solver/pipeline/FactorOwner;
+	public static final field SHARED Lcom/eignex/klause/solver/pipeline/FactorOwner;
+	public static final field THEORY Lcom/eignex/klause/solver/pipeline/FactorOwner;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/FactorOwner;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/FactorOwner;
+}
+
 public final class com/eignex/klause/solver/pipeline/FiniteEngine : java/lang/Enum {
 	public static final field ALNS Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public static final field BACKTRACK Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -8780,6 +8735,14 @@ public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
 	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
 }
 
+public final class com/eignex/klause/solver/pipeline/IntVariableOwner : java/lang/Enum {
+	public static final field CP Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
+	public static final field THEORY Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 }
 
@@ -8828,7 +8791,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Genera
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/ProblemPipeline;)V
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/pipeline/ProblemPipeline;)V
 	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryEngine;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
@@ -8860,7 +8823,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryMinimizer {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;)V
-	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
+	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public final fun minimize (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryMinimizer;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 }
@@ -8972,8 +8935,45 @@ public final class com/eignex/klause/solver/pipeline/PlannedSearch {
 }
 
 public final class com/eignex/klause/solver/pipeline/PlannedSearchKt {
-	public static final fun search (Lcom/eignex/klause/solver/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
-	public static synthetic fun search$default (Lcom/eignex/klause/solver/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
+	public static final fun search (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
+	public static synthetic fun search$default (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
+}
+
+public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang/Enum {
+	public static final field DIFFERENCE_THEORY Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field EXACT_LIRA Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field EXACT_LRA Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field FINITE_CP Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field GENERAL_LIA Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field UNSUPPORTED_OPEN Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+}
+
+public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
+	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final fun supportsExactLra (Lcom/eignex/klause/solver/ProblemSpec;)Z
+}
+
+public final class com/eignex/klause/solver/pipeline/UnplaceableColumn {
+	public fun <init> (ILjava/lang/Integer;Ljava/lang/String;)V
+	public final fun getColumn ()I
+	public final fun getFactorIndex ()Ljava/lang/Integer;
+	public final fun getFactorKind ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/VariablePartition {
+	public fun <init> ([Z)V
+	public final fun getSize ()I
+	public final fun getTheoryEligibleCount ()I
+	public final fun isSearchVariable (I)Z
+	public final fun isTheoryEligible (I)Z
+}
+
+public final class com/eignex/klause/solver/pipeline/VariablePartitionKt {
+	public static final fun variablePartition (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/solver/pipeline/VariablePartition;
+	public static final fun variablePartition (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/VariablePartition;
 }
 
 public final class com/eignex/klause/solver/result/ConflictAnalysisStats {
@@ -10336,7 +10336,7 @@ public final class com/eignex/klause/theory/TheoryCheck$Sat : com/eignex/klause/
 }
 
 public final class com/eignex/klause/theory/TheoryComponentFactoryKt {
-	public static final fun theoryComponent (Lcom/eignex/klause/solver/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/search/TheoryComponent;
+	public static final fun theoryComponent (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/search/TheoryComponent;
 }
 
 public abstract interface class com/eignex/klause/theory/TheoryContext {
