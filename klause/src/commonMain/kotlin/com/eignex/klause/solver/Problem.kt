@@ -4,14 +4,10 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.rootBake
 import com.eignex.klause.propagation.runRootPropagation
-import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.LongArrayList
-import com.eignex.klause.util.MutableIntObjectMap
-import com.eignex.klause.util.toSortedLongArray
 import kotlin.time.Duration
 
 /**
@@ -376,34 +372,6 @@ open class Problem(
         modelBounds = intBounds,
         alreadyFolded = true,
     )
-
-    /** Folds the root-level int deductions of a successful bake into [requireFiniteIntDomains] so the
-     *  tightened bounds are part of the problem itself rather than transient solver state.
-     *  Bounds are applied before holes so every recorded hole is interior to the final
-     *  bounds; pins collapse the domain to a singleton via the same hole-aware paths. */
-    protected fun foldIntoDomains(result: PropagationResult) {
-        if (result !is PropagationResult.Implied) return
-        result.forEachInt { v, value ->
-            requireFiniteIntDomains()[v] = requireFiniteIntDomains()[v].withMinAtLeast(value).withMaxAtMost(value)
-        }
-        result.forEachIntMin { v, lo -> requireFiniteIntDomains()[v] = requireFiniteIntDomains()[v].withMinAtLeast(lo) }
-        result.forEachIntMax { v, hi -> requireFiniteIntDomains()[v] = requireFiniteIntDomains()[v].withMaxAtMost(hi) }
-        // Group the baked holes per variable and exclude each set in one merged pass. Applying a
-        // wide hole set one value at a time rebuilds the hole array per value (O(holes^2)) — the
-        // construction-time wedge on Element-heavy instances. Holes are interior to the
-        // bounds folded above, so excluding them never empties a domain of an Implied bake.
-        val holesByVar = MutableIntObjectMap<LongArrayList>()
-        result.forEachIntHole { v, value -> holesByVar.getOrPut(v) { LongArrayList() }.add(value) }
-        holesByVar.forEach { v, holes ->
-            val sorted = holes.toSortedLongArray()
-            requireFiniteIntDomains()[v] = requireNotNull(requireFiniteIntDomains()[v].excludeValues(sorted)) {
-                "baked holes emptied domain $v despite an Implied bake"
-            }
-        }
-        // Wide-but-sparse reductions fold by rebuilding the domain from its survivor set directly —
-        // O(survivors), never materializing the O(span) hole set the excludeValues path above would.
-        result.forEachIntSet { v, survivors -> requireFiniteIntDomains()[v] = intDomainFromSurvivors(survivors) }
-    }
 
     /**
      * Run sound-but-incomplete deductive propagation against [assumptions]. Each factor's

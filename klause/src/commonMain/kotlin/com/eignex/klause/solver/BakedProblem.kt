@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.foldRootDeductionsIntoDomains
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -53,7 +54,7 @@ class BakedProblem internal constructor(
     init {
         if (!alreadyFolded) {
             val mark = TimeSource.Monotonic.markNow()
-            foldIntoDomains(baked)
+            foldRootDeductionsIntoDomains(baked)
             bakeElapsed = mark.elapsedNow()
         }
     }
