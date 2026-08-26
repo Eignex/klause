@@ -4,6 +4,7 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -338,17 +339,26 @@ class CliModeTest {
 
     @Test
     fun `default engine is mixed and is overridable via the KLAUSE_ENGINE property`() {
-        assertTrue(defaultEngine() == Engine.MIXED, defaultEngine().id)
+        assertTrue(defaultEngine() == FiniteEngine.MIXED, defaultEngine().id)
         // cliProp reads the system property first on the JVM, so it stands in for the env var.
         System.setProperty("klause.engine", "fixed")
         try {
-            assertTrue(defaultEngine() == Engine.FIXED, defaultEngine().id)
+            assertTrue(defaultEngine() == FiniteEngine.FIXED, defaultEngine().id)
             // The override must surface in --help so a packaged image's default is visible.
             val out = capture { main(arrayOf("--help")) }
             assertTrue("default: fixed" in out, out)
         } finally {
             System.clearProperty("klause.engine")
         }
+    }
+
+    @Test
+    fun `engine tokens map to their finite solve routes`() {
+        assertEquals(FiniteEngine.FIXED, parseEngine("fixed"))
+        assertEquals(FiniteEngine.BACKTRACK, parseEngine("cp"))
+        assertEquals(FiniteEngine.LOCAL_SEARCH, parseEngine("local-search"))
+        assertEquals(FiniteEngine.MIXED, parseEngine("portfolio"))
+        assertEquals(FiniteEngine.ALNS, parseEngine("lns"))
     }
 
     @Test
