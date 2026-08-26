@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.factor.bool.Xor
 import kotlin.test.Test

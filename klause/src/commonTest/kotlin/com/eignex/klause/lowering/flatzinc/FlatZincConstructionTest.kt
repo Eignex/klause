@@ -1,6 +1,7 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.flatzinc.FlatZincParseException
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
