@@ -5,6 +5,9 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.ValSelectorKind
+import com.eignex.klause.solver.pipeline.VarSelectorKind
+import com.eignex.klause.solver.pipeline.ineffectiveNumerics
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
