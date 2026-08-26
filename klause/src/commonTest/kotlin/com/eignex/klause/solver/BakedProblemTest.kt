@@ -8,9 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ProblemRebuildTest {
-
-    /** A mixed model: one continuous column a reified row reads, and one integer column. */
+class BakedProblemTest {
     private fun mixed(): Problem = Problem(
         numBoolVars = 1,
         numIntVars = 1,
