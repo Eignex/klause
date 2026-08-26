@@ -8751,12 +8751,11 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/ProblemPipeline;Lcom/eignex/klause/solver/objective/LinearObjective;Z)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/ProblemPipeline;Lcom/eignex/klause/solver/objective/LinearObjective;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getMaximize ()Z
 	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getRoute ()Lcom/eignex/klause/solver/ProblemPipeline;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryResult {

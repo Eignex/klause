@@ -1,16 +1,14 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.TheoryParams
 
 /** A complete open-model solve request selected by the orchestration layer. */
 class OpenTheoryRequest(
-    /** Source model the selected route decides. */
+    /** Source model whose complete theory route is selected by this pipeline. */
     val model: ProblemSpec,
-    /** Complete theory route selected for [model]. */
-    val route: ProblemPipeline,
     /** Null requests satisfiability; a value requests optimization. */
     val objective: LinearObjective? = null,
     /** Whether [objective] is maximized rather than minimized. */
@@ -38,7 +36,8 @@ object OpenTheoryPipeline {
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
         val objective = request.objective
         if (objective == null) {
-            return OpenTheoryExecution.Satisfy(OpenTheoryEngine(request.model, request.route).solve(params))
+            val plan = request.model.componentPlan()
+            return OpenTheoryExecution.Satisfy(OpenTheoryEngine(request.model, plan.theoryPipeline, plan).solve(params))
         }
         val driven = if (request.maximize) objective.negated() else objective
         return OpenTheoryExecution.Optimize(OpenTheoryMinimizer(request.model, driven).minimize(params))

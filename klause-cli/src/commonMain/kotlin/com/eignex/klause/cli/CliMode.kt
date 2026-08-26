@@ -11,7 +11,6 @@ import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -523,7 +522,6 @@ internal sealed interface SolvablePipeline {
     /** A complete open-model theory, selected by the solver-side route builder. */
     data class OpenTheory(
         val model: ProblemSpec,
-        val route: ProblemPipeline,
         val render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
         /** Objective to minimize over the route, or null to decide satisfiability only. */
         val objective: LinearObjective? = null,
@@ -551,7 +549,6 @@ internal fun differenceTheorySolvable(
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
         model,
-        ProblemPipeline.DIFFERENCE_THEORY,
         { assignment ->
             render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
         },
@@ -579,7 +576,6 @@ internal fun generalLiaSolvable(
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
         model,
-        ProblemPipeline.GENERAL_LIA,
         { assignment ->
             render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
         },
@@ -599,7 +595,7 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     definitionalSweep = null,
     render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LRA, render = { assignment ->
+    pipeline = SolvablePipeline.OpenTheory(model, render = { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment)
     }),
 )
@@ -623,7 +619,6 @@ internal fun exactLiraSolvable(
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
         model,
-        ProblemPipeline.EXACT_LIRA,
         { assignment ->
             render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
         },
