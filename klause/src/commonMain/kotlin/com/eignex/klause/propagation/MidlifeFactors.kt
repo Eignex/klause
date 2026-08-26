@@ -33,11 +33,11 @@ internal class MidlifeFactors {
      *  factor ids that wake on any change to bool var `v` (those NOT using per-literal watchers).
      *  `null` until the first such factor is added — a search state and a watcher-only presolve
      *  never allocate it, so `enqueueForBoolChange` pays a single null-check. Complements
-     *  [com.eignex.klause.solver.Problem.nonBoolWatcherBoolOccurrences]. */
+     *  [PropagationProblem.nonBoolWatcherBoolOccurrences]. */
     var boolOccurrences: Array<IntArrayList>? = null
 
     /** Int-side analog of [boolOccurrences]: `[v]` lists mid-life factor ids that wake on any
      *  change to int var `v` and do not subscribe to a typed int-event on `v`. Complements
-     *  [com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences]. */
+     *  [PropagationProblem.nonIntEventWatcherIntOccurrences]. */
     var intOccurrences: Array<IntArrayList>? = null
 }

@@ -92,5 +92,3 @@ class PropagationProblem(
         return out
     }
 }
-
-internal val Problem.clauseArena: ClauseArena get() = PropagationProblem(this).clauseArena

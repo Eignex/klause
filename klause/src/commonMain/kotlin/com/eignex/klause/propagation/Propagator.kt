@@ -69,7 +69,7 @@ interface Propagator {
      * [com.eignex.klause.propagation.IntEvent.LB_RAISED] / `UB_LOWERED` and skip waking on
      * interior value removals it cannot act on; a factor that only reacts to assignment can
      * subscribe to `FIXED` alone. A variable named here is removed from this factor's
-     * occurrence-list wakeup (see [com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences])
+     * occurrence-list wakeup (see [PropagationProblem.nonIntEventWatcherIntOccurrences])
      * — so the subscription must cover every kind the factor needs to stay correct; an under-broad
      * subscription silently drops a wake. A variable in [Factor.intVars] but *not* named here keeps
      * its normal occurrence-list wakeup.
@@ -129,7 +129,7 @@ interface Propagator {
  * The absence of a deductive role. A factor whose [Factor.asPropagator] returns this is
  * **invariant-only**: it participates in local search but never filters domains. The CP
  * engine skips such factors entirely — they are dropped from the deductive occurrence lists
- * ([Problem.boolOccurrences] / [Problem.intOccurrences]) so propagation never wakes them. All
+ * ([PropagationProblem.boolOccurrences] / [PropagationProblem.intOccurrences]) so propagation never wakes them. All
  * methods keep the no-op [Propagator] defaults (propagate is a no-op, no watches, no reason).
  */
 object NoPropagator : Propagator

@@ -786,8 +786,8 @@ class PropagationState(
     }
 
     /**
-     * Register mid-life factor [fid]'s occurrence-list wakeup, mirroring [Problem.nonBoolWatcherBoolOccurrences]
-     * / [Problem.nonIntEventWatcherIntOccurrences]: a factor using per-literal bool watchers is excluded
+     * Register mid-life factor [fid]'s occurrence-list wakeup, mirroring [PropagationProblem.nonBoolWatcherBoolOccurrences]
+     * / [PropagationProblem.nonIntEventWatcherIntOccurrences]: a factor using per-literal bool watchers is excluded
      * from every bool var's overlay (it wakes through [BoolWatcherIndex.byLit]); on the int side a var is
      * excluded only when the factor subscribes to a typed event on *that* var. The overlays are allocated
      * lazily on first need.
@@ -1094,11 +1094,11 @@ class PropagationState(
     /**
      * Enqueue every factor that should fire on `v`'s domain change, mirroring [enqueueForBoolChange]
      * on the int side: the occurrence-list factors that don't subscribe to typed events on `v`
-     * ([com.eignex.klause.solver.Problem.nonIntEventWatcherIntOccurrences]), plus — for each
+     * ([PropagationProblem.nonIntEventWatcherIntOccurrences]), plus — for each
      * [IntEvent] kind that actually occurred (read from [IntEventMachinery.dirtyKinds]) — the advisors registered
      * in [IntEventMachinery.forEachWatcher]. The kind mask is cleared after dispatch so it doesn't leak into a
      * later change to the same variable. When no factor subscribes this reduces to the plain
-     * occurrence-list walk over [com.eignex.klause.solver.Problem.intOccurrences].
+     * occurrence-list walk over [PropagationProblem.intOccurrences].
      */
     private fun enqueueForIntChange(v: Int) {
         for (fid in nonIntEventWatcherOcc[v]) propEnq(fid)

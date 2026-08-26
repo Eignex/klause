@@ -194,7 +194,7 @@ interface Invariant {
      *  [updateIntBreakMakeForIntSet] instead. Factors whose [deltaIfBoolFlipped] doesn't
      *  depend on int values (e.g. pure Boolean constraints with no intVars) get no
      *  benefit from setting this flag — the engine already short-circuits when intVars
-     *  is empty via [Problem.intOccurrences]. */
+     *  is empty via [LocalSearchProblem.intOccurrences]. */
     val maintainsIntBreakMakeIncrementallyForIntSet: Boolean get() = false
 
     /** Adjust [LocalSearchState.boolBreakCount] / [LocalSearchState.boolMakeCount] after
@@ -210,7 +210,7 @@ interface Invariant {
  * The absence of a local-search role. A factor whose [Factor.asInvariant] returns this is
  * **propagator-only**: it participates in CP propagation but contributes nothing to local
  * search. The LS engine skips such factors entirely — they are dropped from the LS occurrence lists
- * ([Problem.lsBoolOccurrences] / [Problem.lsIntOccurrences]) so a move never queries them and they
+ * ([LocalSearchProblem.boolOccurrences] / [LocalSearchProblem.intOccurrences]) so a move never queries them and they
  * add no violation. All methods keep the no-op [Invariant] defaults (never violated, zero delta).
  */
 object NoInvariant : Invariant
