@@ -102,6 +102,10 @@ internal class RevisedSimplex(
     override var infeasibleRay: DoubleArray? = null
         private set
 
+    override val lastPivots: Int get() = pivots
+    override val lastRefactorizations: Int get() = refactorizations
+    override val lastWarmStarted: Boolean get() = warmStarted
+
     init {
         colRows = Array(n) { EmptyIntArray }
         colVals = Array(n) { DoubleArray(0) }
