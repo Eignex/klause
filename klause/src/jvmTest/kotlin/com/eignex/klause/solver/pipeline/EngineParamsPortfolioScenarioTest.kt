@@ -4,6 +4,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -123,5 +124,25 @@ class EngineParamsPortfolioScenarioTest {
         val dryRun = assertIs<PortfolioPlan.LocalSearchDryRun>(plan(FiniteEngine.LOCAL_SEARCH, listOf("dry-run-solver=on")))
 
         assertNull(dryRun.pool, "the unchanged curated catalog is rendered by the frontend")
+    }
+
+    @Test
+    fun `fixed planning resolves the fallback recipe and dry run before solver construction`() {
+        val plan = FinitePipeline.planFixedBacktrack(
+            FixedBacktrackPlanRequest(
+                annotatedParams = null,
+                engineParams = listOf("dry-run-solver=on", "luby=17"),
+                randomSeed = 4L,
+                cancellation = Cancellation.Never,
+                nodeBudget = null,
+                solveBudgetMillis = null,
+                lpConfig = LpConfig.OFF,
+                onEvent = null,
+            ),
+        )
+
+        assertTrue(plan.dryRun)
+        assertEquals(4L, plan.params.randomSeed)
+        assertEquals(17L, plan.params.lubyRestartBase)
     }
 }
