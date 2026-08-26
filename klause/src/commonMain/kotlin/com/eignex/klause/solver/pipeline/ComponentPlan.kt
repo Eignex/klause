@@ -1,11 +1,15 @@
-package com.eignex.klause.solver
+package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.solver.pipeline.ProblemPipeline
-import com.eignex.klause.solver.pipeline.admitsGeneralLia
-import com.eignex.klause.solver.pipeline.isTheoryOwnable
-import com.eignex.klause.solver.pipeline.supportsExactLira
-import com.eignex.klause.solver.pipeline.supportsExactLra
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.FiniteIntColumns
+import com.eignex.klause.solver.IntColumn
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.MixedIntColumns
+import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.VarRemap
+import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
