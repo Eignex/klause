@@ -12,10 +12,10 @@ import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.lowering.opb.toProblem
 import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.pipeline.sourceRoute
 import java.io.File
 
 /** A parsed instance lifted into klause's solver representation, plus an optional objective. */

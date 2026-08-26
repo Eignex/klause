@@ -8,10 +8,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.rootBake
 import com.eignex.klause.propagation.runRootPropagation
-<<<<<<< HEAD
 import com.eignex.klause.ir.values
-=======
->>>>>>> 497f6fdb0 (refactor: move bake lifecycle into propagation)
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray

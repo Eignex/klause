@@ -4,9 +4,9 @@ import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.lowering.mps.MpsCompiled
 import com.eignex.klause.lowering.mps.MpsLoweringException
 import com.eignex.klause.lowering.mps.toProblem
-import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 
