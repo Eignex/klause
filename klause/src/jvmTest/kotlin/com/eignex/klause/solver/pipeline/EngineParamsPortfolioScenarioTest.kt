@@ -1,5 +1,4 @@
-package com.eignex.klause.cli
-
+package com.eignex.klause.solver.pipeline
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario

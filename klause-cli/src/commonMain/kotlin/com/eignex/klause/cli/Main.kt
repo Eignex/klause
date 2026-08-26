@@ -1,6 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.solver.pipeline.EngineParams
+import com.eignex.klause.solver.pipeline.PipelineConfigException
 import com.eignex.klause.lowering.mps.MpsLoweringException
 import com.eignex.klause.lowering.opb.OpbLoweringException
 
@@ -40,6 +42,9 @@ internal fun runCli(args: Array<String>): Int = try {
     run(args)
     EXIT_OK
 } catch (e: CliUsageException) {
+    errPrintln("klause-cli: ${e.message}")
+    EXIT_ERROR
+} catch (e: PipelineConfigException) {
     errPrintln("klause-cli: ${e.message}")
     EXIT_ERROR
 } catch (e: FormatException) {

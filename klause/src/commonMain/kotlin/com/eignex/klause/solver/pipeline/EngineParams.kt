@@ -1,4 +1,4 @@
-package com.eignex.klause.cli
+package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
@@ -49,6 +49,11 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.LsRecipeSweep
 import com.eignex.klause.portfolio.PortfolioScenario
 
+/** Invalid solver-policy configuration. */
+class PipelineConfigException(message: String) : RuntimeException(message)
+
+fun pipelineConfigError(message: String): Nothing = throw PipelineConfigException(message)
+
 /**
  * Engine tuning knobs passed as repeatable `--param key=value` flags. (`-p` is NOT an
  * alias: it is the MiniZinc-standard parallelism flag.)
@@ -72,7 +77,7 @@ import com.eignex.klause.portfolio.PortfolioScenario
  *  - `portfolio`: `arms`, `ls`, `bt`, `seed`, `lambda`; `bt-arm=label,label` (cp/mixed only) pins the
  *    backtrack pool to named catalog arms, the backtrack analogue of `ls`'s `arm=`
  */
-internal class EngineParams(pairs: List<String>) {
+class EngineParams(pairs: List<String>) {
     private val map: MutableMap<String, String> = mutableMapOf()
 
     init {
@@ -108,12 +113,12 @@ internal class EngineParams(pairs: List<String>) {
 
     /** Consume and validate the var-selector [key] into its [VarSelectorKind] (the instance is built
      *  fresh per worker via [VarSelectorKind.selector]); null when absent. */
-    fun varSelectorKind(key: String): VarSelectorKind? = map.remove(key)?.let { raw ->
+    internal fun varSelectorKind(key: String): VarSelectorKind? = map.remove(key)?.let { raw ->
         VarSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${VarSelectorKind.ids()}, got `$raw`")
     }
 
     /** Consume and validate the val-selector [key] into its [ValSelectorKind]; null when absent. */
-    fun valSelectorKind(key: String): ValSelectorKind? = map.remove(key)?.let { raw ->
+    internal fun valSelectorKind(key: String): ValSelectorKind? = map.remove(key)?.let { raw ->
         ValSelectorKind.fromId(raw) ?: fail("engine param `$key` expects ${ValSelectorKind.ids()}, got `$raw`")
     }
 
@@ -126,14 +131,13 @@ internal class EngineParams(pairs: List<String>) {
     }
 
     private fun fail(msg: String): Nothing {
-        errPrintln("klause-cli: $msg")
-        exitCli(2)
+        pipelineConfigError(msg)
     }
 }
 
 /** The backtrack override keys consumed by [backtrackOverride], excluding `seed` (owned by the naked
  *  engine / the portfolio scenario) — the set that, when present, edits the `cp` arm pool. */
-internal val BACKTRACK_OVERRIDE_KEYS = listOf(
+val BACKTRACK_OVERRIDE_KEYS = listOf(
     "max-decisions", "luby", "adaptive-restart", "ema-restart", "mode-switching-restart", "phase-saving",
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
@@ -151,7 +155,7 @@ internal val BACKTRACK_OVERRIDE_KEYS = listOf(
  *  heuristic state. `seed` is left to the caller. [allowSelectors] gates the `var-selector`/`val-selector`
  *  keys: the annotation-following `fixed` engine passes `false` (the annotation decides the heuristic).
  *  Null when no override key is present. */
-internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
+fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
     val maxDecisions = p.long("max-decisions")
     val luby = p.long("luby")
     val adaptiveRestart = p.bool("adaptive-restart")
@@ -227,7 +231,7 @@ internal fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((Back
 /** Apply `--param` overrides for the naked `fixed` backtrack solve on top of [base] and reject any
  *  leftover keys. Selector keys are not accepted (the annotation decides the heuristic — free-search
  *  heuristic A/B lives on `-e cp`). */
-internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
+fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
     backtrackOverride(p, allowSelectors = false)?.let { out = it(out) }
@@ -241,7 +245,7 @@ internal fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): Backt
  *  resolved arm pool (the solver configuration) instead of solving. [forceArms], when set, pins the
  *  worker count to the pool size so **every** resolved recipe runs as its own arm — the `strategy=sweep`
  *  campaign, where the bandit must schedule the whole cross-product rather than an `autoArms` prefix. */
-internal class LsResolution(
+class LsResolution(
     val pool: List<() -> LocalSearchRecipe>?,
     val dryRunSolver: Boolean,
     val forceArms: Int? = null,
@@ -251,7 +255,7 @@ private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
     "weighted" -> MoveScoring.Weighted
     "raw" -> MoveScoring.Raw
     "break" -> MoveScoring.Break
-    else -> usageError("ls: scoring expects weighted|raw|break, got `$s`")
+    else -> pipelineConfigError("ls: scoring expects weighted|raw|break, got `$s`")
 }
 
 private fun parseAcceptance(s: String, noise: Double?, cb: Double, skewAlpha: Double): AcceptanceRule =
@@ -261,14 +265,14 @@ private fun parseAcceptance(s: String, noise: Double?, cb: Double, skewAlpha: Do
         "probsat" -> AcceptanceRule.ProbSat(cb)
         "skew" -> AcceptanceRule.Skew(skewAlpha)
         "sa" -> AcceptanceRule.Metropolis
-        else -> usageError("ls: acceptance expects greedy|walksat|probsat|skew|sa, got `$s`")
+        else -> pipelineConfigError("ls: acceptance expects greedy|walksat|probsat|skew|sa, got `$s`")
     }
 
 private fun parseRestart(s: String): RestartPolicy = when (s.lowercase()) {
     "fixed" -> FixedCadenceRestart()
     "luby" -> LubyRestart(unit = 200)
     "perturb", "adaptive-perturb" -> AdaptivePerturbationRestart()
-    else -> usageError("ls: restart expects fixed|luby|perturb, got `$s`")
+    else -> pipelineConfigError("ls: restart expects fixed|luby|perturb, got `$s`")
 }
 
 /** Parse a single-valued axis spec into its tokens, rejecting `+`/`-` (only the sources list axis
@@ -276,7 +280,7 @@ private fun parseRestart(s: String): RestartPolicy = when (s.lowercase()) {
 private fun scalarTokens(spec: String?, axis: String): List<AxisToken> {
     val tokens = spec?.let { AxisEdits.tokens(it) } ?: return emptyList()
     tokens.firstOrNull { it.op != AxisToken.Op.SET }?.let {
-        usageError("ls: $axis is single-valued and takes no +/- edit (got `${it.value}`)")
+        pipelineConfigError("ls: $axis is single-valued and takes no +/- edit (got `${it.value}`)")
     }
     return tokens
 }
@@ -333,7 +337,7 @@ private fun namedFactory(
         }
     }
 
-    else -> usageError("ls: strategy expects auto|cbls|feasibilityjump|walksat|probsat|sa|bare, got `$name`")
+    else -> pipelineConfigError("ls: strategy expects auto|cbls|feasibilityjump|walksat|probsat|sa|bare, got `$name`")
 }
 
 /** A bare driver with no preset axes; its sources are supplied by a force-exactly `sources=` spec. */
@@ -381,7 +385,7 @@ private fun applyEdits(
  * `-e ls` with no overrides keeps the curated pool unchanged (a null pool). `dry-run-solver=on` lists
  * the resolved arms instead of solving.
  */
-internal fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
+fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val dryRunSolver = p.bool("dry-run-solver") ?: false
     val noiseRaw = p.double("noise")
     val cbRaw = p.double("cb")
@@ -410,17 +414,17 @@ internal fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
     val strategyRaw = p.string("strategy")?.lowercase()
     val armLabel = p.string("arm")
     if (armLabel != null && (strategyRaw != null || sourcesSpec != null)) {
-        usageError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
+        pipelineConfigError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
     }
     if (armLabel != null && armLabel !in LocalSearchCatalog.labels()) {
-        usageError("ls: arm=`$armLabel` is not a catalog arm (have ${LocalSearchCatalog.labels().joinToString()})")
+        pipelineConfigError("ls: arm=`$armLabel` is not a catalog arm (have ${LocalSearchCatalog.labels().joinToString()})")
     }
     // `strategy=sweep` is the exploration campaign: the entire cross-product as the arm pool, with
     // forceArms pinning the worker count to it so the bandit schedules every recipe rather than an
     // autoArms prefix. It *is* the whole space, so an arm= or an axis edit would contradict it.
     if (strategyRaw == "sweep") {
         if (armLabel != null || hasEdits || sourcesSpec != null) {
-            usageError("ls: strategy=sweep runs the full recipe cross-product and takes no arm=/sources=/axis edits")
+            pipelineConfigError("ls: strategy=sweep runs the full recipe cross-product and takes no arm=/sources=/axis edits")
         }
         val sweep = LsRecipeSweep.pool()
         return LsResolution(sweep, dryRunSolver, forceArms = sweep.size)
@@ -464,7 +468,7 @@ internal fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
         strategyName == "auto" -> LocalSearchCatalog.factories(Kind.COP).map { factory -> { edit(factory()) } }
 
         strategyName == "bare" -> {
-            if (sources.isEmpty()) usageError("ls: strategy=bare needs a sources= spec")
+            if (sources.isEmpty()) pipelineConfigError("ls: strategy=bare needs a sources= spec")
             listOf({ edit(bareRecipe(tabu)) })
         }
 
@@ -490,7 +494,7 @@ private val LS_TABU_BASES = setOf("cbls", "walksat", "probsat", "sa", "bare")
 /** The [provided] numeric knobs that the resolved [canonical] base + [acceptanceValues] edits can't
  *  consume (e.g. `noise` on the curated pool with no walksat acceptance). An unknown base consumes
  *  nothing here — its own factory reports the bad name. */
-internal fun ineffectiveNumerics(
+fun ineffectiveNumerics(
     canonical: String,
     acceptanceValues: Set<String>,
     provided: List<String>,
@@ -519,7 +523,7 @@ internal fun ineffectiveNumerics(
 private fun rejectIneffectiveNumerics(canonical: String, acceptanceValues: Set<String>, provided: List<String>) {
     val unconsumed = ineffectiveNumerics(canonical, acceptanceValues, provided)
     if (unconsumed.isNotEmpty()) {
-        usageError(
+        pipelineConfigError(
             "ls: ${unconsumed.joinToString()} set but no axis consumes ${if (unconsumed.size == 1) "it" else "them"} " +
                 "(strategy=$canonical); set the matching strategy or acceptance",
         )
@@ -540,7 +544,7 @@ private fun rejectIneffectiveNumerics(canonical: String, acceptanceValues: Set<S
  *
  * The exact LS:backtrack split within a MIXED pool stays the composition's (kind-derived) decision.
  */
-internal fun buildPortfolioScenario(
+fun buildPortfolioScenario(
     p: EngineParams,
     fallbackSeed: Long?,
     cores: Int,
@@ -562,7 +566,7 @@ internal fun buildPortfolioScenario(
     val clauseShareLen = p.int("clause-share-len")
     p.finish("portfolio", "arms, ls, bt, seed, lambda, clause-share-lbd, clause-share-len")
     if (armsParam != null && (ls != null || bt != null)) {
-        usageError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
+        pipelineConfigError("portfolio: set either `arms=N` or `ls=/bt=`, not both")
     }
     val (engine, arms) = if (ls != null || bt != null) {
         val l = ls ?: 0
@@ -610,22 +614,22 @@ internal fun buildPortfolioScenario(
  * `null` when neither is set — the curated pool is used. A resolved pool is the *set* of arms; the
  * worker *count* still comes from `arms=`/`bt=`/the default and wraps over it, exactly as `lsPool` does.
  */
-internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
+fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? {
     val btArm = p.string("bt-arm")
     val edit = backtrackOverride(p, allowSelectors = true)
     if (btArm != null && edit != null) {
-        usageError(
+        pipelineConfigError(
             "cp: bt-arm= pins catalog arms and is mutually exclusive with per-solver overrides " +
                 "(${BACKTRACK_OVERRIDE_KEYS.joinToString()})",
         )
     }
     if (btArm != null) {
         val labels = btArm.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-        if (labels.isEmpty()) usageError("bt-arm: expected a comma-separated list of backtrack arm labels")
+        if (labels.isEmpty()) pipelineConfigError("bt-arm: expected a comma-separated list of backtrack arm labels")
         val known = BacktrackCatalog.labels(kind).toSet()
         for (label in labels) {
             if (label !in known) {
-                usageError("bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})")
+                pipelineConfigError("bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})")
             }
         }
         return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
@@ -638,8 +642,16 @@ internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> Backtrack
 
 /** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
  *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
-internal const val NODE_LIMIT_KEY = "node-limit"
+const val NODE_LIMIT_KEY = "node-limit"
 
+/** [pool], or the curated pool when it is null, with every arm spending [budget]. */
+fun withNodeBudget(
+    pool: List<() -> BacktrackRecipe>?,
+    kind: Kind,
+    budget: NodeBudget,
+): List<() -> BacktrackRecipe> = (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
+    { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
+}
 /** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
  *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */
 private fun editRecipe(recipe: BacktrackRecipe, edit: (BacktrackParams) -> BacktrackParams): BacktrackRecipe =
@@ -649,7 +661,7 @@ private fun editRecipe(recipe: BacktrackRecipe, edit: (BacktrackParams) -> Backt
  *  core — always *more* arms than cores, so the bandit (single core) / parallel race always has a
  *  pool to draw on — floored at [PortfolioScenario.DEFAULT_ARMS] so the single-core free track still
  *  gets a real pool. Overridable via `--param arms=N`. */
-internal fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * ARMS_PER_CORE)
+fun autoArms(cores: Int): Int = maxOf(PortfolioScenario.DEFAULT_ARMS, cores * ARMS_PER_CORE)
 
 /** Default arms-per-core oversubscription factor for [autoArms]. */
 private const val ARMS_PER_CORE = 2
@@ -658,7 +670,7 @@ private const val ARMS_PER_CORE = 2
  *  Covers the public no-argument selectors; the objective-/base-parameterised ones (MaxRegret,
  *  IndomainBest, LastConflict, …) and the `internal` ones (DomWdeg, ActivityBasedSearch) are not
  *  exposable as a bare value here. */
-internal enum class VarSelectorKind(val id: String) {
+enum class VarSelectorKind(val id: String) {
     VSIDS("vsids"),
     CHB("chb"),
     LINUCB("linucb"),
@@ -696,7 +708,7 @@ internal enum class VarSelectorKind(val id: String) {
 /** `val-selector` `--param` values for the `cp` engine's override pool (each maps to a [ValueSelector]).
  *  Covers the public no-argument value selectors; IndomainBest (needs the objective) and the
  *  `internal` ones (IndomainSet, MaxSd, Impact) are not exposable as a bare value here. */
-internal enum class ValSelectorKind(val id: String) {
+enum class ValSelectorKind(val id: String) {
     RANDOM("random"),
     MIN("min"),
     MAX("max"),
