@@ -1,4 +1,4 @@
-package com.eignex.klause.formats
+package com.eignex.klause.lowering
 
 import com.ionspin.kotlin.bignum.integer.BigInteger
 

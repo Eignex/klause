@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.wideIntColumns
+import com.eignex.klause.lowering.wideIntColumns
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
