@@ -27,6 +27,8 @@ internal class ComponentLpSolver(
     private val solvers: List<LpSolver>,
     private val isolated: IntArray,
 ) : LpSolver {
+    private var blockResults: List<FloatLpResult>? = null
+
     override var infeasibleRay: DoubleArray? = null
         private set
 
@@ -36,6 +38,7 @@ internal class ComponentLpSolver(
 
     private inline fun stitch(op: (LpSolver) -> FloatLpResult?): FloatLpResult? {
         infeasibleRay = null
+        blockResults = null
         var objective = 0.0
         val primal = DoubleArray(model.n)
         val duals = DoubleArray(model.m)
@@ -45,6 +48,7 @@ internal class ComponentLpSolver(
         var pivots = 0
         var maxFill = 0.0
         var maxDensity = 0.0
+        val results = ArrayList<FloatLpResult>(parts.size)
         for (j in isolated) {
             val c = model.costD(j)
             var shifted = 0.0
@@ -68,6 +72,7 @@ internal class ComponentLpSolver(
                 }
                 return null
             }
+            results.add(r)
             objective += r.objective
             val sub = part.model
             for (c in 0 until sub.n) {
@@ -85,6 +90,7 @@ internal class ComponentLpSolver(
             if (r.luMaxFill > maxFill) maxFill = r.luMaxFill
             if (r.luMaxDensity > maxDensity) maxDensity = r.luMaxDensity
         }
+        blockResults = results
         return FloatLpResult(
             basis = Basis(basicVars, status),
             objective = objective,
@@ -95,6 +101,43 @@ internal class ComponentLpSolver(
             luMaxDensity = maxDensity,
             blocks = parts.size,
         )
+    }
+
+    /** Exact lower bound assembled from the independently certified block objectives. */
+    fun exactLowerBound(): Long? {
+        if (model.hasContinuous) return null
+        val results = blockResults ?: return null
+        val certificates = ArrayList<IntegerCertificate>(parts.size)
+        for (index in parts.indices) {
+            val certificate = integerCertify(parts[index].model, results[index].duals) ?: return null
+            certificates.add(certificate)
+        }
+        var scaleBits = 0
+        for (certificate in certificates) scaleBits = maxOf(scaleBits, certificate.objectiveScaleBits)
+        val numerator = Int128()
+        for (certificate in certificates) {
+            val part = certificate.objectiveNumerator()
+            part.shiftLeft(scaleBits - certificate.objectiveScaleBits)
+            numerator.add(part)
+        }
+        val isolatedObjective = Int128()
+        for (column in isolated) {
+            val cost = model.cost[column]
+            if (cost < 0L) {
+                if (!model.hasFiniteUpper(column)) return null
+                isolatedObjective.addProduct(cost, model.upper[column])
+            }
+            isolatedObjective.addProduct(cost, model.loShift[column])
+        }
+        isolatedObjective.shiftLeft(scaleBits)
+        numerator.add(isolatedObjective)
+        return numerator.ceilDivPow2(scaleBits)
+    }
+
+    /** Whether every independently solved continuous block has an exact feasible basis. */
+    fun exactBasisFeasible(): Boolean {
+        val results = blockResults ?: return false
+        return parts.indices.all { exactBasisFeasible(parts[it].model, results[it].basis) == true }
     }
 }
 
