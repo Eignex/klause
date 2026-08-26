@@ -1,11 +1,14 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.FactorRow
 import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.RealConstants
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.arithmetic.WideConstants
+import com.eignex.klause.factor.arithmetic.complemented
+import com.eignex.klause.factor.arithmetic.linearRow
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
@@ -317,23 +320,11 @@ private data class SearchNode(
     fun nextDisequality(model: ProblemSpec, bools: BooleanArray): Int {
         for (index in model.factors.indices) {
             if (index in disequalityDirections) continue
-            val factor = model.factors[index]
-            val op = when (factor) {
-                is Linear -> factor.op
-                is ReifiedLinear -> if (bools[factor.auxBoolVar]) factor.op else factor.op.complement()
-                is ReifiedRealLinear -> if (bools[factor.aux]) factor.op else factor.op.complement()
-                else -> continue
-            }
-            if (op == LinearOp.NE) return index
+            val row = model.factors[index].linearRow() ?: continue
+            val truth = row.activator == FactorRow.ALWAYS || bools[row.activator]
+            if ((if (truth) row.op else row.op.complemented()) == LinearOp.NE) return index
         }
         return -1
-    }
-
-    private fun LinearOp.complement(): LinearOp = when (this) {
-        LinearOp.LE -> LinearOp.GE
-        LinearOp.GE -> LinearOp.LE
-        LinearOp.EQ -> LinearOp.NE
-        LinearOp.NE -> LinearOp.EQ
     }
 }
 
@@ -418,88 +409,39 @@ private class QfLiraSystem(private val model: ProblemSpec) {
                     }
             }
         }
+        // Every linear shape states its row the same way; only whether a Boolean gates it differs, and
+        // an ungated row is read as one whose activator is true.
         for ((index, factor) in model.factors.withIndex()) {
             if (cancellation()) return null
-            when (factor) {
-                is Linear -> if (factor.constants is WideConstants) {
-                    val wide = factor.constants
-                    if (!addWide(
-                            builder, intsPositive, intsNegative, constants, factor.vars,
-                            wide.coefficients.toTypedArray(), factor.op, wide.bound,
-                            node.disequalityDirections[index],
-                        )
-                    ) {
-                            return null
-                        }
-                } else {
-                    addLinear(
-                        builder,
-                        intsPositive,
-                        intsNegative,
-                        realsPositive,
-                        realsNegative,
-                        factor.vars,
-                        factor.coefficients(),
-                        factor.realVars,
-                        factor.realCoefficientsForTheory(),
-                        factor.op,
-                        factor.boundForTheory(),
-                        factor.realConstants?.strict == true,
-                        node.disequalityDirections[index],
-                        factor.realConstants != null,
+            val row = factor.linearRow() ?: continue
+            val truth = row.activator == FactorRow.ALWAYS || bools[row.activator]
+            val direction = node.disequalityDirections[index]
+            when (row) {
+                is FactorRow.Wide -> if (!addWide(
+                        builder, intsPositive, intsNegative, constants, row.intVars,
+                        row.coefficients, if (truth) row.op else row.op.complemented(), row.bound, direction,
                     )
+                ) {
+                    return null
                 }
 
-                is ReifiedLinear -> if (factor.constants is WideConstants) {
-                    val wide = factor.constants
-                    val op = if (bools[factor.auxBoolVar]) factor.op else factor.op.complement()
-                    if (!addWide(
-                            builder, intsPositive, intsNegative, constants, factor.vars,
-                            wide.coefficients.toTypedArray(), op, wide.bound,
-                            node.disequalityDirections[index],
-                        )
-                    ) {
-                            return null
-                        }
-                } else {
-                    addReified(
-                        builder = builder,
-                        intsPositive = intsPositive,
-                        intsNegative = intsNegative,
-                        realsPositive = realsPositive,
-                        realsNegative = realsNegative,
-                        intVars = factor.vars,
-                        intCoeffs = factor.coefficients(),
-                        realVars = IntArray(0),
-                        realCoeffs = DoubleArray(0),
-                        op = factor.op,
-                        bound = factor.boundForTheory(),
-                        strict = false,
-                        truth = bools[factor.auxBoolVar],
-                        disequalityDirection = node.disequalityDirections[index],
-                        hasReals = false,
-                    )
-                }
-
-                is ReifiedRealLinear -> addReified(
+                is FactorRow.Doubles -> addReified(
                     builder = builder,
                     intsPositive = intsPositive,
                     intsNegative = intsNegative,
                     realsPositive = realsPositive,
                     realsNegative = realsNegative,
-                    intVars = factor.vars,
-                    intCoeffs = factor.intCoeffs,
-                    realVars = factor.realVars,
-                    realCoeffs = factor.realCoeffs,
-                    op = factor.op,
-                    bound = factor.bound,
-                    strict = factor.strict,
-                    truth = bools[factor.aux],
-                    disequalityDirection = node.disequalityDirections[index],
-                    hasReals = true,
+                    intVars = row.intVars,
+                    intCoeffs = row.intCoeffs,
+                    realVars = row.realVars,
+                    realCoeffs = row.realCoeffs,
+                    op = row.op,
+                    bound = row.bound,
+                    strict = row.strict,
+                    truth = truth,
+                    disequalityDirection = direction,
+                    hasReals = row.realVars.isNotEmpty(),
                 )
-
-                else -> Unit
             }
         }
         for (cut in node.cuts) {
@@ -507,45 +449,6 @@ private class QfLiraSystem(private val model: ProblemSpec) {
             builder.addRealRow(cut.columns, cut.coefficients, Relation.GE, cut.rhs)
         }
         return QfLiraLeaf(builder.build(Sense.MINIMIZE), intsPositive, intsNegative, realsPositive, realsNegative)
-    }
-
-    private fun addLinear(
-        builder: LpBuilder,
-        intsPositive: IntArray,
-        intsNegative: IntArray,
-        realsPositive: IntArray,
-        realsNegative: IntArray,
-        intVars: IntArray,
-        intCoeffs: DoubleArray,
-        realVars: IntArray,
-        realCoeffs: DoubleArray,
-        op: LinearOp,
-        bound: Double,
-        strict: Boolean,
-        disequalityDirection: LinearOp?,
-        hasReals: Boolean,
-    ) {
-        val (actualOp, actualBound, actualStrict) = lowerDisequality(
-            op,
-            bound,
-            strict,
-            disequalityDirection,
-            hasReals,
-        )
-        add(
-            builder,
-            intsPositive,
-            intsNegative,
-            realsPositive,
-            realsNegative,
-            intVars,
-            intCoeffs,
-            realVars,
-            realCoeffs,
-            actualOp,
-            actualBound,
-            actualStrict,
-        )
     }
 
     private fun addReified(
@@ -660,31 +563,6 @@ private class QfLiraSystem(private val model: ProblemSpec) {
 
     // A wide row is added to the theory through its exact constants ([addWide]), never through these
     // double readings.
-    private fun Linear.coefficients(): DoubleArray = when (val c = constants) {
-        is RealConstants -> c.intCoefficients.toDoubleArray()
-        is IntegerConstants -> DoubleArray(vars.size) { c.coeff(it).toDouble() }
-        is WideConstants -> error("a wide row has no double coefficients")
-    }
-
-    private fun Linear.realCoefficientsForTheory(): DoubleArray =
-        realConstants?.realCoefficients?.toDoubleArray() ?: DoubleArray(0)
-
-    private fun Linear.boundForTheory(): Double = when (val c = constants) {
-        is RealConstants -> c.bound
-        is IntegerConstants -> c.bound.toDouble()
-        is WideConstants -> error("a wide row has no double bound")
-    }
-
-    private fun ReifiedLinear.boundForTheory(): Double = when (val c = constants) {
-        is IntegerConstants -> c.bound.toDouble()
-        is WideConstants -> error("a wide row has no double bound")
-    }
-
-    private fun ReifiedLinear.coefficients(): DoubleArray = when (val c = constants) {
-        is IntegerConstants -> DoubleArray(vars.size) { c.coeff(it).toDouble() }
-        is WideConstants -> error("a wide row has no double coefficients")
-    }
-
     private fun lowerDisequality(
         op: LinearOp,
         bound: Double,
@@ -717,13 +595,6 @@ private class QfLiraSystem(private val model: ProblemSpec) {
         LinearOp.EQ -> Relation.EQ
         LinearOp.NE -> error("checked by add")
     }
-}
-
-private fun LinearOp.complement(): LinearOp = when (this) {
-    LinearOp.LE -> LinearOp.GE
-    LinearOp.GE -> LinearOp.LE
-    LinearOp.EQ -> LinearOp.NE
-    LinearOp.NE -> LinearOp.EQ
 }
 
 private fun lowerWideDisequality(op: LinearOp, bound: BigInteger, direction: LinearOp?): Pair<LinearOp, BigInteger> =

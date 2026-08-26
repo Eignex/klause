@@ -1031,6 +1031,48 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
 }
 
+public abstract interface class com/eignex/klause/factor/arithmetic/FactorRow {
+	public static final field ALWAYS I
+	public static final field Companion Lcom/eignex/klause/factor/arithmetic/FactorRow$Companion;
+	public abstract fun getActivator ()I
+	public abstract fun getIntVars ()[I
+	public abstract fun getOp ()Lcom/eignex/klause/ir/LinearOp;
+	public abstract fun getRealVars ()[I
+	public abstract fun getStrict ()Z
+}
+
+public final class com/eignex/klause/factor/arithmetic/FactorRow$Companion {
+	public static final field ALWAYS I
+}
+
+public final class com/eignex/klause/factor/arithmetic/FactorRow$Doubles : com/eignex/klause/factor/arithmetic/FactorRow {
+	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZI)V
+	public fun getActivator ()I
+	public final fun getBound ()D
+	public final fun getIntCoeffs ()[D
+	public fun getIntVars ()[I
+	public fun getOp ()Lcom/eignex/klause/ir/LinearOp;
+	public final fun getRealCoeffs ()[D
+	public fun getRealVars ()[I
+	public fun getStrict ()Z
+}
+
+public final class com/eignex/klause/factor/arithmetic/FactorRow$Wide : com/eignex/klause/factor/arithmetic/FactorRow {
+	public fun <init> ([I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;I)V
+	public fun getActivator ()I
+	public final fun getBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getCoefficients ()[Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun getIntVars ()[I
+	public fun getOp ()Lcom/eignex/klause/ir/LinearOp;
+	public fun getRealVars ()[I
+	public fun getStrict ()Z
+}
+
+public final class com/eignex/klause/factor/arithmetic/FactorRowKt {
+	public static final fun complemented (Lcom/eignex/klause/ir/LinearOp;)Lcom/eignex/klause/ir/LinearOp;
+	public static final fun linearRow (Lcom/eignex/klause/solver/Factor;)Lcom/eignex/klause/factor/arithmetic/FactorRow;
+}
+
 public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/eignex/klause/factor/arithmetic/IntegralConstants, com/eignex/klause/lp/LinearRow {
 	public fun <init> ([ILcom/eignex/klause/solver/LongConstList;Lcom/eignex/klause/ir/LinearOp;J)V
 	public fun coeff (I)J
