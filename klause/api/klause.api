@@ -8550,6 +8550,25 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/FiniteEngine : java/lang/Enum {
+	public static final field ALNS Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public static final field BACKTRACK Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public static final field Companion Lcom/eignex/klause/solver/pipeline/FiniteEngine$Companion;
+	public static final field FIXED Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public static final field LOCAL_SEARCH Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public static final field MIXED Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getPortfolioMix ()Lcom/eignex/klause/portfolio/EngineMix;
+	public final fun getPureLocalSearch ()Z
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+}
+
+public final class com/eignex/klause/solver/pipeline/FiniteEngine$Companion {
+	public final fun getDEFAULT ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 }
 
