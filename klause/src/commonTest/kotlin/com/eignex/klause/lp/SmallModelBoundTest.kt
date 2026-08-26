@@ -3,8 +3,9 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -43,5 +44,12 @@ class SmallModelBoundTest {
     fun `a system with no rows is admitted and bounded at one`() {
         assertEquals(true, admitsSmallModelBound(0, emptyList(), openBounds))
         assertEquals("1", smallModelBigIntBound(0, emptyList(), openBounds).toString())
+    }
+
+    @Test
+    fun `witness-bound construction observes cancellation`() {
+        val factors = listOf<Factor>(row(0, 1), row(1, 2))
+
+        assertNull(smallModelBigIntBound(3, factors, openBounds, Cancellation { true }))
     }
 }

@@ -419,8 +419,8 @@ class GeneralLiaSearchComponent(
     private val modelContribution: ((GeneralLiaAssignment, SearchModel) -> Unit)? = null,
 ) : TheoryComponent,
     SearchBrancher {
-    private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
-    private val pollStride = pollStrideFor(witnessBound.bitLength())
+    private var witnessBound: BigInteger? = null
+    private var pollStride = MAX_POLL_FACTORS
     private val theoryIntVars = theoryIntVars.copyOf()
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
@@ -438,6 +438,9 @@ class GeneralLiaSearchComponent(
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
+        val bound = model.generalLiaWitnessBound(context::cancelled) ?: return ComponentResult.Indeterminate
+        witnessBound = bound
+        pollStride = pollStrideFor(bound.bitLength())
         domainsByLevel.put(0, initialDomains(context))
         return if (domainsByLevel.getValue(
                 0,
@@ -536,6 +539,7 @@ class GeneralLiaSearchComponent(
     }
 
     private fun initialDomains(context: SearchContext): Array<BigInterval> = Array(model.numIntVars) { variable ->
+        val witnessBound = checkNotNull(witnessBound)
         val lo = if (model.intBounds.hasLower(variable)) {
             maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(variable)))
         } else {
