@@ -180,6 +180,9 @@ internal class SmtLibOutput : BufferedBestOutput() {
  * user to guess which of their constraints is the unsupported one.
  */
 internal fun unsupportedOpenReason(model: ProblemSpec, names: Map<String, Int>): String {
+    // Builds the plan a second time, after `sourceRoute` built one to reach this branch. Deliberate:
+    // the run ends here either way, and threading the plan out of routing would put a cost on every
+    // model to save one on a rejected one.
     val unplaceable = model.componentPlan().unplaceable
         ?: return "open integer bounds require supported difference, General LIA, or exact LIRA coverage"
     val column = names.entries.firstOrNull { it.value == unplaceable.column }?.key
