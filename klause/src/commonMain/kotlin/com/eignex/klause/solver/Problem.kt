@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.rootBake

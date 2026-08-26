@@ -16,7 +16,7 @@ import kotlin.random.Random
 /**
  * The "destroy" half of an ALNS / LNS iteration: returns the set of variables to *free*
  * for the repair phase. The complementary set stays pinned at the incumbent's values via
- * [com.eignex.klause.solver.Assumptions]. Operators are expected to be stateless and
+ * [com.eignex.klause.propagation.Assumptions]. Operators are expected to be stateless and
  * cheap; they're invoked once per ALNS iteration.
  */
 internal fun interface DestroyOperator {

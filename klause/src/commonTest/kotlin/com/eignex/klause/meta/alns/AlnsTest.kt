@@ -8,7 +8,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.portfolio.PoolClauseExchange
 import com.eignex.klause.portfolio.SharedClausePool
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit

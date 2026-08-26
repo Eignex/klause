@@ -1,7 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.util.LongArrayList
 
 /**

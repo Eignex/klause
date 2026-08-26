@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.count.AnytimeCounter
 import com.eignex.klause.count.ApproxCountConfig
