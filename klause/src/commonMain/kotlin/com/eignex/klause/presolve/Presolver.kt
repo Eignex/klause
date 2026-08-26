@@ -179,7 +179,7 @@ enum class PresolveTiming {
 private const val MAX_PRESOLVE_ROUNDS = 16
 
 /** Integer-variables-to-factors ratio above which a model is treated as *underdetermined*, so affine
- *  elimination caps its wide folds ([AffineSingletons]). Well below every model where affine folds
+ *  elimination caps its wide folds. Well below every model where affine folds
  *  productively (all observed ≤ ~2.4) and well below the pathological dense case (~23). */
 private const val UNDERDETERMINED_RATIO = 8
 

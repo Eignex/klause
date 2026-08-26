@@ -118,7 +118,7 @@ internal object CoefficientStrengthening {
         )
     }
 
-    /** A contradictory unit-clause pair on [lit]'s variable — jointly unsatisfiable (cf. [XorUnits]). */
+    /** A contradictory unit-clause pair on [lit]'s variable — jointly unsatisfiable. */
     private fun boolContradiction(lit: Int): List<Factor> {
         val v = Lit.variable(lit)
         return listOf(Clause(intArrayOf(Lit.make(v, true))), Clause(intArrayOf(Lit.make(v, false))))

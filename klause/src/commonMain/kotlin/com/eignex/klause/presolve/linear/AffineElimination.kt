@@ -11,6 +11,7 @@ import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.solver.Cancellation
@@ -1300,7 +1301,7 @@ internal object AffineSingletons {
 }
 
 /** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by
- *  [Presolve.eliminateAffineSingletons]. [divisor] is `1` for the unit-pivot cases and the
+ *  [Presolve]. [divisor] is `1` for the unit-pivot cases and the
  *  pivot coefficient for a residue-class doubleton, where the division is always exact on the
  *  values the partner's restricted domain admits. */
 internal class AffineSub(
@@ -1312,7 +1313,7 @@ internal class AffineSub(
 )
 
 /**
- * The affine eliminations [Presolve.eliminateAffineSingletons] made, holding the data to rebuild the
+ * The affine eliminations [Presolve] made, holding the data to rebuild the
  * eliminated variables. Pass a solution of the reduced problem through [reconstruct] to recover a
  * solution of the original.
  */
