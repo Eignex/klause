@@ -39,6 +39,23 @@ internal interface LpSolver {
 
     /** The leaving row of [infeasibleBasis]; `-1` when there is none. */
     val infeasibleRow: Int get() = -1
+
+    /**
+     * Pivots the last solve spent, whether or not it returned a [FloatLpResult].
+     *
+     * A solve that terminates dual-unbounded or non-convergent still spent them, and a caller that
+     * counts the solve has to be able to count its cost — reading the count off the result alone drops
+     * exactly the solves that prune, which are the ones worth costing. 0 on an engine that keeps no
+     * pivot count.
+     */
+    val lastPivots: Int get() = 0
+
+    /** Sparse LU factorizations the last solve built, on the same terms as [lastPivots]. */
+    val lastRefactorizations: Int get() = 0
+
+    /** Whether the last solve started from a prior basis rather than a cold start, on the same terms
+     *  as [lastPivots]. */
+    val lastWarmStarted: Boolean get() = false
 }
 
 /**

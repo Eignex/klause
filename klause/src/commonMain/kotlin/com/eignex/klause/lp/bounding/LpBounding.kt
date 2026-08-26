@@ -9,6 +9,7 @@ import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
@@ -119,6 +120,18 @@ private fun LpEngine.solveNode(
     return fresh to fresh.solve(warm)
 }
 
+/**
+ * Charge one counted solve's cost to [SolveStatsSink], reading it off the engine rather than the result.
+ *
+ * Every `observeSolve` pairs with exactly one of these, so the per-solve rates divide counts that cover
+ * the same set of solves. Taking the numbers from a [FloatLpResult] cannot do that: a dual-unbounded or
+ * non-convergent solve has no result to read, and on a model that prunes often those are most of them.
+ */
+private fun SolveStatsSink.observeSolveCost(solver: LpSolver) {
+    lp.observePivots(solver.lastPivots)
+    lp.observeStart(solver.lastWarmStarted, solver.lastRefactorizations)
+}
+
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
@@ -206,8 +219,11 @@ private fun LpEngine.foldSelectedCuts(
     } catch (_: LpOverflowException) {
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
-    val r = dualSimplex(tightened.model, cancellation).solve() ?: return base to res
+    val cutSimplex = dualSimplex(tightened.model, cancellation)
+    val r = cutSimplex.solve()
     sink.lp.observeSolve()
+    sink.observeSolveCost(cutSimplex)
+    if (r == null) return base to res
     return tightened to r
 }
 
@@ -263,8 +279,8 @@ internal fun LpEngine.sparseSafePrune(
             }
             val gatedResult = filter.simplex.resolveGated(filter.enforced)
             if (gatedStrictSaved != null && gatedDv != null) gatedStrictSaved.copyInto(gatedDv.rhs)
+            sink.observeSolveCost(filter.simplex)
             if (gatedResult != null) {
-                sink.lp.observePivots(gatedResult.pivots)
                 filter.enforced.copyInto(filter.lastEnforced)
                 filter.lastFeasible = true
                 return LpNodeOutcome(false, null)
@@ -309,6 +325,10 @@ internal fun LpEngine.sparseSafePrune(
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
     val (simplex, floatResult) = solveNode(model, warm, cancellation)
     if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
+    // Read the cost off the solver rather than the result: a solve that terminates dual-unbounded
+    // returns none, and those are the solves that prune — costing only the ones that return a result
+    // would drop the most valuable work from the average.
+    sink.observeSolveCost(simplex)
     val result = floatResult ?: run {
         // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).
@@ -340,9 +360,7 @@ internal fun LpEngine.sparseSafePrune(
         }
         return LpNodeOutcome(false, null)
     }
-    sink.lp.observePivots(result.pivots)
     sink.lp.observeLuFill(result.luMaxFill, result.luMaxDensity)
-    sink.lp.observeStart(result.warmStarted, result.refactorizations)
     // LP-guided branching: record the fractional primal + reduced costs so the descent can order
     // branch values toward the LP point and pick reduced-cost-impactful fractional variables. Purely
     // advisory — it never changes feasibility or the optimum.
@@ -391,8 +409,11 @@ internal fun LpEngine.sparseSafePrune(
             } catch (_: LpOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
-            val r = dualSimplex(tightened.model, cancellation).solve() ?: break
+            val roundSimplex = dualSimplex(tightened.model, cancellation)
+            val r = roundSimplex.solve()
             sink.lp.observeSolve()
+            sink.observeSolveCost(roundSimplex)
+            if (r == null) break
             boundRel = tightened
             boundRes = r
         }
@@ -609,7 +630,10 @@ internal fun LpEngine.sparseCertifiedPrune(
     val relaxation = nodeRelaxation(relaxer, session)
     if (relaxation.model.n == 0) return LpNodeOutcome(false, null)
     sink.lp.observeSolve()
-    val result = dualSimplex(relaxation.model, cancellation).solve() ?: return LpNodeOutcome(false, null)
+    val recoverySimplex = dualSimplex(relaxation.model, cancellation)
+    val result = recoverySimplex.solve()
+    sink.observeSolveCost(recoverySimplex)
+    if (result == null) return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
     // The integer-multiplier 128-bit bound: round the float duals and evaluate the Lagrangian exactly.
     // Sound by construction (a valid lower bound for any integer multipliers); includes the model's
