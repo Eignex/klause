@@ -8,7 +8,6 @@ import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
-import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.AffinePivotOrder
@@ -22,17 +21,15 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.EngineParams
-import com.eignex.klause.solver.pipeline.LsResolution
-import com.eignex.klause.solver.pipeline.buildPortfolioScenario
-import com.eignex.klause.solver.pipeline.resolveBtRecipes
-import com.eignex.klause.solver.pipeline.resolveLocalSearchRecipes
-import com.eignex.klause.solver.pipeline.withNodeBudget
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
+import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.applyBacktrackParams
 import com.eignex.klause.solver.pipeline.autoArms
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.PortfolioPlan
+import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
+import com.eignex.klause.solver.pipeline.planPortfolio
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -96,9 +93,6 @@ internal object SolveCore {
                 if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
-                // The open lane bounds the allowance in *theory checks*, not decision nodes: it decides a
-                // fragment rather than branching a finite domain, so it has no node counter to spend and
-                // reports none. The flag still holds two runs to the same work here, in that unit.
                 val theoryParams = TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel)
                 val request = pipeline.request
                 val objective = request.objective
@@ -203,7 +197,7 @@ internal object SolveCore {
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
             // single resolved arm runs as a one-arm pool.
             FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
-                runPortfolio(solvable, common, output, cores, FinitePipeline.portfolioMix(engine), cancel, nodeBudget)
+                runPortfolio(solvable, common, output, cores, engine, cancel, nodeBudget)
         }
     }
 
@@ -540,7 +534,7 @@ internal object SolveCore {
         common: CommonOptions,
         output: OutputProtocol,
         cores: Int,
-        mix: EngineMix,
+        engine: FiniteEngine,
         cancel: Cancellation,
         nodeBudget: NodeBudget?,
     ) {
@@ -552,52 +546,34 @@ internal object SolveCore {
         val lpCeiling = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: LpConfig.AGGRESSIVE
-        // For an LS-bearing pool, resolve the four-axis arm overrides (a `strategy=` base + per-axis
-        // edits) before consuming the portfolio knobs from the same params. A null pool keeps the
-        // curated catalog. `dry-run-solver` lists the resolved pool and exits without solving.
-        val params = EngineParams(common.engineParams)
-        val lsResolution = if (mix != EngineMix.BACKTRACK) {
-            resolveLocalSearchRecipes(
-                params,
-            )
-        } else {
-            LsResolution(null, false)
-        }
-        if (lsResolution.dryRunSolver) {
-            printLsPool(lsResolution.pool)
-            return
-        }
-        val kind = if (solvable.optimize) Kind.COP else Kind.CSP
-        // `--param bt-arm=label,label` pins a named backtrack arm pool, or the per-solver override
-        // --params (var-/val-selector, luby, …) resolve a one-arm pool (a no-op for a pure-LS pool).
-        val btPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
-        // A backtrack-only pool has no LS resolution to carry its dry-run flag, so consume it here.
-        if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
-            printBtPool(solvable.finiteProblem, btPool, kind)
-            return
-        }
-        val scenario = buildPortfolioScenario(
-            params,
-            common.randomSeed,
-            cores = cores,
-            kind = kind,
-            defaultEngine = mix,
-            // `strategy=sweep` pins the worker count to the full recipe cross-product so the bandit
-            // schedules every recipe; otherwise the env override or the auto-tuned default.
-            defaultArms = lsResolution.forceArms ?: defaultArms,
-            lpCeiling = lpCeiling,
-            lsPool = lsResolution.pool,
-            btPool = btPool,
-            // Include the model's search-annotation arm in the backtrack pool when the model
-            // carries one (a no-op for a pure-LS pool, which has no backtrack slot).
-            annotationArm = solvable.annotatedBacktrackParams,
-            // One allowance for the whole pool: the composition hands it to every arm that runs a
-            // backtrack engine, so the cap bounds the solve rather than each arm, and a capped run
-            // still composes the pool an uncapped one would. A pure-LS pool has no arm to spend it.
-            nodeBudget = nodeBudget,
+        val plan = FinitePipeline.planPortfolio(
+            PortfolioPlanRequest(
+                engine = engine,
+                optimize = solvable.optimize,
+                cores = cores,
+                engineParams = common.engineParams,
+                randomSeed = common.randomSeed,
+                defaultArms = defaultArms,
+                lpCeiling = lpCeiling,
+                nodeBudget = nodeBudget,
+                annotationArm = solvable.annotatedBacktrackParams,
+            ),
         )
+        val scenario = when (plan) {
+            is PortfolioPlan.LocalSearchDryRun -> {
+                printLsPool(plan.pool)
+                return
+            }
+
+            is PortfolioPlan.BacktrackDryRun -> {
+                printBtPool(solvable.finiteProblem, plan.pool, plan.kind)
+                return
+            }
+
+            is PortfolioPlan.Execute -> plan.scenario
+        }
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
-        val complete = scenario.engine != EngineMix.LOCAL_SEARCH
+        val complete = !engine.pureLocalSearch
         val executor = FinitePipeline.portfolioExecutor(
             solvable.finiteProblem,
             scenario,
