@@ -43,8 +43,8 @@ fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
     else -> componentPlan().theoryPipeline
 }
 
-/** Factors whose Boolean skeleton and rational rows the exact pure-real lane decides completely. */
-internal fun ProblemSpec.supportsExactLra(): Boolean =
+/** Whether the exact pure-real lane decides every factor in this source model. */
+fun ProblemSpec.supportsExactLra(): Boolean =
     numIntVars == 0 && numRealVars != 0 && factors.all { it.exactTheoryOwnable }
 
 /** Factors whose mixed rows the exact QF_LIRA branch-and-simplex route decides. */
