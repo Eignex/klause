@@ -1,4 +1,4 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.LpOverflowException
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
+import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

@@ -1,5 +1,6 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.structural
 
+import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain

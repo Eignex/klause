@@ -1,6 +1,8 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
