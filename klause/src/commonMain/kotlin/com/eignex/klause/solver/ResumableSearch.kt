@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
 
 /**
@@ -47,6 +48,15 @@ interface ResumableSearch : AutoCloseable {
 
     /** True once [runSlice] has returned a terminal verdict; further calls are no-ops. */
     val isDone: Boolean
+
+    /**
+     * Counters accumulated so far, whether or not the search has finished.
+     *
+     * A paused slice still did the work it did, so a caller reporting a run its deadline cut short reads
+     * them here — the terminal verdict it would otherwise take them from is exactly what such a run never
+     * produces. Cumulative for this handle, so a caller folds each handle once rather than per slice.
+     */
+    val stats: SolveStats
 
     override fun close() {}
 }

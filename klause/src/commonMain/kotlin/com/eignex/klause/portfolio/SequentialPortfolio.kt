@@ -139,7 +139,6 @@ class SequentialPortfolio(
         var bound = Double.POSITIVE_INFINITY
         var best: Sample? = null
         var rewardScale = 0.0
-        var stats = SolveStats.EMPTY
         var slice = baseSliceMillis
         var segment = 0
         val start = TimeSource.Monotonic.markNow()
@@ -153,6 +152,11 @@ class SequentialPortfolio(
         // One resumable handle per backtrack arm, opened lazily on the arm's first segment and resumed
         // on every later one. LS arms stay null and run a fresh warm-started slice each time.
         val handles = arrayOfNulls<ResumableSearch>(workers.size)
+        // Per-arm counters. A resumable arm's handle carries them cumulatively, so its entry is replaced
+        // each segment rather than accumulated; a non-resumable arm runs a fresh search per segment, so
+        // its terminal verdicts are merged. Folding only terminal verdicts loses every arm the deadline
+        // paused instead of finishing — which, under a wall clock, is usually all of them.
+        val perArm = arrayOfNulls<SolveStats>(workers.size)
         // Consecutive non-improving segments per arm; drives re-seeding (see [reseedStaleThreshold]).
         val staleSegments = IntArray(workers.size)
 
@@ -191,7 +195,11 @@ class SequentialPortfolio(
                     }
                 }
             }
-            terminal?.let { stats = stats.mergedWith(it.stats) }
+            if (handle != null) {
+                perArm[arm] = handle.stats
+            } else {
+                terminal?.let { perArm[arm] = (perArm[arm] ?: SolveStats.EMPTY).mergedWith(it.stats) }
+            }
 
             val improvement = before - bound
             val reward = if (!hadIncumbent) {
@@ -220,14 +228,18 @@ class SequentialPortfolio(
 
             // A clean segment exhaustion ends the run: any incumbent is optimal, else infeasible.
             if (PortfolioReduction.isExhausted(terminal)) {
-                return PortfolioReduction.terminal(best, bound, dirty = false, stats)
+                return PortfolioReduction.terminal(best, bound, dirty = false, foldArms(perArm))
             }
             if (!warming) slice = (slice * sliceGrowth).toLong().coerceAtMost(maxSliceMillis)
             segment++
         }
         // Cancellation stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
-        return PortfolioReduction.terminal(best, bound, dirty = true, stats)
+        return PortfolioReduction.terminal(best, bound, dirty = true, foldArms(perArm))
     }
+
+    /** The pool's total counters: every arm that did work, whether or not it reached a verdict. */
+    private fun foldArms(perArm: Array<SolveStats?>): SolveStats =
+        perArm.filterNotNull().fold(SolveStats.EMPTY) { acc, s -> acc.mergedWith(s) }
 
     override fun close() {
         workers.forEach { runCatching { it.close() } }

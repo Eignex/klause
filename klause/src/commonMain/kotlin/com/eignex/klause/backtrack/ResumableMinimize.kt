@@ -29,6 +29,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
@@ -197,6 +198,10 @@ internal class ResumableMinimize(
     private var done: MinimizeResult? = null
     private var pendingIncumbent: MinimizeResult.WithSample? = null
     override val isDone: Boolean get() = done != null
+
+    /** Live counters; [SolveStatsSink.snapshot] reads elapsed time without needing the sink stopped, so
+     *  this is meaningful mid-search as well as after one. */
+    override val stats: SolveStats get() = sink.snapshot()
 
     init {
         val seeded = session.seed(params.assumptions)
@@ -425,7 +430,11 @@ internal class ResumableMinimize(
         if (singleObj != null) objVarBest = sample.ints[singleObj.varId]
         params.improvedSolutionSink?.invoke(sample, o)
         params.onEvent?.invoke(SearchEvent.Incumbent(o))
-        return MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted)
+        // Carry the counters as they stand. A caller that consumes the improvement stream and stops when
+        // it dries up holds only the last step it saw, so an incumbent without stats leaves the whole run
+        // reporting nothing — search and LP alike. Snapshotting mid-search is sound: it reads elapsed time
+        // live rather than requiring the sink to have been stopped.
+        return MinimizeResult.BestFound(sample, o, TerminationReason.BudgetExhausted, sink.snapshot())
     }
 
     /**
