@@ -159,7 +159,7 @@ enum class PresolveTiming {
 }
 
 /** Round cap for the iterating emphasis levels; the fixpoint is almost always reached well before. */
-private const val MAX_PRESOLVE_ROUNDS = 16
+internal const val MAX_PRESOLVE_ROUNDS = 16
 
 /** Integer-variables-to-factors ratio above which a model is treated as *underdetermined*, so affine
  *  elimination caps its wide folds. Well below every model where affine folds
@@ -170,10 +170,10 @@ private const val UNDERDETERMINED_RATIO = 8
  *  The capped tier bounds an EXHAUSTIVE pass turned on by an explicit override under a non-aggressive
  *  level so it can't dominate presolve time; the aggressive tier is larger but still bounded so a big
  *  instance with wide domains terminates. */
-private const val CAPPED_PROBE_BUDGET_PER_VAR = 256
-private const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
-private const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
-private const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
+internal const val CAPPED_PROBE_BUDGET_PER_VAR = 256
+internal const val CAPPED_PROBE_TOTAL_BUDGET = 20_000
+internal const val AGGRESSIVE_PROBE_BUDGET_PER_VAR = 4_096
+internal const val AGGRESSIVE_PROBE_TOTAL_BUDGET = 250_000
 
 /** Free-Boolean candidate cap for the [PresolvePass.PROBE] fixpoint pass per invocation. Each
  *  candidate costs up to two `propagate` calls, so this bounds the pass's work on a Boolean-heavy
@@ -579,198 +579,6 @@ enum class PresolvePass(
     }
 }
 
-/**
- * Preset effort levels. Each level is just a bundle: which [PresolveTiming] tiers run, and how many round-to-fixpoint
- * iterations the engine may take (1 = a single pass, no iteration). Per-pass overrides on
- * [PresolveConfig] sit on top of the level.
- */
-enum class PresolveEmphasis(
-    /** Canonical token shown in `--presolve` / `--help` and error messages. */
-    val id: String,
-    /** Cost tiers this level lets run. */
-    val timings: Set<PresolveTiming>,
-    /** Round-to-fixpoint cap (`0` = no presolve, `1` = a single non-iterating pass). */
-    val maxRounds: Int,
-    /** Per-var cap on bake-time SAC `propagate` calls — the EXHAUSTIVE-tier work budget. */
-    val probeBudgetPerVar: Int,
-    /** Total cap on bake-time SAC `propagate` calls across all vars. */
-    val probeTotalBudget: Int,
-    /** Accepted spellings besides [id]. */
-    private val aliases: List<String> = emptyList(),
-) {
-    /** No presolve. */
-    OFF("off", emptySet(), 0, CAPPED_PROBE_BUDGET_PER_VAR, CAPPED_PROBE_TOTAL_BUDGET, aliases = listOf("none")),
-
-    /** Cheap FAST reductions only, applied once — no symmetry, no iteration. */
-    CONSERVATIVE(
-        "conservative",
-        setOf(PresolveTiming.FAST),
-        1,
-        CAPPED_PROBE_BUDGET_PER_VAR,
-        CAPPED_PROBE_TOTAL_BUDGET,
-        aliases = listOf("fast"),
-    ),
-
-    /** FAST + MEDIUM (adds symmetry), iterated to a fixpoint. The shipped default. */
-    DEFAULT(
-        "default",
-        setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM),
-        MAX_PRESOLVE_ROUNDS,
-        CAPPED_PROBE_BUDGET_PER_VAR,
-        CAPPED_PROBE_TOTAL_BUDGET,
-        aliases = listOf("auto"),
-    ),
-
-    /** FAST + MEDIUM + EXHAUSTIVE (adds SAC probing), iterated to a fixpoint. */
-    AGGRESSIVE(
-        "aggressive",
-        setOf(PresolveTiming.FAST, PresolveTiming.MEDIUM, PresolveTiming.EXHAUSTIVE),
-        MAX_PRESOLVE_ROUNDS,
-        AGGRESSIVE_PROBE_BUDGET_PER_VAR,
-        AGGRESSIVE_PROBE_TOTAL_BUDGET,
-    ),
-    ;
-
-    /** Token lookup and the id listing for spec parsing / help (single source of truth). */
-    companion object {
-        private val byToken: Map<String, PresolveEmphasis> =
-            entries.flatMap { e -> (listOf(e.id) + e.aliases).map { it to e } }.toMap()
-
-        /** `null`/blank/`default`/`auto` → [DEFAULT]; `off`/`none` → [OFF]; `conservative`/`fast` →
-         *  [CONSERVATIVE]; `aggressive` → [AGGRESSIVE]; otherwise `null`. */
-        fun fromId(id: String?): PresolveEmphasis? {
-            val token = id?.trim()?.lowercase()
-            return if (token.isNullOrEmpty()) DEFAULT else byToken[token]
-        }
-
-        /** Canonical ids joined for `--help` / error messages: `off | conservative | default | aggressive`. */
-        fun ids(): String = entries.joinToString(" | ") { it.id }
-    }
-}
-
-/**
- * A presolve configuration: an [emphasis] level plus per-pass [overrides] (force a single pass on or
- * off regardless of the level — the benchmarking toggle). [resolved] answers whether a pass runs
- * under a given [PresolveContext]; an override always wins, otherwise the level + the pass's
- * eligibility and solution-set-sensitivity decide.
- */
-class PresolveConfig(
-    val emphasis: PresolveEmphasis = PresolveEmphasis.DEFAULT,
-    val overrides: Map<PresolvePass, Boolean> = emptyMap(),
-    /** Per-var SAC probe budget; `null` follows the [emphasis] tier. The benchmarking knob. */
-    private val probeBudgetPerVarOverride: Int? = null,
-    /** Total SAC probe budget; `null` follows the [emphasis] tier. */
-    private val probeTotalBudgetOverride: Int? = null,
-    /** The order affine elimination picks its pivots in. Every order yields the same solutions, so this
-     *  only decides how far the pass gets within its fill-in budget. */
-    val affinePivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
-) {
-
-    /** Per-var cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
-    fun probeBudgetPerVar(): Int = probeBudgetPerVarOverride ?: emphasis.probeBudgetPerVar
-
-    /** Total cap on bake-time SAC `propagate` calls: an explicit override, else the [emphasis] tier. */
-    fun probeTotalBudget(): Int = probeTotalBudgetOverride ?: emphasis.probeTotalBudget
-
-    /** This config with a different affine pivot order — the benchmarking knob for that choice. */
-    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig =
-        PresolveConfig(emphasis, overrides, probeBudgetPerVarOverride, probeTotalBudgetOverride, pivotOrder)
-
-    /** Whether [pass] runs under [context]: an explicit override wins, else the emphasis rule. */
-    fun resolved(pass: PresolvePass, context: PresolveContext): Boolean = overrides[pass] ?: auto(pass, context)
-
-    /** Emphasis rule: an auto-eligible pass whose tier the level enables, unless it would drop
-     *  solutions on a solution-set-sensitive query, or it is symmetry breaking the model already
-     *  does itself. */
-    private fun auto(pass: PresolvePass, context: PresolveContext): Boolean = pass.autoEligible &&
-        pass.timing in emphasis.timings &&
-        (pass.preservesSolutionSet || !context.solutionSetSensitive) &&
-        !(pass == PresolvePass.BREAK_SYMMETRIES && context.modelBreaksSymmetry)
-
-    /** The [PresolvePass.Stage.PROBLEM] passes that run under [context], in enum (priority) order. */
-    fun problemPasses(context: PresolveContext): List<PresolvePass> =
-        PresolvePass.entries.filter { it.stage == PresolvePass.Stage.PROBLEM && resolved(it, context) }
-
-    /** Force the solution-set-*collapsing* passes off (symmetry breaking, value precedence, dual
-     *  fixing) — for a pure local-search engine, where the ordering constraints they add fight the
-     *  search and it gains nothing from collapsing symmetric solutions. The cheap solution-preserving
-     *  reductions (strengthening, substitution, probing) stay on; affine substitution counts as one
-     *  here — it only *inflates* the count for a complete enumerator, which LS never does, so
-     *  it stays on and keeps shrinking the problem. */
-    fun forLocalSearch(): PresolveConfig = PresolveConfig(
-        emphasis,
-        overrides + PresolvePass.entries
-            .filter { !it.preservesSolutionSet && it != PresolvePass.ELIMINATE_AFFINE_SINGLETONS }
-            .associateWith { false },
-        probeBudgetPerVarOverride,
-        probeTotalBudgetOverride,
-        affinePivotOrder,
-    )
-
-    /** Predefined configs and the spec-string [parse]r. */
-    companion object {
-        /** The shipped default — [PresolveEmphasis.DEFAULT], no overrides. */
-        val AUTO = PresolveConfig(PresolveEmphasis.DEFAULT)
-
-        /** Back-compat alias for [AUTO]. */
-        val DEFAULT = AUTO
-
-        /** No presolve at all. */
-        val NONE = PresolveConfig(PresolveEmphasis.OFF)
-
-        /**
-         * Parse a `--presolve` / `klause.presolve` spec into an [emphasis] + per-pass [overrides]:
-         *  - an emphasis level alone (`default` / `auto`, `off` / `none`, `conservative` / `fast`,
-         *    `aggressive`);
-         *  - an emphasis level followed by `+<pass>` / `-<pass>` deltas that force individual passes
-         *    on/off on top of it — e.g. `default,-symmetry` (defaults but no symmetry breaking),
-         *    `off,+symmetry` (no presolve except symmetry breaking). This is what enables/disables a
-         *    single pass, which a bare list cannot;
-         *  - `all` — every pass forced on;
-         *  - a bare comma-separated pass-id list — each forced on, all others off (force-exactly).
-         *
-         * An unknown token throws.
-         */
-        fun parse(spec: String?): PresolveConfig {
-            val s = spec?.trim()?.lowercase().orEmpty()
-            if (s.isEmpty()) return AUTO
-            if (s == "all") return PresolveConfig(overrides = PresolvePass.entries.associateWith { true })
-            val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            // Emphasis-base form: first token is a level, the rest are +/- deltas.
-            PresolveEmphasis.fromId(tokens.first())?.let { base ->
-                val overrides = HashMap<PresolvePass, Boolean>()
-                for (tok in tokens.drop(1)) {
-                    val on = when (tok.firstOrNull()) {
-                        '+' -> true
-                        '-' -> false
-                        else -> error("after an emphasis, `$tok` must be +<pass> or -<pass>")
-                    }
-                    overrides[passOf(tok.substring(1))] = on
-                }
-                return PresolveConfig(base, overrides)
-            }
-            // Bare force-list: the named passes on, all others off.
-            val on = tokens.map { passOf(it) }.toSet()
-            return PresolveConfig(overrides = PresolvePass.entries.associateWith { it in on })
-        }
-
-        private fun passOf(id: String): PresolvePass =
-            PresolvePass.fromId(id) ?: error("unknown presolve pass `$id`; expected ${PresolvePass.ids()}")
-    }
-}
-
-/**
- * The presolve engine. Runs the enabled [PresolvePass.Stage.PROBLEM] passes in **rounds to a
- * fixpoint**: each round applies, in priority order, every pass that hasn't already run
- * since the problem last changed; when a pass changes the problem the others become eligible again.
- * This captures cross-pass synergy (e.g. an affine elimination exposing a new GCD) instead of a
- * single linear sweep. The per-pass reconstructs are composed in reverse so [Presolved.reconstruct]
- * maps a final-problem solution all the way back to the original.
- *
- * [PresolveEmphasis.maxRounds] caps the iteration (`1` = a single non-iterating pass, used by
- * [PresolveEmphasis.CONSERVATIVE]); the version-stamp skip below means a clean fixpoint usually stops
- * earlier.
- */
 object Presolver {
 
     /** Apply [config]'s passes to [problem] under [context], returning the transformed problem and a
