@@ -9,12 +9,17 @@ Run `./gradlew check lintDocs`.
 - check runs tests and some light checks.
 - lintDocs runs detekt and dokka linting.
 - For new/edited files add `--rerun-tasks`, detekt caches per source-set and skips them otherwise.
-- detekt and dokka run on alpha analysis engines and fail intermittently. A detekt failure reporting
-  **zero findings**, or a dokka `Error in translating of symbol`, with a stack frame inside the Kotlin
-  analysis API rather than a file of yours, is a flake: re-run the task before investigating. Seen as
-  `No receiver found in qualified expression`, `AsyncExecutionService.getService must not return null`,
-  and a dokka failure on an untouched file that passes locally. A genuine violation names your file and
-  the rule.
+- detekt and dokka run on alpha analysis engines. Two crash shapes look alike and are not:
+  - **It names one of your files.** `No receiver found in qualified expression`, or an offsets error
+    like `Range [0, 27) out of bounds for length 4`, means the file changed under the analysis. Usually
+    detekt's own `autoCorrect` resorting that file's imports mid-run, so a later rule reads a stale
+    context. Real and repeatable: run detekt, commit the autocorrection it writes, and it goes. Editing
+    a source file while the gate runs does the same thing, so don't. Reproducing it needs the whole
+    `check` graph — a bare detekt run has no binding context, so the rule that crashes never fires.
+  - **No file of yours appears in it.** `AsyncExecutionService.getService must not return null`, with
+    every stack frame inside the Kotlin analysis API, is a flake: re-run before investigating.
+  A dokka `Error in translating of symbol` can be either; one on an untouched file was a real broken
+  link. Check the symbol it names first. A finding that names your file and a rule is always genuine.
 
 ## Tests
 
