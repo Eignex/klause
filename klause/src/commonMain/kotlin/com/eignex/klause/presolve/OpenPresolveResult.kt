@@ -1,7 +1,13 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
+import com.eignex.klause.factor.arithmetic.internals.floorDivLong
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.exactBoundsInfeasible
 import com.eignex.klause.lp.longOrNull
@@ -46,8 +52,9 @@ sealed interface OpenPresolveResult {
  * kinds of bound are the model's own, so closing a side with either keeps it equisatisfiable — the
  * property that lets a later `unsat` be reported as one.
  *
- * Only unconditional [Linear] rows participate. A reified row's truth is not decided yet and a wide row
- * carries no `Long` reading, so both are skipped: the phase then proves fewer bounds, never a wrong one.
+ * Unconditional [Linear] rows and rows whose reifying Boolean is fixed by a unit clause participate. A
+ * wide row carries no `Long` reading, so it is skipped: the phase then proves fewer bounds, never a
+ * wrong one.
  *
  * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
  * through leaves the bounds it had already proved — every one of them sound on its own.
@@ -63,7 +70,7 @@ fun ProblemSpec.presolveOpen(cancellation: Cancellation = Cancellation.Never): O
     }
     if (declared.none { it.lo == null || it.hi == null }) return OpenPresolveResult.Tightened(this, closedSides = 0)
 
-    val rows = factors.filterIsInstance<Linear>()
+    val rows = openPresolveRows()
     val intRows = rows.filter { it.realVars.isEmpty() }
     // Exact arithmetic refutes ahead of the tightening below, which reads the same rows in `Long` and
     // `Double`. A coefficient times an open bound is the product that leaves 64 bits, so the systems
@@ -93,6 +100,53 @@ fun ProblemSpec.presolveOpen(cancellation: Cancellation = Cancellation.Never): O
     }
     if (closed == 0) return OpenPresolveResult.Tightened(this, closedSides = 0)
     return OpenPresolveResult.Tightened(withBounds(bounds), closedSides = closed)
+}
+
+/** Unconditional integer rows plus the integer rows a root unit clause asserts. */
+private fun ProblemSpec.openPresolveRows(): List<Linear> {
+    val truth = BooleanArray(numBoolVars)
+    val fixed = BooleanArray(numBoolVars)
+    for (clause in factors.filterIsInstance<Clause>()) {
+        if (clause.literals.size != 1) continue
+        val literal = clause.literals[0]
+        val variable = Lit.variable(literal)
+        val value = Lit.isPositive(literal)
+        if (fixed[variable] && truth[variable] != value) return emptyList()
+        fixed[variable] = true
+        truth[variable] = value
+    }
+    val rows = ArrayList<Linear>()
+    for (factor in factors) {
+        when (factor) {
+        is Linear -> rows += roundIntegerRow(factor)
+
+        is ReifiedLinear -> if (fixed[factor.auxBoolVar] && truth[factor.auxBoolVar]) {
+            val constants = factor.integerConstants ?: continue
+            rows += roundIntegerRow(Linear(constants.coeffs, factor.vars.copyOf(), factor.op, constants.bound))
+        }
+
+        else -> Unit
+    }
+    }
+    return rows
+}
+
+/** Divide a whole integer inequality by its coefficient gcd, rounding its bound inward. */
+private fun roundIntegerRow(row: Linear): Linear {
+    val constants = row.integerConstants ?: return row
+    val gcd = PresolveShared.gcdOf(constants.coeffs)
+    if (gcd <= 1L) return row
+    val bound = when (row.op) {
+        LinearOp.LE -> floorDivLong(constants.bound, gcd)
+        LinearOp.GE -> ceilDivLong(constants.bound, gcd)
+        else -> return row
+    }
+    return Linear(
+        LongArray(constants.coeffs.size) { constants.coeffs[it] / gcd },
+        row.vars.copyOf(),
+        row.op,
+        bound,
+    )
 }
 
 /**

@@ -681,12 +681,7 @@ class GeneralLiaSearchComponent(
 
                 is Linear -> relationPossible(rowRange(factor, domains), factor.op, linearBound(factor))
 
-                is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || relationPossibleForTruth(
-                    rowRange(factor, domains),
-                    factor.op,
-                    reifiedBound(factor),
-                    bools[factor.auxBoolVar] == TRUE,
-                )
+                is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || reifiedPossible(factor, domains)
 
                 is ComparisonClause -> factor.vars.indices.any { index ->
                     relationPossible(
@@ -762,6 +757,36 @@ class GeneralLiaSearchComponent(
     private fun linearBound(factor: Linear): BigInteger = exactConstantsOf(factor).exactBound
 
     private fun reifiedBound(factor: ReifiedLinear): BigInteger = factor.constants.exactBound
+
+    /** Feasibility of an asserted reified row after rounding its integer lattice. */
+    private fun reifiedPossible(factor: ReifiedLinear, domains: Array<BigInterval>): Boolean {
+        val range = rowRange(factor, domains)
+        val truth = bools[factor.auxBoolVar] == TRUE
+        val gcd = factor.vars.indices.fold(BigInteger.ZERO) { current, index ->
+            bigGcd(current, factor.constants.exactCoeff(index))
+        }
+        if (gcd <= BigInteger.ONE) {
+            return relationPossibleForTruth(range, factor.op, reifiedBound(factor), truth)
+        }
+        val bound = reifiedBound(factor)
+        return when (factor.op) {
+            LinearOp.LE -> if (truth) range.lo <= floorDiv(bound, gcd) * gcd else {
+                range.hi >= ceilDiv(bound + BigInteger.ONE, gcd) * gcd
+            }
+
+            LinearOp.EQ -> if (bound % gcd != BigInteger.ZERO) !truth else {
+                relationPossibleForTruth(range, factor.op, bound, truth)
+            }
+
+            LinearOp.GE -> if (truth) range.hi >= ceilDiv(bound, gcd) * gcd else {
+                range.lo <= floorDiv(bound - BigInteger.ONE, gcd) * gcd
+            }
+
+            LinearOp.NE -> if (bound % gcd != BigInteger.ZERO) truth else {
+                relationPossibleForTruth(range, factor.op, bound, truth)
+            }
+        }
+    }
 
     private fun relationPossible(range: BigInterval, op: LinearOp, bound: BigInteger): Boolean = when (op) {
         LinearOp.LE -> range.lo <= bound
@@ -843,6 +868,17 @@ private fun ceilDiv(a: BigInteger, b: BigInteger): BigInteger {
     } else {
         quotient
     }
+}
+
+private fun bigGcd(first: BigInteger, second: BigInteger): BigInteger {
+    var a = if (first < BigInteger.ZERO) -first else first
+    var b = if (second < BigInteger.ZERO) -second else second
+    while (b != BigInteger.ZERO) {
+        val remainder = a % b
+        a = b
+        b = remainder
+    }
+    return a
 }
 
 private sealed interface GeneralLiaSearchOutcome {

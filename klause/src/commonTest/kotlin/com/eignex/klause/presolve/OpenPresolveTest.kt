@@ -1,7 +1,10 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.ProblemSpec
@@ -159,5 +162,20 @@ class OpenPresolveTest {
 
         assertTrue(result.spec.intBounds.hasUpper(0), "the constrained column closes")
         assertTrue(result.spec.intBounds.isOpenUpper(1), "the unconstrained one cannot be proved")
+    }
+
+    @Test
+    fun `a unit-asserted reified row is rounded in open presolve`() {
+        val openHi = Bits(1).also { it.set(0) }
+        val spec = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(0), null, openHi),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, positive = true))),
+                ReifiedLinear(0, longArrayOf(2), intArrayOf(0), LinearOp.LE, 1L),
+            ),
+        )
+
+        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
     }
 }
