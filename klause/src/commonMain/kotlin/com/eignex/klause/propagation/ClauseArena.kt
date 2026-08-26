@@ -45,7 +45,12 @@ internal class ClauseArena private constructor(
     companion object {
         /** Pack [problem]'s clauses into a flat arena. Requires a native-SAT-eligible problem. */
         fun of(problem: Problem): ClauseArena {
-            require(problem.numIntVars == 0 && problem.numBoolVars > 0 && problem.factors.isNotEmpty() && problem.factors.all { it is Clause }) {
+            require(
+                problem.numIntVars == 0 &&
+                    problem.numBoolVars > 0 &&
+                    problem.factors.isNotEmpty() &&
+                    problem.factors.all { it is Clause },
+            ) {
                 "ClauseArena requires a pure-Boolean clause-only problem"
             }
             val factors = problem.factors

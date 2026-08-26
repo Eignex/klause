@@ -16,7 +16,10 @@ class PropagationProblem(
 ) {
     /** Whether this projection can use the packed native-SAT propagation lane. */
     val isNativeSatEligible: Boolean =
-        problem.numIntVars == 0 && problem.numBoolVars > 0 && problem.factors.isNotEmpty() && problem.factors.all { it is Clause }
+        problem.numIntVars == 0 &&
+            problem.numBoolVars > 0 &&
+            problem.factors.isNotEmpty() &&
+            problem.factors.all { it is Clause }
 
     /** One propagator per model factor. */
     val propagators: Array<out Propagator> = Array(problem.numFactors) { problem.factors[it].asPropagator() }
