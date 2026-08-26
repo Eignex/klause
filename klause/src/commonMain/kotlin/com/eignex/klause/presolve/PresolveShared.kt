@@ -6,7 +6,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

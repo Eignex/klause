@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.integration
+package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 /** Root-level deductions from the bake are folded into [BakedProblem.intDomains] by [Problem.bake], so
  *  every solver sees the tightened domains rather than the loosely-declared input. */
-class ProblemDomainTighteningTest {
+class BakedProblemTest {
     @Test
     fun `bound tightenings become the baked problem's domains`() {
         val p =

@@ -14,7 +14,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective

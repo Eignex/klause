@@ -10,6 +10,7 @@ import com.eignex.klause.count.ExactCountConfig
 import com.eignex.klause.count.SampleQuality
 import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.count.UniGen
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult

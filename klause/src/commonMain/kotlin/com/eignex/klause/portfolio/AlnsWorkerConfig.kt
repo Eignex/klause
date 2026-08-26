@@ -10,7 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
-import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent

@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.LongHashSet

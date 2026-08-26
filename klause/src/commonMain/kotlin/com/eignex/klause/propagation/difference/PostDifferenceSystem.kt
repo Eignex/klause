@@ -2,7 +2,7 @@ package com.eignex.klause.propagation.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.lowering.differenceFragmentOf
-import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Problem
 
 /**

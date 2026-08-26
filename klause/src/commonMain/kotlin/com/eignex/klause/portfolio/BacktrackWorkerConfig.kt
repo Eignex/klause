@@ -5,7 +5,7 @@ import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.solver.BakedProblem
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
