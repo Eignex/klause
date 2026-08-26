@@ -3,6 +3,11 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lowering.mps.MpsConstraint
+import com.eignex.klause.lowering.mps.MpsIndicator
+import com.eignex.klause.lowering.mps.MpsModel
+import com.eignex.klause.lowering.mps.MpsObjective
+import com.eignex.klause.lowering.mps.MpsVar
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.lineSequence
@@ -13,79 +18,6 @@ class MpsFormatException(msg: String) : FormatException("MPS", msg)
 /** Reject a malformed line with a clean [MpsFormatException]; `Nothing`-typed so call sites stay
  *  expression-friendly (an elvis branch reads as a value, not a statement). */
 internal fun mpsError(msg: String): Nothing = throw MpsFormatException(msg)
-
-/**
- * A decision variable. [integer] marks a column declared inside an `INTORG`/`INTEND` marker pair (or
- * given an integer bound type `UI`/`LI`/`BV`). Bounds are resolved to their effective values, with a
- * `null` standing for infinity: `lower == null` is `-∞`, `upper == null` is `+∞`.
- */
-data class MpsVar(
-    /** Column (variable) name. */
-    val name: String,
-    /** True for a column declared integer (an `INTORG`/`INTEND` marker, or a `UI`/`LI`/`BV` bound). */
-    val integer: Boolean,
-    /** Lower bound; `null` is `-∞`. */
-    val lower: Double?,
-    /** Upper bound; `null` is `+∞`. */
-    val upper: Double?,
-)
-
-/** An `INDICATORS` entry on a row: the row is enforced only when column [column] takes value 1
- *  ([whenOne]) or 0, and is relaxed otherwise. */
-data class MpsIndicator(
-    /** Indicator column index into [MpsModel.variables]. */
-    val column: Int,
-    /** True when the row is enforced at `column == 1`, false when it is enforced at `column == 0`. */
-    val whenOne: Boolean,
-)
-
-/**
- * A constraint row as a two-sided linear bound `lower ≤ Σ coeffs(i)·var(indices(i)) ≤ upper`. The MPS
- * row type and any `RANGES` entry are resolved into [lower]/[upper] (`null` = the side is open): an
- * `L` row is `(null, rhs)`, `G` is `(rhs, null)`, `E` is `(rhs, rhs)`, and a ranged row is the
- * corresponding finite interval. [indices] point into [MpsModel.variables]; [coeffs] is parallel.
- */
-data class MpsConstraint(
-    /** Row name. */
-    val name: String,
-    /** Variable indices into [MpsModel.variables], parallel to [coeffs]. */
-    val indices: IntArray,
-    /** Coefficients, parallel to [indices]. */
-    val coeffs: DoubleArray,
-    /** Lower bound of the row's linear form; `null` = open below. */
-    val lower: Double?,
-    /** Upper bound of the row's linear form; `null` = open above. */
-    val upper: Double?,
-    /** `INDICATORS` entry gating the row, or `null` when the row always holds. */
-    val indicator: MpsIndicator? = null,
-)
-
-/** The objective (the first free `N` row): a sparse linear form plus a [constant] (from an `RHS`
- *  entry against the objective row, negated per the MPS convention). Empty when the file has no `N` row. */
-data class MpsObjective(
-    /** Objective row name (empty when the file has no `N` row). */
-    val name: String,
-    /** Variable indices into [MpsModel.variables], parallel to [coeffs]. */
-    val indices: IntArray,
-    /** Coefficients, parallel to [indices]. */
-    val coeffs: DoubleArray,
-    /** Constant term (an `RHS` against the objective row, negated). */
-    val constant: Double,
-)
-
-/** A parsed MPS instance in its native double-valued form, before lowering to a klause `Problem`. */
-data class MpsModel(
-    /** Problem name from the `NAME` section (empty if absent). */
-    val name: String,
-    /** Objective optimisation sense. */
-    val sense: ObjectiveSense,
-    /** The objective's linear form and constant. */
-    val objective: MpsObjective,
-    /** Declared variables, in declaration order (constraint/objective indices point here). */
-    val variables: List<MpsVar>,
-    /** Constraint rows (the `N` objective row is excluded). */
-    val constraints: List<MpsConstraint>,
-)
 
 /**
  * Parser for the MPS (Mathematical Programming System) MIP/LP format. Reads the standard sections —

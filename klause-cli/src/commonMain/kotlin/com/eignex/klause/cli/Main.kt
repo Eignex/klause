@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.lowering.mps.MpsLoweringException
 
 /*
  * Unified klause CLI entry point. The CLI is a registry of CliMode front-ends
@@ -45,6 +46,9 @@ internal fun runCli(args: Array<String>): Int = try {
     // already carries the `klause <format>: <message>` prefix, so surface it verbatim on stderr
     // and exit with the CLI error code rather than leaking a stack trace.
     errPrintln(e.message.orEmpty())
+    EXIT_ERROR
+} catch (e: MpsLoweringException) {
+    errPrintln("klause ${e.message.orEmpty()}")
     EXIT_ERROR
 }
 

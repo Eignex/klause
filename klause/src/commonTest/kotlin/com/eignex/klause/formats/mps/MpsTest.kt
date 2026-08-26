@@ -1,6 +1,8 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lowering.mps.MpsIndicator
+import com.eignex.klause.lowering.mps.MpsVar
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
