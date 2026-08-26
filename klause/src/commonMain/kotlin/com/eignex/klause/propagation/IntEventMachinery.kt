@@ -57,7 +57,7 @@ internal class IntEventMachinery(projection: PropagationProblem, incremental: Bo
                 projection.propagators[fid].initialIntEventWatches?.let {
                     for (packed in it) {
                         flat[cursor[packed]++] =
-                        fid
+                            fid
                     }
                 }
             }
