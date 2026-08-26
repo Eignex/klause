@@ -7,27 +7,9 @@ import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.EmptyIntArray
-
-/**
- * Result of running a presolve pipeline: the transformed [problem] plus the [reconstruct]
- * function that maps a solution of [problem] back to a solution of the original problem. For an
- * all-identity pipeline [reconstruct] is the identity (no per-sample cost).
- */
-class Presolved(
-    val problem: Problem,
-    val reconstruct: (Sample) -> Sample,
-    /** The problem-stage passes that changed the problem at least once during the run, in first-fire
-     *  order — surfaced as presolve statistics (which techniques actually did something). */
-    val passesFired: List<PresolvePass> = emptyList(),
-    /** Whether presolve proved the problem infeasible. Surfaced here so the caller need not force the
-     *  materialized [problem]'s lazy `baked` — which the incremental path defers past presolve timing. */
-    val infeasible: Boolean = false,
-)
 
 /**
  * Information a pass needs to stay sound. [objectiveIntVars] / [objectiveBoolVars] are the
@@ -215,37 +197,6 @@ private fun complexity(problem: Problem): Long {
     var c = problem.factors.size.toLong()
     for (d in problem.requireFiniteIntDomains()) c += d.max - d.min
     return c
-}
-
-/**
- * A pass's explicit change to the problem it was given: [droppedIndices] into the input's factor list
- * (factors removed or replaced), [addedFactors] to append (brand-new or rewritten factors), and
- * [domains] the pass's directly-derived tightened int domains (or `null` when it leaves domains alone).
- * A factor rewrite is a drop of its index plus an add of the replacement; a no-op pass returns an
- * empty [PassDelta] ([isEmpty]), which the round engine treats as the fixpoint signal. [reconstruct]
- * lifts a solution of the transformed problem back when the pass changed the variable mapping.
- *
- * The round engine materializes the next problem from the delta (fresh path) or folds it into the
- * persistent [PresolveSession] (incremental path); neither rebuilds a whole [Problem] inside the pass.
- */
-class PassDelta(
-    /** Indices into the input [Problem.factors] that were removed or replaced. */
-    val droppedIndices: IntArray = EmptyIntArray,
-    /** Brand-new or rewritten factors to append after the kept ones. */
-    val addedFactors: List<Factor> = emptyList(),
-    /** The pass's directly-derived tightened int domains, or `null` when it leaves domains alone. */
-    val domains: Array<IntDomain>? = null,
-    /** Lifts a solution of the transformed problem back to the pass's input, when the pass changed the
-     *  variable mapping (affine / dup-columns / implication merges); `null` for a plain transform. */
-    val reconstruct: ((Sample) -> Sample)? = null,
-    /** Whether the pass proved the problem infeasible outright (e.g. a gcd-indivisible equality). Lets a
-     *  caller short-circuit — reporting infeasibility without materializing/baking the problem — instead
-     *  of relying on the added contradiction to surface as an `Unsat` bake (which on a wide domain would
-     *  first grind O(span)). */
-    val infeasible: Boolean = false,
-) {
-    /** Whether the pass changed nothing this round — the round engine's fixpoint signal. */
-    val isEmpty: Boolean get() = droppedIndices.isEmpty() && addedFactors.isEmpty() && domains == null
 }
 
 /**
