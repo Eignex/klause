@@ -2,7 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.rootBake
 import com.eignex.klause.propagation.runRootPropagation
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.solver.values
@@ -304,11 +304,7 @@ open class Problem(
      * replay [baked] as assumptions are unaffected.
      */
     val baked: PropagationResult by lazy(LazyThreadSafetyMode.NONE) {
-        // The root bake skips firing expensive propagators (Table/Mdd/Regular/global/scheduling): their
-        // heavy per-state bookkeeping is not built at load and their optional root tightening is deferred
-        // to the first search fire, re-derived once on the final post-presolve factors. Only weakens the
-        // bake fixpoint (always sound) — cheap bounds/clauses still reach fixpoint at load.
-        mergeBase(propagate(Assumptions.None, cancellation, skipExpensiveBake = true), seedDeductions)
+        rootBake(this, seedDeductions, cancellation)
     }
 
     /** Wall time the root bake took on a [BakedProblem]: forcing [baked] (root propagation to fixpoint)
@@ -409,28 +405,11 @@ open class Problem(
         result.forEachIntSet { v, survivors -> requireFiniteIntDomains()[v] = intDomainFromSurvivors(survivors) }
     }
 
-    /** Merge the presolve-lane [seed] deductions into the kernel's [base] `propagate` bake. An
-     *  `Unsat` on either side wins (an infeasible base or a probing-proven contradiction), otherwise
-     *  the two implied sets union via [PropagationResult.Implied.merge]. The common no-probe case
-     *  passes [PropagationResult.Implied.EMPTY] and returns [base] unchanged. */
-    private fun mergeBase(base: PropagationResult, seed: PropagationResult): PropagationResult = when {
-        base is PropagationResult.Unsat -> base
-
-        seed is PropagationResult.Unsat -> seed
-
-        // The common no-probe case seeds the shared empty sentinel — return the base bake untouched.
-        // A non-sentinel seed can carry bound tightenings / holes with no pins, so `isEmpty` (which only
-        // inspects pins) is not a safe skip: merge unconditionally.
-        seed === PropagationResult.Implied.EMPTY -> base
-
-        else -> (base as PropagationResult.Implied).merge(seed as PropagationResult.Implied)
-    }
-
     /**
      * Run sound-but-incomplete deductive propagation against [assumptions]. Each factor's
-     * [Propagator.propagate] is invoked to fixed point; pins / domain tightenings cascade through
-     * the occurrence lists. Returns the literals/values forced *beyond* [assumptions] (disjoint
-     * from the input), or [PropagationResult.Unsat] if a contradiction is derived.
+     * [com.eignex.klause.propagation.Propagator.propagate] is invoked to fixed point; pins and domain
+     * tightenings cascade through the occurrence lists. Returns deductions beyond [assumptions]
+     * (disjoint from the input), or [PropagationResult.Unsat] if a contradiction is derived.
      *
      * This is the same routine the solver uses internally at init and at every sample / solve
      * call that carries non-empty assumptions.
