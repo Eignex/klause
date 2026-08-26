@@ -8622,6 +8622,10 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
 	public final fun getSolutionSetSensitive ()Z
 }
 
+public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
+	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 }
 

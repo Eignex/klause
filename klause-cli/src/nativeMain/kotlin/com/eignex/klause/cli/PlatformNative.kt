@@ -1,8 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.portfolio.Portfolio
-import com.eignex.klause.portfolio.PortfolioExecutor
-import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -86,8 +83,6 @@ private fun readCommandOutput(command: String): String {
     }
     return all.decodeToString()
 }
-
-internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)
 
 // Native has no heap accounting equivalent to the JVM's memory pools, so the dry-run reports no
 // heap figures there rather than inventing one.

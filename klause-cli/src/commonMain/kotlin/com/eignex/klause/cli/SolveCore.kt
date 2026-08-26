@@ -12,9 +12,6 @@ import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
-import com.eignex.klause.portfolio.PortfolioBuilder
-import com.eignex.klause.portfolio.PortfolioExecutor
-import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -33,6 +30,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.portfolioExecutor
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
@@ -590,8 +588,8 @@ internal object SolveCore {
         )
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
-        val workers = PortfolioBuilder.build(
-            solvable.finiteProblem.bake(),
+        val executor = FinitePipeline.portfolioExecutor(
+            solvable.finiteProblem,
             scenario,
             objective = solvable.linearObjective,
             lsObjective = solvable.lsObjective,
@@ -602,8 +600,6 @@ internal object SolveCore {
         // cores == 1 → the single-core bandit-scheduled SequentialPortfolio (it persists/shares learned
         // clauses across its segments and bandit-schedules the whole arm pool on one core); cores > 1 →
         // the concurrent Portfolio. Both are blocking (coroutine-free) and yield the same result types.
-        val executor: PortfolioExecutor =
-            if (scenario.cores == 1) SequentialPortfolio.exp3(workers) else parallelPortfolio(workers)
         executor.use {
             if (solvable.optimize) {
                 // Stream every improving incumbent live (the MiniZinc `-i` contract): emit its solution
