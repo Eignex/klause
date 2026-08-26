@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.CostShaping
 import com.eignex.klause.localsearch.DefinitionalSweep
@@ -29,8 +30,14 @@ import kotlin.math.ln
  * [profile] fixes this arm's regime — its destroy-size band and acceptance temperature; a diverse ALNS
  * engine cycles [AlnsProfile.Curated] via [diverse]. The default regime is used for the standalone arm
  * (e.g. the last slot of a mixed portfolio).
+ *
+ * [nodeBudget] is the solve-spanning node allowance. This arm builds its repair [BacktrackParams] itself
+ * rather than drawing a [com.eignex.klause.backtrack.BacktrackRecipe] from the pool, so it has to be
+ * handed the allowance explicitly; without it the bootstrap and every repair search nodes that neither
+ * count against the cap nor stop at it.
  */
-internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default) : WorkerConfig {
+internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default, val nodeBudget: NodeBudget? = null) :
+    WorkerConfig {
     override val label: String get() = "alns-${profile.label}"
 
     override fun materialize(
@@ -62,6 +69,7 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default) 
             backtrackParams = BacktrackParams(
                 randomSeed = seed + index,
                 clauseExchange = PoolClauseExchange(repairClauses, skipPermanent = true, shareGlobalNogoods = false),
+                nodeBudget = nodeBudget,
             ),
             minDestroyFraction = profile.minDestroyFraction,
             maxDestroyFraction = profile.maxDestroyFraction,
@@ -102,8 +110,9 @@ internal class AlnsWorkerConfig(val profile: AlnsProfile = AlnsProfile.Default) 
 
     companion object {
         /** [count] diverse ALNS arms cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
-         *  of [LocalSearchWorkerConfig.diverse]. Every slot is a fresh instance even when regimes repeat. */
-        fun diverse(count: Int): List<AlnsWorkerConfig> =
-            List(count) { AlnsWorkerConfig(AlnsProfile.Curated[it % AlnsProfile.Curated.size]) }
+         *  of [LocalSearchWorkerConfig.diverse]. Every slot is a fresh instance even when regimes repeat,
+         *  and every slot spends [nodeBudget]. */
+        fun diverse(count: Int, nodeBudget: NodeBudget? = null): List<AlnsWorkerConfig> =
+            List(count) { AlnsWorkerConfig(AlnsProfile.Curated[it % AlnsProfile.Curated.size], nodeBudget) }
     }
 }

@@ -3,6 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.solver.BakedProblem
@@ -111,11 +112,24 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
 
         /** The top-[count] prefix of [BacktrackCatalog.ranked], wrapping past the pool size so larger
          *  pools repeat the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls).
-         *  Each arm is capped under [lpCeiling] (default `AGGRESSIVE`, no overrides = uncapped). */
-        fun diverse(kind: Kind, count: Int, lpCeiling: LpConfig = LpConfig.AGGRESSIVE): List<BacktrackWorkerConfig> {
+         *  Each arm is capped under [lpCeiling] (default `AGGRESSIVE`, no overrides = uncapped) and
+         *  spends [nodeBudget]. */
+        fun diverse(
+            kind: Kind,
+            count: Int,
+            lpCeiling: LpConfig = LpConfig.AGGRESSIVE,
+            nodeBudget: NodeBudget? = null,
+        ): List<BacktrackWorkerConfig> {
             require(count >= 1) { "count must be ≥ 1" }
             val order = BacktrackCatalog.ranked(kind)
-            return List(count) { BacktrackWorkerConfig(order[it % order.size].capLp(lpCeiling)) }
+            return List(count) { BacktrackWorkerConfig(order[it % order.size].capLp(lpCeiling).spending(nodeBudget)) }
         }
     }
+}
+
+/** This recipe with every arm it builds spending [budget], the solve-spanning node allowance. A null
+ *  budget leaves the recipe untouched, so an uncapped run composes exactly the pool it would anyway. */
+internal fun BacktrackRecipe.spending(budget: NodeBudget?): BacktrackRecipe {
+    if (budget == null) return this
+    return BacktrackRecipe(label) { seed, onEvent -> build(seed, onEvent).copy(nodeBudget = budget) }
 }
