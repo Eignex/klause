@@ -13,12 +13,12 @@ import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.componentPlan
-import com.eignex.klause.solver.sourceRoute
-import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
@@ -1006,7 +1006,8 @@ class SmtLibTest {
                 "the fresh ite var inherits the unbounded branch's range",
         )
         for ((text, message) in cases) {
-            assertEquals(ProblemPipeline.GENERAL_LIA, SmtLib.parse(text).model.sourceRoute(), message)
+            val parsed = SmtLib.parse(text)
+            assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute(), message)
         }
     }
 
