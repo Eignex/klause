@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.xcsp3
+package com.eignex.klause.lowering.xcsp3
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
