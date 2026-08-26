@@ -1105,6 +1105,64 @@ sealed interface com.eignex.klause.config/ConfigSpec { // com.eignex.klause.conf
     }
 }
 
+sealed interface com.eignex.klause.factor.arithmetic/FactorRow { // com.eignex.klause.factor.arithmetic/FactorRow|null[0]
+    abstract val activator // com.eignex.klause.factor.arithmetic/FactorRow.activator|{}activator[0]
+        abstract fun <get-activator>(): kotlin/Int // com.eignex.klause.factor.arithmetic/FactorRow.activator.<get-activator>|<get-activator>(){}[0]
+    abstract val intVars // com.eignex.klause.factor.arithmetic/FactorRow.intVars|{}intVars[0]
+        abstract fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.intVars.<get-intVars>|<get-intVars>(){}[0]
+    abstract val op // com.eignex.klause.factor.arithmetic/FactorRow.op|{}op[0]
+        abstract fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/FactorRow.op.<get-op>|<get-op>(){}[0]
+    abstract val realVars // com.eignex.klause.factor.arithmetic/FactorRow.realVars|{}realVars[0]
+        abstract fun <get-realVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.realVars.<get-realVars>|<get-realVars>(){}[0]
+    abstract val strict // com.eignex.klause.factor.arithmetic/FactorRow.strict|{}strict[0]
+        abstract fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/FactorRow.strict.<get-strict>|<get-strict>(){}[0]
+
+    final class Doubles : com.eignex.klause.factor.arithmetic/FactorRow { // com.eignex.klause.factor.arithmetic/FactorRow.Doubles|null[0]
+        constructor <init>(kotlin/IntArray, kotlin/DoubleArray, kotlin/IntArray, kotlin/DoubleArray, com.eignex.klause.ir/LinearOp, kotlin/Double, kotlin/Boolean, kotlin/Int) // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.<init>|<init>(kotlin.IntArray;kotlin.DoubleArray;kotlin.IntArray;kotlin.DoubleArray;com.eignex.klause.ir.LinearOp;kotlin.Double;kotlin.Boolean;kotlin.Int){}[0]
+
+        final val activator // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.activator|{}activator[0]
+            final fun <get-activator>(): kotlin/Int // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.activator.<get-activator>|<get-activator>(){}[0]
+        final val bound // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.bound|{}bound[0]
+            final fun <get-bound>(): kotlin/Double // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.bound.<get-bound>|<get-bound>(){}[0]
+        final val intCoeffs // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intCoeffs|{}intCoeffs[0]
+            final fun <get-intCoeffs>(): kotlin/DoubleArray // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intCoeffs.<get-intCoeffs>|<get-intCoeffs>(){}[0]
+        final val intVars // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intVars|{}intVars[0]
+            final fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.intVars.<get-intVars>|<get-intVars>(){}[0]
+        final val op // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.op|{}op[0]
+            final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.op.<get-op>|<get-op>(){}[0]
+        final val realCoeffs // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.realCoeffs|{}realCoeffs[0]
+            final fun <get-realCoeffs>(): kotlin/DoubleArray // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.realCoeffs.<get-realCoeffs>|<get-realCoeffs>(){}[0]
+        final val realVars // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.realVars|{}realVars[0]
+            final fun <get-realVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.realVars.<get-realVars>|<get-realVars>(){}[0]
+        final val strict // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.strict|{}strict[0]
+            final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/FactorRow.Doubles.strict.<get-strict>|<get-strict>(){}[0]
+    }
+
+    final class Wide : com.eignex.klause.factor.arithmetic/FactorRow { // com.eignex.klause.factor.arithmetic/FactorRow.Wide|null[0]
+        constructor <init>(kotlin/IntArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, com.eignex.klause.ir/LinearOp, com.ionspin.kotlin.bignum.integer/BigInteger, kotlin/Int) // com.eignex.klause.factor.arithmetic/FactorRow.Wide.<init>|<init>(kotlin.IntArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;com.eignex.klause.ir.LinearOp;com.ionspin.kotlin.bignum.integer.BigInteger;kotlin.Int){}[0]
+
+        final val activator // com.eignex.klause.factor.arithmetic/FactorRow.Wide.activator|{}activator[0]
+            final fun <get-activator>(): kotlin/Int // com.eignex.klause.factor.arithmetic/FactorRow.Wide.activator.<get-activator>|<get-activator>(){}[0]
+        final val bound // com.eignex.klause.factor.arithmetic/FactorRow.Wide.bound|{}bound[0]
+            final fun <get-bound>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.factor.arithmetic/FactorRow.Wide.bound.<get-bound>|<get-bound>(){}[0]
+        final val coefficients // com.eignex.klause.factor.arithmetic/FactorRow.Wide.coefficients|{}coefficients[0]
+            final fun <get-coefficients>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.factor.arithmetic/FactorRow.Wide.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final val intVars // com.eignex.klause.factor.arithmetic/FactorRow.Wide.intVars|{}intVars[0]
+            final fun <get-intVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.Wide.intVars.<get-intVars>|<get-intVars>(){}[0]
+        final val op // com.eignex.klause.factor.arithmetic/FactorRow.Wide.op|{}op[0]
+            final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/FactorRow.Wide.op.<get-op>|<get-op>(){}[0]
+        final val realVars // com.eignex.klause.factor.arithmetic/FactorRow.Wide.realVars|{}realVars[0]
+            final fun <get-realVars>(): kotlin/IntArray // com.eignex.klause.factor.arithmetic/FactorRow.Wide.realVars.<get-realVars>|<get-realVars>(){}[0]
+        final val strict // com.eignex.klause.factor.arithmetic/FactorRow.Wide.strict|{}strict[0]
+            final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/FactorRow.Wide.strict.<get-strict>|<get-strict>(){}[0]
+    }
+
+    final object Companion { // com.eignex.klause.factor.arithmetic/FactorRow.Companion|null[0]
+        final const val ALWAYS // com.eignex.klause.factor.arithmetic/FactorRow.Companion.ALWAYS|{}ALWAYS[0]
+            final fun <get-ALWAYS>(): kotlin/Int // com.eignex.klause.factor.arithmetic/FactorRow.Companion.ALWAYS.<get-ALWAYS>|<get-ALWAYS>(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.factor.arithmetic/IntegralConstants : com.eignex.klause.factor.arithmetic/LinearConstants { // com.eignex.klause.factor.arithmetic/IntegralConstants|null[0]
     abstract val exactBound // com.eignex.klause.factor.arithmetic/IntegralConstants.exactBound|{}exactBound[0]
         abstract fun <get-exactBound>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.factor.arithmetic/IntegralConstants.exactBound.<get-exactBound>|<get-exactBound>(){}[0]
@@ -10587,6 +10645,7 @@ final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@co
     final fun (com.eignex.klause.solver/IntDomain).<get-values>(): com.eignex.klause.solver/IntSpan // com.eignex.klause.solver/values.<get-values>|<get-values>@com.eignex.klause.solver.IntDomain(){}[0]
 
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(){}[0]
+final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/and(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/and|and@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/iff(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/iff|iff@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/implies(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/implies|implies@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
@@ -10644,6 +10703,7 @@ final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/co
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>, kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>;kotlin.Long;com.eignex.klause.solver.Cancellation){}[0]
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.theory/theoryComponent(com.eignex.klause.solver/ProblemSpec): com.eignex.klause.solver.search/TheoryComponent? // com.eignex.klause.theory/theoryComponent|theoryComponent@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec){}[0]
 final fun (com.eignex.klause.solver/ConstList).com.eignex.klause.solver/longsOrNull(): com.eignex.klause.solver/LongConstList? // com.eignex.klause.solver/longsOrNull|longsOrNull@com.eignex.klause.solver.ConstList(){}[0]
+final fun (com.eignex.klause.solver/Factor).com.eignex.klause.factor.arithmetic/linearRow(): com.eignex.klause.factor.arithmetic/FactorRow? // com.eignex.klause.factor.arithmetic/linearRow|linearRow@com.eignex.klause.solver.Factor(){}[0]
 final fun (com.eignex.klause.solver/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.solver.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
