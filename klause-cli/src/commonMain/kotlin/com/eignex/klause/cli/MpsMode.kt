@@ -25,12 +25,14 @@ internal object MpsMode : CliMode {
 
     private class Session : ModeSession {
         private var objectiveScale = 1L
+        private var objectiveErrorBound: Double? = null
 
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val compiled = Mps.parse(openFileSource(path)).toProblem()
             objectiveScale = compiled.objectiveScale
+            objectiveErrorBound = compiled.objectiveErrorBound
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -81,7 +83,7 @@ internal object MpsMode : CliMode {
             )
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(objectiveScale)
+        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(objectiveScale, objectiveErrorBound)
     }
 }
 
@@ -114,7 +116,8 @@ internal fun renderMpsExactLiraModel(compiled: MpsCompiled, assignment: ExactLir
 }
 
 /** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
-internal class MpsOutput(private val objectiveScale: Long = 1L) : BufferedBestOutput() {
+internal class MpsOutput(private val objectiveScale: Long = 1L, private val objectiveErrorBound: Double? = null) :
+    BufferedBestOutput() {
     private var bestObjective: Long? = null
 
     override fun onSolutionObjective(objective: Long?) {
@@ -127,16 +130,30 @@ internal class MpsOutput(private val objectiveScale: Long = 1L) : BufferedBestOu
     override fun formatObjective(objective: Long): String = scaledDecimal(objective, objectiveScale)
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
-        Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
-        Verdict.OPTIMAL -> "s OPTIMUM FOUND"
+        Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
+            if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null) "s OPTIMUM FOUND" else "s SATISFIABLE"
+
         Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
     override fun keepStat(key: String): Boolean = true
+
+    override fun verdictReason(verdict: Verdict): String? {
+        val approximation = objectiveErrorBound?.let {
+            if (verdict == Verdict.OPTIMAL) {
+                "objective approximation error <= $it; retained objective is optimal"
+            } else {
+                "objective approximation error <= $it"
+            }
+        }
+        val cause = super.verdictReason(verdict)
+        return listOfNotNull(approximation, cause).joinToString("; ").ifEmpty { null }
+    }
 }
 
-/** Format the exact decimal value of an MPS objective whose solver coefficients were scaled by [scale]. */
+/** Format an MPS retained-objective value whose solver coefficients were scaled by [scale]. */
 private fun scaledDecimal(value: Long, scale: Long): String {
     require(scale > 0L)
     if (scale == 1L || value % scale == 0L) return (value / scale).toString()
