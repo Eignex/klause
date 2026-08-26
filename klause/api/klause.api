@@ -7935,6 +7935,7 @@ public final class com/eignex/klause/solver/ComponentPlan {
 	public final fun getHasTheoryComponent ()Z
 	public final fun getTheoryIntVars ()[I
 	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
+	public final fun getUnplaceable ()Lcom/eignex/klause/solver/UnplaceableColumn;
 	public final fun intOwner (I)Lcom/eignex/klause/solver/IntVariableOwner;
 	public final fun materialize (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/Problem;
 	public final fun theoryFragment (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemSpec;
@@ -8487,6 +8488,13 @@ public final class com/eignex/klause/solver/UnitConsts : com/eignex/klause/solve
 	public fun getSize ()I
 	public fun negated ()Lcom/eignex/klause/solver/LongConstList;
 	public fun toLongArray ()[J
+}
+
+public final class com/eignex/klause/solver/UnplaceableColumn {
+	public fun <init> (ILjava/lang/Integer;Ljava/lang/String;)V
+	public final fun getColumn ()I
+	public final fun getFactorIndex ()Ljava/lang/Integer;
+	public final fun getFactorKind ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/VariablePartition {

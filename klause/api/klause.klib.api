@@ -9851,6 +9851,8 @@ final class com.eignex.klause.solver/ComponentPlan { // com.eignex.klause.solver
         final fun <get-theoryIntVars>(): kotlin/IntArray // com.eignex.klause.solver/ComponentPlan.theoryIntVars.<get-theoryIntVars>|<get-theoryIntVars>(){}[0]
     final val theoryPipeline // com.eignex.klause.solver/ComponentPlan.theoryPipeline|{}theoryPipeline[0]
         final fun <get-theoryPipeline>(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/ComponentPlan.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
+    final val unplaceable // com.eignex.klause.solver/ComponentPlan.unplaceable|{}unplaceable[0]
+        final fun <get-unplaceable>(): com.eignex.klause.solver/UnplaceableColumn? // com.eignex.klause.solver/ComponentPlan.unplaceable.<get-unplaceable>|<get-unplaceable>(){}[0]
 
     final fun cpProjection(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/CpProblemProjection // com.eignex.klause.solver/ComponentPlan.cpProjection|cpProjection(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>){}[0]
     final fun factorOwner(kotlin/Int): com.eignex.klause.solver/FactorOwner // com.eignex.klause.solver/ComponentPlan.factorOwner|factorOwner(kotlin.Int){}[0]
@@ -10029,6 +10031,17 @@ final class com.eignex.klause.solver/UnitConsts : com.eignex.klause.solver/LongC
     final fun at(kotlin/Int): kotlin/Long // com.eignex.klause.solver/UnitConsts.at|at(kotlin.Int){}[0]
     final fun negated(): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/UnitConsts.negated|negated(){}[0]
     final fun toLongArray(): kotlin/LongArray // com.eignex.klause.solver/UnitConsts.toLongArray|toLongArray(){}[0]
+}
+
+final class com.eignex.klause.solver/UnplaceableColumn { // com.eignex.klause.solver/UnplaceableColumn|null[0]
+    constructor <init>(kotlin/Int, kotlin/Int?, kotlin/String?) // com.eignex.klause.solver/UnplaceableColumn.<init>|<init>(kotlin.Int;kotlin.Int?;kotlin.String?){}[0]
+
+    final val column // com.eignex.klause.solver/UnplaceableColumn.column|{}column[0]
+        final fun <get-column>(): kotlin/Int // com.eignex.klause.solver/UnplaceableColumn.column.<get-column>|<get-column>(){}[0]
+    final val factorIndex // com.eignex.klause.solver/UnplaceableColumn.factorIndex|{}factorIndex[0]
+        final fun <get-factorIndex>(): kotlin/Int? // com.eignex.klause.solver/UnplaceableColumn.factorIndex.<get-factorIndex>|<get-factorIndex>(){}[0]
+    final val factorKind // com.eignex.klause.solver/UnplaceableColumn.factorKind|{}factorKind[0]
+        final fun <get-factorKind>(): kotlin/String? // com.eignex.klause.solver/UnplaceableColumn.factorKind.<get-factorKind>|<get-factorKind>(){}[0]
 }
 
 final class com.eignex.klause.solver/VariablePartition { // com.eignex.klause.solver/VariablePartition|null[0]

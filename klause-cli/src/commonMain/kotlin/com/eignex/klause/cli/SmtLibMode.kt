@@ -1,11 +1,13 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.sourceRoute
 import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
@@ -47,9 +49,7 @@ internal object SmtLibMode : CliMode {
             }
             when (pipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
-                    throw UnsupportedSmtException(
-                        "open integer bounds require supported difference, General LIA, or exact LIRA coverage",
-                    )
+                    throw UnsupportedSmtException(unsupportedOpenReason(parsed.model, ints))
 
                 ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA, ProblemPipeline.EXACT_LRA,
                 ProblemPipeline.EXACT_LIRA,
@@ -169,4 +169,22 @@ internal class SmtLibOutput : BufferedBestOutput() {
     private companion object {
         private val SMT_SEARCH_KEYS = setOf("nodes", "failures", "propagations")
     }
+}
+
+/**
+ * Why an open model has no route, naming the column and the constraint that demanded it be finite.
+ *
+ * A model is declined whole, but the cause is one column and one factor: the column carries no bound CP
+ * can index, and the factor is one no theory holds. Naming both says what to change — bound that column,
+ * or state a decomposition for that constraint the theories can take — where naming neither leaves a
+ * user to guess which of their constraints is the unsupported one.
+ */
+internal fun unsupportedOpenReason(model: ProblemSpec, names: Map<String, Int>): String {
+    val unplaceable = model.componentPlan().unplaceable
+        ?: return "open integer bounds require supported difference, General LIA, or exact LIRA coverage"
+    val column = names.entries.firstOrNull { it.value == unplaceable.column }?.key
+        ?: "integer column ${unplaceable.column}"
+    val kind = unplaceable.factorKind ?: "a constraint"
+    return "$column has no bound to search over and $kind needs one; " +
+        "bound it, or state this constraint as rows a theory can hold"
 }

@@ -43,3 +43,42 @@ internal fun allDifferentWindowSize(min: Long, max: Long): Int? {
     if (span > Int.MAX_VALUE - 1L) return null
     return (span + 1L).toInt()
 }
+
+/** The value window an [AllDifferent] indexes: its first value and how many it covers. */
+internal class AllDifferentWindow(
+    /** Lowest value any member can take. */
+    val min: Long,
+    /** Count of values the global indexes, starting at [min]. */
+    val size: Int,
+)
+
+/**
+ * The window [AllDifferent] would index over [vars], or null when the global cannot hold them and the
+ * caller must post the pairwise decomposition instead.
+ *
+ * [AllDifferent] filters by indexing a window of values, so it needs every member bounded on both sides
+ * and a window an `Int` can address. Neither is a property of the caller, which is why this is asked
+ * here rather than decided again in each front-end — one that forgot the openness half would hand the
+ * plan a global over a column no theory can hold and no CP domain can index, and the model is refused
+ * whole rather than in the part that is genuinely unsupported.
+ *
+ * Declining costs nothing the global was providing: pairwise `!=` is `x < y or x > y`, two difference
+ * rows the theories own over unbounded integers, and Hall intervals deduce nothing without a finite
+ * value set to draw them from.
+ *
+ * [lower] and [upper] report a member's bounds, `null` for a side with no bound. Fewer than two members
+ * is vacuous, and reported as no window so the caller's decomposition posts nothing.
+ */
+internal fun allDifferentWindow(vars: IntArray, lower: (Int) -> Long?, upper: (Int) -> Long?): AllDifferentWindow? {
+    if (vars.size < 2) return null
+    var min = Long.MAX_VALUE
+    var max = Long.MIN_VALUE
+    for (v in vars) {
+        val lo = lower(v) ?: return null
+        val hi = upper(v) ?: return null
+        if (lo < min) min = lo
+        if (hi > max) max = hi
+    }
+    val size = allDifferentWindowSize(min, max) ?: return null
+    return AllDifferentWindow(min, size)
+}

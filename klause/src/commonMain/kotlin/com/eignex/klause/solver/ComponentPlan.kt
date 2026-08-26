@@ -30,6 +30,8 @@ class ComponentPlan internal constructor(
     private val factorOwners: Array<FactorOwner>,
     /** Theory route selected from the theory-owned source fragment. */
     val theoryPipeline: ProblemPipeline,
+    /** What left the model without a route, or null when it has one. */
+    val unplaceable: UnplaceableColumn? = null,
 ) {
     /** Owner of integer column [v]. */
     fun intOwner(v: Int): IntVariableOwner = intOwners[v]
@@ -161,12 +163,12 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
     // An open column some CP-only factor reads has no owner: CP cannot index it and no theory can hold
     // the factor. The plan says so rather than asserting it away, so one model has one verdict however
     // it was reached.
-    var unownedOpenColumn = false
+    var unownedOpenColumn = -1
     val intOwners = Array(numIntVars) { v ->
         if (completeTheory != null) {
             IntVariableOwner.THEORY
         } else if (!intBounds.hasLower(v) || !intBounds.hasUpper(v)) {
-            if (partition.isSearchVariable(v)) unownedOpenColumn = true
+            if (partition.isSearchVariable(v) && unownedOpenColumn < 0) unownedOpenColumn = v
             IntVariableOwner.THEORY
         } else if (partition.isSearchVariable(v)) {
             IntVariableOwner.CP
@@ -197,7 +199,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         realUpper = realUpper,
     )
     val route = when {
-        unownedOpenColumn -> ProblemPipeline.UNSUPPORTED_OPEN
+        unownedOpenColumn >= 0 -> ProblemPipeline.UNSUPPORTED_OPEN
 
         theoryFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
 
@@ -225,5 +227,36 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         intOwners,
         factorOwners,
         route,
+        // Only searched on the refusal path, where the model is already declined and the scan is the
+        // difference between naming the constraint at fault and naming nothing.
+        if (unownedOpenColumn < 0) null else unplaceable(unownedOpenColumn, factors, numRealVars != 0),
     )
 }
+
+/**
+ * The column no lane could own, and the first factor that demanded it be finite.
+ *
+ * A refusal that names only the model leaves nothing to act on: the column has no bound for CP to index,
+ * and some factor no theory holds reads it. Which factor that is decides the remedy — bound the column,
+ * or state a decomposition for that global the theories can take.
+ */
+private fun unplaceable(column: Int, factors: Array<Factor>, hasRealColumns: Boolean): UnplaceableColumn {
+    val culprit = factors.indexOfFirst { f ->
+        !f.isTheoryOwnable(hasRealColumns) && f.variables.ints.any { it == column }
+    }
+    return UnplaceableColumn(
+        column,
+        culprit.takeIf { it >= 0 },
+        factors.getOrNull(culprit)?.let { it::class.simpleName },
+    )
+}
+
+/** Why a model has no route; see [ComponentPlan.unplaceable]. */
+class UnplaceableColumn(
+    /** Integer column with no finite bound that a domain-requiring factor reads. */
+    val column: Int,
+    /** Index of the factor demanding it, or null when none was found. */
+    val factorIndex: Int?,
+    /** That factor's type name, for a diagnostic that names the constraint. */
+    val factorKind: String?,
+)
