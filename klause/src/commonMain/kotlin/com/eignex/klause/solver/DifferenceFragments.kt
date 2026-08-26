@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering
+package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
@@ -8,8 +8,8 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.Factor
 
+/** Gather the immutable difference fragment represented by this core model data. */
 internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
     val zero = DifferenceFragment.ZERO
     val edges = ArrayList<DifferenceEdge>()
@@ -23,9 +23,7 @@ internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBo
     for (variable in mentioned.toIntArray().sortedArray()) {
         if (variable >= numIntVars) continue
         if (intBounds.hasUpper(variable)) {
-            edges.add(
-                DifferenceEdge(zero, variable, intBounds.upper(variable), domainBound = true),
-            )
+            edges.add(DifferenceEdge(zero, variable, intBounds.upper(variable), domainBound = true))
         }
         if (intBounds.hasLower(variable)) {
             edges.add(DifferenceEdge(variable, zero, -intBounds.lower(variable), domainBound = true))
@@ -34,18 +32,18 @@ internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBo
     return DifferenceFragment(edges)
 }
 
+/** Whether every integer row can be decided by the complete difference-theory route. */
 internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
     val scratch = ArrayList<DifferenceEdge>(2)
     for (factor in factors) {
         if (factor.intVars.isEmpty()) continue
         scratch.clear()
-        if (!appendFactorDifferenceEdges(factor, scratch) || scratch.isEmpty()) {
-            return false
-        }
+        if (!appendFactorDifferenceEdges(factor, scratch) || scratch.isEmpty()) return false
     }
     return true
 }
 
+/** Whether the model is complete and numerically safe for the difference-theory route. */
 internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): Boolean =
     hasCompleteDifferenceCoverage(factors) &&
         (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)

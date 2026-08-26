@@ -4,11 +4,11 @@ import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.differenceFragmentOf
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.componentPlan
+import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck

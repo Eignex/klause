@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
-import com.eignex.klause.lowering.differenceFragmentOf
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.solver.differenceFragmentOf
 
 /**
  * This [Problem] with a [DifferenceSystem] over its difference rows appended, or the problem unchanged

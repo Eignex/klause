@@ -1,7 +1,6 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.lowering.supportsCompleteDifferenceTheory
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
