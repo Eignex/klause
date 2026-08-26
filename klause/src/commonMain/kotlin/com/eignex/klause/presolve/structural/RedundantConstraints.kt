@@ -1,4 +1,4 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
@@ -10,6 +10,9 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.PresolveShared
+import com.eignex.klause.presolve.SubsumeState
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -24,10 +27,6 @@ import com.eignex.kumulant.math.splitmix64
 /** Marks a bool var id into a range disjoint from int var ids in [RedundantConstraints.shallowKey]'s
  *  variable-set sum, so a bool var and an int var of the same id don't cancel or alias. */
 private const val BOOL_VAR_MARK = 1L shl 40
-
-/** Opaque handle for the incremental round engine's persistent subsume state, carried across the module
- *  boundary by [com.eignex.klause.presolve.PresolveContext]. Its implementation lives in this file. */
-interface SubsumeState
 
 internal object RedundantConstraints {
 

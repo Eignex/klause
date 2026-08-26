@@ -33,7 +33,7 @@ internal object PresolveShared {
 
     /** [amoCliques] restricted to cliques backed by a [Cardinality] or [Clause] — factors a knapsack
      *  drop never removes. A clique implied by a [PseudoBoolean] knapsack only holds while that knapsack
-     *  is present, so it is unsound for [RedundantConstraints] to use one to *drop* a knapsack (it could
+     *  is present, so it is unsound for redundancy elimination to use one to *drop* a knapsack (it could
      *  drop the very constraint the clique rests on); this restricted set is the one safe to drop by. */
     fun persistentAmoCliques(factors: List<Factor>): List<Set<Int>> = collectCliques(factors, includeKnapsacks = false)
 

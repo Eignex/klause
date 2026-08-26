@@ -1,8 +1,9 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
-import com.eignex.klause.presolve.RedundantConstraints.SubsumeIncremental
-import com.eignex.klause.presolve.RedundantConstraints.SubsumeMemo
+import com.eignex.klause.presolve.structural.RedundantConstraints
+import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
+import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor

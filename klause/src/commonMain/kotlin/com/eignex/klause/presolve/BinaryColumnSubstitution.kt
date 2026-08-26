@@ -27,7 +27,7 @@ import com.eignex.klause.util.LongArrayList
  * The column is substituted **outright** — a fresh Boolean variable carries its value and no channelling
  * factor is posted. Channelling instead (a reified `x = 1 ⟺ b` per column) would trade the [Linear] rows
  * for pseudo-Boolean rows *plus* a reified factor each, and reified single-variable indicators are
- * consumed by [ComparisonClauseFold], which strands them.
+ * consumed by comparison-clause folding, which strands them.
  *
  * A column is substituted only when *every* factor mentioning it is a row this can rewrite:
  *  - an integer-core [Linear] (no continuous term, no over-64-bit coefficient) whose operator is not `≠`
