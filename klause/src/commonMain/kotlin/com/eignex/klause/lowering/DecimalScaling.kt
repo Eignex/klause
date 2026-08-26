@@ -62,7 +62,9 @@ internal class RowScaleBuilder {
         if (magnitude > largest) largest = magnitude
         if (magnitude != 0.0 && magnitude < smallestNonZero) smallestNonZero = magnitude
         val needed = decimalPlacesOf(value)
-        if (needed < 0) recoverable = false else if (needed > places) {
+        if (needed < 0) {
+            recoverable = false
+        } else if (needed > places) {
             places = needed
         }
     }

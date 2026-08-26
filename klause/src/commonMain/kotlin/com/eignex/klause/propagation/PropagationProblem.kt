@@ -50,8 +50,8 @@ class PropagationProblem(
             boolOccurrences
         } else {
             Array(problem.numBoolVars) { v ->
-            retain(boolOccurrences[v]) { fid -> !watcherFid[fid] }
-        }
+                retain(boolOccurrences[v]) { fid -> !watcherFid[fid] }
+            }
         }
     }
 
