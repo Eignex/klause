@@ -4,9 +4,9 @@ import com.eignex.klause.factor.*
 import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
-import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList

@@ -5,9 +5,9 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.CnfLowering
+import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
