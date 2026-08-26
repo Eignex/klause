@@ -26,6 +26,7 @@ internal object MpsMode : CliMode {
     private class Session : ModeSession {
         private var objectiveScale = 1L
         private var objectiveErrorBound: Double? = null
+        private var hasInnerConstraintApproximation = false
 
         override fun flags(): List<FlagSpec> = emptyList()
 
@@ -33,6 +34,7 @@ internal object MpsMode : CliMode {
             val compiled = Mps.parse(openFileSource(path)).toProblem()
             objectiveScale = compiled.objectiveScale
             objectiveErrorBound = compiled.objectiveErrorBound
+            hasInnerConstraintApproximation = compiled.hasInnerConstraintApproximation
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -83,7 +85,8 @@ internal object MpsMode : CliMode {
             )
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(objectiveScale, objectiveErrorBound)
+        override fun output(common: CommonOptions): OutputProtocol =
+            MpsOutput(objectiveScale, objectiveErrorBound, hasInnerConstraintApproximation)
     }
 }
 
@@ -116,8 +119,11 @@ internal fun renderMpsExactLiraModel(compiled: MpsCompiled, assignment: ExactLir
 }
 
 /** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
-internal class MpsOutput(private val objectiveScale: Long = 1L, private val objectiveErrorBound: Double? = null) :
-    BufferedBestOutput() {
+internal class MpsOutput(
+    private val objectiveScale: Long = 1L,
+    private val objectiveErrorBound: Double? = null,
+    private val hasInnerConstraintApproximation: Boolean = false,
+) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
     override fun onSolutionObjective(objective: Long?) {
@@ -131,9 +137,13 @@ internal class MpsOutput(private val objectiveScale: Long = 1L, private val obje
 
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
-            if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null) "s OPTIMUM FOUND" else "s SATISFIABLE"
+            if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null && !hasInnerConstraintApproximation) {
+                "s OPTIMUM FOUND"
+            } else {
+                "s SATISFIABLE"
+            }
 
-        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+        Verdict.UNSATISFIABLE -> if (hasInnerConstraintApproximation) "s UNKNOWN" else "s UNSATISFIABLE"
 
         Verdict.UNKNOWN -> "s UNKNOWN"
     }
@@ -142,14 +152,26 @@ internal class MpsOutput(private val objectiveScale: Long = 1L, private val obje
 
     override fun verdictReason(verdict: Verdict): String? {
         val approximation = objectiveErrorBound?.let {
-            if (verdict == Verdict.OPTIMAL) {
+            if (verdict == Verdict.OPTIMAL && !hasInnerConstraintApproximation) {
                 "objective approximation error <= $it; retained objective is optimal"
             } else {
                 "objective approximation error <= $it"
             }
         }
+        val constraintQualification = if (hasInnerConstraintApproximation) {
+            when (verdict) {
+                Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
+                    "satisfying assignment passed the inner constraint approximation"
+
+                Verdict.UNSATISFIABLE -> "inner constraint approximation is infeasible; source boundary is unresolved"
+
+                Verdict.UNKNOWN -> "inner constraint approximation leaves the source boundary unresolved"
+            }
+        } else {
+            null
+        }
         val cause = super.verdictReason(verdict)
-        return listOfNotNull(approximation, cause).joinToString("; ").ifEmpty { null }
+        return listOfNotNull(approximation, constraintQualification, cause).joinToString("; ").ifEmpty { null }
     }
 }
 

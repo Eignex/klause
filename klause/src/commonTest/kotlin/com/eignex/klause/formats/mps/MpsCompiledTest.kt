@@ -89,43 +89,41 @@ class MpsCompiledTest {
     }
 
     @Test
-    fun `an underflowing integer constraint remains rejected`() {
-        val error = assertFailsWith<MpsFormatException> {
-            lower(
-                twoFinite,
-                MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), null, 1.0),
-            )
-        }
+    fun `an underflowing integer constraint is tightened to its inner upper side`() {
+        val row = lower(
+            twoFinite,
+            MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1e15, 0.25), null, 1e15),
+        )
 
-        assertTrue("row 'c' spans" in error.message.orEmpty())
+        val constants = assertNotNull(row.integerConstants)
+        assertEquals(listOf(1_000_000_000_000_000L, 0L), row.vars.indices.map { constants.coeff(it) })
+        assertEquals(999_999_999_999_997L, constants.bound)
     }
 
     @Test
-    fun `an underflowing indicated integer constraint remains rejected`() {
-        val error = assertFailsWith<MpsFormatException> {
-            MpsModel(
-                "m",
-                ObjectiveSense.MINIMIZE,
-                MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
-                listOf(
-                    MpsVar("guard", integer = true, lower = 0.0, upper = 1.0),
-                    MpsVar("x", integer = true, lower = 0.0, upper = 1.0),
-                    MpsVar("y", integer = true, lower = 0.0, upper = 1.0),
+    fun `an underflowing indicated integer constraint is qualified`() {
+        val compiled = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
+            listOf(
+                MpsVar("guard", integer = true, lower = 0.0, upper = 1.0),
+                MpsVar("x", integer = true, lower = 0.0, upper = 1.0),
+                MpsVar("y", integer = true, lower = 0.0, upper = 1.0),
+            ),
+            listOf(
+                MpsConstraint(
+                    "c",
+                    intArrayOf(1, 2),
+                    doubleArrayOf(1e15, 0.25),
+                    null,
+                    1e15,
+                    MpsIndicator(column = 0, whenOne = true),
                 ),
-                listOf(
-                    MpsConstraint(
-                        "c",
-                        intArrayOf(1, 2),
-                        doubleArrayOf(1e15, 0.25),
-                        null,
-                        1.0,
-                        MpsIndicator(column = 0, whenOne = true),
-                    ),
-                ),
-            ).toProblem()
-        }
+            ),
+        ).toProblem()
 
-        assertTrue("row 'c' spans" in error.message.orEmpty())
+        assertTrue(compiled.hasInnerConstraintApproximation)
     }
 
     @Test
