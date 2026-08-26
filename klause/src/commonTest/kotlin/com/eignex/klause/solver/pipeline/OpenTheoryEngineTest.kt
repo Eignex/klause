@@ -49,6 +49,29 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `an open conjunctive integer model is answered with a witness satisfying its rows`() {
+        val parsed = SmtLib.parse(
+            """
+                (declare-const x Int) (declare-const y Int)
+                (assert (<= (+ (* 3 x) (* 5 y)) 100))
+                (assert (>= (+ (* 2 x) y) 7))
+                (check-sat)
+            """.trimIndent(),
+        )
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+
+        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve()
+
+        val ints = assertIs<OpenTheoryAssignment.GeneralLia>(
+            assertIs<OpenTheoryResult.Sat>(result).assignment,
+        ).assignment.ints
+        val x = ints[parsed.intVarNames.getValue("x")].longValue()
+        val y = ints[parsed.intVarNames.getValue("y")].longValue()
+        assertTrue(3 * x + 5 * y <= 100, "the witness satisfies the first row")
+        assertTrue(2 * x + y >= 7, "the witness satisfies the second row")
+    }
+
+    @Test
     fun `a finite global alongside an open column routes and answers`() {
         // The chain collapses to an Element, which needs finite domains, while `r` stays open. A
         // whole-model classifier calls that unroutable; ownership per column gives CP the Element and
