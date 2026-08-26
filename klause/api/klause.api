@@ -8206,7 +8206,6 @@ public class com/eignex/klause/solver/Problem {
 	protected final fun foldIntoDomains (Lcom/eignex/klause/propagation/PropagationResult;)V
 	public final fun getBakeElapsed-UwyO8pc ()J
 	public final fun getBaked ()Lcom/eignex/klause/propagation/PropagationResult;
-	public final fun getBoolOccurrences ()[[I
 	public final fun getCancellation ()Lcom/eignex/klause/solver/Cancellation;
 	public final fun getFactors ()[Lcom/eignex/klause/solver/Factor;
 	public final fun getHasFiniteIntDomains ()Z
@@ -8214,17 +8213,10 @@ public class com/eignex/klause/solver/Problem {
 	public final fun getImpliedFactorMask ()[Z
 	public final fun getIntBounds ()Lcom/eignex/klause/solver/IntBounds;
 	public final fun getIntColumns ()Lcom/eignex/klause/solver/IntColumns;
-	public final fun getIntOccurrences ()[[I
-	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
-	public final fun getLsBoolOccurrences ()[[I
-	public final fun getLsIntOccurrences ()[[I
-	public final fun getNonBoolWatcherBoolOccurrences ()[[I
-	public final fun getNonIntEventWatcherIntOccurrences ()[[I
 	public final fun getNumBoolVars ()I
 	public final fun getNumFactors ()I
 	public final fun getNumIntVars ()I
 	public final fun getNumRealVars ()I
-	public final fun getPropagators ()[Lcom/eignex/klause/propagation/Propagator;
 	public final fun getRealLower ()[D
 	public final fun getRealUpper ()[D
 	public final fun getSharedDomains ()Z
