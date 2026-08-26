@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.formats.smtlib
 
+import com.eignex.klause.lowering.smtlib.SmtLib
+
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Element

@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.lowering.smtlib
+
+import com.eignex.klause.formats.smtlib.*
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.Increasing

@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.lowering.smtlib
+
+import com.eignex.klause.formats.smtlib.*
 
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
@@ -12,9 +14,6 @@ import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
-
-/** Raised when an SMT-LIB construct outside the supported linear-arithmetic subset is encountered. */
-class UnsupportedSmtException(msg: String) : FormatException("SMT-LIB", msg)
 
 /** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
