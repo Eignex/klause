@@ -26,9 +26,10 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryMinimizer
+import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
@@ -97,7 +98,12 @@ internal object SolveCore {
                     return
                 }
                 output.begin(optimize = false, maximize = false)
-                val result = OpenTheoryEngine(pipeline.model, pipeline.route).solve(theoryParams)
+                val result = (
+                    OpenTheoryPipeline.execute(
+                    OpenTheoryRequest(pipeline.model, pipeline.route),
+                    theoryParams,
+                ) as OpenTheoryExecution.Satisfy
+                ).result
                 output.onVerdictContext(
                     VerdictContext(budgetExhausted = budgetSpent(common, result.stats.run.timedOut)),
                 )
@@ -925,8 +931,12 @@ private fun solveOpenTheoryOptimum(
     output: OutputProtocol,
     budgetExhausted: (Boolean) -> Boolean,
 ) {
-    val driven = if (pipeline.maximize) objective.negated() else objective
-    val result = OpenTheoryMinimizer(pipeline.model, driven).minimize(params)
+    val result = (
+        OpenTheoryPipeline.execute(
+        OpenTheoryRequest(pipeline.model, pipeline.route, objective, pipeline.maximize),
+        params,
+    ) as OpenTheoryExecution.Optimize
+    ).result
     val reported: (BigInteger) -> Long? = { value ->
         val signed = if (pipeline.maximize) -value else value
         // An objective past 64 bits is reported as absent rather than as a wrapped number.
@@ -962,14 +972,6 @@ private fun solveOpenTheoryOptimum(
         output.onStatistics(result.stats, result.stats.run.wallMs, found)
     }
 }
-
-/** The objective whose minimum is this one's maximum. */
-private fun LinearObjective.negated(): LinearObjective = LinearObjective(
-    boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
-    intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
-    constant = -constant,
-    realCoefficients = DoubleArray(realCoefficients.size) { -realCoefficients[it] },
-)
 
 private val LONG_MIN_BIG = BigInteger.fromLong(Long.MIN_VALUE)
 private val LONG_MAX_BIG = BigInteger.fromLong(Long.MAX_VALUE)
