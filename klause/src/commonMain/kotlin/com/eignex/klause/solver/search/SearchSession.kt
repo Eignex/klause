@@ -578,7 +578,11 @@ class SearchSession(
             activeComponent = component
             val result = call(component)
             activeComponent = null
-            return if (result is ComponentResult.Consistent) ComponentResult.Consistent else recordConflict(component, result)
+            return if (result is ComponentResult.Consistent) {
+                ComponentResult.Consistent
+            } else {
+                recordConflict(component, result)
+            }
         }
         for (component in components) {
             activeComponent = component

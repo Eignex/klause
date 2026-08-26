@@ -9342,7 +9342,8 @@ public final class com/eignex/klause/solver/search/SearchComponent$DefaultImpls 
 }
 
 public final class com/eignex/klause/solver/search/SearchComponentSet {
-	public fun <init> (Ljava/util/List;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun session (JLcom/eignex/klause/solver/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;)Lcom/eignex/klause/solver/search/SearchSession;
 	public static synthetic fun session$default (Lcom/eignex/klause/solver/search/SearchComponentSet;JLcom/eignex/klause/solver/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchSession;
 }
@@ -9923,8 +9924,8 @@ public final class com/eignex/klause/solver/search/SearchRunObserver$None : com/
 }
 
 public final class com/eignex/klause/solver/search/SearchSession : com/eignex/klause/solver/search/ClauseWatchHost, com/eignex/klause/solver/search/SearchContext {
-	public fun <init> (Ljava/util/List;JLcom/eignex/klause/solver/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;)V
-	public synthetic fun <init> (Ljava/util/List;JLcom/eignex/klause/solver/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;JLcom/eignex/klause/solver/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;JLcom/eignex/klause/solver/Cancellation;Lcom/eignex/klause/solver/search/SearchLearnedDbParams;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun boolValue (I)Ljava/lang/Boolean;
 	public fun cancelled ()Z
 	public final fun check ()Lcom/eignex/klause/solver/search/ComponentCheck;

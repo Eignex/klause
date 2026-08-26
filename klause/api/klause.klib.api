@@ -9458,7 +9458,7 @@ final class com.eignex.klause.solver.search/SearchCancellationPoller { // com.ei
 }
 
 final class com.eignex.klause.solver.search/SearchComponentSet { // com.eignex.klause.solver.search/SearchComponentSet|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>) // com.eignex.klause.solver.search/SearchComponentSet.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin.collections/List<com.eignex.klause.solver.search/SearchBrancher> = ...) // com.eignex.klause.solver.search/SearchComponentSet.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.collections.List<com.eignex.klause.solver.search.SearchBrancher>){}[0]
 
     final fun session(kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ...): com.eignex.klause.solver.search/SearchSession // com.eignex.klause.solver.search/SearchComponentSet.session|session(kotlin.Long;com.eignex.klause.solver.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams){}[0]
 }
@@ -9524,7 +9524,7 @@ final class com.eignex.klause.solver.search/SearchRun { // com.eignex.klause.sol
 }
 
 final class com.eignex.klause.solver.search/SearchSession : com.eignex.klause.solver.search/ClauseWatchHost, com.eignex.klause.solver.search/SearchContext { // com.eignex.klause.solver.search/SearchSession|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ...) // com.eignex.klause.solver.search/SearchSession.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.Long;com.eignex.klause.solver.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.solver.search/SearchComponent>, kotlin/Long = ..., com.eignex.klause.solver/Cancellation = ..., com.eignex.klause.solver.search/SearchLearnedDbParams = ..., kotlin.collections/List<com.eignex.klause.solver.search/SearchBrancher> = ...) // com.eignex.klause.solver.search/SearchSession.<init>|<init>(kotlin.collections.List<com.eignex.klause.solver.search.SearchComponent>;kotlin.Long;com.eignex.klause.solver.Cancellation;com.eignex.klause.solver.search.SearchLearnedDbParams;kotlin.collections.List<com.eignex.klause.solver.search.SearchBrancher>){}[0]
 
     final val decisionLevel // com.eignex.klause.solver.search/SearchSession.decisionLevel|{}decisionLevel[0]
         final fun <get-decisionLevel>(): kotlin/Int // com.eignex.klause.solver.search/SearchSession.decisionLevel.<get-decisionLevel>|<get-decisionLevel>(){}[0]
