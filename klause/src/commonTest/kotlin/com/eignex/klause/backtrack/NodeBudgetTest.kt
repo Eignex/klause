@@ -5,6 +5,8 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -58,5 +60,30 @@ class NodeBudgetTest {
         val budget = NodeBudget(limit = 1_000_000)
         val result = BacktrackSolver(php(pigeons = 5, holes = 4).bake()).solve(params(budget))
         assertIs<SolveResult.Unsat>(result, "a cap it never reaches must not change the verdict")
+    }
+
+    @Test
+    fun `a spent allowance stops an optimize short of a verdict`() {
+        val budget = NodeBudget(limit = 1)
+        val problem = php(pigeons = 8, holes = 7).bake()
+        val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
+        val result = BacktrackSolver(problem).minimize(objective, params(budget))
+        assertIs<MinimizeResult.Unknown>(result, "the first decision exhausts the allowance before the refutation")
+        assertTrue(budget.exhausted(), "the allowance is what stopped it, spent=${budget.spent}")
+    }
+
+    @Test
+    fun `an optimize charges the allowance rather than only its per-slice limit`() {
+        val problem = php(pigeons = 8, holes = 7).bake()
+        val objective = LinearObjective(boolWeights = LongArray(8 * 7) { 1L })
+        val spent = listOf(64L, 256L).map { limit ->
+            val budget = NodeBudget(limit = limit)
+            BacktrackSolver(problem).minimize(objective, params(budget))
+            budget.spent
+        }
+        assertTrue(
+            spent[0] < spent[1],
+            "raising the cap must raise the work an optimize does; both caps spent $spent",
+        )
     }
 }

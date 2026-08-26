@@ -11,7 +11,10 @@ package com.eignex.klause.backtrack
  * cannot do either.
  *
  * The counter is shared by every engine reading the same [BacktrackParams], so the allowance is spent
- * once across the solve rather than once per arm.
+ * once across the solve rather than once per arm. Reaching every engine is the caller's job and the easy
+ * half to get wrong: an arm that builds its own [BacktrackParams] — the hybrid-ALNS repair — is invisible
+ * to anything that edits a recipe pool, and a driver that reads only [BacktrackParams.maxDecisions]
+ * spends nothing. Both leave a cap that looks set and bounds nothing.
  *
  * Charged at the event the node statistic counts, so a run stops on the node that exhausts the allowance
  * and `-s` reports exactly the cap: 500, 2000 and 8000 nodes for those three caps, and one cap repeated
