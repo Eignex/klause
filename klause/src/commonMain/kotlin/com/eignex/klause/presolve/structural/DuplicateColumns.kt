@@ -2,6 +2,7 @@ package com.eignex.klause.presolve.structural
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -234,7 +235,7 @@ internal object DuplicateColumns {
 internal class ColumnMerge(val keep: Int, val drop: Int, val keepDomain: IntDomain, val dropDomain: IntDomain)
 
 /**
- * The duplicate-column aggregations [Presolve.mergeDuplicateColumns] made, holding the data to split
+ * The duplicate-column aggregations [Presolve] made, holding the data to split
  * each aggregate variable back into its two originals. Pass a solution of the reduced problem through
  * [reconstruct] to recover a solution of the original.
  */
