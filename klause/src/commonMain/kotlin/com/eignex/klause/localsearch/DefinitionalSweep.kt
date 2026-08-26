@@ -3,6 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Assignment
@@ -47,17 +48,6 @@ class DefinitionalSweep internal constructor(
     /** Defining nodes in topological order — every node's inputs are free vars or earlier nodes. */
     private val nodes: List<SweepNode>,
 ) {
-    /** A front-end-supplied bool definition `out ↔ ⋀ lits` (or `⋁` when `!isAnd`) — the shape a
-     *  Tseitin AND indicator (OPB product term) recovers. */
-    class BoolFoldSpec(
-        /** The defined indicator's bool var id. */
-        val out: Int,
-        /** [Lit]-encoded member literals (a negated member is legal). */
-        val lits: IntArray,
-        /** `true` for a conjunction (`⋀`), `false` for a disjunction (`⋁`). */
-        val isAnd: Boolean,
-    )
-
     /** Factory for sweeps inferred from the factor IR (as opposed to front-end annotations). */
     companion object {
         /** Infer a sweep from the factor IR, so local search derives functionally-defined vars from the
@@ -73,7 +63,7 @@ class DefinitionalSweep internal constructor(
             factors: Array<Factor>,
             numIntVars: Int,
             definedHints: IntArray = IntArray(0),
-            boolFolds: List<BoolFoldSpec> = emptyList(),
+            boolFolds: List<BoolFoldDefinition> = emptyList(),
         ): DefinitionalSweep? {
             val def = arrayOfNulls<Factor>(numIntVars)
             val defOut = IntArray(numIntVars) { -1 } // for a Linear definer, the output var's index
