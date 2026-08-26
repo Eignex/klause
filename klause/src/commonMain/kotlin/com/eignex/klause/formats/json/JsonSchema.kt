@@ -10,15 +10,15 @@ import kotlinx.serialization.json.Json
 /** Raised when a schema JSON document is malformed or uses an unknown field. */
 class JsonFormatException(msg: String, cause: Throwable? = null) : FormatException("JSON", msg, cause)
 
-/** Schema JSON parser. */
+/** Parses a schema JSON document into its source representation. */
 object JsonSchema {
 
     private val json: Json = Json {
         schemaJsonConfig()
     }
 
-    /** Parse [text] into an immutable schema definition. */
-    fun parse(text: String): SchemaDef<SchemaEntry> = try {
+    /** Decodes JSON syntax and schema entries without lowering them into solver IR. */
+    fun decode(text: String): SchemaDef<SchemaEntry> = try {
         json.decodeFromString(SchemaDef.serializer(SchemaEntry.serializer()), text)
     } catch (e: SerializationException) {
         throw JsonFormatException(e.message ?: "malformed document", e)
