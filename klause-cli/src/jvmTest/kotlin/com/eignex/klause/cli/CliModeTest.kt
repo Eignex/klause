@@ -201,6 +201,35 @@ class CliModeTest {
     }
 
     @Test
+    fun `an MPS objective is reported in file units`() {
+        val mps = File.createTempFile("cliobjective", ".mps").apply {
+            writeText(
+                """
+                NAME          OBJECTIVE
+                ROWS
+                 N  COST
+                 G  LOWER
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         COST           0.5
+                    X         LOWER          1.0
+                    MK2       'MARKER'                 'INTEND'
+                RHS
+                    RHS       LOWER          3.0
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertTrue("o 1.5" in out, out)
+    }
+
+    @Test
     fun `an open mixed MPS model remains rejected until optimization uses the LIRA core`() {
         val mps = File.createTempFile("clilira", ".mps").apply {
             writeText(
