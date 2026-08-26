@@ -5,7 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

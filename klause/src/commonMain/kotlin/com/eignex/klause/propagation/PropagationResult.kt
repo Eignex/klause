@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.DeducedRestrictions
+import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

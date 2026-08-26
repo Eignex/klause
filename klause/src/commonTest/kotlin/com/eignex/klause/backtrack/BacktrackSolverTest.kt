@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit

@@ -5,6 +5,7 @@ import com.eignex.klause.count.Count
 import com.eignex.klause.count.CountConfig
 import com.eignex.klause.count.ExactCountConfig
 import com.eignex.klause.count.SamplingConfig
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SampleResult

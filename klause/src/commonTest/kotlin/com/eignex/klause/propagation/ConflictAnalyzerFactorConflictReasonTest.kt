@@ -12,7 +12,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit

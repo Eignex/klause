@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.propagation
 
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

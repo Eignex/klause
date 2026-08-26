@@ -5,7 +5,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample

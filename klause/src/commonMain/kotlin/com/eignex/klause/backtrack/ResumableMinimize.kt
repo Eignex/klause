@@ -22,7 +22,7 @@ import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample

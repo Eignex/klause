@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.Session
 import com.eignex.klause.solver.SolveResult

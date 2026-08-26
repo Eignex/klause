@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

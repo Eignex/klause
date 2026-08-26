@@ -6,7 +6,7 @@ import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.PooledSolutionImporter
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem

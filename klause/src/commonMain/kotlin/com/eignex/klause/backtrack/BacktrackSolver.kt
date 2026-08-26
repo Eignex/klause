@@ -5,7 +5,7 @@ import com.eignex.klause.compile.compile
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
