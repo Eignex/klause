@@ -1,3 +1,10 @@
+@file:Suppress(
+    "MaxLineLength",
+    "UndocumentedPublicClass",
+    "UndocumentedPublicFunction",
+    "UndocumentedPublicProperty",
+)
+
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.BacktrackParams
