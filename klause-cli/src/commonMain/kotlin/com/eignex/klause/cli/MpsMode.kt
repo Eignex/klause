@@ -39,19 +39,15 @@ internal object MpsMode : CliMode {
                     throw MpsFormatException("open MPS models require a supported theory pipeline")
 
                 ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
-                    if (compiled.objective != null) {
-                        val theory = if (pipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-                            "difference-theory"
-                        } else {
-                            "General LIA"
-                        }
-                        throw MpsFormatException("open $theory optimization is unsupported")
-                    }
-                    return if (pipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+                    // An objective enters the open route as a row bounding it, which is outside the
+                    // difference fragment, so an optimizing model takes General LIA either way.
+                    return if (pipeline == ProblemPipeline.DIFFERENCE_THEORY && compiled.objective == null) {
                         differenceTheorySolvable(compiled.model, render)
                     } else {
                         generalLiaSolvable(
                             compiled.model,
+                            compiled.objective,
+                            compiled.maximize,
                         ) { assignment ->
                             renderMpsGeneralLiaModel(compiled, assignment)
                         }

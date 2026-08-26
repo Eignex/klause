@@ -545,39 +545,67 @@ internal sealed interface SolvablePipeline {
         val model: ProblemSpec,
         val route: ProblemPipeline,
         val render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
+        /** Objective to minimize over the route, or null to decide satisfiability only. */
+        val objective: LinearObjective? = null,
+        /** Whether [objective] is to be maximized; the driver minimizes its negation. */
+        val maximize: Boolean = false,
     ) : SolvablePipeline
 }
 
-/** Build a satisfiability instance whose open integer rows are decided by difference theory. */
-internal fun differenceTheorySolvable(model: ProblemSpec, render: (Sample) -> String): Solvable = Solvable(
+/** Build an instance whose open integer rows are decided by difference theory, minimizing [objective]
+ *  when one is given. */
+internal fun differenceTheorySolvable(
+    model: ProblemSpec,
+    render: (Sample) -> String,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+): Solvable = Solvable(
     problem = null,
-    optimize = false,
-    maximize = false,
+    optimize = objective != null,
+    maximize = maximize,
     lsObjective = null,
     linearObjective = null,
     objVarId = null,
     definitionalSweep = null,
     render = render,
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.DIFFERENCE_THEORY) { assignment ->
-        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
-    },
+    pipeline = SolvablePipeline.OpenTheory(
+        model,
+        ProblemPipeline.DIFFERENCE_THEORY,
+        { assignment ->
+            render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
+        },
+        objective,
+        maximize,
+    ),
 )
 
-/** Build a satisfiability instance whose open integer rows are decided by General LIA. */
-internal fun generalLiaSolvable(model: ProblemSpec, render: (GeneralLiaAssignment) -> String): Solvable = Solvable(
+/** Build an instance whose open integer rows are decided by General LIA, minimizing [objective] when one
+ *  is given. */
+internal fun generalLiaSolvable(
+    model: ProblemSpec,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    render: (GeneralLiaAssignment) -> String,
+): Solvable = Solvable(
     problem = null,
-    optimize = false,
-    maximize = false,
+    optimize = objective != null,
+    maximize = maximize,
     lsObjective = null,
     linearObjective = null,
     objVarId = null,
     definitionalSweep = null,
     render = { error("General LIA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.GENERAL_LIA) { assignment ->
-        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
-    },
+    pipeline = SolvablePipeline.OpenTheory(
+        model,
+        ProblemPipeline.GENERAL_LIA,
+        { assignment ->
+            render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
+        },
+        objective,
+        maximize,
+    ),
 )
 
 /** Build a satisfiability instance whose open real rows are decided by exact QF_LRA. */
@@ -591,9 +619,9 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     definitionalSweep = null,
     render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LRA) { assignment ->
+    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LRA, render = { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment)
-    },
+    }),
 )
 
 /** Build a satisfiability instance whose open mixed rows are decided by exact QF_LIRA. */
@@ -607,9 +635,9 @@ internal fun exactLiraSolvable(model: ProblemSpec, render: (ExactLiraAssignment)
     definitionalSweep = null,
     render = { error("exact LIRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LIRA) { assignment ->
+    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LIRA, render = { assignment ->
         render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
-    },
+    }),
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via

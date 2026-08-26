@@ -79,13 +79,17 @@ sealed interface OpenTheoryResult {
  * Route selection happens once from `ProblemSpec.componentPlan()`. Frontends consume this uniform result
  * rather than importing or dispatching to individual theory implementations.
  */
-class OpenTheoryEngine(model: ProblemSpec, route: ProblemPipeline) {
+class OpenTheoryEngine internal constructor(
+    model: ProblemSpec,
+    route: ProblemPipeline,
+    // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
+    // most of what a short budget has. Select it once and hand the same plan to every solve.
+    private val plan: ComponentPlan,
+) {
     private val model = model
     private val route = route
 
-    // Selecting the plan reads every factor and builds the theory fragment, which on a large model is
-    // most of what a short budget has. Select it once and hand the same plan to every solve.
-    private val plan: ComponentPlan = model.componentPlan()
+    constructor(model: ProblemSpec, route: ProblemPipeline) : this(model, route, model.componentPlan())
 
     init {
         require(route != ProblemPipeline.FINITE_CP && route != ProblemPipeline.UNSUPPORTED_OPEN) {

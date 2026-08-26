@@ -1958,6 +1958,62 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
     }
 }
 
+sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum|null[0]
+    abstract val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.stats|{}stats[0]
+        abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.stats.<get-stats>|<get-stats>(){}[0]
+
+    final class Bounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.ionspin.kotlin.bignum.integer/BigInteger?, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.ionspin.kotlin.bignum.integer.BigInteger?;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val incumbent // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent|{}incumbent[0]
+            final fun <get-incumbent>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
+        final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats.<get-stats>|<get-stats>(){}[0]
+        final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value|{}value[0]
+            final fun <get-value>(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component1|component1(){}[0]
+        final fun component2(): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.ionspin.kotlin.bignum.integer/BigInteger? = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.ionspin.kotlin.bignum.integer.BigInteger?;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.toString|toString(){}[0]
+    }
+
+    final class Infeasible : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible|null[0]
+        constructor <init>(com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.<init>|<init>(com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.stats.<get-stats>|<get-stats>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.copy|copy(com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Infeasible.toString|toString(){}[0]
+    }
+
+    final class Optimal : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.ionspin.kotlin.bignum.integer/BigInteger, com.eignex.klause.solver.result/SolveStats) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+
+        final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment|{}assignment[0]
+            final fun <get-assignment>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment.<get-assignment>|<get-assignment>(){}[0]
+        final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats.<get-stats>|<get-stats>(){}[0]
+        final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value|{}value[0]
+            final fun <get-value>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component1|component1(){}[0]
+        final fun component2(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component2|component2(){}[0]
+        final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.ionspin.kotlin.bignum.integer/BigInteger = ..., com.eignex.klause.solver.result/SolveStats = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.ionspin.kotlin.bignum.integer.BigInteger;com.eignex.klause.solver.result.SolveStats){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eignex.klause.solver.pipeline/OpenTheoryResult|null[0]
     abstract val stats // com.eignex.klause.solver.pipeline/OpenTheoryResult.stats|{}stats[0]
         abstract fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryResult.stats.<get-stats>|<get-stats>(){}[0]
@@ -9110,6 +9166,15 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.k
     constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.ProblemPipeline){}[0]
 
     final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryEngine.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/OpenTheoryMinimizer { // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer|null[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver.objective/LinearObjective) // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective){}[0]
+
+    final val theoryPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline|{}theoryPipeline[0]
+        final fun <get-theoryPipeline>(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
+
+    final fun minimize(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.minimize|minimize(com.eignex.klause.theory.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/PlannedSearch { // com.eignex.klause.solver.pipeline/PlannedSearch|null[0]

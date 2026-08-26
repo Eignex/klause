@@ -8623,6 +8623,58 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
 	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryEngine;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
 
+public final class com/eignex/klause/solver/pipeline/OpenTheoryMinimizer {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;)V
+	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
+	public final fun minimize (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
+	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryMinimizer;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
+}
+
+public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
+	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public final fun component2 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIncumbent ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getValue ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
+	public fun <init> (Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasible;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public final fun component2 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/solver/result/SolveStats;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
+	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getValue ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryResult {
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 }
