@@ -55,8 +55,8 @@ internal class FloatLpResult(
  * limit is a constructor knob only so tests can force a refactorization per pivot and compare.
  */
 internal class RevisedSimplex(
-    private val model: LpModel,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private var model: LpModel,
+    private var cancellation: Cancellation = Cancellation.Never,
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
 ) : TableauCutSolver {
     private val m = model.m
@@ -233,8 +233,35 @@ internal class RevisedSimplex(
      */
     fun resolveGated(enforced: BooleanArray): FloatLpResult? = solveCore(null, reuse = true, enforced = enforced)
 
-    /** The factorization at the previous solve's termination, held for [resolveGated]; the seated
-     *  [basicVar]/[status] it factorizes are still in place. Null after a bailed solve. */
+    /**
+     * Re-point this engine at [next] and [token], keeping the seated basis and its factorization, then
+     * re-solve. Null when [next] is not a bound-only revision of the current model, which is the caller's
+     * signal to build a fresh engine.
+     *
+     * The basis matrix is `csc`'s columns at [basicVar], and dual feasibility is a function of `cost` and
+     * the basis — neither reads a bound. So when both arrays are the *same objects*, a child node's
+     * tightened bounds leave the parent's factorization valid and its basis dual-feasible, and the dual
+     * simplex repairs the primal infeasibility in a few pivots instead of refactorizing. `LpModel.rebind`
+     * shares exactly those two and replaces the rest, so identity is the honest test: it cannot pass for
+     * a model whose matrix or objective was rebuilt.
+     *
+     * The bounds and right-hand side are re-read every iteration of the solve loop, so nothing stale
+     * survives the swap; only the basis and its factorization do.
+     */
+    fun rebind(next: LpModel, token: Cancellation): Boolean {
+        if (next.csc !== model.csc || next.cost !== model.cost) return false
+        if (next.n != n || next.m != m) return false
+        model = next
+        cancellation = token
+        return true
+    }
+
+    /** Re-solve after a [rebind], continuing from the kept basis and factorization. */
+    fun resolveBounds(): FloatLpResult? = solveCore(null, reuse = true)
+
+    /** The factorization at the previous solve's termination, held for [resolveGated] and
+     *  [resolveBounds]; the seated [basicVar]/[status] it factorizes are still in place. Null after a
+     *  bailed solve. */
     private var keptFactor: EtaBasis? = null
 
     private fun solveCore(warm: Basis?, reuse: Boolean, enforced: BooleanArray? = null): FloatLpResult? {

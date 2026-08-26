@@ -4,7 +4,6 @@ import com.eignex.klause.factor.bool.CardinalityPropagator
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 

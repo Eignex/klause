@@ -15,7 +15,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.kumulant.bandit.univariate.RouletteWheelBandit

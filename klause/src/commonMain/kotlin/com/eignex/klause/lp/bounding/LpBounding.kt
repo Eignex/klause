@@ -94,6 +94,31 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
 internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver =
     RevisedSimplex(model, cancellation)
 
+/**
+ * The node bound's engine and its solve.
+ *
+ * A rebound relaxation shares its matrix and objective with the last node's, so the kept engine's basis
+ * and LU factorization are still valid and the dual simplex resumes from them — the expensive half of a
+ * node solve, skipped. Anything else (the first node, a rebuilt or cut-augmented relaxation) builds a
+ * fresh engine, which then becomes the kept one; [RevisedSimplex.rebind] decides which case this is and
+ * cannot mistake them, since it tests object identity of the matrix and cost arrays.
+ *
+ * [warm] is used only on the fresh path: a kept engine already has that basis seated, and better, has it
+ * factorized.
+ */
+private fun LpEngine.solveNode(
+    model: LpModel,
+    warm: Basis?,
+    cancellation: Cancellation,
+): Pair<TableauCutSolver, FloatLpResult?> {
+    nodeSimplex?.let { kept ->
+        if (kept.rebind(model, cancellation)) return kept to kept.resolveBounds()
+    }
+    val fresh = RevisedSimplex(model, cancellation)
+    nodeSimplex = fresh
+    return fresh to fresh.solve(warm)
+}
+
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
  *  optional learned nogood (the sparse path is reason-less, so it is null). */
 internal class LpNodeOutcome(val prune: Boolean, val basis: Basis?, val explanation: IntArray? = null)
@@ -282,8 +307,7 @@ internal fun LpEngine.sparseSafePrune(
         for (i in 0 until model.m) if (model.rowStrict[i]) dv.rhs[i] -= STRICT_FILTER_EPS * (1.0 + abs(dv.rhs[i]))
     }
     // Always solve: an infeasible relaxation prunes the node regardless of incumbent or objective.
-    val simplex = dualSimplex(model, cancellation)
-    val floatResult = simplex.solve(warm)
+    val (simplex, floatResult) = solveNode(model, warm, cancellation)
     if (strictSaved != null && dv != null) strictSaved.copyInto(dv.rhs)
     val result = floatResult ?: run {
         // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
