@@ -7,12 +7,13 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
-import com.eignex.klause.lowering.allDifferentWindowSize
+import com.eignex.klause.lowering.allDifferentWindow
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinOr
+import com.eignex.klause.solver.IntDomain
 
 /** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
  *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities
@@ -154,19 +155,14 @@ internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
     if (args.all { !isBoolExpr(it) }) {
         val terms = args.map { linearTermNarrow(it) }
         val simpleVars = terms.mapNotNull { it.asSimpleVar() }
-        val allFinite = simpleVars.none { intDomains[it] is PresolveDomain.Open }
-        if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size && allFinite) {
+        if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size) {
             val vars = simpleVars.toIntArray()
-            val min = vars.minOf { (intDomains[it] as PresolveDomain.Finite).domain.min }
-            val max = vars.maxOf { (intDomains[it] as PresolveDomain.Finite).domain.max }
-            val window = allDifferentWindowSize(min, max)
+            val window = allDifferentWindow(vars, { finiteDomainOf(it)?.min }, { finiteDomainOf(it)?.max })
             if (window != null) {
-                factors.add(AllDifferent(vars = vars, domainMin = min, domainSize = window))
+                factors.add(AllDifferent(vars = vars, domainMin = window.min, domainSize = window.size))
             } else {
                 assertPairwiseStrictOrder(terms)
             }
-        } else if (simpleVars.size == terms.size && simpleVars.toSet().size == simpleVars.size) {
-            assertPairwiseStrictOrder(terms)
         } else {
             assertPairwiseNe(terms)
         }
@@ -174,6 +170,11 @@ internal fun SmtLib.Builder.assertDistinct(args: List<SExpr>) {
         assertPairwiseNe(args.map { if (isBoolExpr(it)) litToIntTerm(compileBool(it)) else linearTermNarrow(it) })
     }
 }
+
+/** The declared domain of [variable] when both its sides are known, else null — a column still open on
+ *  either side has no window a value-indexed global can address. */
+private fun SmtLib.Builder.finiteDomainOf(variable: Int): IntDomain? =
+    (intDomains[variable] as? PresolveDomain.Finite)?.domain
 
 /** Post pairwise `!=` as linear NE constraints. */
 internal fun SmtLib.Builder.assertPairwiseNe(terms: List<LinComb>) {

@@ -17,6 +17,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LayeredMddData
+import com.eignex.klause.lowering.allDifferentWindow
 import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
@@ -1097,12 +1098,14 @@ internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
     postAllDifferent(vars)
 }
 
-/** Post one all-different over [vars] as an [AllDifferent] factor, or as pairwise `!=` when the
- *  value span would overflow AllDifferent's Int-sized value-indexed scratch (sound at any magnitude).
- *  Fewer than two variables is vacuous and posts nothing. */
+/** Post one all-different over [vars] as an [AllDifferent] factor, or as pairwise `!=` when the global
+ *  cannot hold the members — see [allDifferentWindow]. Fewer than two variables is vacuous and posts
+ *  nothing. */
 internal fun Xcsp3.Builder.postAllDifferent(vars: IntArray) {
-    if (vars.size < 2) return
-    if (domainSpan(vars) > Int.MAX_VALUE.toLong()) {
+    // An XCSP3 column always declares a finite domain, so both sides are always present here; the
+    // shared judgement still owns the window, and admits an open column the day the format grows one.
+    val window = allDifferentWindow(vars, { domains[it].min }, { domains[it].max })
+    if (window == null) {
         for (a in vars.indices) {
             for (b in a + 1 until vars.size) {
                 factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[a], vars[b]), LinearOp.NE, 0))
@@ -1110,13 +1113,7 @@ internal fun Xcsp3.Builder.postAllDifferent(vars: IntArray) {
         }
         return
     }
-    factors.add(
-        AllDifferent(
-            vars = vars,
-            domainMin = domainMin(vars),
-            domainSize = domainSpan(vars).toInt(),
-        ),
-    )
+    factors.add(AllDifferent(vars = vars, domainMin = window.min, domainSize = window.size))
 }
 
 /** `allDifferent` with `<except>`: variables must be pairwise distinct unless they take an exempt
