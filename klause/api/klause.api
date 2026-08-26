@@ -7293,6 +7293,7 @@ public final class com/eignex/klause/propagation/PropagationProblem {
 	public final fun getPropagators ()[Lcom/eignex/klause/propagation/Propagator;
 	public final fun getUsesIntEventDeltaConsumers ()Z
 	public final fun getUsesIntEventWatchers ()Z
+	public final fun isNativeSatEligible ()Z
 }
 
 public abstract interface class com/eignex/klause/propagation/PropagationResult {
@@ -8221,7 +8222,6 @@ public class com/eignex/klause/solver/Problem {
 	public final fun getRealUpper ()[D
 	public final fun getSharedDomains ()Z
 	public final fun intDomainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
-	public final fun isNativeSatEligible ()Z
 	public final fun propagate (Lcom/eignex/klause/solver/Assumptions;Lcom/eignex/klause/solver/Cancellation;Z)Lcom/eignex/klause/propagation/PropagationResult;
 	public static synthetic fun propagate$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/Assumptions;Lcom/eignex/klause/solver/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/propagation/PropagationResult;
 	public final fun requireFiniteIntDomains ()[Lcom/eignex/klause/solver/IntDomain;
