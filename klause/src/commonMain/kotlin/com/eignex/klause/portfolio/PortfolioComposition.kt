@@ -233,9 +233,17 @@ internal object PortfolioComposition {
         val lsCount = (count * lsShare(scenario.kind)).roundToInt().coerceIn(if (count >= 2) 1 else count, count)
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
-        arms += lsArms(scenario.kind, lsCount, scenario.lsPool)
-        if (btCount > 0) {
-            arms += btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
+        val local = lsArms(scenario.kind, lsCount, scenario.lsPool)
+        val backtrack = btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
+        if (scenario.kind == Kind.COP) {
+            // Sequential portfolios warm every arm in list order. A complete arm must receive its first
+            // slice before the local-search incumbents, which cannot prove an optimum and otherwise delay
+            // a trivial optimization by the entire local-search warmup.
+            arms += backtrack
+            arms += local
+        } else {
+            arms += local
+            arms += backtrack
         }
         // Hybrid ALNS with CP repair: a mixed LS+backtrack engine, added last (lowest priority,
         // pending its credit pass). COP only — it optimises an incumbent, so a CSP has nothing for it.
