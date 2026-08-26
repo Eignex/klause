@@ -1,8 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.portfolio.Portfolio
-import com.eignex.klause.portfolio.PortfolioExecutor
-import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.util.CharSource
 import java.io.File
 import java.io.Reader
@@ -46,8 +43,6 @@ private class ReaderCharSource(private val reader: Reader, private val onEof: ()
         return String(buffer, 0, n)
     }
 }
-
-internal actual fun parallelPortfolio(workers: List<PortfolioWorker>): PortfolioExecutor = Portfolio(workers)
 
 /** Poll period of the peak-heap sampler. Short enough that an allocation burst big enough to matter for
  *  a heap ceiling cannot pass entirely between two reads, long enough to cost nothing next to ingest. */
