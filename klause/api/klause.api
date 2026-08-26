@@ -2150,14 +2150,6 @@ public class com/eignex/klause/formats/FormatException : java/lang/RuntimeExcept
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 }
 
-public final class com/eignex/klause/formats/ObjectiveSense : java/lang/Enum {
-	public static final field MAXIMIZE Lcom/eignex/klause/formats/ObjectiveSense;
-	public static final field MINIMIZE Lcom/eignex/klause/formats/ObjectiveSense;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/formats/ObjectiveSense;
-	public static fun values ()[Lcom/eignex/klause/formats/ObjectiveSense;
-}
-
 public final class com/eignex/klause/formats/dimacs/Dimacs {
 	public static final field INSTANCE Lcom/eignex/klause/formats/dimacs/Dimacs;
 	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/solver/Problem;
@@ -2540,19 +2532,19 @@ public final class com/eignex/klause/formats/mps/MpsIndicator {
 }
 
 public final class com/eignex/klause/formats/mps/MpsModel {
-	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)V
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)V
 	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun component2 ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun component3 ()Lcom/eignex/klause/formats/mps/MpsObjective;
 	public final fun component4 ()Ljava/util/List;
 	public final fun component5 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/formats/mps/MpsModel;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsModel;Ljava/lang/String;Lcom/eignex/klause/formats/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsModel;
+	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/formats/mps/MpsModel;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsModel;Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsModel;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getConstraints ()Ljava/util/List;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getObjective ()Lcom/eignex/klause/formats/mps/MpsObjective;
-	public final fun getSense ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getVariables ()Ljava/util/List;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -2662,23 +2654,23 @@ public final class com/eignex/klause/formats/smtlib/SmtLib {
 }
 
 public final class com/eignex/klause/formats/smtlib/SmtLibProblem {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Ljava/util/Map;
 	public final fun component5 ()Ljava/util/Map;
-	public final fun component6 ()Lcom/eignex/klause/formats/ObjectiveSense;
-	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public final fun component6 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtLibProblem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getRealVarNames ()Ljava/util/Map;
-	public final fun getSense ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2754,21 +2746,21 @@ public final class com/eignex/klause/formats/xcsp3/Xcsp3 {
 }
 
 public final class com/eignex/klause/formats/xcsp3/Xcsp3Problem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;[I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Ljava/util/Map;
-	public final fun component4 ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun component5 ()[I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;[I)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/formats/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDefinedVars ()[I
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
-	public final fun getSense ()Lcom/eignex/klause/formats/ObjectiveSense;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -2867,6 +2859,14 @@ public final class com/eignex/klause/ir/NoVars : com/eignex/klause/ir/VarList {
 	public fun getSpanInts ()[I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
+	public static final field MAXIMIZE Lcom/eignex/klause/ir/ObjectiveSense;
+	public static final field MINIMIZE Lcom/eignex/klause/ir/ObjectiveSense;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/ObjectiveSense;
+	public static fun values ()[Lcom/eignex/klause/ir/ObjectiveSense;
 }
 
 public final class com/eignex/klause/ir/RealVars : com/eignex/klause/ir/VarList {

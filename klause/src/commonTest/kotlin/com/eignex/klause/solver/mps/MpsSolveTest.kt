@@ -2,7 +2,6 @@ package com.eignex.klause.solver.mps
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.formats.mps.MpsConstraint
 import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.MpsObjective
@@ -15,13 +14,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import com.eignex.klause.ir.ObjectiveSense as ObjectiveDirection
 
 class MpsSolveTest {
     @Test
     fun `solves a mixed integer-continuous model and reports the continuous value`() {
         val model = MpsModel(
             name = "m",
-            sense = ObjectiveSense.MINIMIZE,
+            sense = ObjectiveDirection.MINIMIZE,
             objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
             variables = listOf(
                 MpsVar("x", integer = false, lower = 0.0, upper = 10.0),
@@ -54,7 +54,7 @@ class MpsSolveTest {
         // coarser grid empties it into `0 >= 0`, and the model reads as satisfiable at x = 0.
         val model = MpsModel(
             name = "m",
-            sense = ObjectiveSense.MINIMIZE,
+            sense = ObjectiveDirection.MINIMIZE,
             objective = MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
             variables = listOf(MpsVar("x", integer = true, lower = 0.0, upper = 10.0)),
             constraints = listOf(
@@ -70,7 +70,7 @@ class MpsSolveTest {
     fun `proves an infeasible continuous model unsat`() {
         val model = MpsModel(
             name = "m",
-            sense = ObjectiveSense.MINIMIZE,
+            sense = ObjectiveDirection.MINIMIZE,
             objective = MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
             variables = listOf(MpsVar("x", integer = false, lower = 0.0, upper = 1.0)),
             constraints = listOf(MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1.0), lower = 5.0, upper = null)),
@@ -82,7 +82,7 @@ class MpsSolveTest {
     fun `a declared empty integer domain is unsat`() {
         val model = MpsModel(
             name = "emptyclosed",
-            sense = ObjectiveSense.MINIMIZE,
+            sense = ObjectiveDirection.MINIMIZE,
             objective = MpsObjective("obj", intArrayOf(0), doubleArrayOf(1.0), 0.0),
             variables = listOf(
                 MpsVar("x", integer = true, lower = 5.0, upper = 3.0),
