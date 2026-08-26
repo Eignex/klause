@@ -9,9 +9,9 @@ import com.eignex.klause.formats.opb.OpbProblem
 import com.eignex.klause.formats.opb.OpbRelation
 import com.eignex.klause.formats.opb.OpbStatement
 import com.eignex.klause.formats.opb.OpbTerm
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.objective.LinearObjective
@@ -170,7 +170,7 @@ internal object OpbLowering {
                 problemBuilder.trueLitCache = value
             }
         val numBoolVars get() = problemBuilder.numBoolVars
-        val boolFolds = ArrayList<DefinitionalSweep.BoolFoldSpec>()
+        val boolFolds = ArrayList<BoolFoldDefinition>()
         private val productCache = HashMap<List<Int>, Int>()
 
         init {
@@ -189,7 +189,7 @@ internal object OpbLowering {
             val key = term.literals.sorted()
             return productCache.getOrPut(key) {
                 val indicator = tseitinAnd(key)
-                boolFolds += DefinitionalSweep.BoolFoldSpec(
+                boolFolds += BoolFoldDefinition(
                     Lit.variable(indicator),
                     key.toIntArray(),
                     isAnd = true,

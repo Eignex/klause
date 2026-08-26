@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.lowering.OpbLowering
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -19,7 +19,7 @@ data class OpbProblem(
     /** Objective, or null for satisfaction instances. */
     val objective: LinearObjective?,
     /** AND-indicator definitions for product terms — the local-search bool functional cone. */
-    val boolFolds: List<DefinitionalSweep.BoolFoldSpec> = emptyList(),
+    val boolFolds: List<BoolFoldDefinition> = emptyList(),
     /** Count of declared `x1..xN` variables. [Problem.numBoolVars] also counts the Tseitin/soft
      *  indicators appended above them, so a model listing must use this to omit the aux variables. */
     val numDeclaredVars: Int = 0,

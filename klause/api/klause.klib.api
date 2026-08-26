@@ -4717,10 +4717,10 @@ final class com.eignex.klause.formats.opb/OpbFormatException : com.eignex.klause
 }
 
 final class com.eignex.klause.formats.opb/OpbProblem { // com.eignex.klause.formats.opb/OpbProblem|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/List<com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec> = ..., kotlin/Int = ...) // com.eignex.klause.formats.opb/OpbProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.localsearch.DefinitionalSweep.BoolFoldSpec>;kotlin.Int){}[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.formats.opb/OpbProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
 
     final val boolFolds // com.eignex.klause.formats.opb/OpbProblem.boolFolds|{}boolFolds[0]
-        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec> // com.eignex.klause.formats.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
+        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
     final val numDeclaredVars // com.eignex.klause.formats.opb/OpbProblem.numDeclaredVars|{}numDeclaredVars[0]
         final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
     final val objective // com.eignex.klause.formats.opb/OpbProblem.objective|{}objective[0]
@@ -4730,9 +4730,9 @@ final class com.eignex.klause.formats.opb/OpbProblem { // com.eignex.klause.form
 
     final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.opb/OpbProblem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.opb/OpbProblem.component2|component2(){}[0]
-    final fun component3(): kotlin.collections/List<com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec> // com.eignex.klause.formats.opb/OpbProblem.component3|component3(){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.opb/OpbProblem.component3|component3(){}[0]
     final fun component4(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.component4|component4(){}[0]
-    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/List<com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec> = ..., kotlin/Int = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/OpbProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.localsearch.DefinitionalSweep.BoolFoldSpec>;kotlin.Int){}[0]
+    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/OpbProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.opb/OpbProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.opb/OpbProblem.toString|toString(){}[0]
@@ -4852,6 +4852,17 @@ final class com.eignex.klause.formats/FloatBucketing { // com.eignex.klause.form
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats/FloatBucketing.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats/FloatBucketing.toString|toString(){}[0]
     final fun valueOf(kotlin/Int): kotlin/Double // com.eignex.klause.formats/FloatBucketing.valueOf|valueOf(kotlin.Int){}[0]
+}
+
+final class com.eignex.klause.ir/BoolFoldDefinition { // com.eignex.klause.ir/BoolFoldDefinition|null[0]
+    constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/Boolean) // com.eignex.klause.ir/BoolFoldDefinition.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.Boolean){}[0]
+
+    final val isAnd // com.eignex.klause.ir/BoolFoldDefinition.isAnd|{}isAnd[0]
+        final fun <get-isAnd>(): kotlin/Boolean // com.eignex.klause.ir/BoolFoldDefinition.isAnd.<get-isAnd>|<get-isAnd>(){}[0]
+    final val lits // com.eignex.klause.ir/BoolFoldDefinition.lits|{}lits[0]
+        final fun <get-lits>(): kotlin/IntArray // com.eignex.klause.ir/BoolFoldDefinition.lits.<get-lits>|<get-lits>(){}[0]
+    final val out // com.eignex.klause.ir/BoolFoldDefinition.out|{}out[0]
+        final fun <get-out>(): kotlin/Int // com.eignex.klause.ir/BoolFoldDefinition.out.<get-out>|<get-out>(){}[0]
 }
 
 final class com.eignex.klause.ir/BoolVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/BoolVars|null[0]
@@ -5585,19 +5596,8 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
         }
     }
 
-    final class BoolFoldSpec { // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec|null[0]
-        constructor <init>(kotlin/Int, kotlin/IntArray, kotlin/Boolean) // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.<init>|<init>(kotlin.Int;kotlin.IntArray;kotlin.Boolean){}[0]
-
-        final val isAnd // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.isAnd|{}isAnd[0]
-            final fun <get-isAnd>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.isAnd.<get-isAnd>|<get-isAnd>(){}[0]
-        final val lits // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.lits|{}lits[0]
-            final fun <get-lits>(): kotlin/IntArray // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.lits.<get-lits>|<get-lits>(){}[0]
-        final val out // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.out|{}out[0]
-            final fun <get-out>(): kotlin/Int // com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec.out.<get-out>|<get-out>(){}[0]
-    }
-
     final object Companion { // com.eignex.klause.localsearch/DefinitionalSweep.Companion|null[0]
-        final fun infer(kotlin/Array<com.eignex.klause.solver/Factor>, kotlin/Int, kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.localsearch/DefinitionalSweep.BoolFoldSpec> = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.infer|infer(kotlin.Array<com.eignex.klause.solver.Factor>;kotlin.Int;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.localsearch.DefinitionalSweep.BoolFoldSpec>){}[0]
+        final fun infer(kotlin/Array<com.eignex.klause.solver/Factor>, kotlin/Int, kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ...): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/DefinitionalSweep.Companion.infer|infer(kotlin.Array<com.eignex.klause.solver.Factor>;kotlin.Int;kotlin.IntArray;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>){}[0]
     }
 }
 

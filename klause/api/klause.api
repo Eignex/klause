@@ -2749,6 +2749,13 @@ public final class com/eignex/klause/formats/xcsp3/XmlElementKt {
 	public static final fun parseXml (Ljava/lang/String;)Lcom/eignex/klause/formats/xcsp3/XmlElement;
 }
 
+public final class com/eignex/klause/ir/BoolFoldDefinition {
+	public fun <init> (I[IZ)V
+	public final fun getLits ()[I
+	public final fun getOut ()I
+	public final fun isAnd ()Z
+}
+
 public final class com/eignex/klause/ir/BoolVars : com/eignex/klause/ir/VarList {
 	public fun <init> ([I)V
 	public fun getBoolVars ()[I
@@ -3036,13 +3043,6 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep {
 	public final fun network (II)Lcom/eignex/klause/localsearch/InvariantNetwork;
 	public final fun sweep (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lkotlin/jvm/functions/Function1;)V
 	public static synthetic fun sweep$default (Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
-}
-
-public final class com/eignex/klause/localsearch/DefinitionalSweep$BoolFoldSpec {
-	public fun <init> (I[IZ)V
-	public final fun getLits ()[I
-	public final fun getOut ()I
-	public final fun isAnd ()Z
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$Companion {
