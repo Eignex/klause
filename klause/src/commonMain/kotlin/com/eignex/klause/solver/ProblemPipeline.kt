@@ -71,5 +71,5 @@ internal fun ProblemSpec.admitsGeneralLia(): Boolean =
  * The small-model theorem includes declared finite sides as rows, so the resulting box preserves them
  * without treating an implementation clamp as part of the model.
  */
-internal fun ProblemSpec.generalLiaWitnessBound() =
-    if (numRealVars == 0) smallModelBigIntBound(numIntVars, factors.asList(), intBounds) else null
+internal fun ProblemSpec.generalLiaWitnessBound(cancellation: Cancellation = Cancellation.Never) =
+    if (numRealVars == 0) smallModelBigIntBound(numIntVars, factors.asList(), intBounds, cancellation) else null

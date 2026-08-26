@@ -8,7 +8,10 @@ import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.TheoryParams
+import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -260,5 +263,22 @@ class OpenTheoryEngineTest {
             .solve(TheoryParams(cancellation = Cancellation { true }))
 
         assertIs<OpenTheoryResult.Unknown>(stopped)
+    }
+
+    @Test
+    fun `general LIA builds its witness bound under the session cancellation`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int)
+                (assert (>= x 0))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        val component = GeneralLiaSearchComponent(parsed.model)
+        val session = SearchSession(listOf(component), cancellation = Cancellation { true })
+
+        assertIs<ComponentResult.Indeterminate>(session.initialize())
     }
 }
