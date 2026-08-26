@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
@@ -618,7 +619,7 @@ internal fun linearSolvable(
     maximize: Boolean,
     render: (Sample) -> String,
     definedVars: IntArray = IntArray(0),
-    boolFolds: List<DefinitionalSweep.BoolFoldSpec> = emptyList(),
+    boolFolds: List<BoolFoldDefinition> = emptyList(),
 ): Solvable {
     // Feasibility sweep derives functionally-defined vars and excludes them from search. A bool AND
     // fold is derived only when all its literals are objective variables: deriving an OPB product
@@ -691,9 +692,9 @@ internal fun linearModelSolvable(
  *  the objective drives, rather than pure feasibility-structure variables whose exclusion stalls
  *  constraint repair. */
 private fun foldsOverObjectiveVars(
-    folds: List<DefinitionalSweep.BoolFoldSpec>,
+    folds: List<BoolFoldDefinition>,
     objective: LinearObjective,
-): List<DefinitionalSweep.BoolFoldSpec> {
+): List<BoolFoldDefinition> {
     if (folds.isEmpty()) return folds
     val bw = objective.boolWeights
     fun isObjectiveVar(v: Int) = v in bw.indices && bw[v] != 0L
