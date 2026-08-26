@@ -101,7 +101,7 @@ internal object SolveCore {
                 output.begin(optimize = false, maximize = false)
                 val result = (
                     OpenTheoryPipeline.execute(
-                        OpenTheoryRequest(pipeline.model, pipeline.route),
+                        OpenTheoryRequest(pipeline.model),
                         theoryParams,
                     ) as OpenTheoryExecution.Satisfy
                     ).result
@@ -942,7 +942,7 @@ private fun solveOpenTheoryOptimum(
 ) {
     val result = (
         OpenTheoryPipeline.execute(
-            OpenTheoryRequest(pipeline.model, pipeline.route, objective, pipeline.maximize),
+            OpenTheoryRequest(pipeline.model, objective, pipeline.maximize),
             params,
         ) as OpenTheoryExecution.Optimize
         ).result
