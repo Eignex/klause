@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.integration
+package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
@@ -22,7 +22,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-class PropagationTest {
+class RootPropagationTest {
 
     private fun boolProblem(numBoolVars: Int, vararg clauses: IntArray): Problem = Problem(
         numBoolVars = numBoolVars,
