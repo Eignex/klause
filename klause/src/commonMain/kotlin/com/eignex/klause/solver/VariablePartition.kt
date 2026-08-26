@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.pipeline.isTheoryOwnable
+
 /** Partition integer variables by whether finite-domain search must branch on them. */
 class VariablePartition(private val searchRequired: BooleanArray) {
 

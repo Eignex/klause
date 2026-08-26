@@ -11,7 +11,7 @@ import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.lowering.smtlib.SmtLibProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.componentPlan
@@ -19,8 +19,8 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.sourceRoute
-import com.eignex.klause.solver.supportsExactLra
+import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.pipeline.supportsExactLra
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
