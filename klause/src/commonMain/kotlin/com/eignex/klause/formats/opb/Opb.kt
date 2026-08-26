@@ -2,7 +2,6 @@ package com.eignex.klause.formats.opb
 
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.ir.BoolFoldDefinition
-import com.eignex.klause.lowering.OpbLowering
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource
@@ -25,12 +24,12 @@ data class OpbProblem(
     val numDeclaredVars: Int = 0,
 )
 
-/** OPB/WBO format facade. Syntax parsing is format-owned; factor construction is [OpbLowering]-owned. */
+/** OPB/WBO format facade. It parses external syntax and decodes it into solver data. */
 object Opb {
 
     /** Parse OPB [text] into an [OpbProblem]. */
     fun parse(text: String): OpbProblem = parse(StringCharSource(text))
 
     /** Parse an OPB [source] into an [OpbProblem], consuming it line by line. */
-    fun parse(source: CharSource): OpbProblem = OpbLowering.lower(OpbSyntax.parse(source))
+    fun parse(source: CharSource): OpbProblem = OpbDecoder.decode(OpbSyntax.parse(source))
 }
