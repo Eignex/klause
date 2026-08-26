@@ -10,7 +10,6 @@ import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 

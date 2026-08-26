@@ -29,7 +29,6 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
 /**

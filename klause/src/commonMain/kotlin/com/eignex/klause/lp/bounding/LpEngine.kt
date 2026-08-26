@@ -297,6 +297,16 @@ internal class LpEngine(
     private var persistentRelaxation: LpRelaxation? = null
 
     /**
+     * The engine the node bound re-solves on, kept across nodes so its basis and LU factorization carry
+     * with it ([RevisedSimplex.resolveBounds]).
+     *
+     * Held here rather than per call because a factorization is the expensive half of a node solve and a
+     * rebound relaxation does not invalidate it. Only the cut-free base relaxation is eligible: the
+     * cut-augmented build is a different matrix, so it gets its own engine and never displaces this one.
+     */
+    internal var nodeSimplex: RevisedSimplex? = null
+
+    /**
      * The **cut-free** LP relaxation for the current node: the persistent relaxation re-bound to
      * [session]'s live column bounds when eligible, else a fresh per-node build. On first call it builds a
      * base relaxation from the declared domains; if that base is [LpRelaxation.persistentEligible] it is

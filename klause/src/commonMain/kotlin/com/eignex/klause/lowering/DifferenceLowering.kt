@@ -46,11 +46,7 @@ internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
     return true
 }
 
-internal fun supportsCompleteDifferenceTheory(
-    factors: Array<Factor>,
-    numIntVars: Int,
-    intBounds: IntBounds,
-): Boolean =
+internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): Boolean =
     hasCompleteDifferenceCoverage(factors) &&
         (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)
 
