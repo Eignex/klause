@@ -714,7 +714,18 @@ internal class ResumableMinimize(
         SearchRunLifecycle {
         override val solveParams = SearchSolveParams(maxDecisions = Long.MAX_VALUE, restart = restart)
         override val booleanBranching = BooleanBranching.None
-        override val decisionBudget = SearchDecisionBudget { --decisionLimit >= 0L }
+
+        // Two allowances, and a decision is charged against both. [decisionLimit] bounds one slice and is
+        // refilled whenever a driver re-enters — a restart, an arm resuming, an LNS repair — so it never
+        // bounds a solve. [BacktrackParams.nodeBudget] is the solve-spanning one, and an optimize run that
+        // read only the slice allowance ignored `node-limit` entirely: capping `flugpl` at 1000, 5000 and
+        // 20000 all visited the same 920695 nodes.
+        override val decisionBudget = SearchDecisionBudget {
+            val withinSlice = --decisionLimit >= 0L
+            val budget = params.nodeBudget ?: return@SearchDecisionBudget withinSlice
+            budget.spend()
+            withinSlice && !budget.exhausted()
+        }
         override val observer = brancher
         override val modelContinuation = SearchModelContinuation.BlockAtRoot
         override val modelPolicy: SearchModelPolicy = IncumbentPolicy()
