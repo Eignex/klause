@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.IntBounds
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.theory.TheoryParams

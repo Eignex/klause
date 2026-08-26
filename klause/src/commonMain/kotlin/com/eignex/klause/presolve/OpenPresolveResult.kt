@@ -1,6 +1,7 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.exactBoundsInfeasible
 import com.eignex.klause.lp.longOrNull
@@ -8,7 +9,6 @@ import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.structuralIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
 import com.eignex.klause.solver.Cancellation
-import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.util.Bits
 

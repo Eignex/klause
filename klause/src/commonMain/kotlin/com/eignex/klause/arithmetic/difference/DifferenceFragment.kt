@@ -2,9 +2,9 @@ package com.eignex.klause.arithmetic.difference
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntBounds
 
 internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     val nodes: IntArray = run {

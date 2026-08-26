@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp

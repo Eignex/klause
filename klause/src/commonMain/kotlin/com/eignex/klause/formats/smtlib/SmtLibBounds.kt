@@ -2,8 +2,8 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.util.Bits
 
 /**
