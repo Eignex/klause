@@ -1,4 +1,4 @@
-package com.eignex.klause.formats
+package com.eignex.klause.lowering
 
 /**
  * Bucketing metadata for one float variable lowered to an integer bucket index: a float in `[lo, hi]`

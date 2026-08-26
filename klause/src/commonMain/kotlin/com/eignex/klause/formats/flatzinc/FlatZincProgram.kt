@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.formats.FloatBucketing
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 

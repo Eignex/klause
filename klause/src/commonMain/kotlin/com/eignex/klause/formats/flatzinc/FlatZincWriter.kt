@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.formats.FloatBucketing
+import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.solver.Sample
 
 /** Render one solved sample in FlatZinc output format. */
