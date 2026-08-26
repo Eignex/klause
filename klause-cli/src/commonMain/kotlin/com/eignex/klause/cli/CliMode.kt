@@ -6,11 +6,8 @@ import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
-import com.eignex.klause.presolve.PresolveBudget
-import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
-import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -20,12 +17,12 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
-import com.eignex.klause.util.Cancellation
 
 /*
  * Generic multi-mode CLI framework.
@@ -265,34 +262,17 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
 )
 
 /**
- * Apply a presolve [config] to this Solvable, returning one whose [Solvable.problem] is the transformed
- * problem and whose [Solvable.render] / [Solvable.objectiveValue] reconstruct the solution back to the
- * original variables first. Every other field is valid unchanged because the same-space passes keep
- * variable ids. Returns `this` when nothing changed. A thin adapter over [PresolvePipeline] — the
- * fixpoint pipeline itself lives in the presolve layer; this only re-wraps its result as a [Solvable].
+ * Adapt a prepared finite pipeline into this mode's rendering shape. The CLI keeps reconstruction only
+ * because rendering belongs to the front-end; presolve policy and model preparation live in the pipeline.
  */
-internal fun Solvable.presolved(
-    config: PresolveConfig,
-    solutionSetSensitive: Boolean,
-    cancellation: Cancellation = Cancellation.Never,
-    presolveBudget: PresolveBudget? = null,
-): Solvable {
-    val outcome =
-        PresolvePipeline.run(
-            finiteProblem,
-            linearObjective,
-            config,
-            solutionSetSensitive,
-            cancellation,
-            presolveBudget,
-        )
-    if (!outcome.changed) return this
+internal fun Solvable.withPreparation(preparation: FinitePipelinePreparation): Solvable {
+    if (preparation.problem === finiteProblem) return this
     return copyWith(
-        outcome.problem,
-        outcome.stats,
-        { sample -> render(outcome.reconstruct(sample)) },
-        objectiveValue?.let { ov -> { sample -> ov(outcome.reconstruct(sample)) } },
-        outcome.objective ?: linearObjective,
+        preparation.problem,
+        preparation.presolve,
+        { sample -> render(preparation.reconstruct(sample)) },
+        objectiveValue?.let { objectiveValue -> { sample -> objectiveValue(preparation.reconstruct(sample)) } },
+        preparation.objective,
     )
 }
 
