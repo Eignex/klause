@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals

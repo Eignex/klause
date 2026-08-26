@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.lowering.smtlib
+
+import com.eignex.klause.formats.smtlib.*
 
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong

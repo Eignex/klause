@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.lowering.smtlib
+
+import com.eignex.klause.formats.smtlib.*
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.lowering.IntComb

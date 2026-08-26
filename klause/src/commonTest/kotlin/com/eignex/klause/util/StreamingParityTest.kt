@@ -5,7 +5,7 @@ import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.opb.Opb
-import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.lowering.opb.toProblem

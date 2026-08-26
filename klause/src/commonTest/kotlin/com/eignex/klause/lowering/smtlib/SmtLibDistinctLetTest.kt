@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.smtlib
+package com.eignex.klause.lowering.smtlib
+
+import com.eignex.klause.formats.smtlib.*
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

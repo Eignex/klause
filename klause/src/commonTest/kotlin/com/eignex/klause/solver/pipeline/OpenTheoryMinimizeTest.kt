@@ -6,6 +6,7 @@ import com.eignex.klause.lowering.mps.MpsModel
 import com.eignex.klause.lowering.mps.MpsObjective
 import com.eignex.klause.lowering.mps.MpsVar
 import com.eignex.klause.lowering.mps.toProblem
+import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.util.Cancellation
