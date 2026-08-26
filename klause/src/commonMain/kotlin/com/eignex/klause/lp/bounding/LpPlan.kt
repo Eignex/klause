@@ -254,7 +254,7 @@ data class LpPlan(
     val knapsackLagrangian: Boolean = false,
     /**
      * Decompose a separable LP into its column components at the solver seam and solve each block
-     * independently ([com.eignex.klause.lp.ComponentLpSolver]). Exact — the stitched optimum, primal
+     * independently ([com.eignex.klause.lp.engine.ComponentLpSolver]). Exact — the stitched optimum, primal
      * point, and duals match the monolithic solve — while each block's factorization costs a fraction
      * of the monolithic one. On by default; the `lp-component-split` param opts a run out.
      */

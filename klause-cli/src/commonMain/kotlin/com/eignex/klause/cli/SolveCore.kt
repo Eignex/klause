@@ -18,7 +18,6 @@ import com.eignex.klause.portfolio.SequentialPortfolio
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
@@ -37,6 +36,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.variablePartition
 import com.eignex.klause.theory.TheoryParams
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds

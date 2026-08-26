@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntObjectMap

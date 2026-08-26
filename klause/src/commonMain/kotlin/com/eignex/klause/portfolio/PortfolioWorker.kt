@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 
 /**
  * One configured engine instance in a `Portfolio`: a [Session] together with the base

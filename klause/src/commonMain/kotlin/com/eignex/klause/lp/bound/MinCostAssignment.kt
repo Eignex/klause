@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.bound
 
-import com.eignex.klause.lp.LpOverflowException
-import com.eignex.klause.lp.addExact
+import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.lp.engine.addExact
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList

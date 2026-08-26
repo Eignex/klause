@@ -5,11 +5,11 @@ import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeMemo
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 
 /**
  * Information a pass needs to stay sound. [objectiveIntVars] / [objectiveBoolVars] are the

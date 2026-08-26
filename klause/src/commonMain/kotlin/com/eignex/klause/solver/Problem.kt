@@ -7,6 +7,7 @@ import com.eignex.klause.propagation.runRootPropagation
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap

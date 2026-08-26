@@ -7,12 +7,12 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

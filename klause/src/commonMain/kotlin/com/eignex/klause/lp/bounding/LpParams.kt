@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 
 /**
  * The LP-bounding runtime's own parameters, independent of the search layer's `BacktrackParams`. Both the

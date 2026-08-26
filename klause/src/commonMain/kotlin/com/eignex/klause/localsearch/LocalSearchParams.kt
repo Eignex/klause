@@ -2,12 +2,12 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.util.Cancellation
 
 /**
  * Per-call params for the local-search [LocalSearchSolver]. Engine setup

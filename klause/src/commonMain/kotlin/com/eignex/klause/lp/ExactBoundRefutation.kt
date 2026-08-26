@@ -2,7 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

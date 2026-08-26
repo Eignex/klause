@@ -9,14 +9,14 @@ import com.eignex.klause.factor.arithmetic.WideConstants
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LpBuilder
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.Sense
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalTableauRow
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -30,6 +30,7 @@ import com.eignex.klause.solver.supportsExactLira
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -738,7 +739,7 @@ private fun lowerWideDisequality(op: LinearOp, bound: BigInteger, direction: Lin
     }
 
 private class QfLiraLeaf(
-    val model: com.eignex.klause.lp.LpModel,
+    val model: com.eignex.klause.lp.engine.LpModel,
     val integerPositive: IntArray,
     val integerNegative: IntArray,
     val realPositive: IntArray,

@@ -1,11 +1,12 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.Relation
+import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 
 /**

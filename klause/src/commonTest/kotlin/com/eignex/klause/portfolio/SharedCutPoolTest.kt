@@ -2,11 +2,11 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.cut.Cut
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.CutSharing
 import com.eignex.klause.lp.cut.SharedCut
+import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession

@@ -5,7 +5,6 @@ import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.unitCubeSolution
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.presolveOpen
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.ComponentPlan
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.ProblemPipeline
@@ -21,6 +20,7 @@ import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** A complete witness emitted by an open-model theory route. */

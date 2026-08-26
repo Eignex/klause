@@ -5,9 +5,8 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.search.ComponentResult
@@ -16,6 +15,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

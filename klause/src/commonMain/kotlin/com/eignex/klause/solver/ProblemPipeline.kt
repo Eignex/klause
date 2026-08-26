@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.lp.admitsSmallModelBound
 import com.eignex.klause.lp.smallModelBigIntBound
+import com.eignex.klause.util.Cancellation
 
 /** The solver pipeline selected once from a source [ProblemSpec]. */
 enum class ProblemPipeline {

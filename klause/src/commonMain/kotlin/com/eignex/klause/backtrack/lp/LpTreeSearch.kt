@@ -5,9 +5,9 @@ import com.eignex.klause.lp.bounding.dualSimplex
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor

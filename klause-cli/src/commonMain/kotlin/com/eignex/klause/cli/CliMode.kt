@@ -11,7 +11,6 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.PresolvePipeline
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
@@ -26,6 +25,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
+import com.eignex.klause.util.Cancellation
 
 /*
  * Generic multi-mode CLI framework.

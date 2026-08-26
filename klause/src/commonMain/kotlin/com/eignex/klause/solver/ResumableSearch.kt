@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 
 /**
  * A pause/resume handle over a branch-and-bound optimisation. Unlike [Optimizer.improvements] — whose

@@ -1,8 +1,8 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.lp.LpBuilder
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.Sense
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.Sense
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

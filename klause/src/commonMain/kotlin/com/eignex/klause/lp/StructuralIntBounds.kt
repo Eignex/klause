@@ -2,7 +2,12 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.lp.lattice.TriangularBounds
+import com.eignex.klause.lp.lattice.mixedEchelonHermite
+import com.eignex.klause.lp.lattice.originalBounds
+import com.eignex.klause.lp.lattice.sparseIntRow
+import com.eignex.klause.lp.lattice.triangularBounds
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

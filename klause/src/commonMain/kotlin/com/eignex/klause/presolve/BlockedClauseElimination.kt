@@ -1,9 +1,9 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntHashSet
 
 /**

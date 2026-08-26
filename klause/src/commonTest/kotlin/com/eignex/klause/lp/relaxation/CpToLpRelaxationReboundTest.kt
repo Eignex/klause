@@ -9,9 +9,9 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LpModel
-import com.eignex.klause.lp.LpVerdict
-import com.eignex.klause.lp.solveLp
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.LpVerdict
+import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain

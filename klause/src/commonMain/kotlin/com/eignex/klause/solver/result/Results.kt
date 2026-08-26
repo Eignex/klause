@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.result
+
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.Cancellation
 
 /**
  * Why a solver / optimiser returned without a definitive verdict. Lets callers tell
@@ -14,7 +16,7 @@ enum class TerminationReason {
     /** Wall-clock `timeoutMillis` elapsed. */
     Timeout,
 
-    /** Cooperative [com.eignex.klause.solver.Cancellation] token tripped. */
+    /** Cooperative [com.eignex.klause.util.Cancellation] token tripped. */
     Cancelled,
 
     /**

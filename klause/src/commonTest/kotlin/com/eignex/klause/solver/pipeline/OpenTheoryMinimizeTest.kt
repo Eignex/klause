@@ -7,7 +7,7 @@ import com.eignex.klause.formats.mps.MpsObjective
 import com.eignex.klause.formats.mps.MpsVar
 import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.TheoryParams
 import kotlin.test.Test

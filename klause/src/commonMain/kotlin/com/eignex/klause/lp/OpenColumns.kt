@@ -2,6 +2,8 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.Relation
 
 /**
  * The split column pair per variable, plus the builder they were added to.

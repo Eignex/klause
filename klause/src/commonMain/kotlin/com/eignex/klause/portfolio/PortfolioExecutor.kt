@@ -1,8 +1,8 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 
 /**

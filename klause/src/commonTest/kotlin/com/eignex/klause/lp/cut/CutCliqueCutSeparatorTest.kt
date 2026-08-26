@@ -2,8 +2,9 @@ package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession

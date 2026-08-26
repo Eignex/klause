@@ -1,12 +1,12 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.lp.Int128
-import com.eignex.klause.lp.LpBuilder
-import com.eignex.klause.lp.LpModel
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.RevisedSimplex
-import com.eignex.klause.lp.Sense
-import com.eignex.klause.lp.integerFarkasRay
+import com.eignex.klause.lp.engine.Int128
+import com.eignex.klause.lp.engine.LpBuilder
+import com.eignex.klause.lp.engine.LpModel
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.RevisedSimplex
+import com.eignex.klause.lp.engine.Sense
+import com.eignex.klause.lp.engine.integerFarkasRay
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertNotNull

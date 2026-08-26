@@ -1,5 +1,6 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

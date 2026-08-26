@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.solver.Cancellation
+import com.eignex.klause.util.Cancellation
 
 /**
  * The components selected for one solver engine from its source model.

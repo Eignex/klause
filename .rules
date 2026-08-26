@@ -53,8 +53,15 @@ Read `klause-bench/README.md` before benchmarking. In short:
   system follows the trail and can pin literals back into the propagation fixpoint.
 - `arithmetic.difference` owns immutable difference-constraint representation, fragment extraction,
   and non-incremental graph operations. It must not depend on propagation state.
-- `simplex.exact` owns reusable exact rational arithmetic and feasibility simplex primitives. `lp` owns
-  floating LP, finite-CP bounding, cuts, and relaxation assembly.
+- `simplex.exact` owns reusable exact rational arithmetic and feasibility simplex primitives.
+- `lp.engine` owns solving an `LpModel` and certifying the result: the simplex, its basis, and the exact
+  dual/Farkas certificates. It may depend only on `util`, `simplex.exact`, and `lp.lattice` — never on
+  factors, propagation, presolve, search, or the solver model. That closed list is what keeps the engine
+  swappable, so widening it is the thing to refuse.
+- `lp.lattice` owns exact integer matrix reduction (echelon, Hermite, unimodular transforms) and the
+  bounds a triangular block implies. It is a leaf: `util` and nothing else.
+- `lp` and its remaining subpackages own the model-facing half: relaxation assembly from factors,
+  separators, bounding policy, open-model reasoning. Dependencies point at `lp.engine`, never back.
 - `theory.difference`, `theory.lia`, and `theory.qflra` decide complete open-model fragments. They must
   not materialize finite CP domains.
 - `solver.pipeline` selects an open theory once and exposes one verdict surface. Frontends render

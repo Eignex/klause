@@ -4,8 +4,8 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.LastConflict
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.Vsids
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.result.SearchEvent
+import com.eignex.klause.util.Cancellation
 
 /**
  * Curated [BacktrackParams] presets — named, ready-to-use configurations that bundle the

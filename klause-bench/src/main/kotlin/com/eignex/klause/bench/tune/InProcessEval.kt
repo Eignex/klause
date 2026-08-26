@@ -7,9 +7,9 @@ import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.util.Cancellation
 
 /** Outcome of a single-solver evaluation. COP: [feasible] with [objective] (minimised orientation) and
  *  whether optimality was [proven]. CSP: [feasible] (SAT) with [firstFeasibleMs] (time to the witness,

@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.util.Cancellation
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.test.Test

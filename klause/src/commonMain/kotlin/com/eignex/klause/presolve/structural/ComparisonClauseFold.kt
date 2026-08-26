@@ -5,9 +5,9 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.LpOverflowException
-import com.eignex.klause.lp.mulExact
-import com.eignex.klause.lp.subExact
+import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.lp.engine.mulExact
+import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Factor

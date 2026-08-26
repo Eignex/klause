@@ -4,11 +4,11 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

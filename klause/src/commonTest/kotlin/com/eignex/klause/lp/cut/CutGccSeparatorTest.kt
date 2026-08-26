@@ -1,8 +1,9 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.factor.global.GlobalCardinality
-import com.eignex.klause.lp.Relation
-import com.eignex.klause.lp.RevisedSimplex
+import com.eignex.klause.lp.engine.Cut
+import com.eignex.klause.lp.engine.Relation
+import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
