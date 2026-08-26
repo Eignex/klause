@@ -296,20 +296,28 @@ open class Problem(
     /** Total number of factors. */
     val numFactors: Int get() = factors.size
 
+    /** Compatibility projection for callers that have not yet selected a propagation engine. */
     val propagators: Array<out Propagator> get() = PropagationProblem(this).propagators
 
+    /** Compatibility projection for callers that have not yet selected a local-search engine. */
     val invariants: Array<out Invariant> get() = LocalSearchProblem(this).invariants
 
+    /** Compatibility propagation occurrence view over Boolean variables. */
     val boolOccurrences: Array<IntArray> get() = PropagationProblem(this).boolOccurrences
 
+    /** Compatibility propagation occurrence view over integer variables. */
     val intOccurrences: Array<IntArray> get() = PropagationProblem(this).intOccurrences
 
+    /** Compatibility local-search occurrence view over Boolean variables. */
     val lsBoolOccurrences: Array<IntArray> get() = LocalSearchProblem(this).boolOccurrences
 
+    /** Compatibility local-search occurrence view over integer variables. */
     val lsIntOccurrences: Array<IntArray> get() = LocalSearchProblem(this).intOccurrences
 
+    /** Compatibility propagation wakeup view over Boolean variables. */
     val nonBoolWatcherBoolOccurrences: Array<IntArray> get() = PropagationProblem(this).nonBoolWatcherBoolOccurrences
 
+    /** Compatibility propagation wakeup view over integer variables. */
     val nonIntEventWatcherIntOccurrences: Array<IntArray> get() = PropagationProblem(
         this,
     ).nonIntEventWatcherIntOccurrences

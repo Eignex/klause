@@ -9,19 +9,26 @@ import com.eignex.klause.util.IntHashSet
  * Propagation-engine projection of an immutable [Problem]. It owns the propagator table and every
  * propagation wakeup index, keeping those engine allocations out of the model object.
  */
-class PropagationProblem(val problem: Problem) {
+class PropagationProblem(
+    /** Immutable model data compiled by this projection. */
+    val problem: Problem,
+) {
+    /** One propagator per model factor. */
     val propagators: Array<out Propagator> = Array(problem.numFactors) { problem.factors[it].asPropagator() }
 
+    /** Propagator occurrences indexed by Boolean variable. */
     val boolOccurrences: Array<IntArray> = invert(
         problem.numBoolVars,
         { propagators[it] !== NoPropagator },
     ) { it.boolVars }
 
+    /** Propagator occurrences indexed by integer variable. */
     val intOccurrences: Array<IntArray> = invert(
         problem.numIntVars,
         { propagators[it] !== NoPropagator },
     ) { it.intVars }
 
+    /** Boolean occurrences excluding factors with literal watchers. */
     val nonBoolWatcherBoolOccurrences: Array<IntArray> = run {
         val watcherFid = BooleanArray(problem.numFactors)
         var any = false
@@ -40,10 +47,13 @@ class PropagationProblem(val problem: Problem) {
         }
     }
 
+    /** Whether any propagator subscribes to typed integer-domain events. */
     val usesIntEventWatchers: Boolean = propagators.any { it.initialIntEventWatches != null }
 
+    /** Whether any propagator consumes its dirty integer-variable delta. */
     val usesIntEventDeltaConsumers: Boolean = propagators.any { it.consumesIntEventDelta }
 
+    /** Integer occurrences excluding factors with typed event subscriptions for that variable. */
     val nonIntEventWatcherIntOccurrences: Array<IntArray> = if (!usesIntEventWatchers) {
         intOccurrences
     } else {

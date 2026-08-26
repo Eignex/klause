@@ -5,11 +5,17 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 
 /** Local-search-engine projection of an immutable [Problem]. */
-class LocalSearchProblem(val problem: Problem) {
+class LocalSearchProblem(
+    /** Immutable model data compiled by this projection. */
+    val problem: Problem,
+) {
+    /** One local-search invariant per model factor. */
     val invariants: Array<out Invariant> = Array(problem.numFactors) { problem.factors[it].asInvariant() }
 
+    /** Invariant occurrences indexed by Boolean variable. */
     val boolOccurrences: Array<IntArray> = invert(problem.numBoolVars) { it.boolVars }
 
+    /** Invariant occurrences indexed by integer variable. */
     val intOccurrences: Array<IntArray> = invert(problem.numIntVars) { it.intVars }
 
     private inline fun invert(slots: Int, vars: (Factor) -> IntArray): Array<IntArray> {
