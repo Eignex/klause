@@ -8261,6 +8261,7 @@ public final class com/eignex/klause/solver/ProblemPipeline : java/lang/Enum {
 
 public final class com/eignex/klause/solver/ProblemPipelineKt {
 	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemPipeline;
+	public static final fun supportsExactLra (Lcom/eignex/klause/solver/ProblemSpec;)Z
 }
 
 public final class com/eignex/klause/solver/ProblemSpec {
