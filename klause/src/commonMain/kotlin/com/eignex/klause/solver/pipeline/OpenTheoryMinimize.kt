@@ -72,8 +72,11 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
     private val route: ProblemPipeline
 
     init {
-        require(objective.realCoefficients.isEmpty()) {
-            "an open integer route cannot minimize an objective over continuous columns"
+        // A continuous column may exist — a mixed model keeps its reals — but the descent steps by one,
+        // which only bounds an objective whose value is integral. A continuous term has no next value
+        // below the incumbent, and its greatest lower bound need not be attained at all.
+        require(objective.realCoefficients.none { it != 0.0 }) {
+            "the integral descent cannot minimize an objective weighting a continuous column"
         }
         require(objective.boolWeights.all { it == 0L }) {
             "an open integer route cannot minimize an objective weighting Boolean columns"
@@ -129,12 +132,17 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
     /**
      * The row `Σ c(i)·x(i) ≤ bound − constant`, or an inactive one when [bound] is null.
      *
-     * Carried wide because the descent subtracts one per improvement without knowing how far it will go,
-     * and a bound that leaves 64 bits would otherwise wrap into a row admitting what it excludes.
+     * Widened only when the right-hand side leaves 64 bits, which the descent can reach because it
+     * subtracts one per improvement without knowing how far it will go. Widening unconditionally would
+     * be sound and is not free: a wide row routes the exact core through its digit-chain encoder, which
+     * on a model with thousands of rows costs more than deciding it.
      */
     private fun boundRow(bound: BigInteger?): Factor {
-        val wideCoeffs = Array(coefficients.size) { BigInteger.fromLong(coefficients[it]) }
         val rhs = (bound ?: INACTIVE) - BigInteger.fromLong(objective.constant)
+        if (rhs >= LONG_MIN && rhs <= LONG_MAX) {
+            return Linear(coefficients.copyOf(), terms, LinearOp.LE, rhs.longValue())
+        }
+        val wideCoeffs = Array(coefficients.size) { BigInteger.fromLong(coefficients[it]) }
         return Linear(terms, wideCoeffs, LinearOp.LE, rhs)
     }
 
@@ -158,7 +166,14 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
                 total += BigInteger.fromLong(coefficients[i]) * assignment.assignment.ints[terms[i]]
             }
 
-            else -> error("an open integer route answers with an integer assignment")
+            // A mixed model carries continuous columns the objective does not weight, so its value is
+            // still the integer sum; the reals are decided alongside and contribute nothing to it.
+            is OpenTheoryAssignment.ExactLira -> for (i in terms.indices) {
+                total += BigInteger.fromLong(coefficients[i]) * assignment.assignment.ints[terms[i]]
+            }
+
+            is OpenTheoryAssignment.ExactLra ->
+                error("a route with no integer column cannot carry an integral objective")
         }
         return total
     }
@@ -166,5 +181,7 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
     private companion object {
         /** A right-hand side no objective reaches, so the first round runs unconstrained. */
         val INACTIVE: BigInteger = BigInteger.fromLong(Long.MAX_VALUE)
+        val LONG_MIN: BigInteger = BigInteger.fromLong(Long.MIN_VALUE)
+        val LONG_MAX: BigInteger = BigInteger.fromLong(Long.MAX_VALUE)
     }
 }
