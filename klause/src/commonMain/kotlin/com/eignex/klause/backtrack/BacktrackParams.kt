@@ -337,7 +337,7 @@ data class BacktrackParams(
      * Whether to route an eligible pure-Boolean problem (no integer variables, all clause factors)
      * through the native-SAT BCP lane: arena-packed two-watched-literal propagation with
      * no atom store or factor-queue overhead. `null` (default) auto-dispatches — the lane is selected
-     * exactly when the baked problem is [com.eignex.klause.solver.Problem.isNativeSatEligible]. `true`
+     * exactly when the propagation projection is native-SAT eligible. `true`
      * requests it (still a no-op on an ineligible problem); `false` forces the general LCG path.
      */
     val nativeSat: Boolean? = null,

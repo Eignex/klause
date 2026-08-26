@@ -18,6 +18,8 @@ import kotlin.test.assertTrue
 
 class ClauseArenaTest {
 
+    private fun nativeSatEligible(problem: Problem): Boolean = PropagationProblem(problem).isNativeSatEligible
+
     private fun cnf(vararg clauses: IntArray): Problem = Problem(
         numBoolVars = 3,
         numIntVars = 0,
@@ -27,7 +29,7 @@ class ClauseArenaTest {
 
     @Test
     fun `pure-Boolean clause-only problem is native-SAT eligible`() {
-        assertTrue(cnf(intArrayOf(Lit.make(0, true), Lit.make(1, false))).isNativeSatEligible)
+        assertTrue(nativeSatEligible(cnf(intArrayOf(Lit.make(0, true), Lit.make(1, false)))))
     }
 
     @Test
@@ -38,7 +40,7 @@ class ClauseArenaTest {
             intDomains = arrayOf(IntDomain(0L, 2L)),
             factors = arrayOf<Factor>(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1)),
         )
-        assertFalse(problem.isNativeSatEligible)
+        assertFalse(nativeSatEligible(problem))
     }
 
     @Test
@@ -52,7 +54,7 @@ class ClauseArenaTest {
                 PseudoBoolean(longArrayOf(1L, 1L), intArrayOf(Lit.make(0, true), Lit.make(1, true)), PbOp.LE, 1L),
             ),
         )
-        assertFalse(problem.isNativeSatEligible)
+        assertFalse(nativeSatEligible(problem))
     }
 
     @Test
