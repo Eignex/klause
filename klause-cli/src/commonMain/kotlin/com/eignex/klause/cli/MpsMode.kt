@@ -8,6 +8,7 @@ import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.sourceRoute
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
@@ -38,8 +39,21 @@ internal object MpsMode : CliMode {
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
             val pipeline = compiled.model.sourceRoute()
             when (pipeline) {
-                ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA, ProblemPipeline.EXACT_LIRA ->
+                ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA ->
                     throw MpsFormatException("open MPS models require a supported theory pipeline")
+
+                // A mixed open model decides through the exact core. Its objective is minimized by the
+                // same integral descent the pure-integer routes use when it weights only integer columns;
+                // one weighting a continuous column has no next value to step to and is declined.
+                ProblemPipeline.EXACT_LIRA -> {
+                    val objective = compiled.objective
+                    if (objective != null && objective.realCoefficients.any { it != 0.0 }) {
+                        throw MpsFormatException("open MPS optimization over a continuous objective is unsupported")
+                    }
+                    return exactLiraSolvable(compiled.model, objective, compiled.maximize) { assignment ->
+                        renderMpsExactLiraModel(compiled, assignment)
+                    }
+                }
 
                 ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
                     // An objective enters the open route as a row bounding it, which is outside the
@@ -86,6 +100,16 @@ internal fun renderMpsGeneralLiaModel(compiled: MpsCompiled, assignment: General
     for (col in compiled.columns) {
         check(!col.real) { "General LIA does not admit continuous columns" }
         append(" ${col.name}=${assignment.ints[col.id]}")
+    }
+}
+
+/** Render an exact mixed witness: an integer column at full precision, a continuous one as its exact
+ *  rational value rather than a rounding of it. */
+internal fun renderMpsExactLiraModel(compiled: MpsCompiled, assignment: ExactLiraAssignment): String = buildString {
+    append("v")
+    for (col in compiled.columns) {
+        val value = if (col.real) assignment.reals[col.id].toString() else assignment.ints[col.id].toString()
+        append(" ${col.name}=$value")
     }
 }
 

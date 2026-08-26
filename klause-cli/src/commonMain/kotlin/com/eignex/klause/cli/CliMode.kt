@@ -624,20 +624,32 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     }),
 )
 
-/** Build a satisfiability instance whose open mixed rows are decided by exact QF_LIRA. */
-internal fun exactLiraSolvable(model: ProblemSpec, render: (ExactLiraAssignment) -> String): Solvable = Solvable(
+/** Build an instance whose open mixed rows are decided by exact QF_LIRA, minimizing [objective] when one
+ *  is given. An objective weighting a continuous column is not admitted; see the integral descent. */
+internal fun exactLiraSolvable(
+    model: ProblemSpec,
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    render: (ExactLiraAssignment) -> String,
+): Solvable = Solvable(
     problem = null,
-    optimize = false,
-    maximize = false,
+    optimize = objective != null,
+    maximize = maximize,
     lsObjective = null,
     linearObjective = null,
     objVarId = null,
     definitionalSweep = null,
     render = { error("exact LIRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, ProblemPipeline.EXACT_LIRA, render = { assignment ->
-        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
-    }),
+    pipeline = SolvablePipeline.OpenTheory(
+        model,
+        ProblemPipeline.EXACT_LIRA,
+        { assignment ->
+            render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
+        },
+        objective,
+        maximize,
+    ),
 )
 
 /** Per-invocation parsing + loading + output for one front-end. Created fresh per run via
