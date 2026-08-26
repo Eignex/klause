@@ -1,8 +1,11 @@
-package com.eignex.klause.arithmetic.difference
+package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.Potentials
+import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.ir.IntBounds
