@@ -88,10 +88,11 @@ internal object SolveCore {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
                 val theoryParams = TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel)
-                val objective = pipeline.objective
+                val request = pipeline.request
+                val objective = request.objective
                 if (objective != null) {
-                    output.begin(optimize = true, maximize = pipeline.maximize)
-                    solveOpenTheoryOptimum(pipeline, objective, theoryParams, common.statistics, output) {
+                    output.begin(optimize = true, maximize = request.maximize)
+                    solveOpenTheoryOptimum(request, pipeline.render, theoryParams, common.statistics, output) {
                         budgetSpent(common, it)
                     }
                     return
@@ -99,7 +100,7 @@ internal object SolveCore {
                 output.begin(optimize = false, maximize = false)
                 val result = (
                     OpenTheoryPipeline.execute(
-                        OpenTheoryRequest(pipeline.model),
+                        request,
                         theoryParams,
                     ) as OpenTheoryExecution.Satisfy
                     ).result
@@ -929,8 +930,8 @@ private const val MIB = 1024L * 1024L
  * back, so the descent has one direction and the sign lives only at this boundary.
  */
 private fun solveOpenTheoryOptimum(
-    pipeline: SolvablePipeline.OpenTheory,
-    objective: LinearObjective,
+    request: OpenTheoryRequest,
+    render: (com.eignex.klause.solver.pipeline.OpenTheoryAssignment) -> String,
     params: TheoryParams,
     statistics: Boolean,
     output: OutputProtocol,
@@ -938,12 +939,12 @@ private fun solveOpenTheoryOptimum(
 ) {
     val result = (
         OpenTheoryPipeline.execute(
-            OpenTheoryRequest(pipeline.model, objective, pipeline.maximize),
+            request,
             params,
         ) as OpenTheoryExecution.Optimize
         ).result
     val reported: (BigInteger) -> Long? = { value ->
-        val signed = if (pipeline.maximize) -value else value
+        val signed = if (request.maximize) -value else value
         // An objective past 64 bits is reported as absent rather than as a wrapped number.
         if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.longValue() else null
     }
@@ -952,7 +953,7 @@ private fun solveOpenTheoryOptimum(
     )
     when (result) {
         is OpenTheoryOptimum.Optimal -> {
-            output.onSolution(pipeline.render(result.assignment), reported(result.value))
+            output.onSolution(render(result.assignment), reported(result.value))
             output.onComplete(Verdict.OPTIMAL)
         }
 
@@ -963,7 +964,7 @@ private fun solveOpenTheoryOptimum(
             if (incumbent == null) {
                 output.onComplete(Verdict.UNKNOWN)
             } else {
-                output.onSolution(pipeline.render(incumbent), result.value?.let(reported))
+                output.onSolution(render(incumbent), result.value?.let(reported))
                 output.onComplete(Verdict.BEST_FOUND)
             }
         }
