@@ -1,4 +1,4 @@
-package com.eignex.klause.formats
+package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
