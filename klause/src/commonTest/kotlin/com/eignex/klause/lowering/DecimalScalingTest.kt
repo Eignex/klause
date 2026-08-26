@@ -43,6 +43,6 @@ class DecimalScalingTest {
     fun `a row wider than any single multiplier is unrepresentable`() {
         val scale = scaleOf(1e16, 1e-3)
 
-        assertEquals(RowScale.Unrepresentable, scale)
+        assertEquals(1L, (scale as RowScale.Unrepresentable).multiplier)
     }
 }

@@ -4,10 +4,10 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
@@ -18,6 +18,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -42,9 +43,12 @@ data class MpsCompiled(
     val maximize: Boolean,
     /** Columns in declaration order, each mapping a name to its integer- or real-variable id. */
     val columns: List<MpsColumn>,
-    /** Power of ten the objective was multiplied by to carry its integer-column coefficients onto whole
-     *  numbers (1 when they already are); divide the reported objective by it for the true value. */
+    /** Power of ten the retained objective was multiplied by to carry its integer-column coefficients
+     *  onto whole numbers (1 when they already are). */
     val objectiveScale: Long,
+    /** Maximum absolute difference between the reported retained objective and the source objective,
+     *  over the declared integer-column bounds; null when no objective term was dropped. */
+    val objectiveErrorBound: Double?,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
 )
@@ -135,6 +139,8 @@ fun MpsModel.toProblem(): MpsCompiled {
 
     val objRowScale = objectiveRowScale(isFloat)
     val objScale = objRowScale.multiplier
+    val objectiveErrorBound =
+        if (objective.indices.isEmpty()) null else objectiveApproximationError(objRowScale, isFloat)
     val objective = if (objective.indices.isEmpty()) {
         null
     } else {
@@ -152,7 +158,15 @@ fun MpsModel.toProblem(): MpsCompiled {
     val columns = variables.mapIndexed { i, v ->
         MpsColumn(v.name, isFloat[i], if (isFloat[i]) realVarOf[i] else intVarOf[i])
     }
-    return MpsCompiled(model, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, numReal)
+    return MpsCompiled(
+        model,
+        objective,
+        sense == ObjectiveSense.MAXIMIZE,
+        columns,
+        objScale,
+        objectiveErrorBound,
+        numReal,
+    )
 }
 
 /** Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its
@@ -178,7 +192,7 @@ private fun MpsConstraint.integerRowScale(): RowScale {
     rowBound(lower)?.let { builder.observe(it) }
     rowBound(upper)?.let { builder.observe(it) }
     return when (val scale = builder.resolve()) {
-        RowScale.Unrepresentable ->
+        is RowScale.Unrepresentable ->
             mpsError("row '$name' spans a wider range than an integer row holds: its smallest term rounds to zero")
 
         else -> scale
@@ -326,17 +340,36 @@ private fun emitIndicatedRealRow(
 }
 
 /** The scale carrying the objective's integer-column coefficients and its constant onto whole numbers.
- *  A term on a float column keeps its double and so places no demand on the scale. */
+ *  A term on a float column keeps its double and so places no demand on the scale; an underflowing
+ *  integer term is handled by [objectiveApproximationError]. */
 private fun MpsModel.objectiveRowScale(isFloat: BooleanArray): RowScale {
     val builder = RowScaleBuilder()
     objective.indices.forEachIndexed { k, idx -> if (!isFloat[idx]) builder.observe(objective.coeffs[k]) }
     builder.observe(objective.constant)
-    return when (val scale = builder.resolve()) {
-        RowScale.Unrepresentable ->
-            mpsError("objective spans a wider range than an integer objective holds: its smallest term rounds to zero")
+    return builder.resolve()
+}
 
-        else -> scale
+/**
+ * Bounds the objective difference introduced when [scale] drops a coefficient. Every dropped term must
+ * have a finite integer-column bound; otherwise no finite statement about the source objective exists.
+ */
+private fun MpsModel.objectiveApproximationError(scale: RowScale, isFloat: BooleanArray): Double? {
+    if (scale !is RowScale.Unrepresentable) return null
+    var error = abs(scale.scale(objective.constant).toDouble() / scale.multiplier - objective.constant)
+    objective.indices.forEachIndexed { k, index ->
+        if (isFloat[index]) return@forEachIndexed
+        val source = objective.coeffs[k]
+        val delta = abs(scale.scale(source).toDouble() / scale.multiplier - source)
+        if (delta == 0.0) return@forEachIndexed
+        val variable = variables[index]
+        val lower = intLowerOrNull(variable.lower)
+            ?: mpsError("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
+        val upper = intUpperOrNull(variable.upper)
+            ?: mpsError("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
+        error += delta * maxOf(abs(lower.toDouble()), abs(upper.toDouble()))
     }
+    if (!error.isFinite()) mpsError("objective approximation error exceeds a finite double")
+    return error
 }
 
 private fun MpsModel.buildObjective(

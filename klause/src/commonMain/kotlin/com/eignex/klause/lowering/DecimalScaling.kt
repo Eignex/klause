@@ -35,11 +35,9 @@ internal sealed interface RowScale {
     /**
      * The row spans a wider dynamic range than any single multiplier covers: the multiplier that keeps
      * the largest term inside the recoverable range sends the smallest term to zero, which would drop
-     * it from the row instead of approximating it.
+     * it from an integer row instead of approximating it.
      */
-    data object Unrepresentable : RowScale {
-        override val multiplier: Long get() = 1L
-    }
+    class Unrepresentable(override val multiplier: Long) : RowScale
 }
 
 /**
@@ -77,7 +75,7 @@ internal class RowScaleBuilder {
             if (largest * exact.toDouble() <= MAX_UNITS) return RowScale.Exact(exact)
         }
         val fitted = largestFittingPower(largest)
-        if (smallestNonZero * fitted.toDouble() < 0.5) return RowScale.Unrepresentable
+        if (smallestNonZero * fitted.toDouble() < 0.5) return RowScale.Unrepresentable(fitted)
         return RowScale.Rounded(fitted)
     }
 }

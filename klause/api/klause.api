@@ -2447,21 +2447,23 @@ public final class com/eignex/klause/formats/mps/MpsColumn {
 }
 
 public final class com/eignex/klause/formats/mps/MpsCompiled {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JI)V
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;I)V
 	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Z
 	public final fun component4 ()Ljava/util/List;
 	public final fun component5 ()J
-	public final fun component6 ()I
-	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JI)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JIILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun component7 ()I
+	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;I)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;IILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getColumns ()Ljava/util/List;
 	public final fun getFloatColumns ()I
 	public final fun getMaximize ()Z
 	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getObjectiveErrorBound ()Ljava/lang/Double;
 	public final fun getObjectiveScale ()J
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

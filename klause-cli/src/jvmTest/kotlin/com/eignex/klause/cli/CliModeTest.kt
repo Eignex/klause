@@ -230,6 +230,51 @@ class CliModeTest {
     }
 
     @Test
+    fun `an approximate MPS objective does not claim an exact optimum`() {
+        val mps = File.createTempFile("cliapproxobjective", ".mps").apply {
+            writeText(
+                """
+                NAME          APPROXIMATE
+                ROWS
+                 N  COST
+                 G  FIXED
+                COLUMNS
+                    MK1       'MARKER'                 'INTORG'
+                    X         COST           1000000000000000
+                    X         FIXED          1
+                    Y         COST           0.25
+                    MK2       'MARKER'                 'INTEND'
+                RHS
+                    RHS       FIXED          1
+                BOUNDS
+                 UP BND       X              1
+                 LO BND       Y             -2
+                 UP BND       Y              3
+                ENDATA
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
+
+        assertEquals(0, code, out)
+        assertTrue("s SATISFIABLE" in out, out)
+        assertTrue("objective approximation error <= 0.75" in out, out)
+    }
+
+    @Test
+    fun `an unknown approximate MPS objective does not claim a retained optimum`() {
+        val output = MpsOutput(objectiveErrorBound = 0.75)
+
+        val out = capture { output.onComplete(Verdict.UNKNOWN) }
+
+        assertTrue("objective approximation error <= 0.75" in out, out)
+        assertTrue("retained objective is optimal" !in out, out)
+    }
+
+    @Test
     fun `an open mixed MPS model decides through the exact LIRA core`() {
         val mps = File.createTempFile("clilira", ".mps").apply {
             writeText(
