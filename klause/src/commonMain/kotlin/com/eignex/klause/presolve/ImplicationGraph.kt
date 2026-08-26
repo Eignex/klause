@@ -5,6 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.propagatedImplicationGraph
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
@@ -99,7 +100,7 @@ internal object ImplicationGraph {
         problem: Problem,
         maxCandidates: Int,
         cancellation: Cancellation = Cancellation.Never,
-    ): Array<IntArray> = harvestImplications(problem, maxCandidates, cancellation).toArrays()
+    ): Array<IntArray> = problem.propagatedImplicationGraph(maxCandidates, cancellation)
 
     /** Pin `v = [value]`, propagate, and record `pinned -> forced` for every other Boolean the
      *  propagation forces. A self-edge (the pin itself) is never emitted. */
