@@ -26,6 +26,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
@@ -49,10 +50,10 @@ internal object SolveCore {
 
     fun solve(rawSolvable: Solvable, common: CommonOptions, output: OutputProtocol) {
         // Engine resolution: explicit `-e` wins, then `-f` (free) ≡ `-e cp`, else the configured
-        // default ([defaultEngine] — the built-in [Engine.DEFAULT] or a packaged image's env override).
+        // default ([defaultEngine] — the built-in [FiniteEngine.DEFAULT] or a packaged image's env override).
         val engine = common.engine
-            ?.let { Engine.fromId(it) ?: usageError("unknown engine `$it`; expected ${Engine.ids()}") }
-            ?: if (common.freeSearch) Engine.CP else defaultEngine()
+            ?.let { parseEngine(it) ?: usageError("unknown engine `$it`; expected ${engineIds()}") }
+            ?: if (common.freeSearch) FiniteEngine.BACKTRACK else defaultEngine()
         // Presolve once, before any worker is built, so every engine and portfolio worker shares
         // the one transformed problem. Solution-set-altering passes (symmetry breaking, value
         // precedence) are dropped for a pure-LS engine (their ordering constraints are believed to
@@ -60,7 +61,7 @@ internal object SolveCore {
         // overrides this default verbatim, so an LS run can be benchmarked *with* those passes on
         // (the A/B that decides whether the LS-specific stripping is worth keeping).
         val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
-        val forEngine = if (engine.pureLs && common.presolve == null) base.forLocalSearch() else base
+        val forEngine = if (engine.pureLocalSearch && common.presolve == null) base.forLocalSearch() else base
         // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
         // orders differ in what they fold first, never in what the problem means — exposed so the choice
         // can be A/B'd on a corpus rather than argued about.
@@ -156,7 +157,7 @@ internal object SolveCore {
         when (engine) {
             // Naked single backtrack following the model's search annotation (FD track). The
             // annotation decides the heuristic, so per-solver selector --params are rejected.
-            Engine.FIXED -> {
+            FiniteEngine.FIXED -> {
                 rejectParallel(engine, cores, alt = null)
                 runBacktrack(solvable, common, output, cancel, deadline, nodeBudget)
             }
@@ -165,8 +166,8 @@ internal object SolveCore {
             // a four-axis arm pool from its --params (a `strategy=` base plus per-axis edits); `cp`
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
             // single resolved arm runs as a one-arm pool.
-            Engine.CP, Engine.LS, Engine.MIXED, Engine.ALNS ->
-                runPortfolio(solvable, common, output, cores, requireNotNull(engine.mix), cancel, nodeBudget)
+            FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
+                runPortfolio(solvable, common, output, cores, requireNotNull(engine.portfolioMix), cancel, nodeBudget)
         }
     }
 
@@ -183,7 +184,7 @@ internal object SolveCore {
         backendTimedOut || common.deadlineAtMs?.let { nowMillis() >= it } == true
 
     /** Reject `-p N>1` for a single-core engine; [alt], when given, is the parallel engine to suggest. */
-    private fun rejectParallel(engine: Engine, cores: Int, alt: Engine?) {
+    private fun rejectParallel(engine: FiniteEngine, cores: Int, alt: FiniteEngine?) {
         if (cores <= 1) return
         val hint = alt?.let { "; use '${it.id}' for a parallel pool" } ?: " (FD track); drop -p"
         usageError("engine '${engine.id}' is single-core$hint")

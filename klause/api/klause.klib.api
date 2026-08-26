@@ -354,6 +354,31 @@ final enum class com.eignex.klause.propagation/VarKind : kotlin/Enum<com.eignex.
     final fun values(): kotlin/Array<com.eignex.klause.propagation/VarKind> // com.eignex.klause.propagation/VarKind.values|values#static(){}[0]
 }
 
+final enum class com.eignex.klause.solver.pipeline/FiniteEngine : kotlin/Enum<com.eignex.klause.solver.pipeline/FiniteEngine> { // com.eignex.klause.solver.pipeline/FiniteEngine|null[0]
+    enum entry ALNS // com.eignex.klause.solver.pipeline/FiniteEngine.ALNS|null[0]
+    enum entry BACKTRACK // com.eignex.klause.solver.pipeline/FiniteEngine.BACKTRACK|null[0]
+    enum entry FIXED // com.eignex.klause.solver.pipeline/FiniteEngine.FIXED|null[0]
+    enum entry LOCAL_SEARCH // com.eignex.klause.solver.pipeline/FiniteEngine.LOCAL_SEARCH|null[0]
+    enum entry MIXED // com.eignex.klause.solver.pipeline/FiniteEngine.MIXED|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/FiniteEngine.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/FiniteEngine> // com.eignex.klause.solver.pipeline/FiniteEngine.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val id // com.eignex.klause.solver.pipeline/FiniteEngine.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteEngine.id.<get-id>|<get-id>(){}[0]
+    final val portfolioMix // com.eignex.klause.solver.pipeline/FiniteEngine.portfolioMix|{}portfolioMix[0]
+        final fun <get-portfolioMix>(): com.eignex.klause.portfolio/EngineMix? // com.eignex.klause.solver.pipeline/FiniteEngine.portfolioMix.<get-portfolioMix>|<get-portfolioMix>(){}[0]
+    final val pureLocalSearch // com.eignex.klause.solver.pipeline/FiniteEngine.pureLocalSearch|{}pureLocalSearch[0]
+        final fun <get-pureLocalSearch>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteEngine.pureLocalSearch.<get-pureLocalSearch>|<get-pureLocalSearch>(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/FiniteEngine.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/FiniteEngine> // com.eignex.klause.solver.pipeline/FiniteEngine.values|values#static(){}[0]
+
+    final object Companion { // com.eignex.klause.solver.pipeline/FiniteEngine.Companion|null[0]
+        final val DEFAULT // com.eignex.klause.solver.pipeline/FiniteEngine.Companion.DEFAULT|{}DEFAULT[0]
+            final fun <get-DEFAULT>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/FiniteEngine.Companion.DEFAULT.<get-DEFAULT>|<get-DEFAULT>(){}[0]
+    }
+}
+
 final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum<com.eignex.klause.solver.result/TerminationReason> { // com.eignex.klause.solver.result/TerminationReason|null[0]
     enum entry BudgetExhausted // com.eignex.klause.solver.result/TerminationReason.BudgetExhausted|null[0]
     enum entry Cancelled // com.eignex.klause.solver.result/TerminationReason.Cancelled|null[0]

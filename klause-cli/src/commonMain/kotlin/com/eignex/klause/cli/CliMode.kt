@@ -19,6 +19,7 @@ import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
@@ -119,10 +120,23 @@ internal class FlagSpec(
 
 /** The engine for a bare invocation (no `-e`, no `-f`): the `KLAUSE_ENGINE` env var /
  *  `klause.engine` property when set — so a packaged image (e.g. a MiniZinc-Challenge-compliant
- *  Docker build) can ship a different default — else [Engine.DEFAULT]. `-e` and `-f` override it. */
-internal fun defaultEngine(): Engine = cliProp(CliKnobs.engine)
-    ?.let { Engine.fromId(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${Engine.ids()}") }
-    ?: Engine.DEFAULT
+ *  Docker build) can ship a different default — else [FiniteEngine.DEFAULT]. `-e` and `-f` override it. */
+internal fun defaultEngine(): FiniteEngine = cliProp(CliKnobs.engine)
+    ?.let { parseEngine(it) ?: usageError("unknown KLAUSE_ENGINE `$it`; expected ${engineIds()}") }
+    ?: FiniteEngine.DEFAULT
+
+/** Translate a CLI engine token into the orchestration route it requests. */
+internal fun parseEngine(token: String): FiniteEngine? = when (token.trim().lowercase()) {
+    "fixed" -> FiniteEngine.FIXED
+    "backtrack", "bt", "cp" -> FiniteEngine.BACKTRACK
+    "localsearch", "ls", "local-search" -> FiniteEngine.LOCAL_SEARCH
+    "mixed", "portfolio", "pf" -> FiniteEngine.MIXED
+    "alns", "lns", "hybrid-lns" -> FiniteEngine.ALNS
+    else -> null
+}
+
+/** Canonical engine ids rendered by CLI help and diagnostics. */
+internal fun engineIds(): String = FiniteEngine.entries.joinToString(" | ") { it.id }
 
 /** The `--lp` ceiling spec for a bare invocation: the `KLAUSE_LP` env var / `klause.lp` property when
  *  set — so a packaged image can ship a different LP default — else null (the per-engine built-in
@@ -199,7 +213,7 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         true,
         FlagGroup.ENGINE,
         valueLabel = "name",
-        help = "${Engine.ids()}; -f selects cp",
+        help = "${engineIds()}; -f selects cp",
         // env-aware: KLAUSE_ENGINE overrides the built-in default, and --help reflects it.
         default = defaultEngine().id,
     ) { o.engine = it },
