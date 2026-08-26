@@ -29,6 +29,27 @@ data class LpPlan(
      */
     val boundMaxDepth: Int = Int.MAX_VALUE,
     /**
+     * Pivot budget for [bounding]'s dual solve: a node LP that reaches this many pivots hands back the
+     * iterate it has reached instead of running on to the optimum. `0` disables the budget entirely,
+     * leaving the size-derived one that on most models never binds.
+     *
+     * The dual simplex is dual-feasible at every basis it passes through, so a stopped solve still
+     * carries a valid bound — it just may be looser. That makes this a throughput knob, not a refusal:
+     * every model still gets its LP, and a stopped solve still prunes on the bound it reached. What it
+     * cannot do is claim an optimum, so reduced-cost fixing and tableau cuts stand down on one.
+     *
+     * The budget does not apply to every solve. A relaxation that prunes is worth its pivots outright —
+     * capping one measurably costs bound quality — so this bites only on an LP that has run the effort
+     * ladder's warmup window of prunable solves without a single prune, and any prune lifts it
+     * permanently ([LpPivotBudget]).
+     *
+     * Off by default. A cap of 500 cuts an unproductive node LP's pivots several-fold where it applies,
+     * but no automatic rule measured so far both fires where that pays and stays off where it does not:
+     * the models with the most to gain are the ones that never find an incumbent, and those are exactly
+     * the ones a prune-based gate cannot distinguish from a model whose LP has not started pruning yet.
+     */
+    val boundMaxPivots: Int = 0,
+    /**
      * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
      * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
      * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes

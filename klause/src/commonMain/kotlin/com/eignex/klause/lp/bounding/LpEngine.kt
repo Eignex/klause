@@ -254,6 +254,15 @@ internal class LpEngine(
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
 
+    // Pivot budget for an LP that is not repaying its cost. See [LpPivotBudget].
+    private val lpPivotBudget = LpPivotBudget(
+        cap = params.lpPlan.boundMaxPivots,
+        warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
+    )
+
+    /** Pivots this node's LP may spend, or 0 for the size-derived budget that effectively never binds. */
+    internal fun nodePivotBudget(): Int = lpPivotBudget.pivots()
+
     /** Milliseconds of LP wall budget left, or `null` when no budget is set (breaker off). The
      *  one-shot root work is time-boxed to this so it competes with the per-node solves for one budget,
      *  rather than the looser [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
@@ -585,6 +594,7 @@ internal class LpEngine(
             )
             // Charge this solve's wall time; a prune (or reaching the ladder's warmup) spares the LP.
             solveStart?.let { lpWallBreaker.charge(it.elapsedNow().inWholeMilliseconds, outcome.prune) }
+            lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
             if (outcome.basis != null) {
                 while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)
                 lpBasisByDepth[depth] = outcome.basis
