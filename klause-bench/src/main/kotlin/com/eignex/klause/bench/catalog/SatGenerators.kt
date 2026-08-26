@@ -1,6 +1,7 @@
 package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 
@@ -15,8 +16,8 @@ import kotlin.random.Random
  *    sweep `n` to plot solver scaling.
  */
 internal object SatGenerators {
-    fun php(n: Int): Problem = Dimacs.parse(phpCnf(n))
-    fun random3Sat(n: Int, ratio: Double = 4.26, seed: Long = 1L): Problem = Dimacs.parse(random3SatCnf(n, ratio, seed))
+    fun php(n: Int): Problem = Dimacs.parse(phpCnf(n)).toProblem()
+    fun random3Sat(n: Int, ratio: Double = 4.26, seed: Long = 1L): Problem = Dimacs.parse(random3SatCnf(n, ratio, seed)).toProblem()
 
     /** PHPₙ as DIMACS CNF. Var `p*n+h+1` = "pigeon p sits in hole h". */
     private fun phpCnf(n: Int): String {

@@ -1,12 +1,11 @@
 package com.eignex.klause.formats.dimacs
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.lowering.dimacs.CnfDocument
+import com.eignex.klause.lowering.dimacs.WcnfDocument
+import com.eignex.klause.lowering.dimacs.WeightedCnfClause
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.StringCharSource
@@ -38,15 +37,15 @@ object Dimacs {
     // Hard-clause sentinel when `top` is absent in `.wcnf`.
     private const val HARD_WEIGHT_SENTINEL: Long = Long.MAX_VALUE
 
-    /** Parse DIMACS CNF/WCNF [text] into a [Problem]. */
-    fun parse(text: String): Problem = parse(StringCharSource(text))
+    /** Parse DIMACS CNF [text] into a [CnfDocument]. */
+    fun parse(text: String): CnfDocument = parse(StringCharSource(text))
 
-    /** Parse a DIMACS CNF/WCNF [source] into a [Problem], consuming it line by line. */
-    fun parse(source: CharSource): Problem {
+    /** Parse a DIMACS CNF [source] into a [CnfDocument], consuming it line by line. */
+    fun parse(source: CharSource): CnfDocument {
         var numVars = -1
         var declaredClauses = -1
         var parsedClauses = 0
-        val clauses = mutableListOf<Clause>()
+        val clauses = mutableListOf<IntArray>()
         // A bare `0` with no accumulated literals is the empty clause (⊥) — an unsatisfiable instance —
         // unless it sits in the legacy trailing `%` block, where a lone `0` is an end-of-file sentinel.
         var triviallyUnsat = false
@@ -87,7 +86,7 @@ object Dimacs {
                     // the trailing `%` block where a lone `0` is a sentinel to ignore.
                     when {
                         acc != null && !acc.isEmpty() -> {
-                            clauses += Clause(acc.toIntArray())
+                            clauses += acc.toIntArray()
                             parsedClauses++
                         }
 
@@ -112,47 +111,21 @@ object Dimacs {
         dimacsRequire(parsedClauses == declaredClauses) {
             "DIMACS header declares $declaredClauses clauses, found $parsedClauses"
         }
-        // The empty clause is ⊥; a [Clause] needs a non-empty literal set, so force a contradiction on a
-        // fresh marker variable (as the WCNF path does) to reject the instance.
-        val totalVars = numVars + if (triviallyUnsat) 1 else 0
-        val factors = ArrayList<Factor>(clauses.size + if (triviallyUnsat) 2 else 0)
-        factors.addAll(clauses)
-        if (triviallyUnsat) {
-            val marker = numVars
-            factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
-            factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
-        }
-        return Problem(
-            numBoolVars = totalVars,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = factors.toTypedArray(),
-            // Defer the base bake (root unit propagation) to presolve step 0, so parsing only reads.
-        )
+        return CnfDocument(numVars, clauses, triviallyUnsat)
     }
 
-    /** Parsed WCNF problem and its soft-clause objective. */
-    data class WcnfProblem(
-        /** Compiled solver problem. */
-        val problem: Problem,
-        /** Soft-clause objective. */
-        val objective: LinearObjective,
-        /** Number of original, non-relaxation variables. */
-        val numOriginalBoolVars: Int,
-    )
+    /** Parse `.wcnf` into a [WcnfDocument]. */
+    fun parseWcnf(text: String): WcnfDocument = parseWcnf(StringCharSource(text))
 
-    /** Parse `.wcnf` into hard clauses plus weighted soft clauses. */
-    fun parseWcnf(text: String): WcnfProblem = parseWcnf(StringCharSource(text))
-
-    /** Parse a `.wcnf` [source] into hard clauses plus weighted soft clauses, consuming it line by line. */
-    fun parseWcnf(source: CharSource): WcnfProblem {
+    /** Parse a `.wcnf` [source] into a [WcnfDocument], consuming it line by line. */
+    fun parseWcnf(source: CharSource): WcnfDocument {
         var numVars = -1
         var declaredClauses = -1
         var parsedClauses = 0
         var top: Long? = null
         var hasOldHeader = false
-        val hardClauses = mutableListOf<Clause>()
-        val softClauses = mutableListOf<Pair<Long, IntArray>>()
+        val hardClauses = mutableListOf<IntArray>()
+        val softClauses = mutableListOf<WeightedCnfClause>()
         // An empty hard clause is unsatisfiable; an empty soft clause is always falsified, so its
         // weight is a fixed cost every solution pays.
         var triviallyUnsat = false
@@ -227,14 +200,14 @@ object Dimacs {
             when {
                 isHard && clauseLits.isEmpty() -> triviallyUnsat = true
 
-                isHard -> hardClauses.add(Clause(clauseLits))
+                isHard -> hardClauses.add(clauseLits)
 
                 // A zero-weight soft clause contributes no cost and imposes no constraint.
                 weight == 0L -> Unit
 
                 clauseLits.isEmpty() -> fixedCost += weight
 
-                else -> softClauses.add(weight to clauseLits)
+                else -> softClauses.add(WeightedCnfClause(weight, clauseLits))
             }
         }
         // New-format instances carry no header, so an instance with no variable-bearing clause
@@ -246,34 +219,6 @@ object Dimacs {
             }
         }
 
-        val numOriginal = numVars
-        // Relaxation variables follow the originals; an unsat marker (if any) follows the relaxations.
-        val totalVars = numOriginal + softClauses.size + if (triviallyUnsat) 1 else 0
-        val factors = mutableListOf<Factor>()
-        factors.addAll(hardClauses)
-        val weights = LongArray(totalVars)
-        for ((i, soft) in softClauses.withIndex()) {
-            val (w, lits) = soft
-            val relax = numOriginal + i
-            val extended = IntArray(lits.size + 1)
-            extended[0] = Lit.make(relax, positive = true)
-            for (k in lits.indices) extended[k + 1] = lits[k]
-            factors.add(Clause(extended))
-            weights[relax] = w
-        }
-        if (triviallyUnsat) {
-            // Force a contradiction on a fresh variable to reject the whole instance.
-            val marker = numOriginal + softClauses.size
-            factors.add(Clause(intArrayOf(Lit.make(marker, positive = true))))
-            factors.add(Clause(intArrayOf(Lit.make(marker, positive = false))))
-        }
-        val problem = Problem(
-            numBoolVars = totalVars,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = factors.toTypedArray(),
-            // Defer the base bake (root unit propagation) to presolve step 0, so parsing only reads.
-        )
-        return WcnfProblem(problem, LinearObjective(boolWeights = weights, constant = fixedCost), numOriginal)
+        return WcnfDocument(numVars, hardClauses, softClauses, triviallyUnsat, fixedCost)
     }
 }

@@ -1,6 +1,7 @@
-package com.eignex.klause.formats.dimacs
+package com.eignex.klause.lowering.dimacs
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.formats.dimacs.DimacsFormatException
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -9,6 +10,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class DimacsTest {
+
+    private object Dimacs {
+        fun parse(text: String) = com.eignex.klause.formats.dimacs.Dimacs.parse(text).toProblem()
+        fun parseWcnf(text: String) = com.eignex.klause.formats.dimacs.Dimacs.parseWcnf(text).toProblem()
+    }
 
     @Test
     fun `parses simple sat instance`() {
