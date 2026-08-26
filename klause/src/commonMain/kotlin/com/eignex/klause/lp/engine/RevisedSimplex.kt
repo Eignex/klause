@@ -29,6 +29,12 @@ internal class FloatLpResult(
     val luMaxDensity: Double = 0.0,
     /** Column components this solve decomposed into ([ComponentLpSolver]); 1 for a monolithic solve. */
     val blocks: Int = 1,
+    /** Whether the solve started from a prior basis rather than the slack cold start. A warm basis saves
+     *  pivots; it does not save the factorization, which [refactorizations] counts separately. */
+    val warmStarted: Boolean = false,
+    /** Sparse LU factorizations this solve built. The floor is 1 per solve while each node constructs its
+     *  own engine, so this is the direct measure of what carrying one across nodes would save. */
+    val refactorizations: Int = 0,
 )
 
 /**
@@ -68,6 +74,8 @@ internal class RevisedSimplex(
     private val basicVar = IntArray(m)
     private val status = Array(numVars) { VarStatus.BASIC }
     private var pivots = 0
+    private var warmStarted = false
+    private var refactorizations = 0
     private var maxLuFill = 0.0 // max (nnz(L)+nnz(U)) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz(L)+nnz(U)) / m² — 1.0 means the LU is effectively dense
 
@@ -131,6 +139,7 @@ internal class RevisedSimplex(
     /** Refactorize the current basis `B` (`B[i][t] = A_full[i][basicVar[t]]`) into a fresh, empty
      *  [EtaBasis]; null if singular. */
     private fun refactor(): EtaBasis? {
+        refactorizations++
         var nnzB = 0
         // Basis slot t holds column basicVar(t), so the basis is naturally column-major: slack column
         // n+i is the unit vector e_i, a structural column is its CSC entries verbatim.
@@ -237,13 +246,19 @@ internal class RevisedSimplex(
         pivots = 0
         maxLuFill = 0.0
         maxLuDensity = 0.0
+        refactorizations = 0
         val kept = if (reuse) keptFactor else null
         keptFactor = null
+        // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
+        // start there is; a warm basis alone still pays for a factorization.
+        warmStarted = kept != null
         // A warm basis can be singular; fall back to the (always non-singular) slack cold start.
         var factor: EtaBasis = kept ?: run {
-            if (warm == null || !tryWarmStart(warm)) coldStart()
+            if (warm == null || !tryWarmStart(warm)) coldStart() else warmStarted = true
             refactor() ?: run {
+                // The warm basis factorized singular, so the solve runs from the slack start after all.
                 coldStart()
+                warmStarted = false
                 refactor() ?: return null
             }
         }
@@ -506,7 +521,17 @@ internal class RevisedSimplex(
         val basis = Basis(basicVar.copyOf(), status.copyOf())
         optimalBasis = basis
         optimalPrimal = primal
-        return FloatLpResult(basis, obj, duals(factor), primal, pivots, maxLuFill, maxLuDensity)
+        return FloatLpResult(
+            basis,
+            obj,
+            duals(factor),
+            primal,
+            pivots,
+            maxLuFill,
+            maxLuDensity,
+            warmStarted = warmStarted,
+            refactorizations = refactorizations,
+        )
     }
 
     /** The basis at the last optimal [solve]; null until an optimal solve. For tableau cut generation. */
