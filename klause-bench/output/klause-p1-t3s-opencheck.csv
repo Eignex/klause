@@ -1,0 +1,7 @@
+suite,problem,maximize,objective,feasible,proven,elapsedMs,budgetMs,format,structure,numGlobal,numLinear,boolHeavy
+smtlib-qf_lia,20180326-Bromberger/more_slacked/CAV_2009_benchmarks/coef-size/smt/size-10/c10_problem__001.smt2.slack,false,,,false,3000,3000,smtlib,arithmetic,0,0,false
+smtlib-qf_lia,2019-cmodelsdiff/boundsmodels/dp_10.formula1-i-O2-b12.smo2,false,,,false,3000,3000,smtlib,arithmetic,0,0,false
+smtlib-qf_lia,2019-ezsmt/Labyrinth/SCC/0003-labyrinth-11-0,false,,,false,3000,3000,smtlib,arithmetic,0,0,false
+smtlib-qf_lia,20210219-Dartagnan/ConcurrencySafety-Main/03_incdec-O0,false,,,false,3000,3000,,,,,
+smtlib-qf_lia,20220307-SMPT/2PhLockVParam/RC-00,false,,,false,3000,3000,smtlib,arithmetic,0,0,false
+smtlib-qf_lia,20230321-UltimateAutomizerSvcomp2023/jain_5-2.c_1,false,,,false,3000,3000,smtlib,arithmetic,0,0,false

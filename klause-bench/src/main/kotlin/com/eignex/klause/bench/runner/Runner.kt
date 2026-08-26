@@ -11,10 +11,18 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
-/** A catalog [ProblemRef] resolved into a concrete, solvable klause [Problem]. */
+/**
+ * A catalog [ProblemRef] resolved into a concrete, solvable klause [Problem].
+ *
+ * The model is materialised on first read, not at resolve time. Only the in-process paths — the
+ * profiler and the reference adapters — ever ask for it; a `solve` run hands the file to `klause-cli`
+ * as a subprocess, which parses it itself. Ingesting eagerly therefore imposed the in-process
+ * frontend's limits on runs that never use it, and an open-bounded model was dropped from the
+ * selection before any backend saw it.
+ */
 internal data class ResolvedProblem(
     internal val ref: ProblemRef,
-    internal val problem: Problem,
+    private val ingest: Lazy<Problem>,
     internal val objective: LinearObjective? = null,
     /** True when the model's objective is a maximization (so "better" = higher). MiniZinc sets it;
      *  other formats leave it false (klause minimises internally). */
@@ -32,6 +40,10 @@ internal data class ResolvedProblem(
     val searchParams: BacktrackParams? = null,
 ) {
     internal val name: String get() = ref.name
+
+    /** The in-process model, parsed on first read. Throws for a model the in-process frontend cannot
+     *  build — which a subprocess run never triggers, because it never asks. */
+    internal val problem: Problem get() = ingest.value
 }
 
 /** Wall-clock / effort budget threaded into solver params by metrics that honor it. */
@@ -60,11 +72,18 @@ internal object InProcessRunner : Runner {
         val src = ref.source
         if (src is ProblemSource.InCode) {
             require(ref.format == Format.IN_CODE) { "${ref.name}: InCode source must use Format.IN_CODE" }
-            return ResolvedProblem(ref, src.build())
+            return ResolvedProblem(ref, lazy { src.build() })
         }
         val format = Formats[ref.format]
         require(format.inProcess) { "${ref.name}: format ${ref.format} is not in-process; use its dedicated runner" }
-        val ingested = format.ingest(CorpusFetcher.resolve(src))
-        return ResolvedProblem(ref, ingested.problem, ingested.objective)
+        val file = CorpusFetcher.resolve(src)
+        return runCatching { format.ingest(file) }
+            .map { ResolvedProblem(ref, lazyOf(it.problem), it.objective) }
+            .getOrElse { failure ->
+                // The in-process frontend cannot build this model — an open-bounded one, say. A
+                // subprocess run does not need it to, so carry the failure instead of dropping the
+                // instance, and let it surface only if something actually asks for the model.
+                ResolvedProblem(ref, lazy { throw failure })
+            }
     }
 }

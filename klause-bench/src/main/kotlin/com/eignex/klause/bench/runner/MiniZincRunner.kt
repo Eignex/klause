@@ -35,7 +35,7 @@ internal class MiniZincRunner(
         }
         return ResolvedProblem(
             ref,
-            program.problem,
+            lazyOf(program.problem),
             objective,
             maximize = program.solve is SolveDirective.Maximize,
             lsObjective = program.lsObjective,
