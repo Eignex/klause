@@ -37,6 +37,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
         out += "lpPruneRate" to round4(pruned / solves)
         out += "lpPivotsPerSolve" to round4(stats.lp.pivots.sum / solves)
         out += "lpSeededRate" to round4(stats.lp.seeded.sum / solves)
+        out += "lpRefactorizationsPerSolve" to round4(stats.lp.refactorizations.sum / solves)
     }
     out += "lpFixed" to "${stats.lp.fixed.sum.toLong()}"
     out += "lpCuts" to "${stats.lp.cuts.sum.toLong()}"

@@ -39,9 +39,12 @@ data class LpStats(
     val cuts: SumResult = ZERO_COUNT,
     /** Non-chronological backjumps driven by an LP infeasibility (Farkas) certificate. */
     val backjumps: SumResult = ZERO_COUNT,
-    /** Node LP solves that started from a seeded tableau (the cheapest warm start) instead of a basis
-     *  reload or cold start — the hot-tableau hit rate. */
+    /** Node LP solves that started from a prior basis instead of the slack cold start — the warm-start
+     *  hit rate. A warm basis saves pivots but not the factorization; [refactorizations] is that cost. */
     val seeded: SumResult = ZERO_COUNT,
+    /** Sparse LU factorizations built across all node LP solves. While each node constructs its own
+     *  engine the floor is one per solve, so this measures what carrying one across nodes would save. */
+    val refactorizations: SumResult = ZERO_COUNT,
     /** Certified LP solves whose model decomposed into column components (`lp-component-split`); the
      *  denominator for judging the split is [solves] on the paths that carry a sink. */
     val componentSplits: SumResult = ZERO_COUNT,
@@ -63,6 +66,7 @@ data class LpStats(
         cuts = SumResult(cuts.sum + o.cuts.sum),
         backjumps = SumResult(backjumps.sum + o.backjumps.sum),
         seeded = SumResult(seeded.sum + o.seeded.sum),
+        refactorizations = SumResult(refactorizations.sum + o.refactorizations.sum),
         componentSplits = SumResult(componentSplits.sum + o.componentSplits.sum),
         componentBlocks = MaxResult(maxOf(componentBlocks.max, o.componentBlocks.max)),
     )
@@ -80,6 +84,7 @@ internal class LpStatsSink {
     val cuts: CountStat = CountStat()
     val backjumps: CountStat = CountStat()
     val seeded: CountStat = CountStat()
+    val refactorizations: CountStat = CountStat()
     val componentSplits: CountStat = CountStat()
     val componentBlocks: MaxStat = MaxStat()
 
@@ -147,9 +152,16 @@ internal class LpStatsSink {
         backjumps.update(1.0)
     }
 
-    /** A node LP solve that started from a seeded tableau instead of a basis/cold reload. */
+    /** A node LP solve that started from a prior basis instead of the slack cold start. */
     fun observeSeeded() {
         seeded.update(1.0)
+    }
+
+    /** Record how one node LP solve started: [warmStarted] off a prior basis, and the [refactorizations]
+     *  it built getting there and back to optimal. */
+    fun observeStart(warmStarted: Boolean, refactorizations: Int) {
+        if (warmStarted) seeded.update(1.0)
+        repeat(refactorizations) { this.refactorizations.update(1.0) }
     }
 
     /** One certified LP solve that decomposed into [blocks] column components. A monolithic solve
@@ -173,6 +185,7 @@ internal class LpStatsSink {
         cuts = cuts.read(),
         backjumps = backjumps.read(),
         seeded = seeded.read(),
+        refactorizations = refactorizations.read(),
         componentSplits = componentSplits.read(),
         componentBlocks = componentBlocks.read(),
     )
