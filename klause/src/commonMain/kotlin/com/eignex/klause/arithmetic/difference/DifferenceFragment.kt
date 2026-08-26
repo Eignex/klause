@@ -19,13 +19,26 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
 
     fun carriesAPotential(): Boolean {
-        var maxAbs = 0L
-        for (e in edges) {
-            val a = if (e.bound < 0L) -e.bound else e.bound
-            if (a > maxAbs) maxAbs = a
-        }
-        return numNodes > 0 && maxAbs <= Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
+        return numNodes > 0 && edges.all { it.absBound() <= potentialBoundLimit() }
     }
+
+    /**
+     * Discard only declared-range edges too wide for the incremental graph's `Long` potentials.
+     *
+     * Those edges express a finite CP domain that remains enforced by its owning propagator. Omitting
+     * them from this redundant graph only weakens its deductions; every retained guarded refutation is
+     * still implied by the source model. A non-domain edge outside the range cannot be dropped because
+     * it is a model row, so no usable fragment exists in that case.
+     */
+    fun withoutOverHeavyDomainEdges(): DifferenceFragment? {
+        val retained = edges.filterNot { it.domainBound && it.absBound() > potentialBoundLimit() }
+        if (retained.size == edges.size) return takeIf(DifferenceFragment::carriesAPotential)
+        return DifferenceFragment(retained).takeIf(DifferenceFragment::carriesAPotential)
+    }
+
+    private fun potentialBoundLimit(): Long = Long.MAX_VALUE / (8L * (numNodes + 1).toLong())
+
+    private fun DifferenceEdge.absBound(): Long = if (bound < 0L) -bound else bound
 
     fun graph(): DifferenceGraph {
         val g = DifferenceGraph(numNodes)
