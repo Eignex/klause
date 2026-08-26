@@ -8327,13 +8327,12 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 public class com/eignex/klause/solver/Problem {
 	public fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
 	public synthetic fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun bake (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/BakedProblem;
-	public static synthetic fun bake$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/BakedProblem;
-	protected final fun foldIntoDomains (Lcom/eignex/klause/propagation/PropagationResult;)V
+	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
+	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
+	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bake (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/propagation/BakedProblem;
+	public static synthetic fun bake$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/propagation/BakedProblem;
 	public final fun getBakeElapsed-UwyO8pc ()J
 	public final fun getBaked ()Lcom/eignex/klause/propagation/PropagationResult;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -10611,4 +10610,3 @@ public final class com/eignex/klause/util/StringCharSource : com/eignex/klause/u
 	public fun <init> (Ljava/lang/String;)V
 	public fun next ()Ljava/lang/String;
 }
-
