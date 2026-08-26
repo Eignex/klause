@@ -28,6 +28,8 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryMinimizer
+import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
@@ -35,6 +37,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.variablePartition
 import com.eignex.klause.theory.TheoryParams
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -84,10 +87,17 @@ internal object SolveCore {
                 if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
+                val theoryParams = TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel)
+                val objective = pipeline.objective
+                if (objective != null) {
+                    output.begin(optimize = true, maximize = pipeline.maximize)
+                    solveOpenTheoryOptimum(pipeline, objective, theoryParams, common.statistics, output) {
+                        budgetSpent(common, it)
+                    }
+                    return
+                }
                 output.begin(optimize = false, maximize = false)
-                val result = OpenTheoryEngine(pipeline.model, pipeline.route).solve(
-                    TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel),
-                )
+                val result = OpenTheoryEngine(pipeline.model, pipeline.route).solve(theoryParams)
                 output.onVerdictContext(
                     VerdictContext(budgetExhausted = budgetSpent(common, result.stats.run.timedOut)),
                 )
@@ -900,3 +910,65 @@ internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) 
 
 /** Bytes per mebibyte — heap figures are reported in MiB, the unit `-Xmx` is set in. */
 private const val MIB = 1024L * 1024L
+
+/**
+ * Minimize [objective] over an open theory route and report the outcome.
+ *
+ * A maximize is driven as the minimization of the negated objective, and the reported value is negated
+ * back, so the descent has one direction and the sign lives only at this boundary.
+ */
+private fun solveOpenTheoryOptimum(
+    pipeline: SolvablePipeline.OpenTheory,
+    objective: LinearObjective,
+    params: TheoryParams,
+    statistics: Boolean,
+    output: OutputProtocol,
+    budgetExhausted: (Boolean) -> Boolean,
+) {
+    val driven = if (pipeline.maximize) objective.negated() else objective
+    val result = OpenTheoryMinimizer(pipeline.model, driven).minimize(params)
+    val reported: (BigInteger) -> Long? = { value ->
+        val signed = if (pipeline.maximize) -value else value
+        // An objective past 64 bits is reported as absent rather than as a wrapped number.
+        if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.longValue() else null
+    }
+    output.onVerdictContext(
+        VerdictContext(budgetExhausted = budgetExhausted(result.stats.run.timedOut)),
+    )
+    when (result) {
+        is OpenTheoryOptimum.Optimal -> {
+            output.onSolution(pipeline.render(result.assignment), reported(result.value))
+            output.onComplete(Verdict.OPTIMAL)
+        }
+
+        is OpenTheoryOptimum.Infeasible -> output.onComplete(Verdict.UNSATISFIABLE)
+
+        is OpenTheoryOptimum.Bounded -> {
+            val incumbent = result.incumbent
+            if (incumbent == null) {
+                output.onComplete(Verdict.UNKNOWN)
+            } else {
+                output.onSolution(pipeline.render(incumbent), result.value?.let(reported))
+                output.onComplete(Verdict.BEST_FOUND)
+            }
+        }
+    }
+    if (statistics) {
+        output.onStatistics(
+            result.stats,
+            result.stats.run.wallMs,
+            if (result is OpenTheoryOptimum.Infeasible) 0L else 1L,
+        )
+    }
+}
+
+/** The objective whose minimum is this one's maximum. */
+private fun LinearObjective.negated(): LinearObjective = LinearObjective(
+    boolWeights = LongArray(boolWeights.size) { -boolWeights[it] },
+    intCoefficients = LongArray(intCoefficients.size) { -intCoefficients[it] },
+    constant = -constant,
+    realCoefficients = DoubleArray(realCoefficients.size) { -realCoefficients[it] },
+)
+
+private val LONG_MIN_BIG = BigInteger.fromLong(Long.MIN_VALUE)
+private val LONG_MAX_BIG = BigInteger.fromLong(Long.MAX_VALUE)
