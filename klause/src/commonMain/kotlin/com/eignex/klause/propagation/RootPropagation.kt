@@ -2,8 +2,8 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.solver.Assumptions
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.solver.Problem
+import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -123,4 +123,24 @@ internal fun runRootPropagation(
         intSetOffsets = if (intSetKeys.isEmpty()) EmptyIntArray else intSetOffsets.toIntArray(),
         intSetValues = intSetValues.toLongArray(),
     )
+}
+
+/** Run the construction-time propagation bake and merge deductions supplied by presolve. */
+internal fun rootBake(
+    problem: Problem,
+    seedDeductions: PropagationResult,
+    cancellation: Cancellation,
+): PropagationResult {
+    val base = runRootPropagation(
+        problem,
+        Assumptions.None,
+        cancellation,
+        skipExpensiveBake = true,
+    )
+    return when {
+        base is PropagationResult.Unsat -> base
+        seedDeductions is PropagationResult.Unsat -> seedDeductions
+        seedDeductions === PropagationResult.Implied.EMPTY -> base
+        else -> (base as PropagationResult.Implied).merge(seedDeductions as PropagationResult.Implied)
+    }
 }
