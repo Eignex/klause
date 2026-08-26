@@ -1,5 +1,6 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
+import com.eignex.klause.formats.flatzinc.FlatZincParseException
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
