@@ -1,11 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.IntComb
-import com.eignex.klause.formats.LinComb
-import com.eignex.klause.formats.WideLinComb
-import com.eignex.klause.formats.toWide
 import com.eignex.klause.formats.wideIntColumns
+import com.eignex.klause.lowering.IntComb
+import com.eignex.klause.lowering.LinComb
+import com.eignex.klause.lowering.WideLinComb
+import com.eignex.klause.lowering.toWide
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

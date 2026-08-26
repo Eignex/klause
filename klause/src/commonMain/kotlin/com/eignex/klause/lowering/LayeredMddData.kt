@@ -1,4 +1,4 @@
-package com.eignex.klause.formats
+package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.internals.MddTransitionIndex

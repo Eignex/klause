@@ -1,4 +1,4 @@
-package com.eignex.klause.formats
+package com.eignex.klause.lowering
 
 /**
  * An integer linear combination `Σ coeffs[v]·v + constant` over variable ids — the shared term the
