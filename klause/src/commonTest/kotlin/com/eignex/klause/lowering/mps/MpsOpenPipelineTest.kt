@@ -2,8 +2,8 @@ package com.eignex.klause.lowering.mps
 
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.solver.ProblemPipeline
-import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.sourceRoute
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

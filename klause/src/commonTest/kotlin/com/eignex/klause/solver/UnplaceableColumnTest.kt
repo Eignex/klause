@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.solver.pipeline.ProblemPipeline
+
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.util.Bits

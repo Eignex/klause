@@ -3,9 +3,11 @@ package com.eignex.klause.theory.lia
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.theory.TheoryCheck
-import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.solver.pipeline.generalLiaWitnessBound
+import com.eignex.klause.solver.pipeline.OpenTheoryEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.util.Bits
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
