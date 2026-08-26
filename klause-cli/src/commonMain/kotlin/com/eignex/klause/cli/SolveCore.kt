@@ -26,6 +26,8 @@ import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -65,11 +67,10 @@ internal object SolveCore {
         // overrides this default verbatim, so an LS run can be benchmarked *with* those passes on
         // (the A/B that decides whether the LS-specific stripping is worth keeping).
         val base = common.presolve?.let { PresolveConfig.parse(it) } ?: KlauseConfig.current.presolveConfig()
-        val forEngine = if (engine.pureLocalSearch && common.presolve == null) base.forLocalSearch() else base
         // `affine-pivot-order` selects how affine elimination orders its pivots. A cost knob only — the
         // orders differ in what they fold first, never in what the problem means — exposed so the choice
         // can be A/B'd on a corpus rather than argued about.
-        val config = affinePivotOrderParam(common)?.let { forEngine.withAffinePivotOrder(it) } ?: forEngine
+        val config = affinePivotOrderParam(common)?.let { base.withAffinePivotOrder(it) } ?: base
         // Symmetry breaking collapses symmetric solutions, so disable it (via auto resolution) when
         // the run wants the full solution set: enumeration (`-a`) or a multi-solution cap (`-n N`),
         // unless we're optimizing (a single optimum, where symmetry breaking is sound).
@@ -100,10 +101,10 @@ internal object SolveCore {
                 output.begin(optimize = false, maximize = false)
                 val result = (
                     OpenTheoryPipeline.execute(
-                    OpenTheoryRequest(pipeline.model, pipeline.route),
-                    theoryParams,
-                ) as OpenTheoryExecution.Satisfy
-                ).result
+                        OpenTheoryRequest(pipeline.model, pipeline.route),
+                        theoryParams,
+                    ) as OpenTheoryExecution.Satisfy
+                    ).result
                 output.onVerdictContext(
                     VerdictContext(budgetExhausted = budgetSpent(common, result.stats.run.timedOut)),
                 )
@@ -131,11 +132,19 @@ internal object SolveCore {
         }
         val presolveStart = TimeSource.Monotonic.markNow()
         val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
-        val solvable = rawSolvable.presolved(
-            config,
-            solutionSetSensitive,
-            presolveCancel,
-            presolveBudget = presolveBudget,
+        val solvable = rawSolvable.withPreparation(
+            FinitePipeline.prepare(
+                FinitePipelineRequest(
+                    problem = rawSolvable.finiteProblem,
+                    engine = engine,
+                    objective = rawSolvable.linearObjective,
+                    presolveConfig = config,
+                    explicitPresolveConfig = common.presolve != null,
+                    solutionSetSensitive = solutionSetSensitive,
+                    cancellation = presolveCancel,
+                    presolveBudget = presolveBudget,
+                ),
+            ),
         )
         val presolveElapsed = presolveStart.elapsedNow()
         // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
@@ -933,10 +942,10 @@ private fun solveOpenTheoryOptimum(
 ) {
     val result = (
         OpenTheoryPipeline.execute(
-        OpenTheoryRequest(pipeline.model, pipeline.route, objective, pipeline.maximize),
-        params,
-    ) as OpenTheoryExecution.Optimize
-    ).result
+            OpenTheoryRequest(pipeline.model, pipeline.route, objective, pipeline.maximize),
+            params,
+        ) as OpenTheoryExecution.Optimize
+        ).result
     val reported: (BigInteger) -> Long? = { value ->
         val signed = if (pipeline.maximize) -value else value
         // An objective past 64 bits is reported as absent rather than as a wrapped number.

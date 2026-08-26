@@ -8588,6 +8588,32 @@ public final class com/eignex/klause/solver/pipeline/FiniteEngine$Companion {
 	public final fun getDEFAULT ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 }
 
+public final class com/eignex/klause/solver/pipeline/FinitePipeline {
+	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/FinitePipeline;
+	public final fun prepare (Lcom/eignex/klause/solver/pipeline/FinitePipelineRequest;)Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;
+}
+
+public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;)V
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public final fun getExplicitPresolveConfig ()Z
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
+	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getSolutionSetSensitive ()Z
+}
+
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 }
 

@@ -9248,6 +9248,40 @@ final class com.eignex.klause.solver.objective/SingleIntObjective { // com.eigne
     final fun toString(): kotlin/String // com.eignex.klause.solver.objective/SingleIntObjective.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/FinitePipelinePreparation { // com.eignex.klause.solver.pipeline/FinitePipelinePreparation|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?){}[0]
+
+    final val objective // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.objective.<get-objective>|<get-objective>(){}[0]
+    final val presolve // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.presolve|{}presolve[0]
+        final fun <get-presolve>(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.presolve.<get-presolve>|<get-presolve>(){}[0]
+    final val problem // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.problem.<get-problem>|<get-problem>(){}[0]
+    final val reconstruct // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.reconstruct|{}reconstruct[0]
+        final fun <get-reconstruct>(): kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample> // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.reconstruct.<get-reconstruct>|<get-reconstruct>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eignex.klause.solver.pipeline/FinitePipelineRequest|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.presolve/PresolveConfig = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.presolve/PresolveBudget? = ...) // com.eignex.klause.solver.pipeline/FinitePipelineRequest.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.presolve.PresolveConfig;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.util.Cancellation;com.eignex.klause.presolve.PresolveBudget?){}[0]
+
+    final val cancellation // com.eignex.klause.solver.pipeline/FinitePipelineRequest.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/FinitePipelineRequest.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val engine // com.eignex.klause.solver.pipeline/FinitePipelineRequest.engine|{}engine[0]
+        final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/FinitePipelineRequest.engine.<get-engine>|<get-engine>(){}[0]
+    final val explicitPresolveConfig // com.eignex.klause.solver.pipeline/FinitePipelineRequest.explicitPresolveConfig|{}explicitPresolveConfig[0]
+        final fun <get-explicitPresolveConfig>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.explicitPresolveConfig.<get-explicitPresolveConfig>|<get-explicitPresolveConfig>(){}[0]
+    final val objective // com.eignex.klause.solver.pipeline/FinitePipelineRequest.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/FinitePipelineRequest.objective.<get-objective>|<get-objective>(){}[0]
+    final val presolveBudget // com.eignex.klause.solver.pipeline/FinitePipelineRequest.presolveBudget|{}presolveBudget[0]
+        final fun <get-presolveBudget>(): com.eignex.klause.presolve/PresolveBudget? // com.eignex.klause.solver.pipeline/FinitePipelineRequest.presolveBudget.<get-presolveBudget>|<get-presolveBudget>(){}[0]
+    final val presolveConfig // com.eignex.klause.solver.pipeline/FinitePipelineRequest.presolveConfig|{}presolveConfig[0]
+        final fun <get-presolveConfig>(): com.eignex.klause.presolve/PresolveConfig // com.eignex.klause.solver.pipeline/FinitePipelineRequest.presolveConfig.<get-presolveConfig>|<get-presolveConfig>(){}[0]
+    final val problem // com.eignex.klause.solver.pipeline/FinitePipelineRequest.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.solver.pipeline/FinitePipelineRequest.problem.<get-problem>|<get-problem>(){}[0]
+    final val solutionSetSensitive // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive|{}solutionSetSensitive[0]
+        final fun <get-solutionSetSensitive>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive.<get-solutionSetSensitive>|<get-solutionSetSensitive>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.klause.solver.pipeline/OpenTheoryEngine|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.ProblemPipeline){}[0]
 
@@ -10651,6 +10685,10 @@ final object com.eignex.klause.presolve/RootBaker { // com.eignex.klause.presolv
 }
 
 final object com.eignex.klause.propagation/NoPropagator : com.eignex.klause.propagation/Propagator // com.eignex.klause.propagation/NoPropagator|null[0]
+
+final object com.eignex.klause.solver.pipeline/FinitePipeline { // com.eignex.klause.solver.pipeline/FinitePipeline|null[0]
+    final fun prepare(com.eignex.klause.solver.pipeline/FinitePipelineRequest): com.eignex.klause.solver.pipeline/FinitePipelinePreparation // com.eignex.klause.solver.pipeline/FinitePipeline.prepare|prepare(com.eignex.klause.solver.pipeline.FinitePipelineRequest){}[0]
+}
 
 final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eignex.klause.solver.pipeline/OpenTheoryPipeline|null[0]
     final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.theory.TheoryParams){}[0]
