@@ -67,7 +67,7 @@ class StratifiedPoolTest {
     fun `sample skips a ref whose resolution throws and never redraws it`() {
         val pool = pool { r ->
             if (r.name == "c") error("unsupported construct")
-            ResolvedProblem(r, Problem(1, 0, emptyArray(), emptyList()))
+            ResolvedProblem(r, lazyOf(Problem(1, 0, emptyArray(), emptyList())))
         }
         val drawn = pool.sample(6, Random(0))
         assertEquals(5, drawn.size, "the one throwing ref is skipped; the other five resolve")

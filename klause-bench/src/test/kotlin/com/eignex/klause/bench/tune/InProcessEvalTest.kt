@@ -24,7 +24,7 @@ class InProcessEvalTest {
         val parsed = Opb.parse(opb)
         return ResolvedProblem(
             ref = ProblemRef(name, Format.OPB, ProblemSource.Vendored("test/$name"), Category.CSP, Expected.Unknown),
-            problem = parsed.problem,
+            ingest = lazyOf(parsed.problem),
             objective = null,
         )
     }

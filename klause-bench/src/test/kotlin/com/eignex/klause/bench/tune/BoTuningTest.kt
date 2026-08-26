@@ -26,7 +26,7 @@ class BoTuningTest {
                 Category.OPTIMIZATION,
                 Expected.Unknown,
             ),
-            problem = parsed.problem,
+            ingest = lazyOf(parsed.problem),
             objective = requireNotNull(parsed.objective) { "OPB test instance needs a min: objective" },
         )
     }
@@ -37,7 +37,7 @@ class BoTuningTest {
         val parsed = Opb.parse(opb)
         return ResolvedProblem(
             ref = ProblemRef(name, Format.OPB, ProblemSource.Vendored("test/$name"), Category.CSP, Expected.Unknown),
-            problem = parsed.problem,
+            ingest = lazyOf(parsed.problem),
             objective = null,
         )
     }
