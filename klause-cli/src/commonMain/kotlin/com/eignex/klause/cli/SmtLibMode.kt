@@ -6,6 +6,8 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
@@ -38,7 +40,12 @@ internal object SmtLibMode : CliMode {
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
-            when (parsed.sourcePipeline) {
+            val pipeline = if (parsed.model.supportsExactLra()) {
+                ProblemPipeline.EXACT_LRA
+            } else {
+                parsed.model.sourceRoute()
+            }
+            when (pipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
                     throw UnsupportedSmtException(
                         "open integer bounds require supported difference, General LIA, or exact LIRA coverage",
@@ -48,7 +55,7 @@ internal object SmtLibMode : CliMode {
                 ProblemPipeline.EXACT_LIRA,
                 -> {
                     if (parsed.objective != null) {
-                        val theory = when (parsed.sourcePipeline) {
+                        val theory = when (pipeline) {
                             ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
                             ProblemPipeline.GENERAL_LIA -> "General LIA"
                             ProblemPipeline.EXACT_LRA -> "exact LRA"
@@ -57,7 +64,7 @@ internal object SmtLibMode : CliMode {
                         }
                         throw UnsupportedSmtException("open $theory optimization is unsupported")
                     }
-                    return when (parsed.sourcePipeline) {
+                    return when (pipeline) {
                         ProblemPipeline.DIFFERENCE_THEORY -> differenceTheorySolvable(parsed.model, render)
 
                         ProblemPipeline.GENERAL_LIA -> generalLiaSolvable(parsed.model) { assignment ->

@@ -17,6 +17,8 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
+import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
@@ -70,13 +72,13 @@ class SmtLibTest {
 
     private fun solve(text: String): LongArray {
         val parsed = SmtLib.parse(text)
-        if (parsed.sourcePipeline == ProblemPipeline.GENERAL_LIA) {
+        if (parsed.model.sourceRoute() == ProblemPipeline.GENERAL_LIA) {
             val assignment = liaSat(parsed.model)
             return LongArray(parsed.intVarNames.values.maxOrNull()?.plus(1) ?: 0) { v ->
                 assignment.ints[v].longValue()
             }
         }
-        if (parsed.sourcePipeline == ProblemPipeline.DIFFERENCE_THEORY) {
+        if (parsed.model.sourceRoute() == ProblemPipeline.DIFFERENCE_THEORY) {
             return differenceSat(parsed.model).ints
         }
         val r = BacktrackSolver(parsed.bounded().bake()).solve(BacktrackParams())
@@ -97,7 +99,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
         val x = result.ints[parsed.intVarNames.getValue("x")]
@@ -131,7 +133,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         liraUnsat(parsed.model, TheoryParams(maxLeaves = 3))
     }
 
@@ -147,7 +149,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         liraUnsat(parsed.model)
     }
 
@@ -180,7 +182,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
         assertEquals(BigInteger.ONE, result.ints[parsed.intVarNames.getValue("x")])
@@ -233,7 +235,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
         assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
@@ -251,7 +253,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
         assertTrue(result.reals[parsed.realVarNames.getValue("y")].isZero.not())
@@ -270,7 +272,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         val result = liraSat(parsed.model)
 
         assertTrue(result.ints[parsed.intVarNames.getValue("x")] != BigInteger.ZERO)
@@ -289,7 +291,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         liraUnsat(parsed.model)
     }
 
@@ -299,7 +301,7 @@ class SmtLibTest {
             "(set-logic QF_LRA) (declare-const x Real) (assert (= x (/ 1.0 3.0))) (check-sat)",
         )
 
-        assertEquals(ProblemPipeline.EXACT_LRA, parsed.sourcePipeline)
+        assertTrue(parsed.model.supportsExactLra())
         val result = lraSat(parsed.model)
 
         assertEquals("1/3", result.reals[parsed.realVarNames.getValue("x")].toString())
@@ -318,7 +320,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LRA, parsed.sourcePipeline)
+        assertTrue(parsed.model.supportsExactLra())
         lraUnsat(parsed.model)
     }
 
@@ -532,7 +534,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.model.sourceRoute())
         assertEquals(2, parsed.model.factors.count { it is ReifiedLinear })
         assertEquals(1, parsed.model.factors.count { it is Clause })
         val result = differenceSat(parsed.model)
@@ -551,7 +553,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.model.sourceRoute())
         assertEquals(2, parsed.model.factors.count { it is ReifiedLinear })
         val result = differenceSat(parsed.model)
         assertTrue(result.ints[0] != result.ints[1])
@@ -776,7 +778,7 @@ class SmtLibTest {
             (check-sat)
             """.trimIndent(),
         )
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
     }
 
     @Test
@@ -921,7 +923,7 @@ class SmtLibTest {
         )
         assertFalse(parsed.model.intBounds.isOpenLower(0))
         assertTrue(parsed.model.intBounds.isOpenUpper(0))
-        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.model.sourceRoute())
     }
 
     @Test
@@ -957,7 +959,7 @@ class SmtLibTest {
         val parsed = SmtLib.parse(
             "(declare-fun x () Int) (assert (>= x 0)) (assert (<= x 5)) (assert (>= x 8)) (check-sat)",
         )
-        assertEquals(ProblemPipeline.FINITE_CP, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.FINITE_CP, parsed.model.sourceRoute())
     }
 
     @Test
@@ -965,7 +967,7 @@ class SmtLibTest {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ (* 2 x) y) 10))\n(assert (= y 0))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
         assertEquals(5L, solveFor(text, "x"))
     }
 
@@ -973,7 +975,7 @@ class SmtLibTest {
     fun `an open inequality routes to difference theory`() {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (> x 3))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.model.sourceRoute())
         assertTrue(solveFor(text, "x") > 3L, "search still finds a witness within the box")
     }
 
@@ -989,7 +991,7 @@ class SmtLibTest {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ x y) 10))\n(assert (= (- x y) 4))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
         assertEquals(7L, solveFor(text, "x"))
     }
 
@@ -1004,7 +1006,8 @@ class SmtLibTest {
                 "the fresh ite var inherits the unbounded branch's range",
         )
         for ((text, message) in cases) {
-            assertEquals(ProblemPipeline.GENERAL_LIA, SmtLib.parse(text).sourcePipeline, message)
+            val parsed = SmtLib.parse(text)
+            assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute(), message)
         }
     }
 
@@ -1014,7 +1017,7 @@ class SmtLibTest {
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
         )
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
     }
 
     @Test
@@ -1057,7 +1060,7 @@ class SmtLibTest {
     /** The value of the single declared int in [text], read off its digit columns when it has them. */
     private fun soleIntValue(text: String): BigInteger {
         val parsed = SmtLib.parse(text)
-        if (parsed.sourcePipeline == com.eignex.klause.solver.ProblemPipeline.GENERAL_LIA) {
+        if (parsed.model.sourceRoute() == ProblemPipeline.GENERAL_LIA) {
             return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
         val r = BacktrackSolver(parsed.model.materializeFiniteBounds().bake()).solve(BacktrackParams())

@@ -4876,8 +4876,6 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem { // com.eignex.klaus
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.smtlib/SmtLibProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
     final val sense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense|{}sense[0]
         final fun <get-sense>(): com.eignex.klause.formats/ObjectiveSense // com.eignex.klause.formats.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
-    final val sourcePipeline // com.eignex.klause.formats.smtlib/SmtLibProblem.sourcePipeline|{}sourcePipeline[0]
-        final fun <get-sourcePipeline>(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.formats.smtlib/SmtLibProblem.sourcePipeline.<get-sourcePipeline>|<get-sourcePipeline>(){}[0]
 
     final fun component1(): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.formats.smtlib/SmtLibProblem.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.smtlib/SmtLibProblem.component2|component2(){}[0]
@@ -10711,6 +10709,7 @@ final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver/variablePa
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.solver.ProblemSpec(com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/componentPlan(): com.eignex.klause.solver/ComponentPlan // com.eignex.klause.solver/componentPlan|componentPlan@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/sourceRoute(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/sourceRoute|sourceRoute@com.eignex.klause.solver.ProblemSpec(){}[0]
+final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/supportsExactLra(): kotlin/Boolean // com.eignex.klause.solver/supportsExactLra|supportsExactLra@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
