@@ -101,7 +101,7 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
                     stack.addLast(node.withDirection(disequality, LinearOp.LE))
                     continue
                 }
-                val leaf = QfLiraSystem(model).build(bools, node) ?: return IntegerSearchResult.Budget
+                val leaf = QfLiraSystem(model).build(bools, node, cancellation) ?: return IntegerSearchResult.Cancelled
                 val outcome = bigRationalOutcome(leaf.model, cancellation, Int.MAX_VALUE)
                 when (outcome.feasibility) {
                     RationalFeasibility.INFEASIBLE -> Unit
@@ -228,7 +228,7 @@ class ExactLiraSearchComponent(
                 decision(current.withDirection(disequality, LinearOp.LE)),
             )
         }
-        val leaf = QfLiraSystem(model).build(values, current)
+        val leaf = QfLiraSystem(model).build(values, current, Cancellation(context::cancelled))
         if (leaf == null) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -356,7 +356,7 @@ private fun SearchNode.withPublishedBounds(
 private data class ExactLiraDecision(val node: SearchNode) : SearchTheoryDecision
 
 private class QfLiraSystem(private val model: ProblemSpec) {
-    fun build(bools: BooleanArray, node: SearchNode): QfLiraLeaf? {
+    fun build(bools: BooleanArray, node: SearchNode, cancellation: Cancellation): QfLiraLeaf? {
         val builder = LpBuilder()
         // Split every source column as p - n. Both halves use true open-above columns rather than
         // the LP probe box: an exact infeasibility proof must never rest on an invented frontier.
@@ -364,16 +364,18 @@ private class QfLiraSystem(private val model: ProblemSpec) {
         val intsNegative = IntArray(model.numIntVars) { builder.addOpenAboveVar(0L) }
         val realsPositive = IntArray(model.numRealVars) { builder.addOpenAboveVar(0L) }
         val realsNegative = IntArray(model.numRealVars) { builder.addOpenAboveVar(0L) }
-        val constants = BigConstantEncoder(builder)
+        val constants = BigConstantEncoder(builder, cancellation)
         for (integer in 0 until model.numIntVars) {
+            if (cancellation()) return null
             model.intBounds.lowerOrNull(integer)?.let(BigInteger::fromLong)?.let { lower ->
-                constants.addBound(intsPositive[integer], intsNegative[integer], Relation.GE, lower)
+                if (!constants.addBound(intsPositive[integer], intsNegative[integer], Relation.GE, lower)) return null
             }
             model.intBounds.upperOrNull(integer)?.let(BigInteger::fromLong)?.let { upper ->
-                constants.addBound(intsPositive[integer], intsNegative[integer], Relation.LE, upper)
+                if (!constants.addBound(intsPositive[integer], intsNegative[integer], Relation.LE, upper)) return null
             }
         }
         for (real in 0 until model.numRealVars) {
+            if (cancellation()) return null
             model.realLower[real].takeIf(Double::isFinite)?.let { lower ->
                 builder.addRealRow(
                     intArrayOf(realsPositive[real], realsNegative[real]),
@@ -392,32 +394,43 @@ private class QfLiraSystem(private val model: ProblemSpec) {
             }
         }
         for (branch in node.branches) {
+            if (cancellation()) return null
             if (branch.lower != null) {
-                constants.addBound(
-                    intsPositive[branch.variable],
-                    intsNegative[branch.variable],
-                    Relation.GE,
-                    branch.lower,
-                )
+                if (!constants.addBound(
+                        intsPositive[branch.variable],
+                        intsNegative[branch.variable],
+                        Relation.GE,
+                        branch.lower,
+                    )
+                ) {
+                        return null
+                    }
             }
             if (branch.upper != null) {
-                constants.addBound(
-                    intsPositive[branch.variable],
-                    intsNegative[branch.variable],
-                    Relation.LE,
-                    branch.upper,
-                )
+                if (!constants.addBound(
+                        intsPositive[branch.variable],
+                        intsNegative[branch.variable],
+                        Relation.LE,
+                        branch.upper,
+                    )
+                ) {
+                        return null
+                    }
             }
         }
         for ((index, factor) in model.factors.withIndex()) {
+            if (cancellation()) return null
             when (factor) {
                 is Linear -> if (factor.constants is WideConstants) {
                     val wide = factor.constants
-                    addWide(
-                        builder, intsPositive, intsNegative, constants, factor.vars,
-                        wide.coefficients.toTypedArray(), factor.op, wide.bound,
-                        node.disequalityDirections[index],
-                    )
+                    if (!addWide(
+                            builder, intsPositive, intsNegative, constants, factor.vars,
+                            wide.coefficients.toTypedArray(), factor.op, wide.bound,
+                            node.disequalityDirections[index],
+                        )
+                    ) {
+                            return null
+                        }
                 } else {
                     addLinear(
                         builder,
@@ -440,11 +453,14 @@ private class QfLiraSystem(private val model: ProblemSpec) {
                 is ReifiedLinear -> if (factor.constants is WideConstants) {
                     val wide = factor.constants
                     val op = if (bools[factor.auxBoolVar]) factor.op else factor.op.complement()
-                    addWide(
-                        builder, intsPositive, intsNegative, constants, factor.vars,
-                        wide.coefficients.toTypedArray(), op, wide.bound,
-                        node.disequalityDirections[index],
-                    )
+                    if (!addWide(
+                            builder, intsPositive, intsNegative, constants, factor.vars,
+                            wide.coefficients.toTypedArray(), op, wide.bound,
+                            node.disequalityDirections[index],
+                        )
+                    ) {
+                            return null
+                        }
                 } else {
                     addReified(
                         builder = builder,
@@ -487,6 +503,7 @@ private class QfLiraSystem(private val model: ProblemSpec) {
             }
         }
         for (cut in node.cuts) {
+            if (cancellation()) return null
             builder.addRealRow(cut.columns, cut.coefficients, Relation.GE, cut.rhs)
         }
         return QfLiraLeaf(builder.build(Sense.MINIMIZE), intsPositive, intsNegative, realsPositive, realsNegative)
@@ -591,16 +608,21 @@ private class QfLiraSystem(private val model: ProblemSpec) {
         op: LinearOp,
         bound: BigInteger,
         direction: LinearOp?,
-    ) {
+    ): Boolean {
         val (relation, rhs) = lowerWideDisequality(op, bound, direction)
         val columns = ArrayList<Int>()
         val values = ArrayList<Double>()
         for (index in variables.indices) {
-            constants.appendProduct(coefficients[index], positive[variables[index]], columns, values, 1.0)
-            constants.appendProduct(coefficients[index], negative[variables[index]], columns, values, -1.0)
+            if (!constants.appendProduct(coefficients[index], positive[variables[index]], columns, values, 1.0)) {
+                return false
+            }
+            if (!constants.appendProduct(coefficients[index], negative[variables[index]], columns, values, -1.0)) {
+                return false
+            }
         }
-        constants.appendConstant(-rhs, columns, values)
+        if (!constants.appendConstant(-rhs, columns, values)) return false
         builder.addRealRow(columns.toIntArray(), values.toDoubleArray(), relation(relation), 0.0)
+        return true
     }
 
     private fun add(
@@ -820,16 +842,17 @@ private fun BigFraction.exactDoubleOrNull(): Double? {
     return value.takeIf { it.isFinite() && BigFraction.ofDouble(it) == this }
 }
 
-private class BigConstantEncoder(private val builder: LpBuilder) {
+private class BigConstantEncoder(private val builder: LpBuilder, private val cancellation: Cancellation) {
     private val base = BigInteger.ONE shl 40
     private val columns = ArrayList<Int>()
     private val scaledColumns = HashMap<Int, ArrayList<Int>>()
 
-    fun addBound(positive: Int, negative: Int, relation: Relation, bound: BigInteger) {
+    fun addBound(positive: Int, negative: Int, relation: Relation, bound: BigInteger): Boolean {
         val rowColumns = arrayListOf(positive, negative)
         val rowValues = arrayListOf(1.0, -1.0)
-        appendConstant(-bound, rowColumns, rowValues)
+        if (!appendConstant(-bound, rowColumns, rowValues)) return false
         builder.addRealRow(rowColumns.toIntArray(), rowValues.toDoubleArray(), relation, 0.0)
+        return true
     }
 
     fun appendProduct(
@@ -838,26 +861,32 @@ private class BigConstantEncoder(private val builder: LpBuilder) {
         targetColumns: MutableList<Int>,
         targetValues: MutableList<Double>,
         multiplier: Double,
-    ) {
-        for ((digit, value) in digits(coefficient).withIndex()) {
+    ): Boolean {
+        val digits = digits(coefficient) ?: return false
+        for ((digit, value) in digits.withIndex()) {
+            if (cancellation()) return false
             if (value.isZero()) continue
-            targetColumns.add(scaled(column, digit))
+            targetColumns.add(scaled(column, digit) ?: return false)
             targetValues.add(multiplier * value.longValue().toDouble())
         }
+        return true
     }
 
-    fun appendConstant(value: BigInteger, targetColumns: MutableList<Int>, targetValues: MutableList<Double>) {
-        ensureDigits(value)
-        for ((digit, part) in digits(value).withIndex()) {
+    fun appendConstant(value: BigInteger, targetColumns: MutableList<Int>, targetValues: MutableList<Double>): Boolean {
+        val digits = digits(value) ?: return false
+        if (!ensureDigits(digits.size)) return false
+        for ((digit, part) in digits.withIndex()) {
+            if (cancellation()) return false
             if (part.isZero()) continue
             targetColumns.add(columns[digit])
             targetValues.add(part.longValue().toDouble())
         }
+        return true
     }
 
-    private fun ensureDigits(value: BigInteger) {
-        val needed = digits(value).size
+    private fun ensureDigits(needed: Int): Boolean {
         while (columns.size < needed) {
+            if (cancellation()) return false
             val column = builder.addOpenAboveVar(0L)
             if (columns.isEmpty()) {
                 builder.addRealRow(intArrayOf(column), doubleArrayOf(1.0), Relation.EQ, 1.0)
@@ -871,22 +900,25 @@ private class BigConstantEncoder(private val builder: LpBuilder) {
             }
             columns.add(column)
         }
+        return true
     }
 
-    private fun digits(value: BigInteger): List<BigInteger> {
+    private fun digits(value: BigInteger): List<BigInteger>? {
         var remaining = value.abs()
         val sign = if (value < BigInteger.ZERO) -BigInteger.ONE else BigInteger.ONE
         val result = ArrayList<BigInteger>()
         do {
+            if (cancellation()) return null
             result.add((remaining % base) * sign)
             remaining /= base
         } while (remaining != BigInteger.ZERO)
         return result
     }
 
-    private fun scaled(column: Int, exponent: Int): Int {
+    private fun scaled(column: Int, exponent: Int): Int? {
         val chain = scaledColumns.getOrPut(column) { arrayListOf(column) }
         while (chain.size <= exponent) {
+            if (cancellation()) return null
             val next = builder.addOpenAboveVar(0L)
             builder.addRealRow(
                 intArrayOf(next, chain.last()),
