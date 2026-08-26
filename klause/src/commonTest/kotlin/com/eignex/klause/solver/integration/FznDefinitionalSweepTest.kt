@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.integration
 
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test

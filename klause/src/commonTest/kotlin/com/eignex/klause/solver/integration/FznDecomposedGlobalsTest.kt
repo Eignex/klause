@@ -4,8 +4,8 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

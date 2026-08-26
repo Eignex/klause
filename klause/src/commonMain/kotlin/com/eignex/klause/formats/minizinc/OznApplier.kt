@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.minizinc
 
-import com.eignex.klause.formats.flatzinc.FlatZincArray
-import com.eignex.klause.formats.flatzinc.FlatZincProgram
-import com.eignex.klause.formats.flatzinc.SetVarLayout
+import com.eignex.klause.lowering.flatzinc.FlatZincArray
+import com.eignex.klause.lowering.flatzinc.FlatZincProgram
+import com.eignex.klause.lowering.flatzinc.SetVarLayout
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.IntArrayList
 

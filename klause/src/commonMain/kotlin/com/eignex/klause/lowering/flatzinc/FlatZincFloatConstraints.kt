@@ -1,9 +1,10 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.factor.*
 import com.eignex.klause.factor.arithmetic.*
 import com.eignex.klause.factor.bool.*
 import com.eignex.klause.factor.table.*
+import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.FloatBucketing

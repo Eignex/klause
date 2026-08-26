@@ -1,6 +1,7 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 
 internal fun FlatZincCompiler.processConstraint(c: FznConstraint) = when (c.name) {

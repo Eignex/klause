@@ -1,4 +1,6 @@
-package com.eignex.klause.formats.flatzinc
+package com.eignex.klause.lowering.flatzinc
+
+import com.eignex.klause.formats.flatzinc.*
 
 /** Reified bool comparison used by `bool_{eq,le,lt}_reif`. */
 internal enum class BoolCmpOp { EQ, LE, LT }

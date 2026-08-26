@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
