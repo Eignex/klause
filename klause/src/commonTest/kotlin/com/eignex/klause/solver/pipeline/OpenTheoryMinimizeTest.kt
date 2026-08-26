@@ -73,6 +73,21 @@ class OpenTheoryMinimizeTest {
     }
 
     @Test
+    fun `an open MPS constant objective reports the feasible model as optimal`() {
+        val compiled = MpsModel(
+            "m",
+            ObjectiveSense.MINIMIZE,
+            MpsObjective("obj", intArrayOf(0), doubleArrayOf(0.0), 7.0),
+            listOf(MpsVar("x", integer = true, lower = null, upper = null)),
+            listOf(MpsConstraint("c", intArrayOf(0), doubleArrayOf(1.0), lower = 3.0, upper = null)),
+        ).toProblem()
+
+        val result = OpenTheoryMinimizer(compiled.model, compiled.objective!!).minimize()
+
+        assertEquals("7", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
+    }
+
+    @Test
     fun `a spent budget reports the incumbent as a bound rather than an optimum`() {
         val parsed = modelOf(
             """

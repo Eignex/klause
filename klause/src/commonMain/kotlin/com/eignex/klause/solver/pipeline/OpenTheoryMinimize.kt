@@ -85,7 +85,7 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
         terms = present.toIntArray()
         coefficients = LongArray(present.size) { objective.intCoefficients[present[it]] }
         source = model
-        base = model.withRow(boundRow(null))
+        base = if (terms.isEmpty()) model else model.withRow(boundRow(null))
         route = base.componentPlan().theoryPipeline
         // The bound row is a general linear one, so a model whose rows were all differences leaves that
         // fragment by being optimized at all. Say so here rather than at the first round's engine build.
@@ -107,6 +107,13 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
             val result = OpenTheoryEngine(spec, route, plan).solve(params)
             when (result) {
                 is OpenTheoryResult.Sat -> {
+                    if (terms.isEmpty()) {
+                        return OpenTheoryOptimum.Optimal(
+                            result.assignment,
+                            BigInteger.fromLong(objective.constant),
+                            result.stats,
+                        )
+                    }
                     val value = objective.valueOf(result.assignment)
                     // A round that does not improve would repeat forever on the same bound.
                     if (best != null && value >= best) {
