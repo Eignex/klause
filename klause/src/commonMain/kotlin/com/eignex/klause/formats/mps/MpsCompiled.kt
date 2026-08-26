@@ -1,6 +1,5 @@
 package com.eignex.klause.formats.mps
 
-import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -8,6 +7,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.ObjectiveSense
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.lowering.RowScale
+import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.solver.Factor
@@ -17,8 +18,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyLongArray
-import kotlin.math.abs
-import kotlin.math.roundToLong
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /** One MPS column in declaration order, for rendering a solution value back by name. */
 data class MpsColumn(
@@ -41,8 +42,8 @@ data class MpsCompiled(
     val maximize: Boolean,
     /** Columns in declaration order, each mapping a name to its integer- or real-variable id. */
     val columns: List<MpsColumn>,
-    /** Fixed-point factor the objective was multiplied by (1 when it is already integral); divide the
-     *  reported objective by it for the true value. */
+    /** Power of ten the objective was multiplied by to carry its integer-column coefficients onto whole
+     *  numbers (1 when they already are); divide the reported objective by it for the true value. */
     val objectiveScale: Long,
     /** Count of LP-only continuous (real) columns (zero for a pure-integer instance). */
     val floatColumns: Int,
@@ -61,12 +62,10 @@ private const val MPS_INFINITY = 1e20
  *  - an **indicated row** (an `INDICATORS` entry) becomes a reified row plus a `guard -> cond` clause over
  *    a Boolean channelled to its binary column, so the row is relaxed at the column's other value.
  *  - a constraint or objective term touching a float becomes a real ([Double]-coefficient) [Linear] row;
- *    a purely-integer row with a fractional coefficient is still scaled by [floatScale] to stay integral.
+ *    a purely-integer row with a fractional coefficient is multiplied onto the least common denominator
+ *    of the decimals it is written with, so the integer row restates the source rather than rounding it.
  */
-fun MpsModel.toProblem(
-    @Suppress("UNUSED_PARAMETER") floatBuckets: Int = 0,
-    floatScale: Long = DEFAULT_FLOAT_SCALE,
-): MpsCompiled {
+fun MpsModel.toProblem(): MpsCompiled {
     val isFloat = BooleanArray(variables.size) { !variables[it].integer }
     val intVarOf = IntArray(variables.size) { -1 }
     val realVarOf = IntArray(variables.size) { -1 }
@@ -84,7 +83,7 @@ fun MpsModel.toProblem(
             realLower[realVarOf[i]] = openLower(v.lower)
             realUpper[realVarOf[i]] = openUpper(v.upper)
         } else {
-            declaredBounds[intVarOf[i]] = OpenIntBounds(intBoundOrNull(v.lower), intBoundOrNull(v.upper))
+            declaredBounds[intVarOf[i]] = OpenIntBounds(intLowerOrNull(v.lower), intUpperOrNull(v.upper))
         }
     }
 
@@ -103,14 +102,14 @@ fun MpsModel.toProblem(
             if (touchesFloat) {
                 emitRealRow(factors, c, isFloat, intVarOf, realVarOf)
             } else {
-                emitIntRow(factors, c, intVarOf, floatScale)
+                emitIntRow(factors, c, intVarOf)
             }
         } else {
             val guard = guards.guardFor(indicator, c.name)
             if (touchesFloat) {
                 emitIndicatedRealRow(factors, c, isFloat, intVarOf, realVarOf, guard, guards)
             } else {
-                emitIndicatedIntRow(factors, c, intVarOf, floatScale, guard, guards)
+                emitIndicatedIntRow(factors, c, intVarOf, guard, guards)
             }
         }
     }
@@ -134,11 +133,12 @@ fun MpsModel.toProblem(
         }
     }
 
-    val objScale = if (objectiveNeedsScaling(isFloat)) floatScale else 1L
+    val objRowScale = objectiveRowScale(isFloat)
+    val objScale = objRowScale.multiplier
     val objective = if (objective.indices.isEmpty()) {
         null
     } else {
-        buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objScale)
+        buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objRowScale)
     }
 
     val model = ProblemSpec(
@@ -155,14 +155,33 @@ fun MpsModel.toProblem(
     return MpsCompiled(model, objective, sense == ObjectiveSense.MAXIMIZE, columns, objScale, numReal)
 }
 
-/** Emit a purely-integer row over integer-variable ids, scaling by [floatScale] when a coefficient or
- *  bound is fractional so the integer [Linear] stays exact. */
-private fun emitIntRow(factors: MutableList<Factor>, c: MpsConstraint, intVarOf: IntArray, floatScale: Long) {
+/** Emit a purely-integer row over integer-variable ids, multiplied onto the scale that carries its
+ *  coefficients and bounds onto whole numbers. */
+private fun emitIntRow(factors: MutableList<Factor>, c: MpsConstraint, intVarOf: IntArray) {
     val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
-    val scale = if (c.coeffs.any { !isIntegral(it) } || !boundsIntegral(c.lower, c.upper)) floatScale else 1L
-    val coeffs = LongArray(c.indices.size) { (c.coeffs[it] * scale).roundToLong() }
-    emitRow(c.lower, c.upper, { (it * scale).roundToLong() }) { op, bound ->
+    val scale = c.integerRowScale()
+    val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
+    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
         factors.add(Linear(coeffs, vars, op, bound))
+    }
+}
+
+/**
+ * The scale carrying a purely-integer row onto whole numbers.
+ *
+ * A row whose smallest term rounds to zero at every usable scale is rejected rather than emitted: the
+ * term would leave the row entirely, which states a different constraint instead of an approximate one.
+ */
+private fun MpsConstraint.integerRowScale(): RowScale {
+    val builder = RowScaleBuilder()
+    for (coeff in coeffs) builder.observe(coeff)
+    rowBound(lower)?.let { builder.observe(it) }
+    rowBound(upper)?.let { builder.observe(it) }
+    return when (val scale = builder.resolve()) {
+        RowScale.Unrepresentable ->
+            mpsError("row '$name' spans a wider range than an integer row holds: its smallest term rounds to zero")
+
+        else -> scale
     }
 }
 
@@ -212,7 +231,7 @@ private fun emitRealRow(
     realVarOf: IntArray,
 ) {
     val p = splitRealRow(c, isFloat, intVarOf, realVarOf)
-    emitRow(c.lower, c.upper, { it }) { op, bound ->
+    emitRow(rowBound(c.lower), rowBound(c.upper), { it }) { op, bound ->
         factors.add(Linear(p.intVars, p.intCoeffs, p.realVars, p.realCoeffs, op, bound))
     }
 }
@@ -272,14 +291,13 @@ private fun emitIndicatedIntRow(
     factors: MutableList<Factor>,
     c: MpsConstraint,
     intVarOf: IntArray,
-    floatScale: Long,
     guard: Int,
     guards: IndicatorGuards,
 ) {
     val vars = IntArray(c.indices.size) { intVarOf[c.indices[it]] }
-    val scale = if (c.coeffs.any { !isIntegral(it) } || !boundsIntegral(c.lower, c.upper)) floatScale else 1L
-    val coeffs = LongArray(c.indices.size) { (c.coeffs[it] * scale).roundToLong() }
-    emitRow(c.lower, c.upper, { (it * scale).roundToLong() }) { op, bound ->
+    val scale = c.integerRowScale()
+    val coeffs = LongArray(c.indices.size) { scale.scale(c.coeffs[it]) }
+    emitRow(rowBound(c.lower), rowBound(c.upper), scale::scale) { op, bound ->
         val cond = guards.newBool()
         factors.add(ReifiedLinear(cond, coeffs, vars, op, bound))
         postGuardImplies(factors, guard, cond)
@@ -303,13 +321,23 @@ private fun emitIndicatedRealRow(
         factors.add(ReifiedRealLinear(cond, p.intVars, p.intCoeffs, p.realVars, p.realCoeffs, op, bound))
         postGuardImplies(factors, guard, cond)
     }
-    c.upper?.let { post(LinearOp.LE, it) }
-    c.lower?.let { post(LinearOp.GE, it) }
+    rowBound(c.upper)?.let { post(LinearOp.LE, it) }
+    rowBound(c.lower)?.let { post(LinearOp.GE, it) }
 }
 
-private fun MpsModel.objectiveNeedsScaling(isFloat: BooleanArray): Boolean =
-    objective.indices.withIndex().any { (k, idx) -> !isFloat[idx] && !isIntegral(objective.coeffs[k]) } ||
-        !isIntegral(objective.constant)
+/** The scale carrying the objective's integer-column coefficients and its constant onto whole numbers.
+ *  A term on a float column keeps its double and so places no demand on the scale. */
+private fun MpsModel.objectiveRowScale(isFloat: BooleanArray): RowScale {
+    val builder = RowScaleBuilder()
+    objective.indices.forEachIndexed { k, idx -> if (!isFloat[idx]) builder.observe(objective.coeffs[k]) }
+    builder.observe(objective.constant)
+    return when (val scale = builder.resolve()) {
+        RowScale.Unrepresentable ->
+            mpsError("objective spans a wider range than an integer objective holds: its smallest term rounds to zero")
+
+        else -> scale
+    }
+}
 
 private fun MpsModel.buildObjective(
     isFloat: BooleanArray,
@@ -318,22 +346,22 @@ private fun MpsModel.buildObjective(
     numBool: Int,
     numInt: Int,
     numReal: Int,
-    scale: Long,
+    scale: RowScale,
 ): LinearObjective {
     val intCoefficients = LongArray(numInt)
     val realCoefficients = DoubleArray(numReal)
     objective.indices.forEachIndexed { k, idx ->
         if (isFloat[idx]) {
-            realCoefficients[realVarOf[idx]] = objective.coeffs[k] * scale
+            realCoefficients[realVarOf[idx]] = objective.coeffs[k] * scale.multiplier.toDouble()
         } else {
-            intCoefficients[intVarOf[idx]] = (objective.coeffs[k] * scale).roundToLong()
+            intCoefficients[intVarOf[idx]] = scale.scale(objective.coeffs[k])
         }
     }
     return LinearObjective(
         // Indicator guards carry no objective weight, but the weight vector may not outrun `numBoolVars`.
         boolWeights = if (numBool == 0) EmptyLongArray else LongArray(numBool),
         intCoefficients = intCoefficients,
-        constant = (objective.constant * scale).roundToLong(),
+        constant = scale.scale(objective.constant),
         realCoefficients = if (numReal == 0) EmptyDoubleArray else realCoefficients,
     )
 }
@@ -358,16 +386,21 @@ private inline fun <T> emitRow(lower: Double?, upper: Double?, bound: (Double) -
 private fun emptyRowHolds(lower: Double?, upper: Double?): Boolean =
     (lower == null || lower <= 0.0) && (upper == null || upper >= 0.0)
 
-private fun intBoundOrNull(value: Double?): Long? =
-    if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) null else value.roundToLong()
+/** A row bound, with the `1e30` marker read as the open side it stands for. */
+private fun rowBound(value: Double?): Double? =
+    if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) null else value
+
+/** A declared lower bound on an integer column, tightened to the first integer the column may take:
+ *  rounding a fractional bound to the nearest integer would admit a value the source excludes. */
+private fun intLowerOrNull(value: Double?): Long? =
+    if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) null else ceil(value).toLong()
+
+/** A declared upper bound on an integer column, tightened to the last integer the column may take. */
+private fun intUpperOrNull(value: Double?): Long? =
+    if (value == null || value >= MPS_INFINITY || value <= -MPS_INFINITY) null else floor(value).toLong()
 
 private fun openLower(value: Double?): Double =
     if (value == null || value <= -MPS_INFINITY) Double.NEGATIVE_INFINITY else value
 
 private fun openUpper(value: Double?): Double =
     if (value == null || value >= MPS_INFINITY) Double.POSITIVE_INFINITY else value
-
-private fun boundsIntegral(lower: Double?, upper: Double?): Boolean =
-    (lower == null || isIntegral(lower)) && (upper == null || isIntegral(upper))
-
-private fun isIntegral(value: Double): Boolean = abs(value - value.roundToLong()) <= 1e-6

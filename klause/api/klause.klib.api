@@ -10498,7 +10498,7 @@ final val com.eignex.klause.solver/indices // com.eignex.klause.solver/indices|@
 final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@com.eignex.klause.solver.IntDomain{}values[0]
     final fun (com.eignex.klause.solver/IntDomain).<get-values>(): com.eignex.klause.solver/IntSpan // com.eignex.klause.solver/values.<get-values>|<get-values>@com.eignex.klause.solver.IntDomain(){}[0]
 
-final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(kotlin/Int = ..., kotlin/Long = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(kotlin.Int;kotlin.Long){}[0]
+final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/and(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/and|and@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/iff(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/iff|iff@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/implies(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/implies|implies@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]

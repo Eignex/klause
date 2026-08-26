@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.mps.MpsCompiled
 import com.eignex.klause.formats.mps.MpsFormatException
@@ -27,9 +26,7 @@ internal object MpsMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val config = KlauseConfig.current
-            val compiled = Mps.parse(openFileSource(path))
-                .toProblem(config.floatBuckets, config.floatScale)
+            val compiled = Mps.parse(openFileSource(path)).toProblem()
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
