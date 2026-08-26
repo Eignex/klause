@@ -5,7 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.componentPlan
+import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.TheoryParams

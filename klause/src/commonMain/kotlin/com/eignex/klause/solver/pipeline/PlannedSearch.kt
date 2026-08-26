@@ -3,7 +3,6 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.ComponentPlan
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.search.ClauseSearchComponent
