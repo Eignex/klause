@@ -551,6 +551,7 @@ internal fun buildPortfolioScenario(
     lsPool: List<() -> LocalSearchRecipe>? = null,
     btPool: List<() -> BacktrackRecipe>? = null,
     annotationArm: BacktrackParams? = null,
+    nodeBudget: NodeBudget? = null,
 ): PortfolioScenario {
     val seed = p.long("seed") ?: fallbackSeed ?: 1L
     val lambda = p.double("lambda") ?: 1.0
@@ -588,6 +589,7 @@ internal fun buildPortfolioScenario(
         lsPool = lsPool,
         btPool = btPool,
         annotationArm = annotationArm,
+        nodeBudget = nodeBudget,
     )
     clauseShareLbd?.let { scenario = scenario.copy(clauseShareMaxLbd = it) }
     clauseShareLen?.let { scenario = scenario.copy(clauseShareMaxLen = it) }
@@ -637,15 +639,6 @@ internal fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> Backtrack
 /** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
  *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
 internal const val NODE_LIMIT_KEY = "node-limit"
-
-/** [pool], or the curated pool when it is null, with every arm spending [budget]. */
-internal fun withNodeBudget(
-    pool: List<() -> BacktrackRecipe>?,
-    kind: Kind,
-    budget: NodeBudget,
-): List<() -> BacktrackRecipe> = (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
-    { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
-}
 
 /** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
  *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */

@@ -2,6 +2,7 @@ package com.eignex.klause.portfolio
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackRecipe
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
@@ -96,6 +97,12 @@ data class PortfolioScenario(
     val clauseShareMaxLbd: Int = 6,
     /** Length bound of the cross-arm glue-clause exchange filter; see [clauseShareMaxLbd]. */
     val clauseShareMaxLen: Int = 12,
+    /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
+     *  every arm that runs a backtrack engine spends the one counter — including the ones that build
+     *  their own [BacktrackParams] instead of drawing a [BacktrackRecipe] from a pool. Editing the pools
+     *  from outside reaches only the latter, which both leaves the hybrid-ALNS arm's repair unbounded and
+     *  substitutes a pool, so the capped run measures a different arm set than the uncapped one. */
+    val nodeBudget: NodeBudget? = null,
 ) {
     init {
         require(cores >= 1) { "cores must be ≥ 1" }
@@ -186,18 +193,20 @@ internal object PortfolioComposition {
                 scenario.lpCeiling,
                 scenario.btPool,
                 scenario.annotationArm,
+                scenario.nodeBudget,
             )
 
             EngineMix.MIXED -> mixedArms(scenario)
 
-            EngineMix.ALNS -> alnsArms(count)
+            EngineMix.ALNS -> alnsArms(count, scenario.nodeBudget)
         }
     }
 
     /** The [count] hybrid-ALNS arms, cycling the curated regimes ([AlnsProfile.Curated]) — the ALNS analog
      *  of [lsArms]. COP-oriented: with no objective each arm's [com.eignex.klause.meta.alns.Alns] degrades
      *  to its inner local search via `solve`, so the engine is still well-defined on a CSP. */
-    private fun alnsArms(count: Int): List<WorkerConfig> = AlnsWorkerConfig.diverse(count)
+    private fun alnsArms(count: Int, nodeBudget: NodeBudget?): List<WorkerConfig> =
+        AlnsWorkerConfig.diverse(count, nodeBudget)
 
     /** The [count] LS arms — the curated pool ([pool] == null), else the CLI's resolved pool, each
      *  slot a fresh recipe (wrapping past the pool size). */
@@ -210,20 +219,24 @@ internal object PortfolioComposition {
 
     /** The [count] backtrack arms. [btPool] (when set) overrides the pool with injected templates.
      *  Otherwise the curated pool, with the model's [annotationArm] taking the last slot when
-     *  present and there are ≥ 2 slots (so the `satOptimized` guard keeps slot 0). */
+     *  present and there are ≥ 2 slots (so the `satOptimized` guard keeps slot 0). Every resulting arm
+     *  spends [nodeBudget], which is applied to the composed pool so that capping a run does not also
+     *  change which pool it composes. */
     private fun btArms(
         kind: Kind,
         count: Int,
         lpCeiling: LpConfig,
         btPool: List<() -> BacktrackRecipe>?,
         annotationArm: BacktrackParams?,
+        nodeBudget: NodeBudget?,
     ): List<WorkerConfig> {
         if (btPool != null) {
-            return List(count) { BacktrackWorkerConfig(btPool[it % btPool.size]()) }
+            return List(count) { BacktrackWorkerConfig(btPool[it % btPool.size]().spending(nodeBudget)) }
         }
-        val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling)
+        val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling, nodeBudget)
         if (annotationArm == null || count < 2) return base
-        return base.dropLast(1) + BacktrackWorkerConfig(BacktrackWorkerConfig.ofParams("annotation", annotationArm))
+        val annotation = BacktrackWorkerConfig.ofParams("annotation", annotationArm.copy(nodeBudget = nodeBudget))
+        return base.dropLast(1) + BacktrackWorkerConfig(annotation)
     }
 
     private fun mixedArms(scenario: PortfolioScenario): List<WorkerConfig> {
@@ -234,7 +247,14 @@ internal object PortfolioComposition {
         val btCount = count - lsCount
         val arms = ArrayList<WorkerConfig>(count)
         val local = lsArms(scenario.kind, lsCount, scenario.lsPool)
-        val backtrack = btArms(scenario.kind, btCount, scenario.lpCeiling, scenario.btPool, scenario.annotationArm)
+        val backtrack = btArms(
+            scenario.kind,
+            btCount,
+            scenario.lpCeiling,
+            scenario.btPool,
+            scenario.annotationArm,
+            scenario.nodeBudget,
+        )
         if (scenario.kind == Kind.COP) {
             // Sequential portfolios warm every arm in list order. A complete arm must receive its first
             // slice before the local-search incumbents, which cannot prove an optimum and otherwise delay
@@ -247,7 +267,7 @@ internal object PortfolioComposition {
         }
         // Hybrid ALNS with CP repair: a mixed LS+backtrack engine, added last (lowest priority,
         // pending its credit pass). COP only — it optimises an incumbent, so a CSP has nothing for it.
-        if (scenario.kind == Kind.COP) arms += AlnsWorkerConfig()
+        if (scenario.kind == Kind.COP) arms += AlnsWorkerConfig(nodeBudget = scenario.nodeBudget)
         return arms
     }
 }

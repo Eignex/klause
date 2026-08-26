@@ -87,6 +87,9 @@ internal object SolveCore {
                 if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
+                // The open lane bounds the allowance in *theory checks*, not decision nodes: it decides a
+                // fragment rather than branching a finite domain, so it has no node counter to spend and
+                // reports none. The flag still holds two runs to the same work here, in that unit.
                 val theoryParams = TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel)
                 val request = pipeline.request
                 val objective = request.objective
@@ -558,14 +561,7 @@ internal object SolveCore {
         val kind = if (solvable.optimize) Kind.COP else Kind.CSP
         // `--param bt-arm=label,label` pins a named backtrack arm pool, or the per-solver override
         // --params (var-/val-selector, luby, …) resolve a one-arm pool (a no-op for a pure-LS pool).
-        val resolvedBtPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
-        // Every backtrack arm spends the one allowance, so the cap is on the solve rather than on each
-        // arm. A pure-LS pool has no arm to carry it and no nodes to spend.
-        val btPool = if (nodeBudget != null && mix != EngineMix.LOCAL_SEARCH) {
-            withNodeBudget(resolvedBtPool, kind, nodeBudget)
-        } else {
-            resolvedBtPool
-        }
+        val btPool = if (mix != EngineMix.LOCAL_SEARCH) resolveBtRecipes(params, kind) else null
         // A backtrack-only pool has no LS resolution to carry its dry-run flag, so consume it here.
         if (mix == EngineMix.BACKTRACK && params.bool("dry-run-solver") == true) {
             printBtPool(solvable.finiteProblem, btPool, kind)
@@ -585,7 +581,11 @@ internal object SolveCore {
             btPool = btPool,
             // Include the model's search-annotation arm in the backtrack pool when the model
             // carries one (a no-op for a pure-LS pool, which has no backtrack slot).
-            annotationArm = solvable.annotatedBacktrackParams?.copy(nodeBudget = nodeBudget),
+            annotationArm = solvable.annotatedBacktrackParams,
+            // One allowance for the whole pool: the composition hands it to every arm that runs a
+            // backtrack engine, so the cap bounds the solve rather than each arm, and a capped run
+            // still composes the pool an uncapped one would. A pure-LS pool has no arm to spend it.
+            nodeBudget = nodeBudget,
         )
         // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
         val complete = scenario.engine != EngineMix.LOCAL_SEARCH
