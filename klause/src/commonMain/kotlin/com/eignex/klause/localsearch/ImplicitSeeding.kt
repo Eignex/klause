@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.presolve.Presolve
+import com.eignex.klause.propagation.propagatedImplicationGraph
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -49,7 +49,7 @@ class ImplicitSeeding(
      *  materialises an O(numBoolVars²) adjacency that exhausts the heap on Boolean-heavy models. Seeds
      *  past the cap simply find no forced literals, so the move source degrades to lone flips. */
     val implicationGraph: Array<IntArray> by lazy {
-        Presolve.implicationGraph(problem, maxImplicationCandidates, Cancellation.Never)
+        problem.propagatedImplicationGraph(maxImplicationCandidates, Cancellation.Never)
     }
 
     private fun electImplicitFactors(): IntArray {

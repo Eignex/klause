@@ -3,11 +3,8 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.solver.Assumptions
+import com.eignex.klause.propagation.propagatedImplicationGraph
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.IntArrayList
 
 /**
  * Implied-bound cuts from the binary **implication graph**. Probing
@@ -49,31 +46,8 @@ internal class ImpliedBoundSeparator(private val maxCandidates: Int = DEFAULT_MA
         return if (Lit.isPositive(lit)) x else 1.0 - x
     }
 
-    /** Harvest the bounded implication graph locally so LP does not depend on presolve policy. */
-    private fun implicationGraph(problem: Problem): Array<IntArray> {
-        val adjacency = Array(2 * problem.numBoolVars) { IntArrayList() }
-        var candidates = 0
-        var variable = 0
-        while (variable < problem.numBoolVars && candidates < maxCandidates) {
-            candidates++
-            recordImplications(problem, variable, value = true, adjacency)
-            recordImplications(problem, variable, value = false, adjacency)
-            variable++
-        }
-        return Array(adjacency.size) { adjacency[it].toIntArray() }
-    }
-
-    private fun recordImplications(problem: Problem, variable: Int, value: Boolean, adjacency: Array<IntArrayList>) {
-        val implied = problem.propagate(
-            Assumptions.None.withBool(variable, value),
-            Cancellation.Never,
-        )
-        if (implied !is PropagationResult.Implied) return
-        val from = Lit.make(variable, value)
-        implied.forEachBool { other, otherValue ->
-            if (other != variable) adjacency[from].add(Lit.make(other, otherValue))
-        }
-    }
+    /** Harvest bounded propagation implications without depending on presolve policy. */
+    private fun implicationGraph(problem: Problem): Array<IntArray> = problem.propagatedImplicationGraph(maxCandidates)
 
     internal companion object {
         /** Probe at most this many Boolean variables when building the implication graph. */
