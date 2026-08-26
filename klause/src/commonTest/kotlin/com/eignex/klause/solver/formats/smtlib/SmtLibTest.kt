@@ -14,6 +14,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.componentPlan
 import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -300,7 +301,7 @@ class SmtLibTest {
             "(set-logic QF_LRA) (declare-const x Real) (assert (= x (/ 1.0 3.0))) (check-sat)",
         )
 
-        assertEquals(ProblemPipeline.EXACT_LRA, parsed.model.sourceRoute())
+        assertTrue(parsed.model.supportsExactLra())
         val result = lraSat(parsed.model)
 
         assertEquals("1/3", result.reals[parsed.realVarNames.getValue("x")].toString())
@@ -319,7 +320,7 @@ class SmtLibTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.EXACT_LRA, parsed.model.sourceRoute())
+        assertTrue(parsed.model.supportsExactLra())
         lraUnsat(parsed.model)
     }
 

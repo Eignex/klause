@@ -7,6 +7,7 @@ import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.sourceRoute
+import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
@@ -39,7 +40,11 @@ internal object SmtLibMode : CliMode {
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
-            val pipeline = parsed.model.sourceRoute()
+            val pipeline = if (parsed.model.supportsExactLra()) {
+                ProblemPipeline.EXACT_LRA
+            } else {
+                parsed.model.sourceRoute()
+            }
             when (pipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN ->
                     throw UnsupportedSmtException(

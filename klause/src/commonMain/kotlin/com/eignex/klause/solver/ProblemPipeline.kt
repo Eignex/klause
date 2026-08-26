@@ -39,7 +39,6 @@ enum class ProblemPipeline {
  * theory cover the whole model.
  */
 fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
-    supportsExactLra() -> ProblemPipeline.EXACT_LRA
     (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) } -> ProblemPipeline.FINITE_CP
     else -> componentPlan().theoryPipeline
 }
