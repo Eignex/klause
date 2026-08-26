@@ -78,6 +78,10 @@ internal class Compiler(private val config: KlauseConfig = KlauseConfig.current)
     fun compile(def: SchemaDef<SchemaEntry>): CompiledSchema = Lowering(config).run(def)
 }
 
+/** Compile this schema definition into a solver-ready [CompiledSchema]. */
+fun SchemaDef<SchemaEntry>.compile(config: KlauseConfig = KlauseConfig.current): CompiledSchema =
+    Compiler(config).compile(this)
+
 internal class Lowering(val config: KlauseConfig) : CnfLowering {
     private val problemBuilder = ProblemBuilder()
 
