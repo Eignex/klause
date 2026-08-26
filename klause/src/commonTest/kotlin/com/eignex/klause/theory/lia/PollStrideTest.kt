@@ -23,13 +23,15 @@ import kotlin.test.assertTrue
 class PollStrideTest {
 
     @Test
-    fun `a witness box beyond the arithmetic limit declines General LIA search`() {
-        // This equality makes the small-model theorem produce a 21k-bit box. Propagating it would divide
-        // products of that box and the 4k-bit coefficient, so decline before the first endpoint division.
+    fun `a witness box beyond the arithmetic limit is still searched`() {
+        // This equality makes the small-model theorem produce a 21k-bit box, so narrowing it would
+        // divide products of that box by a 4k-bit coefficient — one division long enough to outlast a
+        // deadline. Propagation declines the row and the search proceeds: `wide * x0 + x1 = 0` is
+        // satisfied at the origin, so declining to narrow costs tightness, not the answer.
         val wide = BigInteger.parseString("1" + "0".repeat(1_300))
         val model = ProblemSpec(
             // An unused Boolean keeps this model off OpenTheoryEngine's cheap cube witness path, so the
-            // test reaches the General LIA component that decides whether the box is safe to materialise.
+            // test reaches the General LIA component rather than a shortcut.
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(
                 longArrayOf(0, 0),
@@ -48,8 +50,8 @@ class PollStrideTest {
             ),
         )
 
-        assertTrue(checkNotNull(model.generalLiaWitnessBound()).bitLength() > MAX_GENERAL_LIA_WITNESS_BITS)
-        assertIs<OpenTheoryResult.Unknown>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
+        assertTrue(checkNotNull(model.generalLiaWitnessBound()).bitLength() > MAX_LIA_PROPAGATION_BITS)
+        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
     }
 
     @Test
