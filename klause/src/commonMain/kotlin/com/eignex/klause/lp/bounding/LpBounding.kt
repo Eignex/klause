@@ -93,7 +93,7 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
  *  test, the bound-flipping long step and basis equilibration — all correctness-neutral (they change
  *  only the pivot path / conditioning, never the certified optimum). */
 internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver =
-    RevisedSimplex(model, cancellation)
+    RevisedSimplex(model, cancellation, iterationLimit = nodePivotBudget())
 
 /**
  * The node bound's engine and its solve.
@@ -115,7 +115,7 @@ private fun LpEngine.solveNode(
     nodeSimplex?.let { kept ->
         if (kept.rebind(model, cancellation)) return kept to kept.resolveBounds()
     }
-    val fresh = RevisedSimplex(model, cancellation)
+    val fresh = RevisedSimplex(model, cancellation, iterationLimit = nodePivotBudget())
     nodeSimplex = fresh
     return fresh to fresh.solve(warm)
 }

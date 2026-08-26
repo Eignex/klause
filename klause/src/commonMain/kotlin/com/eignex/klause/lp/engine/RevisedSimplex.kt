@@ -62,11 +62,19 @@ internal class FloatLpResult(
  * inverse): each pivot appends one `O(m)` eta rather than refactorizing the whole basis, and the chain
  * is rebuilt from scratch once it reaches [refactorEtaLimit] (bounding fill and numerical drift). The
  * limit is a constructor knob only so tests can force a refactorization per pivot and compare.
+ *
+ * [iterationLimit] bounds the dual solve's pivots; 0 derives a limit from the model's size. A caller
+ * solving one node of a search sets it low deliberately: the dual simplex is dual-feasible at every
+ * basis it passes through, so stopping short still yields a valid bound, and on a model where the
+ * optimum costs thousands of pivots the truncated bound is usually worth as much for a fraction of
+ * the time. Only the dual solve honours it — a truncated *primal* iterate is primal-feasible rather
+ * than dual-feasible, so it bounds nothing.
  */
 internal class RevisedSimplex(
     private var model: LpModel,
     private var cancellation: Cancellation = Cancellation.Never,
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
+    private val iterationLimit: Int = 0,
 ) : TableauCutSolver {
     private val m = model.m
     private val n = model.n
@@ -311,7 +319,7 @@ internal class RevisedSimplex(
             }
         }
         resetGamma() // fresh Devex reference frame for this solve
-        val maxIter = 50 * (m + numVars) + 200
+        val maxIter = if (iterationLimit > 0) iterationLimit else 50 * (m + numVars) + 200
         val rhsAdj = DoubleArray(m)
         val unit = DoubleArray(m)
         val aq = DoubleArray(m)
