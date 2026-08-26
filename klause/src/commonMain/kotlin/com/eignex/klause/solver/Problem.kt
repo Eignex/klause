@@ -347,37 +347,7 @@ open class Problem(
     }
 
     /**
-     * This problem with [extra] appended, reusing the bake rather than paying a fresh one.
      *
-     * Every field the problem carries comes forward, and a caller names none of them. A rebuild that
-     * listed the fields it thought of instead dropped the ones it did not — the real columns, so factors
-     * referenced continuous columns the rebuild had declared away, and the open-bound provenance, so an
-     * invented endpoint read back as a declared one. Both were silent at the call site, which is the
-     * argument for a derivation over a constructor call.
-     *
-     * [extra] is appended, so existing factor ids keep their meaning and an implied-factor mask grows by
-     * one non-implied slot. The appended factor must derive nothing the bake would have: it is recorded
-     * as already folded, so a factor that propagates at the root would have its deduction missed.
-     */
-    internal fun withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
-        numBoolVars = numBoolVars,
-        numIntVars = numIntVars,
-        intDomains = requireFiniteIntDomains(),
-        factors = factors + extra,
-        seedDeductions = baked,
-        cancellation = cancellation,
-        impliedFactorMask = impliedFactorMask?.let { it + false },
-        hasSymmetryBreaking = hasSymmetryBreaking,
-        numRealVars = numRealVars,
-        realLower = realLower,
-        realUpper = realUpper,
-        packedOpenIntLo = intBounds.openLowerBits,
-        packedOpenIntHi = intBounds.openUpperBits,
-        modelBounds = intBounds,
-        alreadyFolded = true,
-    )
-
-    /**
      * Run sound-but-incomplete deductive propagation against [assumptions]. Each factor's
      * [com.eignex.klause.propagation.Propagator.propagate] is invoked to fixed point; pins and domain
      * tightenings cascade through the occurrence lists. Returns deductions beyond [assumptions]
