@@ -230,7 +230,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an open mixed MPS model remains rejected until optimization uses the LIRA core`() {
+    fun `an open mixed MPS model decides through the exact LIRA core`() {
         val mps = File.createTempFile("clilira", ".mps").apply {
             writeText(
                 """
@@ -252,10 +252,10 @@ class CliModeTest {
         }
 
         var code = -1
-        val err = captureErr { code = runCli(arrayOf(mps.absolutePath)) }
+        val out = capture { code = runCli(arrayOf(mps.absolutePath, "-t", "5000")) }
 
-        assertEquals(2, code, err)
-        assertTrue("open MPS models require a supported theory pipeline" in err, err)
+        assertEquals(0, code, out)
+        assertTrue("s SATISFIABLE" in out, out)
     }
 
     private fun capture(block: () -> Unit): String {

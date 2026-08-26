@@ -204,6 +204,29 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `a cancelled exact LIRA run reports unknown rather than encoding its whole witness box`() {
+        // Every branch bound carries the witness box's magnitude, and the exact system decomposes each
+        // into base-2^40 digits, one column and row per digit. A stop has to be seen inside that
+        // decomposition, not after it: on an open mixed model the box runs to millions of bits.
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIRA)
+                (declare-const x Int) (declare-const y Real)
+                (assert (>= (* 1000003 x) 7))
+                (assert (>= y (to_real x)))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+
+        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline)
+            .solve(TheoryParams(cancellation = Cancellation { true }))
+
+        assertIs<OpenTheoryResult.Unknown>(result)
+    }
+
+    @Test
     fun `open exact LIRA refutes an integral split through the shared trail`() {
         val parsed = SmtLib.parse(
             """
