@@ -1,7 +1,9 @@
-package com.eignex.klause.solver
+package com.eignex.klause.propagation
 
-import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.foldRootDeductionsIntoDomains
+import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -9,7 +11,7 @@ import kotlin.time.TimeSource
 
 /**
  * A [Problem] whose root bake is guaranteed to have run: its [Problem.requireFiniteIntDomains] carry the
- * root-propagation fold, and it is the only problem type the solvers, the model counter,
+ * root-propagation fold, and it is the only problem type the finite engines, the model counter,
  * sampling and the LP engine accept. Produced only by [Problem.bake] (or the presolve pipeline). A raw
  * [Problem] is the supertype, so handing an un-baked model to a solver is a compile error — the caller
  * must [Problem.bake] it first, which is where the parse-vs-solve boundary is enforced by the type system.
