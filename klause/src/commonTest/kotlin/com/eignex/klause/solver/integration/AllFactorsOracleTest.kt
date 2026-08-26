@@ -5,7 +5,6 @@ import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.MoveSetOracle
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -29,6 +28,7 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor

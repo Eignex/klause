@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.formats.IntComb
 import com.eignex.klause.formats.LinComb
@@ -10,6 +9,7 @@ import com.eignex.klause.formats.addExact
 import com.eignex.klause.formats.intCombDiff
 import com.eignex.klause.formats.linCombDiff
 import com.eignex.klause.formats.wideConstHolds
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.constRelationHolds
 import com.eignex.klause.lowering.reifyLinear

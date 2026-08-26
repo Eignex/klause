@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectLinearDirAntecedents
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.linearSumRange
 import com.eignex.klause.factor.arithmetic.internals.propagateLinearBounds
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator

@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.difference
 
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 
 internal class DifferenceEdge(
     val source: Int,

@@ -1,7 +1,7 @@
 package com.eignex.klause.factor
 
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.IntCmpOp
 
 /**

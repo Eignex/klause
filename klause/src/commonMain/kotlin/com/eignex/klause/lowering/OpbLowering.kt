@@ -1,7 +1,6 @@
 package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.formats.opb.OpbDocument
@@ -10,6 +9,7 @@ import com.eignex.klause.formats.opb.OpbProblem
 import com.eignex.klause.formats.opb.OpbRelation
 import com.eignex.klause.formats.opb.OpbStatement
 import com.eignex.klause.formats.opb.OpbTerm
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.model.PbOp

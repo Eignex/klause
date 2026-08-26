@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.bool
 
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.BoolVars
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList

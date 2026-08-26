@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.wideEnforceRow
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator

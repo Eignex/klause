@@ -1,6 +1,6 @@
 package com.eignex.klause.lp
 
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
 
 /**

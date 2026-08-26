@@ -1,11 +1,11 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.LinComb
 import com.eignex.klause.formats.WideLinComb
 import com.eignex.klause.formats.isConstant
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit

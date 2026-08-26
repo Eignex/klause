@@ -9,6 +9,7 @@ import com.eignex.klause.factor.bool.internals.linearHolds
 import com.eignex.klause.factor.bool.internals.linearResidual
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList

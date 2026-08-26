@@ -2,7 +2,6 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -22,6 +21,7 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta

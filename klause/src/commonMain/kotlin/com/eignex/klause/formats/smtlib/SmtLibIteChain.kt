@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.LinComb
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 
 /** Fewest arms worth reading as a table; below it the chain is a decision tree (see [IteChain]). */

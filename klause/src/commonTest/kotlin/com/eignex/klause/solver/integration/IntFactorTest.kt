@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.reifiedIntCompare
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink

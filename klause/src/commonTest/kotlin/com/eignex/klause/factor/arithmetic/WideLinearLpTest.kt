@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.IntDomain

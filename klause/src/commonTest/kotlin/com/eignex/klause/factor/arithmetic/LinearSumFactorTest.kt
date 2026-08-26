@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession

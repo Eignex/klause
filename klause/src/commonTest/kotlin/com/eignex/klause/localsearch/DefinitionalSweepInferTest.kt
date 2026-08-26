@@ -1,8 +1,8 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective

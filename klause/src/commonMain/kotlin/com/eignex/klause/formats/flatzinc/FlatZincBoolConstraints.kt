@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
@@ -9,6 +8,7 @@ import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd

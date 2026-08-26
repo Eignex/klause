@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.bool.internals
 
 import com.eignex.klause.factor.CoeffLookup
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.model.PbOp

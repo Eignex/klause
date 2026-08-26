@@ -6,8 +6,8 @@ import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.addLearnedClause

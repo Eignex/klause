@@ -3,8 +3,8 @@ package com.eignex.klause.propagation.difference
 import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
-import com.eignex.klause.factor.arithmetic.LinearOp
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor

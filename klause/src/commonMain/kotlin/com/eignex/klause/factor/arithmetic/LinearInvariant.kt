@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.internals.initLinearSum
 import com.eignex.klause.factor.bool.internals.linearDegree
 import com.eignex.klause.factor.bool.internals.linearHolds
 import com.eignex.klause.factor.bool.internals.snapLinearTarget
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.ChannelingSink
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState

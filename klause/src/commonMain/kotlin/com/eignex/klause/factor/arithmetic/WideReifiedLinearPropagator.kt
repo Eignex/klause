@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.internals.wideAlwaysHolds
 import com.eignex.klause.factor.arithmetic.internals.wideEnforceRow
 import com.eignex.klause.factor.arithmetic.internals.wideNeverHolds
 import com.eignex.klause.factor.arithmetic.internals.wideSumRange
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState

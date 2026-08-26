@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.LinearOp
+import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpPlan
