@@ -1,15 +1,13 @@
-package com.eignex.klause.lowering
+package com.eignex.klause.formats.opb
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.formats.opb.OpbDocument
-import com.eignex.klause.formats.opb.OpbFormatException
-import com.eignex.klause.formats.opb.OpbProblem
-import com.eignex.klause.formats.opb.OpbRelation
-import com.eignex.klause.formats.opb.OpbStatement
-import com.eignex.klause.formats.opb.OpbTerm
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.lowering.CnfLowering
+import com.eignex.klause.lowering.ProblemBuilder
+import com.eignex.klause.lowering.channelBoolTo01
+import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
@@ -25,10 +23,10 @@ private val longMinBig = BigInteger.fromLong(Long.MIN_VALUE)
 private val longMaxBig = BigInteger.fromLong(Long.MAX_VALUE)
 private fun BigInteger.fitsLong(): Boolean = this in longMinBig..longMaxBig
 
-/** Lowers an OPB syntax document into solver data. */
-internal object OpbLowering {
+/** Decodes an OPB syntax document into solver data. */
+internal object OpbDecoder {
 
-    fun lower(document: OpbDocument): OpbProblem {
+    fun decode(document: OpbDocument): OpbProblem {
         val builder = Builder(document.numDeclaredVars)
         val objectiveWeights = MutableIntLongMap()
         var objectiveConstant = 0L
