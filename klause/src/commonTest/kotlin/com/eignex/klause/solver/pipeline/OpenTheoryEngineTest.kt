@@ -9,6 +9,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.sourceRoute
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
@@ -65,9 +66,9 @@ class OpenTheoryEngineTest {
                 (check-sat)
             """.trimIndent(),
         )
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
 
-        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve()
+        val result = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve()
 
         val ints = assertIs<OpenTheoryAssignment.GeneralLia>(
             assertIs<OpenTheoryResult.Sat>(result).assignment,
@@ -94,7 +95,7 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve()
+        val result = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve()
 
         val assignment = assertIs<OpenTheoryAssignment.GeneralLia>(assertIs<OpenTheoryResult.Sat>(result).assignment)
         assertEquals("21", assignment.assignment.ints[parsed.intVarNames.getValue("r")].toString())
@@ -116,11 +117,11 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
 
         // Deciding it is a search question, tracked as #1579; what matters here is that a spent budget
         // reports unknown rather than the model being refused as outside coverage.
-        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline)
+        val result = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute())
             .solve(TheoryParams(cancellation = Cancellation { true }))
 
         assertIs<OpenTheoryResult.Unknown>(result)
@@ -154,9 +155,9 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve()
+        val result = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve()
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
         assertIs<OpenTheoryResult.Unsat>(result)
     }
 
@@ -197,9 +198,9 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        val result = OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve()
+        val result = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve()
 
-        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
     }
 
@@ -257,10 +258,10 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.sourcePipeline)
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, parsed.model.sourceRoute())
 
         val assignment = assertIs<OpenTheoryResult.Sat>(
-            OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve(),
+            OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve(),
         ).assignment
         val ints = assertIs<OpenTheoryAssignment.Difference>(assignment).sample.ints
 
@@ -283,10 +284,10 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.sourcePipeline)
-        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(parsed.model, parsed.sourcePipeline).solve())
+        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
+        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(parsed.model, parsed.model.sourceRoute()).solve())
 
-        val stopped = OpenTheoryEngine(parsed.model, parsed.sourcePipeline)
+        val stopped = OpenTheoryEngine(parsed.model, parsed.model.sourceRoute())
             .solve(TheoryParams(cancellation = Cancellation { true }))
 
         assertIs<OpenTheoryResult.Unknown>(stopped)

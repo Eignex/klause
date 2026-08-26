@@ -8,11 +8,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.sourceRoute
-import com.eignex.klause.solver.supportsExactLra
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -39,19 +36,7 @@ data class SmtLibProblem(
     val realVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-) {
-    /**
-     * Pipeline selected from the source model before any finite digit lowering.
-     *
-     * Computed on first read, not at construction. Classifying an open model walks every factor — the
-     * General LIA witness bound is a `BigInteger` pass over all of them — so a parse that did it eagerly
-     * charged every caller for a question many never ask.
-     */
-    val sourcePipeline: ProblemPipeline by lazy(LazyThreadSafetyMode.NONE) {
-        // A pure-real model is settled by the cheap check; anything else asks the router.
-        if (model.supportsExactLra()) ProblemPipeline.EXACT_LRA else model.sourceRoute()
-    }
-}
+)
 
 /** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
  *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
