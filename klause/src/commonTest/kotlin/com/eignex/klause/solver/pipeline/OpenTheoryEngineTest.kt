@@ -1,7 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Cancellation
@@ -9,6 +11,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
@@ -16,6 +19,7 @@ import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
@@ -280,5 +284,28 @@ class OpenTheoryEngineTest {
         val session = SearchSession(listOf(component), cancellation = Cancellation { true })
 
         assertIs<ComponentResult.Indeterminate>(session.initialize())
+    }
+
+    @Test
+    fun `general LIA refutes an asserted reified equality outside its integer lattice`() {
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(
+                lowerBounds = longArrayOf(0),
+                upperBounds = longArrayOf(0),
+                openLo = null,
+                openHi = Bits(1).also { it.set(0) },
+            ),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1),
+                Clause(intArrayOf(0)),
+            ),
+        )
+
+        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertNull(session.branchAlternatives())
     }
 }

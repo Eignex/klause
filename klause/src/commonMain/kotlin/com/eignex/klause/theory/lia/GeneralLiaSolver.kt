@@ -762,13 +762,29 @@ class GeneralLiaSearchComponent(
     private fun reifiedPossible(factor: ReifiedLinear, domains: Array<BigInterval>): Boolean {
         val range = rowRange(factor, domains)
         val truth = bools[factor.auxBoolVar] == TRUE
-        val gcd = factor.vars.indices.fold(BigInteger.ZERO) { g, index -> bigGcd(g, factor.constants.exactCoeff(index)) }
-        if (gcd <= BigInteger.ONE) return relationPossibleForTruth(range, factor.op, reifiedBound(factor), truth)
+        val gcd = factor.vars.indices.fold(BigInteger.ZERO) { current, index ->
+            bigGcd(current, factor.constants.exactCoeff(index))
+        }
+        if (gcd <= BigInteger.ONE) {
+            return relationPossibleForTruth(range, factor.op, reifiedBound(factor), truth)
+        }
         val bound = reifiedBound(factor)
         return when (factor.op) {
-            LinearOp.LE -> if (truth) range.lo <= floorDiv(bound, gcd) * gcd else range.hi >= ceilDiv(bound + BigInteger.ONE, gcd) * gcd
-            LinearOp.GE -> if (truth) range.hi >= ceilDiv(bound, gcd) * gcd else range.lo <= floorDiv(bound - BigInteger.ONE, gcd) * gcd
-            else -> relationPossibleForTruth(range, factor.op, bound, truth)
+            LinearOp.LE -> if (truth) range.lo <= floorDiv(bound, gcd) * gcd else {
+                range.hi >= ceilDiv(bound + BigInteger.ONE, gcd) * gcd
+            }
+
+            LinearOp.EQ -> if (bound % gcd != BigInteger.ZERO) !truth else {
+                relationPossibleForTruth(range, factor.op, bound, truth)
+            }
+
+            LinearOp.GE -> if (truth) range.hi >= ceilDiv(bound, gcd) * gcd else {
+                range.lo <= floorDiv(bound - BigInteger.ONE, gcd) * gcd
+            }
+
+            LinearOp.NE -> if (bound % gcd != BigInteger.ZERO) truth else {
+                relationPossibleForTruth(range, factor.op, bound, truth)
+            }
         }
     }
 
