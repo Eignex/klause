@@ -49,6 +49,24 @@ class MpsSolveTest {
     }
 
     @Test
+    fun `refutes a model whose only infeasibility is stated in coefficients finer than a millionth`() {
+        // `1e-7·x >= 1e-7` is `x >= 1`, which the `x <= 0` row contradicts. Rounding the row onto a
+        // coarser grid empties it into `0 >= 0`, and the model reads as satisfiable at x = 0.
+        val model = MpsModel(
+            name = "m",
+            sense = ObjectiveSense.MINIMIZE,
+            objective = MpsObjective("", IntArray(0), DoubleArray(0), 0.0),
+            variables = listOf(MpsVar("x", integer = true, lower = 0.0, upper = 10.0)),
+            constraints = listOf(
+                MpsConstraint("C1", intArrayOf(0), doubleArrayOf(1e-7), lower = 1e-7, upper = null),
+                MpsConstraint("C2", intArrayOf(0), doubleArrayOf(1.0), lower = null, upper = 0.0),
+            ),
+        )
+
+        assertIs<SolveResult.Unsat>(BacktrackSolver(model.toProblem().problem.bake()).solve(BacktrackParams()))
+    }
+
+    @Test
     fun `proves an infeasible continuous model unsat`() {
         val model = MpsModel(
             name = "m",

@@ -2455,8 +2455,7 @@ public final class com/eignex/klause/formats/mps/MpsCompiled {
 }
 
 public final class com/eignex/klause/formats/mps/MpsCompiledKt {
-	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;IJ)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public static synthetic fun toProblem$default (Lcom/eignex/klause/formats/mps/MpsModel;IJILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;)Lcom/eignex/klause/formats/mps/MpsCompiled;
 }
 
 public final class com/eignex/klause/formats/mps/MpsConstraint {
