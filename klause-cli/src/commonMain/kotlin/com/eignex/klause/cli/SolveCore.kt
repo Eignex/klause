@@ -954,11 +954,12 @@ private fun solveOpenTheoryOptimum(
         }
     }
     if (statistics) {
-        output.onStatistics(
-            result.stats,
-            result.stats.run.wallMs,
-            if (result is OpenTheoryOptimum.Infeasible) 0L else 1L,
-        )
+        val found = when (result) {
+            is OpenTheoryOptimum.Optimal -> 1L
+            is OpenTheoryOptimum.Infeasible -> 0L
+            is OpenTheoryOptimum.Bounded -> if (result.incumbent == null) 0L else 1L
+        }
+        output.onStatistics(result.stats, result.stats.run.wallMs, found)
     }
 }
 
