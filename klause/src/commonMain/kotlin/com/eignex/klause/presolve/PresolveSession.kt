@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
@@ -70,7 +71,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     // mutation API and settle at that same greatest fixpoint. A [PropagationResult.Unsat] base seeds
     // nothing (the init below adopts its infeasibility).
     private var state = PropagationState(
-        base,
+        PropagationProblem(base),
         (base.baked as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None,
         incremental = true,
     )
@@ -414,7 +415,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         droppedFactorLog.clear()
         reseedEpoch++
         occDirty = true
-        state = PropagationState(eager, Assumptions.None, incremental = true)
+        state = PropagationState(PropagationProblem(eager), Assumptions.None, incremental = true)
         if (state.runToFixpoint(allFactors = true) != null) {
             infeasible = true
             return false

@@ -26,7 +26,7 @@ import com.eignex.klause.util.IntHashSet
  */
 internal class NativeSatState(private val state: PropagationState) {
 
-    private val arena = state.problem.clauseArena
+    private val arena = state.projection.clauseArena
     private val baseCount = arena.clauseCount
     private val numBoolVars = state.problem.numBoolVars
 

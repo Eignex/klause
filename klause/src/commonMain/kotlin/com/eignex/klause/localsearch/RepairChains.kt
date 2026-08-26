@@ -86,8 +86,8 @@ internal fun LocalSearchState.sampleChainFirsts(
 internal fun LocalSearchState.neighbourPrimitives(fid: Int, sink: MoveSink) {
     val f = problem.factors[fid]
     val seenFactors = IntHashSet()
-    for (v in f.intVars) for (nf in problem.lsIntOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
-    for (v in f.boolVars) for (nf in problem.lsBoolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
+    for (v in f.intVars) for (nf in projection.intOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
+    for (v in f.boolVars) for (nf in projection.boolOccurrences[v]) emitFactorPrimitives(fid, nf, seenFactors, sink)
 }
 
 /** [neighbourPrimitives] helper: primitives for one adjacent factor, deduplicated. Ints get ±1
@@ -186,12 +186,12 @@ internal fun LocalSearchState.buildRepairChain(first: Move, maxDepth: Int, propo
 internal fun LocalSearchState.recordBaseDegrees(p: Move, base: MutableIntIntMap) {
     when (p) {
         is Move.BoolFlip -> {
-            for (fid in problem.lsBoolOccurrences[p.varId]) recordFirstDegree(base, fid)
+            for (fid in projection.boolOccurrences[p.varId]) recordFirstDegree(base, fid)
             recordConeDegrees(intSeeds = EMPTY_INTS, boolSeeds = intArrayOf(p.varId), base)
         }
 
         is Move.IntSet -> {
-            for (fid in problem.lsIntOccurrences[p.varId]) recordFirstDegree(base, fid)
+            for (fid in projection.intOccurrences[p.varId]) recordFirstDegree(base, fid)
             recordConeDegrees(intSeeds = intArrayOf(p.varId), boolSeeds = EMPTY_INTS, base)
         }
 
@@ -209,7 +209,7 @@ internal fun LocalSearchState.recordConeDegrees(intSeeds: IntArray, boolSeeds: I
     val net = invariants ?: return
     for (idx in net.affectedNodes(intSeeds, boolSeeds)) {
         val n = net.node(idx)
-        val occ = if (n.outIsBool) problem.lsBoolOccurrences[n.out] else problem.lsIntOccurrences[n.out]
+        val occ = if (n.outIsBool) projection.boolOccurrences[n.out] else projection.intOccurrences[n.out]
         for (fid in occ) recordFirstDegree(base, fid)
     }
 }

@@ -1,5 +1,6 @@
 package com.eignex.klause.backtrack.selector
 
+import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
@@ -52,15 +53,16 @@ internal class DomWdeg : VariableSelector {
         val numBool = problem.numBoolVars
         val numInt = problem.numIntVars
         val h = IndexedMaxHeap(numBool + numInt)
+        val projection = PropagationProblem(problem)
         // Seed each var's key with Σ factorWeights[f] over its occurrence list.
         for (v in 0 until numBool) {
             var sum = 0.0
-            for (fid in problem.boolOccurrences[v]) sum += factorWeights[fid]
+            for (fid in projection.boolOccurrences[v]) sum += factorWeights[fid]
             h.insert(v, sum)
         }
         for (v in 0 until numInt) {
             var sum = 0.0
-            for (fid in problem.intOccurrences[v]) sum += factorWeights[fid]
+            for (fid in projection.intOccurrences[v]) sum += factorWeights[fid]
             h.insert(numBool + v, sum)
         }
         heap = h

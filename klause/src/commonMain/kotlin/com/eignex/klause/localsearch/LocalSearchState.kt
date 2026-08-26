@@ -36,6 +36,8 @@ class LocalSearchState(
     val rng: Random,
     /** Variables pinned for this search. */
     var assumptions: Assumptions = Assumptions.None,
+    /** Local-search projection for this state. */
+    val projection: LocalSearchProblem = LocalSearchProblem(problem),
 ) {
     /** The stable root domains this search was seeded from — read by invariants for a variable's
      *  original bounds. Decoupled from [problem] so the seed source (declared vs baked) can vary without
@@ -70,7 +72,7 @@ class LocalSearchState(
     val moveSink: MoveSink = MoveSink(assumptions)
 
     /** The problem's invariants, aliased so the hot LS loops read `factors` directly. */
-    val factors: Array<out Invariant> = problem.invariants
+    val factors: Array<out Invariant> = projection.invariants
 
     /** DDFW-style per-invariant dynamic weights and their class-normalised baseline. */
     val weights: FactorWeightBook = FactorWeightBook(problem)
@@ -83,7 +85,7 @@ class LocalSearchState(
     val tabu: TabuBook = TabuBook(problem)
 
     /** Implicit-solving setup: elected globals, disjoint seed set, owner map, implication graph. */
-    val seeding: ImplicitSeeding = ImplicitSeeding(problem)
+    val seeding: ImplicitSeeding = ImplicitSeeding(problem, projection)
 
     /** Implicit-solving feasible init: seed every [ImplicitSeeding.implicitSeedFactors] global into a
      *  satisfying configuration (skipping vars frozen by [assumptions]). Caller is responsible for the
@@ -379,7 +381,7 @@ class LocalSearchState(
         // (indicator flip / sum counter-shift) via Invariant.contributeChanneling; the sink folds them
         // into one Compound and pins claimed vars so two siblings can't clobber the same target.
         val sink = ChannelingSink(intVar, newValue)
-        for (fid in problem.lsIntOccurrences[intVar]) {
+        for (fid in projection.intOccurrences[intVar]) {
             factors[fid].contributeChanneling(this, fid, intVar, cur, newValue, sink)
         }
         return sink.toMove()
@@ -500,7 +502,7 @@ class LocalSearchState(
     }
 
     private fun applyBoolFlip(boolVar: Int) = applyMove(
-        touchedFactors = problem.lsBoolOccurrences[boolVar],
+        touchedFactors = projection.boolOccurrences[boolVar],
         slot = boolVar,
         maintainsIncrementally = { it.maintainsBreakMakeIncrementally },
         commit = { assignment.flipBool(boolVar) },
@@ -513,7 +515,7 @@ class LocalSearchState(
         val old = assignment.intValue(intVar)
         if (old == newValue) return
         applyMove(
-            touchedFactors = problem.lsIntOccurrences[intVar],
+            touchedFactors = projection.intOccurrences[intVar],
             slot = problem.numBoolVars + intVar,
             maintainsIncrementally = { it.maintainsIntBreakMakeIncrementallyForIntSet },
             commit = { assignment.setInt(intVar, newValue) },
@@ -533,7 +535,7 @@ class LocalSearchState(
     /** Walk every factor touching bool var `v`, call its `deltaIfBoolFlipped`, and hand the
      *  (factorId, delta) pair to [action]. Inline so callers stay allocation-free. */
     internal inline fun forEachBoolFactorDelta(v: Int, action: (factorId: Int, delta: Int) -> Unit) {
-        for (factorId in problem.lsBoolOccurrences[v]) {
+        for (factorId in projection.boolOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfBoolFlipped(this, factorId, v))
         }
     }
@@ -541,7 +543,7 @@ class LocalSearchState(
     /** Same as [forEachBoolFactorDelta] but for an `IntSet` move on int var `v` with
      *  target value [newValue]. */
     internal inline fun forEachIntFactorDelta(v: Int, newValue: Long, action: (factorId: Int, delta: Int) -> Unit) {
-        for (factorId in problem.lsIntOccurrences[v]) {
+        for (factorId in projection.intOccurrences[v]) {
             action(factorId, factors[factorId].deltaIfIntSet(this, factorId, v, newValue))
         }
     }

@@ -55,8 +55,8 @@ internal const val PROPAGATION_CANCEL_FLOOR: Int = 1 shl 20
  *  to the inherited level before each factor invocation; mutators read it.
  */
 class PropagationState(
-    /** The problem being propagated. */
-    val problem: Problem,
+    /** Propagation-engine projection of the problem being propagated. */
+    val projection: PropagationProblem,
     assumptions: Assumptions,
     /**
      * Incremental-presolve mode. When `true` the state supports mid-life factors — the
@@ -82,6 +82,17 @@ class PropagationState(
      */
     internal val pbLearning: Boolean = false,
 ) {
+    constructor(
+        problem: Problem,
+        assumptions: Assumptions,
+        incremental: Boolean = false,
+        nativeSat: Boolean = false,
+        pbLearning: Boolean = false,
+    ) : this(PropagationProblem(problem), assumptions, incremental, nativeSat, pbLearning)
+
+    /** Immutable model data addressed by this state. */
+    val problem: Problem get() = projection.problem
+
     /** Two-bit-per-var three-valued pin store. [boolAssigned] says whether the variable has
      *  a definite value; [boolValueBits] holds the value when assigned (ignored otherwise).
      *  Backed by [Bits] — packed `LongArray`, 8× cache-denser than an `Array<Boolean?>`
@@ -133,7 +144,7 @@ class PropagationState(
 
     /** Typed int-event wakeup machinery (advisor index, pending-kind masks, delta accumulators) —
      *  see [IntEventMachinery]. Empty when no factor opts in; forced live in [incremental] mode. */
-    internal val intEvents: IntEventMachinery = IntEventMachinery(problem, incremental)
+    internal val intEvents: IntEventMachinery = IntEventMachinery(projection, incremental)
 
     // [propQueue] is the reusable factor worklist; [propStamp] is a per-factor "currently queued"
     // membership set encoded as a generation stamp so resetting between propagation runs is
@@ -374,15 +385,15 @@ class PropagationState(
     // Cached base factor table — `problem.factors` is immutable after construction, so hoist
     // the array reference and its size out of the per-call `problem.factors` / `.size` getters
     // that [factorAt] (a top BCP-loop method) pays on every watcher fire.
-    internal val baseFactors: Array<out Propagator> = problem.propagators
+    internal val baseFactors: Array<out Propagator> = projection.propagators
     internal val baseFactorCount: Int = problem.factors.size
 
     // Occurrence-list wakeup arrays cached off [problem] once at construction: they are lazily
     // built on [Problem] (deferred entirely for a presolve pass-view), so read them here — where a
     // state is always over a fully-baked problem — to force them once instead of paying a delegated
     // lazy access on every wakeup in the BCP hot loop.
-    private val nonBoolWatcherOcc: Array<IntArray> = problem.nonBoolWatcherBoolOccurrences
-    private val nonIntEventWatcherOcc: Array<IntArray> = problem.nonIntEventWatcherIntOccurrences
+    private val nonBoolWatcherOcc: Array<IntArray> = projection.nonBoolWatcherBoolOccurrences
+    private val nonIntEventWatcherOcc: Array<IntArray> = projection.nonIntEventWatcherIntOccurrences
 
     /** Constraints learned during conflict analysis (clause-only today; see [LearnedClauseDb]). */
     internal val learnedClauses: List<LearnedPropagator> get() = learned.store
@@ -702,7 +713,7 @@ class PropagationState(
         // The native lane replaces the per-literal / occurrence watch indices with its own arena
         // watches, so it skips base-factor registration entirely.
         if (nativeEngine == null) {
-            for (fid in 0 until problem.numFactors) registerFactor(fid, problem.propagators[fid])
+            for (fid in 0 until problem.numFactors) registerFactor(fid, projection.propagators[fid])
         }
     }
 
