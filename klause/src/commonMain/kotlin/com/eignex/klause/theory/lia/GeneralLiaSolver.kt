@@ -52,17 +52,38 @@ private const val POLL_BIT_BUDGET = 65_536
 private const val MAX_POLL_FACTORS = 256
 
 /**
- * Largest finite-witness box this lane materialises.
+ * Widest operand equality propagation will multiply or divide.
  *
- * Equality propagation multiplies box endpoints by exact row coefficients before dividing. The small-model
- * bound dominates those coefficients, so limiting the box also limits every operand that reaches a
- * `BigInteger` division. Above this width one division can outlast a solve deadline, which no polling
- * schedule can repair; the complete route therefore declines the search and reports `unknown`.
+ * Propagation multiplies box endpoints by row coefficients before dividing, and past this width a single
+ * `BigInteger` division outlasts a solve deadline — which no polling schedule can repair, since the
+ * operation itself cannot be interrupted.
+ *
+ * The answer is to skip the row, not the model. Narrowing is optional work: declining it leaves the
+ * domains sound and merely less tight, so the search still runs and can still decide. Refusing the model
+ * outright would trade every answer on it for the ones propagation could not afford.
  */
-internal const val MAX_GENERAL_LIA_WITNESS_BITS = 16_384
+internal const val MAX_LIA_PROPAGATION_BITS = 16_384
 
-internal fun fitsGeneralLiaArithmetic(witnessBound: BigInteger): Boolean =
-    witnessBound.bitLength() <= MAX_GENERAL_LIA_WITNESS_BITS
+/**
+ * Whether narrowing a row over [vars] with [coeffs] would multiply or divide past
+ * [MAX_LIA_PROPAGATION_BITS].
+ *
+ * Measured once per row over its widest coefficient and widest live endpoint, so the guard costs
+ * `O(vars)` rather than the `O(vars²)` the narrowing itself would.
+ */
+private fun rowExceedsArithmetic(
+    vars: IntArray,
+    coeffs: Array<BigInteger>,
+    domains: Array<BigInterval>,
+): Boolean {
+    var widest = 0
+    for (index in vars.indices) {
+        val domain = domains[vars[index]]
+        val product = coeffs[index].bitLength() + maxOf(domain.lo.bitLength(), domain.hi.bitLength())
+        if (product > widest) widest = product
+    }
+    return widest > MAX_LIA_PROPAGATION_BITS
+}
 
 /**
  * Complete finite-witness search for open General LIA.
@@ -84,7 +105,6 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<GeneralLiaAssignment> {
         val witnessBound = witnessBound ?: return TheoryCheck.Cancelled
-        if (!fitsGeneralLiaArithmetic(witnessBound)) return TheoryCheck.Cancelled
         val domains = Array(model.numIntVars) { v ->
             val lo = if (model.intBounds.hasLower(v)) {
                 maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(v)))
@@ -240,6 +260,9 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
 
                         else -> null
                     } ?: continue
+                    // Too wide to narrow within a deadline: leave this row's domains as they are. The
+                    // sweep stays sound, only less tight, and the search keeps its shot at the model.
+                    if (rowExceedsArithmetic(row.vars, row.coeffs, domains)) continue
                     for (i in row.vars.indices) {
                         // Polled per term, not per factor: [rowRangeExcept] re-sums the row for each
                         // term, so one wide row is `O(vars²)` big-integer operations — long enough on
@@ -459,7 +482,6 @@ class GeneralLiaSearchComponent(
 
     override fun initialize(context: SearchContext): ComponentResult {
         val bound = model.generalLiaWitnessBound(context::cancelled) ?: return ComponentResult.Indeterminate
-        if (!fitsGeneralLiaArithmetic(bound)) return ComponentResult.Indeterminate
         witnessBound = bound
         pollStride = pollStrideFor(bound.bitLength())
         domainsByLevel.put(0, initialDomains(context))
@@ -617,6 +639,9 @@ class GeneralLiaSearchComponent(
 
                     else -> null
                 } ?: continue
+                // Too wide to narrow within a deadline: leave this row's domains as they are. The sweep
+                // stays sound, only less tight, and the search keeps its shot at the model.
+                if (rowExceedsArithmetic(row.vars, row.coeffs, domains)) continue
                 for (index in row.vars.indices) {
                     // Polled per term, not per factor: [rowRangeExcept] re-sums the row for each term,
                     // so one wide row is `O(vars²)` big-integer operations — long enough on its own to
