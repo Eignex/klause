@@ -185,12 +185,14 @@ class SearchSession(
                 activeComponent = null
                 if (result !is ComponentResult.Consistent) return recordConflict(component, result)
             }
-        } else for (component in components) {
-            if (component === source) continue
-            activeComponent = component
-            val result = component.assert(decision, this)
-            activeComponent = null
-            if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+        } else {
+            for (component in components) {
+                if (component === source) continue
+                activeComponent = component
+                val result = component.assert(decision, this)
+                activeComponent = null
+                if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+            }
         }
         return propagate()
     }
@@ -241,12 +243,14 @@ class SearchSession(
                         activeComponent = null
                         if (result !is ComponentResult.Consistent) return recordConflict(component, result)
                     }
-                } else for (component in components) {
-                    if (component === pending.source) continue
-                    activeComponent = component
-                    val result = component.assert(pending.decision, this)
-                    activeComponent = null
-                    if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+                } else {
+                    for (component in components) {
+                        if (component === pending.source) continue
+                        activeComponent = component
+                        val result = component.assert(pending.decision, this)
+                        activeComponent = null
+                        if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+                    }
                 }
             }
             val result = runComponents { it.propagate(this) }
@@ -510,12 +514,14 @@ class SearchSession(
                 activeComponent = null
                 if (result !is ComponentResult.Consistent) return recordConflict(component, result)
             }
-        } else for (component in components) {
-            if (component !is SearchModelBlocker) continue
-            activeComponent = component
-            val result = component.blockModel(model, this)
-            activeComponent = null
-            if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+        } else {
+            for (component in components) {
+                if (component !is SearchModelBlocker) continue
+                activeComponent = component
+                val result = component.blockModel(model, this)
+                activeComponent = null
+                if (result !is ComponentResult.Consistent) return recordConflict(component, result)
+            }
         }
         return propagate()
     }

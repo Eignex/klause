@@ -18,9 +18,7 @@ internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
 
     fun nodeOf(endpoint: Int): Int = if (endpoint == ZERO) zeroNode else indexOfSorted(nodes, endpoint)
 
-    fun carriesAPotential(): Boolean {
-        return numNodes > 0 && edges.all { it.absBound() <= potentialBoundLimit() }
-    }
+    fun carriesAPotential(): Boolean = numNodes > 0 && edges.all { it.absBound() <= potentialBoundLimit() }
 
     /**
      * Discard only declared-range edges too wide for the incremental graph's `Long` potentials.
