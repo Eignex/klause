@@ -69,7 +69,7 @@ class PropagationState(
     internal val incremental: Boolean = false,
     /**
      * Opt into the native-SAT BCP lane. When `true` and the problem is
-     * [com.eignex.klause.solver.Problem.isNativeSatEligible], propagation runs through [NativeSatState]
+     * [PropagationProblem.isNativeSatEligible], propagation runs through [NativeSatState]
      * — an arena-packed two-watched-literal loop — instead of the general factor-queue fixpoint, and
      * the general per-literal / occurrence watch indices are left unregistered. Defaults to `false`.
      */
@@ -702,7 +702,7 @@ class PropagationState(
      *  general LCG path. Its construction reads [boolPinOrder] and the clause arena (both live above),
      *  so it is declared after them. */
     internal val nativeEngine: NativeSatState? =
-        if (nativeSat && problem.isNativeSatEligible) NativeSatState(this) else null
+        if (nativeSat && projection.isNativeSatEligible) NativeSatState(this) else null
 
     /** Seed reason (all-false clause literals) stashed by [NativeSatState] on a conflict, so
      *  [PropagationSession] can drive 1UIP through [ConflictAnalyzer.analyzeConflictClause] without a

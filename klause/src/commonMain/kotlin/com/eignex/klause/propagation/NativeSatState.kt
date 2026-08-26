@@ -8,7 +8,7 @@ import com.eignex.klause.util.IntHashSet
 /**
  * Two-watched-literal BCP over the arena-packed clauses of a pure-Boolean problem.
  * Replaces the general [PropagationState.runToFixpoint] factor-queue loop for a
- * [com.eignex.klause.solver.Problem.isNativeSatEligible] problem: no order-literal atoms are ever
+ * native-SAT-eligible propagation problem: no order-literal atoms are ever
  * materialised, so the driver degenerates to classical CDCL, and propagation runs as a trail-pointer
  * literal sweep with no per-fire virtual dispatch, factor-object dereference, or payload cast.
  *

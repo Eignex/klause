@@ -11,7 +11,7 @@ import com.eignex.klause.solver.Problem
  * cache-friendly buffer, so the native-SAT BCP loop can walk clauses without a
  * per-fire virtual dispatch, object dereference, or payload cast.
  *
- * Built only for a [Problem.isNativeSatEligible] problem: no integer variables and every factor a
+ * Built only for a native-SAT-eligible propagation projection: no integer variables and every factor a
  * [Clause]. The literals keep their original [com.eignex.klause.solver.Lit] encoding, and clause
  * indices line up 1:1 with [Problem.factors], so a learned reason expressed as a clause index maps
  * straight back to the originating factor.
@@ -43,9 +43,14 @@ internal class ClauseArena private constructor(
     fun length(c: Int): Int = starts[c + 1] - starts[c]
 
     companion object {
-        /** Pack [problem]'s clauses into a flat arena. Requires [Problem.isNativeSatEligible]. */
+        /** Pack [problem]'s clauses into a flat arena. Requires a native-SAT-eligible problem. */
         fun of(problem: Problem): ClauseArena {
-            require(problem.isNativeSatEligible) {
+            require(
+                problem.numIntVars == 0 &&
+                    problem.numBoolVars > 0 &&
+                    problem.factors.isNotEmpty() &&
+                    problem.factors.all { it is Clause },
+            ) {
                 "ClauseArena requires a pure-Boolean clause-only problem"
             }
             val factors = problem.factors

@@ -1,6 +1,5 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Propagator
@@ -290,16 +289,6 @@ open class Problem(
 
     /** Total number of factors. */
     val numFactors: Int get() = factors.size
-
-    /**
-     * True iff this problem is a pure-Boolean CNF: no integer variables and every factor is a
-     * [com.eignex.klause.factor.bool.Clause]. Such a problem never materialises an order-literal
-     * atom, so the CDCL core degenerates to classical SAT — the native-SAT lane
-     * gates on this to run an arena-packed, atom-free BCP loop. Pseudo-Boolean and global-bearing
-     * problems fail the gate and stay on the general LCG path. Computed once, then cached. */
-    val isNativeSatEligible: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        numIntVars == 0 && numBoolVars > 0 && factors.isNotEmpty() && factors.all { it is Clause }
-    }
 
     /**
      * Result of running [propagate] once with empty assumptions at construction time, merged with
