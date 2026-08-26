@@ -2,7 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -46,7 +46,7 @@ class CpToLpRelaxationElementHullTest {
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(3.0, sol.objectiveValue, eps)
         assertEquals(3.0, sol.primal(intCol(r, 1)), eps)
     }
@@ -64,7 +64,7 @@ class CpToLpRelaxationElementHullTest {
         )
         val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(5.0, sol.objectiveValue, eps)
     }
 
@@ -81,7 +81,7 @@ class CpToLpRelaxationElementHullTest {
         // maximize result <=> minimize -result; hull caps it at the largest entry 9.
         val (sol, _) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, -1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(-9.0, sol.objectiveValue, eps)
     }
 
@@ -127,7 +127,7 @@ class CpToLpRelaxationElementHullTest {
         // The hull adds selector columns and the one-hot + index-channel + big-M rows.
         assertTrue(r.model.n > 1, "selector columns are added")
         assertTrue(r.model.m >= 3, "one-hot + index channel + per-position big-M rows")
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 1")
     }
 }

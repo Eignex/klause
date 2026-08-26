@@ -6,7 +6,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.LpBuilder
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.Relation
 import com.eignex.klause.lp.Sense
 import com.eignex.klause.lp.bounding.LpPlan
@@ -55,7 +55,7 @@ class CumulativeTimeIndexedTest {
         val relaxation = CpToLpRelaxation(problem, obj, cumulativeTimeIndexed = timeIndexed)
             .build(PropagationSession(problem))
         val sol = solveLp(relaxation.model)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 
@@ -69,7 +69,7 @@ class CumulativeTimeIndexedTest {
         val relaxation = CpToLpRelaxation(problem, obj, cumulativeTimeIndexed = timeIndexed)
             .build(PropagationSession(problem))
         val sol = solveLp(relaxation.model)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 
@@ -108,7 +108,7 @@ class CumulativeTimeIndexedTest {
         val relaxation = CpToLpRelaxation(problem, obj, cumulative = true, cumulativeTimeIndexed = ti)
             .build(PropagationSession(problem))
         val sol = solveLp(relaxation.model)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 
@@ -192,7 +192,7 @@ class CumulativeTimeIndexedTest {
             if (row.isNotEmpty()) b.addRow(row, Relation.LE, cap.toLong())
         }
         val sol = solveLp(b.build(Sense.MINIMIZE))
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 

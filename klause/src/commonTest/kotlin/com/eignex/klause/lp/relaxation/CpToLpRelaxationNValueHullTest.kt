@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.global.NValue
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -40,7 +40,7 @@ class CpToLpRelaxationNValueHullTest {
         val bare = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = false).build(session).model)
         // With the hull the fractional value cover proves n ≥ 1.5 — strictly tighter, and sound.
         val hull = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
-        assertEquals(LpStatus.OPTIMAL, hull.status)
+        assertEquals(LpVerdict.OPTIMAL, hull.status)
         assertEquals(1.5, hull.objectiveValue, eps)
         assertTrue(hull.objectiveValue > bare.objectiveValue + eps, "the hull beats the greedy disjoint bound")
     }
@@ -51,7 +51,7 @@ class CpToLpRelaxationNValueHullTest {
         val p = triangle(NValue.Mode.AtMost)
         val session = PropagationSession(p)
         val hull = solveLp(CpToLpRelaxation(p, minimizeN, nValueHull = true).build(session).model)
-        assertEquals(LpStatus.OPTIMAL, hull.status)
+        assertEquals(LpVerdict.OPTIMAL, hull.status)
         assertEquals(1.5, hull.objectiveValue, eps)
     }
 }

@@ -2,7 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -46,7 +46,7 @@ class CpToLpRelaxationArrayMinMaxRowTest {
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(3.0, sol.objectiveValue, eps)
         assertEquals(3.0, sol.primal(intCol(r, 3)), eps)
     }
@@ -66,7 +66,7 @@ class CpToLpRelaxationArrayMinMaxRowTest {
         // maximise result <=> minimise -result
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, -1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(-2.0, sol.objectiveValue, eps)
         assertEquals(2.0, sol.primal(intCol(r, 3)), eps)
     }

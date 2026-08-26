@@ -3,7 +3,7 @@ package com.eignex.klause.lp.relaxation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -32,7 +32,7 @@ class CpToLpRelaxationDiffnTest {
         val obj = LinearObjective(intCoefficients = LongArray(p.numIntVars) { if (it == lVar) 1L else 0L })
         val r = CpToLpRelaxation(p, obj, diffn = diffn).build(PropagationSession(p))
         val sol = solveLp(r.model)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 

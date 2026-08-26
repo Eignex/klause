@@ -2,7 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -39,7 +39,7 @@ class CpToLpRelaxationLinMaxTightFaceTest {
         )
         // maximize result ⇔ minimize −result.
         val sol = solve(p, LinearObjective(intCoefficients = longArrayOf(-1L, 0L, 0L)), tightFace = true)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         // Sound: the relaxation contains result = 7, so LP max ≥ 7 ⇒ objective (−result) ≤ −7.
         assertTrue(sol.objectiveValue <= -7.0 + eps, "UNSOUND: LP max ${-sol.objectiveValue} below integer optimum 7")
     }
@@ -61,7 +61,7 @@ class CpToLpRelaxationLinMaxTightFaceTest {
         assertTrue(withFace.model.n > envelope.model.n, "tight face adds selector columns")
         assertTrue(withFace.model.m > envelope.model.m, "tight face adds rows")
         val sol = solveLp(withFace.model)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(-5.0, sol.objectiveValue, eps) // result = x1 max = 5, exact and sound
     }
 
@@ -75,7 +75,7 @@ class CpToLpRelaxationLinMaxTightFaceTest {
             factors = arrayOf<Factor>(ArrayMinMax(result = 0, xs = intArrayOf(1, 2), max = false)),
         )
         val sol = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 0L, 0L)), tightFace = true)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         // Sound: the relaxation contains result = 1, so LP min ≤ 1.
         assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} above integer optimum 1")
     }
