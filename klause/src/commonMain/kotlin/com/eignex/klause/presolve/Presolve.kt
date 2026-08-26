@@ -1,5 +1,11 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.presolve.linear.AffineSingletons
+import com.eignex.klause.presolve.linear.CoefficientStrengthening
+import com.eignex.klause.presolve.linear.DiophantineReduction
+import com.eignex.klause.presolve.linear.LinearBoundFusion
+import com.eignex.klause.presolve.linear.LinearSubSumAggregation
+import com.eignex.klause.presolve.linear.SingletonInequalityProjection
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 
@@ -13,18 +19,18 @@ import com.eignex.klause.solver.Problem
 object Presolve {
 
     /** GCD coefficient strengthening for [com.eignex.klause.factor.arithmetic.Linear] and
-     *  pseudo-Boolean constraints. See [CoefficientStrengthening]. */
+     *  pseudo-Boolean constraints. */
     fun strengthenCoefficients(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta =
         CoefficientStrengthening.strengthenCoefficients(problem, cancellation)
 
-    /** One-shot GF(2) elimination over all xor factors. See [XorUnits]. */
+    /** One-shot GF(2) elimination over all xor factors. */
     fun deriveXorUnits(problem: Problem): PassDelta = XorUnits.deriveXorUnits(problem)
 
     /** Per-variable modular (Diophantine) domain tightening for integer equalities. See
      *  [DiophantineReduction]. */
     fun reduceDiophantine(problem: Problem): PassDelta = DiophantineReduction.reduce(problem)
 
-    /** Affine variable elimination. See [AffineSingletons]. [incrementalTouchedVars] (from the incremental
+    /** Affine variable elimination. [incrementalTouchedVars] (from the incremental
      *  round engine) restricts a re-run's candidate scan to the variables the delta changed. */
     fun eliminateAffineSingletons(
         problem: Problem,

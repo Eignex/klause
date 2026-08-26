@@ -83,7 +83,7 @@ internal object RedundantConstraints {
      *     their maximal activity), drops the larger row across *different* supports.
      *
      * The GCD reduction in step 2 makes the pass effective standalone — proportional rows match even
-     * when [CoefficientStrengthening.strengthenCoefficients] hasn't run first. Self-redundant rows
+     * when coefficient strengthening hasn't run first. Self-redundant rows
      * (maximal activity already within the bound) are dropped by the strengthen lift, so this pass is
      * purely cross-constraint.
      */
@@ -662,7 +662,7 @@ internal object RedundantConstraints {
     private fun negated(xs: LongArray): LongArray = LongArray(xs.size) { -xs[it] }
 
     /** A `≤`-form `Σ coeffs·refs ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and `2x+2y ≤ 4`)
-     *  share a bucket even when [CoefficientStrengthening.strengthenCoefficients] hasn't normalised them
+     *  share a bucket even when coefficient strengthening hasn't normalised them
      *  first. Dividing by the coefficient GCD `g` and flooring the bound is exact: the left side is
      *  a multiple of `g`, so `Σ c·t ≤ b ⟺ Σ (c/g)·t ≤ ⌊b/g⌋`. */
     private fun reducedIneq(refs: IntArray, coeffs: LongArray, bound: Long, fromEq: Boolean): IneqForm {

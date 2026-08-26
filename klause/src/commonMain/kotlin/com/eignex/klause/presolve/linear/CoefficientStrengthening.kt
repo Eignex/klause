@@ -1,4 +1,4 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
@@ -10,6 +10,8 @@ import com.eignex.klause.lp.addExact
 import com.eignex.klause.lp.mulExact
 import com.eignex.klause.lp.subExact
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.presolve.PassDelta
+import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -116,7 +118,7 @@ internal object CoefficientStrengthening {
         )
     }
 
-    /** A contradictory unit-clause pair on [lit]'s variable — jointly unsatisfiable (cf. [XorUnits]). */
+    /** A contradictory unit-clause pair on [lit]'s variable — jointly unsatisfiable. */
     private fun boolContradiction(lit: Int): List<Factor> {
         val v = Lit.variable(lit)
         return listOf(Clause(intArrayOf(Lit.make(v, true))), Clause(intArrayOf(Lit.make(v, false))))
