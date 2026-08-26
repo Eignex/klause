@@ -35,6 +35,15 @@ internal class FloatLpResult(
     /** Sparse LU factorizations this solve built. The floor is 1 per solve while each node constructs its
      *  own engine, so this is the direct measure of what carrying one across nodes would save. */
     val refactorizations: Int = 0,
+    /**
+     * Whether the solve reached a primal-feasible basis, i.e. the optimum.
+     *
+     * False for an iterate the solve stopped short of optimality — the dual simplex holds dual
+     * feasibility from its first basis, so such an iterate still carries a valid *bound*, which is the
+     * only thing it may be read for. It is not an optimum: no reduced-cost fixing, no tableau cuts, and
+     * no claim of infeasibility rests on it.
+     */
+    val optimal: Boolean = true,
 )
 
 /**
@@ -307,12 +316,17 @@ internal class RevisedSimplex(
         val elig = IntArrayList()
         val eligOrdered = IntArray(numVars) // scratch for the ratio-ordered permutation of [elig]
         var iter = 0
+        // The last iterate's basic values, so a solve that stops short can still hand back its bound.
+        var lastBeta: DoubleArray? = null
         while (iter++ < maxIter) {
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
-            // loop on a large model would still blow the wall-clock limit. On cancellation give
-            // up (null) — the basis is only a heuristic, so this is sound. Phased off the first
-            // iteration so an already-spent budget never starts a solve at all.
-            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) return null
+            // loop on a large model would still blow the wall-clock limit. Stopping here yields the
+            // current iterate rather than nothing: every basis the dual simplex passes through is
+            // dual-feasible, so its objective is a valid lower bound even though the primal is not yet
+            // feasible. Phased off the first iteration so an already-spent budget never starts a solve.
+            if ((iter - 1) % CANCEL_POLL == 0 && cancellation()) {
+                return lastBeta?.let { truncated(it, factor) }
+            }
             // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
             for (i in 0 until m) rhsAdj[i] = model.rhsD(i)
             for (j in 0 until numVars) {
@@ -328,6 +342,7 @@ internal class RevisedSimplex(
                 }
             }
             val beta = factor.solve(rhsAdj)
+            lastBeta = beta
             // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
             // dual steepest edge). `worst` keeps the *raw* violation of the chosen row for the
             // bound-flipping ratio test.
@@ -410,7 +425,9 @@ internal class RevisedSimplex(
                 factor.update(r, alpha)
             }
         }
-        return null // budget exhausted
+        // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
+        // it back rather than discarding the work.
+        return lastBeta?.let { truncated(it, factor) }
     }
 
     /**
@@ -558,6 +575,46 @@ internal class RevisedSimplex(
             maxLuDensity,
             warmStarted = warmStarted,
             refactorizations = refactorizations,
+        )
+    }
+
+    /**
+     * The iterate a solve stopped short on, as a bound-only result.
+     *
+     * Deliberately does *not* record [optimalBasis] / [optimalPrimal]: those gate tableau cut generation,
+     * which needs an optimal tableau, so leaving them alone makes the cut path decline on its own rather
+     * than relying on every caller to remember. Same objective arithmetic as [optimal], since the bound
+     * is read the same way.
+     */
+    private fun truncated(beta: DoubleArray, factor: EtaBasis): FloatLpResult {
+        var obj = model.objConstantD
+        for (j in 0 until numVars) {
+            val c = model.costD(j)
+            if (c != 0.0 && status[j] == VarStatus.AT_UPPER) obj += c * model.upperD(j)
+        }
+        for (i in 0 until m) {
+            val c = model.costD(basicVar[i])
+            if (c != 0.0) obj += c * beta[i]
+        }
+        val primal = DoubleArray(n)
+        for (j in 0 until n) {
+            primal[j] = model.loShiftD(j) + if (status[j] == VarStatus.AT_UPPER) model.upperD(j) else 0.0
+        }
+        for (i in 0 until m) {
+            val v = basicVar[i]
+            if (v < n) primal[v] = model.loShiftD(v) + beta[i]
+        }
+        return FloatLpResult(
+            Basis(basicVar.copyOf(), status.copyOf()),
+            obj,
+            duals(factor),
+            primal,
+            pivots,
+            maxLuFill,
+            maxLuDensity,
+            warmStarted = warmStarted,
+            refactorizations = refactorizations,
+            optimal = false,
         )
     }
 

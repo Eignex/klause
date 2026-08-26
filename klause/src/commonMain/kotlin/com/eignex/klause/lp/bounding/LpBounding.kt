@@ -452,8 +452,9 @@ internal fun LpEngine.sparseSafePrune(
         }
     }
     // Reduced-cost fixing on the exact certified reduced costs — needs a finite incumbent for
-    // the improving gap, so it runs only when pruning is possible.
-    if (canPrune && cert != null &&
+    // the improving gap, so it runs only when pruning is possible. It also argues from the *optimum*,
+    // so a solve that stopped short may bound but may not fix.
+    if (canPrune && cert != null && boundRes.optimal &&
         applySparseReducedCostFixing(
             boundRel, cert, boundRes.basis, session, bound, sink, objectiveVar, objectiveAscending, learn,
         )
