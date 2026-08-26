@@ -869,7 +869,10 @@ private fun hasWideIntValues(problem: Problem): Boolean {
 // A factor whose coefficients or bound exceed the 64-bit range is enforced only by its exact propagator;
 // its local-search invariant is inert (the Long payload is a saturated placeholder), so LS would ignore
 // the constraint. Bail rather than report an assignment that could violate it.
-private fun hasWideFactor(problem: Problem): Boolean = problem.factors.any {
-    (it is Linear && it.wideConstants != null) ||
-        (it is ReifiedLinear && it.wideConstants != null)
+private fun hasWideFactor(problem: Problem): Boolean {
+    for (factor in problem.factors) {
+        if (factor is Linear && factor.wideConstants != null) return true
+        if (factor is ReifiedLinear && factor.wideConstants != null) return true
+    }
+    return false
 }
