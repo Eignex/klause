@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.mps
+package com.eignex.klause.lowering.mps
 
 import com.eignex.klause.solver.Problem
 

@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.formats.mps.MpsConstraint
-import com.eignex.klause.formats.mps.MpsModel
-import com.eignex.klause.formats.mps.MpsObjective
-import com.eignex.klause.formats.mps.MpsVar
-import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.lowering.mps.MpsConstraint
+import com.eignex.klause.lowering.mps.MpsModel
+import com.eignex.klause.lowering.mps.MpsObjective
+import com.eignex.klause.lowering.mps.MpsVar
+import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.TheoryParams

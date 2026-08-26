@@ -1,9 +1,9 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.MpsCompiled
-import com.eignex.klause.formats.mps.MpsFormatException
-import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.lowering.mps.MpsCompiled
+import com.eignex.klause.lowering.mps.MpsLoweringException
+import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.sourceRoute
@@ -12,7 +12,7 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
- * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
+ * klause's hybrid model (see [com.eignex.klause.lowering.mps.toProblem]: integer columns become CP search
  * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
  * model is routed to a complete supported theory pipeline or rejected at load.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
@@ -44,7 +44,7 @@ internal object MpsMode : CliMode {
             val pipeline = compiled.model.sourceRoute()
             when (pipeline) {
                 ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA ->
-                    throw MpsFormatException("open MPS models require a supported theory pipeline")
+                    throw MpsLoweringException("open MPS models require a supported theory pipeline")
 
                 // A mixed open model decides through the exact core. Its objective is minimized by the
                 // same integral descent the pure-integer routes use when it weights only integer columns;
@@ -52,7 +52,7 @@ internal object MpsMode : CliMode {
                 ProblemPipeline.EXACT_LIRA -> {
                     val objective = compiled.objective
                     if (objective != null && objective.realCoefficients.any { it != 0.0 }) {
-                        throw MpsFormatException("open MPS optimization over a continuous objective is unsupported")
+                        throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
                     }
                     return exactLiraSolvable(compiled.model, objective, compiled.maximize) { assignment ->
                         renderMpsExactLiraModel(compiled, assignment)

@@ -4,7 +4,7 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.formats.mps.toProblem
+import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
@@ -91,7 +91,8 @@ internal object SmtLibFormat : ProblemFormat {
     }
 }
 
-/** MPS (MIP) ingest → klause integer model. Parser + lowering live in `com.eignex.klause.formats.mps`;
+/** MPS (MIP) ingest → klause integer model. The parser lives in `com.eignex.klause.formats.mps`; lowering
+ *  lives in `com.eignex.klause.lowering.mps`.
  *  this wrapper normalises to the minimise-canonical objective the runner expects (an MPS `OBJSENSE MAX`
  *  negates every coefficient). */
 internal object MpsFormat : ProblemFormat {
