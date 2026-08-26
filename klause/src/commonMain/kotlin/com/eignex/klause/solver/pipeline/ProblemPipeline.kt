@@ -4,7 +4,7 @@ import com.eignex.klause.lp.admitsSmallModelBound
 import com.eignex.klause.lp.smallModelBigIntBound
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.componentPlan
+import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Cancellation
 
 /** The solver pipeline selected once from a source [ProblemSpec]. */

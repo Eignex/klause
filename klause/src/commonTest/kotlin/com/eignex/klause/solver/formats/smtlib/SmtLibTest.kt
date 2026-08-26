@@ -14,7 +14,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.componentPlan
+import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult

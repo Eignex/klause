@@ -1,6 +1,6 @@
 package com.eignex.klause.theory
 
-import com.eignex.klause.solver.ComponentPlan
+import com.eignex.klause.solver.pipeline.ComponentPlan
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.search.SearchIntValue
@@ -19,7 +19,7 @@ fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
 
         ProblemPipeline.GENERAL_LIA -> GeneralLiaSearchComponent(fragment, theoryIntVars) { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->
-                if (intOwner(variable) == com.eignex.klause.solver.IntVariableOwner.THEORY) {
+                if (intOwner(variable) == com.eignex.klause.solver.pipeline.IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)
                 }
             }
@@ -31,7 +31,7 @@ fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
 
         ProblemPipeline.EXACT_LIRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->
-                if (intOwner(variable) == com.eignex.klause.solver.IntVariableOwner.THEORY) {
+                if (intOwner(variable) == com.eignex.klause.solver.pipeline.IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)
                 }
             }
