@@ -195,7 +195,8 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
          * here means infeasible, and a stopped sweep must not claim that.
          */
 
-        // Looks at the budget once per pollStride factors, so a sweep over a large model notices it.
+        // Looks at the budget once per pollStride units of work, so a sweep over a large model notices
+        // it. A unit is one term of one row, not one factor: a row's cost is quadratic in its width.
         private var untilPoll = pollStride
 
         private fun budgetSpent(): Boolean {
@@ -225,6 +226,10 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
                         else -> null
                     } ?: continue
                     for (i in row.vars.indices) {
+                        // Polled per term, not per factor: [rowRangeExcept] re-sums the row for each
+                        // term, so one wide row is `O(vars²)` big-integer operations — long enough on
+                        // its own to outlast a budget a factor-boundary poll would have caught.
+                        if (budgetSpent()) return null
                         val coefficient = row.coeffs[i]
                         if (coefficient == BigInteger.ZERO) continue
                         val rest = rowRangeExcept(row, i)
@@ -597,6 +602,13 @@ class GeneralLiaSearchComponent(
                     else -> null
                 } ?: continue
                 for (index in row.vars.indices) {
+                    // Polled per term, not per factor: [rowRangeExcept] re-sums the row for each term,
+                    // so one wide row is `O(vars²)` big-integer operations — long enough on its own to
+                    // outlast a budget a factor-boundary poll would have caught.
+                    if (--untilPoll <= 0) {
+                        untilPoll = pollStride
+                        if (context.cancelled()) return null
+                    }
                     val coefficient = row.coeffs[index]
                     if (coefficient == BigInteger.ZERO) continue
                     val rest = rowRangeExcept(row, index, domains)
