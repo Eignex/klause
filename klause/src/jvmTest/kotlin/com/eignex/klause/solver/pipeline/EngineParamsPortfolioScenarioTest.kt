@@ -1,4 +1,6 @@
 package com.eignex.klause.solver.pipeline
+
+import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
@@ -6,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -13,6 +16,21 @@ import kotlin.test.assertTrue
  * auto-tunes from it, and `--param arms=N` overrides — distinct from the engine mix.
  */
 class EngineParamsPortfolioScenarioTest {
+
+    private fun plan(engine: FiniteEngine, params: List<String> = emptyList()): PortfolioPlan =
+        FinitePipeline.planPortfolio(
+            PortfolioPlanRequest(
+                engine = engine,
+                optimize = true,
+                cores = 1,
+                engineParams = params,
+                randomSeed = null,
+                defaultArms = PortfolioScenario.DEFAULT_ARMS,
+                lpCeiling = LpConfig.AGGRESSIVE,
+                nodeBudget = null,
+                annotationArm = null,
+            ),
+        )
 
     private fun scenario(cores: Int, params: List<String> = emptyList(), mix: EngineMix = EngineMix.MIXED) =
         buildPortfolioScenario(
@@ -90,5 +108,20 @@ class EngineParamsPortfolioScenarioTest {
             val e = runCatching { resolveLocalSearchRecipes(EngineParams(mutableListOf("strategy=sweep", extra))) }
             assertTrue(e.isFailure, "strategy=sweep with $extra must be rejected")
         }
+    }
+
+    @Test
+    fun `portfolio planning resolves the execution scenario from the route and parameters`() {
+        val execution = assertIs<PortfolioPlan.Execute>(plan(FiniteEngine.BACKTRACK, listOf("arms=3")))
+
+        assertEquals(EngineMix.BACKTRACK, execution.scenario.engine)
+        assertEquals(3, execution.scenario.arms)
+    }
+
+    @Test
+    fun `portfolio planning preserves local search dry run without constructing workers`() {
+        val dryRun = assertIs<PortfolioPlan.LocalSearchDryRun>(plan(FiniteEngine.LOCAL_SEARCH, listOf("dry-run-solver=on")))
+
+        assertNull(dryRun.pool, "the unchanged curated catalog is rendered by the frontend")
     }
 }
