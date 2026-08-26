@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
@@ -22,6 +21,7 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.LsResolution
@@ -29,6 +29,7 @@ import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.PortfolioPlan
 import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.planPortfolio
+import com.eignex.klause.solver.pipeline.planFixedBacktrack
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -299,42 +300,30 @@ internal object SolveCore {
         deadline: Long?,
         nodeBudget: NodeBudget?,
     ) {
-        // XCSP/SMT carry no annotation (null), so the naked engine falls back to the conflict-driven
-        // preset base. Seed remains unset unless `-r` (or `--param seed=`) pins one.
-        val base = solvable.annotatedBacktrackParams ?: BacktrackPresets.conflictDriven()
         // `--lp CEILING` selects the LP emphasis for the naked engine too (it powers the single-engine
         // LP-success measurement under `-s`); the flag wins, then the `klause.lp` env default, else the
-        // base config (LP off for naked CP).
+        // route default (LP off for naked CP).
         val lpConfig = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
-        } ?: base.lpConfig
-        val engineParams = EngineParams(common.engineParams)
-        // Consume `dry-run-solver` before applyBacktrackParams validates the leftover keys, so it isn't
-        // rejected as unknown; it's an engine-agnostic mode, handled below.
-        val dryRunSolver = engineParams.bool("dry-run-solver") ?: false
-        val params = applyBacktrackParams(
-            base.copy(
-                randomSeed = common.randomSeed ?: base.randomSeed,
+        } ?: solvable.annotatedBacktrackParams?.lpConfig ?: LpConfig.OFF
+        val plan = FinitePipeline.planFixedBacktrack(
+            FixedBacktrackPlanRequest(
+                annotatedParams = solvable.annotatedBacktrackParams,
+                engineParams = common.engineParams,
+                randomSeed = common.randomSeed,
                 cancellation = cancel,
                 nodeBudget = nodeBudget,
-                // Advisory total budget so the LP subsystem sizes its wall-clock caps against the real
-                // `-t` deadline on the FD track, not the absolute root-LP ceiling.
                 solveBudgetMillis = common.timeLimitMs,
-                // Under a wall clock a fixpoint must be interruptible. The default floor only polls after
-                // a fire count no atom-allocating fixpoint reaches, so `-t` was overshot 3x. That floor
-                // is for a slice budget, where abandoning a fixpoint mid-way would change the resumed
-                // result; a deadline carries no such obligation — when the time is gone it is gone.
-                propagationCancelFloor = if (common.timeLimitMs != null) 0 else base.propagationCancelFloor,
-                onEvent = verboseListener(common.verbose),
                 lpConfig = lpConfig,
+                onEvent = verboseListener(common.verbose),
             ),
-            engineParams,
         )
+        val params = plan.params
         cliLogger(common.verbose).v {
             "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
         }
         val solver = FinitePipeline.backtrackSolver(solvable.finiteProblem)
-        if (dryRunSolver) {
+        if (plan.dryRun) {
             errPrintln("solver dry-run:")
             errPrintln(solver.describe(params))
             return
