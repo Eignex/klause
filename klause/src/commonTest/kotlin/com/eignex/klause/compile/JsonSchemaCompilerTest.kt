@@ -1,12 +1,15 @@
-package com.eignex.klause.formats.json
+package com.eignex.klause.compile
 
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.formats.json.JsonSchema
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
-class JsonSchemaTest {
+class JsonSchemaCompilerTest {
+
+    private fun compile(text: String) = JsonSchema.parse(text).compile()
 
     @Test
     fun `parses minimal schema with bool var`() {
@@ -17,7 +20,7 @@ class JsonSchemaTest {
               }
             }
         """.trimIndent()
-        val problem = JsonSchema.parseProblem(text)
+        val problem = compile(text).problem
         assertEquals(1, problem.numBoolVars)
         assertEquals(0, problem.numIntVars)
     }
@@ -32,7 +35,7 @@ class JsonSchemaTest {
               }
             }
         """.trimIndent()
-        val compiled = JsonSchema.parseCompiled(text)
+        val compiled = compile(text)
         assertEquals(3, compiled.problem.numBoolVars, "nominal expands to 3 indicators")
         assertEquals(1, compiled.problem.numIntVars)
         assertEquals(setOf("a", "b", "c"), compiled.nominalIndicators["type"]?.keys)
@@ -48,12 +51,12 @@ class JsonSchemaTest {
               }
             }
         """.trimIndent()
-        assertFailsWith<FormatException> { JsonSchema.parseProblem(text) }
+        assertFailsWith<FormatException> { JsonSchema.parse(text) }
     }
 
     @Test
     fun `wraps a malformed document as a format exception`() {
-        assertFailsWith<FormatException> { JsonSchema.parseProblem("{ not json") }
+        assertFailsWith<FormatException> { JsonSchema.parse("{ not json") }
     }
 
     @Test
@@ -66,6 +69,6 @@ class JsonSchemaTest {
             }
         """.trimIndent()
 
-        assertFailsWith<JsonFormatException> { JsonSchema.parseProblem(text) }
+        assertFailsWith<IllegalArgumentException> { compile(text) }
     }
 }

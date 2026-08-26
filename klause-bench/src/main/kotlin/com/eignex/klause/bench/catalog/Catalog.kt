@@ -25,7 +25,7 @@ enum class Format {
     /** Pseudo-Boolean OPB. In-process via `Opb.parse`. */
     OPB,
 
-    /** klause JSON `SchemaDef`. In-process via `JsonSchema.parseProblem`. */
+    /** klause JSON `SchemaDef`. In-process via `JsonSchema.parse` and compilation. */
     JSON_SCHEMA,
 
     /** MiniZinc model (+ optional `.dzn`). Compiled to FlatZinc by the `minizinc` CLI, then
