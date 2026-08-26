@@ -138,4 +138,34 @@ class LpComponentsTest {
         assertEquals(2, split.blocks)
         assertEquals(1, mono.blocks, "a monolithic solve reports one block")
     }
+
+    @Test
+    fun `component bases certify a continuous model beyond the monolithic row cap`() {
+        val builder = LpBuilder()
+        repeat(50) {
+            val column = builder.addRealVar(0.0, 1.0)
+            builder.addRealRow(intArrayOf(column), doubleArrayOf(1.0), Relation.LE, 1.0)
+        }
+        val model = builder.build(Sense.MINIMIZE)
+        val solver = assertIs<ComponentLpSolver>(newLpSolver(model))
+        val result = assertNotNull(solver.solve())
+
+        assertEquals(null, exactBasisFeasible(model, result.basis))
+        assertTrue(solver.exactBasisFeasible())
+        assertEquals(LpVerdict.OPTIMAL, solveAndCertify(model).verdict)
+    }
+
+    @Test
+    fun `component certificates sum before rounding the objective`() {
+        val builder = LpBuilder()
+        val first = builder.addVar(0L, 1L, cost = 1L)
+        val second = builder.addVar(0L, 1L, cost = 1L)
+        builder.addRow(intArrayOf(first), longArrayOf(2L), Relation.GE, 1L)
+        builder.addRow(intArrayOf(second), longArrayOf(2L), Relation.GE, 1L)
+        val model = builder.build(Sense.MINIMIZE)
+        val solver = assertIs<ComponentLpSolver>(newLpSolver(model))
+
+        assertNotNull(solver.solve())
+        assertEquals(1L, solver.exactLowerBound())
+    }
 }

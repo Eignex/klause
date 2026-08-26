@@ -40,10 +40,11 @@ internal class CertifiedLpResult internal constructor(
     /** On a rational-decider [LpVerdict.INFEASIBLE], the load-bearing original rows (no integer ray
      *  exists for a strictness-carried proof); null otherwise. */
     val infeasibleRows: IntArray? = null,
+    private val componentExactLowerBound: Long? = null,
 ) {
     /** The exact 128-bit integer lower bound `⌈optimum⌉` on the true objective, or null when the LP was
      *  not certified or the bound does not fit a `Long`. */
-    val exactLowerBound: Long? get() = certificate?.objectiveBoundCeil(0L)
+    val exactLowerBound: Long? get() = certificate?.objectiveBoundCeil(0L) ?: componentExactLowerBound
 
     /** The Neumaier–Shcherbina float safe lower bound on the true objective — a cheap pruning heuristic,
      *  looser than [exactLowerBound]; null when the LP was not solved or is unbounded below. Computed on
@@ -112,7 +113,9 @@ internal fun solveAndCertify(
     // certified by the exact dual bound ([integerCertify]); a continuous model has no integer dual bound,
     // so its feasibility is certified by reconstructing the reported basis's point exactly
     // ([exactBasisFeasible]) — enough for a definitive SAT verdict at a leaf.
+    val componentSolver = solver as? ComponentLpSolver
     val certificate = integerCertify(model, result.duals)
+    val componentExactLowerBound = if (certificate == null) componentSolver?.exactLowerBound() else null
     // Strict rows are relaxed to non-strict in the float model, so the basis/point certificates would
     // bless a boundary point a strict row forbids; those models go straight to the delta-aware
     // rational decider.
@@ -120,10 +123,14 @@ internal fun solveAndCertify(
     var exactPrimal: DoubleArray? = null
     var infeasibleRows: IntArray? = null
     val verdict = when {
-        certificate != null -> LpVerdict.OPTIMAL
+        certificate != null || componentExactLowerBound != null -> LpVerdict.OPTIMAL
 
         model.hasContinuous && !anyStrict &&
-            (exactBasisFeasible(model, result.basis) == true || exactPointFeasible(model, result.primal)) ->
+            (
+                componentSolver?.exactBasisFeasible() == true ||
+                    exactBasisFeasible(model, result.basis) == true ||
+                    exactPointFeasible(model, result.primal)
+                ) ->
             LpVerdict.OPTIMAL
 
         // Last resort: decide feasibility outright in exact rational arithmetic. The float point was
@@ -151,5 +158,6 @@ internal fun solveAndCertify(
         model = model,
         exactPrimal = exactPrimal,
         infeasibleRows = infeasibleRows,
+        componentExactLowerBound = componentExactLowerBound,
     )
 }
