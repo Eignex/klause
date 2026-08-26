@@ -118,15 +118,15 @@ private fun ProblemSpec.openPresolveRows(): List<Linear> {
     val rows = ArrayList<Linear>()
     for (factor in factors) {
         when (factor) {
-        is Linear -> rows += roundIntegerRow(factor)
+            is Linear -> rows += roundIntegerRow(factor)
 
-        is ReifiedLinear -> if (fixed[factor.auxBoolVar] && truth[factor.auxBoolVar]) {
-            val constants = factor.integerConstants ?: continue
-            rows += roundIntegerRow(Linear(constants.coeffs, factor.vars.copyOf(), factor.op, constants.bound))
+            is ReifiedLinear -> if (fixed[factor.auxBoolVar] && truth[factor.auxBoolVar]) {
+                val constants = factor.integerConstants ?: continue
+                rows += roundIntegerRow(Linear(constants.coeffs, factor.vars.copyOf(), factor.op, constants.bound))
+            }
+
+            else -> Unit
         }
-
-        else -> Unit
-    }
     }
     return rows
 }

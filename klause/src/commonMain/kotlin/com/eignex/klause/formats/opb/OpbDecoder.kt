@@ -4,12 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.BoolFoldDefinition
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
-import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.objective.LinearObjective

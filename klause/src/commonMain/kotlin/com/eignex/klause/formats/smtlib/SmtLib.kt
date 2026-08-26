@@ -3,8 +3,8 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.solver.Factor

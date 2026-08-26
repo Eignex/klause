@@ -187,7 +187,6 @@ private fun complexity(problem: Problem): Long {
     return c
 }
 
-
 /** Runs enabled problem-transform passes to a bounded fixpoint. */
 object Presolver {
 

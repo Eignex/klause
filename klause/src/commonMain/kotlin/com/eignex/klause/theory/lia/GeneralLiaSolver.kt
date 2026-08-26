@@ -71,11 +71,7 @@ internal const val MAX_LIA_PROPAGATION_BITS = 16_384
  * Measured once per row over its widest coefficient and widest live endpoint, so the guard costs
  * `O(vars)` rather than the `O(vars²)` the narrowing itself would.
  */
-private fun rowExceedsArithmetic(
-    vars: IntArray,
-    coeffs: Array<BigInteger>,
-    domains: Array<BigInterval>,
-): Boolean {
+private fun rowExceedsArithmetic(vars: IntArray, coeffs: Array<BigInteger>, domains: Array<BigInterval>): Boolean {
     var widest = 0
     for (index in vars.indices) {
         val domain = domains[vars[index]]
@@ -823,19 +819,27 @@ class GeneralLiaSearchComponent(
         }
         val bound = reifiedBound(factor)
         return when (factor.op) {
-            LinearOp.LE -> if (truth) range.lo <= floorDiv(bound, gcd) * gcd else {
+            LinearOp.LE -> if (truth) {
+                range.lo <= floorDiv(bound, gcd) * gcd
+            } else {
                 range.hi >= ceilDiv(bound + BigInteger.ONE, gcd) * gcd
             }
 
-            LinearOp.EQ -> if (bound % gcd != BigInteger.ZERO) !truth else {
+            LinearOp.EQ -> if (bound % gcd != BigInteger.ZERO) {
+                !truth
+            } else {
                 relationPossibleForTruth(range, factor.op, bound, truth)
             }
 
-            LinearOp.GE -> if (truth) range.hi >= ceilDiv(bound, gcd) * gcd else {
+            LinearOp.GE -> if (truth) {
+                range.hi >= ceilDiv(bound, gcd) * gcd
+            } else {
                 range.lo <= floorDiv(bound - BigInteger.ONE, gcd) * gcd
             }
 
-            LinearOp.NE -> if (bound % gcd != BigInteger.ZERO) truth else {
+            LinearOp.NE -> if (bound % gcd != BigInteger.ZERO) {
+                truth
+            } else {
                 relationPossibleForTruth(range, factor.op, bound, truth)
             }
         }

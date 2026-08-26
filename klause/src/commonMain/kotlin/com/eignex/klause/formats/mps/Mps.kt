@@ -1,8 +1,8 @@
 package com.eignex.klause.formats.mps
 
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.formats.splitWhitespace
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 import com.eignex.klause.util.lineSequence

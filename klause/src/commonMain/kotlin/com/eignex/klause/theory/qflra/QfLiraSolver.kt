@@ -395,8 +395,8 @@ private class QfLiraSystem(private val model: ProblemSpec) {
                         branch.lower,
                     )
                 ) {
-                        return null
-                    }
+                    return null
+                }
             }
             if (branch.upper != null) {
                 if (!constants.addBound(
@@ -406,8 +406,8 @@ private class QfLiraSystem(private val model: ProblemSpec) {
                         branch.upper,
                     )
                 ) {
-                        return null
-                    }
+                    return null
+                }
             }
         }
         // Every linear shape states its row the same way; only whether a Boolean gates it differs, and
