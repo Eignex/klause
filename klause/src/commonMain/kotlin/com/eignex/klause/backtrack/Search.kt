@@ -130,10 +130,9 @@ private class CpSatisfactionTraversal(
         )
         val components = ArrayList<SearchComponent>()
         components += cp
-        components += traversal.brancher
         completion.addTo(components)
         components += params.componentFactory?.invoke().orEmpty()
-        val session = SearchComponentSet(components).session(
+        val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
             cancellation = params.cancellation,
             learnedDb = params.sharedLearnedDb(),
         )
