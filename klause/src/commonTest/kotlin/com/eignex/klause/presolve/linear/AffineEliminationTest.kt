@@ -1,4 +1,4 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
@@ -8,6 +8,8 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Assumptions

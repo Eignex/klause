@@ -1,7 +1,9 @@
-package com.eignex.klause.presolve
+package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.presolve.BakeConfig
+import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

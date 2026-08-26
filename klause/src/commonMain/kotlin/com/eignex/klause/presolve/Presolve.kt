@@ -1,5 +1,11 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.presolve.linear.AffineSingletons
+import com.eignex.klause.presolve.linear.CoefficientStrengthening
+import com.eignex.klause.presolve.linear.DiophantineReduction
+import com.eignex.klause.presolve.linear.LinearBoundFusion
+import com.eignex.klause.presolve.linear.LinearSubSumAggregation
+import com.eignex.klause.presolve.linear.SingletonInequalityProjection
 import com.eignex.klause.solver.Cancellation
 import com.eignex.klause.solver.Problem
 
