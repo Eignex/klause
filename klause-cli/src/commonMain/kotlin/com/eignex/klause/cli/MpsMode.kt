@@ -23,10 +23,13 @@ internal object MpsMode : CliMode {
     override fun newSession(): ModeSession = Session()
 
     private class Session : ModeSession {
+        private var objectiveScale = 1L
+
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
             val compiled = Mps.parse(openFileSource(path)).toProblem()
+            objectiveScale = compiled.objectiveScale
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: int=${compiled.model.numIntVars} " +
                     "factors=${compiled.model.factors.size} float-cols=${compiled.floatColumns} " +
@@ -64,7 +67,7 @@ internal object MpsMode : CliMode {
             )
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MpsOutput()
+        override fun output(common: CommonOptions): OutputProtocol = MpsOutput(objectiveScale)
     }
 }
 
@@ -87,7 +90,7 @@ internal fun renderMpsGeneralLiaModel(compiled: MpsCompiled, assignment: General
 }
 
 /** MPS output protocol (PB-competition-style `s`/`o`/`v`). */
-internal class MpsOutput : BufferedBestOutput() {
+internal class MpsOutput(private val objectiveScale: Long = 1L) : BufferedBestOutput() {
     private var bestObjective: Long? = null
 
     override fun onSolutionObjective(objective: Long?) {
@@ -97,6 +100,8 @@ internal class MpsOutput : BufferedBestOutput() {
     override val commentPrefix: String = "c"
     override val streamObjective: Boolean = true
 
+    override fun formatObjective(objective: Long): String = scaledDecimal(objective, objectiveScale)
+
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND -> "s SATISFIABLE"
         Verdict.OPTIMAL -> "s OPTIMUM FOUND"
@@ -105,4 +110,15 @@ internal class MpsOutput : BufferedBestOutput() {
     }
 
     override fun keepStat(key: String): Boolean = true
+}
+
+/** Format the exact decimal value of an MPS objective whose solver coefficients were scaled by [scale]. */
+private fun scaledDecimal(value: Long, scale: Long): String {
+    require(scale > 0L)
+    if (scale == 1L || value % scale == 0L) return (value / scale).toString()
+    val digits = scale.toString().length - 1
+    val negative = value < 0L
+    val whole = (value / scale).toString().removePrefix("-")
+    val fraction = (value % scale).toString().removePrefix("-").padStart(digits, '0').trimEnd('0')
+    return "${if (negative) "-" else ""}$whole.$fraction"
 }

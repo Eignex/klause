@@ -19,6 +19,9 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** When true, print `o <objective>` as each improving incumbent streams in. */
     protected open val streamObjective: Boolean = false
 
+    /** Render an incumbent objective for an output protocol. */
+    protected open fun formatObjective(objective: Long): String = objective.toString()
+
     /** The single status line this format prints for [verdict] at completion. */
     protected abstract fun statusLine(verdict: Verdict): String
 
@@ -45,7 +48,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     final override fun onSolution(rendered: String, objective: Long?) {
         best = rendered
         onSolutionObjective(objective)
-        if (streamObjective && objective != null) println("o $objective")
+        if (streamObjective && objective != null) println("o ${formatObjective(objective)}")
     }
 
     final override fun onComplete(verdict: Verdict) {
