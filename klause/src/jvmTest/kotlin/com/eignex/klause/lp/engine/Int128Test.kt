@@ -1,4 +1,4 @@
-package com.eignex.klause.lp
+package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Int128
 import java.math.BigInteger
