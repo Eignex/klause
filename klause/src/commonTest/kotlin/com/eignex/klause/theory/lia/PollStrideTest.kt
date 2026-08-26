@@ -1,7 +1,18 @@
 package com.eignex.klause.theory.lia
 
+import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.solver.ProblemPipeline
+import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.generalLiaWitnessBound
+import com.eignex.klause.solver.pipeline.OpenTheoryEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.util.Bits
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -10,6 +21,36 @@ import kotlin.test.assertTrue
  * overshoots the budget on a wide box or costs more than it guards on a narrow one.
  */
 class PollStrideTest {
+
+    @Test
+    fun `a witness box beyond the arithmetic limit declines General LIA search`() {
+        // This equality makes the small-model theorem produce a 21k-bit box. Propagating it would divide
+        // products of that box and the 4k-bit coefficient, so decline before the first endpoint division.
+        val wide = BigInteger.parseString("1" + "0".repeat(1_300))
+        val model = ProblemSpec(
+            // An unused Boolean keeps this model off OpenTheoryEngine's cheap cube witness path, so the
+            // test reaches the General LIA component that decides whether the box is safe to materialise.
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0),
+                longArrayOf(0, 0),
+                Bits(2).also { bits ->
+                    bits.set(0)
+                    bits.set(1)
+                },
+                Bits(2).also { bits ->
+                    bits.set(0)
+                    bits.set(1)
+                },
+            ),
+            factors = arrayOf(
+                Linear(intArrayOf(0, 1), arrayOf(wide, BigInteger.ONE), LinearOp.EQ, BigInteger.ZERO),
+            ),
+        )
+
+        assertTrue(checkNotNull(model.generalLiaWitnessBound()).bitLength() > MAX_GENERAL_LIA_WITNESS_BITS)
+        assertIs<OpenTheoryResult.Unknown>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
+    }
 
     @Test
     fun `a narrow box polls at the coarsest stride`() {

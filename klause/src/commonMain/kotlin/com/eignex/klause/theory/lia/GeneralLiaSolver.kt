@@ -52,6 +52,19 @@ private const val POLL_BIT_BUDGET = 65_536
 private const val MAX_POLL_FACTORS = 256
 
 /**
+ * Largest finite-witness box this lane materialises.
+ *
+ * Equality propagation multiplies box endpoints by exact row coefficients before dividing. The small-model
+ * bound dominates those coefficients, so limiting the box also limits every operand that reaches a
+ * `BigInteger` division. Above this width one division can outlast a solve deadline, which no polling
+ * schedule can repair; the complete route therefore declines the search and reports `unknown`.
+ */
+internal const val MAX_GENERAL_LIA_WITNESS_BITS = 16_384
+
+internal fun fitsGeneralLiaArithmetic(witnessBound: BigInteger): Boolean =
+    witnessBound.bitLength() <= MAX_GENERAL_LIA_WITNESS_BITS
+
+/**
  * Complete finite-witness search for open General LIA.
  *
  * The model remains arbitrary-precision throughout this path: wide source rows are read directly and
@@ -60,8 +73,8 @@ private const val MAX_POLL_FACTORS = 256
  */
 
 class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssignment> {
-    private val witnessBound = requireNotNull(model.generalLiaWitnessBound())
-    private val pollStride = pollStrideFor(witnessBound.bitLength())
+    private val witnessBound = model.generalLiaWitnessBound()
+    private val pollStride = witnessBound?.let { pollStrideFor(it.bitLength()) } ?: MAX_POLL_FACTORS
 
     init {
         require(model.componentPlan().theoryPipeline == ProblemPipeline.GENERAL_LIA) {
@@ -70,6 +83,8 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
     }
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<GeneralLiaAssignment> {
+        val witnessBound = witnessBound ?: return TheoryCheck.Cancelled
+        if (!fitsGeneralLiaArithmetic(witnessBound)) return TheoryCheck.Cancelled
         val domains = Array(model.numIntVars) { v ->
             val lo = if (model.intBounds.hasLower(v)) {
                 maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(v)))
@@ -444,6 +459,7 @@ class GeneralLiaSearchComponent(
 
     override fun initialize(context: SearchContext): ComponentResult {
         val bound = model.generalLiaWitnessBound(context::cancelled) ?: return ComponentResult.Indeterminate
+        if (!fitsGeneralLiaArithmetic(bound)) return ComponentResult.Indeterminate
         witnessBound = bound
         pollStride = pollStrideFor(bound.bitLength())
         domainsByLevel.put(0, initialDomains(context))
