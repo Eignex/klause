@@ -14,7 +14,6 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.BakedProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
@@ -34,23 +33,6 @@ internal fun objectiveBoundOverlay(
     val factor = ObjectiveBoundFactor.of(objective, bound) ?: return null
     return problem.withAppendedFactor(factor) to bound
 }
-
-/** A copy of this problem with [extra] appended to its factors, reusing the base's bake rather than
- *  paying a fresh one. The appended factor is [NoPropagator], so it changes nothing the bake would
- *  derive; the base's domains are already folded, so `alreadyFolded` skips the redundant construction-time
- *  fold and `seedDeductions` carries the base's proven deductions (a no-op on already-tightened domains)
- *  so the deferred bake stays exact. An implied-factor mask grows by one non-implied slot. */
-private fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
-    numBoolVars = numBoolVars,
-    numIntVars = numIntVars,
-    intDomains = requireFiniteIntDomains(),
-    factors = factors + extra,
-    seedDeductions = baked,
-    cancellation = cancellation,
-    impliedFactorMask = impliedFactorMask?.let { it + false },
-    hasSymmetryBreaking = hasSymmetryBreaking,
-    alreadyFolded = true,
-)
 
 /**
  * Shared, mutable upper bound on an objective's weighted sum `Σ w·b + Σ c·i` — the ratchet knob for
