@@ -1,9 +1,7 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.ir.BoolFoldDefinition
-import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.lowering.opb.OpbDocument
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -11,25 +9,12 @@ import com.eignex.klause.util.StringCharSource
  *  the other input formats. */
 class OpbFormatException(msg: String) : FormatException("OPB", msg)
 
-/** Parsed OPB instance and optional objective. */
-data class OpbProblem(
-    /** Compiled solver problem. */
-    val problem: Problem,
-    /** Objective, or null for satisfaction instances. */
-    val objective: LinearObjective?,
-    /** AND-indicator definitions for product terms — the local-search bool functional cone. */
-    val boolFolds: List<BoolFoldDefinition> = emptyList(),
-    /** Count of declared `x1..xN` variables. [Problem.numBoolVars] also counts the Tseitin/soft
-     *  indicators appended above them, so a model listing must use this to omit the aux variables. */
-    val numDeclaredVars: Int = 0,
-)
-
-/** OPB/WBO format facade. It parses external syntax and decodes it into solver data. */
+/** OPB/WBO format facade. It parses external syntax into an immutable source document. */
 object Opb {
 
-    /** Parse OPB [text] into an [OpbProblem]. */
-    fun parse(text: String): OpbProblem = parse(StringCharSource(text))
+    /** Parse OPB [text] into an [OpbDocument]. */
+    fun parse(text: String): OpbDocument = parse(StringCharSource(text))
 
-    /** Parse an OPB [source] into an [OpbProblem], consuming it line by line. */
-    fun parse(source: CharSource): OpbProblem = OpbDecoder.decode(OpbSyntax.parse(source))
+    /** Parse an OPB [source] into an [OpbDocument], consuming it line by line. */
+    fun parse(source: CharSource): OpbDocument = OpbSyntax.parse(source)
 }

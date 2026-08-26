@@ -1,5 +1,6 @@
-package com.eignex.klause.formats.opb
+package com.eignex.klause.lowering.opb
 
+import com.eignex.klause.formats.opb.OpbFormatException
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
@@ -14,6 +15,10 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpbTest {
+
+    private object Opb {
+        fun parse(text: String): OpbProblem = com.eignex.klause.formats.opb.Opb.parse(text).toProblem()
+    }
 
     @Test
     fun `a malformed opb instance is a catchable format exception`() {
