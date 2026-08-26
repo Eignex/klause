@@ -1,21 +1,14 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.propagation.extractConflictBools
-import com.eignex.klause.propagation.extractConflictFactors
-import com.eignex.klause.propagation.extractConflictInts
+import com.eignex.klause.propagation.runRootPropagation
 import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
-import com.eignex.klause.util.EmptyIntArray
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedLongArray
@@ -425,131 +418,7 @@ open class Problem(
         assumptions: Assumptions = Assumptions.None,
         cancellation: Cancellation = Cancellation.Never,
         skipExpensiveBake: Boolean = false,
-    ): PropagationResult {
-        val state = PropagationState(PropagationProblem(this), assumptions)
-        if (!state.seeded) {
-            val lvls = state.conflictLevels ?: EmptyIntArray
-            // Seed contradiction — no factor invocation was the trigger, so the factor
-            // set stays empty (the assumption pair was the load-bearing input).
-            return PropagationResult.Unsat(
-                state.extractConflictBools(lvls),
-                state.extractConflictInts(lvls),
-                lvls,
-            )
-        }
-        val conflict = state.runToFixpoint(
-            allFactors = true,
-            cancellation = cancellation,
-            skipExpensiveBake = skipExpensiveBake,
-        )
-        if (conflict != null) {
-            return PropagationResult.Unsat(
-                state.extractConflictBools(conflict),
-                state.extractConflictInts(conflict),
-                conflict,
-                state.extractConflictFactors(),
-            )
-        }
-
-        // Diff against input: only emit newly-forced facts. Iterates vars in ascending
-        // id order so the resulting primitive arrays are pre-sorted (no separate sort).
-        val bKeys = IntArrayList(initialCapacity = 8)
-        val bVals = ArrayList<Boolean>()
-        for (v in 0 until numBoolVars) {
-            val b = state.boolValues[v] ?: continue
-            if (assumptions.boolValueOrNull(v) == b) continue
-            bKeys.add(v)
-            bVals.add(b)
-        }
-        val iKeys = IntArrayList(initialCapacity = 8)
-        val iVals = LongArrayList(initialCapacity = 8)
-        val iMinKeys = IntArrayList(initialCapacity = 8)
-        val iMinVals = LongArrayList(initialCapacity = 8)
-        val iMaxKeys = IntArrayList(initialCapacity = 8)
-        val iMaxVals = LongArrayList(initialCapacity = 8)
-        val iHoleIds = IntArrayList(initialCapacity = 8)
-        val iHoleVals = LongArrayList(initialCapacity = 8)
-        val iSetKeys = IntArrayList(initialCapacity = 4)
-        val iSetOffsets = IntArrayList(initialCapacity = 4).also { it.add(0) }
-        val iSetVals = LongArrayList(initialCapacity = 8)
-        for (v in 0 until numIntVars) {
-            val d = state.intDomains[v]
-            if (d.min == d.max) {
-                if (assumptions.intValueOrNull(v) == d.min) continue
-                iKeys.add(v)
-                iVals.add(d.min)
-                continue
-            }
-            // A wide-but-sparse reduction (more holes inside [min, max] than surviving values) records
-            // its survivor set compactly instead of one interior hole per excluded value: for a domain
-            // spanning up to millions but holding a handful of values, per-value holes are O(span) to emit
-            // here and to re-apply when seeding. Restricting to the survivors reproduces the identical
-            // folded domain. Gated on a span past [KlauseConfig.bitsetThreshold] — the width klause already
-            // treats as too wide for a bitset — so narrow reductions keep the plain hole path (their holes
-            // are few and cheap, and the hole path carries the pre-existing-seed dedup the survivor path
-            // omits). A full contiguous domain has `size == span`, so `size <= holes` excludes it anyway.
-            val span = d.max - d.min + 1
-            // The survivor path enumerates every present value, so it asks for them and takes the
-            // bound + forEachHole path below when the domain has too many to walk — span-independent,
-            // never enumerating billions of values.
-            val values = if (span > KlauseConfig.current.bitsetThreshold) d.spanOrNull() else null
-            if (values != null && values.size <= d.holeCount) {
-                iSetKeys.add(v)
-                values.forEach { iSetVals.add(it) }
-                iSetOffsets.add(iSetVals.size)
-                continue
-            }
-            // Non-singleton: emit bound tightenings relative to the effective seed bounds.
-            val orig = requireFiniteIntDomains()[v]
-            val seedMin = maxOf(orig.min, assumptions.deductions.intMinOrNull(v) ?: Long.MIN_VALUE)
-            val seedMax = minOf(orig.max, assumptions.deductions.intMaxOrNull(v) ?: Long.MAX_VALUE)
-            if (d.min > seedMin) {
-                iMinKeys.add(v)
-                iMinVals.add(d.min)
-            }
-            if (d.max < seedMax) {
-                iMaxKeys.add(v)
-                iMaxVals.add(d.max)
-            }
-            // Interior holes: values [d] excludes strictly inside its bounds that [orig] still held.
-            // Walk [d]'s actual holes — span-independent for the wide reps — instead of every value
-            // in `(d.min, d.max)`: a wide contiguous domain (spans reaching billions here) has none,
-            // so this is O(holes) rather than O(max − min), which otherwise dominates the whole bake.
-            // Skip values already in the seed assumption's hole set so only newly-derived holes emit.
-            d.forEachHole { value ->
-                if (value in orig) {
-                    var preExisting = false
-                    for (i in 0 until assumptions.deductions.intHoleVarIds.size) {
-                        if (assumptions.deductions.intHoleVarIds[i] == v &&
-                            assumptions.deductions.intHoleValues[i] == value
-                        ) {
-                            preExisting = true
-                            break
-                        }
-                    }
-                    if (!preExisting) {
-                        iHoleIds.add(v)
-                        iHoleVals.add(value)
-                    }
-                }
-            }
-        }
-        return PropagationResult.Implied(
-            boolKeys = bKeys.toIntArray(),
-            boolValues = BooleanArray(bVals.size) { bVals[it] },
-            intKeys = iKeys.toIntArray(),
-            intValues = iVals.toLongArray(),
-            intMinKeys = iMinKeys.toIntArray(),
-            intMinValues = iMinVals.toLongArray(),
-            intMaxKeys = iMaxKeys.toIntArray(),
-            intMaxValues = iMaxVals.toLongArray(),
-            intHoleVarIds = iHoleIds.toIntArray(),
-            intHoleValues = iHoleVals.toLongArray(),
-            intSetKeys = iSetKeys.toIntArray(),
-            intSetOffsets = if (iSetKeys.isEmpty()) EmptyIntArray else iSetOffsets.toIntArray(),
-            intSetValues = iSetVals.toLongArray(),
-        )
-    }
+    ): PropagationResult = runRootPropagation(this, assumptions, cancellation, skipExpensiveBake)
 }
 
 /**
