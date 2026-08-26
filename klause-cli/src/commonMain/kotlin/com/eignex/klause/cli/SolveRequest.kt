@@ -3,11 +3,11 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.result.PresolveStats
 
 /**
@@ -54,11 +54,8 @@ internal sealed interface SolvablePipeline {
 
     /** A complete open-model theory, selected by the solver-side route builder. */
     data class OpenTheory(
-        val model: ProblemSpec,
+        /** Mode-neutral pipeline request; this wrapper owns only output rendering. */
+        val request: OpenTheoryRequest,
         val render: (OpenTheoryAssignment) -> String,
-        /** Objective to minimize over the route, or null to decide satisfiability only. */
-        val objective: LinearObjective? = null,
-        /** Whether [objective] is to be maximized; the driver minimizes its negation. */
-        val maximize: Boolean = false,
     ) : SolvablePipeline
 }

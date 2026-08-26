@@ -16,6 +16,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
+import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
@@ -494,12 +495,10 @@ internal fun differenceTheorySolvable(
     render = render,
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
-        model,
-        { assignment ->
+        OpenTheoryRequest(model, objective, maximize),
+        render = { assignment ->
             render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
         },
-        objective,
-        maximize,
     ),
 )
 
@@ -521,12 +520,10 @@ internal fun generalLiaSolvable(
     render = { error("General LIA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
-        model,
-        { assignment ->
+        OpenTheoryRequest(model, objective, maximize),
+        render = { assignment ->
             render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
         },
-        objective,
-        maximize,
     ),
 )
 
@@ -541,9 +538,14 @@ internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -
     definitionalSweep = null,
     render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(model, render = { assignment ->
-        render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment)
-    }),
+    pipeline = SolvablePipeline.OpenTheory(
+        OpenTheoryRequest(model),
+        render = { assignment ->
+            render(
+                (assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment,
+            )
+        },
+    ),
 )
 
 /** Build an instance whose open mixed rows are decided by exact QF_LIRA, minimizing [objective] when one
@@ -564,12 +566,10 @@ internal fun exactLiraSolvable(
     render = { error("exact LIRA witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
-        model,
-        { assignment ->
+        OpenTheoryRequest(model, objective, maximize),
+        render = { assignment ->
             render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
         },
-        objective,
-        maximize,
     ),
 )
 
