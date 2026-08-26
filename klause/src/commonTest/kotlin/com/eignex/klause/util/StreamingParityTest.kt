@@ -1,6 +1,7 @@
 package com.eignex.klause.util
 
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.opb.Opb
@@ -29,7 +30,7 @@ class StreamingParityTest {
 
     @Test
     fun `dimacs parse is chunk-boundary agnostic`() =
-        assertParity("dimacs", "c comment\r\np cnf 3 2\n1 -2 0\n2 3 0\n") { Dimacs.parse(it) }
+        assertParity("dimacs", "c comment\r\np cnf 3 2\n1 -2 0\n2 3 0\n") { Dimacs.parse(it).toProblem() }
 
     @Test
     fun `opb parse is chunk-boundary agnostic`() =

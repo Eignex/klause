@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.solver.Sample
 
 /**
@@ -20,7 +21,7 @@ internal object WcnfMode : CliMode {
         override fun flags(): List<FlagSpec> = emptyList()
 
         override fun load(path: String, common: CommonOptions): Solvable {
-            val parsed = Dimacs.parseWcnf(openFileSource(path))
+            val parsed = Dimacs.parseWcnf(openFileSource(path)).toProblem()
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
                     "soft=${parsed.problem.numBoolVars - parsed.numOriginalBoolVars} factors=${parsed.problem.numFactors}"

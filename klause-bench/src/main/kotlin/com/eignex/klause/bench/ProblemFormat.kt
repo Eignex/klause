@@ -2,6 +2,7 @@ package com.eignex.klause.bench
 
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.lowering.mps.toProblem
@@ -36,14 +37,14 @@ internal interface ProblemFormat {
 internal object DimacsFormat : ProblemFormat {
     override val format = Format.DIMACS
     override val inProcess = true
-    override fun ingest(file: File) = Ingested(Dimacs.parse(file.readText()))
+    override fun ingest(file: File) = Ingested(Dimacs.parse(file.readText()).toProblem())
 }
 
 internal object WcnfFormat : ProblemFormat {
     override val format = Format.WCNF
     override val inProcess = true
     override fun ingest(file: File): Ingested {
-        val wcnf = Dimacs.parseWcnf(file.readText())
+        val wcnf = Dimacs.parseWcnf(file.readText()).toProblem()
         return Ingested(wcnf.problem, wcnf.objective)
     }
 }
