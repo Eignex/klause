@@ -13,7 +13,6 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedLongArray
 import kotlin.time.Duration
-import kotlin.time.TimeSource
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
@@ -441,105 +440,4 @@ open class Problem(
         cancellation: Cancellation = Cancellation.Never,
         skipExpensiveBake: Boolean = false,
     ): PropagationResult = runRootPropagation(this, assumptions, cancellation, skipExpensiveBake)
-}
-
-/**
- * A [Problem] whose root bake is guaranteed to have run: its [Problem.requireFiniteIntDomains] carry the
- * root-propagation fold, and it is the only problem type the solvers, the model counter,
- * sampling and the LP engine accept. Produced only by [Problem.bake] (or the presolve pipeline). A raw
- * [Problem] is the supertype, so handing an un-baked model to a solver is a compile error — the caller
- * must [Problem.bake] it first, which is where the parse-vs-solve boundary is enforced by the type system.
- */
-class BakedProblem internal constructor(
-    numBoolVars: Int,
-    numIntVars: Int,
-    intDomains: Array<IntDomain>,
-    factors: Array<Factor>,
-    seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-    impliedFactorMask: BooleanArray? = null,
-    hasSymmetryBreaking: Boolean = false,
-    // Undefaulted deliberately. A rebuild that omitted these declared the model's continuous columns away
-    // while keeping factors that reference them, which the invariant below catches only at construction
-    // and only when such a factor exists. Stating them is cheap; forgetting them was not.
-    numRealVars: Int,
-    realLower: DoubleArray,
-    realUpper: DoubleArray,
-    openIntLo: BooleanArray? = null,
-    openIntHi: BooleanArray? = null,
-    packedOpenIntLo: Bits? = null,
-    packedOpenIntHi: Bits? = null,
-    modelBounds: IntBounds? = null,
-    cancellation: Cancellation = Cancellation.Never,
-    /**
-     * When `true`, [requireFiniteIntDomains] already carry the root-bake fold (an incremental presolve pass view or a
-     * presolve rebuild supplies its re-propagated array): share the array and skip the fold. When `false`
-     * (the [Problem.bake] path), [requireFiniteIntDomains] are the raw declared domains and this constructor folds the
-     * base bake into them.
-     */
-    alreadyFolded: Boolean = false,
-) : Problem(
-    numBoolVars = numBoolVars,
-    numIntVars = numIntVars,
-    intDomains = intDomains,
-    factors = factors,
-    seedDeductions = seedDeductions,
-    cancellation = cancellation,
-    impliedFactorMask = impliedFactorMask,
-    hasSymmetryBreaking = hasSymmetryBreaking,
-    sharedDomains = alreadyFolded,
-    numRealVars = numRealVars,
-    realLower = realLower,
-    realUpper = realUpper,
-    openIntLo = openIntLo,
-    openIntHi = openIntHi,
-    packedOpenIntLo = packedOpenIntLo,
-    packedOpenIntHi = packedOpenIntHi,
-    modelBounds = modelBounds,
-) {
-    init {
-        if (!alreadyFolded) {
-            val mark = TimeSource.Monotonic.markNow()
-            foldIntoDomains(baked)
-            bakeElapsed = mark.elapsedNow()
-        }
-    }
-
-    /** Convenience overload taking factors as a [List] (stored as an [Array]); mirrors [Problem]'s. */
-    internal constructor(
-        numBoolVars: Int,
-        numIntVars: Int,
-        intDomains: Array<IntDomain>,
-        factors: List<Factor>,
-        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-        impliedFactorMask: BooleanArray? = null,
-        hasSymmetryBreaking: Boolean = false,
-        numRealVars: Int = 0,
-        realLower: DoubleArray = EmptyDoubleArray,
-        realUpper: DoubleArray = EmptyDoubleArray,
-        openIntLo: BooleanArray? = null,
-        openIntHi: BooleanArray? = null,
-        packedOpenIntLo: Bits? = null,
-        packedOpenIntHi: Bits? = null,
-        modelBounds: IntBounds? = null,
-        cancellation: Cancellation = Cancellation.Never,
-        alreadyFolded: Boolean = false,
-    ) : this(
-        numBoolVars = numBoolVars,
-        numIntVars = numIntVars,
-        intDomains = intDomains,
-        factors = Array(factors.size) { factors[it] },
-        seedDeductions = seedDeductions,
-        impliedFactorMask = impliedFactorMask,
-        hasSymmetryBreaking = hasSymmetryBreaking,
-        numRealVars = numRealVars,
-        realLower = realLower,
-        realUpper = realUpper,
-        openIntLo = openIntLo,
-        openIntHi = openIntHi,
-        packedOpenIntLo = packedOpenIntLo,
-        packedOpenIntHi = packedOpenIntHi,
-        modelBounds = modelBounds,
-        cancellation = cancellation,
-        alreadyFolded = alreadyFolded,
-    )
 }
