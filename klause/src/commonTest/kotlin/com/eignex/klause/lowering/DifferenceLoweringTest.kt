@@ -1,11 +1,14 @@
-package com.eignex.klause.arithmetic.difference
+package com.eignex.klause.lowering
 
+import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.Potentials
+import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
@@ -21,15 +24,16 @@ import kotlin.test.assertTrue
  * instance is clauses and reified rows around a core of differences, so collecting must compose with
  * structure it does not understand rather than refusing the model.
  */
-class DifferenceFragmentTest {
+class DifferenceLoweringTest {
 
     private fun open(n: Int) = Array(n) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) }
 
     private fun frag(factors: List<Factor>, n: Int, domains: Array<IntDomain> = open(n)) =
         differenceFragmentOf(factors.toTypedArray(), n, bounds(domains))
 
-    private fun bounds(domains: Array<IntDomain>) = IntBounds.fromOpenSides(
-        domains,
+    private fun bounds(domains: Array<IntDomain>) = IntBounds.fromFiniteBounds(
+        LongArray(domains.size) { domains[it].min },
+        LongArray(domains.size) { domains[it].max },
         BooleanArray(domains.size) { domains[it].min == Long.MIN_VALUE },
         BooleanArray(domains.size) { domains[it].max == Long.MAX_VALUE },
         null,
@@ -47,7 +51,14 @@ class DifferenceFragmentTest {
     @Test
     fun `an open model side does not become a difference range edge`() {
         val domains = arrayOf(IntDomain(-8, 8))
-        val bounds = IntBounds.fromOpenSides(domains, booleanArrayOf(true), booleanArrayOf(true), null, null)
+        val bounds = IntBounds.fromFiniteBounds(
+            longArrayOf(-8),
+            longArrayOf(8),
+            booleanArrayOf(true),
+            booleanArrayOf(true),
+            null,
+            null,
+        )
 
         val fragment = assertNotNull(
             differenceFragmentOf(arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)), 1, bounds),

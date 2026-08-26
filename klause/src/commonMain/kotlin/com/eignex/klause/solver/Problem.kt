@@ -2,6 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationState
@@ -135,13 +136,16 @@ open class Problem(
      */
     val intBounds: IntBounds = modelBounds ?: run {
         require(hasFiniteIntDomains) { "symbolic integer columns require source model bounds" }
-        IntBounds.fromOpenSides(
-            domains = requireFiniteIntDomains(),
-            openLo = openIntLo,
-            openHi = openIntHi,
-            packedOpenLo = packedOpenIntLo,
-            packedOpenHi = packedOpenIntHi,
-        )
+        requireFiniteIntDomains().let { domains ->
+            IntBounds.fromFiniteBounds(
+                lowerBounds = LongArray(numIntVars) { domains[it].min },
+                upperBounds = LongArray(numIntVars) { domains[it].max },
+                openLo = openIntLo,
+                openHi = openIntHi,
+                packedOpenLo = packedOpenIntLo,
+                packedOpenHi = packedOpenIntHi,
+            )
+        }
     }
 
     init {

@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.arithmetic.WideConstants
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.LpBuilder
 import com.eignex.klause.lp.Relation
@@ -906,7 +907,7 @@ private fun BigFraction.floor(): BigInteger {
     return if (num < BigInteger.ZERO && num % den != BigInteger.ZERO) quotient - BigInteger.ONE else quotient
 }
 
-private fun com.eignex.klause.solver.IntBounds.lowerOrNull(variable: Int): Long? = if (hasLower(
+private fun IntBounds.lowerOrNull(variable: Int): Long? = if (hasLower(
         variable,
     )
 ) {
@@ -915,7 +916,7 @@ private fun com.eignex.klause.solver.IntBounds.lowerOrNull(variable: Int): Long?
     null
 }
 
-private fun com.eignex.klause.solver.IntBounds.upperOrNull(variable: Int): Long? = if (hasUpper(
+private fun IntBounds.upperOrNull(variable: Int): Long? = if (hasUpper(
         variable,
     )
 ) {

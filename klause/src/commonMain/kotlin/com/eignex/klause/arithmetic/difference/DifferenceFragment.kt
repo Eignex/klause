@@ -1,10 +1,6 @@
 package com.eignex.klause.arithmetic.difference
 
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntBounds
 
 internal class DifferenceFragment(val edges: List<DifferenceEdge>) {
     val nodes: IntArray = run {
@@ -56,114 +52,6 @@ internal fun indexOfSorted(sorted: IntArray, value: Int): Int {
     }
     return -1
 }
-
-internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): DifferenceFragment? {
-    val zero = DifferenceFragment.ZERO
-    val edges = ArrayList<DifferenceEdge>()
-    factors.forEach { f ->
-        when (f) {
-            is Linear ->
-                f.integerConstants?.let { row ->
-                    appendDifferenceEdges(f.vars, row::coeff, f.op, row.bound, zero, DifferenceEdge.ALWAYS, edges)
-                }
-
-            is ReifiedLinear ->
-                // The aux is an equivalence, so both polarities constrain: the row under a true aux, its
-                // integer negation under a false one. A wide row has no 64-bit reading, so its shape
-                // cannot be read here at all.
-                f.integerConstants?.let { row ->
-                    appendDifferenceEdges(
-                        f.vars,
-                        row::coeff,
-                        f.op,
-                        row.bound,
-                        zero,
-                        Lit.make(f.auxBoolVar, true),
-                        edges,
-                    )
-                    appendNegatedDifferenceEdges(
-                        f.vars,
-                        row::coeff,
-                        f.op,
-                        row.bound,
-                        zero,
-                        Lit.make(f.auxBoolVar, false),
-                        edges,
-                    )
-                }
-
-            else -> Unit
-        }
-    }
-    if (edges.isEmpty()) return null
-    val mentioned = HashSet<Int>()
-    for (e in edges) {
-        if (e.source != zero) mentioned.add(e.source)
-        if (e.target != zero) mentioned.add(e.target)
-    }
-    for (v in mentioned.toIntArray().sortedArray()) {
-        if (v >= numIntVars) continue
-        if (intBounds.hasUpper(v)) edges.add(DifferenceEdge(zero, v, intBounds.upper(v), domainBound = true))
-        if (intBounds.hasLower(v)) edges.add(DifferenceEdge(v, zero, -intBounds.lower(v), domainBound = true))
-    }
-    return DifferenceFragment(edges)
-}
-
-internal fun hasCompleteDifferenceCoverage(factors: Array<Factor>): Boolean {
-    val scratch = ArrayList<DifferenceEdge>(2)
-    for (factor in factors) {
-        if (factor.intVars.isEmpty()) continue
-        scratch.clear()
-        when (factor) {
-            is Linear -> {
-                val row = factor.integerConstants ?: return false
-                if (!appendDifferenceEdges(
-                        factor.vars,
-                        row::coeff,
-                        factor.op,
-                        row.bound,
-                        DifferenceFragment.ZERO,
-                        DifferenceEdge.ALWAYS,
-                        scratch,
-                    )
-                ) {
-                    return false
-                }
-            }
-
-            is ReifiedLinear -> {
-                val row = factor.integerConstants ?: return false
-                if (!appendDifferenceEdges(
-                        factor.vars,
-                        row::coeff,
-                        factor.op,
-                        row.bound,
-                        DifferenceFragment.ZERO,
-                        Lit.make(factor.auxBoolVar, true),
-                        scratch,
-                    ) || !appendNegatedDifferenceEdges(
-                        factor.vars,
-                        row::coeff,
-                        factor.op,
-                        row.bound,
-                        DifferenceFragment.ZERO,
-                        Lit.make(factor.auxBoolVar, false),
-                        scratch,
-                    )
-                ) {
-                    return false
-                }
-            }
-
-            else -> return false
-        }
-    }
-    return true
-}
-
-internal fun supportsCompleteDifferenceTheory(factors: Array<Factor>, numIntVars: Int, intBounds: IntBounds): Boolean =
-    hasCompleteDifferenceCoverage(factors) &&
-        (differenceFragmentOf(factors, numIntVars, intBounds)?.carriesAPotential() ?: true)
 
 /** One value per integer column witnessing feasibility, or why none was produced. */
 internal fun DifferenceFragment.potentialSample(

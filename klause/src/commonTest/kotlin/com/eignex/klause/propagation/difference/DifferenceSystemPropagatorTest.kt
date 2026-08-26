@@ -1,10 +1,10 @@
 package com.eignex.klause.propagation.difference
 
-import com.eignex.klause.arithmetic.difference.differenceFragmentOf
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.lowering.differenceFragmentOf
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.Assumptions
 import com.eignex.klause.solver.Factor
@@ -37,8 +37,9 @@ class DifferenceSystemPropagatorTest {
         rows: List<ReifiedLinear>,
         domains: Array<IntDomain> = Array(numInts) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) },
     ): Problem {
-        val bounds = IntBounds.fromOpenSides(
-            domains,
+        val bounds = IntBounds.fromFiniteBounds(
+            LongArray(numInts) { domains[it].min },
+            LongArray(numInts) { domains[it].max },
             BooleanArray(numInts) { domains[it].min == Long.MIN_VALUE },
             BooleanArray(numInts) { domains[it].max == Long.MAX_VALUE },
             null,

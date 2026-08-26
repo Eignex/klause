@@ -4872,6 +4872,22 @@ final class com.eignex.klause.ir/BoolVars : com.eignex.klause.ir/VarList { // co
         final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/BoolVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
 }
 
+final class com.eignex.klause.ir/IntBounds { // com.eignex.klause.ir/IntBounds|null[0]
+    final val size // com.eignex.klause.ir/IntBounds.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/IntBounds.size.<get-size>|<get-size>(){}[0]
+
+    final fun hasLower(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/IntBounds.hasLower|hasLower(kotlin.Int){}[0]
+    final fun hasUpper(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/IntBounds.hasUpper|hasUpper(kotlin.Int){}[0]
+    final fun isOpenLower(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/IntBounds.isOpenLower|isOpenLower(kotlin.Int){}[0]
+    final fun isOpenUpper(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/IntBounds.isOpenUpper|isOpenUpper(kotlin.Int){}[0]
+    final fun lower(kotlin/Int): kotlin/Long // com.eignex.klause.ir/IntBounds.lower|lower(kotlin.Int){}[0]
+    final fun lowerAsBigInteger(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.ir/IntBounds.lowerAsBigInteger|lowerAsBigInteger(kotlin.Int){}[0]
+    final fun upper(kotlin/Int): kotlin/Long // com.eignex.klause.ir/IntBounds.upper|upper(kotlin.Int){}[0]
+    final fun upperAsBigInteger(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.ir/IntBounds.upperAsBigInteger|upperAsBigInteger(kotlin.Int){}[0]
+
+    final object Companion // com.eignex.klause.ir/IntBounds.Companion|null[0]
+}
+
 final class com.eignex.klause.ir/IntVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/IntVars|null[0]
     constructor <init>(kotlin/IntArray) // com.eignex.klause.ir/IntVars.<init>|<init>(kotlin.IntArray){}[0]
 
@@ -9703,22 +9719,6 @@ final class com.eignex.klause.solver/FiniteIntColumns : com.eignex.klause.solver
     final fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/FiniteIntColumns.column|column(kotlin.Int){}[0]
 }
 
-final class com.eignex.klause.solver/IntBounds { // com.eignex.klause.solver/IntBounds|null[0]
-    final val size // com.eignex.klause.solver/IntBounds.size|{}size[0]
-        final fun <get-size>(): kotlin/Int // com.eignex.klause.solver/IntBounds.size.<get-size>|<get-size>(){}[0]
-
-    final fun hasLower(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/IntBounds.hasLower|hasLower(kotlin.Int){}[0]
-    final fun hasUpper(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/IntBounds.hasUpper|hasUpper(kotlin.Int){}[0]
-    final fun isOpenLower(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/IntBounds.isOpenLower|isOpenLower(kotlin.Int){}[0]
-    final fun isOpenUpper(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/IntBounds.isOpenUpper|isOpenUpper(kotlin.Int){}[0]
-    final fun lower(kotlin/Int): kotlin/Long // com.eignex.klause.solver/IntBounds.lower|lower(kotlin.Int){}[0]
-    final fun lowerAsBigInteger(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver/IntBounds.lowerAsBigInteger|lowerAsBigInteger(kotlin.Int){}[0]
-    final fun upper(kotlin/Int): kotlin/Long // com.eignex.klause.solver/IntBounds.upper|upper(kotlin.Int){}[0]
-    final fun upperAsBigInteger(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger? // com.eignex.klause.solver/IntBounds.upperAsBigInteger|upperAsBigInteger(kotlin.Int){}[0]
-
-    final object Companion // com.eignex.klause.solver/IntBounds.Companion|null[0]
-}
-
 final class com.eignex.klause.solver/IntConsts : com.eignex.klause.solver/LongConstList { // com.eignex.klause.solver/IntConsts|null[0]
     constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/IntConsts.<init>|<init>(kotlin.IntArray){}[0]
 
@@ -9756,7 +9756,7 @@ final class com.eignex.klause.solver/MixedIntColumns : com.eignex.klause.solver/
 }
 
 final class com.eignex.klause.solver/ProblemSpec { // com.eignex.klause.solver/ProblemSpec|null[0]
-    constructor <init>(kotlin/Int, com.eignex.klause.solver/IntBounds, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver/ProblemSpec.<init>|<init>(kotlin.Int;com.eignex.klause.solver.IntBounds;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
+    constructor <init>(kotlin/Int, com.eignex.klause.ir/IntBounds, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.solver/ProblemSpec.<init>|<init>(kotlin.Int;com.eignex.klause.ir.IntBounds;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
 
     final val cancellation // com.eignex.klause.solver/ProblemSpec.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.solver/Cancellation // com.eignex.klause.solver/ProblemSpec.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
@@ -9767,7 +9767,7 @@ final class com.eignex.klause.solver/ProblemSpec { // com.eignex.klause.solver/P
     final val impliedFactorMask // com.eignex.klause.solver/ProblemSpec.impliedFactorMask|{}impliedFactorMask[0]
         final fun <get-impliedFactorMask>(): kotlin/BooleanArray? // com.eignex.klause.solver/ProblemSpec.impliedFactorMask.<get-impliedFactorMask>|<get-impliedFactorMask>(){}[0]
     final val intBounds // com.eignex.klause.solver/ProblemSpec.intBounds|{}intBounds[0]
-        final fun <get-intBounds>(): com.eignex.klause.solver/IntBounds // com.eignex.klause.solver/ProblemSpec.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
+        final fun <get-intBounds>(): com.eignex.klause.ir/IntBounds // com.eignex.klause.solver/ProblemSpec.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
     final val numBoolVars // com.eignex.klause.solver/ProblemSpec.numBoolVars|{}numBoolVars[0]
         final fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.solver/ProblemSpec.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
     final val numIntVars // com.eignex.klause.solver/ProblemSpec.numIntVars|{}numIntVars[0]
@@ -10135,9 +10135,9 @@ open class com.eignex.klause.schema/VariableSchema : com.eignex.skema/Schema<com
 }
 
 open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Problem|null[0]
-    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.solver/IntColumns, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.solver/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.solver.IntColumns;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.solver.IntBounds?){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin.collections/List<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.solver/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.collections.List<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.solver.IntBounds?){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.solver/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.solver.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.solver/IntColumns, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.solver.IntColumns;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin.collections/List<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.collections.List<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.solver/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.solver.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
 
     final val baked // com.eignex.klause.solver/Problem.baked|{}baked[0]
         final fun <get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.baked.<get-baked>|<get-baked>(){}[0]
@@ -10152,7 +10152,7 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
     final val impliedFactorMask // com.eignex.klause.solver/Problem.impliedFactorMask|{}impliedFactorMask[0]
         final fun <get-impliedFactorMask>(): kotlin/BooleanArray? // com.eignex.klause.solver/Problem.impliedFactorMask.<get-impliedFactorMask>|<get-impliedFactorMask>(){}[0]
     final val intBounds // com.eignex.klause.solver/Problem.intBounds|{}intBounds[0]
-        final fun <get-intBounds>(): com.eignex.klause.solver/IntBounds // com.eignex.klause.solver/Problem.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
+        final fun <get-intBounds>(): com.eignex.klause.ir/IntBounds // com.eignex.klause.solver/Problem.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
     final val intColumns // com.eignex.klause.solver/Problem.intColumns|{}intColumns[0]
         final fun <get-intColumns>(): com.eignex.klause.solver/IntColumns // com.eignex.klause.solver/Problem.intColumns.<get-intColumns>|<get-intColumns>(){}[0]
     final val isNativeSatEligible // com.eignex.klause.solver/Problem.isNativeSatEligible|{}isNativeSatEligible[0]
