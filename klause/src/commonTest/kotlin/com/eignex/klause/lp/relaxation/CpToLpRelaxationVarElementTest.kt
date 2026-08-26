@@ -2,7 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -43,7 +43,7 @@ class CpToLpRelaxationVarElementTest {
     fun `var-array hull bound is sound for a free index`() {
         // arr[0] ∈ [4,10], arr[1] ∈ [2,8], idx ∈ {0,1}. True integer min(result) = 2 (idx=1, arr[1]=2).
         val sol = minResult(IntDomain(0, 1), IntDomain(4, 10), IntDomain(2, 8))
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertTrue(sol.objectiveValue <= 2.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 2")
     }
 
@@ -53,7 +53,7 @@ class CpToLpRelaxationVarElementTest {
         // is exactly the pinned entry's own minimum.
         listOf(0 to 4.0, 1 to 2.0).forEach { (position, expected) ->
             val sol = minResult(IntDomain(position.toLong(), position.toLong()), IntDomain(4, 10), IntDomain(2, 8))
-            assertEquals(LpStatus.OPTIMAL, sol.status, "idx=$position: status")
+            assertEquals(LpVerdict.OPTIMAL, sol.status, "idx=$position: status")
             assertEquals(expected, sol.objectiveValue, eps, "idx=$position: LP min is arr[$position]'s minimum")
         }
     }
@@ -62,7 +62,7 @@ class CpToLpRelaxationVarElementTest {
     fun `var-array hull bound stays sound when both arrays are tightened high`() {
         // arr[0] ∈ [6,9], arr[1] ∈ [5,7], idx ∈ {0,1}. True integer min(result) = 5.
         val sol = minResult(IntDomain(0, 1), IntDomain(6, 9), IntDomain(5, 7))
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertTrue(sol.objectiveValue <= 5.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 5")
     }
 }

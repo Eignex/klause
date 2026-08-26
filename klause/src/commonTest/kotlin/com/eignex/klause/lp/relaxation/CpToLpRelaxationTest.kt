@@ -7,7 +7,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
@@ -51,7 +51,7 @@ class CpToLpRelaxationTest {
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 0L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(2.0, sol.objectiveValue, eps)
         assertEquals(2.0, sol.primal(intCol(r, 0)), eps)
     }
@@ -61,7 +61,7 @@ class CpToLpRelaxationTest {
         val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>())
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L), constant = 100L))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(100L, r.objectiveConstant)
         // LP objective (cost·x) is 0 at x0 = 0; the true bound is that plus the carried constant.
         assertEquals(0.0, sol.objectiveValue, eps)
@@ -88,7 +88,7 @@ class CpToLpRelaxationTest {
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(0.0, sol.primal(intCol(r, 0)), eps)
     }
 
@@ -112,7 +112,7 @@ class CpToLpRelaxationTest {
         )
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(8.0, sol.primal(intCol(r, 0)), eps)
     }
 
@@ -129,7 +129,7 @@ class CpToLpRelaxationTest {
         )
         val (sol, _) = solve(p, LinearObjective(boolWeights = longArrayOf(1L, 1L, 1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(2.0, sol.objectiveValue, eps)
     }
 
@@ -147,7 +147,7 @@ class CpToLpRelaxationTest {
         )
         val (sol, _) = solve(p, LinearObjective(boolWeights = longArrayOf(-1L, -1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         // min -(b0+b1) = -5/3  ->  max b0+b1 = 5/3.
         assertEquals(-5.0 / 3.0, sol.objectiveValue, eps)
     }
@@ -179,6 +179,6 @@ class CpToLpRelaxationTest {
         // No LP-emittable factor and no objective: a trivially feasible, unconstrained relaxation.
         val p = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>())
         val (sol, _) = solve(p, null)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
     }
 }

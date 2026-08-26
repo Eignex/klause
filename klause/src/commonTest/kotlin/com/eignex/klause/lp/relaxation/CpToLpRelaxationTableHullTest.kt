@@ -2,7 +2,7 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.lp.LpSolution
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
@@ -50,7 +50,7 @@ class CpToLpRelaxationTableHullTest {
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(4.0, sol.objectiveValue, eps)
         assertEquals(4.0, sol.primal(intCol(r, 0)) + sol.primal(intCol(r, 1)), eps)
     }
@@ -72,7 +72,7 @@ class CpToLpRelaxationTableHullTest {
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 1))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(1L, 1L)))
 
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(4.0, sol.objectiveValue, eps)
         assertEquals(4.0, sol.primal(intCol(r, 0)), eps)
         assertEquals(0.0, sol.primal(intCol(r, 1)), eps)
@@ -84,7 +84,7 @@ class CpToLpRelaxationTableHullTest {
         // direction lands on a vertex tuple, confirming the hull is exactly those tuples' convex set.
         val p = tableProblem(IntDomain(0, 4), IntDomain(0, 5))
         val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(-1L, 0L))) // maximize x0
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         assertEquals(4.0, sol.primal(intCol(r, 0)), eps) // (4,0) is the max-x0 vertex
         // x0+x1 of any LP point lies within the tuple range; the three tuples all sum to <= 5.
         assertTrue(sol.primal(intCol(r, 0)) + sol.primal(intCol(r, 1)) <= 5.0 + eps)

@@ -6,7 +6,7 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LpStatus
+import com.eignex.klause.lp.LpVerdict
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.solveLp
 import com.eignex.klause.propagation.PropagationSession
@@ -60,7 +60,7 @@ class CumulativeRelaxationTest {
         val obj = LinearObjective(intCoefficients = LongArray(problem.numIntVars) { if (it == makespanVar) 1L else 0L })
         val relaxation = CpToLpRelaxation(problem, obj, cumulative = cumulative).build(PropagationSession(problem))
         val sol = solveLp(relaxation.model)
-        assertEquals(LpStatus.OPTIMAL, sol.status)
+        assertEquals(LpVerdict.OPTIMAL, sol.status)
         return sol.objectiveValue
     }
 

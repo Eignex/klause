@@ -1,17 +1,5 @@
 package com.eignex.klause.lp
 
-/** Outcome of an LP solve. */
-internal enum class LpStatus {
-    /** An optimal vertex was found. */
-    OPTIMAL,
-
-    /** The LP has no feasible point. For branch-and-bound this means the subtree is infeasible. */
-    INFEASIBLE,
-
-    /** The objective is unbounded below (minimization). Cannot happen when every variable is bounded. */
-    UNBOUNDED,
-}
-
 /** Where a variable sits. Nonbasic variables are pinned to a finite bound; basic ones float. */
 internal enum class VarStatus {
     /** Basic: the variable floats; its value is read off the basis. */
