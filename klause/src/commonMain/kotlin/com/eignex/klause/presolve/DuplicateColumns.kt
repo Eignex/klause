@@ -34,7 +34,7 @@ internal object DuplicateColumns {
      * **What is *not* merged** (each would break the argument above):
      *  - A variable the objective reads ([objectiveIntVars]); the objective names variable ids
      *    directly and the engine optimises over the presolved problem, so folding one objective
-     *    variable into another would silently rewrite the objective. Mirrors [AffineSingletons].
+     *    variable into another would silently rewrite the objective. Mirrors affine elimination.
      *  - A non-contiguous (holed) domain on either side: the split could land in a hole, so the
      *    aggregate would admit a `z` neither original pair can realise.
      *  - A variable occurring in any non-[Linear] factor: a global / reified row needs it as a genuine
