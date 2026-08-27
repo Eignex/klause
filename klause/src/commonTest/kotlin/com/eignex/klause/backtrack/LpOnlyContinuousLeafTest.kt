@@ -54,6 +54,17 @@ class LpOnlyContinuousLeafTest {
     }
 
     @Test
+    fun `a rational leaf witness is read back in real source coordinates`() {
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0 / 3.0), intArrayOf(0), LinearOp.EQ, 3L)
+        val p = problem(0, emptyArray(), 7.0, 10.0, row)
+
+        val result = leafRealFeasibility(p, objective = null, sample = Sample(booleanArrayOf(), longArrayOf()))
+
+        assertEquals(LpVerdict.OPTIMAL, result.verdict)
+        assertEquals(9.0, result.reals[0], absoluteTolerance = 1e-9)
+    }
+
+    @Test
     fun `an infeasible system over a lower-unbounded real column is unsat`() {
         // x >= 6 and x <= 5 over x in (-inf, +inf): once, folding the probe stand-in into the rhs
         // doubles collapsed both rows onto the same right-hand side and the leaf blessed a false SAT.
