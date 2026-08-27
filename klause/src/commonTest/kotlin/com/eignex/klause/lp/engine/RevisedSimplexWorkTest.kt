@@ -95,6 +95,23 @@ class RevisedSimplexWorkTest {
     }
 
     @Test
+    fun `measuring degeneracy for the budget does not charge the budget`() {
+        val plain = RevisedSimplex(cover())
+        assertNotNull(plain.solve(null))
+
+        val tracking = RevisedSimplex(cover(), trackDegeneracy = true)
+        assertNotNull(tracking.solve(null))
+
+        // A meter that grew when the policy reading it was switched on would be measuring itself, and a
+        // budget derived from it would depend on whether it was in use.
+        assertEquals(
+            plain.lastWorkOps,
+            tracking.lastWorkOps,
+            "the degeneracy pass is instrumentation for the policy, not work the solve did",
+        )
+    }
+
+    @Test
     fun `a pivot costs a different amount on a different model`() {
         val small = RevisedSimplex(cover())
         val smallResult = assertNotNull(small.solve(null))

@@ -128,13 +128,28 @@ internal class RevisedSimplex(
      */
     private var degenerateColumns = 0
 
-    /** Count nonbasic columns with zero reduced cost against duals [y]. */
+    /**
+     * Count nonbasic columns with zero reduced cost against duals [y].
+     *
+     * Deliberately does not charge [work]: this pass exists to inform the budgeting policy, and a meter
+     * that grows when the policy is switched on would be measuring itself — budgets derived from it
+     * would then depend on whether they are in use.
+     */
     private fun recordDegeneracy(y: DoubleArray) {
         if (!trackDegeneracy) return
         var count = 0
         for (j in 0 until numVars) {
             if (status[j] == VarStatus.BASIC) continue
-            if (abs(model.costD(j) - dotColumn(y, j)) <= TOL) count++
+            val reduced = if (j >= n) {
+                model.costD(j) - y[j - n]
+            } else {
+                var acc = 0.0
+                val rows = colRows[j]
+                val vals = colVals[j]
+                for (k in rows.indices) acc += y[rows[k]] * vals[k]
+                model.costD(j) - acc
+            }
+            if (abs(reduced) <= TOL) count++
         }
         degenerateColumns = count
     }
