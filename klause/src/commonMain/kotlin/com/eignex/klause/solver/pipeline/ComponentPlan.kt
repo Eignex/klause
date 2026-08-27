@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FiniteIntColumns
 import com.eignex.klause.solver.IntColumn
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.MixedIntColumns
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemSpec

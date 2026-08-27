@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random

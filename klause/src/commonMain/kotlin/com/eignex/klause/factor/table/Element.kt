@@ -15,7 +15,7 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.IntArrayList
 
 /**

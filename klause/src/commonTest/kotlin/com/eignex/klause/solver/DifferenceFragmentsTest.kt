@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.potentialSample

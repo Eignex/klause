@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.scheduling.internals
 
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.values
 import kotlin.math.max
 import kotlin.math.min
 

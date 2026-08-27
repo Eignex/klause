@@ -1,5 +1,7 @@
 package com.eignex.klause.util
 
+import com.eignex.klause.ir.IntDomain
+
 /**
  * Binary search for [element] in a sorted [IntArray]. Multiplatform replacement for
  * `kotlin.collections.IntArray.binarySearch`, which is JVM-only (it delegates to
@@ -46,7 +48,7 @@ internal fun IntArray.binarySearchInt(element: Int, fromIndex: Int = 0, toIndex:
 }
 
 /** [binarySearchInt] for a sorted [LongArray] — same return contract. Used by the wide-value
- *  [com.eignex.klause.solver.intdomain.SurvivorsDomain] whose present values may exceed 32-bit range. */
+ *  [com.eignex.klause.ir.intdomain.SurvivorsDomain] whose present values may exceed 32-bit range. */
 internal fun LongArray.binarySearchLong(element: Long, fromIndex: Int = 0, toIndex: Int = size): Int {
     var lo = fromIndex
     var len = toIndex - fromIndex

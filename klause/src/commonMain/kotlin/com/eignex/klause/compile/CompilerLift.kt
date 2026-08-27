@@ -21,7 +21,7 @@ import com.eignex.klause.model.IntScale
 import com.eignex.klause.model.IntSum
 import com.eignex.klause.model.Not
 import com.eignex.klause.model.SetCard
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 
 /**
  * Affine-fragment lift for [Lowering]. Rewrites a tree of [IntExpr] so the

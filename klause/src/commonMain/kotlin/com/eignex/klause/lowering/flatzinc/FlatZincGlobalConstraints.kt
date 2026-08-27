@@ -21,7 +21,7 @@ import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.packLayeredMdd
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList

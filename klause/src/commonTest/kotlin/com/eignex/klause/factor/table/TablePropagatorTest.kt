@@ -7,10 +7,10 @@ import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.intdomain.SurvivorsDomain
+import com.eignex.klause.ir.intdomain.SurvivorsDomain
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -7,7 +7,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.StructuralKey

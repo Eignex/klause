@@ -3,7 +3,7 @@ package com.eignex.klause.factor.circuit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 import kotlin.test.Test

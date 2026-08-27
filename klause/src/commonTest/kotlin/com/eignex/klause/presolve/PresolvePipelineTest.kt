@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test

@@ -13,14 +13,14 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList
 import com.eignex.klause.solver.VarRemap
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains

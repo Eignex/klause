@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.randomValue
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.util.MutableIntIntMap
 import kotlin.random.Random
 

@@ -6,8 +6,8 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.LongHashSet
 import com.eignex.klause.util.MutableLongIntMap
 

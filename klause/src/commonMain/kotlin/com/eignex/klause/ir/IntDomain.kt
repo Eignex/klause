@@ -1,6 +1,6 @@
-package com.eignex.klause.solver
+package com.eignex.klause.ir
 
-import com.eignex.klause.solver.intdomain.ContiguousDomain
+import com.eignex.klause.ir.intdomain.ContiguousDomain
 import kotlin.random.Random
 
 /** Primitive-`Int` visitor for the [IntDomain] iteration methods. A `fun interface` (not
@@ -14,19 +14,19 @@ fun interface IntConsumer {
 
 /**
  * Integer-variable domain: conceptually a finite set of integers. Physically it is one of a small,
- * fixed family of concrete representations (in `com.eignex.klause.solver.intdomain`), each chosen at
+ * fixed family of concrete representations (in `com.eignex.klause.ir.intdomain`), each chosen at
  * construction so storage and the hot membership / iteration paths stay compact regardless of how
  * wide the declared span is (spans here reach into the tens of millions):
  *
- *  - [com.eignex.klause.solver.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
+ *  - [com.eignex.klause.ir.intdomain.ContiguousDomain] — `(min..max)` with no holes; everything
  *    is O(1).
- *  - [com.eignex.klause.solver.intdomain.BitsetDomain] — one bit per value over a narrow span
+ *  - [com.eignex.klause.ir.intdomain.BitsetDomain] — one bit per value over a narrow span
  *    (`<=` [com.eignex.klause.config.KlauseConfig.bitsetThreshold]); membership is an O(1) bit test
  *    at any density.
- *  - [com.eignex.klause.solver.intdomain.RunsDomain] — a sorted list of disjoint present runs;
+ *  - [com.eignex.klause.ir.intdomain.RunsDomain] — a sorted list of disjoint present runs;
  *    membership O(log runs), storage O(runs). The wide-span rep for relatively few runs (few holes,
  *    or clustered survivors).
- *  - [com.eignex.klause.solver.intdomain.SurvivorsDomain] — the sorted present values; membership
+ *  - [com.eignex.klause.ir.intdomain.SurvivorsDomain] — the sorted present values; membership
  *    O(log survivors), storage O(survivors). The escape for scattered survivor sets and the
  *    alternating "comb", where a run list would cost ~2 ints per survivor.
  *

@@ -6,7 +6,7 @@ import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 
 /** CP propagator for [Product]: bounds propagation for `a * b = result`. */
 internal class ProductPropagator(

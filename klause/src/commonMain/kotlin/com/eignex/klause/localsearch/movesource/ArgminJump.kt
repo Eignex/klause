@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch.movesource
 
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.randomValue
+import com.eignex.klause.ir.randomValue
 
 /**
  * Feasibility-Jump / ViolationLS candidate generation. Where the step-based sources

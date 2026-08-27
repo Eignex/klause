@@ -1,5 +1,7 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.ir.IntDomain
+
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -13,7 +15,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

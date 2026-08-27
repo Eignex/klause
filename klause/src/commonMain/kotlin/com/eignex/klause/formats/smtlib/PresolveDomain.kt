@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 
 /**
  * A per-variable domain **during SMT-LIB presolve**, modelled as a sealed union so that an *open*

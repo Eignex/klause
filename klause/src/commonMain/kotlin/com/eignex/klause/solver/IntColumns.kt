@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+
 /** Declared storage capability of one source integer column. */
 sealed interface IntColumn {
     /**

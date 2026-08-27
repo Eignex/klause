@@ -11,7 +11,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult

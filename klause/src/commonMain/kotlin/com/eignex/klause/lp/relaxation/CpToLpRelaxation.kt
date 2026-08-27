@@ -32,12 +32,12 @@ import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStatsSink
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray

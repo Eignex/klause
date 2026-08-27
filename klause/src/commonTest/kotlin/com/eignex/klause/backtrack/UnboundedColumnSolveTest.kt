@@ -13,7 +13,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test

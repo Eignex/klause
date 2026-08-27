@@ -4,7 +4,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevLongArray
 import com.eignex.klause.propagation.excludeIntValues
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.LongArrayList
 
 /*

@@ -6,7 +6,7 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test

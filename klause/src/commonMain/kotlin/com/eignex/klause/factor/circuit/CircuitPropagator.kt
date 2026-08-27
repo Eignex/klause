@@ -9,7 +9,7 @@ import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 
 /** CP implementation for [Circuit]: propagation of the Hamiltonian-cycle constraint over successor vars. */

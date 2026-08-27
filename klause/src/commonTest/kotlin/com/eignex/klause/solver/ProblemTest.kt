@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause

@@ -4,7 +4,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

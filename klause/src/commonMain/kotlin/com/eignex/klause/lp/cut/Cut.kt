@@ -18,7 +18,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList

@@ -15,7 +15,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpTechnique
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult

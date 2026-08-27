@@ -7,7 +7,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult

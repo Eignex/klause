@@ -13,7 +13,7 @@ import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinOr
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 
 /** Post each conjunct of an assertion. `and`/`let` nesting is walked with an explicit worklist (not
  *  recursion) so a degenerate conjunction can't overflow the stack; relations, arithmetic equalities

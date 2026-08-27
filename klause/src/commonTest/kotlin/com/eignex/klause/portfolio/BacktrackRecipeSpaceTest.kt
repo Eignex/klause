@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.lp.bounding.LpEmphasis
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

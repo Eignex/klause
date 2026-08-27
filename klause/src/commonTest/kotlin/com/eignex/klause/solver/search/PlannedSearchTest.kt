@@ -6,7 +6,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.solver.pipeline.FactorOwner
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.componentPlan

@@ -11,7 +11,7 @@ import com.eignex.klause.solver.SolverParams
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.kpermute.LongPermutation
 import com.eignex.kpermute.longPermutation
 import kotlin.random.Random

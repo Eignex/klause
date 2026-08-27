@@ -10,7 +10,7 @@ import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList

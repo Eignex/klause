@@ -7,7 +7,7 @@ import com.eignex.klause.lp.bounding.LpParams
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.rootLpObjective
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink

@@ -37,7 +37,7 @@ import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 import kotlin.random.Random

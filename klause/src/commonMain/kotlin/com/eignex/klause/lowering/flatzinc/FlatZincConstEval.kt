@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.flatzinc.FlatZincCompiler.ParamValue
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 
 internal fun FlatZincCompiler.evaluateParam(e: FznExpr, declaredType: FznType): ParamValue = when (e) {
     is FznExpr.BoolLit -> ParamValue.Bool(e.value)

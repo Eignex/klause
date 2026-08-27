@@ -5,7 +5,7 @@ import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertTrue

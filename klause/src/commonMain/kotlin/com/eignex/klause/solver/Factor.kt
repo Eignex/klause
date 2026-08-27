@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.HullFlags

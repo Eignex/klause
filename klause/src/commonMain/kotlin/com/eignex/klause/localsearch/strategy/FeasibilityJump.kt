@@ -8,7 +8,7 @@ import com.eignex.klause.localsearch.movesource.ConfiguredSource
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.solver.randomValue
+import com.eignex.klause.ir.randomValue
 
 /**
  * Feasibility-Jump / ViolationLS strategy (Davies et al., CPAIOR 2024) as a [SourceDrivenStrategy]

@@ -11,7 +11,7 @@ import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray

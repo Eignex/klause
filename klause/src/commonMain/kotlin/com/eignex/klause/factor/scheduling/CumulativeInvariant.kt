@@ -17,7 +17,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.randomValue
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy

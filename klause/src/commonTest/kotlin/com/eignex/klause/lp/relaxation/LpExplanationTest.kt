@@ -10,7 +10,7 @@ import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
