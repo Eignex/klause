@@ -77,6 +77,15 @@ data class LpPlan(
      */
     val boundMaxOpsPerNode: Long = 20_000L,
     /**
+     * Work ([LpWork] operations) the one-shot pre-search root LP may spend on cut harvesting and the
+     * root bound, or `0` to bound it by the clock alone.
+     *
+     * The root harvest decides which cuts every later node inherits, so time-boxing it makes the whole
+     * search a function of machine speed — the single largest remaining source of run-to-run drift once
+     * the per-node budget is deterministic. `rootBudgetFraction` stays as the backstop.
+     */
+    val rootMaxWork: Long = 200_000_000L,
+    /**
      * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
      * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
      * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes

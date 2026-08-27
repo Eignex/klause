@@ -29,7 +29,11 @@ fun FinitePipeline.portfolioExecutor(
         definitionalSweep = definitionalSweep,
         onEvent = onEvent,
     )
-    return if (scenario.cores == 1) SequentialPortfolio.exp3(workers) else Portfolio(workers)
+    return if (scenario.cores == 1) {
+        SequentialPortfolio.exp3(workers, sliceNodes = scenario.sliceNodes)
+    } else {
+        Portfolio(workers)
+    }
 }
 
 /** Creates the fixed finite-domain solver over [problem]. */

@@ -135,13 +135,16 @@ internal class ResumableMinimize(
         baseCancellation()
     }
 
-    /** The node budget when one is armed — the clock still bounds it, so an over-large budget cannot
-     *  overrun the deadline. */
-    private fun sliceExpired(): Boolean {
-        val byClock = sliceEnd?.hasPassedNow() ?: false
-        if (sliceNodeEnd < 0L) return byClock
-        return byClock || sink.search.nodeCount >= sliceNodeEnd
-    }
+    /**
+     * The node budget when one is armed, and *only* the node budget.
+     *
+     * Leaving the per-slice clock as an outer bound defeats the purpose: whenever it binds first the
+     * pause point is a function of machine speed again, and the run stops being comparable to itself.
+     * The whole solve is still bounded — [globalToken] carries the real deadline and is checked
+     * alongside this — so dropping the per-slice deadline cannot overrun anything.
+     */
+    private fun sliceExpired(): Boolean =
+        if (sliceNodeEnd >= 0L) sink.search.nodeCount >= sliceNodeEnd else sliceEnd?.hasPassedNow() ?: false
 
     private var best: Sample? = null
     private var bestObj: Double = Double.POSITIVE_INFINITY
@@ -575,7 +578,14 @@ internal class ResumableMinimize(
         // Also cap the one-shot root work by the shared LP wall budget, so an expensive-but-useless
         // root relaxation cannot spend more than the whole LP subsystem is allotted before search starts.
         lpEngine.lpWallRemainingMillis()?.let { budgetMillis = minOf(budgetMillis, it) }
-        return params.cancellation or Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
+        // Work first, clock second. A harvest bounded by time keeps a different set of cuts on every
+        // run, and the search inherits them, so nothing downstream is comparable to itself; bounding it
+        // by work makes the harvest a property of the model. The deadline stays as the backstop for
+        // cost the meter cannot see.
+        val opsBudget = lpEngine.params.lpPlan.rootMaxWork
+        return params.cancellation or
+            Cancellation { lpEngine.workSpentExceeds(opsBudget) } or
+            Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
     }
 
     /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),

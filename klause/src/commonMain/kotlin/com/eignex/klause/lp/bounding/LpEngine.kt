@@ -293,7 +293,21 @@ internal class LpEngine(
     /** Add one solve's work to the current node's total. */
     internal fun noteSolveOps(ops: Long) {
         pendingSolveOps += ops
+        totalSolveOps += ops
     }
+
+    // Work charged since this engine was built, across every solve including the one-shot root work.
+    private var totalSolveOps = 0L
+
+    /**
+     * Whether the LP has spent [budgetOps] of work in total.
+     *
+     * The one-shot root cut harvest is time-boxed by a deadline, which makes how many cuts survive a
+     * function of machine speed — and the cuts a search inherits change the whole search. Bounding it by
+     * work instead makes the harvest a property of the model, so the run that follows is comparable to
+     * itself. The deadline stays as a backstop for cost this meter cannot see.
+     */
+    internal fun workSpentExceeds(budgetOps: Long): Boolean = budgetOps > 0L && totalSolveOps >= budgetOps
 
     /** Feed one solve's outcome back into the work budget. */
     internal fun observeNodeWork(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, rows: Int) {
