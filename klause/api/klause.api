@@ -124,8 +124,8 @@ public final class com/eignex/klause/backtrack/BacktrackRecipe {
 
 public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/ResumableOptimizer, com/eignex/klause/solver/Solver {
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
+	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;)V
 	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
-	public fun <init> (Lcom/eignex/klause/solver/BakedProblem;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
 	public fun describe (Lcom/eignex/klause/backtrack/BacktrackParams;)Ljava/lang/String;
@@ -134,7 +134,7 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public fun enumerate (Lcom/eignex/klause/backtrack/BacktrackParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
-	public fun getProblem ()Lcom/eignex/klause/solver/BakedProblem;
+	public fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/backtrack/BacktrackParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public final fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -566,7 +566,7 @@ public final class com/eignex/klause/brute/BruteForceSolver : com/eignex/klause/
 	public static final field CHUNK_CAP J
 	public static final field Companion Lcom/eignex/klause/brute/BruteForceSolver$Companion;
 	public static final field DEFAULT_MAX_SPACE J
-	public fun <init> (Lcom/eignex/klause/solver/BakedProblem;)V
+	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
 	public fun describe (Lcom/eignex/klause/brute/BruteForceParams;)Ljava/lang/String;
@@ -574,7 +574,7 @@ public final class com/eignex/klause/brute/BruteForceSolver : com/eignex/klause/
 	public fun enumerate (Lcom/eignex/klause/brute/BruteForceParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
-	public fun getProblem ()Lcom/eignex/klause/solver/BakedProblem;
+	public fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/brute/BruteForceParams;)Lkotlin/sequences/Sequence;
 	public synthetic fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/brute/BruteForceParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -2894,9 +2894,9 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 
 public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/klause/solver/Optimizer, com/eignex/klause/solver/Solver {
 	public fun <init> (Lcom/eignex/klause/compile/CompiledSchema;)V
+	public fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/schema/VariableSchema;)V
-	public fun <init> (Lcom/eignex/klause/solver/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZ)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/BakedProblem;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;Lcom/eignex/klause/localsearch/RestartPolicy;ZLcom/eignex/klause/localsearch/DefinitionalSweep;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun approximateCount (Lcom/eignex/klause/count/ApproxCountConfig;)Lcom/eignex/klause/count/Count;
 	public fun count (Lcom/eignex/klause/count/CountConfig;)Lcom/eignex/klause/count/Count;
 	public fun describe (Lcom/eignex/klause/localsearch/LocalSearchParams;)Ljava/lang/String;
@@ -2909,7 +2909,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 	public final fun getGreedyRepairOnRestart ()Z
 	public final fun getOptimizeStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
 	public final fun getPerMoveInvariants ()Z
-	public fun getProblem ()Lcom/eignex/klause/solver/BakedProblem;
+	public fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
 	public final fun getRestartPolicy ()Lcom/eignex/klause/localsearch/RestartPolicy;
 	public final fun getSeedImplicitOnRestart ()Z
 	public final fun getStrategy ()Lcom/eignex/klause/localsearch/strategy/SourceDrivenStrategy;
@@ -6963,10 +6963,10 @@ public final class com/eignex/klause/portfolio/Portfolio : com/eignex/klause/por
 
 public final class com/eignex/klause/portfolio/PortfolioBuilder {
 	public static final field INSTANCE Lcom/eignex/klause/portfolio/PortfolioBuilder;
-	public final fun build (Lcom/eignex/klause/solver/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
-	public static synthetic fun build$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/solver/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
-	public final fun buildExplicit (Lcom/eignex/klause/solver/BakedProblem;Ljava/util/List;ILcom/eignex/klause/portfolio/Kind;JDLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
-	public static synthetic fun buildExplicit$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/solver/BakedProblem;Ljava/util/List;ILcom/eignex/klause/portfolio/Kind;JDLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
+	public final fun build (Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
+	public static synthetic fun build$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/propagation/BakedProblem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
+	public final fun buildExplicit (Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/List;ILcom/eignex/klause/portfolio/Kind;JDLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Ljava/util/List;
+	public static synthetic fun buildExplicit$default (Lcom/eignex/klause/portfolio/PortfolioBuilder;Lcom/eignex/klause/propagation/BakedProblem;Ljava/util/List;ILcom/eignex/klause/portfolio/Kind;JDLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Ljava/util/List;
 }
 
 public abstract interface class com/eignex/klause/portfolio/PortfolioExecutor : java/lang/AutoCloseable {
@@ -7405,6 +7405,9 @@ public final class com/eignex/klause/presolve/SharedIntOccurrence {
 }
 
 public abstract interface class com/eignex/klause/presolve/SubsumeState {
+}
+
+public final class com/eignex/klause/propagation/BakedProblem : com/eignex/klause/solver/Problem {
 }
 
 public abstract interface class com/eignex/klause/propagation/ClauseExchange {
@@ -8076,9 +8079,6 @@ public final class com/eignex/klause/solver/Assumptions$Companion {
 	public static synthetic fun invoke$default (Lcom/eignex/klause/solver/Assumptions$Companion;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/solver/Assumptions;
 }
 
-public final class com/eignex/klause/solver/BakedProblem : com/eignex/klause/solver/Problem {
-}
-
 public final class com/eignex/klause/solver/ComponentPlan {
 	public final fun cpProjection (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/CpProblemProjection;
 	public final fun factorOwner (I)Lcom/eignex/klause/solver/FactorOwner;
@@ -8372,8 +8372,8 @@ public class com/eignex/klause/solver/Problem {
 	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
 	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun bake (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/BakedProblem;
-	public static synthetic fun bake$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/BakedProblem;
+	public final fun bake (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/propagation/BakedProblem;
+	public static synthetic fun bake$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/propagation/BakedProblem;
 	public final fun getBakeElapsed-UwyO8pc ()J
 	public final fun getBaked ()Lcom/eignex/klause/propagation/PropagationResult;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
@@ -8581,7 +8581,7 @@ public abstract interface class com/eignex/klause/solver/Solver {
 	public abstract fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static synthetic fun exactCount$default (Lcom/eignex/klause/solver/Solver;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
-	public abstract fun getProblem ()Lcom/eignex/klause/solver/BakedProblem;
+	public abstract fun getProblem ()Lcom/eignex/klause/propagation/BakedProblem;
 	public fun sample (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public fun samples (Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public abstract fun samples (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
