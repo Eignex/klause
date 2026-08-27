@@ -1,10 +1,9 @@
 package com.eignex.klause.lowering.xcsp3
 
-import com.eignex.klause.formats.xcsp3.*
-
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.TableGroupCache
+import com.eignex.klause.formats.xcsp3.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.reifyLinear

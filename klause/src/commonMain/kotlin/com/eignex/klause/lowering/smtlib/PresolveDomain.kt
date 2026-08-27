@@ -1,7 +1,6 @@
 package com.eignex.klause.lowering.smtlib
 
 import com.eignex.klause.formats.smtlib.*
-
 import com.eignex.klause.solver.IntDomain
 
 /**

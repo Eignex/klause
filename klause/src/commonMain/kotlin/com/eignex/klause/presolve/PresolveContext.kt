@@ -1,6 +1,5 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 

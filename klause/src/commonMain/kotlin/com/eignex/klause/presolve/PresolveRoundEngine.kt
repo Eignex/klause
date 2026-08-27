@@ -11,10 +11,7 @@ private const val PRESOLVE_ABORT_FRACTION = 0.001
 internal object PresolveRoundEngine {
 
     /** The changes made by one bounded pass schedule. */
-    class Result(
-        val fired: List<PresolvePass>,
-        val reconstructs: List<(Sample) -> Sample>,
-    )
+    class Result(val fired: List<PresolvePass>, val reconstructs: List<(Sample) -> Sample>)
 
     /** Drive [passes] to their bounded fixpoint through the supplied host operations. */
     fun run(
@@ -68,12 +65,11 @@ internal object PresolveRoundEngine {
     }
 
     /** Compose pass reconstruction functions in reverse application order. */
-    fun compose(reconstructs: List<(Sample) -> Sample>): (Sample) -> Sample =
-        if (reconstructs.isEmpty()) {
-            { it }
-        } else {
-            { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
-        }
+    fun compose(reconstructs: List<(Sample) -> Sample>): (Sample) -> Sample = if (reconstructs.isEmpty()) {
+        { it }
+    } else {
+        { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
+    }
 
     private fun sliceOf(budget: PresolveBudget, cancellation: Cancellation, eligible: Int): Cancellation {
         val left = budget.remaining()
