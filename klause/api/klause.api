@@ -2427,144 +2427,12 @@ public final class com/eignex/klause/formats/minizinc/OznParseException : com/ei
 
 public final class com/eignex/klause/formats/mps/Mps {
 	public static final field INSTANCE Lcom/eignex/klause/formats/mps/Mps;
-	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/formats/mps/MpsModel;
-	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/formats/mps/MpsModel;
-}
-
-public final class com/eignex/klause/formats/mps/MpsColumn {
-	public fun <init> (Ljava/lang/String;ZI)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Z
-	public final fun component3 ()I
-	public final fun copy (Ljava/lang/String;ZI)Lcom/eignex/klause/formats/mps/MpsColumn;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsColumn;Ljava/lang/String;ZIILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsColumn;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getId ()I
-	public final fun getName ()Ljava/lang/String;
-	public final fun getReal ()Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/formats/mps/MpsCompiled {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)V
-	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
-	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun component3 ()Z
-	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()J
-	public final fun component6 ()Ljava/lang/Double;
-	public final fun component7 ()Z
-	public final fun component8 ()I
-	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZIILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getColumns ()Ljava/util/List;
-	public final fun getFloatColumns ()I
-	public final fun getHasInnerConstraintApproximation ()Z
-	public final fun getMaximize ()Z
-	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
-	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getObjectiveErrorBound ()Ljava/lang/Double;
-	public final fun getObjectiveScale ()J
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/formats/mps/MpsCompiledKt {
-	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;)Lcom/eignex/klause/formats/mps/MpsCompiled;
-}
-
-public final class com/eignex/klause/formats/mps/MpsConstraint {
-	public fun <init> (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/formats/mps/MpsIndicator;)V
-	public synthetic fun <init> (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/formats/mps/MpsIndicator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()[I
-	public final fun component3 ()[D
-	public final fun component4 ()Ljava/lang/Double;
-	public final fun component5 ()Ljava/lang/Double;
-	public final fun component6 ()Lcom/eignex/klause/formats/mps/MpsIndicator;
-	public final fun copy (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/formats/mps/MpsIndicator;)Lcom/eignex/klause/formats/mps/MpsConstraint;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsConstraint;Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/formats/mps/MpsIndicator;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsConstraint;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCoeffs ()[D
-	public final fun getIndicator ()Lcom/eignex/klause/formats/mps/MpsIndicator;
-	public final fun getIndices ()[I
-	public final fun getLower ()Ljava/lang/Double;
-	public final fun getName ()Ljava/lang/String;
-	public final fun getUpper ()Ljava/lang/Double;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/lowering/mps/MpsModel;
+	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/lowering/mps/MpsModel;
 }
 
 public final class com/eignex/klause/formats/mps/MpsFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
-}
-
-public final class com/eignex/klause/formats/mps/MpsIndicator {
-	public fun <init> (IZ)V
-	public final fun component1 ()I
-	public final fun component2 ()Z
-	public final fun copy (IZ)Lcom/eignex/klause/formats/mps/MpsIndicator;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsIndicator;IZILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsIndicator;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getColumn ()I
-	public final fun getWhenOne ()Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/formats/mps/MpsModel {
-	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Lcom/eignex/klause/ir/ObjectiveSense;
-	public final fun component3 ()Lcom/eignex/klause/formats/mps/MpsObjective;
-	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()Ljava/util/List;
-	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/formats/mps/MpsModel;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsModel;Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsModel;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getConstraints ()Ljava/util/List;
-	public final fun getName ()Ljava/lang/String;
-	public final fun getObjective ()Lcom/eignex/klause/formats/mps/MpsObjective;
-	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
-	public final fun getVariables ()Ljava/util/List;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/formats/mps/MpsObjective {
-	public fun <init> (Ljava/lang/String;[I[DD)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()[I
-	public final fun component3 ()[D
-	public final fun component4 ()D
-	public final fun copy (Ljava/lang/String;[I[DD)Lcom/eignex/klause/formats/mps/MpsObjective;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsObjective;Ljava/lang/String;[I[DDILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsObjective;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCoeffs ()[D
-	public final fun getConstant ()D
-	public final fun getIndices ()[I
-	public final fun getName ()Ljava/lang/String;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/formats/mps/MpsVar {
-	public fun <init> (Ljava/lang/String;ZLjava/lang/Double;Ljava/lang/Double;)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Z
-	public final fun component3 ()Ljava/lang/Double;
-	public final fun component4 ()Ljava/lang/Double;
-	public final fun copy (Ljava/lang/String;ZLjava/lang/Double;Ljava/lang/Double;)Lcom/eignex/klause/formats/mps/MpsVar;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsVar;Ljava/lang/String;ZLjava/lang/Double;Ljava/lang/Double;ILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsVar;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getInteger ()Z
-	public final fun getLower ()Ljava/lang/Double;
-	public final fun getName ()Ljava/lang/String;
-	public final fun getUpper ()Ljava/lang/Double;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/formats/opb/Opb {
@@ -4299,6 +4167,142 @@ public final class com/eignex/klause/lowering/FloatBucketing {
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun valueOf (I)D
+}
+
+public final class com/eignex/klause/lowering/mps/MpsColumn {
+	public fun <init> (Ljava/lang/String;ZI)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun component3 ()I
+	public final fun copy (Ljava/lang/String;ZI)Lcom/eignex/klause/lowering/mps/MpsColumn;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsColumn;Ljava/lang/String;ZIILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsColumn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()I
+	public final fun getName ()Ljava/lang/String;
+	public final fun getReal ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsCompiled {
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)V
+	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()J
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun component7 ()Z
+	public final fun component8 ()I
+	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)Lcom/eignex/klause/lowering/mps/MpsCompiled;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsCompiled;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZIILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsCompiled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColumns ()Ljava/util/List;
+	public final fun getFloatColumns ()I
+	public final fun getHasInnerConstraintApproximation ()Z
+	public final fun getMaximize ()Z
+	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getObjectiveErrorBound ()Ljava/lang/Double;
+	public final fun getObjectiveScale ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsCompiledKt {
+	public static final fun toProblem (Lcom/eignex/klause/lowering/mps/MpsModel;)Lcom/eignex/klause/lowering/mps/MpsCompiled;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsConstraint {
+	public fun <init> (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/lowering/mps/MpsIndicator;)V
+	public synthetic fun <init> (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/lowering/mps/MpsIndicator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()[I
+	public final fun component3 ()[D
+	public final fun component4 ()Ljava/lang/Double;
+	public final fun component5 ()Ljava/lang/Double;
+	public final fun component6 ()Lcom/eignex/klause/lowering/mps/MpsIndicator;
+	public final fun copy (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/lowering/mps/MpsIndicator;)Lcom/eignex/klause/lowering/mps/MpsConstraint;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsConstraint;Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/lowering/mps/MpsIndicator;ILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsConstraint;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoeffs ()[D
+	public final fun getIndicator ()Lcom/eignex/klause/lowering/mps/MpsIndicator;
+	public final fun getIndices ()[I
+	public final fun getLower ()Ljava/lang/Double;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getUpper ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsIndicator {
+	public fun <init> (IZ)V
+	public final fun component1 ()I
+	public final fun component2 ()Z
+	public final fun copy (IZ)Lcom/eignex/klause/lowering/mps/MpsIndicator;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsIndicator;IZILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsIndicator;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColumn ()I
+	public final fun getWhenOne ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsLoweringException : java/lang/IllegalArgumentException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/lowering/mps/MpsModel {
+	public fun <init> (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/lowering/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component3 ()Lcom/eignex/klause/lowering/mps/MpsObjective;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/lowering/mps/MpsObjective;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/lowering/mps/MpsModel;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsModel;Ljava/lang/String;Lcom/eignex/klause/ir/ObjectiveSense;Lcom/eignex/klause/lowering/mps/MpsObjective;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsModel;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConstraints ()Ljava/util/List;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getObjective ()Lcom/eignex/klause/lowering/mps/MpsObjective;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun getVariables ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsObjective {
+	public fun <init> (Ljava/lang/String;[I[DD)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()[I
+	public final fun component3 ()[D
+	public final fun component4 ()D
+	public final fun copy (Ljava/lang/String;[I[DD)Lcom/eignex/klause/lowering/mps/MpsObjective;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsObjective;Ljava/lang/String;[I[DDILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsObjective;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoeffs ()[D
+	public final fun getConstant ()D
+	public final fun getIndices ()[I
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/mps/MpsVar {
+	public fun <init> (Ljava/lang/String;ZLjava/lang/Double;Ljava/lang/Double;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/lang/Double;
+	public final fun component4 ()Ljava/lang/Double;
+	public final fun copy (Ljava/lang/String;ZLjava/lang/Double;Ljava/lang/Double;)Lcom/eignex/klause/lowering/mps/MpsVar;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsVar;Ljava/lang/String;ZLjava/lang/Double;Ljava/lang/Double;ILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsVar;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInteger ()Z
+	public final fun getLower ()Ljava/lang/Double;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getUpper ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/lp/Contribution : java/lang/Enum {
