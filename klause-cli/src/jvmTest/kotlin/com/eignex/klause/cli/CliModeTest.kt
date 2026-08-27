@@ -360,7 +360,7 @@ class CliModeTest {
             writeText(fzn)
             deleteOnExit()
         }
-        val out = capture { main(arrayOf("-e", "ls", "-a", "-s", "-t", "2000", file.absolutePath)) }
+        val out = capture { main(arrayOf("-e", "ls", "-a", "-s", "-t", "1000", file.absolutePath)) }
         val separators = out.lines().count { it == "----------" }
         val solutionsStat = Regex("solutions=(\\d+)").find(out)?.groupValues?.get(1)?.toInt()
         assertTrue(separators >= 2, "expected multiple streamed incumbents, got $separators:\n$out")

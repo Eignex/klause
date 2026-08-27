@@ -2,6 +2,7 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.bounding.LpPlan
@@ -45,8 +46,12 @@ class LpNodeReuseTest {
     fun `node LP solves reuse a factorization instead of rebuilding one each time`() {
         val (problem, objective) = problem()
 
-        val result = BacktrackSolver(problem.bake())
-            .minimize(objective, BacktrackParams(randomSeed = 11L, lpPlan = LpPlan(bounding = true)))
+        // The reuse ratio is visible within the first handful of nodes, so the counters do not need a
+        // solve to proven optimality; a node budget keeps the fixture off the full 1000-node tree.
+        val result = BacktrackSolver(problem.bake()).minimize(
+            objective,
+            BacktrackParams(randomSeed = 11L, lpPlan = LpPlan(bounding = true), nodeBudget = NodeBudget(20)),
+        )
 
         val lp = result.stats.lp
         assertTrue(lp.solves.sum > 1.0, "the search must solve more than one node LP, saw ${lp.solves.sum}")
