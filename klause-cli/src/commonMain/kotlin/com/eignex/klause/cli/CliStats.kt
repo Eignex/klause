@@ -36,12 +36,14 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     if (solves > 0.0) {
         out += "lpPruneRate" to round4(pruned / solves)
         out += "lpPivotsPerSolve" to round4(stats.lp.pivots.sum / solves)
+        out += "lpWorkPerSolve" to "${(stats.lp.workOps.sum / solves).toLong()}"
         out += "lpSeededRate" to round4(stats.lp.seeded.sum / solves)
         out += "lpRefactorizationsPerSolve" to round4(stats.lp.refactorizations.sum / solves)
     }
     out += "lpFixed" to "${stats.lp.fixed.sum.toLong()}"
     out += "lpCuts" to "${stats.lp.cuts.sum.toLong()}"
     out += "lpPivots" to "${stats.lp.pivots.sum.toLong()}"
+    out += "lpWorkOps" to "${stats.lp.workOps.sum.toLong()}"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
     if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
     if (splits > 0.0) {

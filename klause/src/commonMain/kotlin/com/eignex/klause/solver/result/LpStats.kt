@@ -31,6 +31,14 @@ data class LpStats(
     val fixed: SumResult = ZERO_COUNT,
     /** Total dual-simplex pivots across all node LP solves; drops sharply with warm-starting. */
     val pivots: SumResult = ZERO_COUNT,
+    /**
+     * Total deterministic LP work (floating-point operations) across all node LP solves.
+     *
+     * Unlike [pivots] this reflects what each pivot cost: a dense basis, a long eta chain and a
+     * refactorization all charge more than a cheap sparse step. Reproducible run to run, so a budget
+     * keyed on it behaves the same on a loaded machine as on an idle one.
+     */
+    val workOps: SumResult = ZERO_COUNT,
     /** Max sparse-LU fill ratio `(nnz L+U)/nnz B` over all factorizations; >1 = fill-in growth. */
     val luMaxFill: MaxResult = NO_MAX,
     /** Max sparse-LU density `(nnz L+U)/m²`; approaching 1.0 means the LU filled in to effectively dense. */
@@ -61,6 +69,7 @@ data class LpStats(
         ms = ms + o.ms,
         fixed = SumResult(fixed.sum + o.fixed.sum),
         pivots = SumResult(pivots.sum + o.pivots.sum),
+        workOps = SumResult(workOps.sum + o.workOps.sum),
         luMaxFill = MaxResult(maxOf(luMaxFill.max, o.luMaxFill.max)),
         luMaxDensity = MaxResult(maxOf(luMaxDensity.max, o.luMaxDensity.max)),
         cuts = SumResult(cuts.sum + o.cuts.sum),
@@ -90,6 +99,10 @@ internal class LpStatsSink {
 
     private var rootBound: Double = Double.NaN
     private var ms: Long = 0L
+
+    // A running total, not a [CountStat]: that counts observations and ignores their magnitude, which is
+    // how the other counters record units (a unit update repeated). Work is a magnitude per solve.
+    private var workOpsTotal: Long = 0L
     private var clock: TimeMark? = null
 
     /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
@@ -136,6 +149,12 @@ internal class LpStatsSink {
         repeat(count) { pivots.update(1.0) }
     }
 
+    /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
+     *  to millions of operations, so a per-unit loop would cost more than the solve it measures. */
+    fun observeWork(ops: Long) {
+        if (ops > 0L) workOpsTotal += ops
+    }
+
     /** Record one node LP solve's sparse-LU fill ratio and density. */
     fun observeLuFill(fill: Double, density: Double) {
         if (fill > 0.0) luMaxFill.update(fill)
@@ -180,6 +199,7 @@ internal class LpStatsSink {
         ms = ms,
         fixed = fixed.read(),
         pivots = pivots.read(),
+        workOps = SumResult(workOpsTotal.toDouble()),
         luMaxFill = luMaxFill.read(),
         luMaxDensity = luMaxDensity.read(),
         cuts = cuts.read(),

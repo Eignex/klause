@@ -56,6 +56,17 @@ internal interface LpSolver {
     /** Whether the last solve started from a prior basis rather than a cold start, on the same terms
      *  as [lastPivots]. */
     val lastWarmStarted: Boolean get() = false
+
+    /**
+     * Floating-point operations the last solve charged — a deterministic stand-in for its cost, on the
+     * same terms as [lastPivots].
+     *
+     * Pivots alone do not measure a solve: one pivot on a dense basis outweighs many on a sparse one, and
+     * a refactorization outweighs both. A policy that budgets LP effort needs a figure that reflects
+     * that and is reproducible run to run, which wall-clock time is not. See [LpWork]. 0 on an engine
+     * that keeps no count.
+     */
+    val lastWorkOps: Long get() = 0L
 }
 
 /**
