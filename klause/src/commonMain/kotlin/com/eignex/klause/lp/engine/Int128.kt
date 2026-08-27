@@ -7,7 +7,7 @@ package com.eignex.klause.lp.engine
  * keep them small) but the *running sum* overflows it. A two-`Long` (hi · 2⁶⁴ + lo) value covers that,
  * with no exotic intrinsic — carry detection uses the common-stdlib unsigned compare, and the one
  * 64×64→128 product needed for [addProduct] is a portable 32-bit schoolbook expansion, so a single
- * code path serves JVM, Native and wasm.
+ * code path serves both JVM and Native.
  *
  * Represented in two's complement: the true value is `hi * 2⁶⁴ + (lo as unsigned)`. The accumulator is
  * mutable and allocation-light (one instance reused across a bound computation); [overflow] latches if

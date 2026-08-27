@@ -43,9 +43,8 @@ jobs:
           key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
           restore-keys: ${{ runner.os }}-konan-
 
-      # Default target set is host-only (jvm + linuxX64); the full matrix (apple, windows,
-      # js/wasm with their browser/node runtimes) is opt-in via -Ptargets.full and builds
-      # and tests on release.
+      # Default target set is host-only (jvm + linuxX64); the cross-compiled native targets
+      # (linuxArm64, macosArm64) are opt-in via -Ptargets.full and build on release.
 
       # `check` runs tests without lintDocs (detekt + dokka), which the parallel `lint` job
       # already covers. Keeping them separate avoids running lintDocs twice per push. Kover only
