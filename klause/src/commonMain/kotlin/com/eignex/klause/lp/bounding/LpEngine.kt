@@ -247,7 +247,7 @@ internal class LpEngine(
     // [chargeRootLpWall] + the per-node solves timed in the bound) may spend at most
     // `min(fraction × budget, cap)` of it before search; if it hits that while still under the ladder's
     // warmup and not having pruned, per-node LP is disabled and the arm runs as a bare combinatorial
-    // search. A cheap LP reaches the warmup first and is left to the ladder. See [LpWallBreaker].
+    // search. A cheap LP reaches the warmup first and is left to the ladder. See [LpEffortGovernor].
     private val lpWallBreaker = LpEffortGovernor(
         opsPerNodeCap = params.lpPlan.boundMaxOpsPerNode,
         wallBackstopMillis = params.solveBudgetMillis?.takeIf { params.lpPlan.lpWallBudgetFraction > 0.0 }

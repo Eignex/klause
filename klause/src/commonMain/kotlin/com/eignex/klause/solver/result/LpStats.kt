@@ -154,13 +154,13 @@ internal class LpStatsSink {
         repeat(count) { pivots.update(1.0) }
     }
 
-    /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
-     *  to millions of operations, so a per-unit loop would cost more than the solve it measures. */
     /** Record that the wall-clock backstop, not the deterministic work rule, demoted the LP. */
     fun observeWallBackstop() {
         wallBackstop = true
     }
 
+    /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
+     *  to millions of operations, so a per-unit loop would cost more than the solve it measures. */
     fun observeWork(ops: Long) {
         if (ops > 0L) workOpsTotal += ops
     }

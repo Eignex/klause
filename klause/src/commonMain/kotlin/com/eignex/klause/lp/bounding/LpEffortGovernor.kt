@@ -4,7 +4,8 @@ package com.eignex.klause.lp.bounding
  * Decides when the node LP has stopped earning the search time it costs, and demotes it to a floor
  * budget rather than switching it off.
  *
- * The signal is **deterministic work per node explored** ([LpWork] operations), not wall-clock time.
+ * The signal is **deterministic work per node explored** — [com.eignex.klause.lp.engine.LpWork]
+ * operations, not wall-clock time.
  * A ratio rather than an absolute budget because it is scale-free: it says *the LP is taxing the
  * search* without needing to know how long the run may take or how fast the machine is, and it reads
  * the same on a loaded box as on an idle one. That is what lets two identical invocations report

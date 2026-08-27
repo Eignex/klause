@@ -9,7 +9,7 @@ package com.eignex.klause.lp.bounding
  * relaxation that prunes is worth its pivots, and capping one costs bound quality outright. So the
  * budget is aimed only at the profile that measurably does not repay it — an LP that has run
  * [warmupSolves] solves without a single prune. A prune at any point lifts the budget permanently, on
- * the same "a prune spares it" rule [LpWallBreaker] uses, and for the same reason.
+ * the same "a prune spares it" rule [LpEffortGovernor] uses, and for the same reason.
  *
  * Kept off [LpEngine] as a small value so the decision is deterministic and unit-testable;
  * `cap <= 0` disables it, leaving the size-derived budget that on most models never binds.
