@@ -2131,25 +2131,10 @@ public class com/eignex/klause/formats/FormatException : java/lang/RuntimeExcept
 
 public final class com/eignex/klause/formats/dimacs/Dimacs {
 	public static final field INSTANCE Lcom/eignex/klause/formats/dimacs/Dimacs;
-	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/solver/Problem;
-	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/solver/Problem;
-	public final fun parseWcnf (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/formats/dimacs/Dimacs$WcnfProblem;
-	public final fun parseWcnf (Ljava/lang/String;)Lcom/eignex/klause/formats/dimacs/Dimacs$WcnfProblem;
-}
-
-public final class com/eignex/klause/formats/dimacs/Dimacs$WcnfProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
-	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun component3 ()I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)Lcom/eignex/klause/formats/dimacs/Dimacs$WcnfProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/dimacs/Dimacs$WcnfProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;IILjava/lang/Object;)Lcom/eignex/klause/formats/dimacs/Dimacs$WcnfProblem;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getNumOriginalBoolVars ()I
-	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/lowering/dimacs/CnfDocument;
+	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/lowering/dimacs/CnfDocument;
+	public final fun parseWcnf (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/lowering/dimacs/WcnfDocument;
+	public final fun parseWcnf (Ljava/lang/String;)Lcom/eignex/klause/lowering/dimacs/WcnfDocument;
 }
 
 public final class com/eignex/klause/formats/dimacs/DimacsFormatException : com/eignex/klause/formats/FormatException {
@@ -4149,6 +4134,73 @@ public final class com/eignex/klause/lowering/FloatBucketing {
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun valueOf (I)D
+}
+
+public final class com/eignex/klause/lowering/dimacs/CnfDocument {
+	public fun <init> (ILjava/util/List;Z)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Z
+	public final fun copy (ILjava/util/List;Z)Lcom/eignex/klause/lowering/dimacs/CnfDocument;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/CnfDocument;ILjava/util/List;ZILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/CnfDocument;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClauses ()Ljava/util/List;
+	public final fun getNumBoolVars ()I
+	public final fun getTriviallyUnsat ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/dimacs/DimacsLoweringKt {
+	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/CnfDocument;)Lcom/eignex/klause/solver/Problem;
+	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/WcnfDocument;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
+}
+
+public final class com/eignex/klause/lowering/dimacs/WcnfDocument {
+	public fun <init> (ILjava/util/List;Ljava/util/List;ZJ)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Z
+	public final fun component5 ()J
+	public final fun copy (ILjava/util/List;Ljava/util/List;ZJ)Lcom/eignex/klause/lowering/dimacs/WcnfDocument;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/WcnfDocument;ILjava/util/List;Ljava/util/List;ZJILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/WcnfDocument;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFixedCost ()J
+	public final fun getHardClauses ()Ljava/util/List;
+	public final fun getNumOriginalBoolVars ()I
+	public final fun getSoftClauses ()Ljava/util/List;
+	public final fun getTriviallyUnsat ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/dimacs/WcnfProblem {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun component3 ()I
+	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/WcnfProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;IILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNumOriginalBoolVars ()I
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/dimacs/WeightedCnfClause {
+	public fun <init> (J[I)V
+	public final fun component1 ()J
+	public final fun component2 ()[I
+	public final fun copy (J[I)Lcom/eignex/klause/lowering/dimacs/WeightedCnfClause;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/WeightedCnfClause;J[IILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/WeightedCnfClause;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLiterals ()[I
+	public final fun getWeight ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/lowering/mps/MpsColumn {
