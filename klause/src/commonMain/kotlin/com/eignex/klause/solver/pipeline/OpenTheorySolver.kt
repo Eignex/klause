@@ -5,11 +5,11 @@ import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.unitCubeSolution
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.presolveOpen
-import com.eignex.klause.solver.pipeline.ComponentPlan
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.ComponentPlan
+import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink

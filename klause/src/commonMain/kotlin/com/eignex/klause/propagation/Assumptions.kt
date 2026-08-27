@@ -2,7 +2,6 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Solver
-
 import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

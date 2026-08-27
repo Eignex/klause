@@ -1,8 +1,8 @@
 package com.eignex.klause.theory
 
+import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.pipeline.ComponentPlan
 import com.eignex.klause.solver.pipeline.ProblemPipeline
-import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent

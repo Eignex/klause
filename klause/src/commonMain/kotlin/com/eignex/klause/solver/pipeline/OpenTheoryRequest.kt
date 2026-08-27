@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.theory.TheoryParams
 
 /** A complete open-model solve request selected by the orchestration layer. */

@@ -8,11 +8,11 @@ import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.atomLevelForConflict
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit

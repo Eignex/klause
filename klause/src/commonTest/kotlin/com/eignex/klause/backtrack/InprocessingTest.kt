@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem

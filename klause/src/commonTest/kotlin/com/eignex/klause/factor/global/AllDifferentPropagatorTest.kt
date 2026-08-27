@@ -6,12 +6,12 @@ import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.global.internals.computeBoundsAllDifferent
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MixedVars
