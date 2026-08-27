@@ -2304,36 +2304,6 @@ public final class com/eignex/klause/formats/xcsp3/FExpr$SetLit : com/eignex/kla
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/formats/xcsp3/UnsupportedXcsp3Exception : com/eignex/klause/formats/FormatException {
-	public fun <init> (Ljava/lang/String;)V
-}
-
-public final class com/eignex/klause/formats/xcsp3/Xcsp3 {
-	public static final field INSTANCE Lcom/eignex/klause/formats/xcsp3/Xcsp3;
-	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-}
-
-public final class com/eignex/klause/formats/xcsp3/Xcsp3Problem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
-	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun component3 ()Ljava/util/Map;
-	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
-	public final fun component5 ()[I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/formats/xcsp3/Xcsp3Problem;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDefinedVars ()[I
-	public final fun getIntVarNames ()Ljava/util/Map;
-	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
-	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
 public final class com/eignex/klause/formats/xcsp3/XmlElement {
 	public fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/util/List;Ljava/lang/String;)V
 	public final fun attr (Ljava/lang/String;)Ljava/lang/String;
@@ -4441,6 +4411,36 @@ public final class com/eignex/klause/lowering/opb/OpbTerm {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCoefficient ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 	public final fun getLiterals ()[I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/xcsp3/UnsupportedXcsp3Exception : com/eignex/klause/formats/FormatException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/lowering/xcsp3/Xcsp3 {
+	public static final field INSTANCE Lcom/eignex/klause/lowering/xcsp3/Xcsp3;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
+	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
+}
+
+public final class com/eignex/klause/lowering/xcsp3/Xcsp3Problem {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
+	public final fun component5 ()[I
+	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDefinedVars ()[I
+	public final fun getIntVarNames ()Ljava/util/Map;
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
