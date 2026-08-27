@@ -31,8 +31,8 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  */
 internal enum class RationalFeasibility { FEASIBLE, INFEASIBLE, UNKNOWN }
 
-/** The exact verdict plus, on FEASIBLE, a concrete structural-column witness (evaluated at a small
- *  positive delta when strict rows are present). */
+/** The exact verdict plus, on FEASIBLE, a concrete structural-column witness in the source model's
+ *  coordinates (evaluated at a small positive delta when strict rows are present). */
 internal class RationalOutcome(
     val feasibility: RationalFeasibility,
     val witness: DoubleArray? = null,
@@ -628,8 +628,9 @@ private class SparseTableau<F>(private val ops: FracOps<F>, m: Int, total: Int) 
 }
 
 /**
- * Concrete structural-column values from a lex-feasible final state, with δ instantiated at a
- * positive rational small enough that every delta-dependent basic value stays inside its box.
+ * Concrete structural-column values in the source model's coordinates from a lex-feasible final
+ * state, with δ instantiated at a positive rational small enough that every delta-dependent basic
+ * value stays inside its box.
  * Every constraint is affine in δ, so any δ below the per-constraint thresholds works; the
  * thresholds are computed exactly and halved once to sit strictly inside.
  */
@@ -659,7 +660,7 @@ private fun <F> structuralWitness(ops: FracOps<F>, st: SimplexState<F>): DoubleA
             st.atUpper[j] -> st.uppers[j] ?: ops.zero
             else -> ops.zero
         }
-        out[j] = ops.toDouble(value)
+        out[j] = ops.toDouble(value) + st.model.loShiftD(j)
     }
     return out
 }
