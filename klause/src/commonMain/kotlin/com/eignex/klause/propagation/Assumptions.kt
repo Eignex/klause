@@ -14,7 +14,7 @@ import com.eignex.klause.util.binarySearchInt
 /**
  * Per-call constraint on the solver: pin specific variables to specific values for the
  * duration of the call. Compatible with all the entry points on [Solver] and
- * [Optimizer]; backends that can't enforce assumptions (e.g. pure model-counting paths)
+ * [com.eignex.klause.solver.Optimizer]; backends that can't enforce assumptions (e.g. pure model-counting paths)
  * will document the limitation.
  *
  * Implementations are expected to:
