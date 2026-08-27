@@ -8804,6 +8804,24 @@ public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
 	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
 }
 
+public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlan {
+	public fun <init> (Lcom/eignex/klause/backtrack/BacktrackParams;Z)V
+	public final fun getDryRun ()Z
+	public final fun getParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
+}
+
+public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlanRequest {
+	public fun <init> (Lcom/eignex/klause/backtrack/BacktrackParams;Ljava/util/List;Ljava/lang/Long;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;Lcom/eignex/klause/lp/bounding/LpConfig;Lkotlin/jvm/functions/Function1;)V
+	public final fun getAnnotatedParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getEngineParams ()Ljava/util/List;
+	public final fun getLpConfig ()Lcom/eignex/klause/lp/bounding/LpConfig;
+	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun getOnEvent ()Lkotlin/jvm/functions/Function1;
+	public final fun getRandomSeed ()Ljava/lang/Long;
+	public final fun getSolveBudgetMillis ()Ljava/lang/Long;
+}
+
 public final class com/eignex/klause/solver/pipeline/LsResolution {
 	public fun <init> (Ljava/util/List;ZLjava/lang/Integer;)V
 	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -9032,6 +9050,7 @@ public final class com/eignex/klause/solver/pipeline/PortfolioPlan$LocalSearchDr
 }
 
 public final class com/eignex/klause/solver/pipeline/PortfolioPlanKt {
+	public static final fun planFixedBacktrack (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/pipeline/FixedBacktrackPlanRequest;)Lcom/eignex/klause/solver/pipeline/FixedBacktrackPlan;
 	public static final fun planPortfolio (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/pipeline/PortfolioPlanRequest;)Lcom/eignex/klause/solver/pipeline/PortfolioPlan;
 }
 
