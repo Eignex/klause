@@ -75,6 +75,18 @@ class RationalSimplexTest {
     }
 
     @Test
+    fun `returns a witness in original coordinates after a lower-bound shift`() {
+        val b = LpBuilder()
+        val x = b.addRealVar(4.0, 8.0, cost = 0.0)
+        b.addRealRow(intArrayOf(x), doubleArrayOf(2.0), Relation.EQ, 10.0)
+
+        val outcome = rationalOutcome(b.build(Sense.MINIMIZE))
+
+        assertEquals(RationalFeasibility.FEASIBLE, outcome.feasibility)
+        assertEquals(5.0, outcome.witness!![x])
+    }
+
+    @Test
     fun `refutes an equality just past the sum of the upper bounds`() {
         val b = LpBuilder()
         val cols = IntArray(3) { b.addRealVar(0.0, 1.0, cost = 0.0) }
