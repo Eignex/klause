@@ -27,6 +27,8 @@ import kotlin.math.nextUp
 /** Raised when an MPS source model cannot be represented by klause's lowering. */
 class MpsLoweringException(msg: String) : IllegalArgumentException("MPS: $msg")
 
+private fun mpsLoweringError(msg: String): Nothing = throw MpsLoweringException(msg)
+
 /** One MPS column in declaration order, for rendering a solution value back by name. */
 data class MpsColumn(
     /** The column's declared name. */
@@ -444,12 +446,16 @@ private fun MpsModel.objectiveApproximationError(scale: RowScale, isFloat: Boole
         if (delta == 0.0) return@forEachIndexed
         val variable = variables[index]
         val lower = intLowerOrNull(variable.lower)
-            ?: throw MpsLoweringException("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
+            ?: mpsLoweringError(
+                "objective drops a term on unbounded column '${variable.name}', so its error is unbounded",
+            )
         val upper = intUpperOrNull(variable.upper)
-            ?: throw MpsLoweringException("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
+            ?: mpsLoweringError(
+                "objective drops a term on unbounded column '${variable.name}', so its error is unbounded",
+            )
         error += delta * maxOf(abs(lower.toDouble()), abs(upper.toDouble()))
     }
-    if (!error.isFinite()) throw MpsLoweringException("objective approximation error exceeds a finite double")
+    if (!error.isFinite()) mpsLoweringError("objective approximation error exceeds a finite double")
     return error
 }
 

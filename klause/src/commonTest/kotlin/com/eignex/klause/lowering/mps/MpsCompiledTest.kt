@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.mps
+package com.eignex.klause.lowering.mps
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.ObjectiveSense
