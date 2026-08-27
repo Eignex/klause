@@ -4,12 +4,12 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lowering.smtlib.SmtLib
-import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.componentPlan
-import com.eignex.klause.solver.sourceRoute
-import com.eignex.klause.solver.supportsExactLra
+import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.pipeline.supportsExactLra
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
