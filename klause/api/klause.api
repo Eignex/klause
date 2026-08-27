@@ -9764,8 +9764,10 @@ public final class com/eignex/klause/solver/search/SearchCancellationPoller {
 	public fun <init> (Lkotlin/time/TimeSource$WithComparableMarks;)V
 	public synthetic fun <init> (Lkotlin/time/TimeSource$WithComparableMarks;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun due ()Z
+	public final fun getFixedCadence ()Z
 	public final fun rearm ()V
 	public final fun reset ()V
+	public final fun setFixedCadence (Z)V
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchComponent {
@@ -10228,8 +10230,10 @@ public final class com/eignex/klause/solver/search/SearchResult$Satisfied : com/
 }
 
 public final class com/eignex/klause/solver/search/SearchRun {
+	public final fun getFixedCancellationCadence ()Z
 	public final fun next ()Lcom/eignex/klause/solver/search/SearchRunEvent;
 	public final fun reset ()V
+	public final fun setFixedCancellationCadence (Z)V
 }
 
 public abstract interface class com/eignex/klause/solver/search/SearchRunDisposition {

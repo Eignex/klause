@@ -246,6 +246,10 @@ internal class ResumableMinimize(
         globalToken = global
         sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         sliceNodeEnd = if (sliceNodes >= 0L) sink.search.nodeCount + sliceNodes else -1L
+        // A counted budget only means something if the search polls on a counted cadence: the run stops
+        // where it polls, and the default cadence is tuned by elapsed time, so the pause would land on a
+        // different node on a faster machine and every counter downstream would follow.
+        run.fixedCancellationCadence = sliceNodeEnd >= 0L
         while (true) {
             when (val e = runUntilEvent()) {
                 is StepEvent.Incumbent -> onIncumbent(e.result)
