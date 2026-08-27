@@ -56,10 +56,15 @@ data class LpPlan(
      *
      * Budgets in work rather than pivots, since a pivot costs an order of magnitude more on a dense
      * basis than a sparse one, and adapts on the solve itself rather than on prune counts, which cannot
-     * separate a useless relaxation from a search that has not yet found an incumbent. Off by default
-     * until measured against [boundMaxPivots] and against no budget at all.
+     * separate a useless relaxation from a search that has not yet found an incumbent.
+     *
+     * On by default. Over one instance from each of 16 XCSP3 COP families at a fixed decision budget it
+     * improved 6, tied 9, and lost 1 — and the loss is a family whose objective moves by more than that
+     * between repeats of the same arm. It spends between 6× and 2500× less LP work wherever the
+     * relaxation does real work, and on two families it reaches a first solution that an unbudgeted LP
+     * never gets to at all, having spent the search's time proving bounds instead.
      */
-    val boundAdaptiveWork: Boolean = false,
+    val boundAdaptiveWork: Boolean = true,
     /**
      * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
      * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
