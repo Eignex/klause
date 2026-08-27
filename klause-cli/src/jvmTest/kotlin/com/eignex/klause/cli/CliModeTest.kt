@@ -278,6 +278,34 @@ class CliModeTest {
     }
 
     @Test
+    fun `an MPS objective a continuous column contributes to is reported whole`() {
+        val output = MpsOutput()
+
+        val out = capture { output.onSolution("v x=60.0", objective = 0L, continuousObjective = 60.0) }
+
+        assertTrue("o 60" in out, out)
+        assertTrue("o 0" !in out, "the discrete part alone must not be reported: $out")
+    }
+
+    @Test
+    fun `an MPS objective on its scale unscales before printing`() {
+        val output = MpsOutput(objectiveScale = 10L)
+
+        val out = capture { output.onSolution("v x=6.05", objective = 0L, continuousObjective = 60.5) }
+
+        assertTrue("o 6.05" in out, out)
+    }
+
+    @Test
+    fun `an MPS objective over integer columns alone keeps its exact integer form`() {
+        val output = MpsOutput()
+
+        val out = capture { output.onSolution("v a=3", objective = 3L) }
+
+        assertTrue("o 3" in out, out)
+    }
+
+    @Test
     fun `an exhausted inner MPS constraint approximation is qualified`() {
         val output = MpsOutput(hasInnerConstraintApproximation = true)
 

@@ -22,6 +22,10 @@ internal abstract class BufferedBestOutput : OutputProtocol {
     /** Render an incumbent objective for an output protocol. */
     protected open fun formatObjective(objective: Long): String = objective.toString()
 
+    /** Render an incumbent objective that a continuous column contributes to. Only a format whose
+     *  models can carry one needs this; the default never sees it. */
+    protected open fun formatContinuousObjective(objective: Double): String = objective.toString()
+
     /** The single status line this format prints for [verdict] at completion. */
     protected abstract fun statusLine(verdict: Verdict): String
 
@@ -45,10 +49,17 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         this.context = context
     }
 
-    final override fun onSolution(rendered: String, objective: Long?) {
+    final override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
         best = rendered
         onSolutionObjective(objective)
-        if (streamObjective && objective != null) println("o ${formatObjective(objective)}")
+        if (!streamObjective) return
+        // A continuous contribution has no exact integer form, so it supersedes the discrete value
+        // rather than riding alongside it.
+        if (continuousObjective != null) {
+            println("o ${formatContinuousObjective(continuousObjective)}")
+        } else if (objective != null) {
+            println("o ${formatObjective(objective)}")
+        }
     }
 
     final override fun onComplete(verdict: Verdict) {

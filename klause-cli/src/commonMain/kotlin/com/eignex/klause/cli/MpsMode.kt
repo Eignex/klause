@@ -9,6 +9,8 @@ import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import kotlin.math.abs
+import kotlin.math.floor
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
@@ -135,6 +137,10 @@ internal class MpsOutput(
 
     override fun formatObjective(objective: Long): String = scaledDecimal(objective, objectiveScale)
 
+    /** The solver value is on [objectiveScale] like the integral one, so undo the scale and print the
+     *  decimal the source states. */
+    override fun formatContinuousObjective(objective: Double): String = scaledDecimal(objective, objectiveScale)
+
     override fun statusLine(verdict: Verdict): String = when (verdict) {
         Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
             if (verdict == Verdict.OPTIMAL && objectiveErrorBound == null && !hasInnerConstraintApproximation) {
@@ -174,6 +180,20 @@ internal class MpsOutput(
         return listOfNotNull(approximation, constraintQualification, cause).joinToString("; ").ifEmpty { null }
     }
 }
+
+/** Format an MPS objective whose continuous columns make it non-integral. A value that lands on a whole
+ *  number after unscaling prints as one, so a model whose reals happen to resolve integrally reads the
+ *  same as a purely discrete one. */
+private fun scaledDecimal(value: Double, scale: Long): String {
+    require(scale > 0L)
+    val unscaled = value / scale
+    if (unscaled == floor(unscaled) && abs(unscaled) < MAX_EXACT_WHOLE) return unscaled.toLong().toString()
+    return unscaled.toString()
+}
+
+/** Largest magnitude a `Double` represents every whole number below; past it the integral shortcut in
+ *  [scaledDecimal] would print a rounded neighbour as though it were exact. */
+private const val MAX_EXACT_WHOLE = 9.007199254740992E15
 
 /** Format an MPS retained-objective value whose solver coefficients were scaled by [scale]. */
 private fun scaledDecimal(value: Long, scale: Long): String {
