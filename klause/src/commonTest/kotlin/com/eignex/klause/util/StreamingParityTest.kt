@@ -2,7 +2,7 @@ package com.eignex.klause.util
 
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.lowering.dimacs.toProblem
-import com.eignex.klause.formats.flatzinc.parseFlatZinc
+import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.formats.smtlib.SmtLib
