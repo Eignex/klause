@@ -9590,6 +9590,29 @@ final class com.eignex.klause.solver.pipeline/PlannedSearch { // com.eignex.klau
         final fun <get-theory>(): com.eignex.klause.solver.search/TheoryComponent? // com.eignex.klause.solver.pipeline/PlannedSearch.theory.<get-theory>|<get-theory>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eignex.klause.solver.pipeline/PortfolioPlanRequest|null[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/FiniteEngine, kotlin/Boolean, kotlin/Int, kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.backtrack/NodeBudget?, com.eignex.klause.backtrack/BacktrackParams?) // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteEngine;kotlin.Boolean;kotlin.Int;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.backtrack.NodeBudget?;com.eignex.klause.backtrack.BacktrackParams?){}[0]
+
+    final val annotationArm // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.annotationArm|{}annotationArm[0]
+        final fun <get-annotationArm>(): com.eignex.klause.backtrack/BacktrackParams? // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.annotationArm.<get-annotationArm>|<get-annotationArm>(){}[0]
+    final val cores // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.cores|{}cores[0]
+        final fun <get-cores>(): kotlin/Int // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.cores.<get-cores>|<get-cores>(){}[0]
+    final val defaultArms // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.defaultArms|{}defaultArms[0]
+        final fun <get-defaultArms>(): kotlin/Int // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.defaultArms.<get-defaultArms>|<get-defaultArms>(){}[0]
+    final val engine // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.engine|{}engine[0]
+        final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.engine.<get-engine>|<get-engine>(){}[0]
+    final val engineParams // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.engineParams|{}engineParams[0]
+        final fun <get-engineParams>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.engineParams.<get-engineParams>|<get-engineParams>(){}[0]
+    final val lpCeiling // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.lpCeiling|{}lpCeiling[0]
+        final fun <get-lpCeiling>(): com.eignex.klause.lp.bounding/LpConfig // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.lpCeiling.<get-lpCeiling>|<get-lpCeiling>(){}[0]
+    final val nodeBudget // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.nodeBudget|{}nodeBudget[0]
+        final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
+    final val optimize // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.optimize|{}optimize[0]
+        final fun <get-optimize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.optimize.<get-optimize>|<get-optimize>(){}[0]
+    final val randomSeed // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.randomSeed|{}randomSeed[0]
+        final fun <get-randomSeed>(): kotlin/Long? // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.randomSeed.<get-randomSeed>|<get-randomSeed>(){}[0]
+}
+
 final class com.eignex.klause.solver.result/ConflictAnalysisStats { // com.eignex.klause.solver.result/ConflictAnalysisStats|null[0]
     constructor <init>(com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ..., com.eignex.kumulant.stat.summary/SumResult = ...) // com.eignex.klause.solver.result/ConflictAnalysisStats.<init>|<init>(com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult;com.eignex.kumulant.stat.summary.SumResult){}[0]
 
@@ -10664,6 +10687,31 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
     final fun withIntDomains(kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...): com.eignex.klause.solver/Problem // com.eignex.klause.solver/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
 }
 
+sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.klause.solver.pipeline/PortfolioPlan|null[0]
+    final class BacktrackDryRun : com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.klause.solver.pipeline/PortfolioPlan.BacktrackDryRun|null[0]
+        constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>?, com.eignex.klause.portfolio/Kind) // com.eignex.klause.solver.pipeline/PortfolioPlan.BacktrackDryRun.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.backtrack.BacktrackRecipe>>?;com.eignex.klause.portfolio.Kind){}[0]
+
+        final val kind // com.eignex.klause.solver.pipeline/PortfolioPlan.BacktrackDryRun.kind|{}kind[0]
+            final fun <get-kind>(): com.eignex.klause.portfolio/Kind // com.eignex.klause.solver.pipeline/PortfolioPlan.BacktrackDryRun.kind.<get-kind>|<get-kind>(){}[0]
+        final val pool // com.eignex.klause.solver.pipeline/PortfolioPlan.BacktrackDryRun.pool|{}pool[0]
+            final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>? // com.eignex.klause.solver.pipeline/PortfolioPlan.BacktrackDryRun.pool.<get-pool>|<get-pool>(){}[0]
+    }
+
+    final class Execute : com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.klause.solver.pipeline/PortfolioPlan.Execute|null[0]
+        constructor <init>(com.eignex.klause.portfolio/PortfolioScenario) // com.eignex.klause.solver.pipeline/PortfolioPlan.Execute.<init>|<init>(com.eignex.klause.portfolio.PortfolioScenario){}[0]
+
+        final val scenario // com.eignex.klause.solver.pipeline/PortfolioPlan.Execute.scenario|{}scenario[0]
+            final fun <get-scenario>(): com.eignex.klause.portfolio/PortfolioScenario // com.eignex.klause.solver.pipeline/PortfolioPlan.Execute.scenario.<get-scenario>|<get-scenario>(){}[0]
+    }
+
+    final class LocalSearchDryRun : com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun|null[0]
+        constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>?) // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?){}[0]
+
+        final val pool // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.pool|{}pool[0]
+            final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.pool.<get-pool>|<get-pool>(){}[0]
+    }
+}
+
 sealed class com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/IntColumns|null[0]
     abstract val size // com.eignex.klause.solver/IntColumns.size|{}size[0]
         abstract fun <get-size>(): kotlin/Int // com.eignex.klause.solver/IntColumns.size.<get-size>|<get-size>(){}[0]
@@ -11054,6 +11102,7 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(ko
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMinus(): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/unaryMinus|unaryMinus@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/backtrackSolver(com.eignex.klause.solver/Problem): com.eignex.klause.backtrack/BacktrackSolver // com.eignex.klause.solver.pipeline/backtrackSolver|backtrackSolver@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.Problem){}[0]
+final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planPortfolio(com.eignex.klause.solver.pipeline/PortfolioPlanRequest): com.eignex.klause.solver.pipeline/PortfolioPlan // com.eignex.klause.solver.pipeline/planPortfolio|planPortfolio@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.PortfolioPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.solver/Problem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.Problem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.theory/theoryComponent(com.eignex.klause.solver/ProblemSpec): com.eignex.klause.solver.search/TheoryComponent? // com.eignex.klause.theory/theoryComponent|theoryComponent@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec){}[0]
