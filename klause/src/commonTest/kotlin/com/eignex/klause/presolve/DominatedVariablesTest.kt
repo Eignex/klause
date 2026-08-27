@@ -229,61 +229,51 @@ class DominatedVariablesTest {
     }
 
     @Test
-    fun `pure-positive booleans in an at-least cardinality are fixed true`() {
-        // `b0 + b1 + b2 >= 1` (max == #lits, only the lower side active) is monotone like a clause:
-        // unsatisfying a +literal is risky, satisfying it is always safe ⇒ pin all true (no objective).
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 3)),
-        )
-        val out = fixed(problem, emptyMap(), emptyMap())
-        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
-        for (b in 0..2) assertTrue(hasUnit(out, Lit.make(b, true)), "b$b should be pinned true")
+    fun `pure-positive booleans in a one-sided cardinality are fixed to the safe polarity`() {
+        // `b0+b1+b2 >= 1` (max == #lits, only the lower side active) is monotone like a clause: satisfying
+        // a +literal is always safe ⇒ pin all true. `b0+b1+b2 <= 1` (min == 0, only the upper side active)
+        // flips it: unsatisfying a +literal is always safe ⇒ pin all false. No objective either way.
+        for ((min, max, expected) in listOf(Triple(1, 3, true), Triple(0, 1, false))) {
+            val problem = Problem(
+                3,
+                0,
+                emptyArray(),
+                listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = min, max = max)),
+            )
+            val out = fixed(problem, emptyMap(), emptyMap())
+            assertEquals(
+                minObjectiveBools(problem, emptyMap()),
+                minObjectiveBools(out, emptyMap()),
+                "optimum changed for min=$min max=$max",
+            )
+            for (b in 0..2) {
+                assertTrue(hasUnit(out, Lit.make(b, expected)), "b$b should be pinned $expected for min=$min max=$max")
+            }
+        }
     }
 
     @Test
-    fun `pure-positive booleans in an at-most cardinality are fixed false`() {
-        // `b0 + b1 + b2 <= 1` (min == 0, only the upper side active): satisfying a +literal is risky,
-        // unsatisfying it is always safe ⇒ pin all false (no objective).
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1)),
-        )
-        val out = fixed(problem, emptyMap(), emptyMap())
-        assertEquals(minObjectiveBools(problem, emptyMap()), minObjectiveBools(out, emptyMap()), "optimum changed")
-        for (b in 0..2) assertTrue(hasUnit(out, Lit.make(b, false)), "b$b should be pinned false")
-    }
-
-    @Test
-    fun `boolean in a pseudo-boolean LE is fixed false`() {
+    fun `boolean in a one-sided pseudo-boolean is fixed to the safe polarity`() {
         // LE: rising sum violates ⇒ positive-weight literals are true-unsafe ⇒ pin false.
-        val le = Problem(
-            2,
-            0,
-            emptyArray(),
-            listOf(PseudoBoolean(longArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.LE, 4L)),
-        )
-        val outLe = fixed(le, emptyMap(), emptyMap())
-        assertEquals(minObjectiveBools(le, emptyMap()), minObjectiveBools(outLe, emptyMap()), "LE optimum changed")
-        assertTrue(hasUnit(outLe, Lit.make(0, false)) && hasUnit(outLe, Lit.make(1, false)), "LE bools pinned false")
-    }
-
-    @Test
-    fun `boolean in a pseudo-boolean GE is fixed true`() {
         // GE: falling sum violates ⇒ positive-weight literals are false-unsafe ⇒ pin true.
-        val ge = Problem(
-            2,
-            0,
-            emptyArray(),
-            listOf(PseudoBoolean(longArrayOf(2, 3), intArrayOf(pos(0), pos(1)), PbOp.GE, 1L)),
-        )
-        val outGe = fixed(ge, emptyMap(), emptyMap())
-        assertEquals(minObjectiveBools(ge, emptyMap()), minObjectiveBools(outGe, emptyMap()), "GE optimum changed")
-        assertTrue(hasUnit(outGe, Lit.make(0, true)) && hasUnit(outGe, Lit.make(1, true)), "GE bools pinned true")
+        for ((op, bound, expected) in listOf(Triple(PbOp.LE, 4L, false), Triple(PbOp.GE, 1L, true))) {
+            val problem = Problem(
+                2,
+                0,
+                emptyArray(),
+                listOf(PseudoBoolean(longArrayOf(2, 3), intArrayOf(pos(0), pos(1)), op, bound)),
+            )
+            val out = fixed(problem, emptyMap(), emptyMap())
+            assertEquals(
+                minObjectiveBools(problem, emptyMap()),
+                minObjectiveBools(out, emptyMap()),
+                "$op optimum changed",
+            )
+            assertTrue(
+                hasUnit(out, Lit.make(0, expected)) && hasUnit(out, Lit.make(1, expected)),
+                "$op bools pinned $expected",
+            )
+        }
     }
 
     @Test

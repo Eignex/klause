@@ -73,10 +73,8 @@ class MutableIntIntMapTest {
 
     @Test
     fun `remove deletes and leaves other entries findable across collisions`() {
-        // Force collisions: many keys, small map; backward-shift must keep chains intact.
         val m = MutableIntIntMap(4)
         for (k in 0 until 50) m.put(k, k * k)
-        // Remove every third key.
         for (k in 0 until 50 step 3) assertTrue(m.remove(k))
         for (k in 0 until 50) {
             if (k % 3 == 0) {
@@ -159,7 +157,6 @@ class MutableIntIntMapTest {
                 }
                 assertEquals(ref.size, m.size)
             }
-            // Final full reconciliation, including forEach contents.
             val seen = HashMap<Int, Int>()
             m.forEach { k, v -> seen[k] = v }
             assertEquals(ref, seen)

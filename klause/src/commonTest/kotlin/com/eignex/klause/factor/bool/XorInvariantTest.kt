@@ -18,7 +18,7 @@ class XorInvariantTest {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
-        for (v in 0..2) state.assignment.setBool(v, false) // parity = 0 != 1
+        for (v in 0..2) state.assignment.setBool(v, false)
         state.recompute()
         assertTrue(state.factors[0].isViolated(state, 0))
     }
@@ -30,7 +30,7 @@ class XorInvariantTest {
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, false)
-        state.assignment.setBool(2, false) // parity = 1
+        state.assignment.setBool(2, false)
         state.recompute()
         assertFalse(state.factors[0].isViolated(state, 0))
     }
@@ -40,7 +40,7 @@ class XorInvariantTest {
         val factor = Xor(IntArray(3) { Lit.make(it, true) }, targetParity = 1)
         val problem = Problem(3, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(0))
-        for (v in 0..2) state.assignment.setBool(v, false) // violated
+        for (v in 0..2) state.assignment.setBool(v, false)
         state.recompute()
         val delta = state.factors[0].deltaIfBoolFlipped(state, 0, 0)
         assertEquals(-1, delta)
@@ -53,7 +53,7 @@ class XorInvariantTest {
         val state = LocalSearchState(problem, Random(0))
         state.assignment.setBool(0, true)
         state.assignment.setBool(1, false)
-        state.assignment.setBool(2, false) // parity=1, satisfied
+        state.assignment.setBool(2, false)
         state.recompute()
         val delta = state.factors[0].deltaIfBoolFlipped(state, 0, 0)
         assertEquals(1, delta)

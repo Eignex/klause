@@ -25,17 +25,11 @@ class PostDifferenceSystemTest {
         ReifiedLinear(aux, longArrayOf(1, -1), intArrayOf(hi, lo), LinearOp.LE, bound)
 
     @Test
-    fun `a model with reified difference rows gains one system factor`() {
+    fun `a model with reified difference rows gains one system factor and keeps the rows it reads`() {
         val problem = problemOf(reified(0, 1, 0, -1L), reified(1, 2, 1, -1L))
         val posted = problem.withDifferenceSystem()
         assertEquals(problem.factors.size + 1, posted.factors.size)
         assertTrue(posted.factors.last() is DifferenceSystem)
-    }
-
-    @Test
-    fun `the rows the system reads stay posted`() {
-        val problem = problemOf(reified(0, 1, 0, -1L), reified(1, 2, 1, -1L))
-        val posted = problem.withDifferenceSystem()
         assertEquals(2, posted.factors.count { it is ReifiedLinear }, "the system is redundant with them")
     }
 

@@ -26,7 +26,18 @@ class OccurrenceDedupTest {
         val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val occA = problem.boolOccurrences[a]
         assertEquals(1, occA.size, "var a registered ${occA.size} times in occurrence list (expected 1)")
+    }
 
+    @Test
+    fun `local search cost stays sound across a flip when a var appears twice in one factor`() {
+        val a = 0
+        val b = 1
+        val factor = Cardinality(
+            literals = intArrayOf(Lit.make(a, true), Lit.make(a, false), Lit.make(b, true)),
+            min = 1,
+            max = 2,
+        )
+        val problem = Problem(2, 0, emptyArray(), listOf(factor))
         val state = LocalSearchState(problem, Random(7))
         state.recompute()
         val brute = if (state.factors[0].isViolated(state, 0)) 1L else 0L

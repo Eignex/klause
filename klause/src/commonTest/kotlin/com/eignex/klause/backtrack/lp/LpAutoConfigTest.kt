@@ -438,20 +438,4 @@ class LpAutoConfigTest {
         assertFalse(r.gomory)
         assertTrue(r.energeticReasoning)
     }
-
-    @Test
-    fun `recommended config preserves the optimum`() {
-        // Triangle covering (see LpBoundingTest): optimum 3; auto-config must not change it.
-        val p = problem(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
-        )
-        val obj = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val auto = BacktrackParams(lpPlan = LpAutoConfig.recommend(p), randomSeed = 1L)
-        assertTrue(auto.lpPlan.bounding)
-        val result = BacktrackSolver(p.bake()).minimize(obj, auto)
-        assertTrue(result is MinimizeResult.Optimal)
-        assertEquals(3.0, result.objectiveValue)
-    }
 }

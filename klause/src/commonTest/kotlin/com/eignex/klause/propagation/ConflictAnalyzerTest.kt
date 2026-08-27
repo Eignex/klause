@@ -101,6 +101,7 @@ class ConflictAnalyzerTest {
             learned.backjumpLevel,
             "backjump should target level 1 (the only lower-level variable's level)",
         )
+        assertEquals(2, learned.lbd, "two-decision-level clause should have LBD = 2")
     }
 
     @Test
@@ -168,27 +169,6 @@ class ConflictAnalyzerTest {
             !(a && b),
             "learned clause [¬a, ¬b] should block the a=true ∧ b=true assignment; got a=$a b=$b",
         )
-    }
-
-    @Test
-    fun `LBD reflects the distinct decision levels in the learned clause`() {
-        // Same two-decision conflict as `learned clause spans multiple decision levels`,
-        // but here we assert the LBD field. Learned clause is [¬a, ¬b]; literals span
-        // two distinct decision levels (1 and 2) → LBD = 2 (glue-clause boundary).
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, true))),
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false))),
-            ),
-        )
-        val session = PropagationSession(problem)
-        assertIs<PropagationResult.Implied>(session.pinBool(0, true))
-        val unsat = assertIs<PropagationResult.Unsat>(session.pinBool(1, true))
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(unsat.learnedClause)
-        assertEquals(2, learned.lbd, "two-decision-level clause should have LBD = 2")
     }
 
     @Test

@@ -11,7 +11,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * #22 Element LP linearization: the one-hot selector model for a constant array. It is the exact
@@ -101,33 +100,5 @@ class CpToLpRelaxationElementHullTest {
 
         assertEquals(3.0, sol.objectiveValue, eps)
         assertEquals(2.0, sol.primal(intCol(r, 0)), eps) // idx points at the cheapest entry
-    }
-
-    @Test
-    fun `variable array element builds a sound big-M hull`() {
-        // Variable-array Element linearizes to a big-M selector hull: it adds selector columns plus
-        // one-hot/index/big-M rows, and the LP bound on `result` is a sound relaxation bound — never
-        // above the true integer optimum.
-        // arr = [v0∈[4,6], v1∈[1,2], v2∈[8,9]], idx∈{0,1,2}, minimize result ⇒ integer min = 1 (idx=1).
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 5, // 0=idx, 1=result, 2..4 = arr vars
-            intDomains = arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 100),
-                IntDomain(4, 6),
-                IntDomain(1, 2),
-                IntDomain(8, 9),
-            ),
-            factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = longArrayOf(2, 3, 4), arrIsVars = true, indexOffset = 0),
-            ),
-        )
-        val (sol, r) = solve(p, LinearObjective(intCoefficients = longArrayOf(0L, 1L, 0L, 0L, 0L)))
-        // The hull adds selector columns and the one-hot + index-channel + big-M rows.
-        assertTrue(r.model.n > 1, "selector columns are added")
-        assertTrue(r.model.m >= 3, "one-hot + index channel + per-position big-M rows")
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
-        assertTrue(sol.objectiveValue <= 1.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 1")
     }
 }

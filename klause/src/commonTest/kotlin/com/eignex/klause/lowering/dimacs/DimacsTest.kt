@@ -52,17 +52,12 @@ class DimacsTest {
     }
 
     @Test
-    fun `rejects missing header`() {
-        assertFails {
-            Dimacs.parse("1 2 3 0\n")
-        }
-    }
-
-    @Test
-    fun `rejects literal out of range`() {
-        assertFails {
-            Dimacs.parse("p cnf 2 1\n1 2 3 0\n")
-        }
+    fun `rejects malformed cnf input`() {
+        val malformed = listOf(
+            "1 2 3 0\n", // missing header
+            "p cnf 2 1\n1 2 3 0\n", // literal out of range
+        )
+        for (text in malformed) assertFails(text) { Dimacs.parse(text) }
     }
 
     @Test
@@ -132,17 +127,12 @@ class DimacsTest {
     }
 
     @Test
-    fun `wcnf rejects trailing tokens after the 0 terminator`() {
-        assertFails {
-            Dimacs.parseWcnf("p wcnf 2 1\n1 -1 0 99\n")
-        }
-    }
-
-    @Test
-    fun `wcnf rejects clause not terminated by 0`() {
-        assertFails {
-            Dimacs.parseWcnf("p wcnf 2 1\n1 -1 -2\n")
-        }
+    fun `wcnf rejects malformed clause syntax`() {
+        val malformed = listOf(
+            "p wcnf 2 1\n1 -1 0 99\n", // trailing tokens after the 0 terminator
+            "p wcnf 2 1\n1 -1 -2\n", // not terminated by 0
+        )
+        for (text in malformed) assertFails(text) { Dimacs.parseWcnf(text) }
     }
 
     @Test

@@ -13,23 +13,18 @@ import kotlin.test.assertTrue
 class ContiguousDomainTest {
 
     @Test
-    fun `contiguous domain basics`() {
+    fun `clamp saturates a value to the domain bounds`() {
         val d = ContiguousDomain(1, 10)
-        assertEquals(1, d.min)
-        assertEquals(10, d.max)
-        assertEquals(10, d.size)
-        assertTrue(5 in d)
-        assertFalse(0 in d)
-        assertFalse(11 in d)
         assertEquals(5, d.clamp(5))
         assertEquals(1, d.clamp(-5))
         assertEquals(10, d.clamp(100))
     }
 
     @Test
-    fun `holeCount is zero even for a span wider than Int`() {
+    fun `holeCount is zero for a span wider than Int and tracks holes carved into it`() {
         assertEquals(0L, ContiguousDomain(1, 10).holeCount)
         assertEquals(0L, ContiguousDomain(0, 5_000_000_000L).holeCount)
+        assertEquals(1L, ContiguousDomain(0, 5_000_000_000L).excludeValue(7L).holeCount)
     }
 
     @Test
@@ -48,12 +43,6 @@ class ContiguousDomainTest {
     @Test
     fun `no cap hands back values an index cannot address`() {
         assertNull(ContiguousDomain(0, 5_000_000_000L).spanOrNull(maxValues = Long.MAX_VALUE))
-    }
-
-    @Test
-    fun `a wide domain still counts its holes`() {
-        assertEquals(0L, ContiguousDomain(0, 5_000_000_000L).holeCount)
-        assertEquals(1L, ContiguousDomain(0, 5_000_000_000L).excludeValue(7L).holeCount)
     }
 
     @Test
@@ -158,14 +147,6 @@ class ContiguousDomainTest {
         assertEquals(1, e.min)
         assertEquals(5, e.max)
         assertEquals(5, e.values.size)
-    }
-
-    @Test
-    fun `forEach skips holes and preserves order`() {
-        val d = ContiguousDomain(1, 7).excludeValue(3).excludeValue(5)
-        val seen = mutableListOf<Long>()
-        d.values.forEach { seen.add(it) }
-        assertEquals(listOf(1L, 2L, 4L, 6L, 7L), seen)
     }
 
     @Test

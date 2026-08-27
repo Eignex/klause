@@ -80,6 +80,8 @@ class AtomConflictAnalyzerTest {
         // Two leaf atoms: ax at level 1, ay at level 2 (the conflict level). The conflict
         // clause forbids both holding. 1UIP keeps ay as the asserting UIP, ax drops to the
         // learned clause as a lower-level literal → backjump to level 1.
+        // #76 regression: the backjump must come from ax's trail-resident establishment level
+        // (1), not from how the search happened to pop to reach the conflict.
         val state = atomGeState(intArrayOf(1, 2)) // ax @1, ay @2
         state.currentLevel = 2
         val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
@@ -88,25 +90,9 @@ class AtomConflictAnalyzerTest {
         assertEquals(setOf(0, 1), varsOf(learned.literals), "both atom vars stay in the clause")
         assertTrue(learned.literals.all { Lit.variable(it) >= state.problem.numBoolVars }, "all literals are atom-vars")
         assertTrue(learned.literals.all { !Lit.isPositive(it) }, "atoms hold, so they appear negated")
-        assertEquals(1, learned.backjumpLevel, "second-highest decision level among the literals")
+        assertEquals(1, learned.backjumpLevel, "backjump must reflect ax's true establishment level 1")
         assertEquals(2, learned.lbd)
         assertTrue(learned.asserting, "exactly one literal at the conflict level → asserting 1UIP clause")
-    }
-
-    @Test
-    fun `backjump level uses the trail-resident atom level`() {
-        // #76 regression: ax's bound was genuinely established at level 1 on this path, and its
-        // trail slot records level 1. The analyzer reads that stored establishment level, so it
-        // sees ax at its true level 1 regardless of how the search popped to reach the conflict.
-        val state = atomGeState(intArrayOf(1, 2)) // ax established @1, ay @2
-        state.currentLevel = 2
-        val fid = state.addLearnedClause(Clause(intArrayOf(negAtom(0), negAtom(1))), lbd = 2)
-
-        val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(state.conflictAnalyzer.analyze(fid))
-        assertEquals(setOf(0, 1), varsOf(learned.literals))
-        assertEquals(1, learned.backjumpLevel, "backjump must reflect ax's true establishment level 1")
-        assertEquals(2, learned.lbd, "two true levels {1, 2}")
-        assertTrue(learned.asserting)
     }
 
     @Test

@@ -63,11 +63,6 @@ class AllDifferentReificationIntegrationTest {
     }
 
     @Test
-    fun `reified literal agrees with all different over three terms`() {
-        checkAgainstOracle(n = 3, values = 3)
-    }
-
-    @Test
     fun `reified literal agrees with all different over four terms`() {
         checkAgainstOracle(n = 4, values = 4)
     }

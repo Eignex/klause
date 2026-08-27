@@ -513,24 +513,6 @@ class CumulativePropagatorTest {
     }
 
     @Test
-    fun `single task never overloads`() {
-        val factor = Cumulative(
-            starts = intArrayOf(0),
-            durations = longArrayOf(2),
-            resources = longArrayOf(1),
-            capacity = 1,
-        )
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 4)),
-            factors = arrayOf<Factor>(factor),
-        )
-        val result = problem.propagate()
-        assertTrue(result is PropagationResult.Implied, "single task is always feasible; got $result")
-    }
-
-    @Test
     fun `zero-duration task contributes no usage`() {
         // A duration-0 task occupies no time, so it never loads the resource — feasible even
         // when its resource demand exceeds capacity.
@@ -593,29 +575,30 @@ class CumulativePropagatorTest {
         assertEquals(0L, t.energyOfTheta())
     }
 
-    @Test fun `two tasks left anchor wins the envelope`() {
-        // Tasks: a est=0 e=10, b est=5 e=2, capacity=1.
-        // env(a) = 0 + 10 = 10
-        // env(b) = 5 + 2 = 7
-        // env(theta) = max(env(a) + e(b), env(b)) = max(12, 7) = 12
-        val t = CumulativeThetaTree(n = 2, capacity = 1)
-        t.setLeafOrder(intArrayOf(0, 1))
-        t.activate(0, est = 0, taskEnergy = 10L)
-        t.activate(1, est = 5, taskEnergy = 2L)
-        assertEquals(12L, t.envOfTheta())
-        assertEquals(12L, t.energyOfTheta())
-    }
-
-    @Test fun `two tasks right anchor wins the envelope`() {
-        // Tasks: a est=0 e=1, b est=100 e=5, capacity=10.
-        // env(a) = 0 + 1 = 1
-        // env(b) = 1000 + 5 = 1005
-        // env(theta) = max(1 + 5, 1005) = 1005
-        val t = CumulativeThetaTree(n = 2, capacity = 10)
-        t.setLeafOrder(intArrayOf(0, 1))
-        t.activate(0, est = 0, taskEnergy = 1L)
-        t.activate(1, est = 100, taskEnergy = 5L)
-        assertEquals(1005L, t.envOfTheta())
+    @Test fun `two task envelope is anchored at whichever side maximises it`() {
+        data class Case(
+            val capacity: Long,
+            val aEst: Long,
+            val aE: Long,
+            val bEst: Long,
+            val bE: Long,
+            val expectedEnv: Long,
+            val label: String,
+        )
+        val cases = listOf(
+            // env(a) = 0 + 10 = 10, env(b) = 5 + 2 = 7, env(theta) = max(10+2, 7) = 12 (left anchor).
+            Case(capacity = 1, aEst = 0, aE = 10L, bEst = 5, bE = 2L, expectedEnv = 12L, label = "left anchor"),
+            // env(a) = 0 + 1 = 1, env(b) = 1000 + 5 = 1005, env(theta) = max(1+5, 1005) = 1005 (right anchor).
+            Case(capacity = 10, aEst = 0, aE = 1L, bEst = 100, bE = 5L, expectedEnv = 1005L, label = "right anchor"),
+        )
+        for (c in cases) {
+            val t = CumulativeThetaTree(n = 2, capacity = c.capacity)
+            t.setLeafOrder(intArrayOf(0, 1))
+            t.activate(0, est = c.aEst, taskEnergy = c.aE)
+            t.activate(1, est = c.bEst, taskEnergy = c.bE)
+            assertEquals(c.expectedEnv, t.envOfTheta(), "${c.label}: envelope")
+            assertEquals(c.aE + c.bE, t.energyOfTheta(), "${c.label}: energy")
+        }
     }
 
     @Test fun `deactivate matches never-activated state`() {

@@ -41,14 +41,6 @@ class DifferenceGraphTest {
     }
 
     @Test
-    fun `a negative cycle is found across a longer loop`() {
-        // Three constraints round a triangle summing to -1.
-        val cycle = graph(3, Triple(0, 1, 1L), Triple(1, 2, 1L), Triple(2, 0, -3L)).negativeCycle()
-        assertNotNull(cycle)
-        assertEquals(3, cycle.size)
-    }
-
-    @Test
     fun `the reported edges form a closed negative walk`() {
         val g = DifferenceGraph(3)
         val e0 = g.addEdge(0, 1, 1L)

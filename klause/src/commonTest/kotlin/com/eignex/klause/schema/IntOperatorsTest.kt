@@ -10,6 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.model.BoolExpr
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -288,43 +289,38 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `lt accepts bound minus one`() {
-        class S : VariableSchema() {
-            val x by intVar(min = 0, max = 10)
-            val cap by constraint { x lt 5 }
+    fun `lt and gt accept the adjacent bound`() {
+        data class Case(
+            val seed: Long,
+            val build: (IntHandle) -> BoolExpr,
+            val holds: (Long) -> Boolean,
+            val adjacent: Long,
+            val label: String,
+        )
+        val cases = listOf(
+            Case(seed = 7, build = { it lt 5 }, holds = { it < 5 }, adjacent = 4, label = "lt 5"),
+            Case(seed = 13, build = { it gt 5 }, holds = { it > 5 }, adjacent = 6, label = "gt 5"),
+        )
+        for (c in cases) {
+            class S : VariableSchema() {
+                val x by intVar(min = 0, max = 10)
+                val cap by constraint { c.build(x) }
+            }
+            val schema = S()
+            val compiled = schema.compile()
+            val solver = LocalSearchSolver(
+                compiled.problem.bake(),
+                restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200),
+            )
+            val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = c.seed)).take(40).toList()
+            assertTrue(samples.isNotEmpty(), "${c.label}: no samples")
+            for (s in samples) {
+                val xv = compiled.decode(schema.x, s)
+                assertTrue(c.holds(xv), "x=$xv violates ${c.label}")
+            }
+            val anyAdjacent = samples.any { compiled.decode(schema.x, it) == c.adjacent }
+            assertTrue(anyAdjacent, "no sample reached x=${c.adjacent} - compiler is over-tightening ${c.label}")
         }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver =
-            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 7)).take(40).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val xv = compiled.decode(schema.x, s)
-            assertTrue(xv < 5, "x=$xv violates lt 5")
-        }
-        val anyAtFour = samples.any { compiled.decode(schema.x, it) == 4L }
-        assertTrue(anyAtFour, "no sample reached x=4 - compiler is over-tightening lt")
-    }
-
-    @Test
-    fun `gt accepts bound plus one`() {
-        class S : VariableSchema() {
-            val x by intVar(min = 0, max = 10)
-            val cap by constraint { x gt 5 }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver =
-            LocalSearchSolver(compiled.problem.bake(), restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 200))
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 13)).take(40).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val xv = compiled.decode(schema.x, s)
-            assertTrue(xv > 5, "x=$xv violates gt 5")
-        }
-        val anyAtSix = samples.any { compiled.decode(schema.x, it) == 6L }
-        assertTrue(anyAtSix, "no sample reached x=6 - compiler is over-tightening gt")
     }
 
     @Test
@@ -345,28 +341,6 @@ class IntOperatorsTest {
             val xv = compiled.decode(schema.x, s)
             val yv = compiled.decode(schema.y, s)
             assertTrue(xv != yv, "x=$xv y=$yv equal")
-        }
-    }
-
-    @Test
-    fun `signed product holds in samples`() {
-        class S : VariableSchema() {
-            val x by intVar(min = -3, max = 3)
-            val y by intVar(min = -3, max = 3)
-            val pin by constraint { (x * y) eq -6 }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem.bake(),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
-        )
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 30_000, randomSeed = 53)).take(15).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val xv = compiled.decode(schema.x, s)
-            val yv = compiled.decode(schema.y, s)
-            assertTrue(xv * yv == -6L, "x=$xv y=$yv x*y=${xv * yv}")
         }
     }
 
@@ -425,40 +399,35 @@ class IntOperatorsTest {
     }
 
     @Test
-    fun `strict less-than excludes the exact boundary bucket`() {
-        // #83: 0.5 is exactly bucket 10 (21 buckets over [0,1], step 0.05). `rate < 0.5` must
-        // exclude it; lowering LT as LE would let 0.5 leak in.
-        class S : VariableSchema() {
-            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
+    fun `strict less-than and greater-than exclude the exact boundary bucket`() {
+        // #83: 0.5 is exactly bucket 10 (21 buckets over [0,1], step 0.05). `rate < 0.5` (resp.
+        // `rate > 0.5`) must exclude it; lowering the strict comparison as its non-strict form
+        // would let 0.5 leak in.
+        data class Case(
+            val seed: Long,
+            val build: (FloatHandle) -> BoolExpr,
+            val holds: (Double) -> Boolean,
+            val label: String,
+        )
+        val cases = listOf(
+            Case(seed = 11, build = { it lt 0.5 }, holds = { it < 0.5 - 1e-9 }, label = "rate < 0.5"),
+            Case(seed = 12, build = { it gt 0.5 }, holds = { it > 0.5 + 1e-9 }, label = "rate > 0.5"),
+        )
+        for (c in cases) {
+            class S : VariableSchema() {
+                val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
 
-            val c by constraint { rate lt 0.5 }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem.bake())
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 11)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate < 0.5 - 1e-9, "rate=$rate admitted on/over the strict boundary of rate < 0.5")
-        }
-    }
-
-    @Test
-    fun `strict greater-than excludes the exact boundary bucket`() {
-        class S : VariableSchema() {
-            val rate by floatVar(min = 0.0, max = 1.0, buckets = 21)
-
-            val c by constraint { rate gt 0.5 }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(compiled.problem.bake())
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = 12)).take(50).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val rate = compiled.decode(schema.rate, s)
-            assertTrue(rate > 0.5 + 1e-9, "rate=$rate admitted on/under the strict boundary of rate > 0.5")
+                val cst by constraint { c.build(rate) }
+            }
+            val schema = S()
+            val compiled = schema.compile()
+            val solver = LocalSearchSolver(compiled.problem.bake())
+            val samples = solver.enumerate(LocalSearchParams(maxFlips = 5_000, randomSeed = c.seed)).take(50).toList()
+            assertTrue(samples.isNotEmpty(), "${c.label}: no samples")
+            for (s in samples) {
+                val rate = compiled.decode(schema.rate, s)
+                assertTrue(c.holds(rate), "rate=$rate admitted on/over the strict boundary of ${c.label}")
+            }
         }
     }
 

@@ -155,21 +155,14 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `a conflict from a component that keeps its explanations is not retained again`() {
-        val session = SearchSession(listOf(ConflictingComponent(retains = true)))
+    fun `conflict retention depends on whether the component keeps its own explanations`() {
+        listOf(true to 0, false to 1).forEach { (retains, expectedCount) ->
+            val session = SearchSession(listOf(ConflictingComponent(retains = retains)))
 
-        drainToExhaustion(session.openRun(numBoolVars = 1))
+            drainToExhaustion(session.openRun(numBoolVars = 1))
 
-        assertEquals(0, session.learnedClauseCount, "the owner keeps the clause in its own database")
-    }
-
-    @Test
-    fun `a conflict from a component that keeps nothing is retained by the engine`() {
-        val session = SearchSession(listOf(ConflictingComponent(retains = false)))
-
-        drainToExhaustion(session.openRun(numBoolVars = 1))
-
-        assertEquals(1, session.learnedClauseCount, "nothing else holds the clause")
+            assertEquals(expectedCount, session.learnedClauseCount, "retains=$retains")
+        }
     }
 
     private fun drainToExhaustion(run: SearchRun) {
@@ -634,33 +627,20 @@ class SearchSessionTest {
     }
 
     @Test
-    fun `restart drops the clauses over the learned database cap`() {
-        val session = SearchSession(
-            emptyList(),
-            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
-        )
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        session.learn(SearchExplanation(intArrayOf(4, 6)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
+    fun `restart reduction over the learned database cap keeps clauses at or above the glue threshold`() {
+        listOf(0 to 1, 1 to 2).forEach { (glueLbd, expectedCount) ->
+            val session = SearchSession(
+                emptyList(),
+                learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = glueLbd),
+            )
+            session.learn(SearchExplanation(intArrayOf(0, 2)))
+            session.learn(SearchExplanation(intArrayOf(4, 6)))
+            assertIs<ComponentResult.Consistent>(session.propagate())
 
-        assertIs<ComponentResult.Consistent>(session.restart())
+            assertIs<ComponentResult.Consistent>(session.restart())
 
-        assertEquals(1, session.learnedClauseCount)
-    }
-
-    @Test
-    fun `restart retains glue clauses over the learned database cap`() {
-        val session = SearchSession(
-            emptyList(),
-            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 1),
-        )
-        session.learn(SearchExplanation(intArrayOf(0, 2)))
-        session.learn(SearchExplanation(intArrayOf(4, 6)))
-        assertIs<ComponentResult.Consistent>(session.propagate())
-
-        assertIs<ComponentResult.Consistent>(session.restart())
-
-        assertEquals(2, session.learnedClauseCount)
+            assertEquals(expectedCount, session.learnedClauseCount, "glueLbd=$glueLbd")
+        }
     }
 
     @Test

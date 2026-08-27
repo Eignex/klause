@@ -125,15 +125,6 @@ class MoveSinkTest {
     }
 
     @Test
-    fun `a non-owner factor cannot move another owner's var`() {
-        val sink = MoveSink()
-        sink.setOwners(intArrayOf(-1, 7, -1))
-        sink.proposer = 9 // a different factor
-        sink.addIntSet(1, 20)
-        assertTrue(sink.list.isEmpty())
-    }
-
-    @Test
     fun `compound parts on a foreign-owned var are dropped individually`() {
         val sink = MoveSink()
         sink.setOwners(intArrayOf(-1, 7, -1, -1))

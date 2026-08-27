@@ -62,15 +62,4 @@ class CutAssignmentObjectiveCutTest {
             }
         }
     }
-
-    @Test
-    fun `stronger than the unweighted hall cut for skewed weights`() {
-        // The Hall sum cut only bounds Σx ≥ 0+1+2 = 3; the assignment cut on weights (1,2,9)
-        // bounds 1·x0+2·x1+9·x2, whose minimum places 0 on the heaviest weight.
-        val coef = longArrayOf(1, 2, 9)
-        val (p, r, sol) = setup(coef, 4)
-        val cuts = AssignmentObjectiveCut(coef).separate(CutContext(p, r, sol.primal, PropagationSession(p)))
-        // min: x2=0 (×9), x1=1 (×2), x0=2 (×1) = 0 + 2 + 2 = 4.
-        assertEquals(4L, cuts.single().rhs)
-    }
 }

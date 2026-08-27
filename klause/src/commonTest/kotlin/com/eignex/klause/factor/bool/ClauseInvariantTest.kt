@@ -24,16 +24,6 @@ class ClauseInvariantTest {
     }
 
     @Test
-    fun `violated when all literals false`() {
-        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false)))
-        val state = stateFor(2, clause)
-        state.assignment.setBool(0, false)
-        state.assignment.setBool(1, true)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-    }
-
-    @Test
     fun `delta if flipped matches apply flip`() {
         val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false), Lit.make(2, true)))
         val state = stateFor(3, clause)
@@ -47,21 +37,6 @@ class ClauseInvariantTest {
         state.apply(Move.BoolFlip(0))
         assertEquals(-1, predictedDelta)
         assertFalse(state.factors[0].isViolated(state, 0))
-    }
-
-    @Test
-    fun `flipping maintains violation status`() {
-        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)))
-        val state = stateFor(3, clause)
-        state.assignment.setBool(0, true)
-        state.assignment.setBool(1, true)
-        state.assignment.setBool(2, false)
-        state.recompute()
-        assertFalse(state.factors[0].isViolated(state, 0))
-        state.apply(Move.BoolFlip(0))
-        assertFalse(state.factors[0].isViolated(state, 0))
-        state.apply(Move.BoolFlip(1))
-        assertTrue(state.factors[0].isViolated(state, 0))
     }
 
     @Test

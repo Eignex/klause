@@ -174,40 +174,21 @@ class FactorPropertyTest {
         )
     }
 
-    @Test fun `int eq delta matches apply`() {
-        runFactorPropertyCheck(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
-            numBoolVars = 0,
-            intDomains = arrayOf(IntDomain(0, 5)),
-            seed = 12,
+    @Test fun `int comparison delta matches apply`() {
+        val cases = listOf(
+            Triple(LinearOp.EQ, 3, IntDomain(0, 5)),
+            Triple(LinearOp.GE, 2, IntDomain(-3, 3)),
+            Triple(LinearOp.LE, 1, IntDomain(-3, 3)),
+            Triple(LinearOp.NE, 0, IntDomain(-2, 2)),
         )
-    }
-
-    @Test fun `int geq delta matches apply`() {
-        runFactorPropertyCheck(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 2),
-            numBoolVars = 0,
-            intDomains = arrayOf(IntDomain(-3, 3)),
-            seed = 13,
-        )
-    }
-
-    @Test fun `int leq delta matches apply`() {
-        runFactorPropertyCheck(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            numBoolVars = 0,
-            intDomains = arrayOf(IntDomain(-3, 3)),
-            seed = 14,
-        )
-    }
-
-    @Test fun `int neq delta matches apply`() {
-        runFactorPropertyCheck(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
-            numBoolVars = 0,
-            intDomains = arrayOf(IntDomain(-2, 2)),
-            seed = 15,
-        )
+        cases.forEachIndexed { i, (op, bound, domain) ->
+            runFactorPropertyCheck(
+                Linear(intArrayOf(1), intArrayOf(0), op, bound),
+                numBoolVars = 0,
+                intDomains = arrayOf(domain),
+                seed = 12 + i,
+            )
+        }
     }
 
     @Test fun `reified linear delta matches apply`() {

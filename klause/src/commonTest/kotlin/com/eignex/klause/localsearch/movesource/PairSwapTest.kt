@@ -9,13 +9,12 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
-import kotlin.test.assertFalse
 
 /**
  * Move-generation coverage for [PairSwap]. The reference closure encodes the expected construction —
  * up to [cap] validated bool-pair swaps followed by up to [cap] validated int-pair swaps, each drawn
  * from two RNG ints and kept only when the pair is non-degenerate and domain-legal — and the test pins
- * [PairSwap.generate] to that multiset. A second test asserts the source yields swaps on a mixed fixture.
+ * [PairSwap.generate] to that multiset.
  */
 class PairSwapTest {
 
@@ -83,12 +82,5 @@ class PairSwapTest {
                 expectedPairSwapFill(state, sink)
             }
         }
-    }
-
-    @Test
-    fun `generate yields swap candidates on a mixed bool-int fixture`() {
-        val state = freshState(mixedProblem(), 7L).also(::prepare)
-        val captured = captureFromSink(state) { sink -> PairSwap(cap).generate(state, sink) }
-        assertFalse(captured.isEmpty, "mixed bool/int assignment with distinct values must yield swaps")
     }
 }

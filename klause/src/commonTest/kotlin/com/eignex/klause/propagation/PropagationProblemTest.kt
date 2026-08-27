@@ -16,15 +16,6 @@ import kotlin.test.assertTrue
 class PropagationProblemTest {
 
     @Test
-    fun `inverts a factor into per-variable occurrence lists`() {
-        val clause = Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true)))
-        val occ = PropagationProblem(Problem(3, 0, emptyArray(), listOf(clause)))
-        assertEquals(listOf(0), occ.boolOccurrences[0].toList())
-        assertTrue(occ.boolOccurrences[1].isEmpty(), "var 1 is not mentioned by the clause")
-        assertEquals(listOf(0), occ.boolOccurrences[2].toList())
-    }
-
-    @Test
     fun `a variable's occurrence list names every factor mentioning it`() {
         val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val c1 = Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true)))

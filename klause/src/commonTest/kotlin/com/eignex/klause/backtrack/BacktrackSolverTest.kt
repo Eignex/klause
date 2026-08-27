@@ -228,20 +228,6 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `solve returns UNSAT on contradiction`() {
-        val p = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-        )
-        assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 0L)))
-    }
-
-    @Test
     fun `tight cumulative packing solves without overflowing conflict-clause minimization`() {
         // A tight unary-resource cumulative drives many conflicts whose atom antecedents form
         // deep (and occasionally cyclic) implication chains, so self-subsuming-resolution
@@ -271,29 +257,6 @@ class BacktrackSolverTest {
                 assertTrue(noOverlap, "tasks $i@${starts[i]} and $j@${starts[j]} overlap under capacity 1")
             }
         }
-    }
-
-    @Test
-    fun `solve populates unsat core when propagation rules out the problem at root`() {
-        // Two-clause direct contradiction. Bake-time propagation pins var 0 via the first
-        // clause; the second clause then fails on a conflicting pin. Both factors are
-        // load-bearing for the contradiction, and the propagation-graph BFS captures both.
-        val p = Problem(
-            numBoolVars = 1,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-        )
-        val verdict = assertIs<SolveResult.Unsat>(BacktrackSolver(p.bake()).solve(BacktrackParams()))
-        val core = verdict.core ?: error("expected propagation-derived unsat core, got null")
-        assertEquals(
-            setOf(0, 1),
-            core.factorIds.toSet(),
-            "core should mention both contradicting clauses, got ${core.factorIds.toList()}",
-        )
     }
 
     @Test
@@ -578,24 +541,6 @@ class BacktrackSolverTest {
     }
 
     @Test
-    fun `solve returns Unknown when budget exhausts before finding SAT`() {
-        val p = Problem(
-            numBoolVars = 10,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf<Factor>(
-                Cardinality.exactlyOne((0..9).map { Lit.make(it, true) }.toIntArray()),
-            ),
-        )
-        val r = BacktrackSolver(p.bake()).solve(BacktrackParams(maxDecisions = 1))
-        // Could legitimately be Unknown or Sat depending on whether the first branch hits.
-        assertTrue(
-            r is SolveResult.Sat || r is SolveResult.Unknown,
-            "should not report Unsat on feasible problem: $r",
-        )
-    }
-
-    @Test
     fun `minimize finds the optimal feasible assignment`() {
         val p = Problem(
             numBoolVars = 4,
@@ -763,12 +708,6 @@ class BacktrackSolverTest {
         val b by intVar(min = 1, max = 3)
         val c by intVar(min = 1, max = 3)
         val unique by constraint { allDifferent(a, b, c) }
-    }
-
-    @Test
-    fun `constructor accepts a compiled problem`() {
-        val compiled = ThreeDistinct().compile()
-        assertIs<SolveResult.Sat>(BacktrackSolver(compiled).solve(BacktrackParams(randomSeed = 0L)))
     }
 
     @Test

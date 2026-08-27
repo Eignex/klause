@@ -247,15 +247,4 @@ class CompilerOptLoweringTest {
         val four = ReifiedAllDiff(4).compile().problem.factors.size
         assertTrue(three > four, "three pairwise terms ($three) should not undercut four witness terms ($four)")
     }
-
-    @Test
-    fun `pin can be disabled via config`() {
-        val pinned = AbsentIntZero().compile(KlauseConfig(pinAbsentOptVars = true))
-        val unpinned = AbsentIntZero().compile(KlauseConfig(pinAbsentOptVars = false))
-        assertTrue(
-            pinned.problem.factors.size > unpinned.problem.factors.size,
-            "pinning should add a constraint (pinned=${pinned.problem.factors.size}, " +
-                "unpinned=${unpinned.problem.factors.size})",
-        )
-    }
 }

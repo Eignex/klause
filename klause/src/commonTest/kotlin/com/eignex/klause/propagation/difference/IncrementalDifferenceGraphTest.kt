@@ -83,18 +83,17 @@ class IncrementalDifferenceGraphTest {
     }
 
     @Test
-    fun `the assertion closing a negative cycle reports it`() {
-        val g = graph(2, Triple(0, 1, -1L), Triple(1, 0, -1L))
-        assertNull(g.assertEdge(0))
-        assertEquals(setOf(0, 1), assertNotNull(g.assertEdge(1)).toSet())
-    }
-
-    @Test
-    fun `a negative cycle is reported across a longer loop`() {
-        val g = graph(3, Triple(0, 1, 1L), Triple(1, 2, 1L), Triple(2, 0, -3L))
-        assertNull(g.assertEdge(0))
-        assertNull(g.assertEdge(1))
-        assertEquals(setOf(0, 1, 2), assertNotNull(g.assertEdge(2)).toSet())
+    fun `the assertion closing a negative cycle reports the full cycle at any length`() {
+        val cases = listOf(
+            2 to arrayOf(Triple(0, 1, -1L), Triple(1, 0, -1L)),
+            3 to arrayOf(Triple(0, 1, 1L), Triple(1, 2, 1L), Triple(2, 0, -3L)),
+        )
+        for ((numNodes, edges) in cases) {
+            val g = graph(numNodes, *edges)
+            for (e in 0 until edges.size - 1) assertNull(g.assertEdge(e))
+            val cycle = assertNotNull(g.assertEdge(edges.size - 1))
+            assertEquals((0 until numNodes).toSet(), cycle.toSet())
+        }
     }
 
     @Test
@@ -126,18 +125,11 @@ class IncrementalDifferenceGraphTest {
     }
 
     @Test
-    fun `a shortest path over negative weights is measured exactly`() {
+    fun `a shortest path over negative weights is measured exactly and its path reported`() {
         val g = graph(3, Triple(0, 1, -5L), Triple(1, 2, -4L), Triple(0, 2, -2L))
         for (e in 0..2) assertNull(g.assertEdge(e))
         g.shortestPathsFrom(0, intArrayOf(2))
         assertEquals(-9L, g.distanceTo(2), "the two-hop route beats the direct edge")
-    }
-
-    @Test
-    fun `the reported path is the one that carries the distance`() {
-        val g = graph(3, Triple(0, 1, -5L), Triple(1, 2, -4L), Triple(0, 2, -2L))
-        for (e in 0..2) assertNull(g.assertEdge(e))
-        g.shortestPathsFrom(0, intArrayOf(2))
         assertEquals(setOf(0, 1), g.pathTo(2).toSet())
     }
 
@@ -159,14 +151,12 @@ class IncrementalDifferenceGraphTest {
     }
 
     @Test
-    fun `a system whose weights cannot be summed inside Long deduces nothing`() {
-        val g = graph(2, Triple(0, 1, Long.MAX_VALUE / 2), Triple(1, 0, Long.MAX_VALUE / 2))
-        assertFalse(g.usable, "a potential over these weights would wrap")
-    }
-
-    @Test
-    fun `an ordinary system is usable`() {
-        assertTrue(graph(2, Triple(0, 1, 5L)).usable)
+    fun `usable reflects whether a potential could be computed without overflow`() {
+        assertFalse(
+            graph(2, Triple(0, 1, Long.MAX_VALUE / 2), Triple(1, 0, Long.MAX_VALUE / 2)).usable,
+            "a potential over these weights would wrap",
+        )
+        assertTrue(graph(2, Triple(0, 1, 5L)).usable, "an ordinary system is usable")
     }
 
     /**
@@ -194,21 +184,14 @@ class IncrementalDifferenceGraphTest {
     }
 
     @Test
-    fun `the repair follows the tight route to the cycle and not the slack one`() {
+    fun `the repair follows the tight route to the cycle settling each vertex at most once`() {
+        // The closing vertex is never settled, so one settle per vertex is strictly under the count.
+        // Ordering the scan by `π + γ` on this system costs 5 settles over 5 vertices instead of 3.
         val (g, edges) = divergentRoutes()
         for (e in 0..6) assertNull(g.assertEdge(e), "setup edge $e must be consistent")
         val cycle = assertNotNull(g.assertEdge(7), "the tight route closes a negative cycle")
         assertEquals(setOf(7, 2, 5, 6), cycle.toSet(), "the slack route through vertex 3 is not negative")
         assertEquals(-3L, weightOf(edges, cycle))
-    }
-
-    @Test
-    fun `the repair settles each vertex at most once`() {
-        // The closing vertex is never settled, so one settle per vertex is strictly under the count.
-        // Ordering the scan by `π + γ` on this system costs 5 settles over 5 vertices instead of 3.
-        val (g, _) = divergentRoutes()
-        for (e in 0..6) g.assertEdge(e)
-        g.assertEdge(7)
         assertTrue(g.settlements < g.numNodes, "settled ${g.settlements} times over ${g.numNodes} vertices")
     }
 

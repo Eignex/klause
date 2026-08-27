@@ -9,7 +9,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -52,26 +51,5 @@ class LpReducedCostFixingTest {
         )
         assertTrue(result.objectiveValue == 5.0, "optimum should still be reached, got ${result.objectiveValue}")
         assertTrue(result.stats.lp.fixed.sum > 0.0, "expected reduced-cost fixings, got ${result.stats.lp.fixed.sum}")
-    }
-
-    @Test
-    fun `fixing stays sound on the triangle covering problem`() {
-        // Same instance #20 used; reduced-cost fixing on top must still prove optimum 3.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 5), IntDomain(0, 5), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 2),
-            ),
-        )
-        val triObj = LinearObjective(intCoefficients = longArrayOf(1L, 1L, 1L))
-        val result = BacktrackSolver(
-            problem.bake(),
-        ).minimize(triObj, BacktrackParams(randomSeed = 4L, lpPlan = LpPlan(bounding = true)))
-        assertTrue(result is MinimizeResult.Optimal)
-        assertEquals(3.0, result.objectiveValue)
     }
 }

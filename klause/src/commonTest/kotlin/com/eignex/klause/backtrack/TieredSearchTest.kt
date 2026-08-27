@@ -3,8 +3,6 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
-import com.eignex.klause.backtrack.selector.LargestUpperBound
-import com.eignex.klause.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor

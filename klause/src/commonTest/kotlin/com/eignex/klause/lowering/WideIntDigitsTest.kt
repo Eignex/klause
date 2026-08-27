@@ -15,10 +15,11 @@ class WideIntDigitsTest {
     private fun big(s: String) = BigInteger.parseString(s)
 
     @Test
-    fun `digits round-trip a value past Long`() {
+    fun `digits round-trip a value past Long and the digit count covers its magnitude`() {
         val v = big("18446744073709551616") // 2^64
         val w = 32
         val n = WideIntDigits.digitCount(v, w)
+        assertTrue(n >= 3, "2^64 needs at least three 32-bit digits, got $n")
         assertEquals(v, WideIntDigits.recompose(WideIntDigits.digitsOf(v, w, n), w))
     }
 
@@ -67,13 +68,5 @@ class WideIntDigitsTest {
     @Test
     fun `zero encodes as a single zero digit`() {
         assertEquals(BigInteger.ZERO, WideIntDigits.recompose(WideIntDigits.digitsOf(BigInteger.ZERO, 16, 1), 16))
-    }
-
-    @Test
-    fun `the digit count covers the magnitude it is asked for`() {
-        val v = big("18446744073709551616") // 2^64 needs three 32-bit digits
-        val n = WideIntDigits.digitCount(v, 32)
-        assertTrue(n >= 3, "2^64 needs at least three 32-bit digits, got $n")
-        assertEquals(v, WideIntDigits.recompose(WideIntDigits.digitsOf(v, 32, n), 32))
     }
 }

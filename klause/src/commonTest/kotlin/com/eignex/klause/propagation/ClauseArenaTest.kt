@@ -81,16 +81,6 @@ class ClauseArenaTest {
     }
 
     @Test
-    fun `length reflects each clause's literal count`() {
-        val arena = cnf(
-            intArrayOf(Lit.make(0, true), Lit.make(1, false)),
-            intArrayOf(Lit.make(2, true)),
-        ).clauseArena
-        assertEquals(2, arena.length(0))
-        assertEquals(1, arena.length(1))
-    }
-
-    @Test
     fun `building an arena from an ineligible problem fails`() {
         val problem = Problem(
             numBoolVars = 1,

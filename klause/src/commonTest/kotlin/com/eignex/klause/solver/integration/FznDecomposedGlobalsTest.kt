@@ -116,24 +116,17 @@ class FznDecomposedGlobalsTest {
     }
 
     @Test
-    fun `at_most matches brute force`() {
-        // fzn_at_most_int(n, x, v): at most n of x equal v.
-        val found = enumerate(decl(2) + "constraint fzn_at_most_int(1, [x1, x2, x3], 1);\nsolve satisfy;", names)
-        assertEquals(brute(3, 2) { t -> t.count { it == 1 } <= 1 }, found)
-    }
-
-    @Test
-    fun `at_least matches brute force`() {
-        // fzn_at_least_int(n, x, v): at least n of x equal v.
-        val found = enumerate(decl(2) + "constraint fzn_at_least_int(2, [x1, x2, x3], 1);\nsolve satisfy;", names)
-        assertEquals(brute(3, 2) { t -> t.count { it == 1 } >= 2 }, found)
-    }
-
-    @Test
-    fun `exactly matches brute force`() {
-        // fzn_exactly_int(n, x, v): exactly n of x equal v.
-        val found = enumerate(decl(2) + "constraint fzn_exactly_int(2, [x1, x2, x3], 1);\nsolve satisfy;", names)
-        assertEquals(brute(3, 2) { t -> t.count { it == 1 } == 2 }, found)
+    fun `at_most and at_least and exactly match brute force`() {
+        // fzn_at_{most,least}_int(n, x, v) and fzn_exactly_int(n, x, v) all bound the count of x equal v.
+        val cases = listOf(
+            Triple("fzn_at_most_int(1, [x1, x2, x3], 1)", { c: Int -> c <= 1 }, "at_most"),
+            Triple("fzn_at_least_int(2, [x1, x2, x3], 1)", { c: Int -> c >= 2 }, "at_least"),
+            Triple("fzn_exactly_int(2, [x1, x2, x3], 1)", { c: Int -> c == 2 }, "exactly"),
+        )
+        for ((constraint, matches, label) in cases) {
+            val found = enumerate(decl(2) + "constraint $constraint;\nsolve satisfy;", names)
+            assertEquals(brute(3, 2) { t -> matches(t.count { it == 1 }) }, found, label)
+        }
     }
 
     @Test

@@ -33,30 +33,20 @@ class ArithmeticPropagatorTest {
     // --- ArrayMinMaxTest ---
 
     @Test
-    fun `array maximum returns the max element`() {
-        // r = max(v0, v1, v2). All ∈ [0..3]. Pin v0=3, v1=1, v2=2: r must be 3.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true)),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals(3, sat.assignment.ints[3])
-    }
-
-    @Test
-    fun `array minimum returns the min element`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
-            factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = false)),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertEquals(1, sat.assignment.ints[3])
+    fun `array minmax returns the extreme element`() {
+        // r = max(v0, v1, v2) or min(v0, v1, v2). All ∈ [0..3]. Pin v0=3, v1=1, v2=2:
+        // max must be 3, min must be 1.
+        for ((max, expected) in listOf(true to 3L, false to 1L)) {
+            val problem = Problem(
+                numBoolVars = 0,
+                numIntVars = 4,
+                intDomains = arrayOf(IntDomain(3, 3), IntDomain(1, 1), IntDomain(2, 2), IntDomain(0, 5)),
+                factors = arrayOf<Factor>(ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = max)),
+            )
+            val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+            val sat = assertIs<SolveResult.Sat>(r)
+            assertEquals(expected, sat.assignment.ints[3], "max=$max")
+        }
     }
 
     @Test

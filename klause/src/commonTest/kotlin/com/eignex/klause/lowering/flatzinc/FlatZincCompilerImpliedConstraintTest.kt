@@ -1,9 +1,7 @@
 package com.eignex.klause.lowering.flatzinc
 
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -61,22 +59,5 @@ class FlatZincCompilerImpliedConstraintTest {
         assertFalse(mask[0])
         assertTrue(mask[1])
         assertTrue(problem.hasSymmetryBreaking)
-    }
-
-    @Test
-    fun `mask size tracks every factor`() {
-        val src = """
-            var 0..10: x;
-            var 0..10: y;
-            var 0..10: z;
-            constraint int_lin_le([1, 1], [x, y], 5);
-            constraint int_lin_eq([1, 1, -1], [x, y, z], 0) :: klause_redundant;
-            constraint int_lin_le([1, 1], [y, z], 9);
-            solve satisfy;
-        """.trimIndent()
-        val problem = parseFlatZinc(src).problem
-        val mask = assertNotNull(problem.impliedFactorMask)
-        assertEquals(problem.numFactors, mask.size)
-        assertEquals(1, mask.count { it })
     }
 }

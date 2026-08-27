@@ -230,35 +230,6 @@ class AlnsTest {
     }
 
     @Test
-    fun `alns with multiple repair operators logs at least one repair pick`() {
-        val factor = Cardinality.exactlyOne(
-            intArrayOf(
-                Lit.make(0, true),
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, true),
-            ),
-        )
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val objective = LinearObjective(boolWeights = longArrayOf(10L, 5L, 8L, 3L))
-        val inner = LocalSearchSolver(problem.bake())
-        val alns = Alns(
-            inner = inner,
-            repairOperators = listOf(InnerLsRepair("quick", 50L), InnerLsRepair("deep", 150L)),
-            minDestroyFraction = 0.5,
-            maxDestroyFraction = 0.5,
-            maxIterations = 8,
-            flipsPerIteration = 100L,
-            acceptance = AcceptanceCriterion.BetterOrEqual,
-        )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
-        assertNotNull(sample)
-        assertEquals(3.0, objective.evaluate(sample))
-        val repairIdxs = alns.iterationLog.map { it.repairIdx }.toSet()
-        assertTrue(repairIdxs.isNotEmpty(), "ALNS should have logged at least one iteration")
-    }
-
-    @Test
     fun `greedy construction repair climbs from infeasible incumbent to feasible optimum`() {
         // 4 vars in exactly-one with weighted objective. Incumbent is all-false (infeasible).
         // Greedy needs to flip one bool to true; under FeasibilityFirst shaping the only

@@ -36,21 +36,15 @@ class ImpactSelectorTest {
     }
 
     @Test
-    fun `a deadline fired inside a probe fixpoint leaves the value order unranked`() {
+    fun `a deadline fired inside a probe fixpoint leaves the value order unranked and the session uncancelled`() {
         // `v0 + v1 <= 3` ranks every value of v0 differently, so probes that all run to completion return
         // the tightest value first. Cut inside the second probe, only the first value is ranked and the
-        // rest keep the domain's own order — truncating the ranking is fine, losing a value is not.
+        // rest keep the domain's own order — truncating the ranking is fine, losing a value is not. A cut
+        // probe reverts to the previous level's complete fixpoint, so nothing under-propagated survives
+        // it — a paused arm has to be able to resume on this session.
         val session = probeCancellingSession()
         val values = Impact(maxProbes = 8).values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertEquals(listOf(0L, 1L, 2L, 3L), values, "only the probe that completed may be ranked")
-    }
-
-    @Test
-    fun `a deadline fired inside a probe fixpoint leaves the session uncancelled`() {
-        // A cut probe reverts to the previous level's complete fixpoint, so nothing under-propagated
-        // survives it — a paused arm has to be able to resume on this session.
-        val session = probeCancellingSession()
-        Impact(maxProbes = 8).values(session, VarRef.IntVar(0), Random(0L)).toList()
         assertTrue(!session.fixpointCancelled, "a reverted probe must not leave a cancelled fixpoint behind")
     }
 

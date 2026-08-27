@@ -493,42 +493,25 @@ class SetPredicateTest {
     }
 
     @Test
-    fun `var set initializer pins indicators to literal`() {
-        val src = """
-            var set of 1..5: s = {1, 3, 5};
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val layout = program.setVarsByName.getValue("s")
-        for ((i, e) in layout.elements.withIndex()) {
-            val expected = e in setOf(1, 3, 5)
-            assertEquals(
-                expected,
-                sat.assignment.bools[layout.indicatorBoolIds[i]],
-                "element $e expected in-set=$expected",
-            )
-        }
-    }
-
-    @Test
-    fun `var set initializer pins indicators to range`() {
-        val src = """
-            var set of 1..5: s = 2..4;
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val layout = program.setVarsByName.getValue("s")
-        for ((i, e) in layout.elements.withIndex()) {
-            val expected = e in 2..4
-            assertEquals(
-                expected,
-                sat.assignment.bools[layout.indicatorBoolIds[i]],
-                "element $e expected in-set=$expected",
-            )
+    fun `var set initializer pins indicators to a literal or a range`() {
+        val cases = listOf<Pair<String, (Int) -> Boolean>>(
+            "var set of 1..5: s = {1, 3, 5};" to { e -> e in setOf(1, 3, 5) },
+            "var set of 1..5: s = 2..4;" to { e -> e in 2..4 },
+        )
+        for ((decl, isExpected) in cases) {
+            val src = "$decl\nsolve satisfy;"
+            val program = parseFlatZinc(src)
+            val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
+            val sat = assertIs<SolveResult.Sat>(r)
+            val layout = program.setVarsByName.getValue("s")
+            for ((i, e) in layout.elements.withIndex()) {
+                val expected = isExpected(e)
+                assertEquals(
+                    expected,
+                    sat.assignment.bools[layout.indicatorBoolIds[i]],
+                    "element $e expected in-set=$expected",
+                )
+            }
         }
     }
 }

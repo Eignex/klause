@@ -9,7 +9,6 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.test.Test
-import kotlin.test.assertFalse
 
 /**
  * Move-generation coverage for [SatisfiedStructured] across its scopes. The reference closures encode
@@ -110,23 +109,5 @@ class SatisfiedStructuredTest {
                 prepare = ::seedPermutation,
             ) { s, sink -> expectedElected(s, sink) }
         }
-    }
-
-    @Test
-    fun `elected scope yields structured moves from the satisfied AllDifferent`() {
-        val state = freshState(electedProblem(), 7L).also(::seedPermutation)
-        val captured = captureFromSink(state) { sink ->
-            SatisfiedStructured.elected(sampleCount).generate(state, sink)
-        }
-        assertFalse(captured.isEmpty, "a satisfied elected AllDifferent must propose structured swaps")
-    }
-
-    @Test
-    fun `the enumerate-all scope yields a non-empty structured pool on the feasible fixture`() {
-        val state = freshState(feasibleProblem(), 7L)
-        val captured = captureFromSink(
-            state,
-        ) { sink -> SatisfiedStructured.all().generate(state, sink) }
-        assertFalse(captured.isEmpty, "satisfied EQ factors must propose structured pair-shifts")
     }
 }

@@ -83,18 +83,11 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `two asserted rows refute the third before it is decided`() {
+    fun `two asserted rows refute the third before it is decided citing only the rows that forced it`() {
         val problem = triangle()
         val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
         assertTrue(runSystem(problem, state))
         assertEquals(false, state.boolValues[2], "closing the cycle is refuted ahead of the decision")
-    }
-
-    @Test
-    fun `a refutation cites the rows that forced it`() {
-        val problem = triangle()
-        val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true))
-        runSystem(problem, state)
         val antecedents = assertNotNull(state.boolAntecedents[2], "the pin must carry its forcing clause")
         assertEquals(
             setOf(Lit.make(0, false), Lit.make(1, false)),
@@ -124,17 +117,10 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a fully asserted negative cycle is a conflict`() {
+    fun `a fully asserted negative cycle is a conflict naming every row on the cycle`() {
         val problem = triangle()
         val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
         assertFalse(runSystem(problem, state))
-    }
-
-    @Test
-    fun `the conflict names the rows on the cycle`() {
-        val problem = triangle()
-        val state = stateOf(problem, Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
-        runSystem(problem, state)
         val id = systemId(problem)
         val reason = assertNotNull(problem.propagators[id].conflictReason(state, id))
         assertEquals(setOf(Lit.make(0, false), Lit.make(1, false), Lit.make(2, false)), reason.toSet())
@@ -150,20 +136,13 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a row its columns' declared ranges already exclude is refuted`() {
+    fun `a row its columns' declared ranges already exclude is refuted unconditionally`() {
         // x1 - x0 <= -6 cannot hold with both columns in 0..5, and no row of the model says so: the
         // deduction is available only through the two declared ranges the graph no longer carries.
         val problem = problemOf(numBools = 1, numInts = 2, rows = listOf(row(0, 1, 0, -6L)), domains = boxed(2, 5))
         val state = stateOf(problem)
         assertTrue(runSystem(problem, state))
         assertEquals(false, state.boolValues[0], "the declared ranges refute the row on their own")
-    }
-
-    @Test
-    fun `a refutation from declared ranges alone cites no guard`() {
-        val problem = problemOf(numBools = 1, numInts = 2, rows = listOf(row(0, 1, 0, -6L)), domains = boxed(2, 5))
-        val state = stateOf(problem)
-        runSystem(problem, state)
         val antecedents = assertNotNull(state.boolAntecedents[0], "the pin must carry its forcing clause")
         assertTrue(antecedents.isEmpty(), "a declared range holds unconditionally, so nothing guards it")
     }
@@ -220,7 +199,7 @@ class DifferenceSystemPropagatorTest {
     }
 
     @Test
-    fun `a route reaching the constant node through a model row still refutes`() {
+    fun `a route reaching the constant node through a model row still refutes citing both segments`() {
         // y >= 10 holds only through the row a <= y and a's own range; x <= 5 likewise through b. Neither
         // endpoint is bounded itself, so the refuting route runs y -> a -> zero -> b -> x: it reaches the
         // constant node through model rows rather than from the endpoints directly.
@@ -239,24 +218,6 @@ class DifferenceSystemPropagatorTest {
         val state = stateOf(problem, Lit.make(1, true), Lit.make(2, true))
         assertTrue(runSystem(problem, state))
         assertEquals(false, state.boolValues[0], "y >= 10 and x <= 5 leave y - x >= 5, refuting the row")
-    }
-
-    @Test
-    fun `a refutation routed through the constant node cites the rows that reached it`() {
-        val rows = listOf(
-            ReifiedLinear(1, longArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0L),
-            ReifiedLinear(2, longArrayOf(1, -1), intArrayOf(1, 3), LinearOp.LE, 0L),
-            row(0, 0, 1, 4L),
-        )
-        val domains = arrayOf(
-            IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
-            IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
-            IntDomain(10, 10),
-            IntDomain(5, 5),
-        )
-        val problem = problemOf(numBools = 3, numInts = 4, rows = rows, domains = domains)
-        val state = stateOf(problem, Lit.make(1, true), Lit.make(2, true))
-        runSystem(problem, state)
         val antecedents = assertNotNull(state.boolAntecedents[0], "the pin must carry its forcing clause")
         assertEquals(
             setOf(Lit.make(1, false), Lit.make(2, false)),

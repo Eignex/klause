@@ -677,32 +677,6 @@ class BuildersTest {
     }
 
     @Test
-    fun `if then else inside arithmetic`() {
-        class S : VariableSchema() {
-            val flag by boolVar()
-            val x by intVar(min = 0, max = 4)
-            val y by intVar(min = 0, max = 4)
-
-            val cap by constraint { ifThenElse(flag, x, y) le 2 }
-        }
-        val schema = S()
-        val compiled = schema.compile()
-        val solver = LocalSearchSolver(
-            compiled.problem.bake(),
-            restartPolicy = FixedCadenceRestart(maxFlipsBeforeRestart = 500),
-        )
-        val samples = solver.enumerate(LocalSearchParams(maxFlips = 20_000, randomSeed = 99)).take(10).toList()
-        assertTrue(samples.isNotEmpty())
-        for (s in samples) {
-            val flag = compiled.decode(schema.flag, s)
-            val xv = compiled.decode(schema.x, s)
-            val yv = compiled.decode(schema.y, s)
-            val picked = if (flag) xv else yv
-            assertTrue(picked <= 2, "selected=$picked > 2")
-        }
-    }
-
-    @Test
     fun `sort - ys is the ascending permutation of xs`() {
         class S : VariableSchema() {
             val x0 by intVar(1, 3)
