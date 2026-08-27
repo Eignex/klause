@@ -149,7 +149,8 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "target-phasing", "solution-phasing", "rephase-interval", "max-learned", "lbd-glue", "tiered-db",
     "mid-lbd", "vivification", "vivify-batch", "subsumption", "subsume-batch", "inprocessing-cadence",
     "lp-objective-cone", "lp-auto-off-reprobe",
-    "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "pb-learning", "pb-objective-cutoff",
+    "lp-knapsack-lagrangian", "lp-component-split", "lp-bound-max-pivots", "lp-adaptive-work",
+    "pb-learning", "pb-objective-cutoff",
     "objective-guided-values",
     "var-selector", "val-selector",
 )
@@ -186,6 +187,7 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     val lpKnapsack = p.bool("lp-knapsack-lagrangian")
     val lpComponentSplit = p.bool("lp-component-split")
     val lpBoundMaxPivots = p.int("lp-bound-max-pivots")
+    val lpAdaptiveWork = p.bool("lp-adaptive-work")
     val lpBranching = p.bool("lp-branching")
     val pbLearning = p.bool("pb-learning")
     val pbObjectiveCutoff = p.bool("pb-objective-cutoff")
@@ -196,7 +198,8 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
         maxDecisions, luby, adaptiveRestart, emaRestart, modeSwitchingRestart, phaseSaving, targetPhasing,
         solutionPhasing, rephaseInterval, maxLearned, lbdGlue, tieredDb, midLbd, vivification, vivifyBatch,
         subsumption, subsumeBatch, inprocessingCadence,
-        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpBranching, pbLearning, pbObjectiveCutoff,
+        lpCone, lpAutoOff, lpKnapsack, lpComponentSplit, lpBoundMaxPivots, lpAdaptiveWork, lpBranching, pbLearning,
+        pbObjectiveCutoff,
         objectiveGuidedValues,
     )
     if (scalars.all { it == null } && varKind == null && valKind == null) return null
@@ -225,6 +228,7 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
         lpKnapsack?.let { out = out.copy(lpPlan = out.lpPlan.copy(knapsackLagrangian = it)) }
         lpComponentSplit?.let { out = out.copy(lpPlan = out.lpPlan.copy(componentSplit = it)) }
         lpBoundMaxPivots?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundMaxPivots = it)) }
+        lpAdaptiveWork?.let { out = out.copy(lpPlan = out.lpPlan.copy(boundAdaptiveWork = it)) }
         lpBranching?.let { out = out.copy(lpPlan = out.lpPlan.copy(branching = it)) }
         pbLearning?.let { out = out.copy(pbLearning = it) }
         pbObjectiveCutoff?.let { out = out.copy(pbObjectiveCutoff = it) }

@@ -81,6 +81,7 @@ internal class RevisedSimplex(
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
+    private val trackDegeneracy: Boolean = false,
 ) : TableauCutSolver {
     private val m = model.m
     private val n = model.n
@@ -117,6 +118,29 @@ internal class RevisedSimplex(
     override var infeasibleRay: DoubleArray? = null
         private set
 
+    /**
+     * Nonbasic columns whose reduced cost is zero at the last termination — dual degeneracy.
+     *
+     * Many tied columns mean the pivot rule has little to choose between, which is when a solve stalls
+     * and spending more on it repays least. A budgeting policy reads this to decide whether a solve that
+     * ran out of budget deserves a larger one or a smaller one. Only maintained when [trackDegeneracy],
+     * since it costs a pass over the columns that a solve otherwise need not make.
+     */
+    private var degenerateColumns = 0
+
+    /** Count nonbasic columns with zero reduced cost against duals [y]. */
+    private fun recordDegeneracy(y: DoubleArray) {
+        if (!trackDegeneracy) return
+        var count = 0
+        for (j in 0 until numVars) {
+            if (status[j] == VarStatus.BASIC) continue
+            if (abs(model.costD(j) - dotColumn(y, j)) <= TOL) count++
+        }
+        degenerateColumns = count
+    }
+
+    override val lastDegenerateColumns: Int get() = degenerateColumns
+    override val lastColumns: Int get() = numVars
     override val lastPivots: Int get() = pivots
     override val lastRefactorizations: Int get() = refactorizations
     override val lastWarmStarted: Boolean get() = warmStarted
@@ -597,10 +621,12 @@ internal class RevisedSimplex(
         val basis = Basis(basicVar.copyOf(), status.copyOf())
         optimalBasis = basis
         optimalPrimal = primal
+        val y = duals(factor)
+        recordDegeneracy(y)
         return FloatLpResult(
             basis,
             obj,
-            duals(factor),
+            y,
             primal,
             pivots,
             maxLuFill,
@@ -636,10 +662,12 @@ internal class RevisedSimplex(
             val v = basicVar[i]
             if (v < n) primal[v] = model.loShiftD(v) + beta[i]
         }
+        val y = duals(factor)
+        recordDegeneracy(y)
         return FloatLpResult(
             Basis(basicVar.copyOf(), status.copyOf()),
             obj,
-            duals(factor),
+            y,
             primal,
             pivots,
             maxLuFill,
