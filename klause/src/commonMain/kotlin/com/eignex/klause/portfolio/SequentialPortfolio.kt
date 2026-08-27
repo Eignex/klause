@@ -111,7 +111,6 @@ class SequentialPortfolio(
     private fun sliceToken(global: Cancellation, sliceMillis: Long): Cancellation =
         Cancellation.until(TimeSource.Monotonic.markNow() + sliceMillis.milliseconds) or global
 
-
     /**
      * Satisfaction: run arms in bandit-chosen segments until one returns a definitive Sat/Unsat
      * (a complete backtrack arm proves Unsat; a slice-truncated arm yields Unknown and the loop
