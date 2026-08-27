@@ -2,7 +2,7 @@ package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

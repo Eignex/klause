@@ -8,7 +8,7 @@ import com.eignex.klause.presolve.PresolvePass
  *  explicit range, SMT-LIB integers with no provable bound): the full `Long` floor, so the finite
  *  model can represent any 64-bit integer value without an artificial clamp clipping a legitimate
  *  one. Callers that do span/coefficient arithmetic on domain bounds must stay overflow-safe (e.g.
- *  [com.eignex.klause.solver.intdomain.ContiguousDomain] saturates its size). */
+ *  [com.eignex.klause.ir.intdomain.ContiguousDomain] saturates its size). */
 const val DEFAULT_UNBOUNDED_INT_LO: Long = Long.MIN_VALUE
 
 /** Default upper bound for unbounded `var int`; counterpart to [DEFAULT_UNBOUNDED_INT_LO]. */

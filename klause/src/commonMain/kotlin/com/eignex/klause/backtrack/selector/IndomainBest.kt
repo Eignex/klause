@@ -2,7 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 
 /**

@@ -6,7 +6,7 @@ import com.eignex.klause.lp.unitCubeSolution
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.presolveOpen
 import com.eignex.klause.solver.pipeline.ComponentPlan
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample

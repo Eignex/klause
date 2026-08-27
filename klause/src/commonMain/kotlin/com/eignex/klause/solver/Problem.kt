@@ -1,12 +1,14 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.rootBake
 import com.eignex.klause.propagation.runRootPropagation
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray

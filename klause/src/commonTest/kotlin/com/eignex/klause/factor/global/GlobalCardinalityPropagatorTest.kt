@@ -8,7 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult

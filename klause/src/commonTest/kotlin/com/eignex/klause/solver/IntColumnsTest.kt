@@ -1,5 +1,7 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

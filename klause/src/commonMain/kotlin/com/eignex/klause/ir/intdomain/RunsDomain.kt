@@ -1,8 +1,8 @@
-package com.eignex.klause.solver.intdomain
+package com.eignex.klause.ir.intdomain
 
-import com.eignex.klause.solver.IntConsumer
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.IntSpan
+import com.eignex.klause.ir.IntConsumer
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.util.LongArrayList
 
 /** Interval-run list: flattened sorted disjoint present runs `[lo0,hi0, lo1,hi1, …]`, `>= 2` runs,

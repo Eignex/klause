@@ -1,6 +1,6 @@
-package com.eignex.klause.solver.intdomain
+package com.eignex.klause.ir.intdomain
 
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

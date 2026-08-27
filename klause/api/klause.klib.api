@@ -1009,10 +1009,10 @@ abstract interface com.eignex.klause.solver/Factor { // com.eignex.klause.solver
     open fun hullFamilyEnabled(com.eignex.klause.lp/HullFlags): kotlin/Boolean // com.eignex.klause.solver/Factor.hullFamilyEnabled|hullFamilyEnabled(com.eignex.klause.lp.HullFlags){}[0]
     open fun isValueAnonymous(): kotlin/Boolean // com.eignex.klause.solver/Factor.isValueAnonymous|isValueAnonymous(){}[0]
     open fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.solver/Factor.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    open fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.solver/Factor.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    open fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.solver/Factor.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     open fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.solver/Factor.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     open fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.solver/Factor.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
-    open fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.solver/Factor.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    open fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.solver/Factor.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     open fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.solver/Factor? // com.eignex.klause.solver/Factor.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
 
@@ -2940,13 +2940,13 @@ sealed interface com.eignex.klause.solver/IntColumn { // com.eignex.klause.solve
     }
 
     final class Finite : com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn.Finite|null[0]
-        constructor <init>(com.eignex.klause.solver/IntDomain) // com.eignex.klause.solver/IntColumn.Finite.<init>|<init>(com.eignex.klause.solver.IntDomain){}[0]
+        constructor <init>(com.eignex.klause.solver/IntDomain) // com.eignex.klause.solver/IntColumn.Finite.<init>|<init>(com.eignex.klause.ir.IntDomain){}[0]
 
         final val domain // com.eignex.klause.solver/IntColumn.Finite.domain|{}domain[0]
             final fun <get-domain>(): com.eignex.klause.solver/IntDomain // com.eignex.klause.solver/IntColumn.Finite.domain.<get-domain>|<get-domain>(){}[0]
 
         final fun component1(): com.eignex.klause.solver/IntDomain // com.eignex.klause.solver/IntColumn.Finite.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.solver/IntDomain = ...): com.eignex.klause.solver/IntColumn.Finite // com.eignex.klause.solver/IntColumn.Finite.copy|copy(com.eignex.klause.solver.IntDomain){}[0]
+        final fun copy(com.eignex.klause.solver/IntDomain = ...): com.eignex.klause.solver/IntColumn.Finite // com.eignex.klause.solver/IntColumn.Finite.copy|copy(com.eignex.klause.ir.IntDomain){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/IntColumn.Finite.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver/IntColumn.Finite.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver/IntColumn.Finite.toString|toString(){}[0]
@@ -3774,7 +3774,7 @@ final class com.eignex.klause.factor.arithmetic/ArrayMinMax : com.eignex.klause.
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/ArrayMinMax.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/ArrayMinMax.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ArrayMinMax.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.arithmetic/ArrayMinMax.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.arithmetic/ArrayMinMax.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/ArrayMinMaxState { // com.eignex.klause.factor.arithmetic/ArrayMinMaxState|null[0]
@@ -3895,7 +3895,7 @@ final class com.eignex.klause.factor.arithmetic/Product : com.eignex.klause.solv
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.arithmetic/Product.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.arithmetic/Product.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/Product.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.arithmetic/Product.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.arithmetic/Product.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
 final class com.eignex.klause.factor.arithmetic/RealConstants : com.eignex.klause.factor.arithmetic/LinearConstants { // com.eignex.klause.factor.arithmetic/RealConstants|null[0]
@@ -4084,7 +4084,7 @@ final class com.eignex.klause.factor.bool/Cardinality : com.eignex.klause.solver
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/Cardinality.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/Cardinality.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/Cardinality.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.bool/Cardinality.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.bool/Cardinality.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 
     final object Companion { // com.eignex.klause.factor.bool/Cardinality.Companion|null[0]
         final fun atLeastOne(kotlin/IntArray): com.eignex.klause.factor.bool/Cardinality // com.eignex.klause.factor.bool/Cardinality.Companion.atLeastOne|atLeastOne(kotlin.IntArray){}[0]
@@ -4174,7 +4174,7 @@ final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.lp/L
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.bool/PseudoBoolean.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.bool/PseudoBoolean.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/PseudoBoolean.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.bool/PseudoBoolean.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.bool/PseudoBoolean.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
 final class com.eignex.klause.factor.bool/Xor : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.bool/Xor|null[0]
@@ -4238,7 +4238,7 @@ final class com.eignex.klause.factor.global/AllDifferent : com.eignex.klause.fac
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.global/AllDifferent.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.global/AllDifferent.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/AllDifferent.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.global/AllDifferent.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.global/AllDifferent.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
 final class com.eignex.klause.factor.global/GlobalCardinality : com.eignex.klause.factor/OptionalFactor, com.eignex.klause.solver/Factor { // com.eignex.klause.factor.global/GlobalCardinality|null[0]
@@ -4266,7 +4266,7 @@ final class com.eignex.klause.factor.global/GlobalCardinality : com.eignex.klaus
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/GlobalCardinality.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/GlobalCardinality.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/GlobalCardinality.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/GlobalCardinality.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/GlobalCardinality.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/GlobalCardinality.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.global/GlobalCardinality.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/GlobalCardinality.structuralKey|structuralKey(){}[0]
@@ -4351,10 +4351,10 @@ final class com.eignex.klause.factor.global/NValue : com.eignex.klause.factor/Op
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.global/NValue.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.global/NValue.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/NValue.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/NValue.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/NValue.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.global/NValue.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/NValue.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.global/NValue.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.global/NValue.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 
     final enum class Mode : kotlin/Enum<com.eignex.klause.factor.global/NValue.Mode> { // com.eignex.klause.factor.global/NValue.Mode|null[0]
         enum entry AtLeast // com.eignex.klause.factor.global/NValue.Mode.AtLeast|null[0]
@@ -4514,7 +4514,7 @@ final class com.eignex.klause.factor.scheduling/Cumulative : com.eignex.klause.f
     final fun resPosOf(kotlin/Int): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.resPosOf|resPosOf(kotlin.Int){}[0]
     final fun startPosOf(kotlin/Int): kotlin/Int // com.eignex.klause.factor.scheduling/Cumulative.startPosOf|startPosOf(kotlin.Int){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.scheduling/Cumulative.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.scheduling/Cumulative.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.scheduling/Cumulative.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 
     final object Companion { // com.eignex.klause.factor.scheduling/Cumulative.Companion|null[0]
         final fun unary(kotlin/IntArray, kotlin/LongArray, kotlin/IntArray = ..., kotlin/IntArray = ...): com.eignex.klause.factor.scheduling/Cumulative // com.eignex.klause.factor.scheduling/Cumulative.Companion.unary|unary(kotlin.IntArray;kotlin.LongArray;kotlin.IntArray;kotlin.IntArray){}[0]
@@ -4590,10 +4590,10 @@ final class com.eignex.klause.factor.table/Element : com.eignex.klause.solver/Fa
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.table/Element.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Element.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Element.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Element.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Element.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Element.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Element.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Element.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Element.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.table/Element.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
 
@@ -4626,12 +4626,12 @@ final class com.eignex.klause.factor.table/Mdd : com.eignex.klause.solver/Factor
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.table/Mdd.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Mdd.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Mdd.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Mdd.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Mdd.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Mdd.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Mdd.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Mdd.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Mdd.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Mdd.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Mdd.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 }
 
 final class com.eignex.klause.factor.table/Regular : com.eignex.klause.solver/Factor { // com.eignex.klause.factor.table/Regular|null[0]
@@ -4657,7 +4657,7 @@ final class com.eignex.klause.factor.table/Regular : com.eignex.klause.solver/Fa
     final fun asInvariant(): com.eignex.klause.localsearch/Invariant // com.eignex.klause.factor.table/Regular.asInvariant|asInvariant(){}[0]
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Regular.asPropagator|asPropagator(){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Regular.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Regular.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Regular.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Regular.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Regular.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.table/Regular.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
@@ -4689,12 +4689,12 @@ final class com.eignex.klause.factor.table/Table : com.eignex.klause.solver/Fact
     final fun asPropagator(): com.eignex.klause.propagation/Propagator // com.eignex.klause.factor.table/Table.asPropagator|asPropagator(){}[0]
     final fun canSubstituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.table/Table.canSubstituteAffine|canSubstituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Table.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Table.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Table.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Table.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Table.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.solver/Factor // com.eignex.klause.factor.table/Table.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Table.structuralKey|structuralKey(){}[0]
-    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Table.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun structuralReduce(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/FactorReduction // com.eignex.klause.factor.table/Table.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun substituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): com.eignex.klause.solver/Factor? // com.eignex.klause.factor.table/Table.substituteAffine|substituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
 }
 
@@ -5402,7 +5402,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
 
     final fun functionalObjective(kotlin/IntArray, kotlin/LongArray, kotlin/Long, kotlin/Boolean, kotlin/IntArray = ..., kotlin/LongArray = ...): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.localsearch/DefinitionalSweep.functionalObjective|functionalObjective(kotlin.IntArray;kotlin.LongArray;kotlin.Long;kotlin.Boolean;kotlin.IntArray;kotlin.LongArray){}[0]
     final fun network(kotlin/Int, kotlin/Int): com.eignex.klause.localsearch/InvariantNetwork // com.eignex.klause.localsearch/DefinitionalSweep.network|network(kotlin.Int;kotlin.Int){}[0]
-    final fun sweep(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<out com.eignex.klause.solver/Factor> = ..., kotlin/Function1<kotlin/Int, kotlin/Boolean> = ...) // com.eignex.klause.localsearch/DefinitionalSweep.sweep|sweep(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Array<out|com.eignex.klause.solver.Factor>;kotlin.Function1<kotlin.Int,kotlin.Boolean>){}[0]
+    final fun sweep(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<out com.eignex.klause.solver/Factor> = ..., kotlin/Function1<kotlin/Int, kotlin/Boolean> = ...) // com.eignex.klause.localsearch/DefinitionalSweep.sweep|sweep(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<out|com.eignex.klause.solver.Factor>;kotlin.Function1<kotlin.Int,kotlin.Boolean>){}[0]
 
     sealed interface SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode|null[0]
         abstract val boolInputs // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.boolInputs|{}boolInputs[0]
@@ -5414,8 +5414,8 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
         abstract val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.outIsBool|{}outIsBool[0]
             abstract fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-        abstract fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
-        open fun apply(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>) // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.apply|apply(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+        abstract fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
+        open fun apply(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>) // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.apply|apply(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
 
         final class Bool2Int : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Bool2Int|null[0]
             constructor <init>(kotlin/Int, kotlin/Int) // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Bool2Int.<init>|<init>(kotlin.Int;kotlin.Int){}[0]
@@ -5429,7 +5429,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
             final val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Bool2Int.outIsBool|{}outIsBool[0]
                 final fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Bool2Int.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Bool2Int.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Bool2Int.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         }
 
         final class BoolFold : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.BoolFold|null[0]
@@ -5444,7 +5444,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
             final val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.BoolFold.outIsBool|{}outIsBool[0]
                 final fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.BoolFold.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.BoolFold.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.BoolFold.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         }
 
         final class CmpReif : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif|null[0]
@@ -5459,7 +5459,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
             final val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.outIsBool|{}outIsBool[0]
                 final fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.CmpReif.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         }
 
         final class ElementDef : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.ElementDef|null[0]
@@ -5474,7 +5474,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
             final val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.ElementDef.outIsBool|{}outIsBool[0]
                 final fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.ElementDef.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.ElementDef.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.ElementDef.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         }
 
         final class IntDef : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.IntDef|null[0]
@@ -5487,7 +5487,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
             final val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.IntDef.outIsBool|{}outIsBool[0]
                 final fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.IntDef.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.IntDef.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.IntDef.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         }
 
         final class SetInReif : com.eignex.klause.localsearch/DefinitionalSweep.SweepNode { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.SetInReif|null[0]
@@ -5502,7 +5502,7 @@ final class com.eignex.klause.localsearch/DefinitionalSweep { // com.eignex.klau
             final val outIsBool // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.SetInReif.outIsBool|{}outIsBool[0]
                 final fun <get-outIsBool>(): kotlin/Boolean // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.SetInReif.outIsBool.<get-outIsBool>|<get-outIsBool>(){}[0]
 
-            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.SetInReif.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+            final fun eval(com.eignex.klause.solver/Assignment, kotlin/Array<com.eignex.klause.solver/IntDomain>): kotlin/Long // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.SetInReif.eval|eval(com.eignex.klause.solver.Assignment;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
         }
 
         final object Companion { // com.eignex.klause.localsearch/DefinitionalSweep.SweepNode.Companion|null[0]
@@ -8869,7 +8869,7 @@ final class com.eignex.klause.presolve/LpHarvestResult { // com.eignex.klause.pr
 }
 
 final class com.eignex.klause.presolve/PassDelta { // com.eignex.klause.presolve/PassDelta|null[0]
-    constructor <init>(kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.solver/Factor> = ..., kotlin/Array<com.eignex.klause.solver/IntDomain>? = ..., kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>? = ..., kotlin/Boolean = ...) // com.eignex.klause.presolve/PassDelta.<init>|<init>(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.solver.Factor>;kotlin.Array<com.eignex.klause.solver.IntDomain>?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>?;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/IntArray = ..., kotlin.collections/List<com.eignex.klause.solver/Factor> = ..., kotlin/Array<com.eignex.klause.solver/IntDomain>? = ..., kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>? = ..., kotlin/Boolean = ...) // com.eignex.klause.presolve/PassDelta.<init>|<init>(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.solver.Factor>;kotlin.Array<com.eignex.klause.ir.IntDomain>?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>?;kotlin.Boolean){}[0]
 
     final val addedFactors // com.eignex.klause.presolve/PassDelta.addedFactors|{}addedFactors[0]
         final fun <get-addedFactors>(): kotlin.collections/List<com.eignex.klause.solver/Factor> // com.eignex.klause.presolve/PassDelta.addedFactors.<get-addedFactors>|<get-addedFactors>(){}[0]
@@ -9598,10 +9598,10 @@ final class com.eignex.klause.solver.pipeline/ComponentPlan { // com.eignex.klau
     final val unplaceable // com.eignex.klause.solver.pipeline/ComponentPlan.unplaceable|{}unplaceable[0]
         final fun <get-unplaceable>(): com.eignex.klause.solver.pipeline/UnplaceableColumn? // com.eignex.klause.solver.pipeline/ComponentPlan.unplaceable.<get-unplaceable>|<get-unplaceable>(){}[0]
 
-    final fun cpProjection(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver.pipeline/CpProblemProjection // com.eignex.klause.solver.pipeline/ComponentPlan.cpProjection|cpProjection(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>){}[0]
+    final fun cpProjection(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver.pipeline/CpProblemProjection // com.eignex.klause.solver.pipeline/ComponentPlan.cpProjection|cpProjection(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>){}[0]
     final fun factorOwner(kotlin/Int): com.eignex.klause.solver.pipeline/FactorOwner // com.eignex.klause.solver.pipeline/ComponentPlan.factorOwner|factorOwner(kotlin.Int){}[0]
     final fun intOwner(kotlin/Int): com.eignex.klause.solver.pipeline/IntVariableOwner // com.eignex.klause.solver.pipeline/ComponentPlan.intOwner|intOwner(kotlin.Int){}[0]
-    final fun materialize(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/Problem // com.eignex.klause.solver.pipeline/ComponentPlan.materialize|materialize(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>){}[0]
+    final fun materialize(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/Problem // com.eignex.klause.solver.pipeline/ComponentPlan.materialize|materialize(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>){}[0]
     final fun theoryFragment(com.eignex.klause.solver/ProblemSpec): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.solver.pipeline/ComponentPlan.theoryFragment|theoryFragment(com.eignex.klause.solver.ProblemSpec){}[0]
 }
 
@@ -10251,14 +10251,14 @@ final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/As
     final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Assignment.boolValue|boolValue(kotlin.Int){}[0]
     final fun flipBool(kotlin/Int) // com.eignex.klause.solver/Assignment.flipBool|flipBool(kotlin.Int){}[0]
     final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Assignment.intValue|intValue(kotlin.Int){}[0]
-    final fun randomize(kotlin.random/Random, kotlin/Array<com.eignex.klause.solver/IntDomain>) // com.eignex.klause.solver/Assignment.randomize|randomize(kotlin.random.Random;kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun randomize(kotlin.random/Random, kotlin/Array<com.eignex.klause.solver/IntDomain>) // com.eignex.klause.solver/Assignment.randomize|randomize(kotlin.random.Random;kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun setBool(kotlin/Int, kotlin/Boolean) // com.eignex.klause.solver/Assignment.setBool|setBool(kotlin.Int;kotlin.Boolean){}[0]
     final fun setInt(kotlin/Int, kotlin/Long) // com.eignex.klause.solver/Assignment.setInt|setInt(kotlin.Int;kotlin.Long){}[0]
     final fun snapshot(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Assignment.snapshot|snapshot(){}[0]
 }
 
 final class com.eignex.klause.solver/FiniteIntColumns : com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/FiniteIntColumns|null[0]
-    constructor <init>(kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Boolean = ...) // com.eignex.klause.solver/FiniteIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Boolean){}[0]
+    constructor <init>(kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Boolean = ...) // com.eignex.klause.solver/FiniteIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Boolean){}[0]
 
     final val size // com.eignex.klause.solver/FiniteIntColumns.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.solver/FiniteIntColumns.size.<get-size>|<get-size>(){}[0]
@@ -10330,7 +10330,7 @@ final class com.eignex.klause.solver/ProblemSpec { // com.eignex.klause.solver/P
         final fun <get-seedDeductions>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/ProblemSpec.seedDeductions.<get-seedDeductions>|<get-seedDeductions>(){}[0]
 
     final fun materialize(com.eignex.klause.solver/IntColumns): com.eignex.klause.solver/Problem // com.eignex.klause.solver/ProblemSpec.materialize|materialize(com.eignex.klause.solver.IntColumns){}[0]
-    final fun materialize(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/Problem // com.eignex.klause.solver/ProblemSpec.materialize|materialize(kotlin.Array<com.eignex.klause.solver.IntDomain>){}[0]
+    final fun materialize(kotlin/Array<com.eignex.klause.solver/IntDomain>): com.eignex.klause.solver/Problem // com.eignex.klause.solver/ProblemSpec.materialize|materialize(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun materializeFiniteBounds(): com.eignex.klause.solver/Problem // com.eignex.klause.solver/ProblemSpec.materializeFiniteBounds|materializeFiniteBounds(){}[0]
 }
 
@@ -10672,8 +10672,8 @@ open class com.eignex.klause.schema/VariableSchema : com.eignex.skema/Schema<com
 
 open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Problem|null[0]
     constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.solver/IntColumns, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.solver.IntColumns;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin.collections/List<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.collections.List<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin.collections/List<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.collections.List<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/Array<com.eignex.klause.solver/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.solver/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<com.eignex.klause.solver.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
 
     final val baked // com.eignex.klause.solver/Problem.baked|{}baked[0]
         final fun <get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.baked.<get-baked>|<get-baked>(){}[0]
@@ -10714,7 +10714,7 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.solver/IntDomain? // com.eignex.klause.solver/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
     final fun propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.propagate|propagate(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
     final fun requireFiniteIntDomains(): kotlin/Array<com.eignex.klause.solver/IntDomain> // com.eignex.klause.solver/Problem.requireFiniteIntDomains|requireFiniteIntDomains(){}[0]
-    final fun withIntDomains(kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...): com.eignex.klause.solver/Problem // com.eignex.klause.solver/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.solver.IntDomain>;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
+    final fun withIntDomains(kotlin/Array<com.eignex.klause.solver/IntDomain>, kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...): com.eignex.klause.solver/Problem // com.eignex.klause.solver/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
 }
 
 sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.klause.solver.pipeline/PortfolioPlan|null[0]
@@ -11069,8 +11069,8 @@ final val com.eignex.klause.solver/NoConsts // com.eignex.klause.solver/NoConsts
     final fun <get-NoConsts>(): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/NoConsts.<get-NoConsts>|<get-NoConsts>(){}[0]
 final val com.eignex.klause.solver/indices // com.eignex.klause.solver/indices|@com.eignex.klause.solver.ConstList{}indices[0]
     final fun (com.eignex.klause.solver/ConstList).<get-indices>(): kotlin.ranges/IntRange // com.eignex.klause.solver/indices.<get-indices>|<get-indices>@com.eignex.klause.solver.ConstList(){}[0]
-final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@com.eignex.klause.solver.IntDomain{}values[0]
-    final fun (com.eignex.klause.solver/IntDomain).<get-values>(): com.eignex.klause.solver/IntSpan // com.eignex.klause.solver/values.<get-values>|<get-values>@com.eignex.klause.solver.IntDomain(){}[0]
+final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@com.eignex.klause.ir.IntDomain{}values[0]
+    final fun (com.eignex.klause.solver/IntDomain).<get-values>(): com.eignex.klause.solver/IntSpan // com.eignex.klause.solver/values.<get-values>|<get-values>@com.eignex.klause.ir.IntDomain(){}[0]
 
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
 final fun (com.eignex.klause.lowering.dimacs/CnfDocument).com.eignex.klause.lowering.dimacs/toProblem(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.dimacs/toProblem|toProblem@com.eignex.klause.lowering.dimacs.CnfDocument(){}[0]
@@ -11131,7 +11131,7 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(ko
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(kotlin/Int): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@com.eignex.klause.schema.FloatTerm(kotlin.Int){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMinus(): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/unaryMinus|unaryMinus@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
-final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
+final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.theory/theoryComponent(com.eignex.klause.solver/ProblemSpec): com.eignex.klause.solver.search/TheoryComponent? // com.eignex.klause.theory/theoryComponent|theoryComponent@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.solver.ProblemSpec){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/backtrackSolver(com.eignex.klause.solver/Problem): com.eignex.klause.backtrack/BacktrackSolver // com.eignex.klause.solver.pipeline/backtrackSolver|backtrackSolver@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.Problem){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planFixedBacktrack(com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest): com.eignex.klause.solver.pipeline/FixedBacktrackPlan // com.eignex.klause.solver.pipeline/planFixedBacktrack|planFixedBacktrack@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest){}[0]
@@ -11139,7 +11139,7 @@ final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.s
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.solver/Problem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.Problem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver/ConstList).com.eignex.klause.solver/longsOrNull(): com.eignex.klause.solver/LongConstList? // com.eignex.klause.solver/longsOrNull|longsOrNull@com.eignex.klause.solver.ConstList(){}[0]
 final fun (com.eignex.klause.solver/Factor).com.eignex.klause.factor.arithmetic/linearRow(): com.eignex.klause.factor.arithmetic/FactorRow? // com.eignex.klause.factor.arithmetic/linearRow|linearRow@com.eignex.klause.solver.Factor(){}[0]
-final fun (com.eignex.klause.solver/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.solver.IntDomain(kotlin.random.Random){}[0]
+final fun (com.eignex.klause.solver/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.solver.Problem(){}[0]

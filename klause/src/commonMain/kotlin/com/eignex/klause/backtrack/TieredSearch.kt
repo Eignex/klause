@@ -12,7 +12,7 @@ import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 
 /**

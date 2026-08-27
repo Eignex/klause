@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.global.internals
 
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap

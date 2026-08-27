@@ -2,7 +2,7 @@ package com.eignex.klause.factor.circuit.internals
 
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 
 /** Subscribe to all four event types for each distinct variable in [succ]. */

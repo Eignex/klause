@@ -4,7 +4,7 @@ import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 
 /** LS invariant logic for `value_precede`. */
 internal class ValuePrecedeInvariant(private val s: Long, private val t: Long, private val xs: IntArray) : Invariant {

@@ -2,7 +2,7 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.solver.FactorReduction
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -26,7 +26,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 
 /**
  * Structural auto-configuration of the LP-relaxation family. Each technique is enabled when —

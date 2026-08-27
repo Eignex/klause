@@ -7,7 +7,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import kotlin.math.abs
 
 // Single source of truth for int_abs, int_min/max, int_div/mod: the schema and FlatZinc compilers

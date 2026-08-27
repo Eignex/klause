@@ -1,12 +1,12 @@
 package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 
 /**
  * Median value (middle of the domain *by position*) first, then alternating outward
- * (`indomain_median`). [com.eignex.klause.solver.IntSpan.valueAt] is sparse-aware, so the median always lands on a
+ * (`indomain_median`). [com.eignex.klause.ir.IntSpan.valueAt] is sparse-aware, so the median always lands on a
  * present value; differs from [IndomainMiddle] (mean of bounds) when the domain is skewed or holey.
  */
 object IndomainMedian : ValueSelector {

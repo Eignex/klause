@@ -8,7 +8,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntHashSet
 

@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.intdomain.intDomainFromSurvivors
+import com.eignex.klause.ir.intdomain.intDomainFromSurvivors
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedLongArray

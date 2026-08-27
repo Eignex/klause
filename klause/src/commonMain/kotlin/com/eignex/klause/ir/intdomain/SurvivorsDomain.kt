@@ -1,8 +1,8 @@
-package com.eignex.klause.solver.intdomain
+package com.eignex.klause.ir.intdomain
 
-import com.eignex.klause.solver.IntConsumer
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.IntSpan
+import com.eignex.klause.ir.IntConsumer
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.util.binarySearchLong
 
 /** Survivor list: the sorted present values, with `>= 1` interior gap. */

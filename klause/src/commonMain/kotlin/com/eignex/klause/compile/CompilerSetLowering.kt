@@ -28,7 +28,7 @@ import com.eignex.klause.model.SetNominalLiteral
 import com.eignex.klause.model.SetRef
 import com.eignex.klause.model.SetSubsetOf
 import com.eignex.klause.model.SetUnion
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 
 /**
  * Materialise a [SetExpr] into a [SetLayout]. Looks up named set vars; for compound

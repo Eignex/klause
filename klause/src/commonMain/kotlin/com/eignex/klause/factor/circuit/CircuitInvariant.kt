@@ -3,7 +3,7 @@ package com.eignex.klause.factor.circuit
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 
 /** LS implementation for [Circuit]: violation scoring and move proposal for the Hamiltonian-cycle

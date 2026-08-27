@@ -2,10 +2,10 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.randomValue
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.randomValue
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.LongHashSet
 import kotlin.math.ln

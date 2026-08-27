@@ -15,7 +15,7 @@ import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntRef
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective

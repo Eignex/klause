@@ -1,7 +1,7 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.EmptyIntArray
 
 /**

@@ -1,6 +1,8 @@
 package com.eignex.klause.solver
 
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.randomValue
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import kotlin.random.Random

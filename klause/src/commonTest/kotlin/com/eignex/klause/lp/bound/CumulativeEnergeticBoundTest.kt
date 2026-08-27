@@ -3,7 +3,7 @@ package com.eignex.klause.lp.bound
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 import kotlin.test.Test

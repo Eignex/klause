@@ -1,5 +1,7 @@
 package com.eignex.klause.lp
 
+import com.eignex.klause.ir.IntDomain
+
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.Basis
@@ -49,7 +51,7 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * above as a probe-flagged free upper ([LpBuilder.addFreeVar]), open below as the zero-shift split
  * `x = x⁺ − x⁻` — so a derived bound holds over the true unbounded region, not a pre-clamped box.
  * This is why it must run before a [com.eignex.klause.solver.Problem]'s finite
- * [com.eignex.klause.solver.IntDomain]s are committed — once a side is clamped the "genuinely infinite"
+ * [com.eignex.klause.ir.IntDomain]s are committed — once a side is clamped the "genuinely infinite"
  * information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ] constraints enter; any other
  * relation is skipped (dropping a constraint only loosens the relaxation, never unsound).
  *

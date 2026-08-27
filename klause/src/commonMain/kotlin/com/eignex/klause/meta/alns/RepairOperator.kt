@@ -10,7 +10,7 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.randomValue
+import com.eignex.klause.ir.randomValue
 import kotlin.math.abs
 import kotlin.random.Random
 

@@ -5,7 +5,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.lowering.flatzinc.FlatZincProgram
 import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test

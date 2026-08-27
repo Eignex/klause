@@ -3,7 +3,7 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
