@@ -295,12 +295,17 @@ internal class LpEngine(
 
     /** Add one solve's work to the current node's total. */
     internal fun noteSolveOps(ops: Long) {
-        pendingSolveOps += ops
-        totalSolveOps += ops
+        pendingSolveOps = saturatingAdd(pendingSolveOps, ops)
+        totalSolveOps = saturatingAdd(totalSolveOps, ops)
     }
 
     // Work charged since this engine was built, across every solve including the one-shot root work.
     private var totalSolveOps = 0L
+
+    /** Deterministic cumulative LP work, for policies that compare snapshots without mutating it. */
+    internal fun totalSolveWork(): Long = totalSolveOps
+
+    private fun saturatingAdd(a: Long, b: Long): Long = if (b > 0L && a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
 
     /**
      * Whether the LP has spent [budgetOps] of work in total.
