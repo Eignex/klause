@@ -9,10 +9,18 @@ import com.eignex.klause.util.Cancellation
  * produced its folded domains; an unprojected [Problem] is propagated on demand.
  */
 val Problem.baked: PropagationResult
-    get() = if (this is BakedProblem) rootDeductions else rootBake(this, seedDeductions, cancellation)
+    get() = if (this is BakedProblem) {
+        rootDeductions
+    } else {
+        rootBake(
+            this,
+            PropagationResult.Implied.EMPTY,
+            Cancellation.Never,
+        )
+    }
 
 /** Build the propagation-owned finite-domain projection of this model. */
-fun Problem.bake(cancellation: Cancellation = this.cancellation): BakedProblem {
+fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem {
     if (this is BakedProblem) return this
     require(hasFiniteIntDomains) { "only finite CP problems can be baked" }
     return BakedProblem(
@@ -32,6 +40,10 @@ fun Problem.bake(cancellation: Cancellation = this.cancellation): BakedProblem {
     )
 }
 
+/** Cancellation that belongs to the propagation projection, or an unbounded token for raw model data. */
+internal val Problem.propagationCancellation: Cancellation
+    get() = (this as? BakedProblem)?.cancellation ?: Cancellation.Never
+
 /** Append a root-inert factor to an already baked propagation projection. */
 internal fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
     numBoolVars = numBoolVars,
@@ -39,7 +51,7 @@ internal fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProb
     intDomains = requireFiniteIntDomains(),
     factors = factors + extra,
     seedDeductions = baked,
-    cancellation = cancellation,
+    cancellation = propagationCancellation,
     impliedFactorMask = impliedFactorMask?.let { it + false },
     hasSymmetryBreaking = hasSymmetryBreaking,
     numRealVars = numRealVars,

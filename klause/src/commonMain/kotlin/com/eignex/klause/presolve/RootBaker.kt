@@ -10,30 +10,30 @@ import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagationCancellation
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 
 /**
- * Bake-time root probing, owned by the presolve lane rather than the kernel `Problem`.
+ * Bake-time root probing, owned by the presolve lane rather than the immutable model.
  *
- * A `Problem` only ever performs the cheap unconditional *base bake* (one `propagate(Assumptions.None)`
- * folded into its domains). The heavier failed-literal / SAC probing tiers — which are only ever enabled
- * by the compile / presolve layers — live here so the kernel never depends on `presolve` (the
- * `solver → presolve → solver` cycle the package split exists to prevent).
+ * The propagation projection performs the cheap unconditional base bake. The heavier failed-literal /
+ * SAC probing tiers — which are only ever enabled by the compile / presolve layers — live here so the
+ * engine never depends on `presolve` (the `solver → presolve → solver` cycle the package split exists
+ * to prevent).
  *
- * [bake] runs the probing fixpoint against an already-base-baked `Problem` via
- * `problem.propagate(assumptions)` and returns the accumulated deductions. The pipeline feeds that
- * back as `Problem`'s `seedDeductions`, so the rebuilt problem's `Problem.baked` carries the probing
- * pins / bound tightenings / holes.
+ * [bake] runs the probing fixpoint against an already-base-baked [Problem] and returns the accumulated
+ * deductions. The pipeline builds a fresh [BakedProblem] with them, so the propagation projection
+ * carries the probing pins, bound tightenings, and holes.
  */
 object RootBaker {
 
     /**
      * Re-seed a base-baked [problem] with the [config]-enabled probing tiers: run [bake] and, when it
-     * found extra deductions, return a fresh folded [BakedProblem] over the same factors / domains whose
-     * `Problem.baked` carries them. Returns [problem] unchanged when no tier is enabled, the problem is
+     * found extra deductions, return a fresh folded [BakedProblem] over the same factors and domains.
+     * Returns [problem] unchanged when no tier is enabled, the problem is
      * an already-folded pass view (which never bakes), or the base bake is already `Unsat`. This is
      * the central re-probe point for the presolve fresh path and the LP harvest — the kernel never
      * initiates it, so no `solver → presolve` cycle.
@@ -48,7 +48,7 @@ object RootBaker {
             intDomains = Array(problem.numIntVars) { problem.requireFiniteIntDomains()[it] },
             factors = problem.factors,
             seedDeductions = extra,
-            cancellation = problem.cancellation,
+            cancellation = problem.propagationCancellation,
             impliedFactorMask = problem.impliedFactorMask,
             hasSymmetryBreaking = problem.hasSymmetryBreaking,
             numRealVars = problem.numRealVars,
@@ -62,7 +62,7 @@ object RootBaker {
 
     /**
      * Run the [config]-enabled probing tiers against the base-baked [problem] and return the resulting
-     * deductions — the base bake merged with every probing finding, ready to seed a rebuilt `Problem`.
+     * deductions — the base bake merged with every probing finding, ready for a rebuilt [BakedProblem].
      * Returns [problem]'s existing bake unchanged when no tier is enabled or the base bake is already
      * `Unsat`. Cancellation is polled between phases and probes; a fired deadline yields a sound partial
      * bake (probing only ever tightens).
@@ -73,7 +73,7 @@ object RootBaker {
         if (!config.anyEnabled) return base
         // SAC probing fires `propagate` repeatedly; stop entering new probe phases once the bake
         // deadline has passed (each phase below also polls between its own probes).
-        if (problem.cancellation()) return base
+        if (problem.propagationCancellation()) return base
         var result: PropagationResult = base
         if (config.probeFailedLiterals) {
             result = probeFreeBools(problem, base)
@@ -110,7 +110,7 @@ object RootBaker {
         while (changed) {
             changed = false
             for (v in sacProbeOrder(problem, acc, factorWeights, rng)) {
-                if (problem.cancellation()) return acc
+                if (problem.propagationCancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
@@ -132,12 +132,12 @@ object RootBaker {
                     if (k in existingHoles) continue
                     perVarCalls[v]++
                     totalCalls++
-                    val pin = problem.propagate(accAsAssumptions.withInt(v, k), problem.cancellation)
+                    val pin = problem.propagate(accAsAssumptions.withInt(v, k), problem.propagationCancellation)
                     if (pin is PropagationResult.Unsat) {
                         bumpFactorWeights(pin, factorWeights)
                         perVarCalls[v]++
                         totalCalls++
-                        val r = problem.propagate(accAsAssumptions.withIntHole(v, k), problem.cancellation)
+                        val r = problem.propagate(accAsAssumptions.withIntHole(v, k), problem.propagationCancellation)
                         if (r is PropagationResult.Unsat) return r
                         acc = acc.withHole(v, k).merge(r as PropagationResult.Implied)
                         changed = true
@@ -212,7 +212,7 @@ object RootBaker {
         while (changed) {
             changed = false
             for (v in sacProbeOrder(problem, acc, factorWeights, rng)) {
-                if (problem.cancellation()) return acc
+                if (problem.propagationCancellation()) return acc
                 if (acc.intValueOrNull(v) != null) continue
                 if (perVarCalls[v] >= config.probeBudgetPerVar) continue
                 if (totalCalls >= config.probeTotalBudget) return acc
@@ -223,13 +223,13 @@ object RootBaker {
                 val accAsAssumptions = acc.toAssumptions()
                 perVarCalls[v]++
                 totalCalls++
-                val pinMin = problem.propagate(accAsAssumptions.withInt(v, curMin), problem.cancellation)
+                val pinMin = problem.propagate(accAsAssumptions.withInt(v, curMin), problem.propagationCancellation)
                 if (pinMin is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMin, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMin(v, curMin + 1)
-                    val r = problem.propagate(tightened, problem.cancellation)
+                    val r = problem.propagate(tightened, problem.propagationCancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = acc.withMin(v, curMin + 1).merge(r as PropagationResult.Implied)
                     changed = true
@@ -239,13 +239,13 @@ object RootBaker {
                 if (totalCalls >= config.probeTotalBudget) return acc
                 perVarCalls[v]++
                 totalCalls++
-                val pinMax = problem.propagate(accAsAssumptions.withInt(v, curMax), problem.cancellation)
+                val pinMax = problem.propagate(accAsAssumptions.withInt(v, curMax), problem.propagationCancellation)
                 if (pinMax is PropagationResult.Unsat) {
                     bumpFactorWeights(pinMax, factorWeights)
                     perVarCalls[v]++
                     totalCalls++
                     val tightened = accAsAssumptions.withTightenedMax(v, curMax - 1)
-                    val r = problem.propagate(tightened, problem.cancellation)
+                    val r = problem.propagate(tightened, problem.propagationCancellation)
                     if (r is PropagationResult.Unsat) return r
                     acc = acc.withMax(v, curMax - 1).merge(r as PropagationResult.Implied)
                     changed = true
@@ -267,19 +267,22 @@ object RootBaker {
         while (changed) {
             changed = false
             for (v in 0 until problem.numBoolVars) {
-                if (problem.cancellation()) return PropagationResult.Implied(bools, ints)
+                if (problem.propagationCancellation()) return PropagationResult.Implied(bools, ints)
                 if (v in bools) continue
-                val tryTrue = problem.propagate(Assumptions(bools + (v to true), ints), problem.cancellation)
+                val tryTrue = problem.propagate(Assumptions(bools + (v to true), ints), problem.propagationCancellation)
                 if (tryTrue is PropagationResult.Unsat) {
-                    val r = problem.propagate(Assumptions(bools + (v to false), ints), problem.cancellation)
+                    val r = problem.propagate(Assumptions(bools + (v to false), ints), problem.propagationCancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, false, r as PropagationResult.Implied)
                     changed = true
                     continue
                 }
-                val tryFalse = problem.propagate(Assumptions(bools + (v to false), ints), problem.cancellation)
+                val tryFalse = problem.propagate(
+                    Assumptions(bools + (v to false), ints),
+                    problem.propagationCancellation,
+                )
                 if (tryFalse is PropagationResult.Unsat) {
-                    val r = problem.propagate(Assumptions(bools + (v to true), ints), problem.cancellation)
+                    val r = problem.propagate(Assumptions(bools + (v to true), ints), problem.propagationCancellation)
                     if (r is PropagationResult.Unsat) return r
                     foldInto(bools, ints, v, true, r as PropagationResult.Implied)
                     changed = true

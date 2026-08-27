@@ -100,7 +100,7 @@ class OpenTheoryEngine internal constructor(
 
     /** Decides the model through its component plan. */
     fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult {
-        val cancellation = Cancellation { params.cancellation() || model.cancellation() }
+        val cancellation = Cancellation { params.cancellation() }
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
         // Building the components reads the whole model, so a budget already spent is answered before

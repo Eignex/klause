@@ -134,8 +134,6 @@ class ComponentPlan internal constructor(
                 .map { spec.factors[it] }
                 .toList()
                 .toTypedArray(),
-            seedDeductions = spec.seedDeductions,
-            cancellation = spec.cancellation,
             numRealVars = spec.numRealVars,
             realLower = spec.realLower,
             realUpper = spec.realUpper,
@@ -200,8 +198,6 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
             .map { factors[it] }
             .toList()
             .toTypedArray(),
-        seedDeductions = seedDeductions,
-        cancellation = cancellation,
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,

@@ -1,11 +1,9 @@
 package com.eignex.klause.ir
 
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.FiniteIntColumns
 import com.eignex.klause.solver.IntColumns
 import com.eignex.klause.util.Bits
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**
@@ -30,23 +28,6 @@ open class Problem(
     val intColumns: IntColumns,
     /** The constraints over the variables. */
     val factors: Array<Factor>,
-    /**
-     * Extra root deductions computed outside the kernel — the failed-literal / SAC probing tiers
-     * live in [com.eignex.klause.presolve.RootBaker], which runs them against an already-base-baked
-     * `Problem` and feeds the result back here. Merged into the base `propagate(Assumptions.None)`
-     * bake before it folds into [requireFiniteIntDomains], so the extra pins / bound tightenings / holes become
-     * part of the propagation bake and the problem's own domains. Defaults to empty = base bake only; the kernel
-     * never initiates probing itself (that would create a `solver → presolve → solver` cycle).
-     */
-    internal val seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-    /**
-     * Cooperative-cancellation token for the construction-time propagation bake. Polled on the
-     * full-propagation fixpoint and between SAC passes so a `-t` deadline can abort an
-     * otherwise-uncancellable bake on a slow propagator over wide domains. The partial bake
-     * that results is sound (it only ever tightens). Defaults to [Cancellation.Never], so
-     * every consumer that doesn't pass a deadline bakes to completion.
-     */
-    val cancellation: Cancellation = Cancellation.Never,
     /**
      * Per-factor flag marking constraints the model declared as *implied* — MiniZinc's
      * `redundant_constraint` / `symmetry_breaking_constraint` (surfaced via the klause MZN
@@ -179,8 +160,6 @@ open class Problem(
         numIntVars: Int,
         intDomains: Array<IntDomain>,
         factors: Array<Factor>,
-        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-        cancellation: Cancellation = Cancellation.Never,
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         sharedDomains: Boolean = false,
@@ -197,8 +176,6 @@ open class Problem(
         numIntVars = numIntVars,
         intColumns = FiniteIntColumns(intDomains, sharedDomains),
         factors = factors,
-        seedDeductions = seedDeductions,
-        cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         sharedDomains = sharedDomains,
@@ -217,8 +194,6 @@ open class Problem(
         numIntVars: Int,
         intDomains: Array<IntDomain>,
         factors: List<Factor>,
-        seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-        cancellation: Cancellation = Cancellation.Never,
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
         numRealVars: Int = 0,
@@ -234,8 +209,6 @@ open class Problem(
         numIntVars = numIntVars,
         intColumns = FiniteIntColumns(intDomains),
         factors = Array(factors.size) { factors[it] },
-        seedDeductions = seedDeductions,
-        cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         numRealVars = numRealVars,

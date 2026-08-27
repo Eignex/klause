@@ -122,8 +122,7 @@ class RootBakerTest {
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
             ),
-            cancellation = cancelled,
-        )
+        ).bake(cancelled)
         val baked = assertIs<PropagationResult.Implied>(bake(p, BakeConfig(probeIntBounds = true)))
         assertEquals(null, baked.intMinOrNullCompat(0), "a fired cancellation should skip SAC tightening")
     }
