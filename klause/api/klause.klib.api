@@ -377,6 +377,57 @@ final enum class com.eignex.klause.solver.pipeline/FiniteEngine : kotlin/Enum<co
     }
 }
 
+final enum class com.eignex.klause.solver.pipeline/ValSelectorKind : kotlin/Enum<com.eignex.klause.solver.pipeline/ValSelectorKind> { // com.eignex.klause.solver.pipeline/ValSelectorKind|null[0]
+    enum entry MAX // com.eignex.klause.solver.pipeline/ValSelectorKind.MAX|null[0]
+    enum entry MEDIAN // com.eignex.klause.solver.pipeline/ValSelectorKind.MEDIAN|null[0]
+    enum entry MIDDLE // com.eignex.klause.solver.pipeline/ValSelectorKind.MIDDLE|null[0]
+    enum entry MIN // com.eignex.klause.solver.pipeline/ValSelectorKind.MIN|null[0]
+    enum entry RANDOM // com.eignex.klause.solver.pipeline/ValSelectorKind.RANDOM|null[0]
+    enum entry SOLUTION_GUIDED // com.eignex.klause.solver.pipeline/ValSelectorKind.SOLUTION_GUIDED|null[0]
+    enum entry SPLIT // com.eignex.klause.solver.pipeline/ValSelectorKind.SPLIT|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/ValSelectorKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/ValSelectorKind> // com.eignex.klause.solver.pipeline/ValSelectorKind.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val id // com.eignex.klause.solver.pipeline/ValSelectorKind.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.eignex.klause.solver.pipeline/ValSelectorKind.id.<get-id>|<get-id>(){}[0]
+
+    final fun selector(): com.eignex.klause.backtrack.selector/ValueSelector // com.eignex.klause.solver.pipeline/ValSelectorKind.selector|selector(){}[0]
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/ValSelectorKind // com.eignex.klause.solver.pipeline/ValSelectorKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/ValSelectorKind> // com.eignex.klause.solver.pipeline/ValSelectorKind.values|values#static(){}[0]
+
+    final object Companion { // com.eignex.klause.solver.pipeline/ValSelectorKind.Companion|null[0]
+        final fun fromId(kotlin/String): com.eignex.klause.solver.pipeline/ValSelectorKind? // com.eignex.klause.solver.pipeline/ValSelectorKind.Companion.fromId|fromId(kotlin.String){}[0]
+        final fun ids(): kotlin/String // com.eignex.klause.solver.pipeline/ValSelectorKind.Companion.ids|ids(){}[0]
+    }
+}
+
+final enum class com.eignex.klause.solver.pipeline/VarSelectorKind : kotlin/Enum<com.eignex.klause.solver.pipeline/VarSelectorKind> { // com.eignex.klause.solver.pipeline/VarSelectorKind|null[0]
+    enum entry CHB // com.eignex.klause.solver.pipeline/VarSelectorKind.CHB|null[0]
+    enum entry DOMAIN_MAX_REGRET // com.eignex.klause.solver.pipeline/VarSelectorKind.DOMAIN_MAX_REGRET|null[0]
+    enum entry INPUT_ORDER // com.eignex.klause.solver.pipeline/VarSelectorKind.INPUT_ORDER|null[0]
+    enum entry LARGEST_DOMAIN // com.eignex.klause.solver.pipeline/VarSelectorKind.LARGEST_DOMAIN|null[0]
+    enum entry LARGEST_UPPER_BOUND // com.eignex.klause.solver.pipeline/VarSelectorKind.LARGEST_UPPER_BOUND|null[0]
+    enum entry LINUCB // com.eignex.klause.solver.pipeline/VarSelectorKind.LINUCB|null[0]
+    enum entry RANDOM // com.eignex.klause.solver.pipeline/VarSelectorKind.RANDOM|null[0]
+    enum entry SMALLEST_DOMAIN // com.eignex.klause.solver.pipeline/VarSelectorKind.SMALLEST_DOMAIN|null[0]
+    enum entry SMALLEST_LOWER_BOUND // com.eignex.klause.solver.pipeline/VarSelectorKind.SMALLEST_LOWER_BOUND|null[0]
+    enum entry VSIDS // com.eignex.klause.solver.pipeline/VarSelectorKind.VSIDS|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/VarSelectorKind.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/VarSelectorKind> // com.eignex.klause.solver.pipeline/VarSelectorKind.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val id // com.eignex.klause.solver.pipeline/VarSelectorKind.id|{}id[0]
+        final fun <get-id>(): kotlin/String // com.eignex.klause.solver.pipeline/VarSelectorKind.id.<get-id>|<get-id>(){}[0]
+
+    final fun selector(kotlin/Long?): com.eignex.klause.backtrack.selector/VariableSelector // com.eignex.klause.solver.pipeline/VarSelectorKind.selector|selector(kotlin.Long?){}[0]
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/VarSelectorKind // com.eignex.klause.solver.pipeline/VarSelectorKind.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/VarSelectorKind> // com.eignex.klause.solver.pipeline/VarSelectorKind.values|values#static(){}[0]
+
+    final object Companion { // com.eignex.klause.solver.pipeline/VarSelectorKind.Companion|null[0]
+        final fun fromId(kotlin/String): com.eignex.klause.solver.pipeline/VarSelectorKind? // com.eignex.klause.solver.pipeline/VarSelectorKind.Companion.fromId|fromId(kotlin.String){}[0]
+        final fun ids(): kotlin/String // com.eignex.klause.solver.pipeline/VarSelectorKind.Companion.ids|ids(){}[0]
+    }
+}
+
 final enum class com.eignex.klause.solver.result/TerminationReason : kotlin/Enum<com.eignex.klause.solver.result/TerminationReason> { // com.eignex.klause.solver.result/TerminationReason|null[0]
     enum entry BudgetExhausted // com.eignex.klause.solver.result/TerminationReason.BudgetExhausted|null[0]
     enum entry Cancelled // com.eignex.klause.solver.result/TerminationReason.Cancelled|null[0]
@@ -9442,6 +9493,17 @@ final class com.eignex.klause.solver.objective/SingleIntObjective { // com.eigne
     final fun toString(): kotlin/String // com.eignex.klause.solver.objective/SingleIntObjective.toString|toString(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/EngineParams { // com.eignex.klause.solver.pipeline/EngineParams|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/String>) // com.eignex.klause.solver.pipeline/EngineParams.<init>|<init>(kotlin.collections.List<kotlin.String>){}[0]
+
+    final fun bool(kotlin/String): kotlin/Boolean? // com.eignex.klause.solver.pipeline/EngineParams.bool|bool(kotlin.String){}[0]
+    final fun double(kotlin/String): kotlin/Double? // com.eignex.klause.solver.pipeline/EngineParams.double|double(kotlin.String){}[0]
+    final fun finish(kotlin/String, kotlin/String) // com.eignex.klause.solver.pipeline/EngineParams.finish|finish(kotlin.String;kotlin.String){}[0]
+    final fun int(kotlin/String): kotlin/Int? // com.eignex.klause.solver.pipeline/EngineParams.int|int(kotlin.String){}[0]
+    final fun long(kotlin/String): kotlin/Long? // com.eignex.klause.solver.pipeline/EngineParams.long|long(kotlin.String){}[0]
+    final fun string(kotlin/String): kotlin/String? // com.eignex.klause.solver.pipeline/EngineParams.string|string(kotlin.String){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/FinitePipelinePreparation { // com.eignex.klause.solver.pipeline/FinitePipelinePreparation|null[0]
     constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?){}[0]
 
@@ -9476,6 +9538,17 @@ final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eig
         final fun <get-solutionSetSensitive>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive.<get-solutionSetSensitive>|<get-solutionSetSensitive>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klause.solver.pipeline/LsResolution|null[0]
+    constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>?, kotlin/Boolean, kotlin/Int? = ...) // com.eignex.klause.solver.pipeline/LsResolution.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.Boolean;kotlin.Int?){}[0]
+
+    final val dryRunSolver // com.eignex.klause.solver.pipeline/LsResolution.dryRunSolver|{}dryRunSolver[0]
+        final fun <get-dryRunSolver>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LsResolution.dryRunSolver.<get-dryRunSolver>|<get-dryRunSolver>(){}[0]
+    final val forceArms // com.eignex.klause.solver.pipeline/LsResolution.forceArms|{}forceArms[0]
+        final fun <get-forceArms>(): kotlin/Int? // com.eignex.klause.solver.pipeline/LsResolution.forceArms.<get-forceArms>|<get-forceArms>(){}[0]
+    final val pool // com.eignex.klause.solver.pipeline/LsResolution.pool|{}pool[0]
+        final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/LsResolution.pool.<get-pool>|<get-pool>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.klause.solver.pipeline/OpenTheoryEngine|null[0]
     constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.ProblemPipeline){}[0]
 
@@ -9500,6 +9573,10 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.
         final fun <get-model>(): com.eignex.klause.solver/ProblemSpec // com.eignex.klause.solver.pipeline/OpenTheoryRequest.model.<get-model>|<get-model>(){}[0]
     final val objective // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective|{}objective[0]
         final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective.<get-objective>|<get-objective>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/PipelineConfigException : kotlin/RuntimeException { // com.eignex.klause.solver.pipeline/PipelineConfigException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.solver.pipeline/PipelineConfigException.<init>|<init>(kotlin.String){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/PlannedSearch { // com.eignex.klause.solver.pipeline/PlannedSearch|null[0]
@@ -10905,7 +10982,11 @@ final const val com.eignex.klause.config/DEFAULT_UNBOUNDED_INT_LO // com.eignex.
     final fun <get-DEFAULT_UNBOUNDED_INT_LO>(): kotlin/Long // com.eignex.klause.config/DEFAULT_UNBOUNDED_INT_LO.<get-DEFAULT_UNBOUNDED_INT_LO>|<get-DEFAULT_UNBOUNDED_INT_LO>(){}[0]
 final const val com.eignex.klause.config/MINIZINC_UNBOUNDED_DEFAULT // com.eignex.klause.config/MINIZINC_UNBOUNDED_DEFAULT|{}MINIZINC_UNBOUNDED_DEFAULT[0]
     final fun <get-MINIZINC_UNBOUNDED_DEFAULT>(): kotlin/Long // com.eignex.klause.config/MINIZINC_UNBOUNDED_DEFAULT.<get-MINIZINC_UNBOUNDED_DEFAULT>|<get-MINIZINC_UNBOUNDED_DEFAULT>(){}[0]
+final const val com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY // com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY|{}NODE_LIMIT_KEY[0]
+    final fun <get-NODE_LIMIT_KEY>(): kotlin/String // com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY.<get-NODE_LIMIT_KEY>|<get-NODE_LIMIT_KEY>(){}[0]
 
+final val com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS|{}BACKTRACK_OVERRIDE_KEYS[0]
+    final fun <get-BACKTRACK_OVERRIDE_KEYS>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS.<get-BACKTRACK_OVERRIDE_KEYS>|<get-BACKTRACK_OVERRIDE_KEYS>(){}[0]
 final val com.eignex.klause.solver/NoConsts // com.eignex.klause.solver/NoConsts|{}NoConsts[0]
     final fun <get-NoConsts>(): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/NoConsts.<get-NoConsts>|<get-NoConsts>(){}[0]
 final val com.eignex.klause.solver/indices // com.eignex.klause.solver/indices|@com.eignex.klause.solver.ConstList{}indices[0]
@@ -11073,5 +11154,14 @@ final fun com.eignex.klause.schema/subcircuit(kotlin.collections/List<com.eignex
 final fun com.eignex.klause.schema/symmetricAllDifferent(kotlin.collections/List<com.eignex.klause.model/IntTerm>, kotlin/Int = ...): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/symmetricAllDifferent|symmetricAllDifferent(kotlin.collections.List<com.eignex.klause.model.IntTerm>;kotlin.Int){}[0]
 final fun com.eignex.klause.schema/table(kotlin.collections/List<com.eignex.klause.model/IntTerm>, kotlin.collections/List<kotlin.collections/List<kotlin/Int>>): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/table|table(kotlin.collections.List<com.eignex.klause.model.IntTerm>;kotlin.collections.List<kotlin.collections.List<kotlin.Int>>){}[0]
 final fun com.eignex.klause.schema/xor(kotlin/Array<out com.eignex.klause.model/BoolTerm>...): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/xor|xor(kotlin.Array<out|com.eignex.klause.model.BoolTerm>...){}[0]
+final fun com.eignex.klause.solver.pipeline/applyBacktrackParams(com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.solver.pipeline/EngineParams): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.solver.pipeline/applyBacktrackParams|applyBacktrackParams(com.eignex.klause.backtrack.BacktrackParams;com.eignex.klause.solver.pipeline.EngineParams){}[0]
+final fun com.eignex.klause.solver.pipeline/autoArms(kotlin/Int): kotlin/Int // com.eignex.klause.solver.pipeline/autoArms|autoArms(kotlin.Int){}[0]
+final fun com.eignex.klause.solver.pipeline/backtrackOverride(com.eignex.klause.solver.pipeline/EngineParams, kotlin/Boolean): kotlin/Function1<com.eignex.klause.backtrack/BacktrackParams, com.eignex.klause.backtrack/BacktrackParams>? // com.eignex.klause.solver.pipeline/backtrackOverride|backtrackOverride(com.eignex.klause.solver.pipeline.EngineParams;kotlin.Boolean){}[0]
+final fun com.eignex.klause.solver.pipeline/buildPortfolioScenario(com.eignex.klause.solver.pipeline/EngineParams, kotlin/Long?, kotlin/Int, com.eignex.klause.portfolio/Kind, com.eignex.klause.portfolio/EngineMix, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig = ..., kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? = ..., kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>? = ..., com.eignex.klause.backtrack/BacktrackParams? = ..., com.eignex.klause.backtrack/NodeBudget? = ...): com.eignex.klause.portfolio/PortfolioScenario // com.eignex.klause.solver.pipeline/buildPortfolioScenario|buildPortfolioScenario(com.eignex.klause.solver.pipeline.EngineParams;kotlin.Long?;kotlin.Int;com.eignex.klause.portfolio.Kind;com.eignex.klause.portfolio.EngineMix;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.collections.List<kotlin.Function0<com.eignex.klause.backtrack.BacktrackRecipe>>?;com.eignex.klause.backtrack.BacktrackParams?;com.eignex.klause.backtrack.NodeBudget?){}[0]
+final fun com.eignex.klause.solver.pipeline/ineffectiveNumerics(kotlin/String, kotlin.collections/Set<kotlin/String>, kotlin.collections/List<kotlin/String>): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/ineffectiveNumerics|ineffectiveNumerics(kotlin.String;kotlin.collections.Set<kotlin.String>;kotlin.collections.List<kotlin.String>){}[0]
+final fun com.eignex.klause.solver.pipeline/pipelineConfigError(kotlin/String): kotlin/Nothing // com.eignex.klause.solver.pipeline/pipelineConfigError|pipelineConfigError(kotlin.String){}[0]
+final fun com.eignex.klause.solver.pipeline/resolveBtRecipes(com.eignex.klause.solver.pipeline/EngineParams, com.eignex.klause.portfolio/Kind): kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>? // com.eignex.klause.solver.pipeline/resolveBtRecipes|resolveBtRecipes(com.eignex.klause.solver.pipeline.EngineParams;com.eignex.klause.portfolio.Kind){}[0]
+final fun com.eignex.klause.solver.pipeline/resolveLocalSearchRecipes(com.eignex.klause.solver.pipeline/EngineParams): com.eignex.klause.solver.pipeline/LsResolution // com.eignex.klause.solver.pipeline/resolveLocalSearchRecipes|resolveLocalSearchRecipes(com.eignex.klause.solver.pipeline.EngineParams){}[0]
+final fun com.eignex.klause.solver.pipeline/withNodeBudget(kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>?, com.eignex.klause.portfolio/Kind, com.eignex.klause.backtrack/NodeBudget): kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>> // com.eignex.klause.solver.pipeline/withNodeBudget|withNodeBudget(kotlin.collections.List<kotlin.Function0<com.eignex.klause.backtrack.BacktrackRecipe>>?;com.eignex.klause.portfolio.Kind;com.eignex.klause.backtrack.NodeBudget){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/IntArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/LongArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.LongArray){}[0]
