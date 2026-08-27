@@ -78,7 +78,7 @@ class IteratedLocalSearchSolveTest {
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1L, 2L, 3L, 4L, 5L, 6L))
         val sample = LocalSearchSolver(problem.bake(), restartPolicy = policy)
-            .minimize(objective, LocalSearchParams(maxFlips = 6_000L, randomSeed = 1L)).assignment
+            .minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L)).assignment
         assertNotNull(sample, "minimize completes without anchoring a stale incumbent")
     }
 
@@ -98,7 +98,7 @@ class IteratedLocalSearchSolveTest {
             problem.bake(),
             restartPolicy = IteratedLocalSearchRestart(maxFlipsBeforeRestart = 50),
         )
-        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 4_000L, randomSeed = 1L)).assignment
+        val sample = solver.minimize(objective, LocalSearchParams(maxFlips = 500L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }

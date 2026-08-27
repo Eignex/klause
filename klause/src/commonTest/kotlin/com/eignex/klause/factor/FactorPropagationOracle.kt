@@ -22,6 +22,19 @@ import kotlin.test.assertTrue
 object FactorPropagationOracle {
 
     fun assertSound(problem: Problem, label: String = "factor") {
+        checkSound(problem, label)
+    }
+
+    /**
+     * The ground truth a soundness check ran against: [samples] is empty exactly when the problem
+     * is unsatisfiable, in which case [result] is [PropagationResult.Unsat]; otherwise [result] is
+     * [PropagationResult.Implied].
+     */
+    private class SoundnessCheck(val samples: List<Sample>, val result: PropagationResult)
+
+    /** [assertSound]'s checks, handing the enumeration and propagation back so [assertGac] adds its
+     *  own on the same data instead of brute-enumerating the space a second time. */
+    private fun checkSound(problem: Problem, label: String): SoundnessCheck {
         val samples = enumerateSat(problem)
         val result = problem.propagate()
         if (samples.isEmpty()) {
@@ -29,7 +42,7 @@ object FactorPropagationOracle {
                 result is PropagationResult.Unsat,
                 "$label: propagate returned $result but brute found zero satisfying assignments",
             )
-            return
+            return SoundnessCheck(samples, result)
         }
         assertTrue(
             result is PropagationResult.Implied,
@@ -82,13 +95,14 @@ object FactorPropagationOracle {
                 )
             }
         }
+        return SoundnessCheck(samples, result)
     }
 
     fun assertGac(problem: Problem, label: String = "factor") {
-        assertSound(problem, label)
-        val samples = enumerateSat(problem)
+        val check = checkSound(problem, label)
+        val samples = check.samples
         if (samples.isEmpty()) return
-        val result = problem.propagate() as PropagationResult.Implied
+        val result = check.result as PropagationResult.Implied
 
         // For each bool var, every supported value must remain allowed by propagation.
         for (v in 0 until problem.numBoolVars) {

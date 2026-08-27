@@ -97,34 +97,38 @@ class CumulativePropagatorTest {
 
     @Test
     fun `cumulative with variable heights never over-prunes`() {
-        // Brute-force oracle over small random instances with variable resource demands — the regime
-        // where no fully-fixed height snapshot exists. Kept under the BruteForceSolver 2^18 cap.
-        val rng = Random(0xC0FFEE)
-        repeat(300) { iter ->
-            val tasks = 2 + rng.nextInt(2) // 2 or 3 tasks
-            val starts = IntArray(tasks) { it }
-            val resourceVars = IntArray(tasks) { tasks + it }
-            val durations = LongArray(tasks) { 1L + rng.nextInt(2) } // 1 or 2
-            val resourceUbs = LongArray(tasks) { 3L }
-            val capacity = (2 + rng.nextInt(2)).toLong() // 2 or 3
-            val doms = ArrayList<IntDomain>()
-            repeat(tasks) { doms.add(IntDomain(0, 2)) } // start domains
-            repeat(tasks) { doms.add(IntDomain(0, 2)) } // height domains
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = 2 * tasks,
-                intDomains = doms.toTypedArray(),
-                factors = arrayOf<Factor>(
-                    Cumulative(
-                        starts = starts,
-                        durations = durations,
-                        resources = resourceUbs,
-                        capacity = capacity,
-                        resourceVars = resourceVars,
-                    ),
-                ),
-            )
-            FactorPropagationOracle.assertSound(problem, "cumulative-varH#$iter")
+        // Brute-force oracle over instances with variable resource demands — the regime where no
+        // fully-fixed height snapshot exists. The sweep is exhaustive over the parameter space —
+        // 2 or 3 tasks, each duration in {1, 2}, capacity in {2, 3} — so the soundness claim covers
+        // every combination rather than a sample. Each instance stays under the BruteForceSolver
+        // 2^18 cap.
+        for (tasks in 2..3) {
+            for (durationMask in 0 until (1 shl tasks)) {
+                for (capacity in 2L..3L) {
+                    val starts = IntArray(tasks) { it }
+                    val resourceVars = IntArray(tasks) { tasks + it }
+                    val durations = LongArray(tasks) { 1L + ((durationMask shr it) and 1) }
+                    val resourceUbs = LongArray(tasks) { 3L }
+                    val doms = ArrayList<IntDomain>()
+                    repeat(tasks) { doms.add(IntDomain(0, 2)) } // start domains
+                    repeat(tasks) { doms.add(IntDomain(0, 2)) } // height domains
+                    val problem = Problem(
+                        numBoolVars = 0,
+                        numIntVars = 2 * tasks,
+                        intDomains = doms.toTypedArray(),
+                        factors = arrayOf<Factor>(
+                            Cumulative(
+                                starts = starts,
+                                durations = durations,
+                                resources = resourceUbs,
+                                capacity = capacity,
+                                resourceVars = resourceVars,
+                            ),
+                        ),
+                    )
+                    FactorPropagationOracle.assertSound(problem, "cumulative-varH-t$tasks-d$durationMask-c$capacity")
+                }
+            }
         }
     }
 

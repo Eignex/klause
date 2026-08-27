@@ -53,7 +53,8 @@ class UniGenTest {
         assertEquals(draws, samples.size)
         for (s in samples) {
             assertTrue(s.bools[0] || s.bools[1], "accurate sample violated the clause")
-            counts[projectionKey(s, n)] = (counts[projectionKey(s, n)] ?: 0) + 1
+            val key = projectionKey(s, n)
+            counts[key] = (counts[key] ?: 0) + 1
         }
         // All 12 satisfying assignments should appear, each near the uniform expectation.
         assertEquals(12, counts.size, "every satisfying assignment should be sampled")

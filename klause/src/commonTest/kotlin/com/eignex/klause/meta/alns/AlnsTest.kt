@@ -111,11 +111,11 @@ class AlnsTest {
             inner = inner,
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 20,
-            flipsPerIteration = 200L,
+            maxIterations = 8,
+            flipsPerIteration = 50L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
     }
@@ -134,10 +134,10 @@ class AlnsTest {
             backtrackParams = BacktrackParams(),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 20,
+            maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample), "CP repair reaches the optimal weighted exactly-one")
     }
@@ -154,11 +154,11 @@ class AlnsTest {
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 20,
+            maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
             improvedSolutionSink = { sample, obj -> published.add(sample to obj) },
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertTrue(published.isNotEmpty(), "at least the initial incumbent must be published")
         assertEquals(objective.evaluate(sample), published.minOf { it.second }, "best published equals the result")
@@ -177,14 +177,14 @@ class AlnsTest {
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 20,
+            maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
             pooledSolutionSupplier = {
                 polls++
                 optimal
             },
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertTrue(polls > 0, "the pool must be consulted each iteration")
         assertEquals(3.0, objective.evaluate(sample), "the pooled optimum is adopted as the incumbent")
@@ -210,10 +210,10 @@ class AlnsTest {
             ),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 10,
+            maxIterations = 6,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample), "gated cross-repair sharing keeps the optimum reachable")
     }
@@ -233,14 +233,14 @@ class AlnsTest {
         val inner = LocalSearchSolver(problem.bake())
         val alns = Alns(
             inner = inner,
-            repairOperators = listOf(InnerLsRepair("quick", 200L), InnerLsRepair("deep", 1_000L)),
+            repairOperators = listOf(InnerLsRepair("quick", 50L), InnerLsRepair("deep", 150L)),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 12,
-            flipsPerIteration = 500L,
+            maxIterations = 8,
+            flipsPerIteration = 100L,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 5_000L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(3.0, objective.evaluate(sample))
         val repairIdxs = alns.iterationLog.map { it.repairIdx }.toSet()
@@ -358,10 +358,10 @@ class AlnsTest {
                 DestroyOperator.Random,
                 DestroyOperator.activityBiased(session),
             ),
-            maxIterations = 10,
-            flipsPerIteration = 200L,
+            maxIterations = 8,
+            flipsPerIteration = 100L,
         )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
+        alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         val touches = session.warmStateView.activityTouches()
         assertEquals(4, touches.size)
         assertTrue(touches.any { it > 0 }, "expected at least one touched variable")
@@ -401,10 +401,10 @@ class AlnsTest {
             newBestReward = 1.0,
             acceptedReward = 0.33,
             rejectedReward = 0.0,
-            maxIterations = 10,
-            flipsPerIteration = 200L,
+            maxIterations = 5,
+            flipsPerIteration = 50L,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 2_000L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
     }
 
@@ -419,8 +419,8 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = longArrayOf(1L))
         val emptyOp = DestroyOperator { _, _, _, _, _ -> FreedVars(IntArray(0), IntArray(0)) }
         val inner = LocalSearchSolver(problem.bake())
-        val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 5, flipsPerIteration = 100L)
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 0L)).assignment
+        val alns = Alns(inner = inner, destroyOperators = listOf(emptyOp), maxIterations = 3, flipsPerIteration = 100L)
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 0L)).assignment
         assertNotNull(sample, "ALNS should still return the initial solve's incumbent")
     }
 
@@ -456,7 +456,7 @@ class AlnsTest {
             inner = LocalSearchSolver(problem.bake()),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 12,
+            maxIterations = 8,
             // The fixed acceptance would allow worsening incumbents; the factory's Improving must win.
             acceptance = AcceptanceCriterion.RandomWalk,
             acceptanceFor = { initial ->
@@ -464,7 +464,7 @@ class AlnsTest {
                 AcceptanceCriterion.Improving
             },
         )
-        alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L))
+        alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L))
         assertTrue(seenInitial.isFinite(), "the factory receives the initial incumbent's objective")
         val incumbents = alns.iterationLog.map { it.incumbentObjective }
         assertTrue(
@@ -497,7 +497,7 @@ class AlnsTest {
             repairOperators = BacktrackRepair.Defaults,
             backtrack = BacktrackSolver(problem.bake()),
             backtrackParams = BacktrackParams(),
-            maxIterations = 20,
+            maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
         val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
@@ -517,10 +517,10 @@ class AlnsTest {
             repairOperators = listOf(GreedyConstructionRepair(noise = 0.5)),
             minDestroyFraction = 0.5,
             maxDestroyFraction = 0.5,
-            maxIterations = 20,
+            maxIterations = 8,
             acceptance = AcceptanceCriterion.BetterOrEqual,
         )
-        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 1_500L, randomSeed = 1L)).assignment
+        val sample = alns.minimize(objective, LocalSearchParams(maxFlips = 200L, randomSeed = 1L)).assignment
         assertNotNull(sample)
         assertEquals(
             3.0,

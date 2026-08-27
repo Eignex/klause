@@ -105,7 +105,7 @@ class FocusedLsTest {
         )
         val result = solver.minimize(
             LinearObjective(boolWeights = longArrayOf(1, 1, 1)),
-            LocalSearchParams(maxFlips = 50_000, randomSeed = 7),
+            LocalSearchParams(maxFlips = 5_000, randomSeed = 7),
         )
         val best = assertIs<MinimizeResult.BestFound>(result, "SA optimizer should reach a feasible incumbent")
         assertEquals(1.0, best.objective, "SA optimizer should anneal to the optimum (exactly one true)")

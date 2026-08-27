@@ -8,6 +8,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.Invariant
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -133,8 +134,8 @@ class ArithmeticPropagatorTest {
         }
     }
 
-    private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+    private fun enumerate(problem: BakedProblem, seed: Long): HashSet<List<Int>> =
+        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     @Test
@@ -150,22 +151,22 @@ class ArithmeticPropagatorTest {
             Triple(LinearOp.NE, 6) { a: Int, b: Int, c: Int -> a + b + c != 6 },
         )
         for ((op, bound, rel) in cases) {
+            val factors = listOf<Factor>(
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), op, bound),
+                ExcludeOnFix(src = 3, dst = 0),
+                ExcludeOnFix(src = 3, dst = 1),
+            )
+            val problem = Problem(0, 4, Array(4) { IntDomain(0, hi.toLong()) }, factors).bake()
+            val brute = HashSet<List<Int>>()
+            val base = hi + 1
+            for (m in 0 until base * base * base * base) {
+                val a = m % base
+                val b = (m / base) % base
+                val c = (m / (base * base)) % base
+                val d = m / (base * base * base)
+                if (rel(a, b, c) && a != d && b != d) brute.add(listOf(a, b, c, d))
+            }
             for (seed in 1L..4L) {
-                val factors = listOf<Factor>(
-                    Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), op, bound),
-                    ExcludeOnFix(src = 3, dst = 0),
-                    ExcludeOnFix(src = 3, dst = 1),
-                )
-                val problem = Problem(0, 4, Array(4) { IntDomain(0, hi.toLong()) }, factors)
-                val brute = HashSet<List<Int>>()
-                val base = hi + 1
-                for (m in 0 until base * base * base * base) {
-                    val a = m % base
-                    val b = (m / base) % base
-                    val c = (m / (base * base)) % base
-                    val d = m / (base * base * base)
-                    if (rel(a, b, c) && a != d && b != d) brute.add(listOf(a, b, c, d))
-                }
                 assertEquals(
                     brute,
                     enumerate(problem, seed),
@@ -337,8 +338,8 @@ class ArithmeticPropagatorTest {
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 
-    private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+    private fun enumerateWithVsids(problem: BakedProblem, seed: Long): HashSet<List<Int>> =
+        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
 
     private fun assertBoundOnly(watches: IntArray?, vars: IntArray) {
@@ -368,24 +369,24 @@ class ArithmeticPropagatorTest {
     fun `product with interior holes punched mid-search enumerates exactly brute force`() {
         // result = a*b, plus a co-constraint carving x3's fixed value out of a and b (interior holes
         // the product is not woken for). a,b,c ∈ 0..3, result ∈ 0..9.
-        for (seed in 1L..16L) {
-            val factors = listOf<Factor>(
-                Product(a = 0, b = 1, result = 2),
-                ExcludeOnFixWithReason(src = 3, dst = 0),
-                ExcludeOnFixWithReason(src = 3, dst = 1),
-            )
-            val doms = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 9), IntDomain(0, 3))
-            val problem = Problem(0, 4, doms, factors)
-            val brute = HashSet<List<Int>>()
-            for (a in 0..3) {
-                for (b in 0..3) {
-                    for (r in 0..9) {
-                        for (c in 0..3) {
-                            if (r == a * b && a != c && b != c) brute.add(listOf(a, b, r, c))
-                        }
+        val factors = listOf<Factor>(
+            Product(a = 0, b = 1, result = 2),
+            ExcludeOnFixWithReason(src = 3, dst = 0),
+            ExcludeOnFixWithReason(src = 3, dst = 1),
+        )
+        val doms = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 9), IntDomain(0, 3))
+        val problem = Problem(0, 4, doms, factors).bake()
+        val brute = HashSet<List<Int>>()
+        for (a in 0..3) {
+            for (b in 0..3) {
+                for (r in 0..9) {
+                    for (c in 0..3) {
+                        if (r == a * b && a != c && b != c) brute.add(listOf(a, b, r, c))
                     }
                 }
             }
+        }
+        for (seed in 1L..16L) {
             assertEquals(brute, enumerateWithVsids(problem, seed), "product seed=$seed must match brute force")
         }
     }
@@ -393,23 +394,23 @@ class ArithmeticPropagatorTest {
     @Test
     fun `array-max with interior holes punched mid-search enumerates exactly brute force`() {
         // result = max(x0,x1), plus a co-constraint carving x3's fixed value out of x0 and x1.
-        for (seed in 1L..16L) {
-            val factors = listOf<Factor>(
-                ArrayMinMax(result = 2, xs = intArrayOf(0, 1), max = true),
-                ExcludeOnFixWithReason(src = 3, dst = 0),
-                ExcludeOnFixWithReason(src = 3, dst = 1),
-            )
-            val problem = Problem(0, 4, Array(4) { IntDomain(0, 3) }, factors)
-            val brute = HashSet<List<Int>>()
-            for (x0 in 0..3) {
-                for (x1 in 0..3) {
-                    for (r in 0..3) {
-                        for (c in 0..3) {
-                            if (r == maxOf(x0, x1) && x0 != c && x1 != c) brute.add(listOf(x0, x1, r, c))
-                        }
+        val factors = listOf<Factor>(
+            ArrayMinMax(result = 2, xs = intArrayOf(0, 1), max = true),
+            ExcludeOnFixWithReason(src = 3, dst = 0),
+            ExcludeOnFixWithReason(src = 3, dst = 1),
+        )
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 3) }, factors).bake()
+        val brute = HashSet<List<Int>>()
+        for (x0 in 0..3) {
+            for (x1 in 0..3) {
+                for (r in 0..3) {
+                    for (c in 0..3) {
+                        if (r == maxOf(x0, x1) && x0 != c && x1 != c) brute.add(listOf(x0, x1, r, c))
                     }
                 }
             }
+        }
+        for (seed in 1L..16L) {
             assertEquals(brute, enumerateWithVsids(problem, seed), "array-max seed=$seed must match brute force")
         }
     }

@@ -7,6 +7,7 @@ import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.global.internals.computeBoundsAllDifferent
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Assumptions
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
@@ -110,28 +111,28 @@ class AllDifferentPropagatorTest {
         // enumerated set must still equal brute force, proving the skipped wakes lose no soundness.
         val hi = 3
         val adVars = intArrayOf(0, 1, 2)
+        val factors = listOf<Factor>(
+            AllDifferent(adVars, domainMin = 0, domainSize = hi + 1, boundsConsistent = true),
+            ExcludeOnFix(src = 3, dst = 0),
+            ExcludeOnFix(src = 3, dst = 1),
+        )
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 4,
+            intDomains = Array(4) { IntDomain(0, hi.toLong()) },
+            factors = factors,
+        ).bake()
+        val brute = HashSet<List<Int>>()
+        val base = hi + 1
+        for (m in 0 until base * base * base * base) {
+            val a = m % base
+            val b = (m / base) % base
+            val c = (m / (base * base)) % base
+            val d = m / (base * base * base)
+            if (a != b && a != c && b != c && a != d && b != d) brute.add(listOf(a, b, c, d))
+        }
         for (seed in 1L..6L) {
-            val factors = listOf<Factor>(
-                AllDifferent(adVars, domainMin = 0, domainSize = hi + 1, boundsConsistent = true),
-                ExcludeOnFix(src = 3, dst = 0),
-                ExcludeOnFix(src = 3, dst = 1),
-            )
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = 4,
-                intDomains = Array(4) { IntDomain(0, hi.toLong()) },
-                factors = factors,
-            )
-            val brute = HashSet<List<Int>>()
-            val base = hi + 1
-            for (m in 0 until base * base * base * base) {
-                val a = m % base
-                val b = (m / base) % base
-                val c = (m / (base * base)) % base
-                val d = m / (base * base * base)
-                if (a != b && a != c && b != c && a != d && b != d) brute.add(listOf(a, b, c, d))
-            }
-            val found = BacktrackSolver(problem.bake())
+            val found = BacktrackSolver(problem)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
                 .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
             assertEquals(
@@ -395,23 +396,32 @@ class AllDifferentPropagatorTest {
 
     // ── Bounds filtering vs brute force ──────────────────────────────────────
 
-    /** True iff vars can be assigned pairwise-distinct values, each within [lo[i], hi[i]]. */
+    /** True iff vars can be assigned pairwise-distinct values, each within [lo[i], hi[i]].
+     *  Value-indexed arrays keyed off the instance's own value window, since the random corpus
+     *  drives this oracle thousands of times and boxed maps dominate at that count. */
     private fun hasMatching(lo: IntArray, hi: IntArray): Boolean {
         val n = lo.size
-        val matchValToVar = HashMap<Int, Int>()
-        fun augment(i: Int, seen: HashSet<Int>): Boolean {
+        val minVal = lo.min()
+        val span = hi.max() - minVal + 1
+        val matchValToVar = IntArray(span) { -1 }
+        val seen = BooleanArray(span)
+        fun augment(i: Int): Boolean {
             for (v in lo[i]..hi[i]) {
-                if (v in seen) continue
-                seen.add(v)
-                val occupant = matchValToVar[v]
-                if (occupant == null || augment(occupant, seen)) {
-                    matchValToVar[v] = i
+                val slot = v - minVal
+                if (seen[slot]) continue
+                seen[slot] = true
+                val occupant = matchValToVar[slot]
+                if (occupant < 0 || augment(occupant)) {
+                    matchValToVar[slot] = i
                     return true
                 }
             }
             return false
         }
-        for (i in 0 until n) if (!augment(i, HashSet())) return false
+        for (i in 0 until n) {
+            seen.fill(false)
+            if (!augment(i)) return false
+        }
         return true
     }
 
@@ -866,8 +876,8 @@ class AllDifferentPropagatorTest {
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 
-    private fun enumerateWithVsids(problem: Problem, seed: Long): HashSet<List<Int>> =
-        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
+    private fun enumerateWithVsids(problem: BakedProblem, seed: Long): HashSet<List<Int>> =
+        BacktrackSolver(problem).enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
             .take(100_000).map { s -> s.ints.map { it.toInt() } }.toHashSet()
 
     private fun assertBoundOnly(watches: IntArray?, vars: IntArray) {
@@ -901,27 +911,27 @@ class AllDifferentPropagatorTest {
     fun `sort with interior holes punched mid-search enumerates exactly brute force`() {
         // ys = sorted(xs) over xs=[0,1], ys=[2,3]; var 4 carved out of xs. Domains 0..2 (wide enough
         // for an interior hole). Brute: y0=min, y1=max of (x0,x1), and x0,x1 ≠ c.
-        for (seed in 1L..3L) {
-            val factors = listOf<Factor>(
-                Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)),
-                ExcludeOnFixWithAntecedent(src = 4, dst = 0),
-                ExcludeOnFixWithAntecedent(src = 4, dst = 1),
-            )
-            val problem = Problem(0, 5, Array(5) { IntDomain(0, 2) }, factors)
-            val brute = HashSet<List<Int>>()
-            for (x0 in 0..2) {
-                for (x1 in 0..2) {
-                    for (y0 in 0..2) {
-                        for (y1 in 0..2) {
-                            for (c in 0..2) {
-                                if (y0 == minOf(x0, x1) && y1 == maxOf(x0, x1) && x0 != c && x1 != c) {
-                                    brute.add(listOf(x0, x1, y0, y1, c))
-                                }
+        val factors = listOf<Factor>(
+            Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)),
+            ExcludeOnFixWithAntecedent(src = 4, dst = 0),
+            ExcludeOnFixWithAntecedent(src = 4, dst = 1),
+        )
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, 2) }, factors).bake()
+        val brute = HashSet<List<Int>>()
+        for (x0 in 0..2) {
+            for (x1 in 0..2) {
+                for (y0 in 0..2) {
+                    for (y1 in 0..2) {
+                        for (c in 0..2) {
+                            if (y0 == minOf(x0, x1) && y1 == maxOf(x0, x1) && x0 != c && x1 != c) {
+                                brute.add(listOf(x0, x1, y0, y1, c))
                             }
                         }
                     }
                 }
             }
+        }
+        for (seed in 1L..3L) {
             assertEquals(brute, enumerateWithVsids(problem, seed), "sort seed=$seed must match brute force")
         }
     }
@@ -929,26 +939,26 @@ class AllDifferentPropagatorTest {
     @Test
     fun `lexless with interior holes punched mid-search enumerates exactly brute force`() {
         // (x0,x1) <lex (y0,y1) strict; var 4 carved out of xs. Domains 0..2.
-        for (seed in 1L..3L) {
-            val factors = listOf<Factor>(
-                LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true),
-                ExcludeOnFixWithAntecedent(src = 4, dst = 0),
-                ExcludeOnFixWithAntecedent(src = 4, dst = 1),
-            )
-            val problem = Problem(0, 5, Array(5) { IntDomain(0, 2) }, factors)
-            val brute = HashSet<List<Int>>()
-            for (x0 in 0..2) {
-                for (x1 in 0..2) {
-                    for (y0 in 0..2) {
-                        for (y1 in 0..2) {
-                            for (c in 0..2) {
-                                val lex = x0 < y0 || (x0 == y0 && x1 < y1)
-                                if (lex && x0 != c && x1 != c) brute.add(listOf(x0, x1, y0, y1, c))
-                            }
+        val factors = listOf<Factor>(
+            LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true),
+            ExcludeOnFixWithAntecedent(src = 4, dst = 0),
+            ExcludeOnFixWithAntecedent(src = 4, dst = 1),
+        )
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, 2) }, factors).bake()
+        val brute = HashSet<List<Int>>()
+        for (x0 in 0..2) {
+            for (x1 in 0..2) {
+                for (y0 in 0..2) {
+                    for (y1 in 0..2) {
+                        for (c in 0..2) {
+                            val lex = x0 < y0 || (x0 == y0 && x1 < y1)
+                            if (lex && x0 != c && x1 != c) brute.add(listOf(x0, x1, y0, y1, c))
                         }
                     }
                 }
             }
+        }
+        for (seed in 1L..3L) {
             assertEquals(brute, enumerateWithVsids(problem, seed), "lexless seed=$seed must match brute force")
         }
     }
@@ -956,26 +966,26 @@ class AllDifferentPropagatorTest {
     @Test
     fun `symmetric-alldiff with interior holes punched mid-search enumerates exactly brute force`() {
         // xs=[0,1,2] a self-inverse permutation (involution); var 3 carved out of xs[0],xs[1].
-        for (seed in 1L..3L) {
-            val factors = listOf<Factor>(
-                SymmetricAllDifferent(xs = intArrayOf(0, 1, 2), indexOffset = 0),
-                ExcludeOnFixWithAntecedent(src = 3, dst = 0),
-                ExcludeOnFixWithAntecedent(src = 3, dst = 1),
-            )
-            val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, factors)
-            val brute = HashSet<List<Int>>()
-            for (a0 in 0..2) {
-                for (a1 in 0..2) {
-                    for (a2 in 0..2) {
-                        for (c in 0..2) {
-                            val a = intArrayOf(a0, a1, a2)
-                            val perm = a0 != a1 && a0 != a2 && a1 != a2 // distinct ⇒ permutation of 0..2
-                            val involution = perm && (0..2).all { a[a[it]] == it }
-                            if (involution && a0 != c && a1 != c) brute.add(listOf(a0, a1, a2, c))
-                        }
+        val factors = listOf<Factor>(
+            SymmetricAllDifferent(xs = intArrayOf(0, 1, 2), indexOffset = 0),
+            ExcludeOnFixWithAntecedent(src = 3, dst = 0),
+            ExcludeOnFixWithAntecedent(src = 3, dst = 1),
+        )
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, factors).bake()
+        val brute = HashSet<List<Int>>()
+        for (a0 in 0..2) {
+            for (a1 in 0..2) {
+                for (a2 in 0..2) {
+                    for (c in 0..2) {
+                        val a = intArrayOf(a0, a1, a2)
+                        val perm = a0 != a1 && a0 != a2 && a1 != a2 // distinct ⇒ permutation of 0..2
+                        val involution = perm && (0..2).all { a[a[it]] == it }
+                        if (involution && a0 != c && a1 != c) brute.add(listOf(a0, a1, a2, c))
                     }
                 }
             }
+        }
+        for (seed in 1L..3L) {
             assertEquals(
                 brute,
                 enumerateWithVsids(problem, seed),
