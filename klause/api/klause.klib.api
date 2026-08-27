@@ -1804,6 +1804,50 @@ sealed interface com.eignex.klause.localsearch/ViolationPenalty { // com.eignex.
     }
 }
 
+sealed interface com.eignex.klause.lowering.opb/OpbStatement { // com.eignex.klause.lowering.opb/OpbStatement|null[0]
+    final class Constraint : com.eignex.klause.lowering.opb/OpbStatement { // com.eignex.klause.lowering.opb/OpbStatement.Constraint|null[0]
+        constructor <init>(kotlin/Long?, com.eignex.klause.lowering.opb/OpbRelation) // com.eignex.klause.lowering.opb/OpbStatement.Constraint.<init>|<init>(kotlin.Long?;com.eignex.klause.lowering.opb.OpbRelation){}[0]
+
+        final val relation // com.eignex.klause.lowering.opb/OpbStatement.Constraint.relation|{}relation[0]
+            final fun <get-relation>(): com.eignex.klause.lowering.opb/OpbRelation // com.eignex.klause.lowering.opb/OpbStatement.Constraint.relation.<get-relation>|<get-relation>(){}[0]
+        final val softCost // com.eignex.klause.lowering.opb/OpbStatement.Constraint.softCost|{}softCost[0]
+            final fun <get-softCost>(): kotlin/Long? // com.eignex.klause.lowering.opb/OpbStatement.Constraint.softCost.<get-softCost>|<get-softCost>(){}[0]
+
+        final fun component1(): kotlin/Long? // com.eignex.klause.lowering.opb/OpbStatement.Constraint.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.lowering.opb/OpbRelation // com.eignex.klause.lowering.opb/OpbStatement.Constraint.component2|component2(){}[0]
+        final fun copy(kotlin/Long? = ..., com.eignex.klause.lowering.opb/OpbRelation = ...): com.eignex.klause.lowering.opb/OpbStatement.Constraint // com.eignex.klause.lowering.opb/OpbStatement.Constraint.copy|copy(kotlin.Long?;com.eignex.klause.lowering.opb.OpbRelation){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbStatement.Constraint.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbStatement.Constraint.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbStatement.Constraint.toString|toString(){}[0]
+    }
+
+    final class Objective : com.eignex.klause.lowering.opb/OpbStatement { // com.eignex.klause.lowering.opb/OpbStatement.Objective|null[0]
+        constructor <init>(kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm>) // com.eignex.klause.lowering.opb/OpbStatement.Objective.<init>|<init>(kotlin.collections.List<com.eignex.klause.lowering.opb.OpbTerm>){}[0]
+
+        final val terms // com.eignex.klause.lowering.opb/OpbStatement.Objective.terms|{}terms[0]
+            final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm> // com.eignex.klause.lowering.opb/OpbStatement.Objective.terms.<get-terms>|<get-terms>(){}[0]
+
+        final fun component1(): kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm> // com.eignex.klause.lowering.opb/OpbStatement.Objective.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm> = ...): com.eignex.klause.lowering.opb/OpbStatement.Objective // com.eignex.klause.lowering.opb/OpbStatement.Objective.copy|copy(kotlin.collections.List<com.eignex.klause.lowering.opb.OpbTerm>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbStatement.Objective.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbStatement.Objective.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbStatement.Objective.toString|toString(){}[0]
+    }
+
+    final class SoftHeader : com.eignex.klause.lowering.opb/OpbStatement { // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader|null[0]
+        constructor <init>(kotlin/Long?) // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.<init>|<init>(kotlin.Long?){}[0]
+
+        final val top // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.top|{}top[0]
+            final fun <get-top>(): kotlin/Long? // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.top.<get-top>|<get-top>(){}[0]
+
+        final fun component1(): kotlin/Long? // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.component1|component1(){}[0]
+        final fun copy(kotlin/Long? = ...): com.eignex.klause.lowering.opb/OpbStatement.SoftHeader // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.copy|copy(kotlin.Long?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbStatement.SoftHeader.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.model/BoolExpr : com.eignex.klause.model/BoolTerm { // com.eignex.klause.model/BoolExpr|null[0]
     open fun toExpr(): com.eignex.klause.model/BoolExpr // com.eignex.klause.model/BoolExpr.toExpr|toExpr(){}[0]
 
@@ -4698,28 +4742,6 @@ final class com.eignex.klause.formats.opb/OpbFormatException : com.eignex.klause
     constructor <init>(kotlin/String) // com.eignex.klause.formats.opb/OpbFormatException.<init>|<init>(kotlin.String){}[0]
 }
 
-final class com.eignex.klause.formats.opb/OpbProblem { // com.eignex.klause.formats.opb/OpbProblem|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.formats.opb/OpbProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
-
-    final val boolFolds // com.eignex.klause.formats.opb/OpbProblem.boolFolds|{}boolFolds[0]
-        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
-    final val numDeclaredVars // com.eignex.klause.formats.opb/OpbProblem.numDeclaredVars|{}numDeclaredVars[0]
-        final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
-    final val objective // com.eignex.klause.formats.opb/OpbProblem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.opb/OpbProblem.objective.<get-objective>|<get-objective>(){}[0]
-    final val problem // com.eignex.klause.formats.opb/OpbProblem.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.opb/OpbProblem.problem.<get-problem>|<get-problem>(){}[0]
-
-    final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.opb/OpbProblem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.opb/OpbProblem.component2|component2(){}[0]
-    final fun component3(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.opb/OpbProblem.component3|component3(){}[0]
-    final fun component4(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.component4|component4(){}[0]
-    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/OpbProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.opb/OpbProblem.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.formats.opb/OpbProblem.toString|toString(){}[0]
-}
-
 final class com.eignex.klause.formats.smtlib/SExprReader { // com.eignex.klause.formats.smtlib/SExprReader|null[0]
     constructor <init>(com.eignex.klause.util/CharReader) // com.eignex.klause.formats.smtlib/SExprReader.<init>|<init>(com.eignex.klause.util.CharReader){}[0]
     constructor <init>(com.eignex.klause.util/CharSource) // com.eignex.klause.formats.smtlib/SExprReader.<init>|<init>(com.eignex.klause.util.CharSource){}[0]
@@ -6148,6 +6170,83 @@ final class com.eignex.klause.lowering.mps/MpsVar { // com.eignex.klause.lowerin
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsVar.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.mps/MpsVar.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.mps/MpsVar.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.opb/OpbDocument { // com.eignex.klause.lowering.opb/OpbDocument|null[0]
+    constructor <init>(kotlin/Int, kotlin.collections/List<com.eignex.klause.lowering.opb/OpbStatement>) // com.eignex.klause.lowering.opb/OpbDocument.<init>|<init>(kotlin.Int;kotlin.collections.List<com.eignex.klause.lowering.opb.OpbStatement>){}[0]
+
+    final val numDeclaredVars // com.eignex.klause.lowering.opb/OpbDocument.numDeclaredVars|{}numDeclaredVars[0]
+        final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.lowering.opb/OpbDocument.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
+    final val statements // com.eignex.klause.lowering.opb/OpbDocument.statements|{}statements[0]
+        final fun <get-statements>(): kotlin.collections/List<com.eignex.klause.lowering.opb/OpbStatement> // com.eignex.klause.lowering.opb/OpbDocument.statements.<get-statements>|<get-statements>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.lowering.opb/OpbDocument.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<com.eignex.klause.lowering.opb/OpbStatement> // com.eignex.klause.lowering.opb/OpbDocument.component2|component2(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.collections/List<com.eignex.klause.lowering.opb/OpbStatement> = ...): com.eignex.klause.lowering.opb/OpbDocument // com.eignex.klause.lowering.opb/OpbDocument.copy|copy(kotlin.Int;kotlin.collections.List<com.eignex.klause.lowering.opb.OpbStatement>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbDocument.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbDocument.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbDocument.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.opb/OpbLoweringException : kotlin/IllegalArgumentException { // com.eignex.klause.lowering.opb/OpbLoweringException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.lowering.opb/OpbLoweringException.<init>|<init>(kotlin.String){}[0]
+}
+
+final class com.eignex.klause.lowering.opb/OpbProblem { // com.eignex.klause.lowering.opb/OpbProblem|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.lowering.opb/OpbProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
+
+    final val boolFolds // com.eignex.klause.lowering.opb/OpbProblem.boolFolds|{}boolFolds[0]
+        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.lowering.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
+    final val numDeclaredVars // com.eignex.klause.lowering.opb/OpbProblem.numDeclaredVars|{}numDeclaredVars[0]
+        final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
+    final val objective // com.eignex.klause.lowering.opb/OpbProblem.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.opb/OpbProblem.objective.<get-objective>|<get-objective>(){}[0]
+    final val problem // com.eignex.klause.lowering.opb/OpbProblem.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.opb/OpbProblem.problem.<get-problem>|<get-problem>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.opb/OpbProblem.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.opb/OpbProblem.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.lowering.opb/OpbProblem.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.component4|component4(){}[0]
+    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/OpbProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbProblem.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbProblem.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.opb/OpbRelation { // com.eignex.klause.lowering.opb/OpbRelation|null[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm>, com.eignex.klause.model/PbOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.lowering.opb/OpbRelation.<init>|<init>(kotlin.collections.List<com.eignex.klause.lowering.opb.OpbTerm>;com.eignex.klause.model.PbOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+
+    final val bound // com.eignex.klause.lowering.opb/OpbRelation.bound|{}bound[0]
+        final fun <get-bound>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lowering.opb/OpbRelation.bound.<get-bound>|<get-bound>(){}[0]
+    final val op // com.eignex.klause.lowering.opb/OpbRelation.op|{}op[0]
+        final fun <get-op>(): com.eignex.klause.model/PbOp // com.eignex.klause.lowering.opb/OpbRelation.op.<get-op>|<get-op>(){}[0]
+    final val terms // com.eignex.klause.lowering.opb/OpbRelation.terms|{}terms[0]
+        final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm> // com.eignex.klause.lowering.opb/OpbRelation.terms.<get-terms>|<get-terms>(){}[0]
+
+    final fun component1(): kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm> // com.eignex.klause.lowering.opb/OpbRelation.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.model/PbOp // com.eignex.klause.lowering.opb/OpbRelation.component2|component2(){}[0]
+    final fun component3(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lowering.opb/OpbRelation.component3|component3(){}[0]
+    final fun copy(kotlin.collections/List<com.eignex.klause.lowering.opb/OpbTerm> = ..., com.eignex.klause.model/PbOp = ..., com.ionspin.kotlin.bignum.integer/BigInteger = ...): com.eignex.klause.lowering.opb/OpbRelation // com.eignex.klause.lowering.opb/OpbRelation.copy|copy(kotlin.collections.List<com.eignex.klause.lowering.opb.OpbTerm>;com.eignex.klause.model.PbOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbRelation.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbRelation.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbRelation.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.opb/OpbTerm { // com.eignex.klause.lowering.opb/OpbTerm|null[0]
+    constructor <init>(com.ionspin.kotlin.bignum.integer/BigInteger, kotlin/IntArray) // com.eignex.klause.lowering.opb/OpbTerm.<init>|<init>(com.ionspin.kotlin.bignum.integer.BigInteger;kotlin.IntArray){}[0]
+
+    final val coefficient // com.eignex.klause.lowering.opb/OpbTerm.coefficient|{}coefficient[0]
+        final fun <get-coefficient>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lowering.opb/OpbTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
+    final val literals // com.eignex.klause.lowering.opb/OpbTerm.literals|{}literals[0]
+        final fun <get-literals>(): kotlin/IntArray // com.eignex.klause.lowering.opb/OpbTerm.literals.<get-literals>|<get-literals>(){}[0]
+
+    final fun component1(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.lowering.opb/OpbTerm.component1|component1(){}[0]
+    final fun component2(): kotlin/IntArray // com.eignex.klause.lowering.opb/OpbTerm.component2|component2(){}[0]
+    final fun copy(com.ionspin.kotlin.bignum.integer/BigInteger = ..., kotlin/IntArray = ...): com.eignex.klause.lowering.opb/OpbTerm // com.eignex.klause.lowering.opb/OpbTerm.copy|copy(com.ionspin.kotlin.bignum.integer.BigInteger;kotlin.IntArray){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbTerm.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbTerm.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbTerm.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.lowering/FloatBucketing { // com.eignex.klause.lowering/FloatBucketing|null[0]
@@ -10555,8 +10654,8 @@ final object com.eignex.klause.formats.mps/Mps { // com.eignex.klause.formats.mp
 }
 
 final object com.eignex.klause.formats.opb/Opb { // com.eignex.klause.formats.opb/Opb|null[0]
-    final fun parse(com.eignex.klause.util/CharSource): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/Opb.parse|parse(com.eignex.klause.util.CharSource){}[0]
-    final fun parse(kotlin/String): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/Opb.parse|parse(kotlin.String){}[0]
+    final fun parse(com.eignex.klause.util/CharSource): com.eignex.klause.lowering.opb/OpbDocument // com.eignex.klause.formats.opb/Opb.parse|parse(com.eignex.klause.util.CharSource){}[0]
+    final fun parse(kotlin/String): com.eignex.klause.lowering.opb/OpbDocument // com.eignex.klause.formats.opb/Opb.parse|parse(kotlin.String){}[0]
 }
 
 final object com.eignex.klause.formats.smtlib/SmtLib { // com.eignex.klause.formats.smtlib/SmtLib|null[0]
@@ -10758,6 +10857,7 @@ final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@co
 
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
 final fun (com.eignex.klause.lowering.mps/MpsModel).com.eignex.klause.lowering.mps/toProblem(): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/toProblem|toProblem@com.eignex.klause.lowering.mps.MpsModel(){}[0]
+final fun (com.eignex.klause.lowering.opb/OpbDocument).com.eignex.klause.lowering.opb/toProblem(): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/toProblem|toProblem@com.eignex.klause.lowering.opb.OpbDocument(){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/and(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/and|and@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/iff(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/iff|iff@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/implies(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/implies|implies@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
