@@ -231,7 +231,11 @@ internal object PortfolioComposition {
         nodeBudget: NodeBudget?,
     ): List<WorkerConfig> {
         if (btPool != null) {
-            return List(count) { BacktrackWorkerConfig(btPool[it % btPool.size]().spending(nodeBudget)) }
+            // The `--lp` ceiling bounds the pool, and an injected pool is still the pool: capping only the
+            // curated one leaves `--lp` silently ignored whenever the caller names its arms.
+            return List(count) {
+                BacktrackWorkerConfig(btPool[it % btPool.size]().capLp(lpCeiling).spending(nodeBudget))
+            }
         }
         val base = BacktrackWorkerConfig.diverse(kind, count, lpCeiling, nodeBudget)
         if (annotationArm == null || count < 2) return base
