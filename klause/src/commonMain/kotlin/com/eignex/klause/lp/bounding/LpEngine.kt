@@ -248,9 +248,10 @@ internal class LpEngine(
     // `min(fraction × budget, cap)` of it before search; if it hits that while still under the ladder's
     // warmup and not having pruned, per-node LP is disabled and the arm runs as a bare combinatorial
     // search. A cheap LP reaches the warmup first and is left to the ladder. See [LpWallBreaker].
-    private val lpWallBreaker = LpWallBreaker(
-        budgetMillis = params.solveBudgetMillis?.takeIf { params.lpPlan.lpWallBudgetFraction > 0.0 }
-            ?.let { minOf((it * params.lpPlan.lpWallBudgetFraction).toLong(), params.lpPlan.lpWallBudgetMillis) } ?: 0L,
+    private val lpWallBreaker = LpEffortGovernor(
+        opsPerNodeCap = params.lpPlan.boundMaxOpsPerNode,
+        wallBackstopMillis = params.solveBudgetMillis?.takeIf { params.lpPlan.lpWallBudgetFraction > 0.0 }
+            ?.let { (it * params.lpPlan.lpWallBudgetFraction).toLong() } ?: 0L,
         warmupSolves = LpEffortLadder.DEFAULT_WARMUP,
     )
 
@@ -273,8 +274,26 @@ internal class LpEngine(
     /** Whether the adaptive work budget is running; also gates the degeneracy count it needs. */
     internal val adaptiveWork: Boolean get() = params.lpPlan.boundAdaptiveWork
 
-    /** Work this node's LP may spend, or 0 when the adaptive budget is off. */
-    internal fun nodeWorkBudget(): Long = if (adaptiveWork) lpWorkBudget.ops() else 0L
+    /**
+     * Work this node's LP may spend, or 0 when the adaptive budget is off.
+     *
+     * A demoted LP drops to the floor rather than off. It still bounds, and with a persistent basis its
+     * solves still advance the next one — so there is nothing to gain from silencing it entirely that a
+     * floor does not already get.
+     */
+    internal fun nodeWorkBudget(): Long = when {
+        !adaptiveWork -> 0L
+        lpWallBreaker.isDemoted -> MIN_NODE_WORK_OPS
+        else -> lpWorkBudget.ops()
+    }
+
+    // Work the current node's LP has charged, across its base, cut-augmented and recovery solves.
+    private var pendingSolveOps = 0L
+
+    /** Add one solve's work to the current node's total. */
+    internal fun noteSolveOps(ops: Long) {
+        pendingSolveOps += ops
+    }
 
     /** Feed one solve's outcome back into the work budget. */
     internal fun observeNodeWork(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, rows: Int) {
@@ -300,7 +319,7 @@ internal class LpEngine(
     /** Charge the one-shot pre-search root LP work's wall time against the shared LP wall budget,
      *  so root and per-node solves compete for the same fraction of the deadline. Called once, after the
      *  root work, by [com.eignex.klause.backtrack.ResumableMinimize]. Root work never counts as a prune. */
-    fun chargeRootLpWall(millis: Long) = lpWallBreaker.charge(millis, pruned = false)
+    fun chargeRootLpWall(millis: Long) = lpWallBreaker.chargeWall(millis)
 
     // Adaptive LP effort ladder: the emphasis sets the ceiling
     // rung (cuts when enabled, else the bare bound), and a rolling prune-rate window descends one rung
@@ -586,9 +605,7 @@ internal class LpEngine(
             // adaptive shedding (breaker, ladder, depth/cadence) does not apply to it.
             val essential = params.lpPlan.realResidual && !residualOversized
             if (params.lpPlan.realResidual && residualOversized) return false
-            // Wall-clock breaker: an expensive LP the ladder can't shed in time is shut off here,
-            // before the ladder, so the search runs as a bare combinatorial arm.
-            if (lpWallBreaker.isTripped && !essential) return false
+            lpWallBreaker.observeNode()
             if (!essential && (
                     session.decisionLevel > params.lpPlan.boundMaxDepth ||
                         ++lpCheckCounter % params.lpPlan.boundEvery != 0 ||
@@ -621,8 +638,12 @@ internal class LpEngine(
                 warm = warm,
                 cutsAllowed = cutsAllowed,
             )
-            // Charge this solve's wall time; a prune (or reaching the ladder's warmup) spares the LP.
-            solveStart?.let { lpWallBreaker.charge(it.elapsedNow().inWholeMilliseconds, outcome.prune) }
+            // Deterministic first: what this node's LP actually cost, against the nodes explored. The
+            // clock is charged separately and only as a backstop for cost the meter cannot see.
+            lpWallBreaker.observeSolve(pendingSolveOps, outcome.prune)
+            pendingSolveOps = 0L
+            solveStart?.let { lpWallBreaker.chargeWall(it.elapsedNow().inWholeMilliseconds) }
+            if (lpWallBreaker.backstopFired) sink.lp.observeWallBackstop()
             lpPivotBudget.observe(pruned = outcome.prune, couldPrune = effectiveBound.isFinite())
             if (outcome.basis != null) {
                 while (lpBasisByDepth.size <= depth) lpBasisByDepth.add(null)

@@ -53,6 +53,9 @@ data class LpStats(
     /** Sparse LU factorizations built across all node LP solves. While each node constructs its own
      *  engine the floor is one per solve, so this measures what carrying one across nodes would save. */
     val refactorizations: SumResult = ZERO_COUNT,
+    /** Whether the wall-clock backstop demoted the node LP — the one policy input that is not
+     *  deterministic, so a run whose counters do not reproduce is explained by this being set. */
+    val wallBackstop: Boolean = false,
     /** Certified LP solves whose model decomposed into column components (`lp-component-split`); the
      *  denominator for judging the split is [solves] on the paths that carry a sink. */
     val componentSplits: SumResult = ZERO_COUNT,
@@ -76,6 +79,7 @@ data class LpStats(
         backjumps = SumResult(backjumps.sum + o.backjumps.sum),
         seeded = SumResult(seeded.sum + o.seeded.sum),
         refactorizations = SumResult(refactorizations.sum + o.refactorizations.sum),
+        wallBackstop = wallBackstop || o.wallBackstop,
         componentSplits = SumResult(componentSplits.sum + o.componentSplits.sum),
         componentBlocks = MaxResult(maxOf(componentBlocks.max, o.componentBlocks.max)),
     )
@@ -103,6 +107,7 @@ internal class LpStatsSink {
     // A running total, not a [CountStat]: that counts observations and ignores their magnitude, which is
     // how the other counters record units (a unit update repeated). Work is a magnitude per solve.
     private var workOpsTotal: Long = 0L
+    private var wallBackstop = false
     private var clock: TimeMark? = null
 
     /** One node LP-bounding pass that built and solved a relaxation (the rate denominator). */
@@ -151,6 +156,11 @@ internal class LpStatsSink {
 
     /** Record one node LP solve's deterministic work. Accumulated in a single update: the figure runs
      *  to millions of operations, so a per-unit loop would cost more than the solve it measures. */
+    /** Record that the wall-clock backstop, not the deterministic work rule, demoted the LP. */
+    fun observeWallBackstop() {
+        wallBackstop = true
+    }
+
     fun observeWork(ops: Long) {
         if (ops > 0L) workOpsTotal += ops
     }
@@ -200,6 +210,7 @@ internal class LpStatsSink {
         fixed = fixed.read(),
         pivots = pivots.read(),
         workOps = SumResult(workOpsTotal.toDouble()),
+        wallBackstop = wallBackstop,
         luMaxFill = luMaxFill.read(),
         luMaxDensity = luMaxDensity.read(),
         cuts = cuts.read(),
