@@ -7,10 +7,13 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.GlobalCardinality
+import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.LexLess
 import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
@@ -22,8 +25,8 @@ import com.eignex.klause.lowering.allDifferentWindow
 import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.tseitinOr
+import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.MutableLongIntMap
 
 // XCSP3 global-constraint family emitters (allDifferent excepted).
 
@@ -751,6 +754,25 @@ internal fun Xcsp3.Builder.instantiation(e: XmlElement) {
     vars.forEachIndexed { i, v -> factors.add(Linear(intArrayOf(1), intArrayOf(v), LinearOp.EQ, vals[i])) }
 }
 
+/**
+ * The [Increasing] chain an `ordered` relation states, or null when the relation is not a chain.
+ *
+ * `relOp` encodes the row as `x[i] − x[i+1] ⟨op⟩ delta`, so `le`/`lt` ascend and `ge`/`gt` descend —
+ * the descending pair is the ascending chain over the reversed sequence. `eq` and `ne` are not chains.
+ */
+private fun orderedChain(vars: IntArray, op: LinearOp, delta: Int): Increasing? {
+    if (vars.size < 2) return null
+    return when {
+        op == LinearOp.LE && delta == 0 -> Increasing(vars, strict = false)
+        op == LinearOp.LE && delta == -1 -> Increasing(vars, strict = true)
+        op == LinearOp.GE && delta == 0 -> Increasing(vars.reversedCopy(), strict = false)
+        op == LinearOp.GE && delta == 1 -> Increasing(vars.reversedCopy(), strict = true)
+        else -> null
+    }
+}
+
+private fun IntArray.reversedCopy(): IntArray = IntArray(size) { this[size - 1 - it] }
+
 /** Chain relation over consecutive list entries: `vars[i] ⟨op⟩ vars[i+1]`, or with `<lengths>`,
  *  `vars[i] + length[i] ⟨op⟩ vars[i+1]` (one length per gap; constants or variables). */
 internal fun Xcsp3.Builder.ordered(e: XmlElement) {
@@ -759,6 +781,14 @@ internal fun Xcsp3.Builder.ordered(e: XmlElement) {
     val (op, delta) = relOp(opText) ?: throw UnsupportedXcsp3Exception("ordered operator '$opText'")
     val lengthsEl = e.child("lengths")
     if (lengthsEl == null) {
+        // The source names a chain, so post the chain: [Increasing] reads prefix minima and suffix
+        // maxima across the whole sequence, where the pairwise rows each see two variables and cannot
+        // reach past their neighbour. A descending operator is the same chain read backwards.
+        val chain = orderedChain(vars, op, delta)
+        if (chain != null) {
+            factors.add(chain)
+            return
+        }
         for (i in 0 until vars.size - 1) {
             factors.add(Linear(intArrayOf(1, -1), intArrayOf(vars[i], vars[i + 1]), op, delta))
         }
@@ -980,22 +1010,11 @@ internal fun Xcsp3.Builder.precedence(e: XmlElement) {
     val values = parseInts(e.child("values")?.textContent)
         ?: vars.flatMap { domainValues(it) }.distinct().sorted().toIntArray()
     if (values.size < 2) return
-    val eqLits = MutableLongIntMap()
-    fun eqLit(j: Int, v: Int): Int {
-        val key = j.toLong() shl 32 or (v.toLong() and 0xffffffffL)
-        val existing = eqLits.getOrDefault(key, Int.MIN_VALUE)
-        if (existing != Int.MIN_VALUE) return existing
-        return reifyLinear(intArrayOf(1), intArrayOf(vars[j]), LinearOp.EQ, v).also { eqLits.put(key, it) }
-    }
+    // The source names the precedence, so post it: [ValuePrecede] scans the sequence for the first
+    // occurrence of either value, where the clause encoding needs a reified equality per (position,
+    // value) and a clause per position — quadratic in the sequence, and each clause sees one position.
     for (i in 0 until values.size - 1) {
-        val s = values[i]
-        val t = values[i + 1]
-        factors.add(Clause(intArrayOf(Lit.negate(eqLit(0, t))))) // t may not occupy position 0
-        for (j in 1 until vars.size) {
-            // x[j] = t ⇒ some earlier variable equals s
-            val clause = IntArray(j + 1) { if (it == 0) Lit.negate(eqLit(j, t)) else eqLit(it - 1, s) }
-            factors.add(Clause(clause))
-        }
+        factors.add(ValuePrecede(values[i].toLong(), values[i + 1].toLong(), vars))
     }
 }
 
@@ -1041,6 +1060,24 @@ internal fun Xcsp3.Builder.noOverlapMulti(e: XmlElement, originsText: String) {
     require(origins.all { it.size == nDim } && lengths.all { it.size == nDim }) {
         "noOverlap: inconsistent box dimensionality"
     }
+    if (nDim == 2) {
+        // The source names rectangles, so post [Diffn]: it reasons over both axes together, where the
+        // clause form reifies four separations per box pair and each clause sees only that pair.
+        // `zeroIgnored="false"` is rejected above, so the remaining semantics is Diffn's [nonStrict].
+        factors.add(
+            Diffn(
+                xs = IntArray(origins.size) { origins[it][0] },
+                ys = IntArray(origins.size) { origins[it][1] },
+                widths = EmptyLongArray,
+                heights = EmptyLongArray,
+                widthVars = IntArray(lengths.size) { lengths[it][0] },
+                heightVars = IntArray(lengths.size) { lengths[it][1] },
+                nonStrict = true,
+            ),
+        )
+        return
+    }
+    // Past two dimensions there is no k-D global to post, so the pairwise separation stands.
     for (i in origins.indices) {
         for (j in i + 1 until origins.size) {
             val seps = ArrayList<Int>(2 * nDim)
