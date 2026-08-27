@@ -53,9 +53,13 @@ interface ResumableSearch : AutoCloseable {
      *
      * A slice measured in nodes is reproducible: the same invocation pauses at the same point in the
      * same tree, so the counters a run reports do not depend on how loaded the machine was. A slice
-     * measured in milliseconds cannot be — it lands somewhere different every time, and every statistic
-     * downstream of the search inherits that. [sliceMillis] still applies as the outer bound, so a
-     * node budget that turns out to be enormous cannot overrun the deadline.
+     * measured in milliseconds cannot be: it lands somewhere different every time, and every statistic
+     * downstream of the search inherits that.
+     *
+     * When a node budget is armed it is the *only* bound on the slice — leaving [sliceMillis] as an outer
+     * bound would defeat the purpose, since the pause point goes back to being a function of machine
+     * speed whenever the clock binds first. [global] still carries the whole-solve deadline, so nothing
+     * can overrun it.
      */
     fun runSlice(
         global: Cancellation,

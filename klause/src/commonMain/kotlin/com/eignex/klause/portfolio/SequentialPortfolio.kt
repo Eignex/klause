@@ -68,8 +68,8 @@ class SequentialPortfolio(
      *
      * A slice measured in nodes pauses at the same point in the same tree on every run, so the counters
      * a solve reports do not depend on machine load; a slice measured in milliseconds lands somewhere
-     * different each time, and every statistic downstream of the search inherits that. The millisecond
-     * bounds still apply on top, so this cannot overrun a deadline.
+     * different each time, and every statistic downstream of the search inherits that. The whole-solve
+     * deadline still applies, so this cannot overrun it.
      *
      * Off by default: it changes how work is apportioned between arms, which is the portfolio's whole
      * job, and that trade has not been measured. Turn it on to compare runs.

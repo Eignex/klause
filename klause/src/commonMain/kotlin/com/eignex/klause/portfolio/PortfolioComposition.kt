@@ -97,6 +97,15 @@ data class PortfolioScenario(
     val clauseShareMaxLbd: Int = 6,
     /** Length bound of the cross-arm glue-clause exchange filter; see [clauseShareMaxLbd]. */
     val clauseShareMaxLen: Int = 12,
+    /**
+     * Nodes a sequential-portfolio segment may explore, or `0` to bound segments by the clock.
+     *
+     * A segment bounded by time pauses somewhere different on every run, so no counter a solve reports
+     * is comparable between two invocations of the same model — the search itself diverges. Bounding it
+     * by nodes makes a segment a function of the model and the seed alone. The whole-solve deadline still
+     * applies, so this cannot overrun it.
+     */
+    val sliceNodes: Long = 0L,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build
      *  their own [BacktrackParams] instead of drawing a [BacktrackRecipe] from a pool. Editing the pools
