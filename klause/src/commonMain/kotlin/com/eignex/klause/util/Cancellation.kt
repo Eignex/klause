@@ -99,7 +99,7 @@ fun interface Cancellation {
 
         /**
          * Cancel after [duration] has elapsed from this call. Backed by KMP-safe
-         * [TimeSource.Monotonic], so it works on JVM, JS, Native, and Wasm without
+         * [TimeSource.Monotonic], so it works on both JVM and Native without
          * a clock-source per platform. The deadline is captured eagerly here; calling
          * this twice yields two independent tokens.
          */

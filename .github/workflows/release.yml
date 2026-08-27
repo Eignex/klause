@@ -80,19 +80,6 @@ jobs:
             echo "IS_SNAPSHOT=false" >> "$GITHUB_ENV"
           fi
 
-      # The full matrix runs the browser tests, so pin Chrome and enable its sandbox; the
-      # runner image's own Chrome drifts with image rollouts.
-      - name: Set up pinned Chrome for Testing
-        if: env.IS_SNAPSHOT == 'false'
-        id: chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: 148.0.7778.178
-
-      - name: Allow Chrome's sandbox (Ubuntu 24.04 userns restriction)
-        if: env.IS_SNAPSHOT == 'false'
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-
       - name: Assemble
         if: env.IS_SNAPSHOT == 'false'
         run: ./gradlew assemble -Ptargets.full -PciVersion=${{ env.RELEASE_VERSION }}
@@ -100,8 +87,6 @@ jobs:
       - name: Build and Test
         if: env.IS_SNAPSHOT == 'false'
         run: ./gradlew build -Ptargets.full -PciVersion=${{ env.RELEASE_VERSION }} --max-workers=2
-        env:
-          CHROME_BIN: ${{ steps.chrome.outputs.chrome-path }}
 
       - name: Upload test reports
         if: always() && env.IS_SNAPSHOT == 'false'

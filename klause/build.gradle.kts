@@ -1,8 +1,3 @@
-@file:OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-
 plugins {
     id("com.eignex.kmp") version "1.3.1"
     kotlin("plugin.serialization")
@@ -13,46 +8,21 @@ eignexPublish {
     githubRepo.set("Eignex/klause")
 }
 
+// Klause is published for the JVM and the Kotlin/Native compute hosts it ships a CLI for; those are
+// the platforms where a solver's startup time and thread use are the point. JavaScript, Wasm, Windows
+// Native and Apple mobile are not published.
+//
 // Default is host-only (jvm + linuxX64): the targets whose tests run on the linux runner, so
 // local `./gradlew build`/`check` and PR/main CI stay fast and mirror each other. Only the
 // release does the full sweep — it opts in via -Ptargets.full.
 val fullTargets = providers.gradleProperty("targets.full").isPresent
 
 kotlin {
-    // The parallel Portfolio needs real threads, which commonMain (shared with the single-threaded
-    // js/wasm targets) has none of. A `jvmAndNative` hierarchy group gives it a first-class
-    // intermediate source set (`jvmAndNativeMain`) shared by jvm + every native target — and, unlike
-    // a hand-created source set, one published as a consumable metadata variant so downstream KMP
-    // modules (klause-cli's native targets) resolve it. js/wasm get only SequentialPortfolio.
-    applyDefaultHierarchyTemplate {
-        common {
-            group("jvmAndNative") {
-                withJvm()
-                // Re-home the standard `native` group under jvmAndNative so the shared `nativeMain`
-                // source set (the native parallelRun/parallelStream actuals) sees the expects there.
-                group("native") { withNative() }
-            }
-        }
-    }
-
     jvm()
     linuxX64()
     if (fullTargets) {
-        // Solver tests are compute-heavy; Mocha's default 2s timeout is far too tight for
-        // the single-threaded JS/wasm targets. Tests must also avoid multi-second busy
-        // loops — ChromeHeadless kills the page.
-        js {
-            browser { testTask { useMocha { timeout = "120s" } } }
-            nodejs { testTask { useMocha { timeout = "120s" } } }
-        }
-        wasmJs {
-            browser { testTask { useMocha { timeout = "120s" } } }
-            nodejs { testTask { useMocha { timeout = "120s" } } }
-        }
-        wasmWasi { nodejs { testTask { useMocha { timeout = "120s" } } } }
         linuxArm64()
-        macosArm64(); mingwX64()
-        iosX64(); iosArm64(); iosSimulatorArm64()
+        macosArm64()
     }
 
     sourceSets {

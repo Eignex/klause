@@ -20,8 +20,7 @@ import kotlin.time.TimeSource
  * single-threaded engine carrying its *own* params, so a portfolio may be **heterogeneous** —
  * local search and backtrack workers in the same race.
  *
- * Lives in `jvmAndNativeMain`: it needs real threads, which the single-threaded js/wasm targets
- * lack — those use only [SequentialPortfolio] from `commonMain`.
+ * Needs real threads, so a one-core scenario takes [SequentialPortfolio] instead.
  *
  * Cancellation is wired through each worker's params:
  *  - `solve`: once any worker reports Sat/Unsat the flag is set and the others stop at their next poll;
