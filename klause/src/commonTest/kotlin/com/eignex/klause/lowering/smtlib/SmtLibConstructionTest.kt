@@ -1,8 +1,7 @@
 package com.eignex.klause.lowering.smtlib
 
-import com.eignex.klause.formats.smtlib.*
-
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.ir.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
