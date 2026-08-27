@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.intdomain
+package com.eignex.klause.ir.intdomain
 
 import com.eignex.klause.solver.values
 import kotlin.test.Test
