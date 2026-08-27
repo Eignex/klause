@@ -6,9 +6,9 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -120,7 +120,9 @@ class EngineParamsPortfolioScenarioTest {
 
     @Test
     fun `portfolio planning preserves local search dry run without constructing workers`() {
-        val dryRun = assertIs<PortfolioPlan.LocalSearchDryRun>(plan(FiniteEngine.LOCAL_SEARCH, listOf("dry-run-solver=on")))
+        val dryRun = assertIs<PortfolioPlan.LocalSearchDryRun>(
+            plan(FiniteEngine.LOCAL_SEARCH, listOf("dry-run-solver=on")),
+        )
 
         assertNull(dryRun.pool, "the unchanged curated catalog is rendered by the frontend")
     }
