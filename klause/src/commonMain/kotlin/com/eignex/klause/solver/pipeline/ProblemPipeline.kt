@@ -38,10 +38,16 @@ enum class ProblemPipeline {
 /** A source model prepared for the finite or complete open-theory pipeline. */
 sealed interface SourceProblemRoute {
     /** A fully bounded source model materialized for finite-domain search. */
-    data class Finite(val problem: Problem) : SourceProblemRoute
+    data class Finite(
+        /** The materialized finite-domain model. */
+        val problem: Problem,
+    ) : SourceProblemRoute
 
     /** A supported open source model with its selected theory request. */
-    data class OpenTheory(val request: OpenTheoryRequest) : SourceProblemRoute
+    data class OpenTheory(
+        /** The complete open-theory request. */
+        val request: OpenTheoryRequest,
+    ) : SourceProblemRoute
 
     /** An open source model for which no complete route exists. */
     data object UnsupportedOpen : SourceProblemRoute
