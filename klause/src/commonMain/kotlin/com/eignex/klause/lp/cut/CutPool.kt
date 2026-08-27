@@ -9,9 +9,8 @@ import kotlin.math.sqrt
 /**
  * An activity-managed pool of globally-valid cuts. Cuts are added with deduplication by
  * [Cut.key]; a hard [maxCuts] cap bounds the per-node LP cost the pool imposes once its cuts are folded
- * into every node's relaxation. When the cap is exceeded the least-active cuts are evicted, where
- * activity is tightness at the LP optimum — the cut-management signal: a cut the LP point sits
- * on shapes the relaxation face, while a slack cut is dead weight on every solve.
+ * into every node's relaxation. [observe] accumulates decayed tightness and removes a cut after the
+ * configured consecutive inactive observations; [retainMostActive] then applies the hard cap.
  *
  * Eviction is sound: every pooled cut is valid at every solution ([Cut.global]), so dropping one only
  * loosens the relaxation — it never removes a feasible point. The pool replaces the unbounded
@@ -19,9 +18,14 @@ import kotlin.math.sqrt
  * cuts for zero prunes). Below the cap the pool preserves insertion order, so it is behaviour-neutral
  * on a harvest that never overflows.
  */
-internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
+internal class CutPool(
+    val maxCuts: Int = DEFAULT_MAX_CUTS,
+    private val maxConsecutiveInactive: Int = DEFAULT_MAX_CONSECUTIVE_INACTIVE,
+) {
     private val seen = HashSet<String>()
-    private val entries = ArrayList<Cut>()
+    private val entries = ArrayList<Entry>()
+
+    private class Entry(val cut: Cut, var activity: Double = 0.0, var inactiveCount: Int = 0)
 
     /** Number of pooled cuts. */
     val size: Int get() = entries.size
@@ -29,7 +33,7 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
     /** Add [cut] unless an equal one (by [Cut.key]) is already pooled; returns true if newly added. */
     fun add(cut: Cut): Boolean {
         if (!seen.add(cut.key())) return false
-        entries.add(cut)
+        entries.add(Entry(cut))
         return true
     }
 
@@ -41,21 +45,35 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
     }
 
     /** The pooled cuts, in insertion order (after any [retainMostActive] eviction). */
-    fun cuts(): List<Cut> = entries
+    fun cuts(): List<Cut> = entries.map { it.cut }
 
-    /**
-     * Evict the least-active cuts until at most [maxCuts] remain, ranking by tightness at the LP point
-     * [primal] (per structural column): a cut's slack `|rhs − Σ coeffs·primal|` measures how far the
-     * point sits inside it, so ascending slack is most-active-first. Ties keep insertion order (the
-     * sort is stable). A no-op when the pool is within the cap, so it leaves a non-overflowing harvest
-     * untouched. Sound — the evicted cuts are globally valid, so dropping them only loosens the bound.
-     */
-    fun retainMostActive(primal: DoubleArray) {
+    /** Observe one solved LP point, update decayed tightness, and expire cuts inactive for too long. */
+    fun observe(primal: DoubleArray) {
+        for (entry in entries) {
+            val active = slack(entry.cut, primal) <= ACTIVE_TOLERANCE
+            entry.activity *= ACTIVITY_DECAY
+            if (active) {
+                entry.activity += 1.0
+                entry.inactiveCount = 0
+            } else {
+                entry.inactiveCount++
+            }
+        }
+        entries.removeAll { it.inactiveCount >= maxConsecutiveInactive }
+        rebuildSeen()
+    }
+
+    /** Enforce [maxCuts], keeping highest decayed activity with insertion order breaking ties. */
+    fun retainMostActive() {
         if (entries.size <= maxCuts) return
-        entries.sortBy { slack(it, primal) }
+        entries.sortByDescending { it.activity }
         while (entries.size > maxCuts) entries.removeAt(entries.size - 1)
+        rebuildSeen()
+    }
+
+    private fun rebuildSeen() {
         seen.clear()
-        for (c in entries) seen.add(c.key())
+        for (entry in entries) seen.add(entry.cut.key())
     }
 
     /** Distance of the LP [primal] point from cut tightness — 0 when the point sits on the cut. */
@@ -70,8 +88,9 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
 
     /**
      * Select up to [max] pooled cuts to add to the LP at the current point [primal]: rank by
-     * **efficacy** (the normalised violation
-     * `violation / ‖coeffs‖₂` — how deeply the point cuts past the inequality) and add greedily,
+     * **efficacy plus objective parallelism**: the normalised violation
+     * `violation / ‖coeffs‖₂` is added to the absolute cosine with the objective direction, following
+     * CP-SAT's linear-constraint-manager policy. Candidates are then added greedily,
      * skipping a candidate that is near-parallel to one already chosen (an **orthogonality** filter on
      * the cosine of their coefficient vectors). A cut the point already satisfies (efficacy below
      * [minEfficacy]) is dropped — adding it would not move the bound. The returned cuts are a subset of
@@ -79,21 +98,27 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
      * removes a feasible point. Insertion order breaks ties (the efficacy sort is stable).
      *
      * @param primal the current LP point cuts are scored against.
+     * @param objective the LP objective direction used for parallelism scoring.
      * @param max the maximum number of cuts to return.
      * @param minEfficacy reject cuts whose normalised violation is below this.
      * @param minOrthogonality require each added cut's cosine-to-nearest-selected `≤ 1 − this`.
      */
     fun select(
         primal: DoubleArray,
+        objective: DoubleArray,
         max: Int,
         minEfficacy: Double = MIN_EFFICACY,
         minOrthogonality: Double = MIN_ORTHOGONALITY,
     ): List<Cut> {
         if (max <= 0) return emptyList()
-        val scored = entries
-            .map { it to efficacy(it, primal) }
-            .filter { it.second >= minEfficacy }
-            .sortedByDescending { it.second }
+        val scored = entries.mapNotNull { entry ->
+            val efficacy = efficacy(entry.cut, primal)
+            if (efficacy < minEfficacy) {
+                null
+            } else {
+                entry.cut to (efficacy + objectiveParallelism(entry.cut, objective))
+            }
+        }.sortedByDescending { it.second }
         val selected = ArrayList<Cut>()
         val maxCos = 1.0 - minOrthogonality
         for ((cut, _) in scored) {
@@ -101,6 +126,19 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
             if (selected.none { cosine(it, cut) > maxCos }) selected.add(cut)
         }
         return selected
+    }
+
+    private fun objectiveParallelism(cut: Cut, objective: DoubleArray): Double {
+        val cutNorm = l2(cut)
+        var objectiveNormSquared = 0.0
+        for (coefficient in objective) objectiveNormSquared += coefficient * coefficient
+        if (cutNorm == 0.0 || objectiveNormSquared == 0.0) return 0.0
+        var dot = 0.0
+        for (k in cut.cols.indices) {
+            val col = cut.cols[k]
+            if (col in objective.indices) dot += cut.coeffs[k].toDouble() * objective[col]
+        }
+        return abs(dot) / (cutNorm * sqrt(objectiveNormSquared))
     }
 
     /** Normalised violation of [cut] at [primal] — `violation / ‖coeffs‖₂`, `0` when satisfied. The
@@ -164,5 +202,13 @@ internal class CutPool(val maxCuts: Int = DEFAULT_MAX_CUTS) {
         /** Minimum orthogonality for [select]: an added cut's cosine to any already-selected cut must
          *  be at most `1 − this`, so near-duplicate faces are not piled onto the LP. */
         const val MIN_ORTHOGONALITY: Double = 0.05
+
+        /** CP-SAT's `cut_active_count_decay`, expressed as a bounded decayed activity accumulator. */
+        const val ACTIVITY_DECAY: Double = 0.8
+
+        /** CP-SAT's default `max_consecutive_inactive_count`. */
+        const val DEFAULT_MAX_CONSECUTIVE_INACTIVE: Int = 100
+
+        const val ACTIVE_TOLERANCE: Double = 1e-6
     }
 }

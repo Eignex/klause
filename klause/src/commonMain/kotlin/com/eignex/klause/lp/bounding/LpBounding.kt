@@ -225,7 +225,9 @@ private fun LpEngine.foldSelectedCuts(
     sink: SolveStatsSink,
 ): Pair<LpRelaxation, FloatLpResult> {
     if (cutPool.size == 0) return base to res
-    val selected = cutPool.select(res.primal, cutPool.maxCuts)
+    cutPool.observe(res.primal)
+    cutPool.retainMostActive()
+    val selected = cutPool.select(res.primal, objectiveCoefficients(base.model), cutPool.maxCuts)
     if (selected.isEmpty()) return base to res
     val tightened = try {
         relaxer.build(session, selected)
@@ -423,7 +425,10 @@ internal fun LpEngine.sparseSafePrune(
             recordSearchCuts(fresh, boundRes.primal) // persist the global cuts into the pool
             for (c in fresh) if (!c.global) localCuts.add(c)
             val tightened = try {
-                relaxer.build(session, cutPool.select(boundRes.primal, cutPool.maxCuts) + localCuts)
+                relaxer.build(
+                    session,
+                    cutPool.select(boundRes.primal, objectiveCoefficients(boundRel.model), cutPool.maxCuts) + localCuts,
+                )
             } catch (_: LpOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
@@ -742,6 +747,7 @@ internal fun LpEngine.harvestRootCuts(
         var result = simplex.solve() ?: return emptyList()
         var round = 0
         while (round++ < CUT_POOL_ROUNDS && !cancellation()) {
+            pool.observe(result.primal)
             val ctx = CutContext(problem, relaxation, result.primal, session)
             // Structural separators read the LP point and factor structure (not the constraint rows), so a
             // cut they separate over the undecided root is valid at every solution — force it global.
@@ -759,7 +765,7 @@ internal fun LpEngine.harvestRootCuts(
         }
         // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
         // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
-        pool.retainMostActive(result.primal)
+        pool.retainMostActive()
     } catch (_: LpOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     }
@@ -768,6 +774,8 @@ internal fun LpEngine.harvestRootCuts(
 
 /** Most Gomory cuts to draw from one tableau per separation round. */
 internal const val GOMORY_CUTS_PER_ROUND: Int = 8
+
+private fun objectiveCoefficients(model: LpModel): DoubleArray = DoubleArray(model.n) { model.costD(it) }
 
 /** Separation rounds when harvesting the persistent root cut pool. */
 internal const val CUT_POOL_ROUNDS: Int = 8

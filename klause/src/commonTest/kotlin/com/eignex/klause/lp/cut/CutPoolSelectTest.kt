@@ -22,7 +22,7 @@ class CutPoolSelectTest {
         // At x0 = 0.5: violated `x0 >= 1` (eff 0.5), satisfied `x0 <= 1`.
         pool.add(cut(Relation.GE, 1, 0 to 1L))
         pool.add(cut(Relation.LE, 1, 0 to 1L))
-        val sel = pool.select(doubleArrayOf(0.5), max = 10)
+        val sel = pool.select(doubleArrayOf(0.5), doubleArrayOf(0.0), max = 10)
         assertEquals(1, sel.size)
         assertEquals(Relation.GE, sel[0].rel)
     }
@@ -36,7 +36,7 @@ class CutPoolSelectTest {
         pool.add(weak)
         pool.add(strong)
         pool.add(parallelToStrong)
-        val sel = pool.select(doubleArrayOf(0.0, 0.0), max = 10)
+        val sel = pool.select(doubleArrayOf(0.0, 0.0), doubleArrayOf(0.0, 0.0), max = 10)
         // strong first (highest efficacy); parallelToStrong dropped (cosine 1 with strong); weak kept (orthogonal).
         assertEquals(2, sel.size)
         assertTrue(sel[0] === strong, "highest-efficacy cut comes first")
@@ -45,11 +45,36 @@ class CutPoolSelectTest {
     }
 
     @Test
+    fun `select prefers a cut parallel to the objective when efficacy ties`() {
+        val pool = CutPool()
+        val orthogonal = cut(Relation.GE, 2, 0 to 1L)
+        val parallel = cut(Relation.GE, 2, 1 to 1L)
+        pool.add(orthogonal)
+        pool.add(parallel)
+
+        val selected = pool.select(DoubleArray(2), doubleArrayOf(0.0, 1.0), max = 1)
+
+        assertTrue(selected.single() === parallel)
+    }
+
+    @Test
+    fun `select handles a zero objective without a nonfinite score`() {
+        val pool = CutPool()
+        val first = cut(Relation.GE, 1, 0 to 1L)
+        pool.add(first)
+        pool.add(cut(Relation.GE, 1, 1 to 1L))
+
+        val selected = pool.select(DoubleArray(2), DoubleArray(2), max = 1)
+
+        assertTrue(selected.single() === first)
+    }
+
+    @Test
     fun `select honours the max cap and never invents cuts`() {
         val pool = CutPool()
         val all = (0 until 6).map { cut(Relation.GE, 5, it to 1L) } // 6 orthogonal violated cuts at 0
         all.forEach { pool.add(it) }
-        val sel = pool.select(DoubleArray(6), max = 3)
+        val sel = pool.select(DoubleArray(6), DoubleArray(6), max = 3)
         assertEquals(3, sel.size)
         assertTrue(sel.all { s -> all.any { it === s } }, "every selected cut is from the pool")
     }
@@ -58,6 +83,6 @@ class CutPoolSelectTest {
     fun `select returns empty when nothing is violated`() {
         val pool = CutPool()
         pool.add(cut(Relation.LE, 10, 0 to 1L)) // x0=1 satisfies it with slack
-        assertTrue(pool.select(doubleArrayOf(1.0), max = 10).isEmpty())
+        assertTrue(pool.select(doubleArrayOf(1.0), doubleArrayOf(0.0), max = 10).isEmpty())
     }
 }
