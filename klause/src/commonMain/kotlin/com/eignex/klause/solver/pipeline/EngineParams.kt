@@ -252,11 +252,7 @@ fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParam
  *  resolved arm pool (the solver configuration) instead of solving. [forceArms], when set, pins the
  *  worker count to the pool size so **every** resolved recipe runs as its own arm — the `strategy=sweep`
  *  campaign, where the bandit must schedule the whole cross-product rather than an `autoArms` prefix. */
-class LsResolution(
-    val pool: List<() -> LocalSearchRecipe>?,
-    val dryRunSolver: Boolean,
-    val forceArms: Int? = null,
-)
+class LsResolution(val pool: List<() -> LocalSearchRecipe>?, val dryRunSolver: Boolean, val forceArms: Int? = null)
 
 private fun parseScoring(s: String): MoveScoring = when (s.lowercase()) {
     "weighted" -> MoveScoring.Weighted
@@ -424,14 +420,18 @@ fun resolveLocalSearchRecipes(p: EngineParams): LsResolution {
         pipelineConfigError("ls: arm= selects one catalog arm and is mutually exclusive with strategy=/sources=")
     }
     if (armLabel != null && armLabel !in LocalSearchCatalog.labels()) {
-        pipelineConfigError("ls: arm=`$armLabel` is not a catalog arm (have ${LocalSearchCatalog.labels().joinToString()})")
+        pipelineConfigError(
+            "ls: arm=`$armLabel` is not a catalog arm (have ${LocalSearchCatalog.labels().joinToString()})",
+        )
     }
     // `strategy=sweep` is the exploration campaign: the entire cross-product as the arm pool, with
     // forceArms pinning the worker count to it so the bandit schedules every recipe rather than an
     // autoArms prefix. It *is* the whole space, so an arm= or an axis edit would contradict it.
     if (strategyRaw == "sweep") {
         if (armLabel != null || hasEdits || sourcesSpec != null) {
-            pipelineConfigError("ls: strategy=sweep runs the full recipe cross-product and takes no arm=/sources=/axis edits")
+            pipelineConfigError(
+                "ls: strategy=sweep runs the full recipe cross-product and takes no arm=/sources=/axis edits",
+            )
         }
         val sweep = LsRecipeSweep.pool()
         return LsResolution(sweep, dryRunSolver, forceArms = sweep.size)
@@ -501,11 +501,7 @@ private val LS_TABU_BASES = setOf("cbls", "walksat", "probsat", "sa", "bare")
 /** The [provided] numeric knobs that the resolved [canonical] base + [acceptanceValues] edits can't
  *  consume (e.g. `noise` on the curated pool with no walksat acceptance). An unknown base consumes
  *  nothing here — its own factory reports the bad name. */
-fun ineffectiveNumerics(
-    canonical: String,
-    acceptanceValues: Set<String>,
-    provided: List<String>,
-): List<String> {
+fun ineffectiveNumerics(canonical: String, acceptanceValues: Set<String>, provided: List<String>): List<String> {
     if (canonical !in LS_KNOWN_BASES) return emptyList()
     val consumed = buildSet {
         if (canonical == "cbls" || canonical == "walksat" || "walksat" in acceptanceValues) add("noise")
@@ -636,7 +632,9 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? 
         val known = BacktrackCatalog.labels(kind).toSet()
         for (label in labels) {
             if (label !in known) {
-                pipelineConfigError("bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})")
+                pipelineConfigError(
+                    "bt-arm: `$label` is not a backtrack arm for this problem (have ${known.joinToString()})",
+                )
             }
         }
         return labels.map { label -> { BacktrackCatalog.byLabel(label) } }
@@ -652,13 +650,11 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? 
 const val NODE_LIMIT_KEY = "node-limit"
 
 /** [pool], or the curated pool when it is null, with every arm spending [budget]. */
-fun withNodeBudget(
-    pool: List<() -> BacktrackRecipe>?,
-    kind: Kind,
-    budget: NodeBudget,
-): List<() -> BacktrackRecipe> = (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
-    { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
-}
+fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeBudget): List<() -> BacktrackRecipe> =
+    (pool ?: BacktrackCatalog.factories(kind)).map { factory ->
+        { editRecipe(factory(), { params -> params.copy(nodeBudget = budget) }) }
+    }
+
 /** Wrap [recipe] so [edit] is applied to the [BacktrackParams] it builds — per worker, so selector
  *  state stays unshared. Preserves the arm's label for telemetry / the `dry-run-solver` listing. */
 private fun editRecipe(recipe: BacktrackRecipe, edit: (BacktrackParams) -> BacktrackParams): BacktrackRecipe =
