@@ -14,17 +14,40 @@ data class OpbDocument(
 /** One parsed OPB statement. */
 sealed interface OpbStatement {
     /** A minimisation objective. */
-    data class Objective(val terms: List<OpbTerm>) : OpbStatement
+    data class Objective(
+        /** Objective terms. */
+        val terms: List<OpbTerm>,
+    ) : OpbStatement
 
     /** A WBO soft-constraint header. */
-    data class SoftHeader(val top: Long?) : OpbStatement
+    data class SoftHeader(
+        /** Optional WBO top cost. */
+        val top: Long?,
+    ) : OpbStatement
 
     /** A hard or soft pseudo-Boolean relation. */
-    data class Constraint(val softCost: Long?, val relation: OpbRelation) : OpbStatement
+    data class Constraint(
+        /** Optional soft-constraint cost. */
+        val softCost: Long?,
+        /** Pseudo-Boolean relation. */
+        val relation: OpbRelation,
+    ) : OpbStatement
 }
 
 /** A coefficient multiplied by a conjunction of literals. */
-data class OpbTerm(val coefficient: BigInteger, val literals: IntArray)
+data class OpbTerm(
+    /** Term coefficient. */
+    val coefficient: BigInteger,
+    /** Conjoined literals. */
+    val literals: IntArray,
+)
 
 /** A pseudo-Boolean relation from an OPB source document. */
-data class OpbRelation(val terms: List<OpbTerm>, val op: PbOp, val bound: BigInteger)
+data class OpbRelation(
+    /** Left-hand terms. */
+    val terms: List<OpbTerm>,
+    /** Relation operator. */
+    val op: PbOp,
+    /** Right-hand bound. */
+    val bound: BigInteger,
+)

@@ -2437,30 +2437,12 @@ public final class com/eignex/klause/formats/mps/MpsFormatException : com/eignex
 
 public final class com/eignex/klause/formats/opb/Opb {
 	public static final field INSTANCE Lcom/eignex/klause/formats/opb/Opb;
-	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/formats/opb/OpbProblem;
-	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/formats/opb/OpbProblem;
+	public final fun parse (Lcom/eignex/klause/util/CharSource;)Lcom/eignex/klause/lowering/opb/OpbDocument;
+	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/lowering/opb/OpbDocument;
 }
 
 public final class com/eignex/klause/formats/opb/OpbFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
-}
-
-public final class com/eignex/klause/formats/opb/OpbProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
-	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun component3 ()Ljava/util/List;
-	public final fun component4 ()I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)Lcom/eignex/klause/formats/opb/OpbProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/opb/OpbProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILjava/lang/Object;)Lcom/eignex/klause/formats/opb/OpbProblem;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBoolFolds ()Ljava/util/List;
-	public final fun getNumDeclaredVars ()I
-	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public abstract interface class com/eignex/klause/formats/smtlib/SExpr {
@@ -4301,6 +4283,111 @@ public final class com/eignex/klause/lowering/mps/MpsVar {
 	public final fun getLower ()Ljava/lang/Double;
 	public final fun getName ()Ljava/lang/String;
 	public final fun getUpper ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbDecoderKt {
+	public static final fun toProblem (Lcom/eignex/klause/lowering/opb/OpbDocument;)Lcom/eignex/klause/lowering/opb/OpbProblem;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbDocument {
+	public fun <init> (ILjava/util/List;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (ILjava/util/List;)Lcom/eignex/klause/lowering/opb/OpbDocument;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbDocument;ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbDocument;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNumDeclaredVars ()I
+	public final fun getStatements ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbLoweringException : java/lang/IllegalArgumentException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/lowering/opb/OpbProblem {
+	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()I
+	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)Lcom/eignex/klause/lowering/opb/OpbProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbProblem;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBoolFolds ()Ljava/util/List;
+	public final fun getNumDeclaredVars ()I
+	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbRelation {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/model/PbOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Lcom/eignex/klause/model/PbOp;
+	public final fun component3 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/model/PbOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)Lcom/eignex/klause/lowering/opb/OpbRelation;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbRelation;Ljava/util/List;Lcom/eignex/klause/model/PbOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;ILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbRelation;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getOp ()Lcom/eignex/klause/model/PbOp;
+	public final fun getTerms ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class com/eignex/klause/lowering/opb/OpbStatement {
+}
+
+public final class com/eignex/klause/lowering/opb/OpbStatement$Constraint : com/eignex/klause/lowering/opb/OpbStatement {
+	public fun <init> (Ljava/lang/Long;Lcom/eignex/klause/lowering/opb/OpbRelation;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component2 ()Lcom/eignex/klause/lowering/opb/OpbRelation;
+	public final fun copy (Ljava/lang/Long;Lcom/eignex/klause/lowering/opb/OpbRelation;)Lcom/eignex/klause/lowering/opb/OpbStatement$Constraint;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbStatement$Constraint;Ljava/lang/Long;Lcom/eignex/klause/lowering/opb/OpbRelation;ILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbStatement$Constraint;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRelation ()Lcom/eignex/klause/lowering/opb/OpbRelation;
+	public final fun getSoftCost ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbStatement$Objective : com/eignex/klause/lowering/opb/OpbStatement {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lcom/eignex/klause/lowering/opb/OpbStatement$Objective;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbStatement$Objective;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbStatement$Objective;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTerms ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbStatement$SoftHeader : com/eignex/klause/lowering/opb/OpbStatement {
+	public fun <init> (Ljava/lang/Long;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun copy (Ljava/lang/Long;)Lcom/eignex/klause/lowering/opb/OpbStatement$SoftHeader;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbStatement$SoftHeader;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbStatement$SoftHeader;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTop ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/opb/OpbTerm {
+	public fun <init> (Lcom/ionspin/kotlin/bignum/integer/BigInteger;[I)V
+	public final fun component1 ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun component2 ()[I
+	public final fun copy (Lcom/ionspin/kotlin/bignum/integer/BigInteger;[I)Lcom/eignex/klause/lowering/opb/OpbTerm;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbTerm;Lcom/ionspin/kotlin/bignum/integer/BigInteger;[IILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbTerm;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCoefficient ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
+	public final fun getLiterals ()[I
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
