@@ -1,28 +1,26 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
 
 /**
  * The deductive contract of a constraint: propagation, watcher subscriptions, and conflict
- * explanation. Constructed by [Factor.asPropagator] and used by the CP engine
+ * explanation. Constructed by `Factor.asPropagator` and used by the CP engine
  * ([com.eignex.klause.backtrack.BacktrackSolver]) when dispatching to factors.
  *
- * See [Factor] for the full constraint contract (structural + deductive + local-search).
+ * See `Factor` for the full constraint contract (structural + deductive + local-search).
  */
 interface Propagator {
     /**
      * Deductive propagation given [state]'s current pins / domains. Pin or tighten anything
      * this factor implies; return `false` iff a contradiction is derived. Default is a no-op
-     * — sound but trivial. Factors override to participate in [Problem.propagate].
+     * — sound but trivial. Factors override to participate in `Problem.propagate`.
      */
     fun propagate(state: PropagationState, factorId: Int): Boolean = true
 
     /**
      * Boolean literals this factor wants per-literal wakeup on, or `null` for the default
      * occurrence-list wakeup (fire on *any* change to a variable in the corresponding
-     * [Factor.boolVars]). When non-null, the propagation engine routes bool wakeups through
+     * `Factor.boolVars`). When non-null, the propagation engine routes bool wakeups through
      * a per-literal index (`watches.byLit[lit]`) instead of through the factor's bool vars:
      * the factor fires only when the literal that just became *false* is in this set. The
      * factor is responsible for keeping the index in sync as watches drift, via
@@ -57,7 +55,7 @@ interface Propagator {
     /**
      * Typed integer-domain events this factor wants advisor-style wakeup on, or `null` (the
      * default) for the occurrence-list wakeup — fire on *any* change to a variable in the
-     * corresponding [Factor.intVars]. Each entry encodes a `(intVar, kind)` pair via
+     * corresponding `Factor.intVars`. Each entry encodes a `(intVar, kind)` pair via
      * [com.eignex.klause.propagation.IntEvent.pack], where `kind` is one of
      * `IntEvent.LB_RAISED` / `UB_LOWERED` / `VALUE_REMOVED` / `FIXED`. When non-null, the engine
      * routes wakeup for the subscribed variables through the per-`(var, kind)` index
@@ -71,7 +69,7 @@ interface Propagator {
      * subscribe to `FIXED` alone. A variable named here is removed from this factor's
      * occurrence-list wakeup (see [PropagationProblem.nonIntEventWatcherIntOccurrences])
      * — so the subscription must cover every kind the factor needs to stay correct; an under-broad
-     * subscription silently drops a wake. A variable in [Factor.intVars] but *not* named here keeps
+     * subscription silently drops a wake. A variable in `Factor.intVars` but *not* named here keeps
      * its normal occurrence-list wakeup.
      *
      * Default is `null` — preserves the current "wake on any intVars change" semantics for every
@@ -84,7 +82,7 @@ interface Propagator {
      * its subscribed variables that changed since it last drained, retrieved on a fire via
      * [com.eignex.klause.propagation.PropagationState.drainIntEventDirtyVars]. A
      * domain-sensitive incremental propagator (Régin/GCC/Table/…) sets this `true` so it can scope
-     * its per-fire work to the changed variables instead of scanning all of [Factor.intVars].
+     * its per-fire work to the changed variables instead of scanning all of `Factor.intVars`.
      *
      * **Contract:** a consumer must also subscribe via [initialIntEventWatches] to *every* kind on
      * *every* variable it depends on — the engine only accumulates a variable into the delta when an
@@ -126,7 +124,7 @@ interface Propagator {
 }
 
 /**
- * The absence of a deductive role. A factor whose [Factor.asPropagator] returns this is
+ * The absence of a deductive role. A factor whose `Factor.asPropagator` returns this is
  * **invariant-only**: it participates in local search but never filters domains. The CP
  * engine skips such factors entirely — they are dropped from the deductive occurrence lists
  * ([PropagationProblem.boolOccurrences] / [PropagationProblem.intOccurrences]) so propagation never wakes them. All

@@ -1,10 +1,9 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Factor
 
 /**
- * One linear constraint `Σ coeff(k) · value(ref(k)) ⟨op⟩ bound`, as exposed by [Factor.linearRows].
+ * One linear constraint `Σ coeff(k) · value(ref(k)) ⟨op⟩ bound`, as exposed by `Factor.linearRows`.
  *
  * An **interface**, not a data holder: a factor implements it directly (or hands back a lightweight
  * view) so a clause-heavy model does not materialise a coefficient array per constraint. Each term
@@ -16,7 +15,7 @@ import com.eignex.klause.solver.Factor
  * occupy disjoint tag ranges, so a key over the refs keeps an integer constraint and a Boolean one in
  * separate buckets with no extra discriminator.
  *
- * A read-only structural view for presolve. Distinct from a [Factor.linearize] relaxation row: a
+ * A read-only structural view for presolve. Distinct from a `Factor.linearize` relaxation row: a
  * [LinearRow] is **solution-set exact** for its originating factor; a relaxation row may be a superset.
  */
 interface LinearRow {

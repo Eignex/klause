@@ -1,6 +1,5 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.util.EmptyBooleanArray
 import com.eignex.klause.util.EmptyIntArray
@@ -19,7 +18,7 @@ import com.eignex.klause.util.binarySearchInt
  * Implementations are expected to:
  *  - initialise (or re-initialise on restart) the assignment with the assumed values,
  *  - skip any move proposal that would change an assumed variable,
- *  - leave the underlying [Problem] untouched — assumptions are call-scoped, not
+ *  - leave the underlying `Problem` untouched — assumptions are call-scoped, not
  *    permanent constraints.
  *
  * If the assumed values are jointly infeasible against the problem's constraints the
@@ -34,7 +33,7 @@ import com.eignex.klause.util.binarySearchInt
  * Storage is parallel primitive arrays sorted ascending by key — no autoboxing on any
  * read, no `HashMap` allocations on merge, and binary-search lookup for [boolValueOrNull]
  * / [intValueOrNull]. The [bools] / [ints] map views are kept for the bake-time
- * failed-literal probing path in [Problem] and for tests; hot paths should use the
+ * failed-literal probing path in `Problem` and for tests; hot paths should use the
  * primitive accessors ([forEachBool], [forEachInt], [boolValueOrNull], [intValueOrNull],
  * [mergedWith]) which never allocate.
  */
@@ -202,7 +201,7 @@ class Assumptions internal constructor(
     fun withIntHole(id: Int, value: Long): Assumptions = copy(deductions = deductions.withIntHole(id, value))
 
     /** Map view. Allocates a `LinkedHashMap` per access — used by cold paths like
-     *  [Problem]'s failed-literal probing and by tests; hot paths should call
+     *  `Problem`'s failed-literal probing and by tests; hot paths should call
      *  [forEachBool] / [boolValueOrNull] instead. */
     val bools: Map<Int, Boolean>
         get() = if (boolKeys.isEmpty()) {

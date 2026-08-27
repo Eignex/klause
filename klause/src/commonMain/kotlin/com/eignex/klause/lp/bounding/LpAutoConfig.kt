@@ -383,7 +383,7 @@ object LpAutoConfig {
     }
 
     /** The aggregate hull size of every factor in the [family] convex-hull family, summing each factor's
-     *  own [com.eignex.klause.solver.Factor.lpSizeEstimate] — the single source shared with the build, so
+     *  own `Factor.lpSizeEstimate` — the single source shared with the build, so
      *  the gating estimate cannot drift from the rows actually emitted. */
     private fun hullEstimate(problem: Problem, technique: LpTechnique, family: HullFamily): HullEstimate? {
         var cols = 0L

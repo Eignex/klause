@@ -1,21 +1,18 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
-
 /**
  * The local-search contract of a constraint: violation scoring, move delta computation,
  * move application, and move proposal. In the LS literature an *invariant* is a maintained
  * constraint with a graded violation score and an incremental update rule; this interface is
  * the klause realisation of that concept.
  *
- * Implemented by every factor in [Problem.factors] (via [Factor]), and the type the LS engine
+ * Implemented by every factor in `Problem.factors` (via `Factor`), and the type the LS engine
  * ([com.eignex.klause.localsearch.LocalSearchSolver]) uses when dispatching to invariants.
  *
  * Every method defaults to a sound no-op (always-satisfied, zero deltas, naive ±1 repair
  * moves), so a propagation-only factor needs to implement nothing here.
  *
- * See [Factor] for the full constraint contract (deductive + local-search + presolve).
+ * See `Factor` for the full constraint contract (deductive + local-search + presolve).
  */
 interface Invariant {
     /** Build this factor's payload from the current assignment. Called once per restart.
@@ -207,7 +204,7 @@ interface Invariant {
 }
 
 /**
- * The absence of a local-search role. A factor whose [Factor.asInvariant] returns this is
+ * The absence of a local-search role. A factor whose `Factor.asInvariant` returns this is
  * **propagator-only**: it participates in CP propagation but contributes nothing to local
  * search. The LS engine skips such factors entirely — they are dropped from the LS occurrence lists
  * ([LocalSearchProblem.boolOccurrences] / [LocalSearchProblem.intOccurrences]) so a move never queries them and they

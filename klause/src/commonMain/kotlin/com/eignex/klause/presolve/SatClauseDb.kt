@@ -9,7 +9,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 
 /**
- * A mutable clause database over the pure-SAT part of a [Problem] — the shared substrate for the
+ * A mutable clause database over the pure-SAT part of a `Problem` — the shared substrate for the
  * SAT-part presolve passes (bounded variable elimination, blocked-clause elimination, and future
  * clique / subsumption work). It holds only the clean all-Boolean [Clause]s (`allLiteralsBool`);
  * every other factor is left untouched, and any Boolean variable those factors touch is marked

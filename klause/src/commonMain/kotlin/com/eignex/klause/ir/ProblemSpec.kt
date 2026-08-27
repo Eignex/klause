@@ -10,7 +10,7 @@ import com.eignex.klause.util.EmptyDoubleArray
  * Immutable model before an enumerating backend chooses finite integer search domains.
  *
  * [intBounds] are the ranges the source model states, so either integer side may be open. A CP, local
- * search, counting, or sampling backend must call [materialize] with finite [IntDomain]s; that deliberate
+ * search, counting, or sampling backend must call [materialize] with finite `IntDomain`s; that deliberate
  * conversion is the only place an invented search bound may enter the model.
  */
 class ProblemSpec(
@@ -43,7 +43,7 @@ class ProblemSpec(
         require(realLower.size == numRealVars && realUpper.size == numRealVars)
     }
 
-    /** Build a [Problem] using the component-selected integer-domain capabilities. */
+    /** Build a `Problem` using the component-selected integer-domain capabilities. */
     fun materialize(intDomains: Array<IntDomain>): Problem {
         require(intDomains.size == numIntVars)
         return Problem(

@@ -3,7 +3,7 @@ import com.eignex.klause.solver.Problem
 
 /**
  * MiniZinc-style `solve minimize x` builders. Return a [LinearObjective] sized to the
- * caller's [Problem] so backends that index coefficient arrays by variable id (e.g.
+ * caller's `Problem` so backends that index coefficient arrays by variable id (e.g.
  * `WorstObjective` destroy in ALNS) read consistent
  * bounds. The factories live as `Problem` extensions rather than on [LinearObjective]'s
  * companion because they need the variable-count context the Problem already carries —

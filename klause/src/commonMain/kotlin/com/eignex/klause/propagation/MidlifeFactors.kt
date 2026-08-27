@@ -18,9 +18,9 @@ internal class MidlifeFactors {
     /** The mid-life propagators, appended by `addMidlifeFactor` in factor-id order. */
     val store: ArrayList<Propagator> = ArrayList()
 
-    /** The [Factor] behind each mid-life propagator, parallel to [store]. Carried because
+    /** The `Factor` behind each mid-life propagator, parallel to [store]. Carried because
      *  [Propagator] exposes no `boolVars` / `intVars`; the conflict and level machinery reads them
-     *  here for a mid-life factor the way it reads [com.eignex.klause.solver.Problem.factors] for a base one. */
+     *  here for a mid-life factor the way it reads `Problem.factors` for a base one. */
     val factors: ArrayList<Factor> = ArrayList()
 
     /** Tombstoned factor ids (base or mid-life). `factorAt` returns [NoPropagator] for a member,

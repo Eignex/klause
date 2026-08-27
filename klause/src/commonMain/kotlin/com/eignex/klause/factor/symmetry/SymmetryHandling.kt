@@ -18,7 +18,7 @@ import com.eignex.klause.util.toSortedIntArray
  * Whole-group symmetry handling as a single propagator-only factor: it carries the verified
  * automorphism [generators] and defers all filtering to [SymmetryPropagator], which enforces every
  * generator's lex-leader at each search node. Consulting the generators dynamically gives full-group
- * coverage without materialising one lex [Factor] per group element.
+ * coverage without materialising one lex `Factor` per group element.
  *
  * Each generator is a kind-preserving permutation given as `(intImage, boolImage)` over the current
  * variable ids (`intImage[i]` / `boolImage[b]` is the image of integer / Boolean variable `i` / `b`;

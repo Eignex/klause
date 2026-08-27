@@ -5,7 +5,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.differenceFragmentOf
 
 /**
- * This [Problem] with a [DifferenceSystem] over its difference rows appended, or the problem unchanged
+ * This `Problem` with a [DifferenceSystem] over its difference rows appended, or the problem unchanged
  * when it carries none the joint propagator could act on.
  *
  * Posted exactly once, after the presolve fixpoint — never as a round pass. A factor pins every variable

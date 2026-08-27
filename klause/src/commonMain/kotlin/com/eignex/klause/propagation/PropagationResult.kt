@@ -12,7 +12,7 @@ import com.eignex.klause.util.binarySearchInt
 import com.eignex.klause.util.sortedKeys
 
 /**
- * Result of [com.eignex.klause.solver.Problem.propagate]. Either a (possibly empty) set of
+ * Result of `Problem.propagate`. Either a (possibly empty) set of
  * literals/values forced beyond the input assumptions, or a sound (but incomplete) proof of
  * infeasibility.
  */
@@ -430,7 +430,7 @@ sealed interface PropagationResult {
      *  - [conflictBools] / [conflictInts] are the decision variables at those levels. They
      *    are derived from [conflictLevels] for convenience; CSP-style DFS samplers typically
      *    read [conflictLevels] directly to compute their backjump target.
-     *  - [conflictFactors] is the set of [com.eignex.klause.solver.Problem.factors] ids that
+     *  - [conflictFactors] is the set of `Problem.factors` ids that
      *    derived the contradiction: the factor that returned `false` from `propagate` plus,
      *    via a backward walk of the reason trail, every factor whose firing contributed to its
      *    premises. Empty when the contradiction came from a seed assumption check.

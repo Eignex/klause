@@ -61,7 +61,7 @@ class PropagationState(
     /**
      * Incremental-presolve mode. When `true` the state supports mid-life factors — the
      * presolve session appends factors and tombstones others between rounds via [addMidlifeFactor] /
-     * [tombstoneFactor] instead of rebuilding a fresh [Problem] each pass. The int-event
+     * [tombstoneFactor] instead of rebuilding a fresh `Problem` each pass. The int-event
      * machinery is forced on so a mid-life factor that subscribes to typed events wakes correctly even
      * when the initial problem had no such factor. Defaults to `false`: a search state never adds
      * presolve factors, so every allocation and branch below drops out.
@@ -389,7 +389,7 @@ class PropagationState(
     internal val baseFactorCount: Int = problem.factors.size
 
     // Occurrence-list wakeup arrays cached off [problem] once at construction: they are lazily
-    // built on [Problem] (deferred entirely for a presolve pass-view), so read them here — where a
+    // built on `Problem` (deferred entirely for a presolve pass-view), so read them here — where a
     // state is always over a fully-baked problem — to force them once instead of paying a delegated
     // lazy access on every wakeup in the BCP hot loop.
     private val nonBoolWatcherOcc: Array<IntArray> = projection.nonBoolWatcherBoolOccurrences
@@ -624,7 +624,7 @@ class PropagationState(
     internal val conflictAnalyzer: ConflictAnalyzer by lazy(LazyThreadSafetyMode.NONE) { ConflictAnalyzer(this) }
 
     /** When false, mutators skip undo-log recording. Default off so the one-shot
-     *  propagation path ([Problem.propagate]) and bake-time fixpoint — neither of which
+     *  propagation path (`Problem.propagate`) and bake-time fixpoint — neither of which
      *  backtracks — pay nothing. [PropagationSession] flips it true after bake, before its
      *  first push. */
     var undoLogging: Boolean = false

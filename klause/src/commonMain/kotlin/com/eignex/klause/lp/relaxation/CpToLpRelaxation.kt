@@ -47,7 +47,7 @@ import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
 
 /**
- * An LP relaxation of a [Problem] at one search node, plus the metadata mapping each LP column
+ * An LP relaxation of a `Problem` at one search node, plus the metadata mapping each LP column
  * back to the CP variable it stands for. The mapping is what lets reduced-cost fixing turn
  * an LP column reduction into a domain reduction on the right `(kind, varId)`.
  *
@@ -192,7 +192,7 @@ internal interface RelaxationDomains {
     fun boolValue(varId: Int): Boolean?
 
     /**
-     * Whether a side [Problem.intBounds] marks as invented should be built as an
+     * Whether a side `Problem.intBounds` marks as invented should be built as an
      * open LP column rather than at the finite clamp. Only the root view may: a bound in a live search
      * state is a decision the node depends on, and cannot be told apart from the clamp it sits on, so
      * relaxing it there would drop the branch's own constraint.
@@ -200,7 +200,7 @@ internal interface RelaxationDomains {
     val honorsOpenSides: Boolean get() = false
 }
 
-/** [RelaxationDomains] over a [Problem]'s declared domains: every integer variable at its full domain
+/** [RelaxationDomains] over a `Problem`'s declared domains: every integer variable at its full domain
  *  and every Boolean free. Reads endpoints only, so building a relaxation from it never triggers the
  *  O(domain span) bake fixpoint a [PropagationSession] runs on construction. */
 internal class RootDomains(private val problem: Problem) : RelaxationDomains {
@@ -268,7 +268,7 @@ internal fun leafRealFeasibility(
 internal class LeafRealResult(val verdict: LpVerdict, val reals: DoubleArray)
 
 /**
- * Walks [Problem.factors] and emits an [LpModel] relaxation for the LP-emittable factor types,
+ * Walks `Problem.factors` and emits an [LpModel] relaxation for the LP-emittable factor types,
  * pulling variable bounds live from the current search node.
  *
  * ## What is encoded
@@ -401,7 +401,7 @@ internal class CpToLpRelaxation(
             }
 
     /**
-     * Objective-cone membership, structural (depends only on [Problem.factors] and the
+     * Objective-cone membership, structural (depends only on `Problem.factors` and the
      * objective, never on live domains), so it is computed once and reused across nodes. `first` is
      * per-int-var, `second` per-bool-var: `true` when the variable is transitively connected to the
      * objective through a cone-relevant factor (every LP-emittable type except the dropped big-M
@@ -430,7 +430,7 @@ internal class CpToLpRelaxation(
         return intIn to boolIn
     }
 
-    /** Whether [f] extends the cone ([Factor.extendsObjectiveCone]) and shares a variable with it. */
+    /** Whether [f] extends the cone (`Factor.extendsObjectiveCone`) and shares a variable with it. */
     private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean =
         f.extendsObjectiveCone && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
 
@@ -505,7 +505,7 @@ internal class CpToLpRelaxation(
     private fun realCost(r: Int): Double = objective?.realCoefficients?.getOrElse(r) { 0.0 } ?: 0.0
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
-     *  [RelaxationBuilder] so a factor's [com.eignex.klause.solver.Factor.linearize] can emit into it. */
+     *  [RelaxationBuilder] so a factor's `Factor.linearize` can emit into it. */
     private inner class Assembler(private val domains: RelaxationDomains, private val gated: Boolean = false) :
         RelaxationBuilder {
         private val builder = LpBuilder()
@@ -537,7 +537,7 @@ internal class CpToLpRelaxation(
 
         /** Whether the factor currently being linearized may contribute HULL rows: its convex-hull
          *  family flag is on and we are not in objective-cone mode (where the column-heavy hulls are
-         *  forced off). Set per factor before [Factor.linearize]; consulted by the row emitters so a
+         *  forced off). Set per factor before `Factor.linearize`; consulted by the row emitters so a
          *  disabled family contributes only its CORE rows. CORE rows ignore it. */
         private var currentHullEnabled = true
 
@@ -548,7 +548,7 @@ internal class CpToLpRelaxation(
         private val hullFactorIds = LinkedHashSet<Int>()
 
         /** The per-family convex-hull switches for this build, read polymorphically by each hull factor's
-         *  [Factor.hullFamilyEnabled]; combined with the cone and per-factor suppression gates when
+         *  `Factor.hullFamilyEnabled`; combined with the cone and per-factor suppression gates when
          *  [currentHullEnabled] is set, so the driver never matches factor types. */
         private val hullFlags = HullFlags(
             element = elementHull,
@@ -867,7 +867,7 @@ internal class CpToLpRelaxation(
                     continue
                 }
                 // Each factor emits its own rows; factors with no linear relaxation (hard globals,
-                // cut-only or scheduling-view factors) keep the default no-op [Factor.linearize] and
+                // cut-only or scheduling-view factors) keep the default no-op `Factor.linearize` and
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.hullFamilyEnabled(hullFlags)

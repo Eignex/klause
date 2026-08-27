@@ -20,7 +20,7 @@ import com.eignex.klause.propagation.Propagator
  * The propagator itself holds only the immutable constraint scope. All per-search working state —
  * the matchings, the SCC scratch, the priority queue and the two stacks — lives in a [SortWork]
  * held in `state.refPayload[factorId]`, because a [Propagator] instance is cached once per
- * [com.eignex.klause.solver.Problem] and shared across every [PropagationState], including the
+ * `Problem` and shared across every [PropagationState], including the
  * concurrently-running arms of a parallel portfolio. Scratch as propagator fields would race across
  * those arms; keyed off `refPayload` each search owns its own copy (mirrors
  * [com.eignex.klause.factor.table.internals.ElementConstState] and `VpState`).

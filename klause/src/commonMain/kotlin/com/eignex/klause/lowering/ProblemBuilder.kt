@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 
 /**
- * Mutable construction context for a solver [Problem].
+ * Mutable construction context for a solver `Problem`.
  *
  * Front-ends and schema compilation allocate source columns and auxiliary variables through this
  * context, emit factors into [factors], and finish with [build]. Source names remain available to

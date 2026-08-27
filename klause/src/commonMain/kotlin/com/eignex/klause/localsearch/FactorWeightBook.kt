@@ -24,7 +24,7 @@ class FactorWeightBook(private val problem: Problem) {
     private var _baseFactorWeights: DoubleArray? = null
 
     /** Per-invariant dynamic weights. Invariants the model declared implied
-     *  ([Problem.impliedFactorMask]) start at [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than 1.0, so the
+     *  (`Problem.impliedFactorMask`) start at [IMPLIED_FACTOR_INITIAL_WEIGHT] rather than 1.0, so the
      *  implied bulk can't dominate the initial descent before structural constraints are met;
      *  SAPS-style bumping still raises an implied invariant's weight if it persistently blocks
      *  progress.

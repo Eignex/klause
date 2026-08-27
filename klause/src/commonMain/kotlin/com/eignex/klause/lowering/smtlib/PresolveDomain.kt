@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntDomain
 
 /**
  * A per-variable domain **during SMT-LIB presolve**, modelled as a sealed union so that an *open*
- * (as-yet unbounded) integer is simply not representable as a searchable [IntDomain]: the type system —
+ * (as-yet unbounded) integer is simply not representable as a searchable `IntDomain`: the type system —
  * not a runtime guard — enforces that infinity never reaches finite CP search. An [Open] domain lives
  * inside [SmtLib.Builder] until its bounds are copied to the source model for pipeline selection.
  * Infinity is carried structurally (a `null` bound), never by a `Long.MIN/MAX` or `±Long/4` sentinel.

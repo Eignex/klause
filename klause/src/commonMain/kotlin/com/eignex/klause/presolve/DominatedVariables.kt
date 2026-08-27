@@ -23,7 +23,7 @@ internal object DominatedVariables {
      *  - **up-safe**: the mirror (`≤`/negative or `≥`/positive, and `cⱼ ≤ 0`) → pin to the upper bound.
      *
      * Integers: a variable whose every occurrence is a monotone `≤`/`≥` row exposed by
-     * [Factor.linearRows] (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
+     * `Factor.linearRows` (an `=`/`≠` row, or a factor with no exact linear form, makes the safety
      * undecidable, so it is excluded) is pinned by tightening its domain to a singleton.
      * Booleans: the pure-literal mirror, extended past [Clause] to every
      * *monotone* pseudo-Boolean row — a [Cardinality] `min ≤ Σ ≤ max` (each active side fixes a safe
@@ -34,7 +34,7 @@ internal object DominatedVariables {
      * the pass idempotent). Coefficients come from [objectiveIntCoeffs] / [objectiveBoolCoeffs]
      * (minimize sense, absent ⇒ 0).
      *
-     * The integer side reasons only over monotone `≤`/`≥` rows from [Factor.linearRows] — plain linear
+     * The integer side reasons only over monotone `≤`/`≥` rows from `Factor.linearRows` — plain linear
      * comparators and the increasing chain both qualify; reified rows are full biconditionals (their
      * inner vars affect feasibility both ways) and other globals expose no exact linear rows, so they
      * exclude their vars.

@@ -4,7 +4,7 @@ import com.eignex.klause.util.LongArrayList
 
 /**
  * A learned CDCL nogood in a **session-portable** form, for sharing across backtrack arms of one
- * [com.eignex.klause.solver.Problem] (a parallel or single-threaded portfolio). All arms share the
+ * `Problem` (a parallel or single-threaded portfolio). All arms share the
  * same problem, so a nogood any arm learns is logically valid for every arm — but klause is an LCG
  * solver whose int-bound *atoms* are allocated lazily per session, so a clause's atom ids differ
  * between sessions and cannot be copied raw. This form keeps the two literal kinds separately:

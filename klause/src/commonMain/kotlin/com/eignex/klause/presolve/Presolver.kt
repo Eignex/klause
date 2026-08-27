@@ -89,7 +89,7 @@ object Presolver {
             .withPresolveBudget(context.presolveBudget)
 
         // Incremental path for the default FAST+MEDIUM rounds: one persistent [PresolveSession] absorbs
-        // each pass's delta instead of rebuilding a [Problem] per firing pass. Scoped away from any
+        // each pass's delta instead of rebuilding a `Problem` per firing pass. Scoped away from any
         // EXHAUSTIVE (SAC / LP-harvest) pass, whose order-sensitive probing keeps the fresh-rebuild path.
         if (passes.none { it.timing == PresolveTiming.EXHAUSTIVE }) {
             return runIncremental(problem, passes, maxRounds, ctx, cancellation)
@@ -121,8 +121,8 @@ object Presolver {
      * Incremental variant of [run]'s round engine (default FAST+MEDIUM emphasis): identical
      * scheduling — priority order, version-stamp fixpoint skip, [PresolvePass.skipAfterEmpty] parking,
      * and the diminishing-returns abort — but a persistent [PresolveSession] absorbs each firing pass's
-     * delta instead of rebuilding a [Problem]. Each pass reads a cheap [PresolveSession.passInput] view
-     * and its delta is folded back via [PresolveSession.applyDelta]; the heavyweight solver [Problem]
+     * delta instead of rebuilding a `Problem`. Each pass reads a cheap [PresolveSession.passInput] view
+     * and its delta is folded back via [PresolveSession.applyDelta]; the heavyweight solver `Problem`
      * is materialized once at the end.
      */
     private fun runIncremental(
@@ -207,7 +207,7 @@ object Presolver {
 
     /** The per-path operations the shared [runRounds] scheduler drives: where a pass reads its input,
      *  how its context is specialised, where a firing pass's delta lands, and the complexity measure
-     *  for the diminishing-returns abort. [run] backs it with a rebuilt [Problem] per firing pass,
+     *  for the diminishing-returns abort. [run] backs it with a rebuilt `Problem` per firing pass,
      *  [runIncremental] with a persistent [PresolveSession]. */
 
     private interface RoundHost {

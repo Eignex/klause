@@ -5,7 +5,7 @@ package com.eignex.klause.propagation
  * scheme ([BoolWatcherIndex.byLit]). A factor subscribes to specific `(intVar, kind)`
  * pairs via [com.eignex.klause.propagation.Propagator.initialIntEventWatches] and is then woken *only* when
  * that kind of change happens to that variable, instead of on every change to any of its
- * [com.eignex.klause.solver.Factor.intVars] (the default occurrence-list wakeup). This is the
+ * `Factor.intVars` (the default occurrence-list wakeup). This is the
  * scheduling substrate for advisor-style incremental propagation.
  *
  * The four kinds partition the ways a domain can shrink:

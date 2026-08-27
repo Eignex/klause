@@ -5,7 +5,7 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * The sink a factor's [com.eignex.klause.solver.Factor.linearize] emits its LP relaxation into. A factor
+ * The sink a factor's `Factor.linearize` emits its LP relaxation into. A factor
  * states linear constraints over the problem's integer variables by raw id; the driver behind this
  * interface maps each variable to its LP column, caps the model, and tracks row provenance — a factor
  * never touches the underlying tableau.

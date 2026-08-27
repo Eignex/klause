@@ -1,5 +1,6 @@
 package com.eignex.klause.bench.runner
 
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
@@ -40,7 +41,10 @@ internal class MiniZincRunner(
             maximize = program.solve is SolveDirective.Maximize,
             lsObjective = program.lsObjective,
             definitionalSweep = program.definitionalSweep,
-            searchParams = program.defaultBacktrackParams,
+            searchParams = program.searchHints?.toBacktrackParams(
+                program.problem.numBoolVars,
+                program.problem.numIntVars,
+            ),
         )
     }
 

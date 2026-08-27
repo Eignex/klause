@@ -14,7 +14,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Cancellation
 
 /**
- * Problem-level presolve transforms. Each takes a [Problem] and returns an equivalent one with
+ * Problem-level presolve transforms. Each takes a `Problem` and returns an equivalent one with
  * a smaller / tighter formulation. Pure (no solving); the caller decides when to apply them.
  *
  * The passes live in focused per-technique units in this package; this object is the stable
@@ -71,7 +71,7 @@ object Presolve {
     fun projectSingletonInequalities(problem: Problem, objectiveIntVars: Set<Int> = emptySet()): PassDelta =
         SingletonInequalityProjection.project(problem, objectiveIntVars)
 
-    /** Per-factor structural self-reduction via [com.eignex.klause.solver.Factor.structuralReduce].
+    /** Per-factor structural self-reduction via `Factor.structuralReduce`.
      *  See [StructuralReduction]. */
     fun reduceStructural(problem: Problem): PassDelta = StructuralReduction.reduce(problem)
 

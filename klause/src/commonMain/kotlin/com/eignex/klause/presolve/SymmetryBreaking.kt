@@ -29,7 +29,7 @@ internal object SymmetryBreaking {
     /**
      * Symmetry breaking by detecting interchangeable variables. A variable transposition
      * is broken only when swapping the two variables maps the factor multiset onto itself — verified by
-     * remapping every factor and comparing [Factor.structuralKey] counts, so it is sound by
+     * remapping every factor and comparing `Factor.structuralKey` counts, so it is sound by
      * construction. Candidate groups come from Weisfeiler–Leman colour refinement (only same-colour
      * variables can be interchangeable); each candidate swap is then checked. Ordering a verified orbit
      * (`x₀ ≤ x₁ ≤ …` for ints, `¬gⱼ ∨ gⱼ₊₁` for bools) keeps exactly one representative per orbit —
@@ -89,17 +89,17 @@ internal object SymmetryBreaking {
      * and the factor set to itself is a symmetry. Candidate orbits are values with the same
      * domain-incidence (the set of variables whose domain contains them) — so any transposition
      * within an orbit already maps every domain to itself. Each transposition is then *verified*
-     * against the factors: applying it via [Factor.remapValues] and comparing the [Factor.structuralKey]
-     * multiset proves the swap is a symmetry, the value analog of the [Factor.remap]-based
+     * against the factors: applying it via `Factor.remapValues` and comparing the `Factor.structuralKey`
+     * multiset proves the swap is a symmetry, the value analog of the `Factor.remap`-based
      * automorphism check. Transpositions generate the full symmetric group on a verified orbit, so one variable
      * whose domain lies entirely within an orbit is pinned to the orbit minimum — a sound break (a
      * solution can always be relabeled within the orbit so that variable takes the minimum).
      *
-     * When every factor is value-anonymous ([Factor.isValueAnonymous] — AllDifferent), verification is
+     * When every factor is value-anonymous (`Factor.isValueAnonymous` — AllDifferent), verification is
      * skipped: anonymity means every relabeling is a symmetry, so the whole incidence group is one
      * orbit (the anonymity fast path). Otherwise verification widens detection to problems with
      * value-relabelable factors (GlobalCardinality, Table, …) that the anonymity gate switched off; a
-     * factor that is unkeyed or returns `null` from [Factor.remapValues] conservatively blocks it.
+     * factor that is unkeyed or returns `null` from `Factor.remapValues` conservatively blocks it.
      */
     private fun breakValueSymmetry(
         problem: Problem,
@@ -202,7 +202,7 @@ internal object SymmetryBreaking {
     /**
      * Law–Lee value precedence, the strong value-symmetry break, posted with the native
      * [ValuePrecede] propagator. For the value-anonymous case (every factor is
-     * [Factor.isValueAnonymous], so any value relabeling is a symmetry), each orbit of interchangeable
+     * `Factor.isValueAnonymous`, so any value relabeling is a symmetry), each orbit of interchangeable
      * values is forced to be *introduced in sorted order*: the first occurrence of the orbit's `j`-th
      * smallest value precedes the first occurrence of its `(j+1)`-th, over the variables whose domain
      * is that orbit. This is a `value_precede_chain` — one [ValuePrecede] per consecutive value pair.
@@ -265,7 +265,7 @@ internal object SymmetryBreaking {
     }
 
     /** Whether the value transposition `(v w)` maps the factor multiset to itself — relabel every
-     *  factor via [Factor.remapValues] and compare [Factor.structuralKey] counts against [base].
+     *  factor via `Factor.remapValues` and compare `Factor.structuralKey` counts against [base].
      *  `false` if any factor is not value-relabelable (returns `null`). The value analog of
      *  [isAutomorphism]. */
     private fun verifyValueSwap(problem: Problem, base: Map<StructuralKey, Int>, v: Long, w: Long): Boolean {
@@ -356,7 +356,7 @@ internal object SymmetryBreaking {
      *
      * Initial colour separates kinds, distinct domains, and each objective variable (a distinguished
      * fixed point). Each round refines a variable's colour by its current colour plus, for every
-     * incident factor, that factor's [Factor.structuralKey] computed with the focal variable
+     * incident factor, that factor's `Factor.structuralKey` computed with the focal variable
      * remapped to [WL_FOCAL] and every other variable to its current colour — the refinement "edge"
      * signature, derived generically for any keyed factor with no per-type code. Iterated to a
      * fixpoint (partition stops refining). Soundness never rests on this: the pairwise/block verifier
@@ -520,7 +520,7 @@ internal object SymmetryBreaking {
     // one (every returned permutation is verified by [isAutomorphism]).
 
     /** Skip the search when a single colour-refinement round is too expensive. One round remaps every
-     *  factor once per incident variable and rebuilds its [Factor.structuralKey], so a factor of degree
+     *  factor once per incident variable and rebuilds its `Factor.structuralKey`, so a factor of degree
      *  `d` and key weight `w` costs `Θ(d·w)` per round and the round costs `Σ_f d_f·w_f` (for a plain
      *  factor `w ≈ d`, so this reduces to `Σ d²`; a data-heavy factor like a wide table has `w ≫ d`).
      *  Per-arc work here is a structural-key rebuild rather than a graph-edge walk, so the realistic
@@ -546,7 +546,7 @@ internal object SymmetryBreaking {
      *  skipping only forgoes value-symmetry pins, never adds an unsound one. */
     private const val VALUE_ORBIT_SCAN_BUDGET = 50_000_000L
 
-    /** Skip value-symmetry verification when keying the factor set (summed [Factor.structuralKeyWeight])
+    /** Skip value-symmetry verification when keying the factor set (summed `Factor.structuralKeyWeight`)
      *  would exceed this — a wide-table model where the per-swap re-keying dominates and a value symmetry
      *  is almost never found, the value-side analog of [GENERATOR_ROUND_COST_BUDGET]. Sound: skipping
      *  only forgoes value pins. */
@@ -584,7 +584,7 @@ internal object SymmetryBreaking {
         if (nInt + nBool == 0) return emptyList()
 
         // Cost skip: estimate one refinement round's work as Σ_f degree·keyWeight — a factor is remapped
-        // and re-keyed once per incident variable, and each rebuild costs its [Factor.structuralKeyWeight]
+        // and re-keyed once per incident variable, and each rebuild costs its `Factor.structuralKeyWeight`
         // (the variables for a plain factor, plus the constant payload for a data-heavy one like a wide
         // table). Bail before starting when a single round cannot fit [GENERATOR_WORK_BUDGET]. A
         // wide-but-shallow model stays cheap; a model whose factors carry large constant data — where the

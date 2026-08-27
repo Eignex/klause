@@ -57,7 +57,7 @@ internal class MutableObjectiveBound(private val objectiveConstant: Long) {
 /**
  * A local-search-only soft constraint `Σ boolWeights·b + Σ intCoeffs·i ≤ bound` over the objective's
  * decision variables, sharing a [MutableObjectiveBound] that the minimize engine ratchets down at each
- * incumbent. Injected as an extra factor into one arm's [com.eignex.klause.solver.Problem] overlay so
+ * incumbent. Injected as an extra factor into one arm's `Problem` overlay so
  * `cost == 0` means "hard constraints satisfied AND objective beats the incumbent" — turning objective
  * optimization back into violation repair for the SAT-style feasibility arms (probSAT / WalkSAT).
  *

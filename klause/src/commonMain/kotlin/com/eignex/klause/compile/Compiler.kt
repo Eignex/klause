@@ -500,7 +500,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
                     // bucketing. `decode` reads it from `Sample.reals`; float-linear lowers to a real row.
                     newRealVar(entry.min, entry.max, name)
                 } else {
-                    // Bucketed inline so [Problem.factors] stays pure int+bool; the parallel floatMeta*
+                    // Bucketed inline so `Problem.factors` stays pure int+bool; the parallel floatMeta*
                     // arrays record the bucket params the float-linear lowering reads.
                     val intId = newIntVar(IntDomain(0L, (entry.buckets - 1).toLong()))
                     bindIntName(name, intId)
@@ -525,7 +525,7 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     // contribute dead-value symmetry. Gated by config so it can be turned off.
     if (config.pinAbsentOptVars) emitOptVarPins(def)
 
-    // The compiler builds a plain base-baked [Problem]; the SAC / failed-literal probing tiers, resolved
+    // The compiler builds a plain base-baked `Problem`; the SAC / failed-literal probing tiers, resolved
     // from the presolve config, run in the presolve lane via [RootBaker] (kernel → presolve would
     // cycle). The presolve pipeline reads the same config through [BakeConfig.from].
     return CompiledSchema(

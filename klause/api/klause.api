@@ -156,6 +156,10 @@ public final class com/eignex/klause/backtrack/BacktrackSolver : com/eignex/klau
 	public synthetic fun solve (Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/SolveResult;
 }
 
+public final class com/eignex/klause/backtrack/FlatZincSearchHintsKt {
+	public static final fun toBacktrackParams (Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;II)Lcom/eignex/klause/backtrack/BacktrackParams;
+}
+
 public final class com/eignex/klause/backtrack/NodeBudget {
 	public fun <init> (J)V
 	public final fun exhausted ()Z
@@ -591,8 +595,8 @@ public final class com/eignex/klause/brute/BruteForceSolver : com/eignex/klause/
 }
 
 public final class com/eignex/klause/brute/BruteForceSolver$Companion {
-	public final fun fits (Lcom/eignex/klause/solver/Problem;J)Z
-	public static synthetic fun fits$default (Lcom/eignex/klause/brute/BruteForceSolver$Companion;Lcom/eignex/klause/solver/Problem;JILjava/lang/Object;)Z
+	public final fun fits (Lcom/eignex/klause/ir/Problem;J)Z
+	public static synthetic fun fits$default (Lcom/eignex/klause/brute/BruteForceSolver$Companion;Lcom/eignex/klause/ir/Problem;JILjava/lang/Object;)Z
 }
 
 public final class com/eignex/klause/compile/CompiledSchema {
@@ -612,7 +616,7 @@ public final class com/eignex/klause/compile/CompiledSchema {
 	public final fun getFloatDecoders ()Ljava/util/Map;
 	public final fun getIntVarIdByName ()Ljava/util/Map;
 	public final fun getNominalIndicators ()Ljava/util/Map;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSetNominalLabels ()Ljava/util/Map;
 	public final fun maximize (Lcom/eignex/klause/schema/BoolHandle;)Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun maximize (Lcom/eignex/klause/schema/FloatHandle;)Lcom/eignex/klause/solver/objective/LinearObjective;
@@ -943,7 +947,7 @@ public final class com/eignex/klause/factor/IntCmpReifiedKt {
 	public static final fun reifiedIntCompare (IILcom/eignex/klause/model/IntCmpOp;I)Lcom/eignex/klause/factor/arithmetic/ReifiedLinear;
 }
 
-public abstract interface class com/eignex/klause/factor/ReifiedFactor : com/eignex/klause/solver/Factor {
+public abstract interface class com/eignex/klause/factor/ReifiedFactor : com/eignex/klause/ir/Factor {
 	public abstract fun getAuxBoolVar ()I
 	public abstract fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
 	public abstract fun residualNow (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
@@ -962,14 +966,14 @@ public final class com/eignex/klause/factor/ReifiedFactor$DefaultImpls {
 	public static fun hullFamilyEnabled (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/lp/HullFlags;)Z
 	public static fun isValueAnonymous (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun linearize (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public static fun lpSizeEstimate (Lcom/eignex/klause/factor/ReifiedFactor;[Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public static fun lpSizeEstimate (Lcom/eignex/klause/factor/ReifiedFactor;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public static fun remapStructuralHash (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/ir/VarRemap;)I
-	public static fun remapValues (Lcom/eignex/klause/factor/ReifiedFactor;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
-	public static fun structuralReduce (Lcom/eignex/klause/factor/ReifiedFactor;[Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public static fun substituteAffine (Lcom/eignex/klause/factor/ReifiedFactor;IIII)Lcom/eignex/klause/solver/Factor;
+	public static fun remapValues (Lcom/eignex/klause/factor/ReifiedFactor;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public static fun structuralReduce (Lcom/eignex/klause/factor/ReifiedFactor;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public static fun substituteAffine (Lcom/eignex/klause/factor/ReifiedFactor;IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/klause/ir/Factor {
 	public fun <init> (I[IZ)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -989,13 +993,13 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/ArrayMinMaxState {
@@ -1004,7 +1008,7 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMaxState {
 	public final fun setBestValue (J)V
 }
 
-public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[Lcom/eignex/klause/ir/LinearOp;[J)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1024,13 +1028,13 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public abstract interface class com/eignex/klause/factor/arithmetic/FactorRow {
@@ -1072,7 +1076,7 @@ public final class com/eignex/klause/factor/arithmetic/FactorRow$Wide : com/eign
 
 public final class com/eignex/klause/factor/arithmetic/FactorRowKt {
 	public static final fun complemented (Lcom/eignex/klause/ir/LinearOp;)Lcom/eignex/klause/ir/LinearOp;
-	public static final fun linearRow (Lcom/eignex/klause/solver/Factor;)Lcom/eignex/klause/factor/arithmetic/FactorRow;
+	public static final fun linearRow (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/factor/arithmetic/FactorRow;
 }
 
 public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/eignex/klause/factor/arithmetic/IntegralConstants, com/eignex/klause/lp/LinearRow {
@@ -1095,7 +1099,7 @@ public abstract interface class com/eignex/klause/factor/arithmetic/IntegralCons
 	public abstract fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 }
 
-public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
 	public synthetic fun <init> ([I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> ([I[ILcom/eignex/klause/ir/LinearOp;I)V
@@ -1125,19 +1129,19 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public abstract interface class com/eignex/klause/factor/arithmetic/LinearConstants {
 }
 
-public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klause/ir/Factor {
 	public fun <init> (III)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1157,13 +1161,13 @@ public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klau
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/RealConstants : com/eignex/klause/factor/arithmetic/LinearConstants {
@@ -1174,7 +1178,7 @@ public final class com/eignex/klause/factor/arithmetic/RealConstants : com/eigne
 	public final fun getStrict ()Z
 }
 
-public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/klause/ir/Factor {
 	public fun <init> (IIIDD)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1196,13 +1200,13 @@ public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/eignex/klause/factor/ReifiedFactor {
@@ -1227,14 +1231,14 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun residualNow (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eignex/klause/factor/ReifiedFactor {
@@ -1263,14 +1267,14 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun residualNow (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : com/eignex/klause/factor/ReifiedFactor {
@@ -1296,17 +1300,17 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun residualNow (Lcom/eignex/klause/localsearch/LocalSearchState;II)I
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/eignex/klause/ir/Factor {
 	public fun <init> (I[I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
 	public synthetic fun <init> (I[I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1332,13 +1336,13 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/arithmetic/WideConstants : com/eignex/klause/factor/arithmetic/IntegralConstants {
@@ -1349,7 +1353,7 @@ public final class com/eignex/klause/factor/arithmetic/WideConstants : com/eigne
 	public fun getExactBound ()Lcom/ionspin/kotlin/bignum/integer/BigInteger;
 }
 
-public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause/ir/Factor {
 	public static final field Companion Lcom/eignex/klause/factor/bool/Cardinality$Companion;
 	public fun <init> ([III)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1370,13 +1374,13 @@ public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/bool/Cardinality$Companion {
@@ -1385,7 +1389,7 @@ public final class com/eignex/klause/factor/bool/Cardinality$Companion {
 	public final fun exactlyOne ([I)Lcom/eignex/klause/factor/bool/Cardinality;
 }
 
-public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/lp/LinearRow, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/Factor, com/eignex/klause/lp/LinearRow {
 	public fun <init> ([I)V
 	public final fun allLiteralsBool (I)Z
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1409,17 +1413,17 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/lp/L
 	public fun isIntegerOnly ()Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public fun ref (I)I
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause/ir/Factor {
 	public fun <init> (Ljava/util/List;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1437,16 +1441,16 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klause/lp/LinearRow, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klause/ir/Factor, com/eignex/klause/lp/LinearRow {
 	public fun <init> ([J[ILcom/eignex/klause/model/PbOp;J)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1471,17 +1475,17 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 	public fun isIntegerOnly ()Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public fun ref (I)I
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/ir/Factor {
 	public fun <init> ([II)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1500,16 +1504,16 @@ public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/solver/
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/ir/Factor {
 	public fun <init> ([IZ)V
 	public synthetic fun <init> ([IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1530,16 +1534,16 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([IJI[I[JZ)V
 	public synthetic fun <init> ([IJI[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1565,17 +1569,17 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/GlobalCardinality : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/GlobalCardinality : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([I[J[I[I[IZ[I)V
 	public synthetic fun <init> ([I[J[I[I[IZ[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1602,17 +1606,17 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/Increasing : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/Increasing : com/eignex/klause/ir/Factor {
 	public fun <init> ([IZ)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1631,16 +1635,16 @@ public final class com/eignex/klause/factor/global/Increasing : com/eignex/klaus
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[III)V
 	public synthetic fun <init> ([I[IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1662,16 +1666,16 @@ public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/s
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[IZ)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1691,16 +1695,16 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/s
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[I)V
 	public synthetic fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1724,14 +1728,14 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/global/NValue$Mode : java/lang/Enum {
@@ -1743,7 +1747,7 @@ public final class com/eignex/klause/factor/global/NValue$Mode : java/lang/Enum 
 	public static fun values ()[Lcom/eignex/klause/factor/global/NValue$Mode;
 }
 
-public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[I)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1762,16 +1766,16 @@ public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/solv
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/eignex/klause/ir/Factor {
 	public fun <init> ([II)V
 	public synthetic fun <init> ([IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1791,16 +1795,16 @@ public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/e
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/klause/ir/Factor {
 	public fun <init> (JJ[I)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1820,16 +1824,16 @@ public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/kla
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public static final field Companion Lcom/eignex/klause/factor/scheduling/Cumulative$Companion;
 	public fun <init> ([I[J[JJ[I[I[II)V
 	public synthetic fun <init> ([I[J[JJ[I[I[IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -1863,16 +1867,16 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
 	public fun present (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public final fun resPosOf (I)I
 	public final fun startPosOf (I)I
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public final class com/eignex/klause/factor/scheduling/Cumulative$Companion {
@@ -1880,7 +1884,7 @@ public final class com/eignex/klause/factor/scheduling/Cumulative$Companion {
 	public static synthetic fun unary$default (Lcom/eignex/klause/factor/scheduling/Cumulative$Companion;[I[J[I[IILjava/lang/Object;)Lcom/eignex/klause/factor/scheduling/Cumulative;
 }
 
-public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[I[J[J[I[IZ)V
 	public synthetic fun <init> ([I[I[J[J[I[IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -1907,13 +1911,13 @@ public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 	public final fun varToRectOf (I)I
 }
 
@@ -1968,7 +1972,7 @@ public final class com/eignex/klause/factor/scheduling/internals/DiffnLsState {
 	public final fun setOverlappingPairs (I)V
 }
 
-public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eignex/klause/ir/Factor {
 	public fun <init> (Ljava/util/List;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -1986,16 +1990,16 @@ public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eign
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/table/Element : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/table/Element : com/eignex/klause/ir/Factor {
 	public fun <init> (II[JZI)V
 	public synthetic fun <init> (II[JZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -2018,16 +2022,16 @@ public final class com/eignex/klause/factor/table/Element : com/eignex/klause/so
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[I[I[JI[III)V
 	public synthetic fun <init> ([I[I[I[JI[IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -2053,16 +2057,16 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/solver
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/ir/Factor {
 	public fun <init> ([III[JI[I)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
@@ -2085,16 +2089,16 @@ public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/so
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/table/Table : com/eignex/klause/solver/Factor {
+public final class com/eignex/klause/factor/table/Table : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[J)V
 	public fun <init> ([I[J[J)V
 	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
@@ -2117,13 +2121,13 @@ public final class com/eignex/klause/factor/table/Table : com/eignex/klause/solv
 	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
 	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
 	public fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
 public class com/eignex/klause/formats/FormatException : java/lang/RuntimeException {
@@ -2306,6 +2310,65 @@ public final class com/eignex/klause/ir/BoolVars : com/eignex/klause/ir/VarList 
 	public fun getSpanInts ()[I
 }
 
+public abstract interface class com/eignex/klause/ir/Factor {
+	public abstract fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
+	public abstract fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
+	public fun canSubstituteAffine (IIII)Z
+	public fun getBoolVars ()[I
+	public fun getExactTheoryOwnable ()Z
+	public fun getExtendsObjectiveCone ()Z
+	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
+	public fun getIntVars ()[I
+	public fun getIntegerTheoryOwnable ()Z
+	public fun getLinearRows ()Ljava/util/List;
+	public fun getStructuralKeyWeight ()I
+	public abstract fun getVariables ()Lcom/eignex/klause/ir/VarList;
+	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
+	public fun isValueAnonymous ()Z
+	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
+	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public abstract fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/ir/Factor;
+	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
+	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public abstract fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
+	public fun structuralReduce ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
+}
+
+public final class com/eignex/klause/ir/Factor$DefaultImpls {
+	public static fun canSubstituteAffine (Lcom/eignex/klause/ir/Factor;IIII)Z
+	public static fun getBoolVars (Lcom/eignex/klause/ir/Factor;)[I
+	public static fun getExactTheoryOwnable (Lcom/eignex/klause/ir/Factor;)Z
+	public static fun getExtendsObjectiveCone (Lcom/eignex/klause/ir/Factor;)Z
+	public static fun getHullFamily (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/lp/HullFamily;
+	public static fun getIntVars (Lcom/eignex/klause/ir/Factor;)[I
+	public static fun getIntegerTheoryOwnable (Lcom/eignex/klause/ir/Factor;)Z
+	public static fun getLinearRows (Lcom/eignex/klause/ir/Factor;)Ljava/util/List;
+	public static fun getStructuralKeyWeight (Lcom/eignex/klause/ir/Factor;)I
+	public static fun hullFamilyEnabled (Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/lp/HullFlags;)Z
+	public static fun isValueAnonymous (Lcom/eignex/klause/ir/Factor;)Z
+	public static fun linearize (Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/lp/RelaxationBuilder;I)V
+	public static fun lpSizeEstimate (Lcom/eignex/klause/ir/Factor;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
+	public static fun remapStructuralHash (Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/ir/VarRemap;)I
+	public static fun remapValues (Lcom/eignex/klause/ir/Factor;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/ir/Factor;
+	public static fun structuralReduce (Lcom/eignex/klause/ir/Factor;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/FactorReduction;
+	public static fun substituteAffine (Lcom/eignex/klause/ir/Factor;IIII)Lcom/eignex/klause/ir/Factor;
+}
+
+public abstract interface class com/eignex/klause/ir/FactorReduction {
+}
+
+public final class com/eignex/klause/ir/FactorReduction$Rewrite : com/eignex/klause/ir/FactorReduction {
+	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getReplacement ()Ljava/util/List;
+	public final fun getTightenedBounds ()Ljava/util/Map;
+}
+
+public final class com/eignex/klause/ir/FactorReduction$Unchanged : com/eignex/klause/ir/FactorReduction {
+	public static final field INSTANCE Lcom/eignex/klause/ir/FactorReduction$Unchanged;
+}
+
 public final class com/eignex/klause/ir/IntBounds {
 	public static final field Companion Lcom/eignex/klause/ir/IntBounds$Companion;
 	public final fun getSize ()I
@@ -2320,6 +2383,58 @@ public final class com/eignex/klause/ir/IntBounds {
 }
 
 public final class com/eignex/klause/ir/IntBounds$Companion {
+}
+
+public abstract interface class com/eignex/klause/ir/IntConsumer {
+	public abstract fun accept (J)V
+}
+
+public abstract interface class com/eignex/klause/ir/IntDomain {
+	public static final field Companion Lcom/eignex/klause/ir/IntDomain$Companion;
+	public fun clamp (J)J
+	public abstract fun contains (J)Z
+	public abstract fun excludeValue (J)Lcom/eignex/klause/ir/IntDomain;
+	public abstract fun excludeValues ([J)Lcom/eignex/klause/ir/IntDomain;
+	public abstract fun forEachHole (Lcom/eignex/klause/ir/IntConsumer;)V
+	public abstract fun forEachHoleInRange (JJLcom/eignex/klause/ir/IntConsumer;)V
+	public abstract fun getHoleCount ()J
+	public abstract fun getMax ()J
+	public abstract fun getMin ()J
+	public fun getValueCount ()J
+	public fun higher (J)J
+	public abstract fun includeInteriorValue (J)Lcom/eignex/klause/ir/IntDomain;
+	public fun isFixed ()Z
+	public fun lower (J)J
+	public fun span ()Lcom/eignex/klause/ir/IntSpan;
+	public abstract fun spanOrNull (J)Lcom/eignex/klause/ir/IntSpan;
+	public static synthetic fun spanOrNull$default (Lcom/eignex/klause/ir/IntDomain;JILjava/lang/Object;)Lcom/eignex/klause/ir/IntSpan;
+	public abstract fun withMaxAtMost (J)Lcom/eignex/klause/ir/IntDomain;
+	public abstract fun withMinAtLeast (J)Lcom/eignex/klause/ir/IntDomain;
+}
+
+public final class com/eignex/klause/ir/IntDomain$Companion {
+	public final fun invoke (JJ)Lcom/eignex/klause/ir/IntDomain;
+}
+
+public final class com/eignex/klause/ir/IntDomain$DefaultImpls {
+	public static fun clamp (Lcom/eignex/klause/ir/IntDomain;J)J
+	public static fun getValueCount (Lcom/eignex/klause/ir/IntDomain;)J
+	public static fun higher (Lcom/eignex/klause/ir/IntDomain;J)J
+	public static fun isFixed (Lcom/eignex/klause/ir/IntDomain;)Z
+	public static fun lower (Lcom/eignex/klause/ir/IntDomain;J)J
+	public static fun span (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/IntSpan;
+	public static synthetic fun spanOrNull$default (Lcom/eignex/klause/ir/IntDomain;JILjava/lang/Object;)Lcom/eignex/klause/ir/IntSpan;
+}
+
+public final class com/eignex/klause/ir/IntDomainKt {
+	public static final fun getValues (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/IntSpan;
+	public static final fun randomValue (Lcom/eignex/klause/ir/IntDomain;Lkotlin/random/Random;)J
+}
+
+public abstract interface class com/eignex/klause/ir/IntSpan {
+	public abstract fun forEach (Lcom/eignex/klause/ir/IntConsumer;)V
+	public abstract fun getSize ()I
+	public abstract fun valueAt (I)J
 }
 
 public final class com/eignex/klause/ir/IntVars : com/eignex/klause/ir/VarList {
@@ -2376,6 +2491,59 @@ public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/ir/ObjectiveSense;
 	public static fun values ()[Lcom/eignex/klause/ir/ObjectiveSense;
+}
+
+public class com/eignex/klause/ir/Problem {
+	public fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
+	public synthetic fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
+	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
+	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bake (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/propagation/BakedProblem;
+	public static synthetic fun bake$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/propagation/BakedProblem;
+	public final fun getBakeElapsed-UwyO8pc ()J
+	public final fun getBaked ()Lcom/eignex/klause/propagation/PropagationResult;
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getFactors ()[Lcom/eignex/klause/ir/Factor;
+	public final fun getHasFiniteIntDomains ()Z
+	public final fun getHasSymmetryBreaking ()Z
+	public final fun getImpliedFactorMask ()[Z
+	public final fun getIntBounds ()Lcom/eignex/klause/ir/IntBounds;
+	public final fun getIntColumns ()Lcom/eignex/klause/solver/IntColumns;
+	public final fun getNumBoolVars ()I
+	public final fun getNumFactors ()I
+	public final fun getNumIntVars ()I
+	public final fun getNumRealVars ()I
+	public final fun getRealLower ()[D
+	public final fun getRealUpper ()[D
+	public final fun getSharedDomains ()Z
+	public final fun intDomainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
+	public final fun propagate (Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Z)Lcom/eignex/klause/propagation/PropagationResult;
+	public static synthetic fun propagate$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/propagation/PropagationResult;
+	public final fun requireFiniteIntDomains ()[Lcom/eignex/klause/ir/IntDomain;
+	protected final fun setBakeElapsed-LRDsOJo (J)V
+	public final fun withIntDomains ([Lcom/eignex/klause/ir/IntDomain;[Z[Z)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun withIntDomains$default (Lcom/eignex/klause/ir/Problem;[Lcom/eignex/klause/ir/IntDomain;[Z[ZILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+}
+
+public final class com/eignex/klause/ir/ProblemSpec {
+	public fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D)V
+	public synthetic fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getFactors ()[Lcom/eignex/klause/ir/Factor;
+	public final fun getHasSymmetryBreaking ()Z
+	public final fun getImpliedFactorMask ()[Z
+	public final fun getIntBounds ()Lcom/eignex/klause/ir/IntBounds;
+	public final fun getNumBoolVars ()I
+	public final fun getNumIntVars ()I
+	public final fun getNumRealVars ()I
+	public final fun getRealLower ()[D
+	public final fun getRealUpper ()[D
+	public final fun getSeedDeductions ()Lcom/eignex/klause/propagation/PropagationResult;
+	public final fun materialize (Lcom/eignex/klause/solver/IntColumns;)Lcom/eignex/klause/ir/Problem;
+	public final fun materialize ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/Problem;
+	public final fun materializeFiniteBounds ()Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/ir/RealVars : com/eignex/klause/ir/VarList {
@@ -2607,20 +2775,20 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep {
 	public static synthetic fun functionalObjective$default (Lcom/eignex/klause/localsearch/DefinitionalSweep;[I[JJZ[I[JILjava/lang/Object;)Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun getSize ()I
 	public final fun network (II)Lcom/eignex/klause/localsearch/InvariantNetwork;
-	public final fun sweep (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lkotlin/jvm/functions/Function1;)V
-	public static synthetic fun sweep$default (Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun sweep (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun sweep$default (Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$Companion {
-	public final fun infer ([Lcom/eignex/klause/solver/Factor;I[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
-	public static synthetic fun infer$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;[Lcom/eignex/klause/solver/Factor;I[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public final fun infer ([Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public static synthetic fun infer$default (Lcom/eignex/klause/localsearch/DefinitionalSweep$Companion;[Lcom/eignex/klause/ir/Factor;I[ILjava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/localsearch/DefinitionalSweep;
 }
 
 public abstract interface class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
 	public static final field Companion Lcom/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Companion;
 	public static final field NO_WRITE J
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public abstract fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public abstract fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public abstract fun getBoolInputs ()[I
 	public abstract fun getIntInputs ()[I
 	public abstract fun getOut ()I
@@ -2629,8 +2797,8 @@ public abstract interface class com/eignex/klause/localsearch/DefinitionalSweep$
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Bool2Int : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
 	public fun <init> (II)V
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public fun getBoolInputs ()[I
 	public fun getIntInputs ()[I
 	public fun getOut ()I
@@ -2639,8 +2807,8 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Boo
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$BoolFold : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
 	public fun <init> (I[IZ)V
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public fun getBoolInputs ()[I
 	public fun getIntInputs ()[I
 	public fun getOut ()I
@@ -2649,8 +2817,8 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Boo
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$CmpReif : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
 	public fun <init> (I[J[IJLcom/eignex/klause/ir/LinearOp;)V
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public fun getBoolInputs ()[I
 	public fun getIntInputs ()[I
 	public fun getOut ()I
@@ -2662,13 +2830,13 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Com
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$DefaultImpls {
-	public static fun apply (Lcom/eignex/klause/localsearch/DefinitionalSweep$SweepNode;Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
+	public static fun apply (Lcom/eignex/klause/localsearch/DefinitionalSweep$SweepNode;Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$ElementDef : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
 	public fun <init> (II[I[JI)V
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public fun getBoolInputs ()[I
 	public fun getIntInputs ()[I
 	public fun getOut ()I
@@ -2676,8 +2844,8 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Ele
 }
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$IntDef : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public fun getBoolInputs ()[I
 	public fun getIntInputs ()[I
 	public fun getOut ()I
@@ -2686,8 +2854,8 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Int
 
 public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$SetInReif : com/eignex/klause/localsearch/DefinitionalSweep$SweepNode {
 	public fun <init> (II[J)V
-	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)V
-	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/solver/IntDomain;)J
+	public fun apply (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)V
+	public fun eval (Lcom/eignex/klause/solver/Assignment;[Lcom/eignex/klause/ir/IntDomain;)J
 	public fun getBoolInputs ()[I
 	public fun getIntInputs ()[I
 	public fun getOut ()I
@@ -2695,7 +2863,7 @@ public final class com/eignex/klause/localsearch/DefinitionalSweep$SweepNode$Set
 }
 
 public final class com/eignex/klause/localsearch/FactorWeightBook {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
 	public final fun getAllocated ()Z
 	public final fun getBaseFactorWeights ()[D
 	public final fun getFactorWeights ()[D
@@ -2714,8 +2882,8 @@ public final class com/eignex/klause/localsearch/FixedCadenceRestart : com/eigne
 }
 
 public final class com/eignex/klause/localsearch/ImplicitSeeding {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/localsearch/LocalSearchProblem;I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/localsearch/LocalSearchProblem;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/localsearch/LocalSearchProblem;I)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/localsearch/LocalSearchProblem;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getElectedImplicit ()[I
 	public final fun getImplicationGraph ()[[I
 	public final fun getImplicitSeedFactors ()[I
@@ -2856,11 +3024,11 @@ public final class com/eignex/klause/localsearch/LocalSearchParams : com/eignex/
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
 	public final fun getBoolOccurrences ()[[I
 	public final fun getIntOccurrences ()[[I
 	public final fun getInvariants ()[Lcom/eignex/klause/localsearch/Invariant;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex/klause/solver/Session {
@@ -2872,7 +3040,7 @@ public final class com/eignex/klause/localsearch/LocalSearchSession : com/eignex
 	public synthetic fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public fun getDepth ()I
-	public fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun getSolver ()Lcom/eignex/klause/localsearch/LocalSearchSolver;
 	public synthetic fun getSolver ()Lcom/eignex/klause/solver/Solver;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/localsearch/LocalSearchParams;)Lkotlin/sequences/Sequence;
@@ -2934,8 +3102,8 @@ public final class com/eignex/klause/localsearch/LocalSearchSolver : com/eignex/
 }
 
 public final class com/eignex/klause/localsearch/LocalSearchState {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/random/Random;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/localsearch/LocalSearchProblem;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun apply (Lcom/eignex/klause/localsearch/Move;)V
 	public final fun breakScore (Lcom/eignex/klause/localsearch/Move;)I
 	public final fun getAssignment ()Lcom/eignex/klause/solver/Assignment;
@@ -2950,11 +3118,11 @@ public final class com/eignex/klause/localsearch/LocalSearchState {
 	public final fun getInvariants ()Lcom/eignex/klause/localsearch/InvariantNetwork;
 	public final fun getLongPayload ()[J
 	public final fun getMoveSink ()Lcom/eignex/klause/localsearch/MoveSink;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getProjection ()Lcom/eignex/klause/localsearch/LocalSearchProblem;
 	public final fun getRefPayload ()[Ljava/lang/Object;
 	public final fun getRng ()Lkotlin/random/Random;
-	public final fun getRootDomains ()[Lcom/eignex/klause/solver/IntDomain;
+	public final fun getRootDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getSeeding ()Lcom/eignex/klause/localsearch/ImplicitSeeding;
 	public final fun getShaping ()Lcom/eignex/klause/localsearch/ObjectiveShaping;
 	public final fun getStep ()J
@@ -3121,7 +3289,7 @@ public final class com/eignex/klause/localsearch/StagnationRestart : com/eignex/
 }
 
 public final class com/eignex/klause/localsearch/TabuBook {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
 	public final fun getLastTouched ()[J
 	public final fun getStep ()J
 	public final fun getTouchCount ()[I
@@ -3862,22 +4030,22 @@ public final class com/eignex/klause/lowering/dimacs/WcnfDocument {
 }
 
 public final class com/eignex/klause/lowering/dimacs/WcnfProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/WcnfProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;IILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;I)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/WcnfProblem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;IILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getNumOriginalBoolVars ()I
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/lowering/dimacs/WcnfProblemKt {
-	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/CnfDocument;)Lcom/eignex/klause/solver/Problem;
+	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/CnfDocument;)Lcom/eignex/klause/ir/Problem;
 	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/WcnfDocument;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
 }
 
@@ -4005,9 +4173,9 @@ public final class com/eignex/klause/lowering/flatzinc/FlatZincCompilerKt {
 }
 
 public final class com/eignex/klause/lowering/flatzinc/FlatZincProgram {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component10 ()Ljava/util/Map;
 	public final fun component11 ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun component12 ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
@@ -4017,25 +4185,87 @@ public final class com/eignex/klause/lowering/flatzinc/FlatZincProgram {
 	public final fun component5 ()Ljava/util/Map;
 	public final fun component6 ()Ljava/util/Map;
 	public final fun component7 ()Ljava/util/List;
-	public final fun component8 ()Lcom/eignex/klause/backtrack/BacktrackParams;
+	public final fun component8 ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
 	public final fun component9 ()Ljava/util/Map;
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;ILjava/lang/Object;)Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;)Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lowering/flatzinc/SolveDirective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;ILjava/lang/Object;)Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getArraysByName ()Ljava/util/Map;
 	public final fun getBoolVarsByName ()Ljava/util/Map;
-	public final fun getDefaultBacktrackParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun getEnumLabelsByVar ()Ljava/util/Map;
 	public final fun getFloatVarsByName ()Ljava/util/Map;
 	public final fun getIntVarsByName ()Ljava/util/Map;
 	public final fun getLsObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
 	public final fun getOutputItems ()Ljava/util/List;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getSearchHints ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
 	public final fun getSetVarsByName ()Ljava/util/Map;
 	public final fun getSolve ()Lcom/eignex/klause/lowering/flatzinc/SolveDirective;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/flatzinc/FlatZincSearchHints {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;Z)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public final fun component3 ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;Z)Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Ljava/util/List;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;ZILjava/lang/Object;)Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFallbackValueSelector ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public final fun getFallbackVarSelector ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public final fun getSolutionGuided ()Z
+	public final fun getTiers ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/flatzinc/FlatZincSearchTier {
+	public fun <init> ([I[ILcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;)V
+	public synthetic fun <init> ([I[ILcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()[I
+	public final fun component2 ()[I
+	public final fun component3 ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public final fun component4 ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public final fun copy ([I[ILcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;)Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchTier;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchTier;[I[ILcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;ILjava/lang/Object;)Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchTier;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBoolVars ()[I
+	public final fun getIntVars ()[I
+	public final fun getValueSelector ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public final fun getVarSelector ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector : java/lang/Enum {
+	public static final field IndomainMax Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static final field IndomainMedian Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static final field IndomainMiddle Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static final field IndomainMin Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static final field IndomainRandom Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static final field IndomainSplit Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+	public static fun values ()[Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchValueSelector;
+}
+
+public final class com/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector : java/lang/Enum {
+	public static final field DomWdeg Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field InputOrder Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field LargestDomain Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field LargestUpperBound Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field MaxRegret Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field RandomOrder Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field SmallestDomain Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static final field SmallestLowerBound Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
+	public static fun values ()[Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
 }
 
 public final class com/eignex/klause/lowering/flatzinc/FlatZincWriterKt {
@@ -4160,8 +4390,8 @@ public final class com/eignex/klause/lowering/mps/MpsColumn {
 }
 
 public final class com/eignex/klause/lowering/mps/MpsCompiled {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)V
-	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)V
+	public final fun component1 ()Lcom/eignex/klause/ir/ProblemSpec;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Z
 	public final fun component4 ()Ljava/util/List;
@@ -4169,14 +4399,14 @@ public final class com/eignex/klause/lowering/mps/MpsCompiled {
 	public final fun component6 ()Ljava/lang/Double;
 	public final fun component7 ()Z
 	public final fun component8 ()I
-	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)Lcom/eignex/klause/lowering/mps/MpsCompiled;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsCompiled;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZIILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsCompiled;
+	public final fun copy (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZI)Lcom/eignex/klause/lowering/mps/MpsCompiled;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsCompiled;Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZLjava/util/List;JLjava/lang/Double;ZIILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsCompiled;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getColumns ()Ljava/util/List;
 	public final fun getFloatColumns ()I
 	public final fun getHasInnerConstraintApproximation ()Z
 	public final fun getMaximize ()Z
-	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getObjectiveErrorBound ()Ljava/lang/Double;
 	public final fun getObjectiveScale ()J
@@ -4302,19 +4532,19 @@ public final class com/eignex/klause/lowering/opb/OpbLoweringException : java/la
 }
 
 public final class com/eignex/klause/lowering/opb/OpbProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Ljava/util/List;
 	public final fun component4 ()I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)Lcom/eignex/klause/lowering/opb/OpbProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbProblem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbProblem;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;I)Lcom/eignex/klause/lowering/opb/OpbProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/opb/OpbProblem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/List;IILjava/lang/Object;)Lcom/eignex/klause/lowering/opb/OpbProblem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBoolFolds ()Ljava/util/List;
 	public final fun getNumDeclaredVars ()I
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -4394,20 +4624,20 @@ public final class com/eignex/klause/lowering/smtlib/SmtLib {
 }
 
 public final class com/eignex/klause/lowering/smtlib/SmtLibProblem {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/ProblemSpec;
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/ProblemSpec;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Ljava/util/Map;
 	public final fun component5 ()Ljava/util/Map;
 	public final fun component6 ()Lcom/eignex/klause/ir/ObjectiveSense;
-	public final fun copy (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/lowering/smtlib/SmtLibProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/smtlib/SmtLibProblem;Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/lowering/smtlib/SmtLibProblem;
+	public final fun copy (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;)Lcom/eignex/klause/lowering/smtlib/SmtLibProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/smtlib/SmtLibProblem;Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;ILjava/lang/Object;)Lcom/eignex/klause/lowering/smtlib/SmtLibProblem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBoolVarNames ()Ljava/util/Map;
 	public final fun getIntVarNames ()Ljava/util/Map;
-	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getRealVarNames ()Ljava/util/Map;
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
@@ -4426,20 +4656,20 @@ public final class com/eignex/klause/lowering/xcsp3/Xcsp3 {
 }
 
 public final class com/eignex/klause/lowering/xcsp3/Xcsp3Problem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
 	public final fun component2 ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun component3 ()Ljava/util/Map;
 	public final fun component4 ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun component5 ()[I
-	public final fun copy (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[I)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/util/Map;Lcom/eignex/klause/ir/ObjectiveSense;[IILjava/lang/Object;)Lcom/eignex/klause/lowering/xcsp3/Xcsp3Problem;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDefinedVars ()[I
 	public final fun getIntVarNames ()Ljava/util/Map;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -4513,13 +4743,13 @@ public abstract interface class com/eignex/klause/lp/RelaxationBuilder {
 	public abstract fun boolColumn (I)I
 	public abstract fun boolRow ([I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;)V
 	public static synthetic fun boolRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
-	public abstract fun declaredDomain (I)Lcom/eignex/klause/solver/IntDomain;
+	public abstract fun declaredDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public abstract fun hullEnabled ()Z
 	public abstract fun intColumn (I)I
 	public abstract fun linearRow (Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;)V
 	public static synthetic fun linearRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;Lcom/eignex/klause/ir/LinearOp;[I[JJLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
 	public fun liveBool (I)Ljava/lang/Boolean;
-	public abstract fun liveDomain (I)Lcom/eignex/klause/solver/IntDomain;
+	public abstract fun liveDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public fun realColumn (I)I
 	public fun realRow ([I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
@@ -4551,10 +4781,10 @@ public final class com/eignex/klause/lp/bounding/LpAutoConfig {
 	public static final field ENERGETIC_OPS_PER_CHECK J
 	public static final field INSTANCE Lcom/eignex/klause/lp/bounding/LpAutoConfig;
 	public static final field SMALL_HULL_DIM J
-	public final fun recommend (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lp/bounding/LpPlan;)Lcom/eignex/klause/lp/bounding/LpPlan;
-	public static synthetic fun recommend$default (Lcom/eignex/klause/lp/bounding/LpAutoConfig;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lp/bounding/LpPlan;ILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
-	public final fun resolve (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;)Lcom/eignex/klause/lp/bounding/LpPlan;
-	public static synthetic fun resolve$default (Lcom/eignex/klause/lp/bounding/LpAutoConfig;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public final fun recommend (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lp/bounding/LpPlan;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public static synthetic fun recommend$default (Lcom/eignex/klause/lp/bounding/LpAutoConfig;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lp/bounding/LpPlan;ILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public final fun resolve (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public static synthetic fun resolve$default (Lcom/eignex/klause/lp/bounding/LpAutoConfig;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/lp/bounding/LpPlan;ILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
 }
 
 public final class com/eignex/klause/lp/bounding/LpConfig {
@@ -7115,19 +7345,19 @@ public final class com/eignex/klause/presolve/BakeConfig$Companion {
 }
 
 public final class com/eignex/klause/presolve/LpHarvestKt {
-	public static final fun lpHarvest (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/Problem;
-	public static synthetic fun lpHarvest$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/Problem;
-	public static final fun lpHarvestReporting (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/LpHarvestResult;
-	public static synthetic fun lpHarvestReporting$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/LpHarvestResult;
-	public static final fun lpRootBounds (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/Problem;
-	public static synthetic fun lpRootBounds$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/Problem;
-	public static final fun lpRootInfeasible (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;)Z
-	public static synthetic fun lpRootInfeasible$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
+	public static final fun lpHarvest (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun lpHarvest$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static final fun lpHarvestReporting (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/LpHarvestResult;
+	public static synthetic fun lpHarvestReporting$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/presolve/BakeConfig;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/LpHarvestResult;
+	public static final fun lpRootBounds (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/ir/Problem;
+	public static synthetic fun lpRootBounds$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/ir/Problem;
+	public static final fun lpRootInfeasible (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;)Z
+	public static synthetic fun lpRootInfeasible$default (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/lp/bounding/LpPlan;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Z
 }
 
 public final class com/eignex/klause/presolve/LpHarvestResult {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/result/LpHarvestReport;)V
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/result/LpHarvestReport;)V
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getReport ()Lcom/eignex/klause/solver/result/LpHarvestReport;
 }
 
@@ -7142,22 +7372,22 @@ public final class com/eignex/klause/presolve/OpenPresolveResult$Refuted : com/e
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResult$Tightened : com/eignex/klause/presolve/OpenPresolveResult {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;I)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;I)V
 	public final fun getClosedSides ()I
-	public final fun getSpec ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun getSpec ()Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public final class com/eignex/klause/presolve/OpenPresolveResultKt {
-	public static final fun presolveOpen (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/OpenPresolveResult;
-	public static synthetic fun presolveOpen$default (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/OpenPresolveResult;
+	public static final fun presolveOpen (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/OpenPresolveResult;
+	public static synthetic fun presolveOpen$default (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/OpenPresolveResult;
 }
 
 public final class com/eignex/klause/presolve/PassDelta {
 	public fun <init> ()V
-	public fun <init> ([ILjava/util/List;[Lcom/eignex/klause/solver/IntDomain;Lkotlin/jvm/functions/Function1;Z)V
-	public synthetic fun <init> ([ILjava/util/List;[Lcom/eignex/klause/solver/IntDomain;Lkotlin/jvm/functions/Function1;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> ([ILjava/util/List;[Lcom/eignex/klause/ir/IntDomain;Lkotlin/jvm/functions/Function1;Z)V
+	public synthetic fun <init> ([ILjava/util/List;[Lcom/eignex/klause/ir/IntDomain;Lkotlin/jvm/functions/Function1;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getAddedFactors ()Ljava/util/List;
-	public final fun getDomains ()[Lcom/eignex/klause/solver/IntDomain;
+	public final fun getDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getDroppedIndices ()[I
 	public final fun getInfeasible ()Z
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
@@ -7166,41 +7396,41 @@ public final class com/eignex/klause/presolve/PassDelta {
 
 public final class com/eignex/klause/presolve/Presolve {
 	public static final field INSTANCE Lcom/eignex/klause/presolve/Presolve;
-	public final fun aggregateSubSums (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun amoCliques (Lcom/eignex/klause/solver/Problem;)Ljava/util/List;
-	public final fun breakSymmetries (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun breakSymmetries$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun breakValuePrecedence (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun breakValuePrecedence$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun deriveXorUnits (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun eliminateAffineSingletons (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun eliminateAffineSingletons$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun eliminateBlockedClauses (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun eliminateBlockedClauses$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun eliminateBoolVars (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun eliminateBoolVars$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun fixDominatedVariables (Lcom/eignex/klause/solver/Problem;Ljava/util/Map;Ljava/util/Map;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun fixDominatedVariables$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun foldComparisonClauses (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun fuseLinearBounds (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun implicationGraph (Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/util/Cancellation;)[[I
-	public static synthetic fun implicationGraph$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)[[I
-	public final fun maxIntSpan (Lcom/eignex/klause/solver/Problem;)J
-	public final fun mergeAmoCliques (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun mergeAmoCliques$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun mergeDuplicateColumns (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/presolve/SharedIntOccurrence;[I)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun mergeDuplicateColumns$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;Lcom/eignex/klause/presolve/SharedIntOccurrence;[IILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun probe (Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun probe$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun projectSingletonInequalities (Lcom/eignex/klause/solver/Problem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun projectSingletonInequalities$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun reduceDiophantine (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun reduceImplicationGraph (Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/util/Cancellation;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun reduceImplicationGraph$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;ILcom/eignex/klause/util/Cancellation;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun reduceStructural (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun removeRedundantConstraints (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/presolve/PassDelta;
-	public final fun strengthenCoefficients (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
-	public static synthetic fun strengthenCoefficients$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun aggregateSubSums (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun amoCliques (Lcom/eignex/klause/ir/Problem;)Ljava/util/List;
+	public final fun breakSymmetries (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun breakSymmetries$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun breakValuePrecedence (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun breakValuePrecedence$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun deriveXorUnits (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun eliminateAffineSingletons (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun eliminateAffineSingletons$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/SharedIntOccurrence;Z[ILcom/eignex/klause/presolve/AffinePivotOrder;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun eliminateBlockedClauses (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun eliminateBlockedClauses$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun eliminateBoolVars (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun eliminateBoolVars$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun fixDominatedVariables (Lcom/eignex/klause/ir/Problem;Ljava/util/Map;Ljava/util/Map;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun fixDominatedVariables$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun foldComparisonClauses (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun fuseLinearBounds (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun implicationGraph (Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;)[[I
+	public static synthetic fun implicationGraph$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)[[I
+	public final fun maxIntSpan (Lcom/eignex/klause/ir/Problem;)J
+	public final fun mergeAmoCliques (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun mergeAmoCliques$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun mergeDuplicateColumns (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/presolve/SharedIntOccurrence;[I)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun mergeDuplicateColumns$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;Lcom/eignex/klause/presolve/SharedIntOccurrence;[IILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun probe (Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun probe$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun projectSingletonInequalities (Lcom/eignex/klause/ir/Problem;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun projectSingletonInequalities$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun reduceDiophantine (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun reduceImplicationGraph (Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;Ljava/util/Set;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun reduceImplicationGraph$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;ILcom/eignex/klause/util/Cancellation;Ljava/util/Set;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun reduceStructural (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun removeRedundantConstraints (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/presolve/PassDelta;
+	public final fun strengthenCoefficients (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/PassDelta;
+	public static synthetic fun strengthenCoefficients$default (Lcom/eignex/klause/presolve/Presolve;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PassDelta;
 }
 
 public final class com/eignex/klause/presolve/PresolveBudget {
@@ -7309,11 +7539,11 @@ public final class com/eignex/klause/presolve/PresolveEmphasis$Companion {
 }
 
 public final class com/eignex/klause/presolve/PresolveOutcome {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;ZLcom/eignex/klause/solver/objective/LinearObjective;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;ZLcom/eignex/klause/solver/objective/LinearObjective;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;ZLcom/eignex/klause/solver/objective/LinearObjective;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;ZLcom/eignex/klause/solver/objective/LinearObjective;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getChanged ()Z
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
 	public final fun getStats ()Lcom/eignex/klause/solver/result/PresolveStats;
 }
@@ -7345,7 +7575,7 @@ public class com/eignex/klause/presolve/PresolvePass : java/lang/Enum {
 	public static final field STRENGTHEN_COEFFICIENTS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field SUBSTITUTE_BINARY_COLUMNS Lcom/eignex/klause/presolve/PresolvePass;
 	public static final field VALUE_PRECEDENCE Lcom/eignex/klause/presolve/PresolvePass;
-	public fun apply (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/PresolveContext;)Lcom/eignex/klause/presolve/PassDelta;
+	public fun apply (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/PresolveContext;)Lcom/eignex/klause/presolve/PassDelta;
 	public final fun getAutoEligible ()Z
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public final fun getId ()Ljava/lang/String;
@@ -7373,8 +7603,8 @@ public final class com/eignex/klause/presolve/PresolvePass$Stage : java/lang/Enu
 
 public final class com/eignex/klause/presolve/PresolvePipeline {
 	public static final field INSTANCE Lcom/eignex/klause/presolve/PresolvePipeline;
-	public final fun run (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/presolve/PresolveOutcome;
-	public static synthetic fun run$default (Lcom/eignex/klause/presolve/PresolvePipeline;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveOutcome;
+	public final fun run (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)Lcom/eignex/klause/presolve/PresolveOutcome;
+	public static synthetic fun run$default (Lcom/eignex/klause/presolve/PresolvePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/lang/Object;)Lcom/eignex/klause/presolve/PresolveOutcome;
 }
 
 public final class com/eignex/klause/presolve/PresolveTiming : java/lang/Enum {
@@ -7387,25 +7617,25 @@ public final class com/eignex/klause/presolve/PresolveTiming : java/lang/Enum {
 }
 
 public final class com/eignex/klause/presolve/Presolved {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Ljava/util/List;Z)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lkotlin/jvm/functions/Function1;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function1;Ljava/util/List;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lkotlin/jvm/functions/Function1;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getInfeasible ()Z
 	public final fun getPassesFired ()Ljava/util/List;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
 }
 
 public final class com/eignex/klause/presolve/Presolver {
 	public static final field INSTANCE Lcom/eignex/klause/presolve/Presolver;
-	public final fun run (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/presolve/PresolveContext;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/Presolved;
-	public static synthetic fun run$default (Lcom/eignex/klause/presolve/Presolver;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/presolve/PresolveContext;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/Presolved;
+	public final fun run (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/presolve/PresolveContext;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/presolve/Presolved;
+	public static synthetic fun run$default (Lcom/eignex/klause/presolve/Presolver;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/PresolveConfig;Lcom/eignex/klause/presolve/PresolveContext;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/presolve/Presolved;
 }
 
 public final class com/eignex/klause/presolve/RootBaker {
 	public static final field INSTANCE Lcom/eignex/klause/presolve/RootBaker;
-	public final fun bake (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/propagation/PropagationResult;
-	public final fun provenInfeasible (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/solver/Problem;
-	public final fun reseed (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/solver/Problem;
+	public final fun bake (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/propagation/PropagationResult;
+	public final fun provenInfeasible (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/ir/Problem;
+	public final fun reseed (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/presolve/BakeConfig;)Lcom/eignex/klause/ir/Problem;
 }
 
 public final class com/eignex/klause/presolve/SharedIntOccurrence {
@@ -7449,7 +7679,7 @@ public final class com/eignex/klause/propagation/Assumptions$Companion {
 	public static synthetic fun invoke$default (Lcom/eignex/klause/propagation/Assumptions$Companion;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lcom/eignex/klause/propagation/Assumptions;
 }
 
-public final class com/eignex/klause/propagation/BakedProblem : com/eignex/klause/solver/Problem {
+public final class com/eignex/klause/propagation/BakedProblem : com/eignex/klause/ir/Problem {
 }
 
 public abstract interface class com/eignex/klause/propagation/ClauseExchange {
@@ -7554,12 +7784,12 @@ public final class com/eignex/klause/propagation/NoPropagator : com/eignex/klaus
 }
 
 public final class com/eignex/klause/propagation/PropagationProblem {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
 	public final fun getBoolOccurrences ()[[I
 	public final fun getIntOccurrences ()[[I
 	public final fun getNonBoolWatcherBoolOccurrences ()[[I
 	public final fun getNonIntEventWatcherIntOccurrences ()[[I
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getPropagators ()[Lcom/eignex/klause/propagation/Propagator;
 	public final fun getUsesIntEventDeltaConsumers ()Z
 	public final fun getUsesIntEventWatchers ()Z
@@ -7630,8 +7860,8 @@ public final class com/eignex/klause/propagation/PropagationResult$Unsat : com/e
 }
 
 public final class com/eignex/klause/propagation/PropagationSession {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;IZZ)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;IZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;IZZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/util/Cancellation;IZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun addLearnedClause (Lcom/eignex/klause/factor/bool/Clause;IZ)Lcom/eignex/klause/propagation/PropagationResult;
 	public static synthetic fun addLearnedClause$default (Lcom/eignex/klause/propagation/PropagationSession;Lcom/eignex/klause/factor/bool/Clause;IZILjava/lang/Object;)Lcom/eignex/klause/propagation/PropagationResult;
 	public final fun addLearnedPb ([J[IJIZ)Lcom/eignex/klause/propagation/PropagationResult;
@@ -7651,7 +7881,7 @@ public final class com/eignex/klause/propagation/PropagationSession {
 	public final fun getDecisionLevel ()I
 	public final fun getFixpointCancelled ()Z
 	public final fun getLearnedClauseCount ()I
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getProjection ()Lcom/eignex/klause/propagation/PropagationProblem;
 	public final fun getPropagationCount ()J
 	public final fun getUnassignListener ()Lkotlin/jvm/functions/Function1;
@@ -7663,7 +7893,7 @@ public final class com/eignex/klause/propagation/PropagationSession {
 	public final fun implyIntAtMostWithReason (IJ[I)Lcom/eignex/klause/propagation/PropagationResult;
 	public final fun importClause (Lcom/eignex/klause/propagation/SharedClause;)V
 	public final fun installObjectiveBoolBound ([J)Z
-	public final fun intDomain (I)Lcom/eignex/klause/solver/IntDomain;
+	public final fun intDomain (I)Lcom/eignex/klause/ir/IntDomain;
 	public final fun isUnsatAtRoot ()Z
 	public final fun learnedClauseLbd (I)I
 	public final fun learnedClausePermanent (I)Z
@@ -7683,10 +7913,10 @@ public final class com/eignex/klause/propagation/PropagationSession {
 }
 
 public final class com/eignex/klause/propagation/PropagationState {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/propagation/Assumptions;ZZZ)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/propagation/Assumptions;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/propagation/PropagationProblem;Lcom/eignex/klause/propagation/Assumptions;ZZZ)V
 	public synthetic fun <init> (Lcom/eignex/klause/propagation/PropagationProblem;Lcom/eignex/klause/propagation/Assumptions;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/propagation/Assumptions;ZZZ)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/propagation/Assumptions;ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun atomVarEq (IJ)I
 	public final fun atomVarGe (IJ)I
 	public final fun atomVarLe (IJ)I
@@ -7701,17 +7931,17 @@ public final class com/eignex/klause/propagation/PropagationState {
 	public final fun getBoolReason ()[I
 	public final fun getBoolValues ()Lcom/eignex/klause/propagation/PropagationState$BoolView;
 	public final fun getHasBinaryClauses ()Z
-	public final fun getIntDomains ()[Lcom/eignex/klause/solver/IntDomain;
+	public final fun getIntDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getIntLevel ()[I
 	public final fun getIntMaxAntecedents ()[[I
 	public final fun getIntMaxReason ()[I
 	public final fun getIntMinAntecedents ()[[I
 	public final fun getIntMinReason ()[I
 	public final fun getNumDecisions ()I
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getProjection ()Lcom/eignex/klause/propagation/PropagationProblem;
 	public final fun getRefPayload ()Ljava/util/List;
-	public final fun getRootDomains ()[Lcom/eignex/klause/solver/IntDomain;
+	public final fun getRootDomains ()[Lcom/eignex/klause/ir/IntDomain;
 	public final fun getSeeded ()Z
 	public final fun getTotalFactorCount ()I
 	public final fun getUnassignListener ()Lkotlin/jvm/functions/Function1;
@@ -8112,7 +8342,7 @@ public final class com/eignex/klause/solver/Assignment {
 	public final fun getNumBoolVars ()I
 	public final fun getNumIntVars ()I
 	public final fun intValue (I)J
-	public final fun randomize (Lkotlin/random/Random;[Lcom/eignex/klause/solver/IntDomain;)V
+	public final fun randomize (Lkotlin/random/Random;[Lcom/eignex/klause/ir/IntDomain;)V
 	public final fun setBool (IZ)V
 	public final fun setInt (IJ)V
 	public final fun snapshot ()Lcom/eignex/klause/solver/Sample;
@@ -8130,69 +8360,10 @@ public final class com/eignex/klause/solver/ConstListKt {
 	public static final fun longsOrNull (Lcom/eignex/klause/solver/ConstList;)Lcom/eignex/klause/solver/LongConstList;
 }
 
-public abstract interface class com/eignex/klause/solver/Factor {
-	public abstract fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
-	public abstract fun asPropagator ()Lcom/eignex/klause/propagation/Propagator;
-	public fun canSubstituteAffine (IIII)Z
-	public fun getBoolVars ()[I
-	public fun getExactTheoryOwnable ()Z
-	public fun getExtendsObjectiveCone ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
-	public fun getIntVars ()[I
-	public fun getIntegerTheoryOwnable ()Z
-	public fun getLinearRows ()Ljava/util/List;
-	public fun getStructuralKeyWeight ()I
-	public abstract fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
-	public fun isValueAnonymous ()Z
-	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public fun lpSizeEstimate ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public abstract fun remap (Lcom/eignex/klause/ir/VarRemap;)Lcom/eignex/klause/solver/Factor;
-	public fun remapStructuralHash (Lcom/eignex/klause/ir/VarRemap;)I
-	public fun remapValues (Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
-	public abstract fun structuralKey ()Lcom/eignex/klause/ir/StructuralKey;
-	public fun structuralReduce ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public fun substituteAffine (IIII)Lcom/eignex/klause/solver/Factor;
-}
-
-public final class com/eignex/klause/solver/Factor$DefaultImpls {
-	public static fun canSubstituteAffine (Lcom/eignex/klause/solver/Factor;IIII)Z
-	public static fun getBoolVars (Lcom/eignex/klause/solver/Factor;)[I
-	public static fun getExactTheoryOwnable (Lcom/eignex/klause/solver/Factor;)Z
-	public static fun getExtendsObjectiveCone (Lcom/eignex/klause/solver/Factor;)Z
-	public static fun getHullFamily (Lcom/eignex/klause/solver/Factor;)Lcom/eignex/klause/lp/HullFamily;
-	public static fun getIntVars (Lcom/eignex/klause/solver/Factor;)[I
-	public static fun getIntegerTheoryOwnable (Lcom/eignex/klause/solver/Factor;)Z
-	public static fun getLinearRows (Lcom/eignex/klause/solver/Factor;)Ljava/util/List;
-	public static fun getStructuralKeyWeight (Lcom/eignex/klause/solver/Factor;)I
-	public static fun hullFamilyEnabled (Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/lp/HullFlags;)Z
-	public static fun isValueAnonymous (Lcom/eignex/klause/solver/Factor;)Z
-	public static fun linearize (Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/lp/RelaxationBuilder;I)V
-	public static fun lpSizeEstimate (Lcom/eignex/klause/solver/Factor;[Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
-	public static fun remapStructuralHash (Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/ir/VarRemap;)I
-	public static fun remapValues (Lcom/eignex/klause/solver/Factor;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/Factor;
-	public static fun structuralReduce (Lcom/eignex/klause/solver/Factor;[Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/FactorReduction;
-	public static fun substituteAffine (Lcom/eignex/klause/solver/Factor;IIII)Lcom/eignex/klause/solver/Factor;
-}
-
-public abstract interface class com/eignex/klause/solver/FactorReduction {
-}
-
-public final class com/eignex/klause/solver/FactorReduction$Rewrite : com/eignex/klause/solver/FactorReduction {
-	public fun <init> (Ljava/util/List;Ljava/util/Map;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getReplacement ()Ljava/util/List;
-	public final fun getTightenedBounds ()Ljava/util/Map;
-}
-
-public final class com/eignex/klause/solver/FactorReduction$Unchanged : com/eignex/klause/solver/FactorReduction {
-	public static final field INSTANCE Lcom/eignex/klause/solver/FactorReduction$Unchanged;
-}
-
 public final class com/eignex/klause/solver/FiniteIntColumns : com/eignex/klause/solver/IntColumns {
-	public fun <init> ([Lcom/eignex/klause/solver/IntDomain;Z)V
-	public synthetic fun <init> ([Lcom/eignex/klause/solver/IntDomain;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
+	public fun <init> ([Lcom/eignex/klause/ir/IntDomain;Z)V
+	public synthetic fun <init> ([Lcom/eignex/klause/ir/IntDomain;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
 	public fun column (I)Lcom/eignex/klause/solver/IntColumn;
 	public fun getSize ()I
 }
@@ -8214,20 +8385,20 @@ public final class com/eignex/klause/solver/IntColumn$Bounded : com/eignex/klaus
 }
 
 public final class com/eignex/klause/solver/IntColumn$Finite : com/eignex/klause/solver/IntColumn {
-	public fun <init> (Lcom/eignex/klause/solver/IntDomain;)V
-	public final fun component1 ()Lcom/eignex/klause/solver/IntDomain;
-	public final fun copy (Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/IntColumn$Finite;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/IntColumn$Finite;Lcom/eignex/klause/solver/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/solver/IntColumn$Finite;
+	public fun <init> (Lcom/eignex/klause/ir/IntDomain;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/IntDomain;
+	public final fun copy (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/solver/IntColumn$Finite;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/IntColumn$Finite;Lcom/eignex/klause/ir/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/solver/IntColumn$Finite;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDomain ()Lcom/eignex/klause/solver/IntDomain;
+	public final fun getDomain ()Lcom/eignex/klause/ir/IntDomain;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public abstract class com/eignex/klause/solver/IntColumns {
-	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
+	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
 	public abstract fun column (I)Lcom/eignex/klause/solver/IntColumn;
-	public final fun domainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
+	public final fun domainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
 	public abstract fun getSize ()I
 }
 
@@ -8240,56 +8411,9 @@ public final class com/eignex/klause/solver/IntConsts : com/eignex/klause/solver
 	public fun toLongArray ()[J
 }
 
-public abstract interface class com/eignex/klause/solver/IntConsumer {
-	public abstract fun accept (J)V
-}
-
-public abstract interface class com/eignex/klause/solver/IntDomain {
-	public static final field Companion Lcom/eignex/klause/solver/IntDomain$Companion;
-	public fun clamp (J)J
-	public abstract fun contains (J)Z
-	public abstract fun excludeValue (J)Lcom/eignex/klause/solver/IntDomain;
-	public abstract fun excludeValues ([J)Lcom/eignex/klause/solver/IntDomain;
-	public abstract fun forEachHole (Lcom/eignex/klause/solver/IntConsumer;)V
-	public abstract fun forEachHoleInRange (JJLcom/eignex/klause/solver/IntConsumer;)V
-	public abstract fun getHoleCount ()J
-	public abstract fun getMax ()J
-	public abstract fun getMin ()J
-	public fun getValueCount ()J
-	public fun higher (J)J
-	public abstract fun includeInteriorValue (J)Lcom/eignex/klause/solver/IntDomain;
-	public fun isFixed ()Z
-	public fun lower (J)J
-	public fun span ()Lcom/eignex/klause/solver/IntSpan;
-	public abstract fun spanOrNull (J)Lcom/eignex/klause/solver/IntSpan;
-	public static synthetic fun spanOrNull$default (Lcom/eignex/klause/solver/IntDomain;JILjava/lang/Object;)Lcom/eignex/klause/solver/IntSpan;
-	public abstract fun withMaxAtMost (J)Lcom/eignex/klause/solver/IntDomain;
-	public abstract fun withMinAtLeast (J)Lcom/eignex/klause/solver/IntDomain;
-}
-
-public final class com/eignex/klause/solver/IntDomain$Companion {
-	public final fun invoke (JJ)Lcom/eignex/klause/solver/IntDomain;
-}
-
-public final class com/eignex/klause/solver/IntDomain$DefaultImpls {
-	public static fun clamp (Lcom/eignex/klause/solver/IntDomain;J)J
-	public static fun getValueCount (Lcom/eignex/klause/solver/IntDomain;)J
-	public static fun higher (Lcom/eignex/klause/solver/IntDomain;J)J
-	public static fun isFixed (Lcom/eignex/klause/solver/IntDomain;)Z
-	public static fun lower (Lcom/eignex/klause/solver/IntDomain;J)J
-	public static fun span (Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/IntSpan;
-	public static synthetic fun spanOrNull$default (Lcom/eignex/klause/solver/IntDomain;JILjava/lang/Object;)Lcom/eignex/klause/solver/IntSpan;
-}
-
 public final class com/eignex/klause/solver/IntDomainKt {
-	public static final fun getValues (Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/IntSpan;
-	public static final fun randomValue (Lcom/eignex/klause/solver/IntDomain;Lkotlin/random/Random;)J
-}
-
-public abstract interface class com/eignex/klause/solver/IntSpan {
-	public abstract fun forEach (Lcom/eignex/klause/solver/IntConsumer;)V
-	public abstract fun getSize ()I
-	public abstract fun valueAt (I)J
+	public static final fun getValues (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/IntSpan;
+	public static final fun randomValue (Lcom/eignex/klause/ir/IntDomain;Lkotlin/random/Random;)J
 }
 
 public abstract interface class com/eignex/klause/solver/LongConstList : com/eignex/klause/solver/ConstList {
@@ -8310,7 +8434,7 @@ public final class com/eignex/klause/solver/LongConsts : com/eignex/klause/solve
 
 public final class com/eignex/klause/solver/MixedIntColumns : com/eignex/klause/solver/IntColumns {
 	public fun <init> ([Lcom/eignex/klause/solver/IntColumn;)V
-	public fun allFiniteOrNull ()[Lcom/eignex/klause/solver/IntDomain;
+	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
 	public fun column (I)Lcom/eignex/klause/solver/IntColumn;
 	public fun getSize ()I
 }
@@ -8329,59 +8453,6 @@ public final class com/eignex/klause/solver/Optimizer$DefaultImpls {
 	public static fun sample (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
 	public static fun samples (Lcom/eignex/klause/solver/Optimizer;Lcom/eignex/klause/count/SamplingConfig;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun session (Lcom/eignex/klause/solver/Optimizer;)Lcom/eignex/klause/solver/Session;
-}
-
-public class com/eignex/klause/solver/Problem {
-	public fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;Ljava/util/List;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (II[Lcom/eignex/klause/solver/IntDomain;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun bake (Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/propagation/BakedProblem;
-	public static synthetic fun bake$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/propagation/BakedProblem;
-	public final fun getBakeElapsed-UwyO8pc ()J
-	public final fun getBaked ()Lcom/eignex/klause/propagation/PropagationResult;
-	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
-	public final fun getFactors ()[Lcom/eignex/klause/solver/Factor;
-	public final fun getHasFiniteIntDomains ()Z
-	public final fun getHasSymmetryBreaking ()Z
-	public final fun getImpliedFactorMask ()[Z
-	public final fun getIntBounds ()Lcom/eignex/klause/ir/IntBounds;
-	public final fun getIntColumns ()Lcom/eignex/klause/solver/IntColumns;
-	public final fun getNumBoolVars ()I
-	public final fun getNumFactors ()I
-	public final fun getNumIntVars ()I
-	public final fun getNumRealVars ()I
-	public final fun getRealLower ()[D
-	public final fun getRealUpper ()[D
-	public final fun getSharedDomains ()Z
-	public final fun intDomainOrNull (I)Lcom/eignex/klause/solver/IntDomain;
-	public final fun propagate (Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;Z)Lcom/eignex/klause/propagation/PropagationResult;
-	public static synthetic fun propagate$default (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/propagation/Assumptions;Lcom/eignex/klause/util/Cancellation;ZILjava/lang/Object;)Lcom/eignex/klause/propagation/PropagationResult;
-	public final fun requireFiniteIntDomains ()[Lcom/eignex/klause/solver/IntDomain;
-	protected final fun setBakeElapsed-LRDsOJo (J)V
-	public final fun withIntDomains ([Lcom/eignex/klause/solver/IntDomain;[Z[Z)Lcom/eignex/klause/solver/Problem;
-	public static synthetic fun withIntDomains$default (Lcom/eignex/klause/solver/Problem;[Lcom/eignex/klause/solver/IntDomain;[Z[ZILjava/lang/Object;)Lcom/eignex/klause/solver/Problem;
-}
-
-public final class com/eignex/klause/solver/ProblemSpec {
-	public fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[D)V
-	public synthetic fun <init> (ILcom/eignex/klause/ir/IntBounds;[Lcom/eignex/klause/solver/Factor;Lcom/eignex/klause/propagation/PropagationResult;Lcom/eignex/klause/util/Cancellation;[ZZI[D[DILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
-	public final fun getFactors ()[Lcom/eignex/klause/solver/Factor;
-	public final fun getHasSymmetryBreaking ()Z
-	public final fun getImpliedFactorMask ()[Z
-	public final fun getIntBounds ()Lcom/eignex/klause/ir/IntBounds;
-	public final fun getNumBoolVars ()I
-	public final fun getNumIntVars ()I
-	public final fun getNumRealVars ()I
-	public final fun getRealLower ()[D
-	public final fun getRealUpper ()[D
-	public final fun getSeedDeductions ()Lcom/eignex/klause/propagation/PropagationResult;
-	public final fun materialize (Lcom/eignex/klause/solver/IntColumns;)Lcom/eignex/klause/solver/Problem;
-	public final fun materialize ([Lcom/eignex/klause/solver/IntDomain;)Lcom/eignex/klause/solver/Problem;
-	public final fun materializeFiniteBounds ()Lcom/eignex/klause/solver/Problem;
 }
 
 public final class com/eignex/klause/solver/RealConsts : com/eignex/klause/solver/ConstList {
@@ -8447,7 +8518,7 @@ public abstract interface class com/eignex/klause/solver/Session : java/lang/Aut
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static synthetic fun exactCount$default (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
 	public abstract fun getDepth ()I
-	public fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public abstract fun getSolver ()Lcom/eignex/klause/solver/Solver;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -8467,7 +8538,7 @@ public final class com/eignex/klause/solver/Session$DefaultImpls {
 	public static synthetic fun count$default (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/CountConfig;ILjava/lang/Object;)Lcom/eignex/klause/count/Count;
 	public static fun exactCount (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public static synthetic fun exactCount$default (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/count/ExactCountConfig;ILjava/lang/Object;)Lkotlin/sequences/Sequence;
-	public static fun getProblem (Lcom/eignex/klause/solver/Session;)Lcom/eignex/klause/solver/Problem;
+	public static fun getProblem (Lcom/eignex/klause/solver/Session;)Lcom/eignex/klause/ir/Problem;
 	public static fun improvements (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public static fun minimize (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
 	public static fun sample (Lcom/eignex/klause/solver/Session;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/SampleResult;
@@ -8572,7 +8643,7 @@ public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solve
 	public fun enumerate (Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun exactCount (Lcom/eignex/klause/count/ExactCountConfig;)Lkotlin/sequences/Sequence;
 	public fun getDepth ()I
-	public fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun getSolver ()Lcom/eignex/klause/solver/Solver;
 	public fun improvements (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lkotlin/sequences/Sequence;
 	public fun minimize (Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/SolverParams;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -8643,8 +8714,8 @@ public final class com/eignex/klause/solver/objective/Objective$DefaultImpls {
 }
 
 public final class com/eignex/klause/solver/objective/ObjectivesKt {
-	public static final fun maximizeInt (Lcom/eignex/klause/solver/Problem;I)Lcom/eignex/klause/solver/objective/LinearObjective;
-	public static final fun minimizeInt (Lcom/eignex/klause/solver/Problem;I)Lcom/eignex/klause/solver/objective/LinearObjective;
+	public static final fun maximizeInt (Lcom/eignex/klause/ir/Problem;I)Lcom/eignex/klause/solver/objective/LinearObjective;
+	public static final fun minimizeInt (Lcom/eignex/klause/ir/Problem;I)Lcom/eignex/klause/solver/objective/LinearObjective;
 }
 
 public final class com/eignex/klause/solver/objective/SingleIntObjective {
@@ -8661,7 +8732,7 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 }
 
 public final class com/eignex/klause/solver/pipeline/ComponentPlan {
-	public final fun cpProjection (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/pipeline/CpProblemProjection;
+	public final fun cpProjection (Lcom/eignex/klause/ir/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/pipeline/CpProblemProjection;
 	public final fun factorOwner (I)Lcom/eignex/klause/solver/pipeline/FactorOwner;
 	public final fun getCpIntVars ()[I
 	public final fun getHasCpComponent ()Z
@@ -8670,17 +8741,17 @@ public final class com/eignex/klause/solver/pipeline/ComponentPlan {
 	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public final fun getUnplaceable ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
 	public final fun intOwner (I)Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
-	public final fun materialize (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/Problem;
-	public final fun theoryFragment (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun materialize (Lcom/eignex/klause/ir/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/ir/Problem;
+	public final fun theoryFragment (Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public final class com/eignex/klause/solver/pipeline/ComponentPlanKt {
-	public static final fun componentPlan (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
+	public static final fun componentPlan (Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ComponentPlan;
 }
 
 public final class com/eignex/klause/solver/pipeline/CpProblemProjection {
 	public final fun cpId (I)I
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun sourceId (I)I
 }
 
@@ -8743,29 +8814,29 @@ public final class com/eignex/klause/solver/pipeline/FinitePipeline {
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelinePreparation {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/objective/LinearObjective;Lkotlin/jvm/functions/Function1;Lcom/eignex/klause/solver/result/PresolveStats;)V
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getReconstruct ()Lkotlin/jvm/functions/Function1;
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
-	public fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public final fun getExplicitPresolveConfig ()Z
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 	public final fun getPresolveBudget ()Lcom/eignex/klause/presolve/PresolveBudget;
 	public final fun getPresolveConfig ()Lcom/eignex/klause/presolve/PresolveConfig;
-	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSolutionSetSensitive ()Z
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
-	public static final fun backtrackSolver (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/backtrack/BacktrackSolver;
-	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
+	public static final fun backtrackSolver (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/backtrack/BacktrackSolver;
+	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
 }
 
 public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlan {
@@ -8850,7 +8921,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Genera
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/pipeline/ProblemPipeline;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/pipeline/ProblemPipeline;)V
 	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryEngine;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
@@ -8881,7 +8952,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryMinimizer {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;)V
 	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public final fun minimize (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryMinimizer;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
@@ -8939,10 +9010,10 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Z)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getMaximize ()Z
-	public final fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public final fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
 }
 
@@ -8998,8 +9069,8 @@ public final class com/eignex/klause/solver/pipeline/PlannedSearch {
 }
 
 public final class com/eignex/klause/solver/pipeline/PlannedSearchKt {
-	public static final fun search (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
-	public static synthetic fun search$default (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
+	public static final fun search (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/ir/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
+	public static synthetic fun search$default (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/ir/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
 }
 
 public abstract class com/eignex/klause/solver/pipeline/PortfolioPlan {
@@ -9052,8 +9123,8 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang
 }
 
 public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
-	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
-	public static final fun supportsExactLra (Lcom/eignex/klause/solver/ProblemSpec;)Z
+	public static final fun sourceRoute (Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final fun supportsExactLra (Lcom/eignex/klause/ir/ProblemSpec;)Z
 }
 
 public final class com/eignex/klause/solver/pipeline/UnplaceableColumn {
@@ -9117,8 +9188,8 @@ public final class com/eignex/klause/solver/pipeline/VariablePartition {
 }
 
 public final class com/eignex/klause/solver/pipeline/VariablePartitionKt {
-	public static final fun variablePartition (Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/solver/pipeline/VariablePartition;
-	public static final fun variablePartition (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/VariablePartition;
+	public static final fun variablePartition (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/VariablePartition;
+	public static final fun variablePartition (Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/VariablePartition;
 }
 
 public final class com/eignex/klause/solver/result/ConflictAnalysisStats {
@@ -10451,7 +10522,7 @@ public final class com/eignex/klause/solver/search/TheoryComponent$DefaultImpls 
 
 public abstract interface class com/eignex/klause/theory/Theory {
 	public abstract fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public abstract fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public abstract fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public abstract interface class com/eignex/klause/theory/TheoryCheck {
@@ -10489,7 +10560,7 @@ public final class com/eignex/klause/theory/TheoryCheck$Sat : com/eignex/klause/
 }
 
 public final class com/eignex/klause/theory/TheoryComponentFactoryKt {
-	public static final fun theoryComponent (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/search/TheoryComponent;
+	public static final fun theoryComponent (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/search/TheoryComponent;
 }
 
 public abstract interface class com/eignex/klause/theory/TheoryContext {
@@ -10534,8 +10605,8 @@ public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/k
 }
 
 public final class com/eignex/klause/theory/difference/DifferenceSearchComponent : com/eignex/klause/solver/search/TheoryComponent {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;[I)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;[I)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/ProblemSpec;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
@@ -10548,9 +10619,9 @@ public final class com/eignex/klause/theory/difference/DifferenceSearchComponent
 }
 
 public final class com/eignex/klause/theory/difference/DifferenceTheorySolver : com/eignex/klause/theory/Theory {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public final class com/eignex/klause/theory/lia/GeneralLiaAssignment {
@@ -10567,8 +10638,8 @@ public final class com/eignex/klause/theory/lia/GeneralLiaAssignment {
 }
 
 public final class com/eignex/klause/theory/lia/GeneralLiaSearchComponent : com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/TheoryComponent {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;[ILkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;[ILkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;[ILkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/ProblemSpec;[ILkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
@@ -10582,9 +10653,9 @@ public final class com/eignex/klause/theory/lia/GeneralLiaSearchComponent : com/
 }
 
 public final class com/eignex/klause/theory/lia/GeneralLiaSolver : com/eignex/klause/theory/Theory {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
@@ -10603,8 +10674,8 @@ public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com/eignex/klause/solver/search/SearchBrancher, com/eignex/klause/solver/search/TheoryComponent {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lkotlin/jvm/functions/Function2;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lkotlin/jvm/functions/Function2;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lkotlin/jvm/functions/Function2;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun assert (Lcom/eignex/klause/solver/search/SearchDecision;Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentResult;
 	public fun check (Lcom/eignex/klause/solver/search/SearchContext;)Lcom/eignex/klause/solver/search/ComponentCheck;
 	public fun contributeModel (Lcom/eignex/klause/solver/search/SearchModel;Lcom/eignex/klause/solver/search/SearchContext;)V
@@ -10618,9 +10689,9 @@ public final class com/eignex/klause/theory/qflra/ExactLiraSearchComponent : com
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraSolver : com/eignex/klause/theory/Theory {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
@@ -10637,9 +10708,9 @@ public final class com/eignex/klause/theory/qflra/ExactLraAssignment {
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLraSolver : com/eignex/klause/theory/Theory {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;)V
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
-	public fun getModel ()Lcom/eignex/klause/solver/ProblemSpec;
+	public fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 }
 
 public final class com/eignex/klause/util/Bits {

@@ -10,7 +10,7 @@ import com.eignex.klause.util.IntArrayList
 internal object StructuralReduction {
 
     /**
-     * Apply every factor's own [Factor.structuralReduce] under the current domains, rewriting globals
+     * Apply every factor's own `Factor.structuralReduce` under the current domains, rewriting globals
      * that their structure pins into simpler / lower-arity factors. The per-factor reductions are
      * solution-set exact (the hook's contract), so the pass preserves the solution set; the driver only
      * collects the replacements, intersects any returned bound narrowings into the domains, and rebuilds.

@@ -6,7 +6,7 @@ import kotlin.random.Random
 
 /**
  * Median value (middle of the domain *by position*) first, then alternating outward
- * (`indomain_median`). [com.eignex.klause.solver.IntSpan.valueAt] is sparse-aware, so the median always lands on a
+ * (`indomain_median`). `IntSpan.valueAt` is sparse-aware, so the median always lands on a
  * present value; differs from [IndomainMiddle] (mean of bounds) when the domain is skewed or holey.
  */
 object IndomainMedian : ValueSelector {

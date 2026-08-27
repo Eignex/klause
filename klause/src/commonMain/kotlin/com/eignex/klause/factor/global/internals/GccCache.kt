@@ -36,7 +36,7 @@ internal class GccIncrementalState(state: PropagationState, val xs: IntArray, va
      *  `cover[k]` (counted). Reversible; forward-monotone (a variable only ever pins once). */
     val pinnedCover = RevIntArray(state, n, -1)
 
-    /** Each var's [IntDomain] at its last fire — the delta base. Reversible, rolls back with the domains
+    /** Each var's `IntDomain` at its last fire — the delta base. Reversible, rolls back with the domains
      *  so `current ⊆ domRef` (deletions-only) always holds forward. */
     val domRef = Array(n) { RevRef<IntDomain?>(state, null) }
 }

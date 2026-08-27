@@ -14,7 +14,7 @@ internal object Probing {
 
     /**
      * Probing as a fixpoint presolve pass. For each free Boolean candidate it tentatively pins the
-     * literal, runs the engine's own [Problem.propagate], and harvests only deductions that hold in
+     * literal, runs the engine's own `Problem.propagate`, and harvests only deductions that hold in
      * **every** solution, so the problem's satisfiability and optimum are untouched:
      *  - **failed literal**: pinning `v = true` propagates to a conflict, so `v` is false in every
      *    solution — emit the unit clause `!v` (mirror for the negative polarity). Soundness rests

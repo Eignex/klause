@@ -10,7 +10,7 @@ import com.eignex.kumulant.stream.lock
 
 /**
  * An append-only, de-duplicated pool of session-portable learned nogoods ([SharedClause]) shared
- * across the backtrack arms of one [com.eignex.klause.solver.Problem]. Arms publish their glue
+ * across the backtrack arms of one `Problem`. Arms publish their glue
  * clauses and pull others' via a per-arm cursor ([PoolClauseExchange]); every arm benefits from
  * every arm's learning.
  *
