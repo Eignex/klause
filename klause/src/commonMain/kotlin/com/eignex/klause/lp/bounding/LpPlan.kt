@@ -66,7 +66,7 @@ data class LpPlan(
      */
     val boundAdaptiveWork: Boolean = true,
     /**
-     * Deterministic ceiling on what the node LP may spend per node the search explores, in [LpWork]
+     * Deterministic ceiling on what the node LP may spend per node the search explores, in [com.eignex.klause.lp.engine.LpWork]
      * operations ([LpEffortGovernor]). Exceeding it, having pruned nothing, demotes the LP to its floor
      * budget; a prune spares it permanently. `0` disables the rule.
      *
@@ -77,8 +77,8 @@ data class LpPlan(
      */
     val boundMaxOpsPerNode: Long = 20_000L,
     /**
-     * Work ([LpWork] operations) the one-shot pre-search root LP may spend on cut harvesting and the
-     * root bound, or `0` to bound it by the clock alone.
+     * Work — [com.eignex.klause.lp.engine.LpWork] operations — the one-shot pre-search root LP may
+     * spend on cut harvesting and the root bound, or `0` to bound it by the clock alone.
      *
      * The root harvest decides which cuts every later node inherits, so time-boxing it makes the whole
      * search a function of machine speed — the single largest remaining source of run-to-run drift once
@@ -255,7 +255,7 @@ data class LpPlan(
      * relaxation's tax does not scale with it — a 300s budget must not let a useless LP grind for 75s
      * before the breaker disables it. On the short budgets where the fraction is the smaller term this
      * ceiling never binds, so it leaves the fraction in charge there. Set above the wall time a cheap,
-     * ladder-managed LP takes to reach its warmup, so the [LpWallBreaker]'s warmup guard — not this cap —
+     * ladder-managed LP takes to reach its warmup, so the [LpEffortGovernor]'s warmup guard — not this cap —
      * is what spares such an LP; it keeps the tax a few seconds regardless of budget for the rest.
      */
     val lpWallBudgetMillis: Long = 5_000,

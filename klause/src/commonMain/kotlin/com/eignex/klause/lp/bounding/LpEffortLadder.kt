@@ -67,7 +67,7 @@ internal class LpEffortLadder(
 ) {
     companion object {
         /** Default solves before the first demotion — the ladder's judging window. Shared with the
-         *  [LpWallBreaker] so its "the ladder has had its chance" guard uses the same threshold. */
+         *  [LpEffortGovernor] so its "the ladder has had its chance" guard uses the same threshold. */
         const val DEFAULT_WARMUP: Int = 64
 
         /** Default first backoff interval; `Int.MAX_VALUE` instead makes a demotion irreversible. */

@@ -124,6 +124,7 @@ internal class ResumableMinimize(
     // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
     // which is the solve start for that path.
     private val startMark = TimeSource.Monotonic.markNow()
+
     // Node budget for the current slice, or -1 when the slice is bounded by the clock instead. A node
     // budget makes the pause point a property of the search rather than of machine load, which is what
     // lets two identical invocations report identical counters.
