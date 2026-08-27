@@ -4608,11 +4608,11 @@ public final class com/eignex/klause/lp/bounding/LpParams {
 
 public final class com/eignex/klause/lp/bounding/LpPlan {
 	public fun <init> ()V
-	public fun <init> (ZIIIZZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZ)V
-	public synthetic fun <init> (ZIIIZZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (ZIIIZJZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZ)V
+	public synthetic fun <init> (ZIIIZJZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Z
-	public final fun component10 ()I
-	public final fun component11 ()Z
+	public final fun component10 ()Z
+	public final fun component11 ()I
 	public final fun component12 ()Z
 	public final fun component13 ()Z
 	public final fun component14 ()Z
@@ -4625,23 +4625,23 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun component20 ()Z
 	public final fun component21 ()Z
 	public final fun component22 ()Z
-	public final fun component23 ()D
-	public final fun component24 ()J
-	public final fun component25 ()D
-	public final fun component26 ()J
-	public final fun component27 ()Z
+	public final fun component23 ()Z
+	public final fun component24 ()D
+	public final fun component25 ()J
+	public final fun component26 ()D
+	public final fun component27 ()J
 	public final fun component28 ()Z
 	public final fun component29 ()Z
 	public final fun component3 ()I
 	public final fun component30 ()Z
-	public final fun component31 ()I
-	public final fun component32 ()Z
+	public final fun component31 ()Z
+	public final fun component32 ()I
 	public final fun component33 ()Z
 	public final fun component34 ()Z
-	public final fun component35 ()I
-	public final fun component36 ()Z
-	public final fun component37 ()I
-	public final fun component38 ()Z
+	public final fun component35 ()Z
+	public final fun component36 ()I
+	public final fun component37 ()Z
+	public final fun component38 ()I
 	public final fun component39 ()Z
 	public final fun component4 ()I
 	public final fun component40 ()Z
@@ -4652,19 +4652,21 @@ public final class com/eignex/klause/lp/bounding/LpPlan {
 	public final fun component45 ()Z
 	public final fun component46 ()Z
 	public final fun component47 ()Z
+	public final fun component48 ()Z
 	public final fun component5 ()Z
-	public final fun component6 ()Z
+	public final fun component6 ()J
 	public final fun component7 ()Z
 	public final fun component8 ()Z
 	public final fun component9 ()Z
-	public final fun copy (ZIIIZZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZ)Lcom/eignex/klause/lp/bounding/LpPlan;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lp/bounding/LpPlan;ZIIIZZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZIILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public final fun copy (ZIIIZJZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZ)Lcom/eignex/klause/lp/bounding/LpPlan;
+	public static synthetic fun copy$default (Lcom/eignex/klause/lp/bounding/LpPlan;ZIIIZJZZZZIZZZZZZZZZZZZDJDJZZZZIZZZIZIZZZZZZZZZZIILjava/lang/Object;)Lcom/eignex/klause/lp/bounding/LpPlan;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAutoOffReprobe ()Z
 	public final fun getBooleanRlt ()Z
 	public final fun getBoundAdaptiveWork ()Z
 	public final fun getBoundEvery ()I
 	public final fun getBoundMaxDepth ()I
+	public final fun getBoundMaxOpsPerNode ()J
 	public final fun getBoundMaxPivots ()I
 	public final fun getBounding ()Z
 	public final fun getBranching ()Z
@@ -7066,8 +7068,8 @@ public final class com/eignex/klause/portfolio/PortfolioWorker$Companion {
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public static final field Companion Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJI)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJI)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
@@ -7075,8 +7077,8 @@ public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/
 }
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio$Companion {
-	public final fun exp3 (Ljava/util/List;JDDJJDJI)Lcom/eignex/klause/portfolio/SequentialPortfolio;
-	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public final fun exp3 (Ljava/util/List;JDDJJDJIJ)Lcom/eignex/klause/portfolio/SequentialPortfolio;
+	public static synthetic fun exp3$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDDJJDJIJILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
 	public final fun ucb1 (Ljava/util/List;JDJJDJI)Lcom/eignex/klause/portfolio/SequentialPortfolio;
 	public static synthetic fun ucb1$default (Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;Ljava/util/List;JDJJDJIILjava/lang/Object;)Lcom/eignex/klause/portfolio/SequentialPortfolio;
 }
@@ -8406,11 +8408,13 @@ public abstract interface class com/eignex/klause/solver/ResumableSearch : java/
 	public fun close ()V
 	public abstract fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public abstract fun isDone ()Z
-	public abstract fun runSlice (Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public abstract fun runSlice (Lcom/eignex/klause/util/Cancellation;JJLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
+	public fun runSlice (Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
 }
 
 public final class com/eignex/klause/solver/ResumableSearch$DefaultImpls {
 	public static fun close (Lcom/eignex/klause/solver/ResumableSearch;)V
+	public static fun runSlice (Lcom/eignex/klause/solver/ResumableSearch;Lcom/eignex/klause/util/Cancellation;JLkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;
 }
 
 public final class com/eignex/klause/solver/Sample {
@@ -9187,16 +9191,17 @@ public final class com/eignex/klause/solver/result/LpHarvestReport {
 
 public final class com/eignex/klause/solver/result/LpStats {
 	public fun <init> ()V
-	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;)V
-	public synthetic fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ZLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;)V
+	public synthetic fun <init> (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ZLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component10 ()Lcom/eignex/kumulant/stat/summary/MaxResult;
 	public final fun component11 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component12 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component13 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component14 ()Lcom/eignex/kumulant/stat/summary/SumResult;
-	public final fun component15 ()Lcom/eignex/kumulant/stat/summary/SumResult;
-	public final fun component16 ()Lcom/eignex/kumulant/stat/summary/MaxResult;
+	public final fun component15 ()Z
+	public final fun component16 ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun component17 ()Lcom/eignex/kumulant/stat/summary/MaxResult;
 	public final fun component2 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component3 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component4 ()D
@@ -9205,8 +9210,8 @@ public final class com/eignex/klause/solver/result/LpStats {
 	public final fun component7 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component8 ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun component9 ()Lcom/eignex/kumulant/stat/summary/MaxResult;
-	public final fun copy (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;)Lcom/eignex/klause/solver/result/LpStats;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LpStats;
+	public final fun copy (Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ZLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;)Lcom/eignex/klause/solver/result/LpStats;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/result/LpStats;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;DJLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/MaxResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/SumResult;ZLcom/eignex/kumulant/stat/summary/SumResult;Lcom/eignex/kumulant/stat/summary/MaxResult;ILjava/lang/Object;)Lcom/eignex/klause/solver/result/LpStats;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBackjumps ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getComponentBlocks ()Lcom/eignex/kumulant/stat/summary/MaxResult;
@@ -9223,6 +9228,7 @@ public final class com/eignex/klause/solver/result/LpStats {
 	public final fun getRootBound ()D
 	public final fun getSeeded ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public final fun getSolves ()Lcom/eignex/kumulant/stat/summary/SumResult;
+	public final fun getWallBackstop ()Z
 	public final fun getWorkOps ()Lcom/eignex/kumulant/stat/summary/SumResult;
 	public fun hashCode ()I
 	public final fun mergedWith (Lcom/eignex/klause/solver/result/LpStats;)Lcom/eignex/klause/solver/result/LpStats;

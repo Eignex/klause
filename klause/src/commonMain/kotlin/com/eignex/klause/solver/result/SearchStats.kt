@@ -54,8 +54,18 @@ internal class SearchStatsSink {
     val peakDepth: MaxStat = MaxStat()
     val depthMean: MeanStat = MeanStat()
 
+    /**
+     * Nodes visited so far, as a plain counter.
+     *
+     * [nodes] holds the same total but reading it allocates a result, and this is read on the search's
+     * pause check — every node — by a scheduler slicing on node count rather than on a clock.
+     */
+    var nodeCount: Long = 0L
+        private set
+
     /** Call on every visited decision node so [nodes] increments and the depth stats see the observation. */
     fun observeNode(depth: Int) {
+        nodeCount++
         nodes.update(1.0)
         peakDepth.update(depth.toDouble())
         depthMean.update(depth.toDouble())

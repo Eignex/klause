@@ -45,6 +45,23 @@ interface ResumableSearch : AutoCloseable {
         global: Cancellation,
         sliceMillis: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
+    ): MinimizeResult? = runSlice(global, sliceMillis, sliceNodes = -1L, onIncumbent)
+
+    /**
+     * As [runSlice], but ending the slice after [sliceNodes] search nodes rather than after
+     * [sliceMillis] when [sliceNodes] is non-negative.
+     *
+     * A slice measured in nodes is reproducible: the same invocation pauses at the same point in the
+     * same tree, so the counters a run reports do not depend on how loaded the machine was. A slice
+     * measured in milliseconds cannot be — it lands somewhere different every time, and every statistic
+     * downstream of the search inherits that. [sliceMillis] still applies as the outer bound, so a
+     * node budget that turns out to be enormous cannot overrun the deadline.
+     */
+    fun runSlice(
+        global: Cancellation,
+        sliceMillis: Long,
+        sliceNodes: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult?
 
     /** True once [runSlice] has returned a terminal verdict; further calls are no-ops. */
