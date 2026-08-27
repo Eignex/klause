@@ -10581,7 +10581,6 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
         final fun <set-bakeElapsed>(kotlin.time/Duration) // com.eignex.klause.solver/Problem.bakeElapsed.<set-bakeElapsed>|<set-bakeElapsed>(kotlin.time.Duration){}[0]
 
     final fun bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver/BakedProblem // com.eignex.klause.solver/Problem.bake|bake(com.eignex.klause.util.Cancellation){}[0]
-    final fun foldIntoDomains(com.eignex.klause.propagation/PropagationResult) // com.eignex.klause.solver/Problem.foldIntoDomains|foldIntoDomains(com.eignex.klause.propagation.PropagationResult){}[0]
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.solver/IntDomain? // com.eignex.klause.solver/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
     final fun propagate(com.eignex.klause.solver/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.propagate|propagate(com.eignex.klause.solver.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
     final fun requireFiniteIntDomains(): kotlin/Array<com.eignex.klause.solver/IntDomain> // com.eignex.klause.solver/Problem.requireFiniteIntDomains|requireFiniteIntDomains(){}[0]
