@@ -10134,6 +10134,10 @@ final class com.eignex.klause.solver.search/SearchBoolValue : com.eignex.klause.
 final class com.eignex.klause.solver.search/SearchCancellationPoller { // com.eignex.klause.solver.search/SearchCancellationPoller|null[0]
     constructor <init>(kotlin.time/TimeSource.WithComparableMarks = ...) // com.eignex.klause.solver.search/SearchCancellationPoller.<init>|<init>(kotlin.time.TimeSource.WithComparableMarks){}[0]
 
+    final var fixedCadence // com.eignex.klause.solver.search/SearchCancellationPoller.fixedCadence|{}fixedCadence[0]
+        final fun <get-fixedCadence>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchCancellationPoller.fixedCadence.<get-fixedCadence>|<get-fixedCadence>(){}[0]
+        final fun <set-fixedCadence>(kotlin/Boolean) // com.eignex.klause.solver.search/SearchCancellationPoller.fixedCadence.<set-fixedCadence>|<set-fixedCadence>(kotlin.Boolean){}[0]
+
     final fun due(): kotlin/Boolean // com.eignex.klause.solver.search/SearchCancellationPoller.due|due(){}[0]
     final fun rearm() // com.eignex.klause.solver.search/SearchCancellationPoller.rearm|rearm(){}[0]
     final fun reset() // com.eignex.klause.solver.search/SearchCancellationPoller.reset|reset(){}[0]
@@ -10201,6 +10205,10 @@ final class com.eignex.klause.solver.search/SearchRealValue : com.eignex.klause.
 }
 
 final class com.eignex.klause.solver.search/SearchRun { // com.eignex.klause.solver.search/SearchRun|null[0]
+    final var fixedCancellationCadence // com.eignex.klause.solver.search/SearchRun.fixedCancellationCadence|{}fixedCancellationCadence[0]
+        final fun <get-fixedCancellationCadence>(): kotlin/Boolean // com.eignex.klause.solver.search/SearchRun.fixedCancellationCadence.<get-fixedCancellationCadence>|<get-fixedCancellationCadence>(){}[0]
+        final fun <set-fixedCancellationCadence>(kotlin/Boolean) // com.eignex.klause.solver.search/SearchRun.fixedCancellationCadence.<set-fixedCancellationCadence>|<set-fixedCancellationCadence>(kotlin.Boolean){}[0]
+
     final fun next(): com.eignex.klause.solver.search/SearchRunEvent // com.eignex.klause.solver.search/SearchRun.next|next(){}[0]
     final fun reset() // com.eignex.klause.solver.search/SearchRun.reset|reset(){}[0]
 }

@@ -761,6 +761,19 @@ class SearchRun internal constructor(
     private var started = false
     private val cancellationPoller = SearchCancellationPoller()
 
+    /**
+     * Poll the cancellation token on a fixed cadence rather than a time-adaptive one.
+     *
+     * A run stops where it polls, so an adaptive cadence makes the stopping point of a *counted* budget
+     * depend on machine speed. A caller pausing this run on a node budget sets this so the pause lands
+     * on the same node every time. See [SearchCancellationPoller.fixedCadence].
+     */
+    var fixedCancellationCadence: Boolean
+        get() = cancellationPoller.fixedCadence
+        set(value) {
+            cancellationPoller.fixedCadence = value
+        }
+
     init {
         params.restart.beginRun()
     }
