@@ -1,4 +1,4 @@
-package com.eignex.klause.formats.mps
+package com.eignex.klause.lowering.mps
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -23,6 +23,9 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.nextUp
+
+/** Raised when an MPS source model cannot be represented by klause's lowering. */
+class MpsLoweringException(msg: String) : IllegalArgumentException("MPS: $msg")
 
 /** One MPS column in declaration order, for rendering a solution value back by name. */
 data class MpsColumn(
@@ -103,7 +106,7 @@ fun MpsModel.toProblem(): MpsCompiled {
     for (c in constraints) {
         if (c.indices.isEmpty()) {
             if (!emptyRowHolds(c.lower, c.upper)) {
-                throw MpsFormatException("constraint row '${c.name}' has no variables but its bound is infeasible")
+                throw MpsLoweringException("constraint row '${c.name}' has no variables but its bound is infeasible")
             }
             continue
         }
@@ -344,7 +347,7 @@ private class IndicatorGuards(
         val v = variables[indicator.column]
         // A continuous column is LP-only, with no CP variable to equality-test, so it cannot gate a row.
         if (!v.integer) {
-            throw MpsFormatException(
+            throw MpsLoweringException(
                 "INDICATORS row '$rowName' names continuous column '${v.name}'; an indicator must be integer",
             )
         }
@@ -441,12 +444,12 @@ private fun MpsModel.objectiveApproximationError(scale: RowScale, isFloat: Boole
         if (delta == 0.0) return@forEachIndexed
         val variable = variables[index]
         val lower = intLowerOrNull(variable.lower)
-            ?: mpsError("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
+            ?: throw MpsLoweringException("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
         val upper = intUpperOrNull(variable.upper)
-            ?: mpsError("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
+            ?: throw MpsLoweringException("objective drops a term on unbounded column '${variable.name}', so its error is unbounded")
         error += delta * maxOf(abs(lower.toDouble()), abs(upper.toDouble()))
     }
-    if (!error.isFinite()) mpsError("objective approximation error exceeds a finite double")
+    if (!error.isFinite()) throw MpsLoweringException("objective approximation error exceeds a finite double")
     return error
 }
 
