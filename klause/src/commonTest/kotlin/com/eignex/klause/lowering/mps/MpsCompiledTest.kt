@@ -72,7 +72,7 @@ class MpsCompiledTest {
 
     @Test
     fun `an underflowing objective term on an unbounded column is rejected`() {
-        val error = assertFailsWith<MpsFormatException> {
+        val error = assertFailsWith<MpsLoweringException> {
             MpsModel(
                 "m",
                 ObjectiveSense.MINIMIZE,
