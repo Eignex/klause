@@ -10704,8 +10704,7 @@ final object com.eignex.klause.formats.dimacs/Dimacs { // com.eignex.klause.form
 }
 
 final object com.eignex.klause.formats.json/JsonSchema { // com.eignex.klause.formats.json/JsonSchema|null[0]
-    final fun parseCompiled(kotlin/String): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.formats.json/JsonSchema.parseCompiled|parseCompiled(kotlin.String){}[0]
-    final fun parseProblem(kotlin/String): com.eignex.klause.solver/Problem // com.eignex.klause.formats.json/JsonSchema.parseProblem|parseProblem(kotlin.String){}[0]
+    final fun parse(kotlin/String): com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry> // com.eignex.klause.formats.json/JsonSchema.parse|parse(kotlin.String){}[0]
 }
 
 final object com.eignex.klause.formats.mps/Mps { // com.eignex.klause.formats.mps/Mps|null[0]
@@ -10991,6 +10990,7 @@ final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/suppor
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
+final fun (com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/minus(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/minus|minus@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/plus(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/plus|plus@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/times(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]

@@ -624,7 +624,9 @@ public final class com/eignex/klause/compile/CompiledSchema {
 
 public final class com/eignex/klause/compile/CompilerKt {
 	public static final fun compile (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static final fun compile (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;)Lcom/eignex/klause/compile/CompiledSchema;
 	public static synthetic fun compile$default (Lcom/eignex/klause/schema/VariableSchema;Lcom/eignex/klause/config/KlauseConfig;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static synthetic fun compile$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
 }
 
 public final class com/eignex/klause/config/BoolConfigSpec : com/eignex/klause/config/ConfigSpec {
@@ -2397,8 +2399,7 @@ public final class com/eignex/klause/formats/json/JsonFormatException : com/eign
 
 public final class com/eignex/klause/formats/json/JsonSchema {
 	public static final field INSTANCE Lcom/eignex/klause/formats/json/JsonSchema;
-	public final fun parseCompiled (Ljava/lang/String;)Lcom/eignex/klause/compile/CompiledSchema;
-	public final fun parseProblem (Ljava/lang/String;)Lcom/eignex/klause/solver/Problem;
+	public final fun parse (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
 }
 
 public final class com/eignex/klause/formats/minizinc/OznApplier {
