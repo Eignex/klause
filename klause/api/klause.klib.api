@@ -4712,35 +4712,6 @@ final class com.eignex.klause.formats.smtlib/UnsupportedSmtException : com.eigne
     constructor <init>(kotlin/String) // com.eignex.klause.formats.smtlib/UnsupportedSmtException.<init>|<init>(kotlin.String){}[0]
 }
 
-final class com.eignex.klause.formats.xcsp3/UnsupportedXcsp3Exception : com.eignex.klause.formats/FormatException { // com.eignex.klause.formats.xcsp3/UnsupportedXcsp3Exception|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.formats.xcsp3/UnsupportedXcsp3Exception.<init>|<init>(kotlin.String){}[0]
-}
-
-final class com.eignex.klause.formats.xcsp3/Xcsp3Problem { // com.eignex.klause.formats.xcsp3/Xcsp3Problem|null[0]
-    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.formats.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
-
-    final val definedVars // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definedVars|{}definedVars[0]
-        final fun <get-definedVars>(): kotlin/IntArray // com.eignex.klause.formats.xcsp3/Xcsp3Problem.definedVars.<get-definedVars>|<get-definedVars>(){}[0]
-    final val intVarNames // com.eignex.klause.formats.xcsp3/Xcsp3Problem.intVarNames|{}intVarNames[0]
-        final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
-    final val objective // com.eignex.klause.formats.xcsp3/Xcsp3Problem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.xcsp3/Xcsp3Problem.objective.<get-objective>|<get-objective>(){}[0]
-    final val problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.problem.<get-problem>|<get-problem>(){}[0]
-    final val sense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.sense|{}sense[0]
-        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.sense.<get-sense>|<get-sense>(){}[0]
-
-    final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component2|component2(){}[0]
-    final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component3|component3(){}[0]
-    final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component4|component4(){}[0]
-    final fun component5(): kotlin/IntArray // com.eignex.klause.formats.xcsp3/Xcsp3Problem.component5|component5(){}[0]
-    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.xcsp3/Xcsp3Problem.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.xcsp3/Xcsp3Problem.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.formats.xcsp3/Xcsp3Problem.toString|toString(){}[0]
-}
-
 final class com.eignex.klause.formats.xcsp3/XmlElement { // com.eignex.klause.formats.xcsp3/XmlElement|null[0]
     constructor <init>(kotlin/String, kotlin.collections/Map<kotlin/String, kotlin/String>, kotlin.collections/List<com.eignex.klause.formats.xcsp3/XmlElement>, kotlin/String) // com.eignex.klause.formats.xcsp3/XmlElement.<init>|<init>(kotlin.String;kotlin.collections.Map<kotlin.String,kotlin.String>;kotlin.collections.List<com.eignex.klause.formats.xcsp3.XmlElement>;kotlin.String){}[0]
 
@@ -6326,6 +6297,35 @@ final class com.eignex.klause.lowering.opb/OpbTerm { // com.eignex.klause.loweri
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbTerm.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbTerm.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbTerm.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.xcsp3/UnsupportedXcsp3Exception : com.eignex.klause.formats/FormatException { // com.eignex.klause.lowering.xcsp3/UnsupportedXcsp3Exception|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.lowering.xcsp3/UnsupportedXcsp3Exception.<init>|<init>(kotlin.String){}[0]
+}
+
+final class com.eignex.klause.lowering.xcsp3/Xcsp3Problem { // com.eignex.klause.lowering.xcsp3/Xcsp3Problem|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
+
+    final val definedVars // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.definedVars|{}definedVars[0]
+        final fun <get-definedVars>(): kotlin/IntArray // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.definedVars.<get-definedVars>|<get-definedVars>(){}[0]
+    final val intVarNames // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.intVarNames|{}intVarNames[0]
+        final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
+    final val objective // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.objective.<get-objective>|<get-objective>(){}[0]
+    final val problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.problem.<get-problem>|<get-problem>(){}[0]
+    final val sense // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.sense|{}sense[0]
+        final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.sense.<get-sense>|<get-sense>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component4|component4(){}[0]
+    final fun component5(): kotlin/IntArray // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component5|component5(){}[0]
+    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.lowering.xcsp3/Xcsp3Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.lowering/FloatBucketing { // com.eignex.klause.lowering/FloatBucketing|null[0]
@@ -10722,11 +10722,6 @@ final object com.eignex.klause.formats.smtlib/SmtLib { // com.eignex.klause.form
     final fun parse(kotlin/String, kotlin/Long = ..., kotlin/Long = ..., kotlin/Boolean = ...): com.eignex.klause.formats.smtlib/SmtLibProblem // com.eignex.klause.formats.smtlib/SmtLib.parse|parse(kotlin.String;kotlin.Long;kotlin.Long;kotlin.Boolean){}[0]
 }
 
-final object com.eignex.klause.formats.xcsp3/Xcsp3 { // com.eignex.klause.formats.xcsp3/Xcsp3|null[0]
-    final fun parse(com.eignex.klause.util/CharSource): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3.parse|parse(com.eignex.klause.util.CharSource){}[0]
-    final fun parse(kotlin/String): com.eignex.klause.formats.xcsp3/Xcsp3Problem // com.eignex.klause.formats.xcsp3/Xcsp3.parse|parse(kotlin.String){}[0]
-}
-
 final object com.eignex.klause.ir/Lit { // com.eignex.klause.ir/Lit|null[0]
     final fun evaluate(kotlin/Int, kotlin/Boolean): kotlin/Boolean // com.eignex.klause.ir/Lit.evaluate|evaluate(kotlin.Int;kotlin.Boolean){}[0]
     final fun isPositive(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/Lit.isPositive|isPositive(kotlin.Int){}[0]
@@ -10777,6 +10772,11 @@ final object com.eignex.klause.localsearch.strategy/WalkSat { // com.eignex.klau
 }
 
 final object com.eignex.klause.localsearch/NoInvariant : com.eignex.klause.localsearch/Invariant // com.eignex.klause.localsearch/NoInvariant|null[0]
+
+final object com.eignex.klause.lowering.xcsp3/Xcsp3 { // com.eignex.klause.lowering.xcsp3/Xcsp3|null[0]
+    final fun parse(com.eignex.klause.util/CharSource): com.eignex.klause.lowering.xcsp3/Xcsp3Problem // com.eignex.klause.lowering.xcsp3/Xcsp3.parse|parse(com.eignex.klause.util.CharSource){}[0]
+    final fun parse(kotlin/String): com.eignex.klause.lowering.xcsp3/Xcsp3Problem // com.eignex.klause.lowering.xcsp3/Xcsp3.parse|parse(kotlin.String){}[0]
+}
 
 final object com.eignex.klause.lp.bounding/LpAutoConfig { // com.eignex.klause.lp.bounding/LpAutoConfig|null[0]
     final const val ENERGETIC_OPS_PER_CHECK // com.eignex.klause.lp.bounding/LpAutoConfig.ENERGETIC_OPS_PER_CHECK|{}ENERGETIC_OPS_PER_CHECK[0]
