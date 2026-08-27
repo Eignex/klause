@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.solver.Sample
 
 /**
