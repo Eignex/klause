@@ -43,15 +43,6 @@ open class Problem(
      */
     val hasSymmetryBreaking: Boolean = false,
     /**
-     * Skip the defensive copy of finite domains: when `true`, the passed array is shared as-is rather than
-     * copied. Internal to an already-folded propagation construction (the incremental
-     * [com.eignex.klause.presolve.PresolveSession] and the SMT/MPS front-ends supply a re-propagated array
-     * read — never mutated — within one firing and rebuilt on the next change, so sharing saves an
-     * O([numIntVars]) copy per firing). A raw `Problem` leaves this off and copies, so nothing it is
-     * constructed from can alias its domains.
-     */
-    val sharedDomains: Boolean = false,
-    /**
      * Number of LP-only continuous (real) variables; ids occupy `[0, numRealVars)` in a namespace
      * separate from the integer and Boolean ones. A real variable is present in the LP relaxation as a
      * continuous column but absent from CP search — it has no [requireFiniteIntDomains] entry, no trail, and is never
@@ -159,7 +150,6 @@ open class Problem(
         factors: Array<Factor>,
         impliedFactorMask: BooleanArray? = null,
         hasSymmetryBreaking: Boolean = false,
-        sharedDomains: Boolean = false,
         numRealVars: Int = 0,
         realLower: DoubleArray = EmptyDoubleArray,
         realUpper: DoubleArray = EmptyDoubleArray,
@@ -171,11 +161,10 @@ open class Problem(
     ) : this(
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
-        intColumns = FiniteIntColumns(intDomains, sharedDomains),
+        intColumns = FiniteIntColumns(intDomains),
         factors = factors,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
-        sharedDomains = sharedDomains,
         numRealVars = numRealVars,
         realLower = realLower,
         realUpper = realUpper,

@@ -44,6 +44,10 @@ fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem 
 internal val Problem.propagationCancellation: Cancellation
     get() = (this as? BakedProblem)?.cancellation ?: Cancellation.Never
 
+/** Whether this is a presolve pass view whose domains already carry its root deductions. */
+internal val Problem.isFoldedPropagationView: Boolean
+    get() = (this as? BakedProblem)?.alreadyFolded == true
+
 /** Append a root-inert factor to an already baked propagation projection. */
 internal fun Problem.withAppendedFactor(extra: Factor): BakedProblem = BakedProblem(
     numBoolVars = numBoolVars,

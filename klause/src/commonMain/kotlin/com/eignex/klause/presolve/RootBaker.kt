@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
+import com.eignex.klause.propagation.isFoldedPropagationView
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagationCancellation
 import com.eignex.klause.solver.Factor
@@ -39,7 +40,7 @@ object RootBaker {
      * initiates it, so no `solver → presolve` cycle.
      */
     fun reseed(problem: Problem, config: BakeConfig): Problem {
-        if (!config.anyEnabled || problem.sharedDomains) return problem
+        if (!config.anyEnabled || problem.isFoldedPropagationView) return problem
         val extra = bake(problem, config)
         if (extra === problem.baked) return problem
         return BakedProblem(

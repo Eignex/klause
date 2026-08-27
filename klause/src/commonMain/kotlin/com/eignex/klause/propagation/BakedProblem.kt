@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.FiniteIntColumns
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -34,15 +35,14 @@ class BakedProblem internal constructor(
     packedOpenIntHi: Bits? = null,
     modelBounds: IntBounds? = null,
     internal val cancellation: Cancellation = Cancellation.Never,
-    alreadyFolded: Boolean = false,
+    internal val alreadyFolded: Boolean = false,
 ) : Problem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
-    intDomains = intDomains,
+    intColumns = FiniteIntColumns(intDomains, shared = alreadyFolded),
     factors = factors,
     impliedFactorMask = impliedFactorMask,
     hasSymmetryBreaking = hasSymmetryBreaking,
-    sharedDomains = alreadyFolded,
     numRealVars = numRealVars,
     realLower = realLower,
     realUpper = realUpper,
