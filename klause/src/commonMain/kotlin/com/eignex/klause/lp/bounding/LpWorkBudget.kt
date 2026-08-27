@@ -15,7 +15,7 @@ package com.eignex.klause.lp.bounding
  *    progress, so double it;
  *  - **stopped short, degenerate** — it was stalling among tied columns, so shrink it;
  *  - **reached the optimum, not degenerate** — the model's own size predicts the cost better than any
- *    history, so reset to [sizeBudget];
+ *    history, so reset to the size baseline the caller supplies;
  *  - **reached the optimum, degenerate** — shrink harder still.
  *
  * Bounded by [minOps] and [maxOps]: the floor keeps a weak bound coming rather than switching the LP off,
