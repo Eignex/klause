@@ -645,7 +645,7 @@ abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause
 
 abstract interface <#A: com.eignex.klause.solver/SolverParams> com.eignex.klause.solver/Solver { // com.eignex.klause.solver/Solver|null[0]
     abstract val problem // com.eignex.klause.solver/Solver.problem|{}problem[0]
-        abstract fun <get-problem>(): com.eignex.klause.solver/BakedProblem // com.eignex.klause.solver/Solver.problem.<get-problem>|<get-problem>(){}[0]
+        abstract fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver/Solver.problem.<get-problem>|<get-problem>(){}[0]
 
     abstract fun enumerate(#A): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Solver.enumerate|enumerate(1:0){}[0]
     abstract fun samples(#A): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.solver/Solver.samples|samples(1:0){}[0]
@@ -3281,11 +3281,11 @@ final class com.eignex.klause.backtrack/BacktrackRecipe { // com.eignex.klause.b
 
 final class com.eignex.klause.backtrack/BacktrackSolver : com.eignex.klause.solver/Optimizer<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/ResumableOptimizer<com.eignex.klause.backtrack/BacktrackParams>, com.eignex.klause.solver/Solver<com.eignex.klause.backtrack/BacktrackParams> { // com.eignex.klause.backtrack/BacktrackSolver|null[0]
     constructor <init>(com.eignex.klause.compile/CompiledSchema) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.compile.CompiledSchema){}[0]
+    constructor <init>(com.eignex.klause.propagation/BakedProblem) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.propagation.BakedProblem){}[0]
     constructor <init>(com.eignex.klause.schema/VariableSchema) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.schema.VariableSchema){}[0]
-    constructor <init>(com.eignex.klause.solver/BakedProblem) // com.eignex.klause.backtrack/BacktrackSolver.<init>|<init>(com.eignex.klause.solver.BakedProblem){}[0]
 
     final val problem // com.eignex.klause.backtrack/BacktrackSolver.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.solver/BakedProblem // com.eignex.klause.backtrack/BacktrackSolver.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.backtrack/BacktrackSolver.problem.<get-problem>|<get-problem>(){}[0]
 
     final fun describe(com.eignex.klause.backtrack/BacktrackParams): kotlin/String // com.eignex.klause.backtrack/BacktrackSolver.describe|describe(com.eignex.klause.backtrack.BacktrackParams){}[0]
     final fun enumerate(): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.backtrack/BacktrackSolver.enumerate|enumerate(){}[0]
@@ -3385,10 +3385,10 @@ final class com.eignex.klause.brute/BruteForceParams : com.eignex.klause.solver/
 }
 
 final class com.eignex.klause.brute/BruteForceSolver : com.eignex.klause.solver/Optimizer<com.eignex.klause.brute/BruteForceParams>, com.eignex.klause.solver/Solver<com.eignex.klause.brute/BruteForceParams> { // com.eignex.klause.brute/BruteForceSolver|null[0]
-    constructor <init>(com.eignex.klause.solver/BakedProblem) // com.eignex.klause.brute/BruteForceSolver.<init>|<init>(com.eignex.klause.solver.BakedProblem){}[0]
+    constructor <init>(com.eignex.klause.propagation/BakedProblem) // com.eignex.klause.brute/BruteForceSolver.<init>|<init>(com.eignex.klause.propagation.BakedProblem){}[0]
 
     final val problem // com.eignex.klause.brute/BruteForceSolver.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.solver/BakedProblem // com.eignex.klause.brute/BruteForceSolver.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.brute/BruteForceSolver.problem.<get-problem>|<get-problem>(){}[0]
 
     final fun describe(com.eignex.klause.brute/BruteForceParams): kotlin/String // com.eignex.klause.brute/BruteForceSolver.describe|describe(com.eignex.klause.brute.BruteForceParams){}[0]
     final fun enumerate(com.eignex.klause.brute/BruteForceParams): kotlin.sequences/Sequence<com.eignex.klause.solver/Sample> // com.eignex.klause.brute/BruteForceSolver.enumerate|enumerate(com.eignex.klause.brute.BruteForceParams){}[0]
@@ -5705,8 +5705,8 @@ final class com.eignex.klause.localsearch/LocalSearchSession : com.eignex.klause
 
 final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.solver/Optimizer<com.eignex.klause.localsearch/LocalSearchParams>, com.eignex.klause.solver/Solver<com.eignex.klause.localsearch/LocalSearchParams> { // com.eignex.klause.localsearch/LocalSearchSolver|null[0]
     constructor <init>(com.eignex.klause.compile/CompiledSchema) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.compile.CompiledSchema){}[0]
+    constructor <init>(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.localsearch.strategy/SourceDrivenStrategy = ..., com.eignex.klause.localsearch.strategy/SourceDrivenStrategy? = ..., com.eignex.klause.localsearch/RestartPolicy = ..., kotlin/Boolean = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy?;com.eignex.klause.localsearch.RestartPolicy;kotlin.Boolean;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Boolean;kotlin.Boolean){}[0]
     constructor <init>(com.eignex.klause.schema/VariableSchema) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.schema.VariableSchema){}[0]
-    constructor <init>(com.eignex.klause.solver/BakedProblem, com.eignex.klause.localsearch.strategy/SourceDrivenStrategy = ..., com.eignex.klause.localsearch.strategy/SourceDrivenStrategy? = ..., com.eignex.klause.localsearch/RestartPolicy = ..., kotlin/Boolean = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // com.eignex.klause.localsearch/LocalSearchSolver.<init>|<init>(com.eignex.klause.solver.BakedProblem;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy;com.eignex.klause.localsearch.strategy.SourceDrivenStrategy?;com.eignex.klause.localsearch.RestartPolicy;kotlin.Boolean;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Boolean;kotlin.Boolean){}[0]
 
     final val definitionalSweep // com.eignex.klause.localsearch/LocalSearchSolver.definitionalSweep|{}definitionalSweep[0]
         final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.localsearch/LocalSearchSolver.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
@@ -5717,7 +5717,7 @@ final class com.eignex.klause.localsearch/LocalSearchSolver : com.eignex.klause.
     final val perMoveInvariants // com.eignex.klause.localsearch/LocalSearchSolver.perMoveInvariants|{}perMoveInvariants[0]
         final fun <get-perMoveInvariants>(): kotlin/Boolean // com.eignex.klause.localsearch/LocalSearchSolver.perMoveInvariants.<get-perMoveInvariants>|<get-perMoveInvariants>(){}[0]
     final val problem // com.eignex.klause.localsearch/LocalSearchSolver.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.solver/BakedProblem // com.eignex.klause.localsearch/LocalSearchSolver.problem.<get-problem>|<get-problem>(){}[0]
+        final fun <get-problem>(): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.localsearch/LocalSearchSolver.problem.<get-problem>|<get-problem>(){}[0]
     final val restartPolicy // com.eignex.klause.localsearch/LocalSearchSolver.restartPolicy|{}restartPolicy[0]
         final fun <get-restartPolicy>(): com.eignex.klause.localsearch/RestartPolicy // com.eignex.klause.localsearch/LocalSearchSolver.restartPolicy.<get-restartPolicy>|<get-restartPolicy>(){}[0]
     final val seedImplicitOnRestart // com.eignex.klause.localsearch/LocalSearchSolver.seedImplicitOnRestart|{}seedImplicitOnRestart[0]
@@ -9020,6 +9020,8 @@ final class com.eignex.klause.presolve/Presolved { // com.eignex.klause.presolve
 
 final class com.eignex.klause.presolve/SharedIntOccurrence // com.eignex.klause.presolve/SharedIntOccurrence|null[0]
 
+final class com.eignex.klause.propagation/BakedProblem : com.eignex.klause.solver/Problem // com.eignex.klause.propagation/BakedProblem|null[0]
+
 final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.solver.search/SearchBrancher, com.eignex.klause.solver.search/SearchConflictResolver, com.eignex.klause.solver.search/SearchModelBlocker { // com.eignex.klause.propagation/CpSearchComponent|null[0]
     constructor <init>(com.eignex.klause.propagation/PropagationSession, kotlin/IntArray? = ..., com.eignex.klause.propagation/CpBranching = ...) // com.eignex.klause.propagation/CpSearchComponent.<init>|<init>(com.eignex.klause.propagation.PropagationSession;kotlin.IntArray?;com.eignex.klause.propagation.CpBranching){}[0]
 
@@ -10107,8 +10109,6 @@ final class com.eignex.klause.solver/Assumptions { // com.eignex.klause.solver/A
     }
 }
 
-final class com.eignex.klause.solver/BakedProblem : com.eignex.klause.solver/Problem // com.eignex.klause.solver/BakedProblem|null[0]
-
 final class com.eignex.klause.solver/ComponentPlan { // com.eignex.klause.solver/ComponentPlan|null[0]
     final val cpIntVars // com.eignex.klause.solver/ComponentPlan.cpIntVars|{}cpIntVars[0]
         final fun <get-cpIntVars>(): kotlin/IntArray // com.eignex.klause.solver/ComponentPlan.cpIntVars.<get-cpIntVars>|<get-cpIntVars>(){}[0]
@@ -10657,7 +10657,7 @@ open class com.eignex.klause.solver/Problem { // com.eignex.klause.solver/Proble
         final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.solver/Problem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
         final fun <set-bakeElapsed>(kotlin.time/Duration) // com.eignex.klause.solver/Problem.bakeElapsed.<set-bakeElapsed>|<set-bakeElapsed>(kotlin.time.Duration){}[0]
 
-    final fun bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver/BakedProblem // com.eignex.klause.solver/Problem.bake|bake(com.eignex.klause.util.Cancellation){}[0]
+    final fun bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.solver/Problem.bake|bake(com.eignex.klause.util.Cancellation){}[0]
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.solver/IntDomain? // com.eignex.klause.solver/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
     final fun propagate(com.eignex.klause.solver/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.solver/Problem.propagate|propagate(com.eignex.klause.solver.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
     final fun requireFiniteIntDomains(): kotlin/Array<com.eignex.klause.solver/IntDomain> // com.eignex.klause.solver/Problem.requireFiniteIntDomains|requireFiniteIntDomains(){}[0]
@@ -10902,8 +10902,8 @@ final object com.eignex.klause.portfolio/LsRecipeSweep { // com.eignex.klause.po
 }
 
 final object com.eignex.klause.portfolio/PortfolioBuilder { // com.eignex.klause.portfolio/PortfolioBuilder|null[0]
-    final fun build(com.eignex.klause.solver/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? = ...): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/PortfolioBuilder.build|build(com.eignex.klause.solver.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
-    final fun buildExplicit(com.eignex.klause.solver/BakedProblem, kotlin.collections/List<kotlin/String>, kotlin/Int, com.eignex.klause.portfolio/Kind, kotlin/Long = ..., kotlin/Double = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? = ...): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/PortfolioBuilder.buildExplicit|buildExplicit(com.eignex.klause.solver.BakedProblem;kotlin.collections.List<kotlin.String>;kotlin.Int;com.eignex.klause.portfolio.Kind;kotlin.Long;kotlin.Double;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
+    final fun build(com.eignex.klause.propagation/BakedProblem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? = ...): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/PortfolioBuilder.build|build(com.eignex.klause.propagation.BakedProblem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
+    final fun buildExplicit(com.eignex.klause.propagation/BakedProblem, kotlin.collections/List<kotlin/String>, kotlin/Int, com.eignex.klause.portfolio/Kind, kotlin/Long = ..., kotlin/Double = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., com.eignex.klause.solver.objective/IncrementalObjective? = ..., com.eignex.klause.localsearch/DefinitionalSweep? = ..., kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? = ...): kotlin.collections/List<com.eignex.klause.portfolio/PortfolioWorker> // com.eignex.klause.portfolio/PortfolioBuilder.buildExplicit|buildExplicit(com.eignex.klause.propagation.BakedProblem;kotlin.collections.List<kotlin.String>;kotlin.Int;com.eignex.klause.portfolio.Kind;kotlin.Long;kotlin.Double;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
 }
 
 final object com.eignex.klause.presolve/Presolve { // com.eignex.klause.presolve/Presolve|null[0]
