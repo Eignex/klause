@@ -13,7 +13,7 @@ import com.eignex.klause.util.lineSequence
 import kotlin.math.abs
 
 /** Raised when a DIMACS CNF/WCNF document is malformed, so a caller can catch it via [FormatException]
- *  like the other input formats. */
+ *  like the other input formats. Parsing and lowering remain separate operations. */
 class DimacsFormatException(msg: String) : FormatException("DIMACS", msg)
 
 private fun dimacsError(msg: String): Nothing = throw DimacsFormatException(msg)
