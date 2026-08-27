@@ -10858,7 +10858,7 @@ final object com.eignex.klause.formats.dimacs/Dimacs { // com.eignex.klause.form
 }
 
 final object com.eignex.klause.formats.json/JsonSchema { // com.eignex.klause.formats.json/JsonSchema|null[0]
-    final fun parse(kotlin/String): com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry> // com.eignex.klause.formats.json/JsonSchema.parse|parse(kotlin.String){}[0]
+    final fun decode(kotlin/String): com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry> // com.eignex.klause.formats.json/JsonSchema.decode|decode(kotlin.String){}[0]
 }
 
 final object com.eignex.klause.formats.mps/Mps { // com.eignex.klause.formats.mps/Mps|null[0]
@@ -11166,6 +11166,7 @@ final fun (kotlin/Int).com.eignex.klause.schema/times(com.eignex.klause.model/In
 final fun (kotlin/Int).com.eignex.klause.schema/times(com.eignex.klause.schema/FloatTerm): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/times|times@kotlin.Int(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/String).com.eignex.klause.schema/inSet(com.eignex.klause.model/SetTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/inSet|inSet@kotlin.String(com.eignex.klause.model.SetTerm){}[0]
 final fun <#A: com.eignex.klause.solver/SolverParams> (com.eignex.klause.solver/Solver<#A>).com.eignex.klause.solver.result/satisfyUnderAssumptions(com.eignex.klause.propagation/Assumptions, #A, kotlin/Boolean = ...): com.eignex.klause.solver.result/SatisfyResult // com.eignex.klause.solver.result/satisfyUnderAssumptions|satisfyUnderAssumptions@com.eignex.klause.solver.Solver<0:0>(com.eignex.klause.propagation.Assumptions;0:0;kotlin.Boolean){0§<com.eignex.klause.solver.SolverParams>}[0]
+final fun com.eignex.klause.compile/compileSchema(com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>, com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compileSchema|compileSchema(com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>;com.eignex.klause.config.KlauseConfig){}[0]
 final fun com.eignex.klause.config/klausePropertyKey(kotlin/String): kotlin/String // com.eignex.klause.config/klausePropertyKey|klausePropertyKey(kotlin.String){}[0]
 final fun com.eignex.klause.config/propertyKnob(): kotlin.properties/PropertyDelegateProvider<kotlin/Any?, kotlin.properties/ReadOnlyProperty<kotlin/Any?, kotlin/String>> // com.eignex.klause.config/propertyKnob|propertyKnob(){}[0]
 final fun com.eignex.klause.factor.scheduling.internals/applyCumulativeCapacityDelta(com.eignex.klause.factor.scheduling.internals/CumulativeLsState, kotlin/Long) // com.eignex.klause.factor.scheduling.internals/applyCumulativeCapacityDelta|applyCumulativeCapacityDelta(com.eignex.klause.factor.scheduling.internals.CumulativeLsState;kotlin.Long){}[0]

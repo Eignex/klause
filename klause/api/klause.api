@@ -629,6 +629,11 @@ public final class com/eignex/klause/compile/CompilerKt {
 	public static synthetic fun compile$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
 }
 
+public final class com/eignex/klause/compile/SchemaCompilationKt {
+	public static final fun compileSchema (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;)Lcom/eignex/klause/compile/CompiledSchema;
+	public static synthetic fun compileSchema$default (Lcom/eignex/skema/SchemaDef;Lcom/eignex/klause/config/KlauseConfig;ILjava/lang/Object;)Lcom/eignex/klause/compile/CompiledSchema;
+}
+
 public final class com/eignex/klause/config/BoolConfigSpec : com/eignex/klause/config/ConfigSpec {
 	public static final field Companion Lcom/eignex/klause/config/BoolConfigSpec$Companion;
 	public fun <init> (Z)V
@@ -2154,7 +2159,7 @@ public final class com/eignex/klause/formats/json/JsonFormatException : com/eign
 
 public final class com/eignex/klause/formats/json/JsonSchema {
 	public static final field INSTANCE Lcom/eignex/klause/formats/json/JsonSchema;
-	public final fun parse (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
+	public final fun decode (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
 }
 
 public final class com/eignex/klause/formats/minizinc/OznParseException : com/eignex/klause/formats/FormatException {
