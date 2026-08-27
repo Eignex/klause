@@ -1,8 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective

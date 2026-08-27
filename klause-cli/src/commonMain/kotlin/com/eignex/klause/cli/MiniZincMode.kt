@@ -1,10 +1,10 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lowering.flatzinc.SolveDirective
 import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.lowering.flatzinc.writeFlatZincSolution
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.lowering.minizinc.OznApplier
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.maximizeInt
