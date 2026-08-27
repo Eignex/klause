@@ -3842,11 +3842,6 @@ public final class com/eignex/klause/lowering/dimacs/CnfDocument {
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/lowering/dimacs/DimacsLoweringKt {
-	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/CnfDocument;)Lcom/eignex/klause/solver/Problem;
-	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/WcnfDocument;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
-}
-
 public final class com/eignex/klause/lowering/dimacs/WcnfDocument {
 	public fun <init> (ILjava/util/List;Ljava/util/List;ZJ)V
 	public final fun component1 ()I
@@ -3879,6 +3874,11 @@ public final class com/eignex/klause/lowering/dimacs/WcnfProblem {
 	public final fun getProblem ()Lcom/eignex/klause/solver/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/dimacs/WcnfProblemKt {
+	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/CnfDocument;)Lcom/eignex/klause/solver/Problem;
+	public static final fun toProblem (Lcom/eignex/klause/lowering/dimacs/WcnfDocument;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
 }
 
 public final class com/eignex/klause/lowering/dimacs/WeightedCnfClause {
@@ -8729,6 +8729,31 @@ public final class com/eignex/klause/solver/objective/SingleIntObjective {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/EngineParams {
+	public fun <init> (Ljava/util/List;)V
+	public final fun bool (Ljava/lang/String;)Ljava/lang/Boolean;
+	public final fun double (Ljava/lang/String;)Ljava/lang/Double;
+	public final fun finish (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun int (Ljava/lang/String;)Ljava/lang/Integer;
+	public final fun long (Ljava/lang/String;)Ljava/lang/Long;
+	public final fun string (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/EngineParamsKt {
+	public static final field NODE_LIMIT_KEY Ljava/lang/String;
+	public static final fun applyBacktrackParams (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/EngineParams;)Lcom/eignex/klause/backtrack/BacktrackParams;
+	public static final fun autoArms (I)I
+	public static final fun backtrackOverride (Lcom/eignex/klause/solver/pipeline/EngineParams;Z)Lkotlin/jvm/functions/Function1;
+	public static final fun buildPortfolioScenario (Lcom/eignex/klause/solver/pipeline/EngineParams;Ljava/lang/Long;ILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;ILcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/backtrack/NodeBudget;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public static synthetic fun buildPortfolioScenario$default (Lcom/eignex/klause/solver/pipeline/EngineParams;Ljava/lang/Long;ILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;ILcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/backtrack/NodeBudget;ILjava/lang/Object;)Lcom/eignex/klause/portfolio/PortfolioScenario;
+	public static final fun getBACKTRACK_OVERRIDE_KEYS ()Ljava/util/List;
+	public static final fun ineffectiveNumerics (Ljava/lang/String;Ljava/util/Set;Ljava/util/List;)Ljava/util/List;
+	public static final fun pipelineConfigError (Ljava/lang/String;)Ljava/lang/Void;
+	public static final fun resolveBtRecipes (Lcom/eignex/klause/solver/pipeline/EngineParams;Lcom/eignex/klause/portfolio/Kind;)Ljava/util/List;
+	public static final fun resolveLocalSearchRecipes (Lcom/eignex/klause/solver/pipeline/EngineParams;)Lcom/eignex/klause/solver/pipeline/LsResolution;
+	public static final fun withNodeBudget (Ljava/util/List;Lcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/backtrack/NodeBudget;)Ljava/util/List;
+}
+
 public final class com/eignex/klause/solver/pipeline/FiniteEngine : java/lang/Enum {
 	public static final field ALNS Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 	public static final field BACKTRACK Lcom/eignex/klause/solver/pipeline/FiniteEngine;
@@ -8777,6 +8802,14 @@ public final class com/eignex/klause/solver/pipeline/FinitePipelineRequest {
 public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
 	public static final fun backtrackSolver (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;)Lcom/eignex/klause/backtrack/BacktrackSolver;
 	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
+}
+
+public final class com/eignex/klause/solver/pipeline/LsResolution {
+	public fun <init> (Ljava/util/List;ZLjava/lang/Integer;)V
+	public synthetic fun <init> (Ljava/util/List;ZLjava/lang/Integer;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDryRunSolver ()Z
+	public final fun getForceArms ()Ljava/lang/Integer;
+	public final fun getPool ()Ljava/util/List;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
@@ -8964,6 +8997,10 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : co
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/solver/pipeline/PipelineConfigException : java/lang/RuntimeException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
 public final class com/eignex/klause/solver/pipeline/PlannedSearch {
 	public final fun getCp ()Lcom/eignex/klause/propagation/CpSearchComponent;
 	public final fun getSession ()Lcom/eignex/klause/solver/search/SearchSession;
@@ -8973,6 +9010,51 @@ public final class com/eignex/klause/solver/pipeline/PlannedSearch {
 public final class com/eignex/klause/solver/pipeline/PlannedSearchKt {
 	public static final fun search (Lcom/eignex/klause/solver/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
 	public static synthetic fun search$default (Lcom/eignex/klause/solver/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
+}
+
+public final class com/eignex/klause/solver/pipeline/ValSelectorKind : java/lang/Enum {
+	public static final field Companion Lcom/eignex/klause/solver/pipeline/ValSelectorKind$Companion;
+	public static final field MAX Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field MEDIAN Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field MIDDLE Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field MIN Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field RANDOM Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field SOLUTION_GUIDED Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static final field SPLIT Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public final fun selector ()Lcom/eignex/klause/backtrack/selector/ValueSelector;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+}
+
+public final class com/eignex/klause/solver/pipeline/ValSelectorKind$Companion {
+	public final fun fromId (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
+	public final fun ids ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/VarSelectorKind : java/lang/Enum {
+	public static final field CHB Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field Companion Lcom/eignex/klause/solver/pipeline/VarSelectorKind$Companion;
+	public static final field DOMAIN_MAX_REGRET Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field INPUT_ORDER Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field LARGEST_DOMAIN Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field LARGEST_UPPER_BOUND Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field LINUCB Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field RANDOM Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field SMALLEST_DOMAIN Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field SMALLEST_LOWER_BOUND Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static final field VSIDS Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getId ()Ljava/lang/String;
+	public final fun selector (Ljava/lang/Long;)Lcom/eignex/klause/backtrack/selector/VariableSelector;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+}
+
+public final class com/eignex/klause/solver/pipeline/VarSelectorKind$Companion {
+	public final fun fromId (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/VarSelectorKind;
+	public final fun ids ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/result/ConflictAnalysisStats {
