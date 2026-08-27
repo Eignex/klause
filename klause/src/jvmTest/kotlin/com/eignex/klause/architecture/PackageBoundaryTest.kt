@@ -24,7 +24,11 @@ class PackageBoundaryTest {
         assertEquals(
             emptyList<String>(),
             violations,
-            "Unexpected lowering→engine dependency on lp.engine checked arithmetic helpers:\n${violations.joinToString("\n")}",
+            buildString {
+                append("Unexpected lowering→engine dependency on lp.engine checked arithmetic helpers:")
+                append('\n')
+                append(violations.joinToString("\n"))
+            },
         )
     }
 
@@ -47,7 +51,11 @@ class PackageBoundaryTest {
         assertEquals(
             emptyList<String>(),
             violations,
-            "Unexpected solver.pipeline→format/lowering dependency:\n${violations.joinToString("\n")}",
+            buildString {
+                append("Unexpected solver.pipeline→format/lowering dependency:")
+                append('\n')
+                append(violations.joinToString("\n"))
+            },
         )
     }
 }

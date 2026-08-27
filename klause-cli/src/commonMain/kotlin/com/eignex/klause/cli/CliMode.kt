@@ -7,10 +7,10 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -643,7 +643,7 @@ internal fun linearSolvable(
 
 /** Build a solvable whose source model deliberately has no CP search domains yet. */
 internal fun linearModelSolvable(
-    model: com.eignex.klause.solver.ProblemSpec,
+    model: com.eignex.klause.ir.ProblemSpec,
     objective: LinearObjective?,
     maximize: Boolean,
     render: (Sample) -> String,

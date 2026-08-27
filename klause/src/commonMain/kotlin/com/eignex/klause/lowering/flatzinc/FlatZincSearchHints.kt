@@ -26,30 +26,36 @@ data class FlatZincSearchTier(
 
 /** Parsed MiniZinc variable heuristic name. */
 enum class FlatZincSearchVarSelector {
-    /** `input_order` */
+    /** Parse `input_order` as a variable selection heuristic. */
     InputOrder,
-    /** `first_fail`, `most_constrained`, `dom_w_deg` */
+    /** Parse `first_fail`, `most_constrained`, or `dom_w_deg` as a variable heuristic. */
     SmallestDomain,
-    /** `anti_first_fail`, `occurrence` */
+    /** Parse `anti_first_fail` or `occurrence` as a variable heuristic. */
     LargestDomain,
-    /** `dom_w_deg` (fallback only) */
+    /** Parse `dom_w_deg` when used as fallback-only variable selection. */
     DomWdeg,
-    /** `smallest` */
+    /** Parse `smallest` as a variable selection heuristic. */
     SmallestLowerBound,
-    /** `largest` */
+    /** Parse `largest` as a variable selection heuristic. */
     LargestUpperBound,
-    /** `max_regret` */
+    /** Parse `max_regret` as a variable selection heuristic. */
     MaxRegret,
-    /** `random_order` */
+    /** Parse `random_order` as a variable selection heuristic. */
     RandomOrder,
 }
 
 /** Parsed MiniZinc value heuristic name. */
 enum class FlatZincSearchValueSelector {
+    /** Parse `indomain_min` as a value selection heuristic. */
     IndomainMin,
+    /** Parse `indomain_max` as a value selection heuristic. */
     IndomainMax,
+    /** Parse `indomain_middle` as a value selection heuristic. */
     IndomainMiddle,
+    /** Parse `indomain_median` as a value selection heuristic. */
     IndomainMedian,
+    /** Parse `indomain_split` as a value selection heuristic. */
     IndomainSplit,
+    /** Parse `indomain_random` as a value selection heuristic. */
     IndomainRandom,
 }
