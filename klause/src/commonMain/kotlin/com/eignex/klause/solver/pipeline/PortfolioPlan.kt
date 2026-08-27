@@ -34,14 +34,22 @@ class PortfolioPlanRequest(
 /** A resolved finite portfolio route, before a problem is materialized into workers. */
 sealed class PortfolioPlan {
     /** Construct this scenario and execute it through the finite portfolio executor. */
-    class Execute(val scenario: PortfolioScenario) : PortfolioPlan()
+    class Execute(
+        /** Scenario to execute through the finite portfolio executor. */
+        val scenario: PortfolioScenario,
+    ) : PortfolioPlan()
 
     /** Render the resolved local-search recipes instead of executing them. */
-    class LocalSearchDryRun(val pool: List<() -> LocalSearchRecipe>?) : PortfolioPlan()
+    class LocalSearchDryRun(
+        /** Resolved local-search recipes, or `null` for the curated catalog. */
+        val pool: List<() -> LocalSearchRecipe>?,
+    ) : PortfolioPlan()
 
     /** Render the resolved backtrack recipes instead of executing them. */
     class BacktrackDryRun(
+        /** Resolved backtrack recipes, or `null` for the curated catalog. */
         val pool: List<() -> BacktrackRecipe>?,
+        /** Problem kind used to resolve the backtrack recipes. */
         val kind: Kind,
     ) : PortfolioPlan()
 }
