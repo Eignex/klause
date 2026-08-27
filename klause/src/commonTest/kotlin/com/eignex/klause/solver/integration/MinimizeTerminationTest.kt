@@ -3,6 +3,7 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.Move
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective

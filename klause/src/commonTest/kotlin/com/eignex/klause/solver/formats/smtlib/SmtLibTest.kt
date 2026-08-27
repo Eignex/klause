@@ -9,6 +9,7 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.lowering.smtlib.SmtLibProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample

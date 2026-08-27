@@ -9185,7 +9185,10 @@ final class com.eignex.klause.propagation/Assumptions { // com.eignex.klause.pro
     }
 }
 
-final class com.eignex.klause.propagation/BakedProblem : com.eignex.klause.ir/Problem // com.eignex.klause.propagation/BakedProblem|null[0]
+final class com.eignex.klause.propagation/BakedProblem : com.eignex.klause.ir/Problem { // com.eignex.klause.propagation/BakedProblem|null[0]
+    final val bakeElapsed // com.eignex.klause.propagation/BakedProblem.bakeElapsed|{}bakeElapsed[0]
+        final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.propagation/BakedProblem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
+}
 
 final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.solver.search/SearchBrancher, com.eignex.klause.solver.search/SearchConflictResolver, com.eignex.klause.solver.search/SearchModelBlocker { // com.eignex.klause.propagation/CpSearchComponent|null[0]
     constructor <init>(com.eignex.klause.propagation/PropagationSession, kotlin/IntArray? = ..., com.eignex.klause.propagation/CpBranching = ...) // com.eignex.klause.propagation/CpSearchComponent.<init>|<init>(com.eignex.klause.propagation.PropagationSession;kotlin.IntArray?;com.eignex.klause.propagation.CpBranching){}[0]
@@ -10758,8 +10761,6 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin.collections/List<com.eignex.klause.ir/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.collections.List<com.eignex.klause.ir.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
     constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Array<com.eignex.klause.ir/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<com.eignex.klause.ir.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
 
-    final val baked // com.eignex.klause.ir/Problem.baked|{}baked[0]
-        final fun <get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.ir/Problem.baked.<get-baked>|<get-baked>(){}[0]
     final val cancellation // com.eignex.klause.ir/Problem.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.ir/Problem.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
     final val factors // com.eignex.klause.ir/Problem.factors|{}factors[0]
@@ -10789,13 +10790,7 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
     final val sharedDomains // com.eignex.klause.ir/Problem.sharedDomains|{}sharedDomains[0]
         final fun <get-sharedDomains>(): kotlin/Boolean // com.eignex.klause.ir/Problem.sharedDomains.<get-sharedDomains>|<get-sharedDomains>(){}[0]
 
-    final var bakeElapsed // com.eignex.klause.ir/Problem.bakeElapsed|{}bakeElapsed[0]
-        final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.ir/Problem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
-        final fun <set-bakeElapsed>(kotlin.time/Duration) // com.eignex.klause.ir/Problem.bakeElapsed.<set-bakeElapsed>|<set-bakeElapsed>(kotlin.time.Duration){}[0]
-
-    final fun bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.ir/Problem.bake|bake(com.eignex.klause.util.Cancellation){}[0]
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.ir/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
-    final fun propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.ir/Problem.propagate|propagate(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
     final fun requireFiniteIntDomains(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.ir/Problem.requireFiniteIntDomains|requireFiniteIntDomains(){}[0]
     final fun withIntDomains(kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...): com.eignex.klause.ir/Problem // com.eignex.klause.ir/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
 }
@@ -11167,6 +11162,8 @@ final const val com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY // com.eignex.k
 
 final val com.eignex.klause.ir/values // com.eignex.klause.ir/values|@com.eignex.klause.ir.IntDomain{}values[0]
     final fun (com.eignex.klause.ir/IntDomain).<get-values>(): com.eignex.klause.ir/IntSpan // com.eignex.klause.ir/values.<get-values>|<get-values>@com.eignex.klause.ir.IntDomain(){}[0]
+final val com.eignex.klause.propagation/baked // com.eignex.klause.propagation/baked|@com.eignex.klause.ir.Problem{}baked[0]
+    final fun (com.eignex.klause.ir/Problem).<get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/baked.<get-baked>|<get-baked>@com.eignex.klause.ir.Problem(){}[0]
 final val com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS|{}BACKTRACK_OVERRIDE_KEYS[0]
     final fun <get-BACKTRACK_OVERRIDE_KEYS>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS.<get-BACKTRACK_OVERRIDE_KEYS>|<get-BACKTRACK_OVERRIDE_KEYS>(){}[0]
 final val com.eignex.klause.solver/NoConsts // com.eignex.klause.solver/NoConsts|{}NoConsts[0]
@@ -11180,6 +11177,8 @@ final fun (com.eignex.klause.ir/Factor).com.eignex.klause.factor.arithmetic/line
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.ir/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.util.Cancellation){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/propagate|propagate@com.eignex.klause.ir.Problem(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.Problem(){}[0]

@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.localsearch.strategy.WalkSat
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import kotlin.random.Random

@@ -8,6 +8,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lowering.flatzinc.SolveDirective
 import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.lowering.flatzinc.writeFlatZincSolution
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals

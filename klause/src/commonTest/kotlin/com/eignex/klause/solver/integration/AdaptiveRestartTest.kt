@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.GlucoseRestart
 import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem

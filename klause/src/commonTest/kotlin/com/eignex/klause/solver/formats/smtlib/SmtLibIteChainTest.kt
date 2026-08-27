@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.lowering.smtlib.SmtLib
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test

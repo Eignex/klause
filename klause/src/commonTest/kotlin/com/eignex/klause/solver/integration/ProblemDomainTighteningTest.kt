@@ -5,6 +5,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

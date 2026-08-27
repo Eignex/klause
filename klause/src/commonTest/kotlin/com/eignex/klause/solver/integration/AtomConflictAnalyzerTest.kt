@@ -13,6 +13,7 @@ import com.eignex.klause.propagation.ConflictAnalyzer
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.atomLevelForConflict
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit

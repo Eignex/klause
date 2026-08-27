@@ -11,6 +11,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.StructuralKey

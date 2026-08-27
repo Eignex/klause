@@ -7,6 +7,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
+import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /**
@@ -53,11 +54,19 @@ class BakedProblem internal constructor(
     packedOpenIntHi = packedOpenIntHi,
     modelBounds = modelBounds,
 ) {
+    /** Deductions established while constructing this propagation projection. */
+    internal val rootDeductions: PropagationResult = rootBake(this, seedDeductions, cancellation)
+
+    /** Time spent building and folding this propagation projection. */
+    val bakeElapsed: Duration
+
     init {
         if (!alreadyFolded) {
             val mark = TimeSource.Monotonic.markNow()
-            foldRootDeductionsIntoDomains(baked)
+            foldRootDeductionsIntoDomains(rootDeductions)
             bakeElapsed = mark.elapsedNow()
+        } else {
+            bakeElapsed = Duration.ZERO
         }
     }
 

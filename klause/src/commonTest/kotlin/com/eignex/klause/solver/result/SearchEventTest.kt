@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective

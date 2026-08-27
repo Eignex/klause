@@ -13,6 +13,7 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntRef
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
 import com.eignex.klause.solver.IntDomain

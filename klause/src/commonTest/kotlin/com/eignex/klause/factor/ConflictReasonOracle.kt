@@ -4,6 +4,7 @@ import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.propagation.AtomKind
 import com.eignex.klause.propagation.PropagationState
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample

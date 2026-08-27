@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.lowering.flatzinc.SetVarLayout
 import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.lowering.flatzinc.writeFlatZincSolution
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals

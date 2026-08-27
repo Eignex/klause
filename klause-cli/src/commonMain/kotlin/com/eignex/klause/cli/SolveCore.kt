@@ -13,6 +13,7 @@ import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -381,13 +382,14 @@ internal object SolveCore {
             )
         }
         // Split the load into parse, the root bake (step 0), and the presolve passes. The base bake is
-        // deferred to the pipeline (stats.bakeElapsed) for a front-end problem, or ran at construction
-        // (original.bakeElapsed) otherwise — only one is non-zero. `elapsed` is the whole presolve phase,
+        // deferred to the pipeline (stats.bakeElapsed) for a front-end problem, or ran while constructing
+        // a [BakedProblem] otherwise — only one is non-zero. `elapsed` is the whole presolve phase,
         // which for a deferred problem includes the step-0 bake, so the passes get the remainder.
         val stepZeroBake = stats?.bakeElapsed ?: Duration.ZERO
-        val bake = original.bakeElapsed + stepZeroBake
+        val constructionBake = (original as? BakedProblem)?.bakeElapsed ?: Duration.ZERO
+        val bake = constructionBake + stepZeroBake
         loadElapsedMs?.let { load ->
-            errPrintln("  parse: ${(load - original.bakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
+            errPrintln("  parse: ${(load - constructionBake.inWholeMilliseconds).coerceAtLeast(0)}ms")
             errPrintln("  bake (step 0): $bake")
         }
         // Presolve passes alone (the step-0 bake is broken out above; for a deferred problem it is part

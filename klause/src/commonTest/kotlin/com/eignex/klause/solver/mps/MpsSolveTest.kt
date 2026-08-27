@@ -8,6 +8,7 @@ import com.eignex.klause.lowering.mps.MpsObjective
 import com.eignex.klause.lowering.mps.MpsVar
 import com.eignex.klause.lowering.mps.problem
 import com.eignex.klause.lowering.mps.toProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
