@@ -23,7 +23,8 @@ import com.eignex.klause.lowering.flatzinc.FlatZincSearchVarSelector
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchValueSelector
 
 /** Convert format-side search hints to `BacktrackParams` in the backtrack engine package. */
-internal fun FlatZincSearchHints.toBacktrackParams(
+/** Convert format-side search hints into backtrack-ready parameters. */
+fun FlatZincSearchHints.toBacktrackParams(
     numBoolVars: Int,
     numIntVars: Int,
 ): BacktrackParams = BacktrackPresets.conflictDriven().copy(
