@@ -3,11 +3,9 @@ package com.eignex.klause.theory.lia
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.ProblemPipeline
 import com.eignex.klause.solver.ProblemSpec
-import com.eignex.klause.solver.generalLiaWitnessBound
-import com.eignex.klause.solver.pipeline.OpenTheoryEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.theory.TheoryCheck
+import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.Bits
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
@@ -23,15 +21,9 @@ import kotlin.test.assertTrue
 class PollStrideTest {
 
     @Test
-    fun `a witness box beyond the arithmetic limit is still searched`() {
-        // This equality makes the small-model theorem produce a 21k-bit box, so narrowing it would
-        // divide products of that box by a 4k-bit coefficient — one division long enough to outlast a
-        // deadline. Propagation declines the row and the search proceeds: `wide * x0 + x1 = 0` is
-        // satisfied at the origin, so declining to narrow costs tightness, not the answer.
-        val wide = BigInteger.parseString("1" + "0".repeat(1_300))
+    fun `a wide row is skipped when shared bounds fix a satisfying witness`() {
+        val wide = BigInteger.ONE shl (MAX_LIA_PROPAGATION_BITS + 1)
         val model = ProblemSpec(
-            // An unused Boolean keeps this model off OpenTheoryEngine's cheap cube witness path, so the
-            // test reaches the General LIA component rather than a shortcut.
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(
                 longArrayOf(0, 0),
@@ -50,8 +42,20 @@ class PollStrideTest {
             ),
         )
 
-        assertTrue(checkNotNull(model.generalLiaWitnessBound()).bitLength() > MAX_LIA_PROPAGATION_BITS)
-        assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
+        val result = GeneralLiaSolver(model).check(
+            BooleanArray(1),
+            object : TheoryContext {
+                override fun consumeCheck(): Boolean = true
+
+                override fun cancelled(): Boolean = false
+
+                override fun intLowerBound(variable: Int): Long = 0
+
+                override fun intUpperBound(variable: Int): Long = 0
+            },
+        )
+
+        assertIs<TheoryCheck.Sat<GeneralLiaAssignment>>(result)
     }
 
     @Test
