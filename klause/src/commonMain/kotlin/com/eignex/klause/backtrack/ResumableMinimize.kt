@@ -161,6 +161,7 @@ internal class ResumableMinimize(
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
     // is off.
     private val lpEngine = LpEngine(problem, objective, params.lpParams(), sink)
+    private val rootLpDutyCycle = RootLpDutyCycle()
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
     // The engine records each node's LP solution into it; the descent reads it for variable/value order.
@@ -481,7 +482,11 @@ internal class ResumableMinimize(
 
     private fun firstRunWorkBody(): MinimizeResult.WithSample? {
         val rootToken = rootLpBudget()
-        initRootLp(rootToken)
+        if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
+            val before = lpEngine.totalSolveWork()
+            initRootLp(rootToken)
+            rootLpDutyCycle.record(before, lpEngine.totalSolveWork())
+        }
         // Objective shaving: raise the objective's proven lower bound before search when the LP +
         // propagation prove lower values infeasible. Sound — every raise is a proof.
         if (lpEngine.params.lpPlan.objectiveShaving) {
