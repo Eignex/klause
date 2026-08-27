@@ -1,10 +1,9 @@
 package com.eignex.klause.lowering.flatzinc
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lowering.FloatBucketing
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 
 /** Compiled FlatZinc model plus metadata used by solution writing and search defaults. */
@@ -23,8 +22,8 @@ data class FlatZincProgram(
     val arraysByName: Map<String, FlatZincArray>,
     /** Ordered output items or null when no output clause exists. */
     val outputItems: List<OutputItem>?,
-    /** Backtrack defaults inferred from search annotations. */
-    val defaultBacktrackParams: BacktrackParams?,
+    /** Search hints inferred from search annotations. */
+    val searchHints: FlatZincSearchHints?,
     /** Enum labels preserved by the FlatZinc frontend. */
     val enumLabelsByVar: Map<String, List<String>> = emptyMap(),
     /** Set variable layouts by name. */

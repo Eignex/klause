@@ -1,14 +1,14 @@
 package com.eignex.klause.lowering.flatzinc
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.TierVarSelect
 import com.eignex.klause.backtrack.TieredValueSelector
 import com.eignex.klause.backtrack.TieredVariableSelector
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMedian
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainSplit
-import com.eignex.klause.backtrack.selector.SmallestDomain
-import com.eignex.klause.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -19,8 +19,15 @@ import kotlin.test.assertTrue
 
 class FlatZincSearchAnnotationTest {
 
+    private fun searchHints(program: FlatZincProgram): FlatZincSearchHints = assertNotNull(program.searchHints)
+
     private fun tieredVar(program: FlatZincProgram): TieredVariableSelector =
-        assertNotNull(program.defaultBacktrackParams).variableSelector as TieredVariableSelector
+        toParams(program).variableSelector as TieredVariableSelector
+
+    private fun toParams(program: FlatZincProgram): BacktrackParams {
+        val hints = searchHints(program)
+        return hints.toBacktrackParams(program.problem.numBoolVars, program.problem.numIntVars)
+    }
 
     @Test
     fun `int_search becomes one tier over the annotated array`() {
@@ -31,13 +38,16 @@ class FlatZincSearchAnnotationTest {
             solve :: int_search([x], first_fail, indomain_min, complete) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
+        val hints = searchHints(program)
+        assertEquals(1, hints.tiers.size)
+        val tier = hints.tiers[0]
+        assertEquals(FlatZincSearchVarSelector.SmallestDomain, tier.varSelector)
+        assertEquals(FlatZincSearchValueSelector.IndomainMin, tier.valueSelector)
         val varH = tieredVar(program)
         assertEquals(1, varH.tiers.size)
-        val tier = varH.tiers[0]
-        assertContentEquals(intArrayOf(assertNotNull(program.intVarsByName["x"])), tier.intVars)
-        assertEquals(TierVarSelect.SmallestDomain, tier.varSelect)
-        assertEquals(IndomainMin, tier.valueSelector)
-        assertEquals(SmallestDomain, varH.fallback)
+        assertContentEquals(intArrayOf(assertNotNull(program.intVarsByName["x"])), varH.tiers[0].intVars)
+        assertEquals(TierVarSelect.SmallestDomain, varH.tiers[0].varSelect)
+        assertEquals(IndomainMin, varH.tiers[0].valueSelector)
     }
 
     @Test
@@ -49,7 +59,7 @@ class FlatZincSearchAnnotationTest {
         """.trimIndent()
         val program = parseFlatZinc(src)
         assertTrue(
-            assertNotNull(program.defaultBacktrackParams).phaseSaving,
+            toParams(program).phaseSaving,
             "annotated track should phase-save (#543)",
         )
     }
@@ -62,9 +72,11 @@ class FlatZincSearchAnnotationTest {
             solve :: int_search([x], max_regret, indomain_median, complete) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
+        val hints = searchHints(program)
+        assertEquals(FlatZincSearchVarSelector.MaxRegret, hints.tiers[0].varSelector)
+        assertEquals(FlatZincSearchValueSelector.IndomainMedian, hints.tiers[0].valueSelector)
         val varH = tieredVar(program)
         assertEquals(TierVarSelect.MaxRegret, varH.tiers[0].varSelect)
-        // indomain_median is its own heuristic, distinct from indomain_middle.
         assertEquals(IndomainMedian, varH.tiers[0].valueSelector)
     }
 
@@ -80,6 +92,11 @@ class FlatZincSearchAnnotationTest {
             ]) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
+        val hints = searchHints(program)
+        assertEquals(FlatZincSearchVarSelector.InputOrder, hints.tiers[0].varSelector)
+        assertEquals(FlatZincSearchValueSelector.IndomainMax, hints.tiers[0].valueSelector)
+        assertEquals(FlatZincSearchVarSelector.SmallestDomain, hints.tiers[1].varSelector)
+        assertEquals(FlatZincSearchValueSelector.IndomainMin, hints.tiers[1].valueSelector)
         val varH = tieredVar(program)
         assertEquals(2, varH.tiers.size)
         assertEquals(TierVarSelect.InputOrder, varH.tiers[0].varSelect)
@@ -88,7 +105,7 @@ class FlatZincSearchAnnotationTest {
         assertEquals(TierVarSelect.SmallestDomain, varH.tiers[1].varSelect)
         assertEquals(IndomainMin, varH.tiers[1].valueSelector)
         assertContentEquals(intArrayOf(assertNotNull(program.boolVarsByName["y"])), varH.tiers[1].boolVars)
-        val valH = assertNotNull(program.defaultBacktrackParams).valueSelector
+        val valH = toParams(program).valueSelector
         assertTrue(valH is TieredValueSelector)
     }
 
@@ -100,10 +117,12 @@ class FlatZincSearchAnnotationTest {
             solve :: int_search([x], smallest, indomain_split, complete) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
+        val hints = searchHints(program)
+        assertEquals(FlatZincSearchVarSelector.SmallestLowerBound, hints.tiers[0].varSelector)
+        assertEquals(FlatZincSearchValueSelector.IndomainSplit, hints.tiers[0].valueSelector)
         val varH = tieredVar(program)
         assertEquals(TierVarSelect.SmallestLowerBound, varH.tiers[0].varSelect)
         assertEquals(IndomainSplit, varH.tiers[0].valueSelector)
-        assertEquals(SmallestLowerBound, varH.fallback)
     }
 
     @Test
@@ -145,42 +164,55 @@ class FlatZincSearchAnnotationTest {
             solve :: int_search([x], domwdeg_xyz, indomain_min, complete) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val varH = tieredVar(program)
-        assertEquals(TierVarSelect.InputOrder, varH.tiers[0].varSelect)
+        val hints = searchHints(program)
+        assertEquals(FlatZincSearchVarSelector.InputOrder, hints.tiers[0].varSelector)
     }
 
     @Test
-    fun `no search annotation leaves defaultBacktrackParams null`() {
+    fun `occurrence strategy keeps fallback and tier differ as legacy mapping`() {
+        val src = """
+            var 0..5: x;
+            constraint int_lin_le([1], [x], 3);
+            solve :: int_search([x], occurrence, indomain_min, complete) satisfy;
+        """.trimIndent()
+        val program = parseFlatZinc(src)
+        val hints = searchHints(program)
+        assertEquals(FlatZincSearchVarSelector.SmallestDomain, hints.tiers[0].varSelector)
+        assertEquals(FlatZincSearchVarSelector.LargestDomain, hints.fallbackVarSelector)
+    }
+
+    @Test
+    fun `no search annotation leaves searchHints null`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
             solve satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        assertNull(program.defaultBacktrackParams)
+        assertNull(program.searchHints)
     }
 
     @Test
-    fun `minimize wraps the value side in SolutionGuided`() {
+    fun `minimize wraps value search in SolutionGuided`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
             solve :: int_search([x], input_order, indomain_min, complete) minimize x;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val params = assertNotNull(program.defaultBacktrackParams)
+        val params = toParams(program)
         assertTrue(params.valueSelector is SolutionGuided)
     }
 
     @Test
-    fun `satisfy does not wrap the value side`() {
+    fun `satisfy does not wrap the value search`() {
         val src = """
             var 0..5: x;
             constraint int_lin_le([1], [x], 3);
             solve :: int_search([x], input_order, indomain_min, complete) satisfy;
         """.trimIndent()
         val program = parseFlatZinc(src)
-        val params = assertNotNull(program.defaultBacktrackParams)
+        val params = toParams(program)
         assertTrue(params.valueSelector is TieredValueSelector)
     }
 }

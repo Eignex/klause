@@ -10,9 +10,9 @@ import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.FloatBucketing
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.CharReader
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
@@ -128,7 +128,7 @@ internal class FlatZincCompiler(
             floatVarsByName = floatVars,
             arraysByName = arrays,
             outputItems = model.output?.let { compileOutput(it) } ?: synthesizeOutputItems(),
-            defaultBacktrackParams = compileSearchAnnotation(),
+            searchHints = compileSearchAnnotation(),
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
             lsObjective = lsObjective,
