@@ -67,6 +67,13 @@ internal interface LpSolver {
      * that keeps no count.
      */
     val lastWorkOps: Long get() = 0L
+
+    /** Nonbasic columns with zero reduced cost at the last termination — dual degeneracy. 0 on an engine
+     *  that does not measure it. */
+    val lastDegenerateColumns: Int get() = 0
+
+    /** Columns the last solve ran over, the denominator [lastDegenerateColumns] is judged against. */
+    val lastColumns: Int get() = 0
 }
 
 /**

@@ -50,6 +50,17 @@ data class LpPlan(
      */
     val boundMaxPivots: Int = 0,
     /**
+     * Adaptive node LP work budget ([LpWorkBudget]): each solve's budget is set from what the last one
+     * did — stopped short while progressing raises it, stalling among tied columns lowers it, a clean
+     * optimum resets it to what the model's size implies.
+     *
+     * Budgets in work rather than pivots, since a pivot costs an order of magnitude more on a dense
+     * basis than a sparse one, and adapts on the solve itself rather than on prune counts, which cannot
+     * separate a useless relaxation from a search that has not yet found an incumbent. Off by default
+     * until measured against [boundMaxPivots] and against no budget at all.
+     */
+    val boundAdaptiveWork: Boolean = false,
+    /**
      * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
      * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
      * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes

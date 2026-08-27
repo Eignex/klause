@@ -93,7 +93,13 @@ internal fun roundUpToResidue(lb: Long, g: Long, r: Long): Long = lb + (r - lb).
  *  test, the bound-flipping long step and basis equilibration — all correctness-neutral (they change
  *  only the pivot path / conditioning, never the certified optimum). */
 internal fun LpEngine.dualSimplex(model: LpModel, cancellation: Cancellation): TableauCutSolver =
-    RevisedSimplex(model, cancellation, iterationLimit = nodePivotBudget())
+    RevisedSimplex(
+        model,
+        cancellation,
+        iterationLimit = nodePivotBudget(),
+        workLimit = nodeWorkBudget(),
+        trackDegeneracy = adaptiveWork,
+    )
 
 /**
  * The node bound's engine and its solve.
@@ -115,7 +121,13 @@ private fun LpEngine.solveNode(
     nodeSimplex?.let { kept ->
         if (kept.rebind(model, cancellation)) return kept to kept.resolveBounds()
     }
-    val fresh = RevisedSimplex(model, cancellation, iterationLimit = nodePivotBudget())
+    val fresh = RevisedSimplex(
+        model,
+        cancellation,
+        iterationLimit = nodePivotBudget(),
+        workLimit = nodeWorkBudget(),
+        trackDegeneracy = adaptiveWork,
+    )
     nodeSimplex = fresh
     return fresh to fresh.solve(warm)
 }
@@ -330,6 +342,11 @@ internal fun LpEngine.sparseSafePrune(
     // returns none, and those are the solves that prune — costing only the ones that return a result
     // would drop the most valuable work from the average.
     sink.observeSolveCost(simplex)
+    // Feed the budget from the solve itself. A solve that produced no result at all was infeasible or
+    // bailed numerically, which says nothing about how much budget the next one deserves.
+    floatResult?.let {
+        observeNodeWork(it.optimal, simplex.lastDegenerateColumns, simplex.lastColumns, model.m)
+    }
     val result = floatResult ?: run {
         // Infeasibility prune: a dual-unbounded termination is only a *candidate* infeasibility —
         // confirm it with an exact Farkas certificate before pruning (the float ray alone is not sound).

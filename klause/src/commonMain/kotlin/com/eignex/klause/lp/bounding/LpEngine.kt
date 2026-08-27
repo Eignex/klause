@@ -263,6 +263,35 @@ internal class LpEngine(
     /** Pivots this node's LP may spend, or 0 for the size-derived budget that effectively never binds. */
     internal fun nodePivotBudget(): Int = lpPivotBudget.pivots()
 
+    // Adaptive work budget, keyed on what each solve did rather than on what the search found.
+    private val lpWorkBudget = LpWorkBudget(
+        minOps = MIN_NODE_WORK_OPS,
+        maxOps = MAX_NODE_WORK_OPS,
+        initialOps = INITIAL_NODE_WORK_OPS,
+    )
+
+    /** Whether the adaptive work budget is running; also gates the degeneracy count it needs. */
+    internal val adaptiveWork: Boolean get() = params.lpPlan.boundAdaptiveWork
+
+    /** Work this node's LP may spend, or 0 when the adaptive budget is off. */
+    internal fun nodeWorkBudget(): Long = if (adaptiveWork) lpWorkBudget.ops() else 0L
+
+    /** Feed one solve's outcome back into the work budget. */
+    internal fun observeNodeWork(reachedOptimum: Boolean, degenerateColumns: Int, columns: Int, rows: Int) {
+        if (!adaptiveWork) return
+        lpWorkBudget.observe(reachedOptimum, degenerateColumns, columns, sizeBudget(columns, rows))
+    }
+
+    /**
+     * The work a solve of this model ought to cost, from its shape alone: roughly one dense pass per
+     * column-derived iteration, on the same `/40` scale CP-SAT uses for its iteration baseline.
+     */
+    private fun sizeBudget(columns: Int, rows: Int): Long {
+        if (columns <= 0 || rows <= 0) return MIN_NODE_WORK_OPS
+        val perPass = rows.toLong() * columns
+        return (perPass / SIZE_BUDGET_DIVISOR * columns).coerceIn(MIN_NODE_WORK_OPS, MAX_NODE_WORK_OPS)
+    }
+
     /** Milliseconds of LP wall budget left, or `null` when no budget is set (breaker off). The
      *  one-shot root work is time-boxed to this so it competes with the per-node solves for one budget,
      *  rather than the looser [LpPlan.rootBudgetFraction] cap alone letting it consume the whole slice. */
@@ -694,3 +723,17 @@ private const val RESIDUAL_MAX_ROWS = 1000
  *  accumulate across nodes, so the chain must span many node re-solves for the kept factorization to
  *  pay; each eta costs one extra sparse pass per FTRAN/BTRAN, bounding the drift. */
 private const val GATED_ETA_LIMIT = 400
+
+/** Floor on the adaptive node LP work budget ([LpWorkBudget]). A floor rather than an off switch: with a
+ *  persistent basis a stopped solve is progress the next node resumes from, and it still bounds. */
+private const val MIN_NODE_WORK_OPS = 10_000L
+
+/** Ceiling on the adaptive node LP work budget — roughly the cost of the most expensive solves measured
+ *  on the XCSP3 COP corpus, so a runaway model cannot spend without limit. */
+private const val MAX_NODE_WORK_OPS = 100_000_000L
+
+/** Where the adaptive budget starts, before any solve has reported. */
+private const val INITIAL_NODE_WORK_OPS = 1_000_000L
+
+/** Divisor on the size-derived work baseline, mirroring CP-SAT's `num_cols / 40` iteration baseline. */
+private const val SIZE_BUDGET_DIVISOR = 40L
