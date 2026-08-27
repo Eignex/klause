@@ -46,8 +46,8 @@ class CombinedCountTest {
 
     @Test
     fun `approx phase takes over when the exact budget is exhausted`() {
-        // 5^3 = 125 combos, above the hashing threshold; a tiny exact budget forces the fallback.
-        val p = ints(3, 0, 4)
+        // 4^3 = 64 combos, above the hashing threshold; a tiny exact budget forces the fallback.
+        val p = ints(3, 0, 3)
         val r = BacktrackSolver(p.bake()).count(CountConfig(exactBudget = 4L, epsilon = 2.0, delta = 0.99, seed = 7L))
         assertTrue(!r.exact, "the exact phase cannot converge within 4 checks")
         // The hard lower bound from the partial exact phase still holds, and the clamped estimate

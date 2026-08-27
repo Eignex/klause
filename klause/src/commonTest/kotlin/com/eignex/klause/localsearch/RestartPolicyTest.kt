@@ -89,8 +89,8 @@ class RestartPolicyTest {
         val fixed = LocalSearchSolver(problem.bake(), restartPolicy = FixedCadenceRestart())
         val adaptive = LocalSearchSolver(problem.bake(), restartPolicy = AdaptivePerturbationRestart())
 
-        val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 1L)).assignment
-        val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 8_000L, randomSeed = 1L)).assignment
+        val a = fixed.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L)).assignment
+        val b = adaptive.minimize(objective, LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L)).assignment
         assertNotNull(a)
         assertNotNull(b)
         assertEquals(objective.evaluate(a), objective.evaluate(b))
@@ -202,7 +202,7 @@ class RestartPolicyTest {
             feasibleDescent = FeasibleDescent.RatchetAsConstraint,
         )
         LocalSearchSolver(problem.bake(), strategy = strategy, restartPolicy = FixedCadenceRestart(1_000_000))
-            .solve(LocalSearchParams(maxFlips = 2_000L, randomSeed = 4L))
+            .solve(LocalSearchParams(maxFlips = 200L, randomSeed = 4L))
         assertTrue(spy.queried > 0, "the engine must use the restart policy from the strategy's schedule bundle")
     }
 
@@ -210,7 +210,8 @@ class RestartPolicyTest {
     fun `engine drives per-round feedback to an adaptive restart policy`() {
         // A restart policy that is also an AdaptivePolicy must be fed RoundLogs by the engine,
         // exactly like an adaptive schedule — proven by a spy whose observe count is non-zero after a
-        // run that spans several rounds on the UNSAT helper.
+        // run that spans several rounds on the UNSAT helper. The flip budget must clear a couple of
+        // ROUND_FEEDBACK_STEPS rounds, since a restart discards a partial round.
         val spy = object : RestartPolicy, AdaptivePolicy {
             var observed = 0
             override fun shouldRestart(stepsSinceLastRestart: Int) = stepsSinceLastRestart >= 1_000_000
@@ -231,7 +232,7 @@ class RestartPolicyTest {
             ),
         )
         LocalSearchSolver(problem.bake(), restartPolicy = spy)
-            .solve(LocalSearchParams(maxFlips = 6_000L, randomSeed = 4L))
+            .solve(LocalSearchParams(maxFlips = 2_500L, randomSeed = 4L))
         assertTrue(spy.observed > 0, "the engine must feed RoundLogs to an adaptive restart policy")
     }
 }

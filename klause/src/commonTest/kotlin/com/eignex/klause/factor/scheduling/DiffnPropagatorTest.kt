@@ -12,7 +12,6 @@ import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -95,22 +94,27 @@ class DiffnPropagatorTest {
     @Test
     fun `diffn sweep never over-prunes`() {
         // Brute-force oracle: every bound the sweep / pairwise pass tightens must hold on all
-        // non-overlapping packings. Small instances stay under the BruteForceSolver 2^18 cap.
-        val rng = Random(0xD1FF)
-        repeat(400) { iter ->
-            val rects = 2 + rng.nextInt(2) // 2 or 3 rectangles
-            val xs = IntArray(rects) { 2 * it }
-            val ys = IntArray(rects) { 2 * it + 1 }
-            val widths = LongArray(rects) { 1L + rng.nextInt(2) }
-            val heights = LongArray(rects) { 1L + rng.nextInt(2) }
-            val doms = Array(2 * rects) { IntDomain(0, 3) }
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = 2 * rects,
-                intDomains = doms,
-                factors = arrayOf<Factor>(Diffn(xs = xs, ys = ys, widths = widths, heights = heights)),
-            )
-            FactorPropagationOracle.assertSound(problem, "diffn#$iter")
+        // non-overlapping packings. The sweep is exhaustive over the parameter space — 2 or 3
+        // rectangles, each width and height in {1, 2} — so the soundness claim covers every shape
+        // combination rather than a sample. Each instance stays under the BruteForceSolver 2^18 cap.
+        for (rects in 2..3) {
+            val shapes = 1 shl rects
+            for (widthMask in 0 until shapes) {
+                for (heightMask in 0 until shapes) {
+                    val xs = IntArray(rects) { 2 * it }
+                    val ys = IntArray(rects) { 2 * it + 1 }
+                    val widths = LongArray(rects) { 1L + ((widthMask shr it) and 1) }
+                    val heights = LongArray(rects) { 1L + ((heightMask shr it) and 1) }
+                    val doms = Array(2 * rects) { IntDomain(0, 3) }
+                    val problem = Problem(
+                        numBoolVars = 0,
+                        numIntVars = 2 * rects,
+                        intDomains = doms,
+                        factors = arrayOf<Factor>(Diffn(xs = xs, ys = ys, widths = widths, heights = heights)),
+                    )
+                    FactorPropagationOracle.assertSound(problem, "diffn-r$rects-w$widthMask-h$heightMask")
+                }
+            }
         }
     }
 

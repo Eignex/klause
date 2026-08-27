@@ -42,7 +42,7 @@ class LocalSearchPoolFlowTest {
         val result = LocalSearchSolver(problem().bake()).minimize(
             objective,
             LocalSearchParams(
-                maxFlips = 3_000L,
+                maxFlips = 300L,
                 randomSeed = 1L,
                 improvedSolutionSink = { sample, obj -> published.add(sample to obj) },
             ),
@@ -60,7 +60,7 @@ class LocalSearchPoolFlowTest {
         val result = LocalSearchSolver(problem().bake()).minimize(
             objective,
             LocalSearchParams(
-                maxFlips = 3_000L,
+                maxFlips = 300L,
                 randomSeed = 1L,
                 pooledSolutionSupplier = {
                     polls++

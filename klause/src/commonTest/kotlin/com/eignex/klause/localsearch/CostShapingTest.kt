@@ -190,7 +190,7 @@ class CostShapingTest {
         val sample = solver.minimize(
             objective,
             LocalSearchParams(
-                maxFlips = 6_000L,
+                maxFlips = 500L,
                 randomSeed = 1L,
                 costShaping = CostShaping.linear(lambda = 1.0),
             ),

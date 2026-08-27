@@ -108,8 +108,9 @@ class OrderLiteralSoundnessHarnessTest {
             intDomains = Array(domains.size) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
             factors = factors,
         )
+        val baked = problem.bake()
         for (seed in 1L..seeds) {
-            val found = BacktrackSolver(problem.bake())
+            val found = BacktrackSolver(baked)
                 .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids(), maxLearnedClauses = 1_000))
                 .take(200_000).map { it.ints.map { v -> v.toInt() } }.toHashSet()
             assertEquals(expected, found, "$label seed=$seed: backtrack solution set must equal brute force")

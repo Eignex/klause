@@ -1101,22 +1101,23 @@ class SmtLibTest {
 
     @Test
     fun `a declared integer the model drives past Long stays in General LIA`() {
-        // c = 4096·a with a ≥ 2^60 forces c past 2^72. General LIA keeps its wide rows and witness in
-        // BigInteger rather than rewriting a declared column onto finite Long digits.
+        // b = 2^32·a and c = 2^32·b with a > 2^32 force both b past 2^64 and c past 2^96. General LIA
+        // keeps its wide rows and witness in BigInteger rather than rewriting a declared column onto
+        // finite Long digits.
         val text = """
             (set-logic QF_LIA)
             (declare-fun a () Int) (declare-fun b () Int) (declare-fun c () Int)
-            (assert (= b (* 64 a))) (assert (= c (* 64 b)))
-            (assert (>= a 1152921504606846977))
+            (assert (= b (* 4294967296 a))) (assert (= c (* 4294967296 b)))
+            (assert (>= a 4294967297))
             (check-sat)
         """.trimIndent()
         val parsed = SmtLib.parse(text)
         val result = liaSat(parsed.model)
         val values = parsed.intVarNames.mapValues { (_, id) -> result.ints[id] }
-        val sixtyFour = BigInteger.fromLong(64)
-        assertEquals(values.getValue("b"), values.getValue("a") * sixtyFour, "b = 64a")
-        assertEquals(values.getValue("c"), values.getValue("b") * sixtyFour, "c = 64b")
-        assertTrue(values.getValue("a") >= BigInteger.parseString("1152921504606846977"), "a keeps its bound")
+        val twoToThirtyTwo = BigInteger.fromLong(4294967296)
+        assertEquals(values.getValue("b"), values.getValue("a") * twoToThirtyTwo, "b = 2^32·a")
+        assertEquals(values.getValue("c"), values.getValue("b") * twoToThirtyTwo, "c = 2^32·b")
+        assertTrue(values.getValue("a") >= BigInteger.parseString("4294967297"), "a keeps its bound")
     }
 
     @Test
