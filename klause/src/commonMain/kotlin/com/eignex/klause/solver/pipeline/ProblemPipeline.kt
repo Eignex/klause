@@ -7,7 +7,7 @@ import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Cancellation
 
-/** The solver pipeline selected once from a source [ProblemSpec]. */
+/** The solver pipeline selected once from a source [ProblemSpec] and shared by all frontends. */
 enum class ProblemPipeline {
     /**
      * Finite search and optimization route.

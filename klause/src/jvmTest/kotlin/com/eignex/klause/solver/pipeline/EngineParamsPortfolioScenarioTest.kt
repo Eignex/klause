@@ -121,7 +121,9 @@ class EngineParamsPortfolioScenarioTest {
 
     @Test
     fun `portfolio planning preserves local search dry run without constructing workers`() {
-        val dryRun = assertIs<PortfolioPlan.LocalSearchDryRun>(plan(FiniteEngine.LOCAL_SEARCH, listOf("dry-run-solver=on")))
+        val dryRun = assertIs<PortfolioPlan.LocalSearchDryRun>(
+            plan(FiniteEngine.LOCAL_SEARCH, listOf("dry-run-solver=on")),
+        )
 
         assertNull(dryRun.pool, "the unchanged curated catalog is rendered by the frontend")
     }
