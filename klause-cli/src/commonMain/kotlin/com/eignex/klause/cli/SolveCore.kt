@@ -46,7 +46,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.variablePartition
+import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
