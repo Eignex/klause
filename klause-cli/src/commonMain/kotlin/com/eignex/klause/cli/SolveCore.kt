@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.AttributedImprovement
@@ -13,7 +14,6 @@ import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
