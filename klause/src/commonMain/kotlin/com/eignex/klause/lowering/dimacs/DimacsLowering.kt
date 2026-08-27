@@ -1,3 +1,5 @@
+@file:Suppress("MatchingDeclarationName")
+
 package com.eignex.klause.lowering.dimacs
 
 import com.eignex.klause.factor.bool.Clause
