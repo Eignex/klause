@@ -205,8 +205,14 @@ class SequentialPortfolio(
                     handle.runSlice(cancellation, sliceMs, sliceNodeBudget()) { accept(it) }
                 }.getOrNull()
             } else {
+                // A non-resumable arm runs a fresh search per segment rather than pausing one, so it
+                // cannot take a node budget. Under node slicing it therefore gets no per-segment
+                // deadline: a wall-clock one here would decide where this arm stops, and every counter
+                // the run reports follows from that. Its own node allowance still bounds it, and the
+                // whole-solve deadline still applies.
+                val armToken = if (sliceNodes > 0L) cancellation else sliceToken(cancellation, sliceMs)
                 runCatching {
-                    for (r in worker.improvements(readBound, sliceToken(cancellation, sliceMs), warmStart = best)) {
+                    for (r in worker.improvements(readBound, armToken, warmStart = best)) {
                         terminal = r
                         if (r is MinimizeResult.WithSample) accept(r)
                     }
