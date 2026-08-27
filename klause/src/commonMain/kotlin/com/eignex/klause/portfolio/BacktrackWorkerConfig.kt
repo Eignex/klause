@@ -98,18 +98,6 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
         fun ofParams(label: String, template: BacktrackParams): BacktrackRecipe =
             BacktrackRecipe(label) { seed, onEvent -> template.copy(randomSeed = seed, onEvent = onEvent) }
 
-        /** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
-         *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above
-         *  what the user permitted, and `--lp aggressive,-cuts` / `off,+energetic` toggle individual
-         *  techniques across the pool. Non-LP arms keep no LP; an all-`AGGRESSIVE`, no-override ceiling
-         *  is a no-op. */
-        private fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe =
-            BacktrackRecipe(label) { seed, onEvent ->
-                val p = build(seed, onEvent)
-                val intended = p.lpConfig
-                if (intended == null) p else p.copy(lpConfig = intended.cappedUnder(ceiling))
-            }
-
         /** The top-[count] prefix of [BacktrackCatalog.ranked], wrapping past the pool size so larger
          *  pools repeat the strong arms on fresh seeds (seed-twin diversity for luck-bound close calls).
          *  Each arm is capped under [lpCeiling] (default `AGGRESSIVE`, no overrides = uncapped) and
@@ -125,6 +113,16 @@ internal class BacktrackWorkerConfig(val recipe: BacktrackRecipe) : WorkerConfig
             return List(count) { BacktrackWorkerConfig(order[it % order.size].capLp(lpCeiling).spending(nodeBudget)) }
         }
     }
+}
+
+/** Cap this recipe under [ceiling] (the `--lp` ceiling): each LP arm's config is `cappedUnder` it —
+ *  emphasis lowered and the ceiling's per-technique overrides applied — so no arm runs LP above what the
+ *  user permitted, and `--lp aggressive,-cuts` / `off,+energetic` toggle individual techniques across the
+ *  pool. Non-LP arms keep no LP; an all-`AGGRESSIVE`, no-override ceiling is a no-op. */
+internal fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe = BacktrackRecipe(label) { seed, onEvent ->
+    val p = build(seed, onEvent)
+    val intended = p.lpConfig
+    if (intended == null) p else p.copy(lpConfig = intended.cappedUnder(ceiling))
 }
 
 /** This recipe with every arm it builds spending [budget], the solve-spanning node allowance. A null
