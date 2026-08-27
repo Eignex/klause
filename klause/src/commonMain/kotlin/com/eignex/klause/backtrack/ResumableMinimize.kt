@@ -124,10 +124,23 @@ internal class ResumableMinimize(
     // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
     // which is the solve start for that path.
     private val startMark = TimeSource.Monotonic.markNow()
+    // Node budget for the current slice, or -1 when the slice is bounded by the clock instead. A node
+    // budget makes the pause point a property of the search rather than of machine load, which is what
+    // lets two identical invocations report identical counters.
+    private var sliceNodeEnd: Long = -1L
+
     private fun sliceCancelled(): Boolean = if (pausable) {
-        globalToken() || (sliceEnd?.hasPassedNow() ?: false)
+        globalToken() || sliceExpired()
     } else {
         baseCancellation()
+    }
+
+    /** The node budget when one is armed — the clock still bounds it, so an over-large budget cannot
+     *  overrun the deadline. */
+    private fun sliceExpired(): Boolean {
+        val byClock = sliceEnd?.hasPassedNow() ?: false
+        if (sliceNodeEnd < 0L) return byClock
+        return byClock || sink.search.nodeCount >= sliceNodeEnd
     }
 
     private var best: Sample? = null
@@ -222,11 +235,13 @@ internal class ResumableMinimize(
     override fun runSlice(
         global: Cancellation,
         sliceMillis: Long,
+        sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? {
         done?.let { return it }
         globalToken = global
         sliceEnd = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+        sliceNodeEnd = if (sliceNodes >= 0L) sink.search.nodeCount + sliceNodes else -1L
         while (true) {
             when (val e = runUntilEvent()) {
                 is StepEvent.Incumbent -> onIncumbent(e.result)
