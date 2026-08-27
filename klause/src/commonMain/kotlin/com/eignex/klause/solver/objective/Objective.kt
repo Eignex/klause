@@ -131,6 +131,11 @@ data class LinearObjective(
      */
     fun singleIntObjective(): SingleIntObjective? {
         if (boolWeights.any { it != 0L }) return null
+        // A continuous term makes the objective more than the one variable, and callers treat the
+        // variable as standing for the whole of it: LP bounding posts its relaxation bound — taken over
+        // every column, real ones included — straight onto this variable, which refutes a feasible model
+        // as soon as the reals carry any of the cost.
+        if (realCoefficients.any { it != 0.0 }) return null
         var found = -1
         for (i in intCoefficients.indices) {
             if (intCoefficients[i] == 0L) continue
