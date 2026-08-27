@@ -6988,6 +6988,7 @@ public final class com/eignex/klause/portfolio/PortfolioExecutor$DefaultImpls {
 public final class com/eignex/klause/portfolio/PortfolioScenario {
 	public static final field Companion Lcom/eignex/klause/portfolio/PortfolioScenario$Companion;
 	public static final field DEFAULT_ARMS I
+	public static final field DEFAULT_SLICE_NODES J
 	public fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;)V
 	public synthetic fun <init> (IILcom/eignex/klause/portfolio/Kind;Lcom/eignex/klause/portfolio/EngineMix;JDLcom/eignex/klause/lp/bounding/LpConfig;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/backtrack/BacktrackParams;ZIIJLcom/eignex/klause/backtrack/NodeBudget;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()I
@@ -7070,8 +7071,8 @@ public final class com/eignex/klause/portfolio/PortfolioWorker$Companion {
 
 public final class com/eignex/klause/portfolio/SequentialPortfolio : com/eignex/klause/portfolio/PortfolioExecutor {
 	public static final field Companion Lcom/eignex/klause/portfolio/SequentialPortfolio$Companion;
-	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJI)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJI)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/kumulant/bandit/UnivariateBandit;JJDJJJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun close ()V
 	public final fun getWorkers ()Ljava/util/List;
 	public fun minimize (Lcom/eignex/klause/util/Cancellation;Lkotlin/jvm/functions/Function1;)Lcom/eignex/klause/solver/result/MinimizeResult;

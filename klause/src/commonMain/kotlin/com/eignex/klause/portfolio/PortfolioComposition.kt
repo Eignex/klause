@@ -105,7 +105,7 @@ data class PortfolioScenario(
      * by nodes makes a segment a function of the model and the seed alone. The whole-solve deadline still
      * applies, so this cannot overrun it.
      */
-    val sliceNodes: Long = 0L,
+    val sliceNodes: Long = DEFAULT_SLICE_NODES,
     /** Optional solve-spanning decision-node allowance, applied here rather than by the caller so that
      *  every arm that runs a backtrack engine spends the one counter — including the ones that build
      *  their own [BacktrackParams] instead of drawing a [BacktrackRecipe] from a pool. Editing the pools
@@ -124,6 +124,10 @@ data class PortfolioScenario(
         /** Default arm-pool size when a caller doesn't specify one — larger than a single core so the
          *  sequential free track bandit-schedules a real pool, not one arm. */
         const val DEFAULT_ARMS = 6
+
+        /** Default nodes in a resumable arm's first segment; later segments grow. Mirrors
+         *  [SequentialPortfolio.baseSliceNodes]. */
+        const val DEFAULT_SLICE_NODES = 5_000L
 
         /** A parallel portfolio over [cores] cores; [arms] defaults to one arm per core. */
         fun parallel(cores: Int, kind: Kind, engine: EngineMix = EngineMix.MIXED, seed: Long = 0L, arms: Int = cores) =
