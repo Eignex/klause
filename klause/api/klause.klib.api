@@ -6002,6 +6002,85 @@ final class com.eignex.klause.localsearch/TabuFilter { // com.eignex.klause.loca
     }
 }
 
+final class com.eignex.klause.lowering.dimacs/CnfDocument { // com.eignex.klause.lowering.dimacs/CnfDocument|null[0]
+    constructor <init>(kotlin/Int, kotlin.collections/List<kotlin/IntArray>, kotlin/Boolean) // com.eignex.klause.lowering.dimacs/CnfDocument.<init>|<init>(kotlin.Int;kotlin.collections.List<kotlin.IntArray>;kotlin.Boolean){}[0]
+
+    final val clauses // com.eignex.klause.lowering.dimacs/CnfDocument.clauses|{}clauses[0]
+        final fun <get-clauses>(): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.lowering.dimacs/CnfDocument.clauses.<get-clauses>|<get-clauses>(){}[0]
+    final val numBoolVars // com.eignex.klause.lowering.dimacs/CnfDocument.numBoolVars|{}numBoolVars[0]
+        final fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.lowering.dimacs/CnfDocument.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
+    final val triviallyUnsat // com.eignex.klause.lowering.dimacs/CnfDocument.triviallyUnsat|{}triviallyUnsat[0]
+        final fun <get-triviallyUnsat>(): kotlin/Boolean // com.eignex.klause.lowering.dimacs/CnfDocument.triviallyUnsat.<get-triviallyUnsat>|<get-triviallyUnsat>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.lowering.dimacs/CnfDocument.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.lowering.dimacs/CnfDocument.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.lowering.dimacs/CnfDocument.component3|component3(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.collections/List<kotlin/IntArray> = ..., kotlin/Boolean = ...): com.eignex.klause.lowering.dimacs/CnfDocument // com.eignex.klause.lowering.dimacs/CnfDocument.copy|copy(kotlin.Int;kotlin.collections.List<kotlin.IntArray>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.dimacs/CnfDocument.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.dimacs/CnfDocument.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.dimacs/CnfDocument.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.dimacs/WcnfDocument { // com.eignex.klause.lowering.dimacs/WcnfDocument|null[0]
+    constructor <init>(kotlin/Int, kotlin.collections/List<kotlin/IntArray>, kotlin.collections/List<com.eignex.klause.lowering.dimacs/WeightedCnfClause>, kotlin/Boolean, kotlin/Long) // com.eignex.klause.lowering.dimacs/WcnfDocument.<init>|<init>(kotlin.Int;kotlin.collections.List<kotlin.IntArray>;kotlin.collections.List<com.eignex.klause.lowering.dimacs.WeightedCnfClause>;kotlin.Boolean;kotlin.Long){}[0]
+
+    final val fixedCost // com.eignex.klause.lowering.dimacs/WcnfDocument.fixedCost|{}fixedCost[0]
+        final fun <get-fixedCost>(): kotlin/Long // com.eignex.klause.lowering.dimacs/WcnfDocument.fixedCost.<get-fixedCost>|<get-fixedCost>(){}[0]
+    final val hardClauses // com.eignex.klause.lowering.dimacs/WcnfDocument.hardClauses|{}hardClauses[0]
+        final fun <get-hardClauses>(): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.lowering.dimacs/WcnfDocument.hardClauses.<get-hardClauses>|<get-hardClauses>(){}[0]
+    final val numOriginalBoolVars // com.eignex.klause.lowering.dimacs/WcnfDocument.numOriginalBoolVars|{}numOriginalBoolVars[0]
+        final fun <get-numOriginalBoolVars>(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfDocument.numOriginalBoolVars.<get-numOriginalBoolVars>|<get-numOriginalBoolVars>(){}[0]
+    final val softClauses // com.eignex.klause.lowering.dimacs/WcnfDocument.softClauses|{}softClauses[0]
+        final fun <get-softClauses>(): kotlin.collections/List<com.eignex.klause.lowering.dimacs/WeightedCnfClause> // com.eignex.klause.lowering.dimacs/WcnfDocument.softClauses.<get-softClauses>|<get-softClauses>(){}[0]
+    final val triviallyUnsat // com.eignex.klause.lowering.dimacs/WcnfDocument.triviallyUnsat|{}triviallyUnsat[0]
+        final fun <get-triviallyUnsat>(): kotlin/Boolean // com.eignex.klause.lowering.dimacs/WcnfDocument.triviallyUnsat.<get-triviallyUnsat>|<get-triviallyUnsat>(){}[0]
+
+    final fun component1(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfDocument.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<kotlin/IntArray> // com.eignex.klause.lowering.dimacs/WcnfDocument.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.klause.lowering.dimacs/WeightedCnfClause> // com.eignex.klause.lowering.dimacs/WcnfDocument.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // com.eignex.klause.lowering.dimacs/WcnfDocument.component4|component4(){}[0]
+    final fun component5(): kotlin/Long // com.eignex.klause.lowering.dimacs/WcnfDocument.component5|component5(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin.collections/List<kotlin/IntArray> = ..., kotlin.collections/List<com.eignex.klause.lowering.dimacs/WeightedCnfClause> = ..., kotlin/Boolean = ..., kotlin/Long = ...): com.eignex.klause.lowering.dimacs/WcnfDocument // com.eignex.klause.lowering.dimacs/WcnfDocument.copy|copy(kotlin.Int;kotlin.collections.List<kotlin.IntArray>;kotlin.collections.List<com.eignex.klause.lowering.dimacs.WeightedCnfClause>;kotlin.Boolean;kotlin.Long){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.dimacs/WcnfDocument.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfDocument.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.dimacs/WcnfDocument.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.dimacs/WcnfProblem { // com.eignex.klause.lowering.dimacs/WcnfProblem|null[0]
+    constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective, kotlin/Int) // com.eignex.klause.lowering.dimacs/WcnfProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective;kotlin.Int){}[0]
+
+    final val numOriginalBoolVars // com.eignex.klause.lowering.dimacs/WcnfProblem.numOriginalBoolVars|{}numOriginalBoolVars[0]
+        final fun <get-numOriginalBoolVars>(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfProblem.numOriginalBoolVars.<get-numOriginalBoolVars>|<get-numOriginalBoolVars>(){}[0]
+    final val objective // com.eignex.klause.lowering.dimacs/WcnfProblem.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.lowering.dimacs/WcnfProblem.objective.<get-objective>|<get-objective>(){}[0]
+    final val problem // com.eignex.klause.lowering.dimacs/WcnfProblem.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.dimacs/WcnfProblem.problem.<get-problem>|<get-problem>(){}[0]
+
+    final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.dimacs/WcnfProblem.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.lowering.dimacs/WcnfProblem.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfProblem.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective = ..., kotlin/Int = ...): com.eignex.klause.lowering.dimacs/WcnfProblem // com.eignex.klause.lowering.dimacs/WcnfProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.dimacs/WcnfProblem.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfProblem.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.dimacs/WcnfProblem.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.dimacs/WeightedCnfClause { // com.eignex.klause.lowering.dimacs/WeightedCnfClause|null[0]
+    constructor <init>(kotlin/Long, kotlin/IntArray) // com.eignex.klause.lowering.dimacs/WeightedCnfClause.<init>|<init>(kotlin.Long;kotlin.IntArray){}[0]
+
+    final val literals // com.eignex.klause.lowering.dimacs/WeightedCnfClause.literals|{}literals[0]
+        final fun <get-literals>(): kotlin/IntArray // com.eignex.klause.lowering.dimacs/WeightedCnfClause.literals.<get-literals>|<get-literals>(){}[0]
+    final val weight // com.eignex.klause.lowering.dimacs/WeightedCnfClause.weight|{}weight[0]
+        final fun <get-weight>(): kotlin/Long // com.eignex.klause.lowering.dimacs/WeightedCnfClause.weight.<get-weight>|<get-weight>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.lowering.dimacs/WeightedCnfClause.component1|component1(){}[0]
+    final fun component2(): kotlin/IntArray // com.eignex.klause.lowering.dimacs/WeightedCnfClause.component2|component2(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/IntArray = ...): com.eignex.klause.lowering.dimacs/WeightedCnfClause // com.eignex.klause.lowering.dimacs/WeightedCnfClause.copy|copy(kotlin.Long;kotlin.IntArray){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.dimacs/WeightedCnfClause.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.dimacs/WeightedCnfClause.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.lowering.dimacs/WeightedCnfClause.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.lowering.mps/MpsColumn { // com.eignex.klause.lowering.mps/MpsColumn|null[0]
     constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Int) // com.eignex.klause.lowering.mps/MpsColumn.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Int){}[0]
 
@@ -10618,29 +10697,10 @@ final object com.eignex.klause.config/KlauseConfigSchema : com.eignex.skema/Sche
 }
 
 final object com.eignex.klause.formats.dimacs/Dimacs { // com.eignex.klause.formats.dimacs/Dimacs|null[0]
-    final fun parse(com.eignex.klause.util/CharSource): com.eignex.klause.solver/Problem // com.eignex.klause.formats.dimacs/Dimacs.parse|parse(com.eignex.klause.util.CharSource){}[0]
-    final fun parse(kotlin/String): com.eignex.klause.solver/Problem // com.eignex.klause.formats.dimacs/Dimacs.parse|parse(kotlin.String){}[0]
-    final fun parseWcnf(com.eignex.klause.util/CharSource): com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem // com.eignex.klause.formats.dimacs/Dimacs.parseWcnf|parseWcnf(com.eignex.klause.util.CharSource){}[0]
-    final fun parseWcnf(kotlin/String): com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem // com.eignex.klause.formats.dimacs/Dimacs.parseWcnf|parseWcnf(kotlin.String){}[0]
-
-    final class WcnfProblem { // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem|null[0]
-        constructor <init>(com.eignex.klause.solver/Problem, com.eignex.klause.solver.objective/LinearObjective, kotlin/Int) // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.<init>|<init>(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective;kotlin.Int){}[0]
-
-        final val numOriginalBoolVars // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.numOriginalBoolVars|{}numOriginalBoolVars[0]
-            final fun <get-numOriginalBoolVars>(): kotlin/Int // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.numOriginalBoolVars.<get-numOriginalBoolVars>|<get-numOriginalBoolVars>(){}[0]
-        final val objective // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.objective|{}objective[0]
-            final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.objective.<get-objective>|<get-objective>(){}[0]
-        final val problem // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.problem|{}problem[0]
-            final fun <get-problem>(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.problem.<get-problem>|<get-problem>(){}[0]
-
-        final fun component1(): com.eignex.klause.solver/Problem // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.component2|component2(){}[0]
-        final fun component3(): kotlin/Int // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.component3|component3(){}[0]
-        final fun copy(com.eignex.klause.solver/Problem = ..., com.eignex.klause.solver.objective/LinearObjective = ..., kotlin/Int = ...): com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.copy|copy(com.eignex.klause.solver.Problem;com.eignex.klause.solver.objective.LinearObjective;kotlin.Int){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.formats.dimacs/Dimacs.WcnfProblem.toString|toString(){}[0]
-    }
+    final fun parse(com.eignex.klause.util/CharSource): com.eignex.klause.lowering.dimacs/CnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parse|parse(com.eignex.klause.util.CharSource){}[0]
+    final fun parse(kotlin/String): com.eignex.klause.lowering.dimacs/CnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parse|parse(kotlin.String){}[0]
+    final fun parseWcnf(com.eignex.klause.util/CharSource): com.eignex.klause.lowering.dimacs/WcnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parseWcnf|parseWcnf(com.eignex.klause.util.CharSource){}[0]
+    final fun parseWcnf(kotlin/String): com.eignex.klause.lowering.dimacs/WcnfDocument // com.eignex.klause.formats.dimacs/Dimacs.parseWcnf|parseWcnf(kotlin.String){}[0]
 }
 
 final object com.eignex.klause.formats.json/JsonSchema { // com.eignex.klause.formats.json/JsonSchema|null[0]
@@ -10856,6 +10916,8 @@ final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@co
     final fun (com.eignex.klause.solver/IntDomain).<get-values>(): com.eignex.klause.solver/IntSpan // com.eignex.klause.solver/values.<get-values>|<get-values>@com.eignex.klause.solver.IntDomain(){}[0]
 
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
+final fun (com.eignex.klause.lowering.dimacs/CnfDocument).com.eignex.klause.lowering.dimacs/toProblem(): com.eignex.klause.solver/Problem // com.eignex.klause.lowering.dimacs/toProblem|toProblem@com.eignex.klause.lowering.dimacs.CnfDocument(){}[0]
+final fun (com.eignex.klause.lowering.dimacs/WcnfDocument).com.eignex.klause.lowering.dimacs/toProblem(): com.eignex.klause.lowering.dimacs/WcnfProblem // com.eignex.klause.lowering.dimacs/toProblem|toProblem@com.eignex.klause.lowering.dimacs.WcnfDocument(){}[0]
 final fun (com.eignex.klause.lowering.mps/MpsModel).com.eignex.klause.lowering.mps/toProblem(): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/toProblem|toProblem@com.eignex.klause.lowering.mps.MpsModel(){}[0]
 final fun (com.eignex.klause.lowering.opb/OpbDocument).com.eignex.klause.lowering.opb/toProblem(): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/toProblem|toProblem@com.eignex.klause.lowering.opb.OpbDocument(){}[0]
 final fun (com.eignex.klause.model/BoolTerm).com.eignex.klause.schema/and(com.eignex.klause.model/BoolTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/and|and@com.eignex.klause.model.BoolTerm(com.eignex.klause.model.BoolTerm){}[0]
