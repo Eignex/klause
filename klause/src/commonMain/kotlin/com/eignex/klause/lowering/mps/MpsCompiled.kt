@@ -287,6 +287,7 @@ private fun splitRealRow(
     isFloat: BooleanArray,
     intVarOf: IntArray,
     realVarOf: IntArray,
+    scale: RowScale?,
 ): RealRowParts {
     val intVars = ArrayList<Int>()
     val intCoeffs = ArrayList<Double>()
@@ -294,12 +295,13 @@ private fun splitRealRow(
     val realCoeffs = ArrayList<Double>()
     for (k in c.indices.indices) {
         val idx = c.indices[k]
+        val coeff = scale.restate(c.coeffs[k])
         if (isFloat[idx]) {
             realVars.add(realVarOf[idx])
-            realCoeffs.add(c.coeffs[k])
+            realCoeffs.add(coeff)
         } else {
             intVars.add(intVarOf[idx])
-            intCoeffs.add(c.coeffs[k])
+            intCoeffs.add(coeff)
         }
     }
     return RealRowParts(
@@ -310,6 +312,29 @@ private fun splitRealRow(
     )
 }
 
+/**
+ * The multiplier restating a row that touches a continuous column in whole numbers, or `null` when the
+ * row's values carry no recoverable source decimal.
+ *
+ * The LP reads these coefficients exactly, so a field written `0.9` and kept as its binary double states
+ * a row the file does not: `0.9·x = 54` and `x = 60` are together infeasible over that double, and the
+ * relaxation then certifies a feasible model refuted. Multiplying the row through by the denominator its
+ * own decimals name restates it — `9·x = 540` — rather than approximating it.
+ *
+ * Only [RowScale.Exact] is used. A rounded multiplier would move coefficients the double already holds,
+ * trading a faithful row for a whole-numbered one, and the exactness this fixes is the whole point.
+ */
+private fun MpsConstraint.realRowScale(): RowScale? {
+    val builder = RowScaleBuilder()
+    for (coeff in coeffs) builder.observe(coeff)
+    rowBound(lower)?.let { builder.observe(it) }
+    rowBound(upper)?.let { builder.observe(it) }
+    return builder.resolve() as? RowScale.Exact
+}
+
+/** [value] on this scale as a whole number, or unchanged when there is no scale to restate it on. */
+private fun RowScale?.restate(value: Double): Double = if (this == null) value else scale(value).toDouble()
+
 /** Emit a row touching a continuous variable as a real ([Double]-coefficient) LP-only [Linear] row over
  *  its integer and real parts. */
 private fun emitRealRow(
@@ -319,8 +344,9 @@ private fun emitRealRow(
     intVarOf: IntArray,
     realVarOf: IntArray,
 ) {
-    val p = splitRealRow(c, isFloat, intVarOf, realVarOf)
-    emitRow(rowBound(c.lower), rowBound(c.upper), { it }) { op, bound ->
+    val scale = c.realRowScale()
+    val p = splitRealRow(c, isFloat, intVarOf, realVarOf, scale)
+    emitRow(rowBound(c.lower), rowBound(c.upper), scale::restate) { op, bound ->
         factors.add(Linear(p.intVars, p.intCoeffs, p.realVars, p.realCoeffs, op, bound))
     }
 }
@@ -412,14 +438,15 @@ private fun emitIndicatedRealRow(
     guard: Int,
     guards: IndicatorGuards,
 ) {
-    val p = splitRealRow(c, isFloat, intVarOf, realVarOf)
+    val scale = c.realRowScale()
+    val p = splitRealRow(c, isFloat, intVarOf, realVarOf, scale)
     fun post(op: LinearOp, bound: Double) {
         val cond = guards.newBool()
         factors.add(ReifiedRealLinear(cond, p.intVars, p.intCoeffs, p.realVars, p.realCoeffs, op, bound))
         postGuardImplies(factors, guard, cond)
     }
-    rowBound(c.upper)?.let { post(LinearOp.LE, it) }
-    rowBound(c.lower)?.let { post(LinearOp.GE, it) }
+    rowBound(c.upper)?.let { post(LinearOp.LE, scale.restate(it)) }
+    rowBound(c.lower)?.let { post(LinearOp.GE, scale.restate(it)) }
 }
 
 /** The scale carrying the objective's integer-column coefficients and its constant onto whole numbers.

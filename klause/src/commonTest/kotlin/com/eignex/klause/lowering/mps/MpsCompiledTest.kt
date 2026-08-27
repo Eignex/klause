@@ -47,6 +47,20 @@ class MpsCompiledTest {
     }
 
     @Test
+    fun `a row touching a continuous column lowers onto the denominator of its decimals`() {
+        val vars = listOf(
+            MpsVar("x", integer = false, lower = 0.0, upper = 100.0),
+            MpsVar("y", integer = true, lower = 0.0, upper = 10.0),
+        )
+        val row = lower(vars, MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(0.9, 1.0), 54.0, 54.0))
+
+        val constants = assertNotNull(row.realConstants)
+        assertEquals(9.0, constants.realCoefficients.at(0), "the real term is restated in whole numbers")
+        assertEquals(10.0, constants.intCoefficients.at(0), "the integer term scales with it")
+        assertEquals(540.0, constants.bound, "and so does the bound")
+    }
+
+    @Test
     fun `a coefficient finer than a millionth keeps its term in the row`() {
         val row = lower(twoFinite, MpsConstraint("c", intArrayOf(0, 1), doubleArrayOf(1e-7, 1.0), null, 1.0))
 
