@@ -13,7 +13,7 @@ import com.eignex.klause.solver.Problem
  *
  * Built only for a native-SAT-eligible propagation projection: no integer variables and every factor a
  * [Clause]. The literals keep their original [com.eignex.klause.solver.Lit] encoding, and clause
- * indices line up 1:1 with [Problem.factors], so a learned reason expressed as a clause index maps
+ * indices line up 1:1 with `Problem.factors`, so a learned reason expressed as a clause index maps
  * straight back to the originating factor.
  *
  * Immutable: the two-watched-literal scheme keeps the *watched* literals in the first two slots of

@@ -6,7 +6,7 @@ import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.toSortedLongArray
 
-/** Fold successful root-propagation deductions into a finite [Problem]'s domains. */
+/** Fold successful root-propagation deductions into a finite `Problem`'s domains. */
 internal fun Problem.foldRootDeductionsIntoDomains(result: PropagationResult) {
     if (result !is PropagationResult.Implied) return
     result.forEachInt { v, value ->

@@ -43,10 +43,10 @@ internal object AffineSingletons {
      * non-unit pivot that fails the divisibility test is left to the residue-class doubleton below.
      *
      * For the **alias** case `x = y` (`n = 2`, `A = 1`, `B = 0`) the substitution `x → y` is a plain
-     * variable rename, applied to *every* factor via [Factor.remap] regardless of type.
+     * variable rename, applied to *every* factor via `Factor.remap` regardless of type.
      * Otherwise the relation folds into every other [Linear]; a **single-partner** `x = a·y + b`
      * additionally projects out of any non-linear factor that can represent the affine view via
-     * [Factor.substituteAffine] (an Element index shift, a Table column rewrite). A multi-partner
+     * `Factor.substituteAffine` (an Element index shift, a Table column rewrite). A multi-partner
      * `B + Σ A_j·y_j` only folds into [Linear] factors — a global keyed on `x`'s value as a sum can't
      * represent it. The contained slice (`x` in no other factor) is the zero-fold special case,
      * and is what lets an `n`-term definition be projected out.
@@ -558,7 +558,7 @@ internal object AffineSingletons {
 
     /** An `EQ` [Linear] at [defIdx] defining `x = constTerm + Σ termCoeffs·termVars` (unit pivot). The
      *  other occurrences of `x` are either all foldable (Linear) or — for the alias case `x = y` —
-     *  substituted via [Factor.remap] into any factor type. */
+     *  substituted via `Factor.remap` into any factor type. */
     private class AffineCandidate(
         val defIdx: Int,
         val x: Int,
@@ -957,7 +957,7 @@ internal object AffineSingletons {
      * candidates in the same sequence the full-rebuild path did.
      *
      * Alongside the slots it holds a per-variable occurrence index over the stable ids of the
-     * live factors whose [Factor.intVars] contains a variable, one entry per occurrence (mirroring a CSR
+     * live factors whose `Factor.intVars` contains a variable, one entry per occurrence (mirroring a CSR
      * rebuild's multiset). It is maintained across eliminations: a fold rewrites only the factors that
      * mention the pivot, so only those ids' occurrence entries move. Its per-list order is irrelevant —
      * every reader (`isContained`, `otherOccurrences*`) tests membership, not position.
@@ -1121,7 +1121,7 @@ internal object AffineSingletons {
 
         /** Whether every factor other than [defIdx] that mentions [x] can take the substitution
          *  `x = scale·replacement + offset`: a [Linear] folds it directly, any other factor must opt in
-         *  via [Factor.substituteAffine] (a global that can represent the affine view). */
+         *  via `Factor.substituteAffine` (a global that can represent the affine view). */
         override fun otherOccurrencesAffineSubstitutable(
             defIdx: Int,
             x: Int,
@@ -1202,9 +1202,9 @@ internal object AffineSingletons {
         }
 
         /**
-         * Apply the alias rename `x → y` to every live factor via [Factor.remap] (any factor type),
+         * Apply the alias rename `x → y` to every live factor via `Factor.remap` (any factor type),
          * dropping the defining equality and appending the domain-bound rows. Rewriting the whole set is
-         * intrinsic to a rename — [Factor.remap] returns a fresh object for every factor — so this stays
+         * intrinsic to a rename — `Factor.remap` returns a fresh object for every factor — so this stays
          * O(live factors); only `x`'s occurrences migrate to `y`, so the index is patched, not rebuilt.
          */
         fun alias(problem: Problem, c: AffineCandidate): Int {
@@ -1214,7 +1214,7 @@ internal object AffineSingletons {
             intMap[c.x] = y
             val mapping = VarRemap(boolMap, intMap)
             // Snapshot the ids that mention `x` before remapping — their occurrence entries for `x` and
-            // `y` are re-derived from the remapped factor's own [Factor.intVars] below (a factor holding
+            // `y` are re-derived from the remapped factor's own `Factor.intVars` below (a factor holding
             // both `x` and `y` coalesces to a single `y`, matching what a fresh CSR rebuild would list).
             val occX = intOcc[c.x]
             val touched = IntArray(occX.size) { occX[it] }

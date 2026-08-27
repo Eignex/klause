@@ -10,7 +10,7 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
  * `k` means different variables in different workers' relaxations — so a cut cannot be shared as-is. A
  * [SharedCut] instead names each term by its CP variable (`(varId, isBool)`), exactly as [com.eignex
  * .klause.solver.propagation.SharedClause] names bound atoms by `(intVar, threshold)`, so it round-trips
- * across the workers of one [com.eignex.klause.solver.Problem]: [fromCut] reads a cut's columns back to
+ * across the workers of one `Problem`: [fromCut] reads a cut's columns back to
  * CP variables via the source relaxation's [LpRelaxation.colVarId] / [LpRelaxation.colIsBool], and
  * [toCut] re-maps them to the importing relaxation's columns via [LpRelaxation.intColOf] /
  * [LpRelaxation.boolColOf].

@@ -17,12 +17,12 @@ import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Binary implication graph presolve. Harvests `lit -> lit` implications the way [Probing] pins a
- * literal — pin a free Boolean, run [Problem.propagate], and read every *other* Boolean propagation
+ * literal — pin a free Boolean, run `Problem.propagate`, and read every *other* Boolean propagation
  * forces — then exploits the graph two ways:
  *
  *  - **Equivalent-literal substitution**: literals on a mutual-implication cycle are logically equal,
  *    so the variables they name are interchangeable. Each cycle collapses to a single representative
- *    and every other member is substituted away (a plain rename via [com.eignex.klause.solver.Factor.remap],
+ *    and every other member is substituted away (a plain rename via `Factor.remap`,
  *    the same machinery affine aliasing uses), then rebuilt for the caller via
  *    [ImplicationReduction.reconstruct].
  *  - **Transitive reduction**: a binary clause `a -> b` whose conclusion is already reachable from
@@ -120,7 +120,7 @@ internal object ImplicationGraph {
      * variable id in a component is its representative.
      *
      * **Polarity scope.** Only same-polarity equivalence is merged. The existing
-     * [com.eignex.klause.solver.Factor.remap] renames a variable id while preserving literal polarity
+     * `Factor.remap` renames a variable id while preserving literal polarity
      * and cannot express the polarity flip an anti-equivalence `r ⇔ ¬w` needs (a reification aux var is
      * a raw id, not a literal, so there is no polarity to flip), so anti-equivalent literals are
      * detected but deliberately left unmerged. A component that contains both polarities of one

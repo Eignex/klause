@@ -14,16 +14,16 @@ import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 
 /**
- * Bake-time root probing, owned by the presolve lane rather than the kernel [Problem].
+ * Bake-time root probing, owned by the presolve lane rather than the kernel `Problem`.
  *
- * A [Problem] only ever performs the cheap unconditional *base bake* (one `propagate(Assumptions.None)`
+ * A `Problem` only ever performs the cheap unconditional *base bake* (one `propagate(Assumptions.None)`
  * folded into its domains). The heavier failed-literal / SAC probing tiers — which are only ever enabled
  * by the compile / presolve layers — live here so the kernel never depends on `presolve` (the
  * `solver → presolve → solver` cycle the package split exists to prevent).
  *
- * [bake] runs the probing fixpoint against an already-base-baked [Problem] via
+ * [bake] runs the probing fixpoint against an already-base-baked `Problem` via
  * `problem.propagate(assumptions)` and returns the accumulated deductions. The pipeline feeds that
- * back as [Problem]'s `seedDeductions`, so the rebuilt problem's [Problem.baked] carries the probing
+ * back as `Problem`'s `seedDeductions`, so the rebuilt problem's `Problem.baked` carries the probing
  * pins / bound tightenings / holes.
  */
 object RootBaker {
@@ -31,7 +31,7 @@ object RootBaker {
     /**
      * Re-seed a base-baked [problem] with the [config]-enabled probing tiers: run [bake] and, when it
      * found extra deductions, return a fresh folded [BakedProblem] over the same factors / domains whose
-     * [Problem.baked] carries them. Returns [problem] unchanged when no tier is enabled, the problem is
+     * `Problem.baked` carries them. Returns [problem] unchanged when no tier is enabled, the problem is
      * an already-folded pass view (which never bakes), or the base bake is already `Unsat`. This is
      * the central re-probe point for the presolve fresh path and the LP harvest — the kernel never
      * initiates it, so no `solver → presolve` cycle.
@@ -60,7 +60,7 @@ object RootBaker {
 
     /**
      * Run the [config]-enabled probing tiers against the base-baked [problem] and return the resulting
-     * deductions — the base bake merged with every probing finding, ready to seed a rebuilt [Problem].
+     * deductions — the base bake merged with every probing finding, ready to seed a rebuilt `Problem`.
      * Returns [problem]'s existing bake unchanged when no tier is enabled or the base bake is already
      * `Unsat`. Cancellation is polled between phases and probes; a fired deadline yields a sound partial
      * bake (probing only ever tightens).
@@ -302,7 +302,7 @@ object RootBaker {
     /**
      * [problem] with an explicit contradiction appended so its bake propagation reports `Unsat` — the
      * materialization a caller uses when an oracle (e.g. the LP harvest) has certified infeasibility but a
-     * concrete infeasible [Problem] is needed. Two equalities pinning one variable to consecutive values
+     * concrete infeasible `Problem` is needed. Two equalities pinning one variable to consecutive values
      * (or a Boolean forced both ways) are jointly unsatisfiable regardless of domains, so the conflict is
      * witnessed without depending on the certifying proof being re-derivable downstream.
      */

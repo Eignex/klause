@@ -18,7 +18,7 @@ import com.eignex.klause.util.MutableIntIntMap
 
 /**
  * Totalizer-encoded core-guided MaxSAT optimiser for **unweighted** problems. Builds
- * one [Problem] up front with:
+ * one `Problem` up front with:
  *  - per soft, a fresh selector `r_i` and a relaxer clause `(origLit ∨ r_i)`;
  *  - a chain of `n` reified cardinality threshold bits `T_k ↔ (Σ r_i ≥ k)` for
  *    `k = 1..n`.

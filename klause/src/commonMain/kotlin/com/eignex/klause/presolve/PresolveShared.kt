@@ -293,7 +293,7 @@ internal object PresolveShared {
      * removed (kept in order) followed by [PassDelta.addedFactors]; the domains are the delta's own
      * ([PassDelta.domains]) or [this]'s when it leaves them alone. Re-baked eagerly through
      * [rebuildProblem] (the per-firing-pass rebuild the fresh path always did), so it is a plain solver
-     * [Problem] whose `baked` folds the delta's narrowings and any dependent tightenings.
+     * `Problem` whose `baked` folds the delta's narrowings and any dependent tightenings.
      */
     fun Problem.withPassDelta(delta: PassDelta, bakeConfig: BakeConfig): Problem {
         val kept = ArrayList<Factor>(factors.size - delta.droppedIndices.size + delta.addedFactors.size)
@@ -309,7 +309,7 @@ internal object PresolveShared {
 
     /**
      * The [PassDelta] taking [inputFactors] to [out] — a rewritten factor list where every survivor is
-     * identity-equal to an input factor ([Factor] uses reference equality, so a plain [HashMap] keys by
+     * identity-equal to an input factor (`Factor` uses reference equality, so a plain [HashMap] keys by
      * identity). Adds every [out] factor absent from the input; drops every input index whose factor is
      * not among [out]'s survivors. For passes that rebuild their whole factor list (variable renames,
      * substitutions) rather than deciding keep/drop per input index.
@@ -365,10 +365,10 @@ internal object PresolveShared {
             packedOpenIntLo = problem.intBounds.openLowerBits,
             packedOpenIntHi = problem.intBounds.openUpperBits,
         )
-        // An already-folded pass view never bakes (nothing reads [Problem.baked]), so [RootBaker.reseed] leaves
+        // An already-folded pass view never bakes (nothing reads `Problem.baked`), so [RootBaker.reseed] leaves
         // it untouched; with no probing tier enabled the plain base bake stands. Otherwise the reseed runs
-        // [RootBaker] against the base-baked problem and returns a fresh eager [Problem] whose
-        // [Problem.baked] carries the failed-literal / SAC deductions — the kernel's former self-bake, now
+        // [RootBaker] against the base-baked problem and returns a fresh eager `Problem` whose
+        // `Problem.baked` carries the failed-literal / SAC deductions — the kernel's former self-bake, now
         // driven from the presolve lane.
         return RootBaker.reseed(base, bakeConfig)
     }
@@ -404,7 +404,7 @@ internal object PresolveShared {
 
     fun divAll(xs: LongArray, g: Long): LongArray = LongArray(xs.size) { xs[it] / g }
 
-    /** Multiset of [Factor.structuralKey] over [factors] — the constraint set keyed for comparison
+    /** Multiset of `Factor.structuralKey` over [factors] — the constraint set keyed for comparison
      *  against a transform of itself. */
     fun structuralKeyMultiset(factors: List<Factor>): Map<StructuralKey, Int> {
         val base = HashMap<StructuralKey, Int>()

@@ -266,7 +266,7 @@ internal fun reginFilter(
 internal class ReginCache {
     val matchedValue = MutableIntLongMap()
 
-    // Unchanged-domains fast-path state: the var-id list and each var's [IntDomain] ref at the
+    // Unchanged-domains fast-path state: the var-id list and each var's `IntDomain` ref at the
     // last successful (null-returning) fire. Drifts across backtrack — a stale entry only ever
     // *misses* (ref-inequality against the restored domain), never falsely matches — so no
     // reversible/snapshot is needed. `lastVars == null` means no fixpoint is on record yet.
@@ -274,7 +274,7 @@ internal class ReginCache {
     private var lastDoms: Array<IntDomain?> = emptyArray()
 
     /** True iff the previous fire on exactly [vars] pruned to a GAC fixpoint that still holds —
-     *  same var set, and every var's [IntDomain] ref unchanged since. */
+     *  same var set, and every var's `IntDomain` ref unchanged since. */
     fun fixpointHolds(state: PropagationState, vars: IntArray): Boolean {
         val lv = lastVars ?: return false
         if (!lv.contentEquals(vars)) return false
@@ -375,7 +375,7 @@ internal class ReginIncrementalState(state: PropagationState, val vars: IntArray
      *  Reversible. */
     val sccId = RevIntArray(state, total, -1)
 
-    /** Each var's [IntDomain] at the end of its last fire — the delta base. Reversible, so it rolls
+    /** Each var's `IntDomain` at the end of its last fire — the delta base. Reversible, so it rolls
      *  back with the domains and the `current` ⊆ `domRef` (deletions-only) invariant always holds. */
     val domRef = Array(n) { RevRef<IntDomain?>(state, null) }
 }

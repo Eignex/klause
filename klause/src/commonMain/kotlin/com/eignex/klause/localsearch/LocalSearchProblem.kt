@@ -4,7 +4,7 @@ import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 
-/** Local-search-engine projection of an immutable [Problem]. */
+/** Local-search-engine projection of an immutable `Problem`. */
 class LocalSearchProblem(
     /** Immutable model data compiled by this projection. */
     val problem: Problem,

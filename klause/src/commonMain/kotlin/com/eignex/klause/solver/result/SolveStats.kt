@@ -206,6 +206,6 @@ data class PresolveStats(
     val constraintsRemoved: Int = 0,
     val infeasible: Boolean = false,
     val lpHarvest: LpHarvestReport? = null,
-    /** Wall time the base bake (presolve step 0, [com.eignex.klause.solver.Problem.bake]) took. */
+    /** Wall time the base bake (presolve step 0, `Problem.bake`) took. */
     val bakeElapsed: Duration = Duration.ZERO,
 )

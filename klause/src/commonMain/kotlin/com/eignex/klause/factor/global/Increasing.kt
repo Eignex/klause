@@ -27,7 +27,7 @@ import com.eignex.klause.solver.Factor
  * bounds-consistency — no global algorithm is stronger. Keeping it one factor (rather than
  * decomposing to pairwise [com.eignex.klause.factor.arithmetic.Linear]) buys the local-search
  * invariant, which re-monotonises the whole chain in one cascading step. The exact pairwise rows in
- * [linearRows] are still surfaced to presolve and, via the [Factor.linearize] default, to the LP
+ * [linearRows] are still surfaced to presolve and, via the `Factor.linearize` default, to the LP
  * relaxation.
  */
 class Increasing(val xs: IntArray, val strict: Boolean) : Factor {

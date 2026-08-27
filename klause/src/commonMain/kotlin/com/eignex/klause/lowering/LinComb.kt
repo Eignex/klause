@@ -3,7 +3,7 @@ package com.eignex.klause.lowering
 /**
  * An integer linear combination `Σ coeffs[v]·v + constant` over variable ids — the shared term the
  * SMT-LIB (QF_LIA) and XCSP3 parsers both fold expressions into before lowering a relation to a
- * [com.eignex.klause.solver.Factor]. Each parser keeps its own AST walk and its own operator/error
+ * `Factor`. Each parser keeps its own AST walk and its own operator/error
  * conventions; only this algebra ([plus], [scaled], [asSimpleVar], and [linCombDiff]) is shared.
  */
 internal data class LinComb(val coeffs: Map<Int, Long>, val constant: Long) {

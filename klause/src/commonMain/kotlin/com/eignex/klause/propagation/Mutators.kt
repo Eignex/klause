@@ -448,7 +448,7 @@ internal fun PropagationState.citeCrossedSearchHoles(
  * Exclude every value in [values] (sorted ascending, distinct) from int var [v] in a single
  * pass — the batched form of [excludeIntValueImpl]. Element's constant-array GAC prunes a wide
  * result domain down to a small reachable set; doing that one value at a time rebuilds the hole
- * array per value (O(domain^2)), whereas [IntDomain.excludeValues] merges them
+ * array per value (O(domain^2)), whereas `IntDomain.excludeValues` merges them
  * in O(domain).
  *
  * Reasoning matches the single-value path: the two endpoints that may move each cite the prior

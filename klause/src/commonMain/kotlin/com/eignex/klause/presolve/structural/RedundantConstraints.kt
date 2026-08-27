@@ -68,7 +68,7 @@ internal object RedundantConstraints {
      * Constraint subsumption / redundant-constraint removal: drop a constraint implied by
      * another retained one, preserving the feasible set exactly. Two mechanisms:
      *
-     *  1. **Exact duplicates** — any factor whose [Factor.structuralKey] equals an earlier kept one is
+     *  1. **Exact duplicates** — any factor whose `Factor.structuralKey` equals an earlier kept one is
      *     redundant (the keys are collision-free up to variable identity, so an equal key means an
      *     equal constraint). Unkeyed factors (`null` key) are never matched and always kept.
      *  2. **Same-vector domination** — over the [Linear] / [PseudoBoolean] inequalities, normalising
@@ -91,7 +91,7 @@ internal object RedundantConstraints {
         // Phase 1: exact-duplicate removal by structural key, two-tier so the full key — which for a
         // Table embeds its entire sorted tuple set and dominates presolve time on table-heavy models —
         // is built only when it can matter. A cheap shallow key (factor type + arity + variable ids,
-        // never the tuple payload) buckets the factors; the full [Factor.structuralKey] is computed and
+        // never the tuple payload) buckets the factors; the full `Factor.structuralKey` is computed and
         // compared only for factors that collide on the shallow key (true duplicates always do). A
         // factor with a unique shallow key — the common case — is kept without ever building its key.
         val deduped = ArrayList<Factor>(factors.size)
@@ -157,7 +157,7 @@ internal object RedundantConstraints {
         return finishAfterPhase2(problem, out, cancellation)
     }
 
-    /** Phases 3–5 over the phase-1/2 survivor list [out] (in [Problem.factors] order), recovering the
+    /** Phases 3–5 over the phase-1/2 survivor list [out] (in `Problem.factors` order), recovering the
      *  dropped input indices. Shared by the fresh recompute and the incremental path. */
     private fun finishAfterPhase2(
         problem: Problem,
@@ -262,7 +262,7 @@ internal object RedundantConstraints {
         }
 
         /** Reconcile the memo with the current live set and return the phase-1/2 survivor list in
-         *  [Problem.factors] order. On [SubsumeIncremental.rebuild] the memo is rebuilt from scratch;
+         *  `Problem.factors` order. On [SubsumeIncremental.rebuild] the memo is rebuilt from scratch;
          *  otherwise only the delta is applied. */
         fun reconcile(
             problem: Problem,
@@ -451,7 +451,7 @@ internal object RedundantConstraints {
     private class LeRow(val factorIndex: Int, val coeffByVar: MutableIntLongMap, val bound: Long)
 
     /** A `≤`-normalised, GCD-reduced [LeRow] for an exact [LinearRow] (from any factor's
-     *  [Factor.linearRows]); `null` for a non-(`≤`/`≥`) row. Coalesced terms have distinct vars, so a
+     *  `Factor.linearRows`); `null` for a non-(`≤`/`≥`) row. Coalesced terms have distinct vars, so a
      *  plain put per index is faithful; zero coefficients carry no support (and would divide by zero in
      *  the dominance ratio check), so skip them. */
     private fun leRowOf(row: LinearRow, factorIndex: Int): LeRow? {
@@ -688,7 +688,7 @@ internal object RedundantConstraints {
     }
 
     /** A cheap discriminator for Phase-1 duplicate bucketing: a commutative splitmix sum of the variable
-     *  ids (bool ids marked into a disjoint range) plus the arity-derived [Factor.structuralKeyWeight] —
+     *  ids (bool ids marked into a disjoint range) plus the arity-derived `Factor.structuralKeyWeight` —
      *  never a Table's tuple payload, the whole point of the two-tier dedup. It is **order-invariant** so
      *  it is implied by full structural-key equality (a [Linear]'s key compares its terms as a var→coeff
      *  map, not positionally, so an order-sensitive hash would split genuine duplicates into different

@@ -15,7 +15,7 @@ sealed interface IntColumn {
      *
      * Only a theory column states its bounds here. A [Finite] column's endpoints may have been
      * invented to close an open side, so the model-level bounds of a finite column are
-     * [Problem.intBounds] and nothing else.
+     * `Problem.intBounds` and nothing else.
      *
      * @property lower Inclusive lower bound, or null when the column is open below.
      * @property upper Inclusive upper bound, or null when the column is open above.
@@ -24,7 +24,7 @@ sealed interface IntColumn {
 }
 
 /**
- * Typed integer-column storage for a [Problem].
+ * Typed integer-column storage for a `Problem`.
  *
  * [FiniteIntColumns] is the hot all-CP representation. [MixedIntColumns] exists only when a composed
  * solve has symbolic theory columns, so ordinary finite search retains its packed domain array.

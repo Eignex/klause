@@ -12,7 +12,7 @@ internal class CutoffBound(val varId: Int, val hi: Long)
  *
  * A column open on the high side is one no row caps: raising it only ever helps satisfy the rows it
  * appears in, so bound tightening leaves the side open and the front-end closes it at an invented
- * search box ([Problem.intBounds] records which sides those are). Cost still caps such a column — but
+ * search box (`Problem.intBounds` records which sides those are). Cost still caps such a column — but
  * only against an incumbent, which exists neither at load nor in presolve. Once the search holds one,
  * `Σ c·x + constant ≤ incumbent − 1` is a row like any other, and propagating it bounds column `j` with
  * `c_j > 0` at `lo_j + ⌊(incumbent − 1 − L) / c_j⌋`, where `L` is the objective's minimum over the

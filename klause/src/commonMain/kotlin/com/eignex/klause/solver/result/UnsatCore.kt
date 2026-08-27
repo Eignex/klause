@@ -3,7 +3,7 @@ package com.eignex.klause.solver.result
 import com.eignex.klause.util.EmptyIntArray
 
 /**
- * A jointly-infeasible subset of [com.eignex.klause.solver.Problem.factors], identified by factor id. Mirrors
+ * A jointly-infeasible subset of `Problem.factors`, identified by factor id. Mirrors
  * SMT-LIB's `get-unsat-core`: when a complete backend (e.g. BacktrackSolver) proves UNSAT, it can
  * point back at the constraints whose conjunction is already unsat — useful for
  * minimisation, explanation, and assumption-style debugging.

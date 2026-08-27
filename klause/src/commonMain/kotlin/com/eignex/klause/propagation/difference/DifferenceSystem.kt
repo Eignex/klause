@@ -25,7 +25,7 @@ import com.eignex.klause.solver.Factor
  * A cycle is explained by the guards of the edges on it, so the learned clause names exactly the reified
  * rows whose conjunction is contradictory.
  *
- * This factor is **propagation-only**: it inherits the [Factor] local-search defaults. The system is
+ * This factor is **propagation-only**: it inherits the `Factor` local-search defaults. The system is
  * redundant with the [com.eignex.klause.factor.arithmetic.Linear] and
  * [com.eignex.klause.factor.arithmetic.ReifiedLinear] rows posted alongside it, which carry the same
  * semantics *with* real LS support, so those siblings stay and enforce each row for local search.

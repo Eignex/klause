@@ -7,7 +7,6 @@ import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -34,7 +33,7 @@ internal fun PropagationState.forEachBinaryPartner(lit: Int, action: (other: Int
     }
 }
 
-/** Unified factor accessor; routes static factor ids to [Problem.factors], and tail ids
+/** Unified factor accessor; routes static factor ids to `Problem.factors`, and tail ids
  *  (≥ `baseFactorCount`) to the mid-life presolve store in [PropagationState.incremental] mode
  *  (a tombstoned factor reads [NoPropagator]) or to [PropagationState.learnedClauses] otherwise. */
 internal fun PropagationState.factorAt(fid: Int): Propagator = when {

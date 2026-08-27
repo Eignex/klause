@@ -98,7 +98,7 @@ internal class FlatZincCompiler(
         }
         // The LS functional objective and definitional sweep resolve constraint args, which allocates a
         // singleton int var per integer-literal argument ([resolveIntVar] on an `IntLit` appends to
-        // [requireFiniteIntDomains]). Build them BEFORE snapshotting the [Problem] so those vars are counted in
+        // [requireFiniteIntDomains]). Build them BEFORE snapshotting the `Problem` so those vars are counted in
         // numIntVars/intDomains — otherwise the sweep references a var id the Problem lacks and the LS
         // invariant network indexes out of bounds.
         val lsObjective = when (solveDirective) {
@@ -107,7 +107,7 @@ internal class FlatZincCompiler(
             else -> null
         }
         val definitionalSweep = buildDefinitionalSweep()
-        // A plain base-baked [Problem]; the SAC / failed-literal probing resolved from the presolve
+        // A plain base-baked `Problem`; the SAC / failed-literal probing resolved from the presolve
         // config runs later in the presolve lane via [RootBaker] (the kernel never probes itself).
         val problem = Problem(
             numBoolVars = numBoolVars,

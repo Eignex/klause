@@ -15,10 +15,10 @@ import kotlin.time.Duration
 
 /**
  * Immutable solver-side problem. Variables come in two id spaces:
- *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [Assignment].
- *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [Assignment].
+ *  - Boolean vars: ids `[0, numBoolVars)`, packed bits in [com.eignex.klause.solver.Assignment].
+ *  - Integer vars: ids `[0, numIntVars)`, raw [Int] values in [com.eignex.klause.solver.Assignment].
  *
- * An integer variable may have an [IntDomain] for finite CP search, or be symbolic and owned by a
+ * An integer variable may have an `IntDomain` for finite CP search, or be symbolic and owned by a
  * theory component. Factors mention either or both.
  * Occurrence lists are split per kind so `flip(boolVar)` and `setInt(intVar)` only walk the
  * factors mentioning that specific variable.
@@ -38,7 +38,7 @@ open class Problem(
     /**
      * Extra root deductions computed outside the kernel — the failed-literal / SAC probing tiers
      * live in [com.eignex.klause.presolve.RootBaker], which runs them against an already-base-baked
-     * [Problem] and feeds the result back here. Merged into the base `propagate(Assumptions.None)`
+     * `Problem` and feeds the result back here. Merged into the base `propagate(Assumptions.None)`
      * bake before it folds into [requireFiniteIntDomains], so the extra pins / bound tightenings / holes become
      * part of [baked] and the problem's own domains. Defaults to empty = base bake only; the kernel
      * never initiates probing itself (that would create a `solver → presolve → solver` cycle).
@@ -74,7 +74,7 @@ open class Problem(
      * copied. Internal to [BakedProblem]'s already-folded construction (the incremental
      * [com.eignex.klause.presolve.PresolveSession] and the SMT/MPS front-ends supply a re-propagated array
      * read — never mutated — within one firing and rebuilt on the next change, so sharing saves an
-     * O([numIntVars]) copy per firing). A raw [Problem] leaves this off and copies, so nothing it is
+     * O([numIntVars]) copy per firing). A raw `Problem` leaves this off and copies, so nothing it is
      * constructed from can alias its domains.
      */
     val sharedDomains: Boolean = false,
@@ -256,7 +256,7 @@ open class Problem(
     /**
      * A copy with the integer domains replaced — used when deferred bounding tightens the
      * open sides after parsing, before the problem flows into presolve. Every other structure (factors,
-     * real bounds, implied/symmetry flags) is shared. The result is a raw [Problem] whose root bake is
+     * real bounds, implied/symmetry flags) is shared. The result is a raw `Problem` whose root bake is
      * still deferred; must not be called on a [BakedProblem], whose fold this copy would not reproduce.
      *
      * [newOpenLo] / [newOpenHi] record which sides of [newDomains] the bounding invented rather than
@@ -307,7 +307,7 @@ open class Problem(
     }
 
     /** Wall time the root bake took on a [BakedProblem]: forcing [baked] (root propagation to fixpoint)
-     *  and folding it into [requireFiniteIntDomains]. Zero on a raw [Problem] (which never bakes) and on a
+     *  and folding it into [requireFiniteIntDomains]. Zero on a raw `Problem` (which never bakes) and on a
      *  [sharedDomains] baked problem (whose domains arrive already folded). Lets a front-end separate parse
      *  cost from bake cost when reporting load time. Set once by [BakedProblem]'s construction. */
     var bakeElapsed: Duration = Duration.ZERO

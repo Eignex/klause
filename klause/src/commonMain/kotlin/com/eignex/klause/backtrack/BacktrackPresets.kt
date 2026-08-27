@@ -22,7 +22,7 @@ object BacktrackPresets {
      *  - a capped three-tier learned-clause database with promotion on reuse;
      *  - binary-resolution learned-clause minimization (always on in the analyzer).
      *
-     * Every component is sound on any [com.eignex.klause.solver.Problem] and the pure-Boolean
+     * Every component is sound on any `Problem` and the pure-Boolean
      * inprocessing simply no-ops where it doesn't apply, so the same preset drives both
      * satisfaction and the complete-search side of optimization — in a portfolio the shared
      * objective bound keeps a SAT-tuned worker useful on COP by racing to feasible incumbents.

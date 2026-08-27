@@ -31,7 +31,7 @@ internal class PresolveDelta(
 }
 
 /**
- * Int-variable occurrence index over a pass's live factor list, in the [Factor.intVars] CSR layout the
+ * Int-variable occurrence index over a pass's live factor list, in the `Factor.intVars` CSR layout the
  * affine / dup-columns candidate searches consume: the factors mentioning var `v` are the dense indices
  * `flat[offsets(v) until offsets(v + 1)]`, in ascending dense-index order — matching what a fresh
  * per-pass rebuild over `problem.factors` would produce. [PresolveSession] maintains the underlying
@@ -42,7 +42,7 @@ class SharedIntOccurrence internal constructor(internal val offsets: IntArray, i
 
 /**
  * Owns the persistent state of an incremental presolve run so the round engine never rebuilds a
- * [Problem] per firing pass. Holds the working factor set as a stable-id, append-only list (a
+ * `Problem` per firing pass. Holds the working factor set as a stable-id, append-only list (a
  * tombstoned slot becomes `null` and its id is never reused) and one persistent [PropagationState]
  * sized to the original variable count — valid for the whole run because presolve never renumbers
  * variables.
@@ -51,7 +51,7 @@ class SharedIntOccurrence internal constructor(internal val offsets: IntArray, i
  * into the live state, then re-propagates incrementally from just that delta via the existing
  * dirty-variable/watcher machinery. Because the propagators are monotone the greatest fixpoint is
  * unique, so this reaches the same tightened domains a from-scratch bake over the final factor set
- * would — no per-pass `computeBaked`. [materialize] builds the heavyweight solver [Problem] once at
+ * would — no per-pass `computeBaked`. [materialize] builds the heavyweight solver `Problem` once at
  * the end, with the single renumber/remap.
  */
 internal class PresolveSession(private val base: Problem, private val bakeConfig: BakeConfig = BakeConfig.NONE) {
@@ -66,7 +66,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     private var stateProblem: Problem = base
 
     // Seed the persistent state directly from the base's already-computed root fixpoint
-    // ([Problem.baked], produced once at base construction) rather than re-propagating every factor
+    // (`Problem.baked`, produced once at base construction) rather than re-propagating every factor
     // inside the presolve window: the seeded pins/bounds are applied through the atom-consistent
     // mutation API and settle at that same greatest fixpoint. A [PropagationResult.Unsat] base seeds
     // nothing (the init below adopts its infeasibility).
@@ -91,7 +91,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     private var liveIds: IntArray = EmptyIntArray
 
     // Int-variable occurrence index keyed by stable factor id: `intOcc[v]` holds the stable ids of every
-    // live factor whose [Factor.intVars] contains `v`, in ascending-stable-id (= append) order. Built
+    // live factor whose `Factor.intVars` contains `v`, in ascending-stable-id (= append) order. Built
     // once from the base factors and maintained O(delta) in [apply] — an added factor's stable id is
     // appended to its vars' lists; a tombstoned factor's id stays (filtered on read, its slot is null).
     // The affine / dup-columns per-round candidate search reads the dense view derived in [passInput],
@@ -107,7 +107,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     private var occView: SharedIntOccurrence? = null
     private var occDirty: Boolean = true
 
-    // The [Problem] view [passInput] last built, reused until the working state changes. A pass that finds
+    // The `Problem` view [passInput] last built, reused until the working state changes. A pass that finds
     // nothing to do emits an empty delta and never calls [applyDelta], so the state is byte-for-byte what
     // the previous pass already saw — the next pass gets the same view instead of rebuilding the live-factor
     // list and domain snapshot. On a large model iterated to a fixpoint over many rounds, most pass calls
@@ -117,7 +117,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
 
     init {
         for (id in base.factors.indices) recordOccurrences(id, base.factors[id])
-        // The base [Problem] already ran its root bake at construction (outside presolve). If that
+        // The base `Problem` already ran its root bake at construction (outside presolve). If that
         // proved infeasibility, adopt it directly — re-propagating the whole factor set just to
         // rediscover a known root conflict is pure waste, and catastrophic on wide domains (a 2M-span
         // infeasible model spends seconds re-deriving what `base.baked` already holds). Otherwise
@@ -131,7 +131,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
     }
 
     /** Append stable factor id [id] to the occurrence list of each int var factor [f] mentions, so the
-     *  index carries [f] once per occurrence in its [Factor.intVars] (mirroring a fresh CSR rebuild). */
+     *  index carries [f] once per occurrence in its `Factor.intVars` (mirroring a fresh CSR rebuild). */
     private fun recordOccurrences(id: Int, f: Factor) {
         for (v in f.intVars) (intOcc[v] ?: IntArrayList(0).also { intOcc[v] = it }).add(id)
     }
@@ -429,7 +429,7 @@ internal class PresolveSession(private val base: Problem, private val bakeConfig
         lastFeasibleDomains = Array(base.numIntVars) { state.intDomains[it] }
     }
 
-    /** Materialize the final solver [Problem] once: the live factors and the tightened int domains. On
+    /** Materialize the final solver `Problem` once: the live factors and the tightened int domains. On
      *  infeasibility the pre-conflict [lastFeasibleDomains] are used (the fresh path likewise skips
      *  folding an Unsat bake); otherwise the state's fully-folded domains.
      *

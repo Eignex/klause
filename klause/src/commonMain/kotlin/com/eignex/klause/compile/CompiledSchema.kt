@@ -23,7 +23,7 @@ import com.eignex.klause.solver.objective.minimizeBool
 import com.eignex.klause.solver.objective.minimizeInt
 
 /**
- * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side [Problem],
+ * Result of compiling a [com.eignex.klause.schema.VariableSchema] to a solver-side `Problem`,
  * carrying the index needed to decode an assignment back to schema values.
  *
  * Boolean-side names map to packed-bit ids in `boolVarIdByName`; integer/float-side names map

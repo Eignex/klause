@@ -264,7 +264,7 @@ object Xcsp3 {
             // Parse the range/singleton tokens into intervals, then build `[lo,hi]` minus only the interior
             // holes (the gaps between consecutive intervals). Enumerating a range's interior would be
             // O(span) — a wide domain like `0..1000000000` would exhaust the heap — while a compact
-            // [IntDomain] needs just the holes, which a contiguous range has none of.
+            // `IntDomain` needs just the holes, which a contiguous range has none of.
             val intervals = ArrayList<LongArray>()
             for (tok in text.splitWs()) {
                 val separator = tok.indexOf("..")
@@ -1277,7 +1277,7 @@ object Xcsp3 {
                 numIntVars = domains.size,
                 intDomains = domains.toTypedArray(),
                 factors = factors.toTypedArray(),
-                // A raw problem: the base bake is deferred to presolve step 0 ([Problem.bake]); construction
+                // A raw problem: the base bake is deferred to presolve step 0 (`Problem.bake`); construction
                 // is pure parse. The pipeline folds it (and can LP-tighten a wide domain first).
             ),
             objective,

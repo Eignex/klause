@@ -30,7 +30,7 @@ import com.eignex.klause.solver.Factor
  * so even-occurrence variables cancel and a derived row's reason is exactly its
  * odd-occurrence assigned support — the minimal sufficient set.
  *
- * This factor is **propagation-only**: it inherits the [Factor] local-search defaults
+ * This factor is **propagation-only**: it inherits the `Factor` local-search defaults
  * (always-satisfied, zero deltas). The Gaussian system is redundant with the per-row [Xor]
  * factors posted alongside it, which carry the same parity semantics *with* real LS support,
  * so LS enforces each parity row via those siblings.

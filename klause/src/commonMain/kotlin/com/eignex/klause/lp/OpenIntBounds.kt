@@ -48,8 +48,8 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
  * The tightening is sound over genuine ±∞ because an open side enters the LP genuinely open — open
  * above as a probe-flagged free upper ([LpBuilder.addFreeVar]), open below as the zero-shift split
  * `x = x⁺ − x⁻` — so a derived bound holds over the true unbounded region, not a pre-clamped box.
- * This is why it must run before a [com.eignex.klause.solver.Problem]'s finite
- * [com.eignex.klause.solver.IntDomain]s are committed — once a side is clamped the "genuinely infinite"
+ * This is why it must run before a `Problem`'s finite
+ * `IntDomain`s are committed — once a side is clamped the "genuinely infinite"
  * information is gone. Only [LinearOp.LE]/[LinearOp.GE]/[LinearOp.EQ] constraints enter; any other
  * relation is skipped (dropping a constraint only loosens the relaxation, never unsound).
  *

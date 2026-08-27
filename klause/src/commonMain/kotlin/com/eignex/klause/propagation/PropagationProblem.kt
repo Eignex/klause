@@ -7,7 +7,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 
 /**
- * Propagation-engine projection of an immutable [Problem]. It owns the propagator table and every
+ * Propagation-engine projection of an immutable `Problem`. It owns the propagator table and every
  * propagation wakeup index, keeping those engine allocations out of the model object.
  */
 class PropagationProblem(

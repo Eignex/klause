@@ -62,7 +62,7 @@ class XorHashFamily(
 }
 
 /**
- * The [Problem] augmented with [hashes] as a single [GaussianXor] system. Variable counts and
+ * The `Problem` augmented with [hashes] as a single [GaussianXor] system. Variable counts and
  * domains are unchanged; only one constraint is appended. The parity constraints are propagated
  * jointly by Gauss-Jordan elimination, which is what makes enumerating a hashed cell tractable
  * (a per-hash [Xor] factor cannot — see [GaussianXor]).

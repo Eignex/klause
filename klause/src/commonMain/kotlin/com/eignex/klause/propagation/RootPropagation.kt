@@ -9,9 +9,9 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 
 /**
- * Runs the propagation engine over an immutable [Problem] and reports deductions beyond [assumptions].
+ * Runs the propagation engine over an immutable `Problem` and reports deductions beyond [assumptions].
  *
- * This belongs to propagation rather than [Problem]: creating a [PropagationState], scheduling
+ * This belongs to propagation rather than `Problem`: creating a [PropagationState], scheduling
  * propagators, and extracting conflicts are propagation-engine work. The model owns only the data
  * used to build that projection.
  */

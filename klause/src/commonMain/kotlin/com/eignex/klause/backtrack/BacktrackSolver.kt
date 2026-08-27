@@ -8,7 +8,6 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.ResumableOptimizer
 import com.eignex.klause.solver.ResumableSearch
@@ -24,7 +23,7 @@ import com.eignex.klause.util.Cancellation
 import kotlin.random.Random
 
 /**
- * Complete depth-first search over a [Problem]'s assignment space, driven by propagation
+ * Complete depth-first search over a `Problem`'s assignment space, driven by propagation
  * via [PropagationSession]. Variable selection and value selection are plug-in heuristics
  * via [BacktrackParams.variableSelector] / [BacktrackParams.valueSelector].
  *

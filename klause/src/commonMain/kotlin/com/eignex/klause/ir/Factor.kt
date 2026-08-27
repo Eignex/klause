@@ -10,7 +10,7 @@ import com.eignex.klause.lp.Term
 import com.eignex.klause.propagation.Propagator
 
 /**
- * Structural contract for a constraint in [Problem]: variable membership, remapping, and
+ * Structural contract for a constraint in `Problem`: variable membership, remapping, and
  * structural identity. The deductive half is [Propagator] (returned by [asPropagator]) and the
  * local-search half is [Invariant] (returned by [asInvariant]); each is a separate object whose
  * allocation is deferred to when the corresponding engine is initialised, because it carries the
@@ -108,7 +108,7 @@ interface Factor {
      * `hashCode` of `remap(mapping).structuralKey()`, the per-incidence port signature symmetry
      * refinement computes for every variable–factor arc each round. The default builds the remapped
      * factor and its key; a hot factor type overrides to fold the same hash directly from its remapped
-     * variables, skipping the intermediate [Factor] and [StructuralKey] allocations. An override must
+     * variables, skipping the intermediate `Factor` and [StructuralKey] allocations. An override must
      * return a value that *discriminates* ports as well as the key's hash — soundness never rests on it
      * (every candidate is re-checked by an automorphism test), so a collision only coarsens the
      * colouring, but the result should match the key hash to keep the colouring (and the symmetries
@@ -206,7 +206,7 @@ interface Factor {
      * Emit this factor's LP-relaxation rows, columns, and auxiliary variables into [builder] — the
      * LP-engine analogue of [asPropagator] / [asInvariant], but a stateless emitter rather than a
      * factory object. The driver calls it once per relaxation build, passing the factor's index in
-     * [Problem.factors] as [factorId]. A single pass may mix [com.eignex.klause.lp.Contribution.CORE]
+     * `Problem.factors` as [factorId]. A single pass may mix [com.eignex.klause.lp.Contribution.CORE]
      * and [com.eignex.klause.lp.Contribution.HULL] rows — the kind is chosen per row at emit time.
      *
      * An exact linear row *is* the tightest valid relaxation, so the default emits the factor's
@@ -246,7 +246,7 @@ interface Factor {
 }
 
 /**
- * The outcome of [Factor.structuralReduce]: either no reduction, or a solution-set-exact rewrite into
+ * The outcome of `Factor.structuralReduce`: either no reduction, or a solution-set-exact rewrite into
  * a (possibly empty) list of replacement factors plus optional per-variable bound narrowings.
  */
 sealed interface FactorReduction {
@@ -266,7 +266,7 @@ sealed interface FactorReduction {
  * Emit one exact [LinearRow] into [builder]. A pure integer row goes through
  * [RelaxationBuilder.linearRow] verbatim; a row carrying Boolean literals is folded to mixed columns,
  * each negative literal's `coeff · (1 − x)` moving its constant to the right-hand side. Used by the
- * default [Factor.linearize] so a factor exposing exact rows needs no bespoke relaxation code.
+ * default `Factor.linearize` so a factor exposing exact rows needs no bespoke relaxation code.
  */
 private fun emitExactRow(builder: RelaxationBuilder, row: LinearRow) {
     val n = row.size

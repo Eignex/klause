@@ -22,16 +22,13 @@ import com.eignex.klause.lowering.flatzinc.FlatZincSearchTier
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchValueSelector
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchVarSelector
 
-/** Convert format-side search hints to `BacktrackParams` in the backtrack engine package. */
 /** Convert format-side search hints into backtrack-ready parameters. */
-fun FlatZincSearchHints.toBacktrackParams(
-    numBoolVars: Int,
-    numIntVars: Int,
-): BacktrackParams = BacktrackPresets.conflictDriven().copy(
-    variableSelector = fallbackVarSelector.toVariableSelector()
-        .let { fallback -> TieredVariableSelector(this.tiers.map { it.toSearchTier() }, fallback = fallback) },
-    valueSelector = toValueSelector(numBoolVars, numIntVars),
-)
+fun FlatZincSearchHints.toBacktrackParams(numBoolVars: Int, numIntVars: Int): BacktrackParams =
+    BacktrackPresets.conflictDriven().copy(
+        variableSelector = fallbackVarSelector.toVariableSelector()
+            .let { fallback -> TieredVariableSelector(this.tiers.map { it.toSearchTier() }, fallback = fallback) },
+        valueSelector = toValueSelector(numBoolVars, numIntVars),
+    )
 
 private fun FlatZincSearchHints.toValueSelector(numBoolVars: Int, numIntVars: Int): ValueSelector {
     val tiers = tiers.map { it.toSearchTier() }

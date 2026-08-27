@@ -93,7 +93,7 @@ sealed interface SolveResult {
 }
 
 /**
- * Backend that produces satisfying assignments for a [Problem]. Four entry points:
+ * Backend that produces satisfying assignments for a `Problem`. Four entry points:
  *
  *  - [solve] — single-shot SAT/UNSAT/Unknown.
  *  - [sample] — first satisfying assignment, or `null` if the engine couldn't find one

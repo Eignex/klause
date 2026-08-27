@@ -3,12 +3,12 @@ package com.eignex.klause.ir
 import com.eignex.klause.solver.intdomain.ContiguousDomain
 import kotlin.random.Random
 
-/** Primitive-`Int` visitor for the [IntDomain] iteration methods. A `fun interface` (not
+/** Primitive-`Int` visitor for the `IntDomain` iteration methods. A `fun interface` (not
  *  `(Int) -> Unit`) so `action(v)` passes a primitive `int` with no `Integer` boxing on the
  *  per-value propagation hot paths; lambdas still convert at the call site via SAM conversion, so
  *  `d.forEach { … }` is unchanged. */
 fun interface IntConsumer {
-    /** Receive one domain [value] from an [IntDomain] iteration. */
+    /** Receive one domain [value] from an `IntDomain` iteration. */
     fun accept(value: Long)
 }
 
@@ -192,7 +192,7 @@ interface IntDomain {
         return ans
     }
 
-    /** Factory for [IntDomain]; the bitset/wide-rep cutoff is
+    /** Factory for `IntDomain`; the bitset/wide-rep cutoff is
      *  [com.eignex.klause.config.KlauseConfig.bitsetThreshold]. */
     companion object {
         /** Construct the contiguous domain `(min..max)`. */
@@ -204,7 +204,7 @@ interface IntDomain {
  * The values of a domain whose constraint only holds over an enumerable one — a table, a value graph,
  * an all-different. Fails loudly on a domain too wide to walk, where the old saturating `size` returned
  * a number that silently meant "very large". A caller that can decline instead should ask
- * [IntDomain.spanOrNull].
+ * `IntDomain.spanOrNull`.
  */
 val IntDomain.values: IntSpan get() = span()
 
@@ -225,12 +225,12 @@ fun IntDomain.randomValue(rng: Random): Long {
 }
 
 /**
- * The values of an [IntDomain], in ascending order, when there are few enough of them to index.
+ * The values of an `IntDomain`, in ascending order, when there are few enough of them to index.
  *
- * Separate from [IntDomain] on purpose. A domain knows its bounds and its holes however wide it is,
+ * Separate from `IntDomain` on purpose. A domain knows its bounds and its holes however wide it is,
  * while enumeration is only meaningful when the present values can be addressed by an `Int` index —
  * so a caller that walks values must obtain this first and handle its absence, rather than checking a
- * predicate and hoping. Obtained from [IntDomain.spanOrNull]; the domain returns itself, so holding a
+ * predicate and hoping. Obtained from `IntDomain.spanOrNull`; the domain returns itself, so holding a
  * span allocates nothing and keeps the packed representation.
  */
 interface IntSpan {

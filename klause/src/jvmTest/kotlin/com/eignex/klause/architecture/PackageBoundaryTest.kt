@@ -1,7 +1,9 @@
 package com.eignex.klause.architecture
 
-import kotlin.io.path.Path
+import java.nio.file.Path
+import java.nio.file.Paths
 import kotlin.io.path.exists
+import kotlin.io.path.name
 import kotlin.io.path.readText
 import kotlin.io.path.walk
 import kotlin.test.Test
@@ -18,7 +20,7 @@ class PackageBoundaryTest {
                 .map { it.trim() }
                 .filter { it.startsWith("import ") }
                 .filter { it.startsWith("import com.eignex.klause.lp.engine.") }
-                .map { "${file.fileName}: $it" }
+                .map { "${file.name}: $it" }
                 .toList()
         }
         assertEquals(
@@ -45,7 +47,7 @@ class PackageBoundaryTest {
                     it.startsWith("import com.eignex.klause.formats.") ||
                         it.startsWith("import com.eignex.klause.lowering.")
                 }
-                .map { "${file.fileName}: $it" }
+                .map { "${file.name}: $it" }
                 .toList()
         }
         assertEquals(
@@ -61,7 +63,7 @@ class PackageBoundaryTest {
 }
 
 private fun locateProjectRoot(): Path? {
-    val candidates = generateSequence(Path(System.getProperty("user.dir"))) { it.parent }
+    val candidates = generateSequence(Paths.get(System.getProperty("user.dir"))) { it.parent }
         .take(6)
         .flatMap { base ->
             sequenceOf(
