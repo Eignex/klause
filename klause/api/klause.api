@@ -2369,6 +2369,14 @@ public final class com/eignex/klause/ir/FactorReduction$Unchanged : com/eignex/k
 	public static final field INSTANCE Lcom/eignex/klause/ir/FactorReduction$Unchanged;
 }
 
+public final class com/eignex/klause/ir/FiniteIntColumns : com/eignex/klause/ir/IntColumns {
+	public fun <init> ([Lcom/eignex/klause/ir/IntDomain;Z)V
+	public synthetic fun <init> ([Lcom/eignex/klause/ir/IntDomain;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
+	public fun column (I)Lcom/eignex/klause/ir/IntColumn;
+	public fun getSize ()I
+}
+
 public final class com/eignex/klause/ir/IntBounds {
 	public static final field Companion Lcom/eignex/klause/ir/IntBounds$Companion;
 	public final fun getSize ()I
@@ -2383,6 +2391,40 @@ public final class com/eignex/klause/ir/IntBounds {
 }
 
 public final class com/eignex/klause/ir/IntBounds$Companion {
+}
+
+public abstract interface class com/eignex/klause/ir/IntColumn {
+}
+
+public final class com/eignex/klause/ir/IntColumn$Bounded : com/eignex/klause/ir/IntColumn {
+	public fun <init> (Ljava/lang/Long;Ljava/lang/Long;)V
+	public final fun component1 ()Ljava/lang/Long;
+	public final fun component2 ()Ljava/lang/Long;
+	public final fun copy (Ljava/lang/Long;Ljava/lang/Long;)Lcom/eignex/klause/ir/IntColumn$Bounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/IntColumn$Bounded;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/ir/IntColumn$Bounded;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLower ()Ljava/lang/Long;
+	public final fun getUpper ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/IntColumn$Finite : com/eignex/klause/ir/IntColumn {
+	public fun <init> (Lcom/eignex/klause/ir/IntDomain;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/IntDomain;
+	public final fun copy (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/IntColumn$Finite;
+	public static synthetic fun copy$default (Lcom/eignex/klause/ir/IntColumn$Finite;Lcom/eignex/klause/ir/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/ir/IntColumn$Finite;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDomain ()Lcom/eignex/klause/ir/IntDomain;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class com/eignex/klause/ir/IntColumns {
+	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
+	public abstract fun column (I)Lcom/eignex/klause/ir/IntColumn;
+	public final fun domainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
+	public abstract fun getSize ()I
 }
 
 public abstract interface class com/eignex/klause/ir/IntConsumer {
@@ -2464,6 +2506,13 @@ public final class com/eignex/klause/ir/Lit {
 	public final fun variable (I)I
 }
 
+public final class com/eignex/klause/ir/MixedIntColumns : com/eignex/klause/ir/IntColumns {
+	public fun <init> ([Lcom/eignex/klause/ir/IntColumn;)V
+	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
+	public fun column (I)Lcom/eignex/klause/ir/IntColumn;
+	public fun getSize ()I
+}
+
 public final class com/eignex/klause/ir/MixedVars : com/eignex/klause/ir/VarList {
 	public fun <init> ()V
 	public fun <init> ([I[I[I[I)V
@@ -2494,8 +2543,8 @@ public final class com/eignex/klause/ir/ObjectiveSense : java/lang/Enum {
 }
 
 public class com/eignex/klause/ir/Problem {
-	public fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/ir/Factor;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
-	public synthetic fun <init> (IILcom/eignex/klause/solver/IntColumns;[Lcom/eignex/klause/ir/Factor;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (IILcom/eignex/klause/ir/IntColumns;[Lcom/eignex/klause/ir/Factor;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
+	public synthetic fun <init> (IILcom/eignex/klause/ir/IntColumns;[Lcom/eignex/klause/ir/Factor;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
 	public synthetic fun <init> (II[Lcom/eignex/klause/ir/IntDomain;Ljava/util/List;[ZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (II[Lcom/eignex/klause/ir/IntDomain;[Lcom/eignex/klause/ir/Factor;[ZZZI[D[D[Z[ZLcom/eignex/klause/util/Bits;Lcom/eignex/klause/util/Bits;Lcom/eignex/klause/ir/IntBounds;)V
@@ -2505,7 +2554,7 @@ public class com/eignex/klause/ir/Problem {
 	public final fun getHasSymmetryBreaking ()Z
 	public final fun getImpliedFactorMask ()[Z
 	public final fun getIntBounds ()Lcom/eignex/klause/ir/IntBounds;
-	public final fun getIntColumns ()Lcom/eignex/klause/solver/IntColumns;
+	public final fun getIntColumns ()Lcom/eignex/klause/ir/IntColumns;
 	public final fun getNumBoolVars ()I
 	public final fun getNumFactors ()I
 	public final fun getNumIntVars ()I
@@ -2531,7 +2580,7 @@ public final class com/eignex/klause/ir/ProblemSpec {
 	public final fun getNumRealVars ()I
 	public final fun getRealLower ()[D
 	public final fun getRealUpper ()[D
-	public final fun materialize (Lcom/eignex/klause/solver/IntColumns;)Lcom/eignex/klause/ir/Problem;
+	public final fun materialize (Lcom/eignex/klause/ir/IntColumns;)Lcom/eignex/klause/ir/Problem;
 	public final fun materialize ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/Problem;
 	public final fun materializeFiniteBounds ()Lcom/eignex/klause/ir/Problem;
 }
@@ -8359,48 +8408,6 @@ public final class com/eignex/klause/solver/ConstListKt {
 	public static final fun longsOrNull (Lcom/eignex/klause/solver/ConstList;)Lcom/eignex/klause/solver/LongConstList;
 }
 
-public final class com/eignex/klause/solver/FiniteIntColumns : com/eignex/klause/solver/IntColumns {
-	public fun <init> ([Lcom/eignex/klause/ir/IntDomain;Z)V
-	public synthetic fun <init> ([Lcom/eignex/klause/ir/IntDomain;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
-	public fun column (I)Lcom/eignex/klause/solver/IntColumn;
-	public fun getSize ()I
-}
-
-public abstract interface class com/eignex/klause/solver/IntColumn {
-}
-
-public final class com/eignex/klause/solver/IntColumn$Bounded : com/eignex/klause/solver/IntColumn {
-	public fun <init> (Ljava/lang/Long;Ljava/lang/Long;)V
-	public final fun component1 ()Ljava/lang/Long;
-	public final fun component2 ()Ljava/lang/Long;
-	public final fun copy (Ljava/lang/Long;Ljava/lang/Long;)Lcom/eignex/klause/solver/IntColumn$Bounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/IntColumn$Bounded;Ljava/lang/Long;Ljava/lang/Long;ILjava/lang/Object;)Lcom/eignex/klause/solver/IntColumn$Bounded;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getLower ()Ljava/lang/Long;
-	public final fun getUpper ()Ljava/lang/Long;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/solver/IntColumn$Finite : com/eignex/klause/solver/IntColumn {
-	public fun <init> (Lcom/eignex/klause/ir/IntDomain;)V
-	public final fun component1 ()Lcom/eignex/klause/ir/IntDomain;
-	public final fun copy (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/solver/IntColumn$Finite;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/IntColumn$Finite;Lcom/eignex/klause/ir/IntDomain;ILjava/lang/Object;)Lcom/eignex/klause/solver/IntColumn$Finite;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDomain ()Lcom/eignex/klause/ir/IntDomain;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public abstract class com/eignex/klause/solver/IntColumns {
-	public abstract fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
-	public abstract fun column (I)Lcom/eignex/klause/solver/IntColumn;
-	public final fun domainOrNull (I)Lcom/eignex/klause/ir/IntDomain;
-	public abstract fun getSize ()I
-}
-
 public final class com/eignex/klause/solver/IntConsts : com/eignex/klause/solver/LongConstList {
 	public fun <init> ([I)V
 	public fun at (I)J
@@ -8429,13 +8436,6 @@ public final class com/eignex/klause/solver/LongConsts : com/eignex/klause/solve
 	public fun getSize ()I
 	public fun negated ()Lcom/eignex/klause/solver/LongConstList;
 	public fun toLongArray ()[J
-}
-
-public final class com/eignex/klause/solver/MixedIntColumns : com/eignex/klause/solver/IntColumns {
-	public fun <init> ([Lcom/eignex/klause/solver/IntColumn;)V
-	public fun allFiniteOrNull ()[Lcom/eignex/klause/ir/IntDomain;
-	public fun column (I)Lcom/eignex/klause/solver/IntColumn;
-	public fun getSize ()I
 }
 
 public abstract interface class com/eignex/klause/solver/Optimizer : com/eignex/klause/solver/Solver {

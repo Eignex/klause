@@ -1,7 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.solver.IntColumns
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**

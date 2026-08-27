@@ -1,4 +1,4 @@
-package com.eignex.klause.solver
+package com.eignex.klause.ir
 
 /** Declared storage capability of one source integer column. */
 sealed interface IntColumn {
