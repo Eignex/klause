@@ -9540,6 +9540,36 @@ final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eig
         final fun <get-solutionSetSensitive>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive.<get-solutionSetSensitive>|<get-solutionSetSensitive>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/FixedBacktrackPlan { // com.eignex.klause.solver.pipeline/FixedBacktrackPlan|null[0]
+    constructor <init>(com.eignex.klause.backtrack/BacktrackParams, kotlin/Boolean) // com.eignex.klause.solver.pipeline/FixedBacktrackPlan.<init>|<init>(com.eignex.klause.backtrack.BacktrackParams;kotlin.Boolean){}[0]
+
+    final val dryRun // com.eignex.klause.solver.pipeline/FixedBacktrackPlan.dryRun|{}dryRun[0]
+        final fun <get-dryRun>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FixedBacktrackPlan.dryRun.<get-dryRun>|<get-dryRun>(){}[0]
+    final val params // com.eignex.klause.solver.pipeline/FixedBacktrackPlan.params|{}params[0]
+        final fun <get-params>(): com.eignex.klause.backtrack/BacktrackParams // com.eignex.klause.solver.pipeline/FixedBacktrackPlan.params.<get-params>|<get-params>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest { // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest|null[0]
+    constructor <init>(com.eignex.klause.backtrack/BacktrackParams?, kotlin.collections/List<kotlin/String>, kotlin/Long?, com.eignex.klause.util/Cancellation, com.eignex.klause.backtrack/NodeBudget?, kotlin/Long?, com.eignex.klause.lp.bounding/LpConfig, kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?) // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.<init>|<init>(com.eignex.klause.backtrack.BacktrackParams?;kotlin.collections.List<kotlin.String>;kotlin.Long?;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?;kotlin.Long?;com.eignex.klause.lp.bounding.LpConfig;kotlin.Function1<com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
+
+    final val annotatedParams // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.annotatedParams|{}annotatedParams[0]
+        final fun <get-annotatedParams>(): com.eignex.klause.backtrack/BacktrackParams? // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.annotatedParams.<get-annotatedParams>|<get-annotatedParams>(){}[0]
+    final val cancellation // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val engineParams // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.engineParams|{}engineParams[0]
+        final fun <get-engineParams>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.engineParams.<get-engineParams>|<get-engineParams>(){}[0]
+    final val lpConfig // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.lpConfig|{}lpConfig[0]
+        final fun <get-lpConfig>(): com.eignex.klause.lp.bounding/LpConfig // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.lpConfig.<get-lpConfig>|<get-lpConfig>(){}[0]
+    final val nodeBudget // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.nodeBudget|{}nodeBudget[0]
+        final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
+    final val onEvent // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.onEvent|{}onEvent[0]
+        final fun <get-onEvent>(): kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.onEvent.<get-onEvent>|<get-onEvent>(){}[0]
+    final val randomSeed // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.randomSeed|{}randomSeed[0]
+        final fun <get-randomSeed>(): kotlin/Long? // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.randomSeed.<get-randomSeed>|<get-randomSeed>(){}[0]
+    final val solveBudgetMillis // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.solveBudgetMillis|{}solveBudgetMillis[0]
+        final fun <get-solveBudgetMillis>(): kotlin/Long? // com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest.solveBudgetMillis.<get-solveBudgetMillis>|<get-solveBudgetMillis>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klause.solver.pipeline/LsResolution|null[0]
     constructor <init>(kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>?, kotlin/Boolean, kotlin/Int? = ...) // com.eignex.klause.solver.pipeline/LsResolution.<init>|<init>(kotlin.collections.List<kotlin.Function0<com.eignex.klause.localsearch.strategy.LocalSearchRecipe>>?;kotlin.Boolean;kotlin.Int?){}[0]
 
@@ -11102,6 +11132,7 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(ko
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMinus(): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/unaryMinus|unaryMinus@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/backtrackSolver(com.eignex.klause.solver/Problem): com.eignex.klause.backtrack/BacktrackSolver // com.eignex.klause.solver.pipeline/backtrackSolver|backtrackSolver@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.Problem){}[0]
+final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planFixedBacktrack(com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest): com.eignex.klause.solver.pipeline/FixedBacktrackPlan // com.eignex.klause.solver.pipeline/planFixedBacktrack|planFixedBacktrack@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planPortfolio(com.eignex.klause.solver.pipeline/PortfolioPlanRequest): com.eignex.klause.solver.pipeline/PortfolioPlan // com.eignex.klause.solver.pipeline/planPortfolio|planPortfolio@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.PortfolioPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.solver/Problem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.Problem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
 final fun (com.eignex.klause.solver/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.solver/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.solver/IntDomain>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.ComponentPlan(com.eignex.klause.solver.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.solver.IntDomain>;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
