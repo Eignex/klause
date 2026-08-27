@@ -69,12 +69,18 @@ internal class FloatLpResult(
  * optimum costs thousands of pivots the truncated bound is usually worth as much for a fraction of
  * the time. Only the dual solve honours it — a truncated *primal* iterate is primal-feasible rather
  * than dual-feasible, so it bounds nothing.
+ *
+ * [workLimit] is the same idea in the better unit ([LpWork]): pivots are not a measure of cost, since one
+ * on a dense basis with a long eta chain outweighs many cheap sparse steps, so a pivot budget means
+ * something different on every model while a work budget does not. 0 leaves it unbounded. Both limits
+ * apply when both are set; whichever binds first stops the solve.
  */
 internal class RevisedSimplex(
     private var model: LpModel,
     private var cancellation: Cancellation = Cancellation.Never,
     private val refactorEtaLimit: Int = DEFAULT_REFACTOR_ETA_LIMIT,
     private val iterationLimit: Int = 0,
+    private val workLimit: Long = 0L,
 ) : TableauCutSolver {
     private val m = model.m
     private val n = model.n
@@ -93,6 +99,7 @@ internal class RevisedSimplex(
     private var pivots = 0
     private var warmStarted = false
     private var refactorizations = 0
+    private val work = LpWork()
     private var maxLuFill = 0.0 // max (nnz(L)+nnz(U)) / nnz(B) over this solve's factorizations
     private var maxLuDensity = 0.0 // max (nnz(L)+nnz(U)) / m² — 1.0 means the LU is effectively dense
 
@@ -113,6 +120,7 @@ internal class RevisedSimplex(
     override val lastPivots: Int get() = pivots
     override val lastRefactorizations: Int get() = refactorizations
     override val lastWarmStarted: Boolean get() = warmStarted
+    override val lastWorkOps: Long get() = work.ops
 
     init {
         colRows = Array(n) { EmptyIntArray }
@@ -137,6 +145,7 @@ internal class RevisedSimplex(
 
     /** Dense original-row column `A_full[*][j]` into [out] (structural via CSC, slack as unit). */
     private fun denseColumn(j: Int, out: DoubleArray) {
+        work.add(m)
         for (i in 0 until m) out[i] = 0.0
         if (j >= n) {
             out[j - n] = 1.0
@@ -150,6 +159,7 @@ internal class RevisedSimplex(
     /** `y · A_j` for the dual vector [y]; column j structural (CSC) or slack (single entry). */
     private fun dotColumn(y: DoubleArray, j: Int): Double {
         if (j >= n) return y[j - n]
+        work.add(colRows[j].size)
         var acc = 0.0
         val rows = colRows[j]
         val vals = colVals[j]
@@ -177,6 +187,9 @@ internal class RevisedSimplex(
             }
         }
         val lu = SparseMatrix.ofColumns(m, m, columns).lu()
+        // The factorization itself is the largest single charge in a solve; the entries it produces are
+        // the deterministic stand-in for the elimination that produced them.
+        work.add(nnzB + lu.nnz)
         if (lu.singular) return null
         // Track LU fill: how much the factorization grows the basis (fill ratio) and how dense
         // it becomes (nnz / m²). If density approaches 1 on real bases, the "sparse" LU is dense.
@@ -186,7 +199,7 @@ internal class RevisedSimplex(
             val density = lu.nnz.toDouble() / (m.toDouble() * m.toDouble())
             if (density > maxLuDensity) maxLuDensity = density
         }
-        return EtaBasis.of(lu)
+        return EtaBasis.of(lu, lu.nnz, work)
     }
 
     /** Duals `y` solving `Bᵀ y = c_B` (BTRAN). */
@@ -295,6 +308,7 @@ internal class RevisedSimplex(
         maxLuFill = 0.0
         maxLuDensity = 0.0
         refactorizations = 0
+        work.reset()
         val kept = if (reuse) keptFactor else null
         keptFactor = null
         // A kept factorization implies the basis it factorizes is still seated, so that is the warmest
@@ -331,6 +345,12 @@ internal class RevisedSimplex(
         // The last iterate's basic values, so a solve that stops short can still hand back its bound.
         var lastBeta: DoubleArray? = null
         while (iter++ < maxIter) {
+            // Work budget, checked before the iteration that would exceed it. Pivots are not a unit of
+            // cost — one costs an order of magnitude more on a dense basis than a sparse one — so a
+            // budget stated in work means the same thing on every model, which a pivot count does not.
+            if (workLimit > 0L && work.ops >= workLimit) {
+                return lastBeta?.let { truncated(it, factor) }
+            }
             // Cooperative deadline: a pivot updates the factorization in place (cheap), but an unbounded
             // loop on a large model would still blow the wall-clock limit. Stopping here yields the
             // current iterate rather than nothing: every basis the dual simplex passes through is

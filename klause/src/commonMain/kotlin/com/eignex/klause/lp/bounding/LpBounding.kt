@@ -129,6 +129,7 @@ private fun LpEngine.solveNode(
  */
 private fun SolveStatsSink.observeSolveCost(solver: LpSolver) {
     lp.observePivots(solver.lastPivots)
+    lp.observeWork(solver.lastWorkOps)
     lp.observeStart(solver.lastWarmStarted, solver.lastRefactorizations)
 }
 

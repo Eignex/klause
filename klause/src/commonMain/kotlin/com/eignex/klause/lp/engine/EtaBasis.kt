@@ -22,7 +22,11 @@ import com.eignex.koblas.sparse.SparseFactorization
  * reaches its limit (rebuilding `B₀` and dropping the chain). Spikes are stored densely (length `m`);
  * index spaces match the base factorization's (basis-slot in, original-row out).
  */
-internal class EtaBasis private constructor(private val base: SparseFactorization) {
+internal class EtaBasis private constructor(
+    private val base: SparseFactorization,
+    private val baseOps: Int,
+    private val work: LpWork,
+) {
     private val m: Int = base.n
 
     private val etaRow = IntArrayList()
@@ -56,6 +60,7 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
     /** The forward sweep: base LU solve, then forward through the eta chain in update order. Each eta
      *  applies over the two contiguous runs around the pivot via `VectorKernels.axpy`. */
     private fun ftranInto(b: DoubleArray, out: DoubleArray): DoubleArray {
+        chargeSolve()
         val x = base.solveInto(b, out, transpose = false, workspace = scratch)
         for (j in etaSpike.indices) {
             val p = etaRow[j]
@@ -74,6 +79,7 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
      *  gathers over the two contiguous runs around the pivot via `VectorKernels.dot`. */
     private fun btranInto(b: DoubleArray, out: DoubleArray): DoubleArray {
         require(b.size == m) { "solve: b size ${b.size} != $m" }
+        chargeSolve()
         // The eta chain transposed, applied to a working copy, then the base solve into out.
         val z = scratch.take(m)
         b.copyInto(z)
@@ -98,8 +104,14 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
      *  forward [solve] of the entering column, computed *before* this call (pivot magnitude already
      *  checked). */
     fun update(pivotRow: Int, spike: DoubleArray) {
+        work.add(m)
         etaRow.add(pivotRow)
         etaSpike.add(spike.copyOf())
+    }
+
+    /** Charge one sweep: the base factorization's entries, then `m` per eta in the chain. */
+    private fun chargeSolve() {
+        work.add(baseOps.toLong() + etaCount.toLong() * m)
     }
 
     /** Factory for an [EtaBasis]. */
@@ -111,6 +123,6 @@ internal class EtaBasis private constructor(private val base: SparseFactorizatio
          * solve, so a host solver's factors work here too. The dimension comes from the factorization
          * rather than being passed alongside it, which removes a way for the two to disagree.
          */
-        fun of(base: SparseFactorization): EtaBasis = EtaBasis(base)
+        fun of(base: SparseFactorization, baseOps: Int, work: LpWork): EtaBasis = EtaBasis(base, baseOps, work)
     }
 }
