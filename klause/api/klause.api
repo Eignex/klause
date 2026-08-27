@@ -8118,7 +8118,7 @@ public final class com/eignex/klause/solver/ComponentPlan {
 	public final fun getHasCpComponent ()Z
 	public final fun getHasTheoryComponent ()Z
 	public final fun getTheoryIntVars ()[I
-	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
+	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public final fun getUnplaceable ()Lcom/eignex/klause/solver/UnplaceableColumn;
 	public final fun intOwner (I)Lcom/eignex/klause/solver/IntVariableOwner;
 	public final fun materialize (Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;)Lcom/eignex/klause/solver/Problem;
@@ -8397,23 +8397,6 @@ public class com/eignex/klause/solver/Problem {
 	protected final fun setBakeElapsed-LRDsOJo (J)V
 	public final fun withIntDomains ([Lcom/eignex/klause/solver/IntDomain;[Z[Z)Lcom/eignex/klause/solver/Problem;
 	public static synthetic fun withIntDomains$default (Lcom/eignex/klause/solver/Problem;[Lcom/eignex/klause/solver/IntDomain;[Z[ZILjava/lang/Object;)Lcom/eignex/klause/solver/Problem;
-}
-
-public final class com/eignex/klause/solver/ProblemPipeline : java/lang/Enum {
-	public static final field DIFFERENCE_THEORY Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field EXACT_LIRA Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field EXACT_LRA Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field FINITE_CP Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field GENERAL_LIA Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final field UNSUPPORTED_OPEN Lcom/eignex/klause/solver/ProblemPipeline;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/ProblemPipeline;
-	public static fun values ()[Lcom/eignex/klause/solver/ProblemPipeline;
-}
-
-public final class com/eignex/klause/solver/ProblemPipelineKt {
-	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/ProblemPipeline;
-	public static final fun supportsExactLra (Lcom/eignex/klause/solver/ProblemSpec;)Z
 }
 
 public final class com/eignex/klause/solver/ProblemSpec {
@@ -8878,7 +8861,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Genera
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
-	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/ProblemPipeline;)V
+	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/pipeline/ProblemPipeline;)V
 	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryEngine;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
@@ -8910,7 +8893,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryMinimizer {
 	public fun <init> (Lcom/eignex/klause/solver/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;)V
-	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/ProblemPipeline;
+	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public final fun minimize (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryMinimizer;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 }
@@ -9065,6 +9048,23 @@ public final class com/eignex/klause/solver/pipeline/PortfolioPlanRequest {
 	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
 	public final fun getOptimize ()Z
 	public final fun getRandomSeed ()Ljava/lang/Long;
+}
+
+public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang/Enum {
+	public static final field DIFFERENCE_THEORY Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field EXACT_LIRA Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field EXACT_LRA Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field FINITE_CP Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field GENERAL_LIA Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final field UNSUPPORTED_OPEN Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+}
+
+public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
+	public static final fun sourceRoute (Lcom/eignex/klause/solver/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
+	public static final fun supportsExactLra (Lcom/eignex/klause/solver/ProblemSpec;)Z
 }
 
 public final class com/eignex/klause/solver/pipeline/ValSelectorKind : java/lang/Enum {
