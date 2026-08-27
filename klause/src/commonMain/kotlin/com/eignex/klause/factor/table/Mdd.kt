@@ -19,6 +19,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -143,7 +145,7 @@ class Mdd(
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         val records = transitions.size / recordStride
         if (records == 0 || records > MINIMIZE_RECORD_CAP || initial !in 0 until numStatesPerLayer[0]) {
-            return FactorReduction.Unchanged
+            return Unchanged
         }
         val n = seq.size
         val fwd = Array(n + 1) { BooleanArray(numStatesPerLayer[it]) }
@@ -183,10 +185,10 @@ class Mdd(
         for (l in 0..n) {
             var id = 0
             for (s in 0 until numStatesPerLayer[l]) if (fwd[l][s] && bwd[l][s]) liveId[l][s] = id++
-            if (id == 0) return FactorReduction.Unchanged // a layer emptied ⇒ infeasible; the propagator reports it
+            if (id == 0) return Unchanged // a layer emptied ⇒ infeasible; the propagator reports it
             newCounts[l] = id
         }
-        if (newCounts.contentEquals(numStatesPerLayer)) return FactorReduction.Unchanged // nothing dead
+        if (newCounts.contentEquals(numStatesPerLayer)) return Unchanged // nothing dead
         val newTransitions = LongArrayList()
         val newStarts = IntArray(n + 1)
         for (i in 0 until n) {
@@ -214,7 +216,7 @@ class Mdd(
         for (a in accepting) {
             if (a in 0 until numStatesPerLayer[n] && fwd[n][a] && bwd[n][a]) newAccepting.add(liveId[n][a])
         }
-        return FactorReduction.Rewrite(
+        return Rewrite(
             listOf(
                 Mdd(
                     seq,

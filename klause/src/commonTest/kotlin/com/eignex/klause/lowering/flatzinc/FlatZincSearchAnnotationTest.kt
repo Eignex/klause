@@ -4,12 +4,12 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.TierVarSelect
 import com.eignex.klause.backtrack.TieredValueSelector
 import com.eignex.klause.backtrack.TieredVariableSelector
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMedian
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainSplit
 import com.eignex.klause.backtrack.selector.SolutionGuided
+import com.eignex.klause.backtrack.toBacktrackParams
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

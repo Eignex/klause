@@ -20,6 +20,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -59,33 +61,33 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
     // an infeasible one is left to propagation. Mixed-polarity literals carry over — [Cardinality] counts
     // literals, not variables.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
-        if (weights.any { it != 1L }) return FactorReduction.Unchanged
+        if (weights.any { it != 1L }) return Unchanged
         val n = literals.size
         return when (op) {
             PbOp.LE -> when {
-                bound >= n -> FactorReduction.Rewrite(emptyList())
+                bound >= n -> Rewrite(emptyList())
 
                 // #true ≤ n always holds
-                bound < 0 -> FactorReduction.Unchanged
+                bound < 0 -> Unchanged
 
                 // infeasible; leave to propagation
-                else -> FactorReduction.Rewrite(listOf(Cardinality(literals, min = 0, max = bound.toInt())))
+                else -> Rewrite(listOf(Cardinality(literals, min = 0, max = bound.toInt())))
             }
 
             PbOp.GE -> when {
-                bound <= 0 -> FactorReduction.Rewrite(emptyList())
+                bound <= 0 -> Rewrite(emptyList())
 
                 // #true ≥ 0 always holds
-                bound > n -> FactorReduction.Unchanged
+                bound > n -> Unchanged
 
                 // infeasible
-                else -> FactorReduction.Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = n)))
+                else -> Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = n)))
             }
 
             PbOp.EQ -> if (bound in 0..n.toLong()) {
-                FactorReduction.Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = bound.toInt())))
+                Rewrite(listOf(Cardinality(literals, min = bound.toInt(), max = bound.toInt())))
             } else {
-                FactorReduction.Unchanged // infeasible
+                Unchanged // infeasible
             }
         }
     }

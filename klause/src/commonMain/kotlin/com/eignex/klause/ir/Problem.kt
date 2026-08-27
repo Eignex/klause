@@ -8,7 +8,6 @@ import com.eignex.klause.propagation.rootBake
 import com.eignex.klause.propagation.runRootPropagation
 import com.eignex.klause.solver.FiniteIntColumns
 import com.eignex.klause.solver.IntColumns
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray

@@ -19,6 +19,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
@@ -75,18 +77,18 @@ class NValue(
     // forces all values distinct (an [AllDifferent] over the union domain), and `n = 1` forces them all
     // equal (a chain of equalities). Solution-set exact; only the non-optional `Eq` mode qualifies.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
-        if (mode != Mode.Eq || presents.isNotEmpty()) return FactorReduction.Unchanged
+        if (mode != Mode.Eq || presents.isNotEmpty()) return Unchanged
         val nDom = domains[n]
-        if (nDom.min != nDom.max) return FactorReduction.Unchanged
+        if (nDom.min != nDom.max) return Unchanged
         val target = nDom.min
         return when {
             target == xs.size.toLong() && xs.size >= 2 -> allDifferent(domains)
 
-            target == 1L -> FactorReduction.Rewrite(
+            target == 1L -> Rewrite(
                 (1 until xs.size).map { Linear(intArrayOf(1, -1), intArrayOf(xs[it], xs[0]), LinearOp.EQ, 0) },
             )
 
-            else -> FactorReduction.Unchanged
+            else -> Unchanged
         }
     }
 
@@ -100,8 +102,8 @@ class NValue(
         }
         val span = hi - lo + 1
         // Guard an oversized union domain: AllDifferent tracks per-value counts over `[lo, lo + span)`.
-        if (span < 1L || span > Int.MAX_VALUE.toLong()) return FactorReduction.Unchanged
-        return FactorReduction.Rewrite(listOf(AllDifferent(xs, domainMin = lo, domainSize = span.toInt())))
+        if (span < 1L || span > Int.MAX_VALUE.toLong()) return Unchanged
+        return Rewrite(listOf(AllDifferent(xs, domainMin = lo, domainSize = span.toInt())))
     }
 
     /** The distinct-value count ignores the order of [xs], so the counted vars are sorted (paired with

@@ -149,18 +149,3 @@ internal fun wideConstHolds(op: LinearOp, bound: BigInteger): Boolean = when (op
 private val LONG_MAX = BigInteger.fromLong(Long.MAX_VALUE)
 private val LONG_MIN = BigInteger.fromLong(Long.MIN_VALUE)
 private fun BigInteger.fitsLong(): Boolean = this in LONG_MIN..LONG_MAX
-
-private fun addExact(a: Long, b: Long): Long {
-    val r = a + b
-    if ((a xor r) and (b xor r) < 0L) throw ArithmeticException("addExact overflow: $a + $b")
-    return r
-}
-
-private fun mulExact(a: Long, b: Long): Long {
-    if (a == 0L || b == 0L) return 0L
-    val r = a * b
-    if (r / a != b || (a == -1L && b == Long.MIN_VALUE)) {
-        throw ArithmeticException("mulExact overflow: $a * $b")
-    }
-    return r
-}
