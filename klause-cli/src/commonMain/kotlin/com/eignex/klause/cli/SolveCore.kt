@@ -838,7 +838,11 @@ internal object SolveCore {
     }
 
     private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample) {
-        output.onSolution(solvable.render(sample), solvable.objectiveValue?.invoke(sample))
+        output.onSolution(
+            solvable.render(sample),
+            solvable.objectiveValue?.invoke(sample),
+            solvable.continuousObjectiveValue?.invoke(sample),
+        )
     }
 
     private fun stats(
@@ -861,6 +865,11 @@ internal object SolveCore {
      *  runs (no incumbent) and non-MiniZinc modes without an objective lambda. */
     private fun withModelObjective(s: SolveStats, solvable: Solvable, sample: Sample?): SolveStats {
         if (sample == null || s.ls.incumbentObjective.isNaN()) return s
+        // The statistic is already a Double, so it reports the continuous contribution where there is
+        // one rather than the discrete part the `o` line stopped reporting alone.
+        solvable.continuousObjectiveValue?.let { exact ->
+            return s.copy(ls = s.ls.copy(incumbentObjective = exact(sample)))
+        }
         val objectiveValue = solvable.objectiveValue ?: return s
         return s.copy(ls = s.ls.copy(incumbentObjective = objectiveValue(sample).toDouble()))
     }

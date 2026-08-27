@@ -271,6 +271,7 @@ internal fun Solvable.withPreparation(preparation: FinitePipelinePreparation): S
         preparation.presolve,
         { sample -> render(preparation.reconstruct(sample)) },
         objectiveValue?.let { objectiveValue -> { sample -> objectiveValue(preparation.reconstruct(sample)) } },
+        continuousObjectiveValue?.let { exact -> { sample -> exact(preparation.reconstruct(sample)) } },
         preparation.objective,
     )
 }
@@ -281,6 +282,7 @@ private fun Solvable.copyWith(
     presolve: PresolveStats?,
     render: (Sample) -> String,
     objectiveValue: ((Sample) -> Long)?,
+    continuousObjectiveValue: ((Sample) -> Double)?,
     linearObjective: LinearObjective? = this.linearObjective,
 ): Solvable = Solvable(
     problem = problem,
@@ -293,6 +295,7 @@ private fun Solvable.copyWith(
     definitionalSweep = definitionalSweep,
     render = render,
     objectiveValue = objectiveValue,
+    continuousObjectiveValue = continuousObjectiveValue,
     annotatedBacktrackParams = annotatedBacktrackParams,
 )
 
@@ -460,7 +463,10 @@ internal fun VerdictContext.softVerdictCause(): String = when {
  */
 internal interface OutputProtocol {
     fun begin(optimize: Boolean, maximize: Boolean) {}
-    fun onSolution(rendered: String, objective: Long?)
+
+    /** One solution. [objective] carries the discrete terms; [continuousObjective] the whole value
+     *  when a continuous column carries cost, which no exact integer can express. */
+    fun onSolution(rendered: String, objective: Long?, continuousObjective: Double? = null)
     fun onComplete(verdict: Verdict)
     fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long)
 
@@ -631,6 +637,7 @@ internal fun linearSolvable(
         definitionalSweep = sweep,
         render = render,
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
+        continuousObjectiveValue = objective.continuousObjectiveValue(maximize),
     )
 }
 
@@ -659,7 +666,20 @@ internal fun linearModelSolvable(
         definitionalSweep = sweep,
         render = render,
         objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
+        continuousObjectiveValue = objective.continuousObjectiveValue(maximize),
     )
+}
+
+/**
+ * The sign-corrected objective including its continuous terms, or null when no continuous column carries
+ * cost and [LinearObjective.evaluateLong] is already the whole of it.
+ *
+ * [LinearObjective.evaluate] reads the real values off the sample, which only a leaf whose residual LP
+ * resolved them carries; a reported solution is such a leaf.
+ */
+private fun LinearObjective.continuousObjectiveValue(maximize: Boolean): ((Sample) -> Double)? {
+    if (realCoefficients.none { it != 0.0 }) return null
+    return { s -> evaluate(s).let { if (maximize) -it else it } }
 }
 
 /** Keep only the AND folds whose every literal is an objective variable (nonzero bool weight). These

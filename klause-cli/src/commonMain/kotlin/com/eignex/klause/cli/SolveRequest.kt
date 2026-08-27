@@ -33,8 +33,14 @@ internal class Solvable(
     val definitionalSweep: DefinitionalSweep?,
     /** Render one solution to the mode's solution text. */
     val render: (Sample) -> String,
-    /** Sign-corrected objective value in original problem units, or null for satisfy. */
+    /** Sign-corrected objective value in original problem units, or null for satisfy. Carries the
+     *  discrete terms only, so a model weighting a continuous column also sets [continuousObjectiveValue]
+     *  — this one stays exact for the integral formats, whose coefficients can outrun a `Double`. */
     val objectiveValue: ((Sample) -> Long)?,
+    /** Sign-corrected objective value including the continuous columns' contribution, set only when the
+     *  objective weights one: their values are real, so the total has no exact integral form. Null
+     *  leaves [objectiveValue] the whole objective. */
+    val continuousObjectiveValue: ((Sample) -> Double)? = null,
     /** Model-supplied backtrack search (FlatZinc `solve :: *_search(...)`); the driver uses
      *  it unless `-f` (free search) is set. Null when the mode carries no search annotations
      *  (XCSP/SMT), so the driver falls back to its default CDCL configuration. */

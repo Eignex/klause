@@ -128,7 +128,7 @@ internal class MiniZincOutput : OutputProtocol {
         this.context = context
     }
 
-    override fun onSolution(rendered: String, objective: Long?) {
+    override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
         // `writeFlatZincSolution` / `OznApplier.render` already include the per-solution
         // `----------` terminator; objective is carried in the rendered text.
         print(rendered)
