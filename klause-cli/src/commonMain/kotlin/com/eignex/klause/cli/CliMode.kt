@@ -16,12 +16,10 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.theory.lia.GeneralLiaAssignment
-import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.theory.qflra.ExactLraAssignment
 
 /*
  * Generic multi-mode CLI framework.
@@ -483,99 +481,23 @@ internal interface OutputProtocol {
     }
 }
 
-/** Build an instance whose open integer rows are decided by difference theory, minimizing [objective]
- *  when one is given. */
-internal fun differenceTheorySolvable(
-    model: ProblemSpec,
-    render: (Sample) -> String,
-    objective: LinearObjective? = null,
-    maximize: Boolean = false,
+/** Build an instance from a pipeline-selected complete open-theory request. */
+internal fun openTheorySolvable(
+    request: OpenTheoryRequest,
+    renderOpenTheory: (OpenTheoryAssignment) -> String,
 ): Solvable = Solvable(
     problem = null,
-    optimize = objective != null,
-    maximize = maximize,
+    optimize = request.objective != null,
+    maximize = request.maximize,
     lsObjective = null,
     linearObjective = null,
     objVarId = null,
     definitionalSweep = null,
-    render = render,
+    render = { error("open-theory witnesses are rendered without narrowing to Sample") },
     objectiveValue = null,
     pipeline = SolvablePipeline.OpenTheory(
-        OpenTheoryRequest(model, objective, maximize),
-        render = { assignment ->
-            render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.Difference).sample)
-        },
-    ),
-)
-
-/** Build an instance whose open integer rows are decided by General LIA, minimizing [objective] when one
- *  is given. */
-internal fun generalLiaSolvable(
-    model: ProblemSpec,
-    objective: LinearObjective? = null,
-    maximize: Boolean = false,
-    render: (GeneralLiaAssignment) -> String,
-): Solvable = Solvable(
-    problem = null,
-    optimize = objective != null,
-    maximize = maximize,
-    lsObjective = null,
-    linearObjective = null,
-    objVarId = null,
-    definitionalSweep = null,
-    render = { error("General LIA witnesses are rendered without narrowing to Sample") },
-    objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(
-        OpenTheoryRequest(model, objective, maximize),
-        render = { assignment ->
-            render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.GeneralLia).assignment)
-        },
-    ),
-)
-
-/** Build a satisfiability instance whose open real rows are decided by exact QF_LRA. */
-internal fun exactLraSolvable(model: ProblemSpec, render: (ExactLraAssignment) -> String): Solvable = Solvable(
-    problem = null,
-    optimize = false,
-    maximize = false,
-    lsObjective = null,
-    linearObjective = null,
-    objVarId = null,
-    definitionalSweep = null,
-    render = { error("exact LRA witnesses are rendered without narrowing to Sample") },
-    objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(
-        OpenTheoryRequest(model),
-        render = { assignment ->
-            render(
-                (assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLra).assignment,
-            )
-        },
-    ),
-)
-
-/** Build an instance whose open mixed rows are decided by exact QF_LIRA, minimizing [objective] when one
- *  is given. An objective weighting a continuous column is not admitted; see the integral descent. */
-internal fun exactLiraSolvable(
-    model: ProblemSpec,
-    objective: LinearObjective? = null,
-    maximize: Boolean = false,
-    render: (ExactLiraAssignment) -> String,
-): Solvable = Solvable(
-    problem = null,
-    optimize = objective != null,
-    maximize = maximize,
-    lsObjective = null,
-    linearObjective = null,
-    objVarId = null,
-    definitionalSweep = null,
-    render = { error("exact LIRA witnesses are rendered without narrowing to Sample") },
-    objectiveValue = null,
-    pipeline = SolvablePipeline.OpenTheory(
-        OpenTheoryRequest(model, objective, maximize),
-        render = { assignment ->
-            render((assignment as com.eignex.klause.solver.pipeline.OpenTheoryAssignment.ExactLira).assignment)
-        },
+        request,
+        render = renderOpenTheory,
     ),
 )
 

@@ -5,8 +5,9 @@ import com.eignex.klause.lowering.mps.MpsCompiled
 import com.eignex.klause.lowering.mps.MpsLoweringException
 import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline.ProblemPipeline
-import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import kotlin.math.abs
@@ -43,54 +44,52 @@ internal object MpsMode : CliMode {
                     "objScale=${compiled.objectiveScale}"
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
-            val pipeline = compiled.model.sourceRoute()
-            when (pipeline) {
-                ProblemPipeline.UNSUPPORTED_OPEN, ProblemPipeline.EXACT_LRA ->
-                    throw MpsLoweringException("open MPS models require a supported theory pipeline")
+            return when (val route = compiled.model.pipelineRoute(compiled.objective, compiled.maximize)) {
+                is SourceProblemRoute.Finite -> linearSolvable(
+                    route.problem,
+                    compiled.objective,
+                    compiled.maximize,
+                    render,
+                )
 
-                // A mixed open model decides through the exact core. Its objective is minimized by the
-                // same integral descent the pure-integer routes use when it weights only integer columns;
-                // one weighting a continuous column has no next value to step to and is declined.
-                ProblemPipeline.EXACT_LIRA -> {
-                    val objective = compiled.objective
-                    if (objective != null && objective.realCoefficients.any { it != 0.0 }) {
+                is SourceProblemRoute.OpenTheory -> {
+                    if (compiled.model.numIntVars == 0 && compiled.model.numRealVars != 0) {
+                        unsupportedOpenMpsModel()
+                    }
+                    if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
                         throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
                     }
-                    return exactLiraSolvable(compiled.model, objective, compiled.maximize) { assignment ->
-                        renderMpsExactLiraModel(compiled, assignment)
-                    }
-                }
+                    openTheorySolvable(route.request) { assignment ->
+                        when (assignment) {
+                            is OpenTheoryAssignment.Difference -> render(assignment.sample)
 
-                ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA -> {
-                    // An objective enters the open route as a row bounding it, which is outside the
-                    // difference fragment, so an optimizing model takes General LIA either way.
-                    return if (pipeline == ProblemPipeline.DIFFERENCE_THEORY && compiled.objective == null) {
-                        differenceTheorySolvable(compiled.model, render)
-                    } else {
-                        generalLiaSolvable(
-                            compiled.model,
-                            compiled.objective,
-                            compiled.maximize,
-                        ) { assignment ->
-                            renderMpsGeneralLiaModel(compiled, assignment)
+                            is OpenTheoryAssignment.GeneralLia -> renderMpsGeneralLiaModel(
+                                compiled,
+                                assignment.assignment,
+                            )
+
+                            is OpenTheoryAssignment.ExactLira -> renderMpsExactLiraModel(
+                                compiled,
+                                assignment.assignment,
+                            )
+
+                            is OpenTheoryAssignment.ExactLra ->
+                                error("MPS does not support pure real open-theory rendering")
                         }
                     }
                 }
 
-                ProblemPipeline.FINITE_CP -> Unit
+                SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
             }
-            return linearSolvable(
-                compiled.model.materializeFiniteBounds(),
-                compiled.objective,
-                compiled.maximize,
-                render,
-            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol =
             MpsOutput(objectiveScale, objectiveErrorBound, hasInnerConstraintApproximation)
     }
 }
+
+private fun unsupportedOpenMpsModel(): Nothing =
+    throw MpsLoweringException("open MPS models require a supported theory pipeline")
 
 /** Render an MPS solution line: `v name=value` per column, a continuous column shown as its LP value. */
 internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildString {

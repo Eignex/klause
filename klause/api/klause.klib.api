@@ -2322,6 +2322,40 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eig
     }
 }
 
+sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute|null[0]
+    final class Finite : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite|null[0]
+        constructor <init>(com.eignex.klause.ir/Problem) // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.<init>|<init>(com.eignex.klause.ir.Problem){}[0]
+
+        final val problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/Problem = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.copy|copy(com.eignex.klause.ir.Problem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.toString|toString(){}[0]
+    }
+
+    final class OpenTheory : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryRequest) // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
+
+        final val request // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.request|{}request[0]
+            final fun <get-request>(): com.eignex.klause.solver.pipeline/OpenTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.request.<get-request>|<get-request>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryRequest = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.toString|toString(){}[0]
+    }
+
+    final object UnsupportedOpen : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult|null[0]
     abstract val assignment // com.eignex.klause.solver.result/MinimizeResult.assignment|{}assignment[0]
         abstract fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -9861,6 +9895,8 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.
         final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.solver.pipeline/OpenTheoryRequest.model.<get-model>|<get-model>(){}[0]
     final val objective // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective|{}objective[0]
         final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective.<get-objective>|<get-objective>(){}[0]
+    final val route // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route|{}route[0]
+        final fun <get-route>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route.<get-route>|<get-route>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/PipelineConfigException : kotlin/RuntimeException { // com.eignex.klause.solver.pipeline/PipelineConfigException|null[0]
@@ -11176,6 +11212,7 @@ final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/mini
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.ir.ProblemSpec(com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/componentPlan(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.ProblemSpec(){}[0]
+final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.ProblemSpec(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/sourceRoute(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/sourceRoute|sourceRoute@com.eignex.klause.ir.ProblemSpec(){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/supportsExactLra(): kotlin/Boolean // com.eignex.klause.solver.pipeline/supportsExactLra|supportsExactLra@com.eignex.klause.ir.ProblemSpec(){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.ProblemSpec(){}[0]

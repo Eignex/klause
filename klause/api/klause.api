@@ -9013,6 +9013,7 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
 	public final fun getMaximize ()Z
 	public final fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
 	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getRoute ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryResult {
@@ -9121,8 +9122,42 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipeline : java/lang
 }
 
 public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
+	public static final fun pipelineRoute (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZZ)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
+	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static final fun sourceRoute (Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
 	public static final fun supportsExactLra (Lcom/eignex/klause/ir/ProblemSpec;)Z
+}
+
+public abstract interface class com/eignex/klause/solver/pipeline/SourceProblemRoute {
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$Finite : com/eignex/klause/solver/pipeline/SourceProblemRoute {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
+	public final fun copy (Lcom/eignex/klause/ir/Problem;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;Lcom/eignex/klause/ir/Problem;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$Finite;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheory : com/eignex/klause/solver/pipeline/SourceProblemRoute {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheory;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheory;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheory;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRequest ()Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen : com/eignex/klause/solver/pipeline/SourceProblemRoute {
+	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/UnplaceableColumn {

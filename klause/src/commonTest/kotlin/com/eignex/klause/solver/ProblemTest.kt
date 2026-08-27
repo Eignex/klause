@@ -10,7 +10,9 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.IntVariableOwner
 import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.util.Bits
@@ -18,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ProblemTest {
@@ -225,5 +228,23 @@ class ProblemTest {
 
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.sourceRoute())
         assertEquals(ProblemPipeline.UNSUPPORTED_OPEN, spec.componentPlan().theoryPipeline)
+    }
+
+    @Test
+    fun `pipeline route materializes finite models and prepares open theory requests`() {
+        val finite = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
+            factors = emptyArray(),
+        )
+        val openUpper = Bits(1).also { it.set(0) }
+        val open = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = emptyArray(),
+        )
+
+        assertIs<SourceProblemRoute.Finite>(finite.pipelineRoute())
+        assertIs<SourceProblemRoute.OpenTheory>(open.pipelineRoute())
     }
 }
