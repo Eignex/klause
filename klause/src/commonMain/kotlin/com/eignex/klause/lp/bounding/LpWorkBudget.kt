@@ -25,11 +25,7 @@ package com.eignex.klause.lp.bounding
  * CP-SAT's `UpdateSimplexIterationLimit`, in work rather than iterations because a pivot is not a unit
  * of cost.
  */
-internal class LpWorkBudget(
-    private val minOps: Long,
-    private val maxOps: Long,
-    initialOps: Long,
-) {
+internal class LpWorkBudget(private val minOps: Long, private val maxOps: Long, initialOps: Long) {
     private var next: Long = initialOps.coerceIn(minOps, maxOps)
 
     /** Work the next node LP may spend. */
