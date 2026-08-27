@@ -1,8 +1,8 @@
 package com.eignex.klause.lowering
 
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Problem
 
 /**
  * Mutable construction context for a solver [Problem].

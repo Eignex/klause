@@ -7,8 +7,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource

@@ -12,8 +12,8 @@ import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lp.OpenIntBounds
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
