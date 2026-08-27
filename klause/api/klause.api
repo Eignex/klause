@@ -9012,6 +9012,42 @@ public final class com/eignex/klause/solver/pipeline/PlannedSearchKt {
 	public static synthetic fun search$default (Lcom/eignex/klause/solver/ComponentPlan;Lcom/eignex/klause/solver/ProblemSpec;Ljava/util/Map;JLcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/PlannedSearch;
 }
 
+public abstract class com/eignex/klause/solver/pipeline/PortfolioPlan {
+}
+
+public final class com/eignex/klause/solver/pipeline/PortfolioPlan$BacktrackDryRun : com/eignex/klause/solver/pipeline/PortfolioPlan {
+	public fun <init> (Ljava/util/List;Lcom/eignex/klause/portfolio/Kind;)V
+	public final fun getKind ()Lcom/eignex/klause/portfolio/Kind;
+	public final fun getPool ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/solver/pipeline/PortfolioPlan$Execute : com/eignex/klause/solver/pipeline/PortfolioPlan {
+	public fun <init> (Lcom/eignex/klause/portfolio/PortfolioScenario;)V
+	public final fun getScenario ()Lcom/eignex/klause/portfolio/PortfolioScenario;
+}
+
+public final class com/eignex/klause/solver/pipeline/PortfolioPlan$LocalSearchDryRun : com/eignex/klause/solver/pipeline/PortfolioPlan {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getPool ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/solver/pipeline/PortfolioPlanKt {
+	public static final fun planPortfolio (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/pipeline/PortfolioPlanRequest;)Lcom/eignex/klause/solver/pipeline/PortfolioPlan;
+}
+
+public final class com/eignex/klause/solver/pipeline/PortfolioPlanRequest {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/backtrack/NodeBudget;Lcom/eignex/klause/backtrack/BacktrackParams;)V
+	public final fun getAnnotationArm ()Lcom/eignex/klause/backtrack/BacktrackParams;
+	public final fun getCores ()I
+	public final fun getDefaultArms ()I
+	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
+	public final fun getEngineParams ()Ljava/util/List;
+	public final fun getLpCeiling ()Lcom/eignex/klause/lp/bounding/LpConfig;
+	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
+	public final fun getOptimize ()Z
+	public final fun getRandomSeed ()Ljava/lang/Long;
+}
+
 public final class com/eignex/klause/solver/pipeline/ValSelectorKind : java/lang/Enum {
 	public static final field Companion Lcom/eignex/klause/solver/pipeline/ValSelectorKind$Companion;
 	public static final field MAX Lcom/eignex/klause/solver/pipeline/ValSelectorKind;
