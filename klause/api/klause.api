@@ -2157,11 +2157,6 @@ public final class com/eignex/klause/formats/json/JsonSchema {
 	public final fun parse (Ljava/lang/String;)Lcom/eignex/skema/SchemaDef;
 }
 
-public final class com/eignex/klause/formats/minizinc/OznApplier {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun render (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;)Ljava/lang/String;
-}
-
 public final class com/eignex/klause/formats/minizinc/OznParseException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
 }
@@ -4202,6 +4197,11 @@ public final class com/eignex/klause/lowering/flatzinc/SolveDirective$Satisfy : 
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/lowering/minizinc/OznApplier {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun render (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/lowering/mps/MpsColumn {

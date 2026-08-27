@@ -4659,12 +4659,6 @@ final class com.eignex.klause.formats.json/JsonFormatException : com.eignex.klau
     constructor <init>(kotlin/String, kotlin/Throwable? = ...) // com.eignex.klause.formats.json/JsonFormatException.<init>|<init>(kotlin.String;kotlin.Throwable?){}[0]
 }
 
-final class com.eignex.klause.formats.minizinc/OznApplier { // com.eignex.klause.formats.minizinc/OznApplier|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.formats.minizinc/OznApplier.<init>|<init>(kotlin.String){}[0]
-
-    final fun render(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample): kotlin/String // com.eignex.klause.formats.minizinc/OznApplier.render|render(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample){}[0]
-}
-
 final class com.eignex.klause.formats.minizinc/OznParseException : com.eignex.klause.formats/FormatException { // com.eignex.klause.formats.minizinc/OznParseException|null[0]
     constructor <init>(kotlin/String) // com.eignex.klause.formats.minizinc/OznParseException.<init>|<init>(kotlin.String){}[0]
 }
@@ -6079,6 +6073,12 @@ final class com.eignex.klause.lowering.flatzinc/SetVarLayout { // com.eignex.kla
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.flatzinc/SetVarLayout.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.flatzinc/SetVarLayout.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.flatzinc/SetVarLayout.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.lowering.minizinc/OznApplier { // com.eignex.klause.lowering.minizinc/OznApplier|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.lowering.minizinc/OznApplier.<init>|<init>(kotlin.String){}[0]
+
+    final fun render(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample): kotlin/String // com.eignex.klause.lowering.minizinc/OznApplier.render|render(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample){}[0]
 }
 
 final class com.eignex.klause.lowering.mps/MpsColumn { // com.eignex.klause.lowering.mps/MpsColumn|null[0]
