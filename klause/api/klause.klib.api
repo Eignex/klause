@@ -377,6 +377,21 @@ final enum class com.eignex.klause.solver.pipeline/FiniteEngine : kotlin/Enum<co
     }
 }
 
+final enum class com.eignex.klause.solver.pipeline/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver.pipeline/ProblemPipeline> { // com.eignex.klause.solver.pipeline/ProblemPipeline|null[0]
+    enum entry DIFFERENCE_THEORY // com.eignex.klause.solver.pipeline/ProblemPipeline.DIFFERENCE_THEORY|null[0]
+    enum entry EXACT_LIRA // com.eignex.klause.solver.pipeline/ProblemPipeline.EXACT_LIRA|null[0]
+    enum entry EXACT_LRA // com.eignex.klause.solver.pipeline/ProblemPipeline.EXACT_LRA|null[0]
+    enum entry FINITE_CP // com.eignex.klause.solver.pipeline/ProblemPipeline.FINITE_CP|null[0]
+    enum entry GENERAL_LIA // com.eignex.klause.solver.pipeline/ProblemPipeline.GENERAL_LIA|null[0]
+    enum entry UNSUPPORTED_OPEN // com.eignex.klause.solver.pipeline/ProblemPipeline.UNSUPPORTED_OPEN|null[0]
+
+    final val entries // com.eignex.klause.solver.pipeline/ProblemPipeline.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/ProblemPipeline> // com.eignex.klause.solver.pipeline/ProblemPipeline.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/ProblemPipeline.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/ProblemPipeline> // com.eignex.klause.solver.pipeline/ProblemPipeline.values|values#static(){}[0]
+}
+
 final enum class com.eignex.klause.solver.pipeline/ValSelectorKind : kotlin/Enum<com.eignex.klause.solver.pipeline/ValSelectorKind> { // com.eignex.klause.solver.pipeline/ValSelectorKind|null[0]
     enum entry MAX // com.eignex.klause.solver.pipeline/ValSelectorKind.MAX|null[0]
     enum entry MEDIAN // com.eignex.klause.solver.pipeline/ValSelectorKind.MEDIAN|null[0]
@@ -463,21 +478,6 @@ final enum class com.eignex.klause.solver/IntVariableOwner : kotlin/Enum<com.eig
 
     final fun valueOf(kotlin/String): com.eignex.klause.solver/IntVariableOwner // com.eignex.klause.solver/IntVariableOwner.valueOf|valueOf#static(kotlin.String){}[0]
     final fun values(): kotlin/Array<com.eignex.klause.solver/IntVariableOwner> // com.eignex.klause.solver/IntVariableOwner.values|values#static(){}[0]
-}
-
-final enum class com.eignex.klause.solver/ProblemPipeline : kotlin/Enum<com.eignex.klause.solver/ProblemPipeline> { // com.eignex.klause.solver/ProblemPipeline|null[0]
-    enum entry DIFFERENCE_THEORY // com.eignex.klause.solver/ProblemPipeline.DIFFERENCE_THEORY|null[0]
-    enum entry EXACT_LIRA // com.eignex.klause.solver/ProblemPipeline.EXACT_LIRA|null[0]
-    enum entry EXACT_LRA // com.eignex.klause.solver/ProblemPipeline.EXACT_LRA|null[0]
-    enum entry FINITE_CP // com.eignex.klause.solver/ProblemPipeline.FINITE_CP|null[0]
-    enum entry GENERAL_LIA // com.eignex.klause.solver/ProblemPipeline.GENERAL_LIA|null[0]
-    enum entry UNSUPPORTED_OPEN // com.eignex.klause.solver/ProblemPipeline.UNSUPPORTED_OPEN|null[0]
-
-    final val entries // com.eignex.klause.solver/ProblemPipeline.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver/ProblemPipeline> // com.eignex.klause.solver/ProblemPipeline.entries.<get-entries>|<get-entries>#static(){}[0]
-
-    final fun valueOf(kotlin/String): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/ProblemPipeline.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.eignex.klause.solver/ProblemPipeline> // com.eignex.klause.solver/ProblemPipeline.values|values#static(){}[0]
 }
 
 open enum class com.eignex.klause.presolve/PresolvePass : kotlin/Enum<com.eignex.klause.presolve/PresolvePass> { // com.eignex.klause.presolve/PresolvePass|null[0]
@@ -9671,7 +9671,7 @@ final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klaus
 }
 
 final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.klause.solver.pipeline/OpenTheoryEngine|null[0]
-    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.ProblemPipeline){}[0]
+    constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver.pipeline/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.pipeline.ProblemPipeline){}[0]
 
     final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryEngine.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
 }
@@ -9680,7 +9680,7 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryMinimizer { // com.eigne
     constructor <init>(com.eignex.klause.solver/ProblemSpec, com.eignex.klause.solver.objective/LinearObjective) // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.<init>|<init>(com.eignex.klause.solver.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective){}[0]
 
     final val theoryPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline|{}theoryPipeline[0]
-        final fun <get-theoryPipeline>(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
+        final fun <get-theoryPipeline>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
 
     final fun minimize(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.minimize|minimize(com.eignex.klause.theory.TheoryParams){}[0]
 }
@@ -10215,7 +10215,7 @@ final class com.eignex.klause.solver/ComponentPlan { // com.eignex.klause.solver
     final val theoryIntVars // com.eignex.klause.solver/ComponentPlan.theoryIntVars|{}theoryIntVars[0]
         final fun <get-theoryIntVars>(): kotlin/IntArray // com.eignex.klause.solver/ComponentPlan.theoryIntVars.<get-theoryIntVars>|<get-theoryIntVars>(){}[0]
     final val theoryPipeline // com.eignex.klause.solver/ComponentPlan.theoryPipeline|{}theoryPipeline[0]
-        final fun <get-theoryPipeline>(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/ComponentPlan.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
+        final fun <get-theoryPipeline>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver/ComponentPlan.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
     final val unplaceable // com.eignex.klause.solver/ComponentPlan.unplaceable|{}unplaceable[0]
         final fun <get-unplaceable>(): com.eignex.klause.solver/UnplaceableColumn? // com.eignex.klause.solver/ComponentPlan.unplaceable.<get-unplaceable>|<get-unplaceable>(){}[0]
 
@@ -11144,9 +11144,9 @@ final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.solver.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.solver/Problem).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.Problem(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.solver.ProblemSpec(com.eignex.klause.util.Cancellation){}[0]
+final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver.pipeline/sourceRoute(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/sourceRoute|sourceRoute@com.eignex.klause.solver.ProblemSpec(){}[0]
+final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver.pipeline/supportsExactLra(): kotlin/Boolean // com.eignex.klause.solver.pipeline/supportsExactLra|supportsExactLra@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/componentPlan(): com.eignex.klause.solver/ComponentPlan // com.eignex.klause.solver/componentPlan|componentPlan@com.eignex.klause.solver.ProblemSpec(){}[0]
-final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/sourceRoute(): com.eignex.klause.solver/ProblemPipeline // com.eignex.klause.solver/sourceRoute|sourceRoute@com.eignex.klause.solver.ProblemSpec(){}[0]
-final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/supportsExactLra(): kotlin/Boolean // com.eignex.klause.solver/supportsExactLra|supportsExactLra@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.solver/ProblemSpec).com.eignex.klause.solver/variablePartition(): com.eignex.klause.solver/VariablePartition // com.eignex.klause.solver/variablePartition|variablePartition@com.eignex.klause.solver.ProblemSpec(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]
