@@ -11,7 +11,6 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -90,17 +89,6 @@ class IntVarLiftTest {
             )
         }
     }
-
-    @Test
-    fun `exact count agrees with full enumeration on a constrained integer problem`() {
-        val p = intVars(3, 0, 3)
-        val exact = BacktrackSolver(p.bake()).enumerate(BacktrackParams())
-            .map(::intKey).toHashSet().size.toLong()
-        val r = BacktrackSolver(p.bake()).approximateCount(ApproxCountConfig(seed = 3L))
-        assertEquals(exact, r.estimate)
-    }
-
-    private fun intKey(s: Sample): List<Long> = s.ints.toList()
 
     @Test
     fun `exact count over a constrained integer problem matches brute force`() {

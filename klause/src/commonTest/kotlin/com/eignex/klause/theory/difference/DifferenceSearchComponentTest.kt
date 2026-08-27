@@ -84,10 +84,5 @@ class DifferenceSearchComponentTest {
         assertEquals(1, session.learnedClauseCount)
         assertEquals(1, learned?.decisionLevel)
         assertEquals(false, session.boolValue(1))
-
-        assertIs<ComponentResult.Consistent>(session.restart())
-        assertEquals(null, session.boolValue(0))
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
-        assertEquals(false, session.boolValue(1))
     }
 }

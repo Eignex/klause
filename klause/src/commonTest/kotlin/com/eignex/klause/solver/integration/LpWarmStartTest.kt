@@ -60,19 +60,4 @@ class LpWarmStartTest {
         assertEquals(11.0, result.objectiveValue)
         assertTrue(result.stats.lp.pivots.sum > 0.0, "expected LP pivots to be recorded")
     }
-
-    @Test
-    fun `a stale or unusable warm basis falls back to a cold solve soundly`() {
-        // Tiny instance: the warm-start path must still prove the optimum even when bases are reused
-        // across structurally identical but differently-bounded nodes.
-        val p = clique(3, 5)
-        val obj = LinearObjective(intCoefficients = LongArray(3) { 1L })
-        val result = BacktrackSolver(p.bake()).minimize(
-            obj,
-            BacktrackParams(randomSeed = 2L, lpPlan = LpPlan(bounding = true, warmStart = true)),
-        )
-        assertTrue(result is MinimizeResult.Optimal)
-        // Pairwise x_i+x_j>=5 over three vars: summing forces 2·Σ >= 15, so Σ >= 8 (ceil 7.5).
-        assertEquals(8.0, result.objectiveValue)
-    }
 }

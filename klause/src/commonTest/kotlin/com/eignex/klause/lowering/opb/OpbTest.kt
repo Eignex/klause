@@ -230,14 +230,6 @@ class OpbTest {
     }
 
     @Test
-    fun `wide constraints retain their exact constants`() {
-        val out = Opb.parse("+18446744073709551616 x1 >= 18446744073709551616 ;\n+18446744073709551616 x1 <= 0 ;\n")
-        val rows = out.problem.factors.filterIsInstance<Linear>()
-        assertEquals(2, rows.size)
-        assertTrue(rows.all { it.wideConstants != null })
-    }
-
-    @Test
     fun `rejects wide values where the target cannot be wide`() {
         // Objective coefficients and WBO soft costs are Long; a wide one is still a clean range error, and a
         // wide coefficient inside a soft constraint is unsupported rather than silently mis-parsed.

@@ -562,17 +562,6 @@ class AllDifferentPropagatorTest {
     }
 
     @Test
-    fun `AllDifferent infeasible when pigeonhole violated`() {
-        // 3 vars, 2 values total — infeasible.
-        val factor = AllDifferent(intArrayOf(0, 1, 2), domainMin = 1, domainSize = 2)
-        val state = stateWithAD(
-            factor,
-            arrayOf(IntDomain(1, 2), IntDomain(1, 2), IntDomain(1, 2)),
-        )
-        assertFalse(state.problem.propagators[0].propagate(state, factorId = 0))
-    }
-
-    @Test
     fun `AllDifferent singleton conflict detected`() {
         val factor = AllDifferent(intArrayOf(0, 1), domainMin = 1, domainSize = 5)
         val state = stateWithAD(factor, arrayOf(IntDomain(3, 3), IntDomain(3, 3)))

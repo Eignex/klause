@@ -33,20 +33,12 @@ class RevisedSimplexSolveCostTest {
     }
 
     @Test
-    fun `a solve that returns no result still reports the pivots it spent`() {
+    fun `a solve that returns no result still reports the cost it spent`() {
         val simplex = RevisedSimplex(infeasible())
 
         assertNull(simplex.solve(null), "the fixture must terminate without a result")
 
         assertTrue(simplex.lastPivots > 0, "the pivots spent reaching infeasibility must survive the null")
-    }
-
-    @Test
-    fun `a solve that returns no result still reports the factorizations it built`() {
-        val simplex = RevisedSimplex(infeasible())
-
-        assertNull(simplex.solve(null))
-
         assertTrue(simplex.lastRefactorizations > 0, "the cold start's factorization is a real cost")
     }
 

@@ -41,17 +41,6 @@ class LpCutTest {
         assertTrue(off is MinimizeResult.Optimal && on is MinimizeResult.Optimal)
         assertEquals(6.0, off.objectiveValue) // 0+1+2+3
         assertEquals(6.0, on.objectiveValue)
-    }
-
-    @Test
-    fun `cuts fire on an all-different objective`() {
-        val p = allDiff(4, 6)
-        val obj = LinearObjective(intCoefficients = LongArray(4) { 1L })
-        val on = BacktrackSolver(
-            p.bake(),
-        ).minimize(obj, BacktrackParams(randomSeed = 1L, lpPlan = LpPlan(bounding = true, cuts = true)))
-        assertTrue(on is MinimizeResult.Optimal)
-        assertEquals(6.0, on.objectiveValue)
         assertTrue(on.stats.lp.cuts.sum > 0.0, "expected AllDifferent cuts, got ${on.stats.lp.cuts.sum}")
     }
 

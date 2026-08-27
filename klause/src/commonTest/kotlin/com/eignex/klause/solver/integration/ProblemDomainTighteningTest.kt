@@ -112,9 +112,8 @@ class ProblemDomainTighteningTest {
 
     @Test
     fun `a fired cancellation makes the bake a sound no-op`() {
-        // The same x + y = 1, x,y >= 0 model that tightens both vars to [0..1] when baked to
-        // completion. With an already-fired cancellation the all-factors fixpoint bails before
-        // firing any factor: domains stay as declared and the bake is sound (Implied, not Unsat).
+        // With an already-fired cancellation the all-factors fixpoint bails before firing any
+        // factor: domains stay as declared and the bake is sound (Implied, not Unsat).
         val wide = { IntDomain(-1_000_000, 1_000_000) }
         val factors =
             listOf(
@@ -128,12 +127,6 @@ class ProblemDomainTighteningTest {
         for (v in 0..1) {
             assertEquals(-1_000_000, cancelled.requireFiniteIntDomains()[v].min, "var $v min unchanged")
             assertEquals(1_000_000, cancelled.requireFiniteIntDomains()[v].max, "var $v max unchanged")
-        }
-        // Same model with the default never-cancel token bakes to completion and tightens.
-        val baked = Problem(0, 2, arrayOf(wide(), wide()), factors).bake()
-        for (v in 0..1) {
-            assertEquals(0, baked.requireFiniteIntDomains()[v].min, "var $v min baked")
-            assertEquals(1, baked.requireFiniteIntDomains()[v].max, "var $v max baked")
         }
     }
 

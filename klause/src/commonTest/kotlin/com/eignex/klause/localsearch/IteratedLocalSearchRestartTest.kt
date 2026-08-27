@@ -6,32 +6,31 @@ import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class IteratedLocalSearchRestartTest {
 
     @Test
-    fun `Improving accepts only a strictly better candidate`() {
+    fun `each acceptance criterion accepts candidates per its semantics`() {
         val rng = Random(0)
-        assertTrue(AcceptanceCriterion.Improving.accept(1.0, 2.0, rng), "better must be accepted")
-        assertFalse(AcceptanceCriterion.Improving.accept(2.0, 2.0, rng), "equal must be rejected")
-        assertFalse(AcceptanceCriterion.Improving.accept(3.0, 2.0, rng), "worse must be rejected")
-    }
-
-    @Test
-    fun `BetterOrEqual also accepts a tied candidate`() {
-        val rng = Random(0)
-        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(1.0, 2.0, rng), "better must be accepted")
-        assertTrue(AcceptanceCriterion.BetterOrEqual.accept(2.0, 2.0, rng), "equal must be accepted")
-        assertFalse(AcceptanceCriterion.BetterOrEqual.accept(3.0, 2.0, rng), "worse must be rejected")
-    }
-
-    @Test
-    fun `RandomWalk accepts any candidate`() {
-        val rng = Random(0)
-        for (candidate in listOf(1.0, 2.0, 3.0)) {
-            assertTrue(AcceptanceCriterion.RandomWalk.accept(candidate, 2.0, rng), "candidate $candidate")
+        val cases = listOf(
+            Triple(AcceptanceCriterion.Improving, 1.0 to 2.0, true),
+            Triple(AcceptanceCriterion.Improving, 2.0 to 2.0, false),
+            Triple(AcceptanceCriterion.Improving, 3.0 to 2.0, false),
+            Triple(AcceptanceCriterion.BetterOrEqual, 1.0 to 2.0, true),
+            Triple(AcceptanceCriterion.BetterOrEqual, 2.0 to 2.0, true),
+            Triple(AcceptanceCriterion.BetterOrEqual, 3.0 to 2.0, false),
+            Triple(AcceptanceCriterion.RandomWalk, 1.0 to 2.0, true),
+            Triple(AcceptanceCriterion.RandomWalk, 2.0 to 2.0, true),
+            Triple(AcceptanceCriterion.RandomWalk, 3.0 to 2.0, true),
+        )
+        for ((criterion, candidateAndBaseline, expected) in cases) {
+            val (candidate, baseline) = candidateAndBaseline
+            assertEquals(
+                expected,
+                criterion.accept(candidate, baseline, rng),
+                "$criterion candidate=$candidate baseline=$baseline",
+            )
         }
     }
 
@@ -191,43 +190,19 @@ class IteratedLocalSearchRestartTest {
     }
 
     @Test
-    fun `BetterBiased crossover skews toward the better parent`() {
-        val bias = BetterBiased(rate = 0.5)
-        assertEquals(
-            1.0,
-            bias.probParentA(parentAObjective = 1.0, parentBObjective = 10.0),
-            "fully-biased should pick A when A is better",
+    fun `crossover bias computes probParentA per its policy`() {
+        val betterBiased = BetterBiased(rate = 0.5)
+        val cases = listOf(
+            Triple(betterBiased, 1.0 to 10.0, 1.0),
+            Triple(betterBiased, 10.0 to 1.0, 0.0),
+            Triple(betterBiased, 5.0 to 5.0, 0.5),
+            Triple(CrossoverBias.Uniform, 1.0 to 100.0, 0.5),
+            Triple(CrossoverBias.Uniform, 100.0 to 1.0, 0.5),
         )
-        assertEquals(
-            0.0,
-            bias.probParentA(parentAObjective = 10.0, parentBObjective = 1.0),
-            "fully-biased should pick B when B is better",
-        )
-        assertEquals(
-            0.5,
-            bias.probParentA(parentAObjective = 5.0, parentBObjective = 5.0),
-            "tied parents should fall back to uniform",
-        )
-    }
-
-    @Test
-    fun `Uniform crossover ignores objective`() {
-        val bias = CrossoverBias.Uniform
-        assertEquals(0.5, bias.probParentA(1.0, 100.0))
-        assertEquals(0.5, bias.probParentA(100.0, 1.0))
-    }
-
-    @Test
-    fun `crossover does nothing when population has fewer than 2 incumbents`() {
-        val factor = Cardinality.atLeastOne(IntArray(4) { Lit.make(it, true) })
-        val problem = Problem(4, 0, emptyArray(), listOf(factor))
-        val state = LocalSearchState(problem, Random(0))
-        for (i in 0 until problem.numFactors) state.factors[i].initialize(state, i)
-
-        val policy = IteratedLocalSearchRestart(populationSize = 3, crossoverRate = 1.0)
-        policy.onLocalOptimum(state, Sample(booleanArrayOf(true, true, true, true), LongArray(0)), 4.0)
-        policy.restart(state, bestSoFar = null)
-        assertTrue(state.step == 0L, "restart should reset step")
+        for ((bias, objectives, expected) in cases) {
+            val (a, b) = objectives
+            assertEquals(expected, bias.probParentA(a, b), "$bias parentA=$a parentB=$b")
+        }
     }
 
     @Test

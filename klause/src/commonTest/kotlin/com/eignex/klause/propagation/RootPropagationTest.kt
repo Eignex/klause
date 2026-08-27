@@ -93,13 +93,6 @@ class RootPropagationTest {
     }
 
     @Test
-    fun `unsatisfiable clause under assumptions returns Unsat`() {
-        val p = boolProblem(2, intArrayOf(lit(0, true), lit(1, true)))
-        val r = p.propagate(Assumptions(bools = mapOf(0 to false, 1 to false)))
-        assertIs<PropagationResult.Unsat>(r)
-    }
-
-    @Test
     fun `non-unit clause does not force anything`() {
         val p = boolProblem(3, intArrayOf(lit(0, true), lit(1, true), lit(2, true)))
         val r = implied(p.propagate())

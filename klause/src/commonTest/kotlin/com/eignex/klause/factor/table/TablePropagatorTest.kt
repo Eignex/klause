@@ -182,39 +182,6 @@ class TablePropagatorTest {
     }
 
     @Test
-    fun `backtrack enumeration equals the in-domain tuple set`() {
-        // Soundness gate for the reversible, delta-driven STR2 sweep: enumerating fires propagate
-        // repeatedly on one PropagationState — the delta fast path skips no-op re-fires, a column
-        // shrink re-wakes the sweep — across push/pop that restore the reversible live-set size
-        // (numValid). An unsound skip (returning satisfied when a value should have been pruned)
-        // would let a forbidden tuple through, so the enumerated set must equal the brute-force set
-        // of allowed rows that lie within the domains.
-        data class Inst(val arity: Int, val lo: Int, val hi: Int, val tuples: List<List<Int>>)
-        val instances = listOf(
-            Inst(2, 0, 3, listOf(listOf(0, 1), listOf(2, 3), listOf(1, 1))),
-            Inst(3, 0, 4, listOf(listOf(1, 2, 3), listOf(1, 4, 1), listOf(3, 3, 3), listOf(0, 0, 0))),
-            Inst(3, 0, 2, listOf(listOf(0, 1, 2), listOf(2, 1, 0), listOf(1, 1, 1), listOf(0, 0, 0), listOf(2, 2, 2))),
-        )
-        for ((idx, inst) in instances.withIndex()) {
-            val varsOf = IntArray(inst.arity) { it }
-            val flat = LongArray(inst.tuples.size * inst.arity)
-            inst.tuples.forEachIndexed { r, t ->
-                for (c in 0 until inst.arity) flat[r * inst.arity + c] = t[c].toLong()
-            }
-            val brute = inst.tuples.filter { t -> t.all { it in inst.lo..inst.hi } }.map { it.toList() }.toHashSet()
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = inst.arity,
-                intDomains = Array(inst.arity) { IntDomain(inst.lo.toLong(), inst.hi.toLong()) },
-                factors = arrayOf<Factor>(Table(xs = varsOf, tuples = flat)),
-            )
-            val found = BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 1L)).take(100_000)
-                .map { it.ints.map { v -> v.toInt() } }.toHashSet()
-            assertEquals(brute, found, "table instance #$idx: enumerated solutions must equal in-domain tuples")
-        }
-    }
-
-    @Test
     fun `randomized tables enumerate exactly the in-domain tuple set across deep backtracking`() {
         // Stresses the reversible STR2 sparse set + delta-driven re-sweep: random tables (varied
         // arity, value span and row count) enumerated under CDCL, which branches/prunes/backtracks

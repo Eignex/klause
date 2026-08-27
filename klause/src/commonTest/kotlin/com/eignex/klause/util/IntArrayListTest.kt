@@ -73,13 +73,13 @@ class IntArrayListTest {
     }
 
     @Test
-    fun `sortByIntKey orders by key ascending and descending with element tie-break`() {
+    fun `sortByIntKey orders by key ascending and descending with negative values`() {
         val list = IntArrayList()
-        for (v in intArrayOf(3, 1, 2, 5, 4)) list.add(v)
+        for (v in intArrayOf(-3, 7, 0, -10, 4)) list.add(v)
         list.sortByIntKey { it } // identity key → plain value sort
-        assertEquals(listOf(1, 2, 3, 4, 5), list.toIntArray().toList())
+        assertEquals(listOf(-10, -3, 0, 4, 7), list.toIntArray().toList())
         list.sortByIntKey(descending = true) { it }
-        assertEquals(listOf(5, 4, 3, 2, 1), list.toIntArray().toList())
+        assertEquals(listOf(7, 4, 0, -3, -10), list.toIntArray().toList())
     }
 
     @Test
@@ -94,14 +94,6 @@ class IntArrayListTest {
         list.sortByIntKey(descending = true) { weights[it] }
         // Descending is the exact reverse of the ascending packed order.
         assertEquals(listOf(2, 0, 4, 3, 1), list.toIntArray().toList())
-    }
-
-    @Test
-    fun `sortByIntKey handles negative keys and elements`() {
-        val list = IntArrayList()
-        for (v in intArrayOf(-3, 7, 0, -10, 4)) list.add(v)
-        list.sortByIntKey { it }
-        assertEquals(listOf(-10, -3, 0, 4, 7), list.toIntArray().toList())
     }
 
     @Test

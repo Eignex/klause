@@ -22,15 +22,18 @@ class PresolveSharedTest {
     private fun pos(v: Int) = Lit.make(v, true)
 
     @Test
-    fun `at-most-one cardinality yields one clique of its literals`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 0, max = 1)),
-        )
-        val cliques = Presolve.amoCliques(problem)
-        assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), cliques)
+    fun `a unit-max cardinality yields one clique of its literals regardless of min`() {
+        // max == 1 is the only condition that matters; at-most-one (min 0) and exactly-one (min 1)
+        // both drive the same clique-extraction branch.
+        for (min in listOf(0, 1)) {
+            val problem = Problem(
+                3,
+                0,
+                emptyArray(),
+                listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = min, max = 1)),
+            )
+            assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), Presolve.amoCliques(problem))
+        }
     }
 
     @Test
@@ -112,17 +115,6 @@ class PresolveSharedTest {
             listOf(PseudoBoolean(longArrayOf(5, 4, 1), intArrayOf(pos(0), pos(1), pos(2)), PbOp.LE, 6L)),
         )
         assertEquals(listOf(setOf(pos(0), pos(1))), Presolve.amoCliques(problem))
-    }
-
-    @Test
-    fun `an exactly-one cardinality yields the clique of its literals`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(Cardinality(intArrayOf(pos(0), pos(1), pos(2)), min = 1, max = 1)),
-        )
-        assertEquals(listOf(setOf(pos(0), pos(1), pos(2))), Presolve.amoCliques(problem))
     }
 
     @Test

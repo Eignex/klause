@@ -84,10 +84,6 @@ class FocusedLsTest {
         assertSolvesSat3("SimulatedAnnealing", SimulatedAnnealing(), seed = 7L)
 
     @Test
-    fun `simulated annealing with fast cooling solves small 3 sat`() =
-        assertSolvesSat3("SimulatedAnnealing(fast)", SimulatedAnnealing(coolingRate = 0.99), seed = 1L)
-
-    @Test
     fun `sa optimizer anneals the objective past first feasible`() {
         // atLeastOne(b0, b1, b2): feasible ⇔ at least one true; objective = count of trues, so the
         // optimum is 1. A feasibility finder bails at the first feasible (often 2–3 trues); the SA

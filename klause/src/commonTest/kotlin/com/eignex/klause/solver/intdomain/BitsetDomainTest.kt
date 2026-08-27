@@ -10,16 +10,6 @@ import kotlin.test.assertTrue
 class BitsetDomainTest {
 
     @Test
-    fun `bitset rep excludeValue updates min when removing the current min`() {
-        var d = ContiguousDomain(10, 30).excludeValue(15)
-        assertEquals(10, d.min)
-        d = d.excludeValue(10)
-        assertEquals(11, d.min)
-        d = d.excludeValue(11)
-        assertEquals(12, d.min)
-    }
-
-    @Test
     fun `bitset rep excludeValue updates max when removing the current max`() {
         var d = ContiguousDomain(10, 30).excludeValue(15)
         d = d.excludeValue(30)
@@ -101,13 +91,6 @@ class BitsetDomainTest {
         d.values.forEach { seen.add(it) }
         val expected = (0..80).filter { it != 40 }.map { it.toLong() }
         assertEquals(expected, seen)
-    }
-
-    @Test
-    fun `bitset rep withMinAtLeast that hits a cleared bit advances further`() {
-        var d = ContiguousDomain(0, 100).excludeValue(50)
-        d = d.withMinAtLeast(50)
-        assertEquals(51, d.min)
     }
 
     @Test

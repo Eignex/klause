@@ -70,27 +70,10 @@ class ValuePrecedePropagatorTest {
         assertExact(1, 2, arrayOf(0..2, 0..2, 0..2))
         // a position that can be neither s nor t in the middle.
         assertExact(2, 5, arrayOf(2..5, 0..1, 2..5))
-    }
-
-    @Test
-    fun `forces s before a fixed t`() {
-        // x1 is pinned to t=1, so s=0 must occur strictly before it ⇒ x0 = 0.
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 1), IntDomain(1, 1)),
-            factors = listOf(ValuePrecede(s = 0, t = 1, xs = intArrayOf(0, 1))),
-        )
-        assertEquals(
-            setOf(listOf(0, 1)),
-            BacktrackSolver(problem.bake()).enumerate(BacktrackParams()).map { s -> s.ints.map { it.toInt() } }.toSet(),
-        )
-    }
-
-    @Test
-    fun `t is impossible when s never can occur`() {
-        // s=5 is not in any domain, so t=1 may never appear.
+        // s is not in any domain, so t may never appear.
         assertExact(5, 1, arrayOf(0..1, 0..1))
+        // t is pinned, forcing s to occur strictly before it.
+        assertExact(0, 1, arrayOf(0..1, 1..1))
     }
 
     @Test

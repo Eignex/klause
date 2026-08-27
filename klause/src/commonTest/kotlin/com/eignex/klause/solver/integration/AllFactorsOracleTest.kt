@@ -137,24 +137,30 @@ class AllFactorsOracleTest {
 
     // ---- Linear / arithmetic -----------------------------------------------------
 
-    @Test fun `linear le passes the propagation and repair oracles with an exact probe`() {
-        val f = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
-    }
-
-    @Test fun `linear eq passes the propagation and repair oracles with an exact probe`() {
-        val f = Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 3)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
-    }
-
-    @Test fun `linear ge passes the propagation and repair oracles with an exact probe`() {
-        val f = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)
-        check(f, intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)), exactProbe = true)
-    }
-
-    @Test fun `linear ne passes the propagation and repair oracles with an exact probe`() {
-        val f = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, 2)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)), exactProbe = true)
+    @Test fun `linear passes the propagation and repair oracles with an exact probe for every operator`() {
+        data class Case(
+            val op: LinearOp,
+            val coeffs: IntArray,
+            val vars: IntArray,
+            val bound: Int,
+            val domains: Array<IntDomain>,
+        )
+        val cases = listOf(
+            Case(LinearOp.LE, intArrayOf(1, 1), intArrayOf(0, 1), 2, arrayOf(IntDomain(0, 3), IntDomain(0, 3))),
+            Case(
+                LinearOp.EQ,
+                intArrayOf(1, 1, 1),
+                intArrayOf(0, 1, 2),
+                3,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+            ),
+            Case(LinearOp.GE, intArrayOf(1, 1), intArrayOf(0, 1), 3, arrayOf(IntDomain(0, 3), IntDomain(0, 3))),
+            Case(LinearOp.NE, intArrayOf(1, 1), intArrayOf(0, 1), 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2))),
+        )
+        for (c in cases) {
+            val f = Linear(c.coeffs, c.vars, c.op, c.bound)
+            check(f, intDomains = c.domains, label = "Linear.${c.op}", exactProbe = true)
+        }
     }
 
     @Test fun `product passes the brute-force propagation and repair oracles`() {
@@ -234,22 +240,16 @@ class AllFactorsOracleTest {
 
     // ---- Array / extremum --------------------------------------------------------
 
-    @Test fun `array min passes the propagation and repair oracles with an exact probe`() {
-        val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = false)
-        check(
-            f,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            exactProbe = true,
-        )
-    }
-
-    @Test fun `array max passes the propagation and repair oracles with an exact probe`() {
-        val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = true)
-        check(
-            f,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            exactProbe = true,
-        )
+    @Test fun `array min and array max pass the propagation and repair oracles with an exact probe`() {
+        for (max in listOf(false, true)) {
+            val f = ArrayMinMax(result = 0, xs = intArrayOf(1, 2, 3), max = max)
+            check(
+                f,
+                intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
+                label = "ArrayMinMax.max=$max",
+                exactProbe = true,
+            )
+        }
     }
 
     @Test fun `element with a constant array is GAC and passes the repair oracle with an exact probe`() {
@@ -356,14 +356,15 @@ class AllFactorsOracleTest {
 
     // ---- Circuit / path ----------------------------------------------------------
 
-    @Test fun `circuit passes the brute-force propagation and repair oracles`() {
-        val f = Circuit(succ = intArrayOf(0, 1, 2))
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
-    }
-
-    @Test fun `subcircuit passes the brute-force propagation and repair oracles`() {
-        val f = Circuit(succ = intArrayOf(0, 1, 2), subcircuit = true)
-        check(f, intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)))
+    @Test fun `circuit and subcircuit pass the brute-force propagation and repair oracles`() {
+        for (subcircuit in listOf(false, true)) {
+            val f = Circuit(succ = intArrayOf(0, 1, 2), subcircuit = subcircuit)
+            check(
+                f,
+                intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
+                label = "Circuit.subcircuit=$subcircuit",
+            )
+        }
     }
 
     // ---- Packing / scheduling ----------------------------------------------------

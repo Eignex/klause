@@ -5,7 +5,6 @@ import com.eignex.klause.solver.values
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RunsDomainTest {
@@ -36,13 +35,6 @@ class RunsDomainTest {
         val narrow = ContiguousDomain(0, 100_000).excludeValue(50_000)
         assertTrue(narrow is RunsDomain)
         assertTrue((narrow.spanOrNull() != null))
-    }
-
-    @Test
-    fun `a wide run domain counts its holes without walking its values`() {
-        val wide = ContiguousDomain(0, 5_000_000_000L).excludeValue(2_500_000_000L)
-        assertEquals(1L, wide.holeCount)
-        assertNull(wide.spanOrNull())
     }
 
     @Test

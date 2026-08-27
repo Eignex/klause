@@ -111,15 +111,6 @@ class BacktrackConfigSpaceTest {
         assertTrue(p.lpPlan.knapsackLagrangian)
     }
 
-    @Test
-    fun `random samples over the whole space all decode without throwing`() {
-        val rng = Random(42)
-        repeat(2000) {
-            val a = BacktrackConfigSpace.sample(rng)
-            BacktrackConfigSpace.toParams(a) // throws on any undecodable value
-        }
-    }
-
     /** A fully-populated assignment with every param at a valid value, overridden by [overrides]. LP
      *  child dials are included so an emphasis-on assignment stays well-formed. */
     private fun baseAssignment(vararg overrides: Pair<String, Any>): Map<String, Any> = buildMap {

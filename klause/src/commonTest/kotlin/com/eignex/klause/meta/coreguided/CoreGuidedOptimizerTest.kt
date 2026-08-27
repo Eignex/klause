@@ -21,7 +21,6 @@ class CoreGuidedOptimizerTest {
 
     @Test
     fun `single satisfiable soft yields cost 0`() {
-        // No constraints; soft "b0 true" is trivially satisfiable.
         val problem = Problem(numBoolVars = 1, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
         val r = CoreGuidedOptimizer(problem).minimize(
             listOf(CoreGuidedOptimizer.Soft(Lit.make(0, true), weight = 5L)),
@@ -54,7 +53,6 @@ class CoreGuidedOptimizerTest {
         val opt = assertIs<CoreGuidedOptimizer.Result.Optimal>(r)
         assertEquals(1L, opt.lowerBound)
         assertEquals(1, opt.coresFound)
-        // Exactly one of b0/b1 should be true in the recovered sample.
         val trueCount = (if (opt.sample.bools[0]) 1 else 0) + (if (opt.sample.bools[1]) 1 else 0)
         assertEquals(1, trueCount)
     }
@@ -80,7 +78,6 @@ class CoreGuidedOptimizerTest {
         )
         val opt = assertIs<CoreGuidedOptimizer.Result.Optimal>(r)
         assertEquals(3L, opt.lowerBound)
-        // The cheaper-to-violate soft (b1) is the one that ends up false.
         assertEquals(true, opt.sample.bools[0])
         assertEquals(false, opt.sample.bools[1])
     }
@@ -106,8 +103,6 @@ class CoreGuidedOptimizerTest {
         val r = CoreGuidedOptimizer(problem).minimize(softs, BacktrackParams())
         val opt = assertIs<CoreGuidedOptimizer.Result.Optimal>(r)
         assertEquals(1L, opt.lowerBound)
-        // The true cost of the returned assignment must equal the reported bound: exactly
-        // one soft (b0) violated, the other three honoured.
         val violated = softs.count { !opt.sample.bools[Lit.variable(it.lit)] }
         assertEquals(1, violated)
         assertEquals(false, opt.sample.bools[0])
@@ -135,7 +130,6 @@ class CoreGuidedOptimizerTest {
             CoreGuidedOptimizer(problem).minimize(softs, BacktrackParams()),
         )
         assertEquals(2L, opt.lowerBound)
-        // True soft cost of the recovered sample must equal the bound.
         val cost = softs.sumOf { if (!opt.sample.bools[Lit.variable(it.lit)]) it.weight else 0L }
         assertEquals(opt.lowerBound, cost)
         assertEquals(true, opt.sample.bools[0])
@@ -185,7 +179,6 @@ class CoreGuidedOptimizerTest {
         val b = assertIs<CoreGuidedOptimizer.Result.Optimal>(withoutStrat)
         assertEquals(5L, a.lowerBound)
         assertEquals(5L, b.lowerBound)
-        // Both runs must keep b0 true (the heaviest), violating b1 and b2.
         assertEquals(true, a.sample.bools[0])
         assertEquals(true, b.sample.bools[0])
     }

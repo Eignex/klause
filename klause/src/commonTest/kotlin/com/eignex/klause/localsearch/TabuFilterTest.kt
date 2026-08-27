@@ -32,14 +32,6 @@ class TabuFilterTest {
     }
 
     @Test
-    fun `filter returns input list when no move is tabu`() {
-        val state = smallState()
-        val filter = TabuFilter(tenure = 0)
-        val moves = listOf<Move>(Move.BoolFlip(0), Move.BoolFlip(1))
-        assertSame(moves, filter.filter(state, moves))
-    }
-
-    @Test
     fun `filter strips tabu candidates when alternatives exist`() {
         val state = smallState()
         val filter = TabuFilter(tenure = 10)

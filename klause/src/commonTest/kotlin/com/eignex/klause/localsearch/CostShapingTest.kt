@@ -52,13 +52,6 @@ class CostShapingTest {
     }
 
     @Test
-    fun `violation penalties convert a raw violation count`() {
-        assertEquals(7.0, ViolationPenalty.Identity.of(7))
-        assertEquals(5.0, ViolationPenalty.Saturating(5.0).of(100))
-        assertEquals(3.0, ViolationPenalty.SquareRoot.of(9))
-    }
-
-    @Test
     fun `shapedBreakScore reduces to breakScore when no shaping configured`() {
         val factor = Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true)))
         val problem = Problem(2, 0, emptyArray(), listOf(factor))

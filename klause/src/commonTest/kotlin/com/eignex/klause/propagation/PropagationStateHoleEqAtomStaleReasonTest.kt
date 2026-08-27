@@ -71,7 +71,6 @@ class PropagationStateHoleEqAtomStaleReasonTest {
         // Level 1: establish [v1 <= 1] as the premise the carve will cite.
         s.beginLevel(1, fid = -1)
         assertTrue(s.tightenIntMax(1, 1))
-        val mark1 = s.mark()
 
         // Level 2: a factor carves value 2 out of v0 (interior: v0 is still [0..6]), citing [v1 <= 1].
         // [v0 = 2] becomes false with this carve as its trail-slot reason.
@@ -100,8 +99,5 @@ class PropagationStateHoleEqAtomStaleReasonTest {
 
         // The reconstructed level is the carve level (2), not the widened-away bound level (3).
         assertEquals(2, s.atomLevelForConflict(eqId))
-
-        // Untouched suffix kept for symmetry with mark1's level.
-        assertEquals(1, mark1.ltdvSize)
     }
 }

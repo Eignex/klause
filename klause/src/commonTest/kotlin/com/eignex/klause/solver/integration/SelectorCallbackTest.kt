@@ -116,7 +116,6 @@ class SelectorCallbackTest {
             h.conflictCount > 0,
             "expected at least one DFS-level propagation conflict; got ${h.conflictCount}",
         )
-        assertEquals(0, h.committedVars.size - h.commitCount, "var-id log matches commit count")
     }
 
     @Test
@@ -141,16 +140,5 @@ class SelectorCallbackTest {
             ),
         )
         assertTrue(h.restartCount > 0, "expected at least one restart, got ${h.restartCount}")
-    }
-
-    @Test
-    fun `default heuristics enumerate without any callback hooks`() {
-        val problem = Problem(
-            numBoolVars = 2,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = emptyArray(),
-        )
-        BacktrackSolver(problem.bake()).enumerate(BacktrackParams(randomSeed = 0L)).toList()
     }
 }

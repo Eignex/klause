@@ -18,10 +18,6 @@ class LastConflictTest {
 
     @Test
     fun `last-conflict prioritises the failing variable on the next pick`() {
-        // Wrap an InputOrder base with LastConflict. After a conflict on v3, the next
-        // pick should be v3 (when still free). We can't directly inspect "which var
-        // was picked first" — instead, verify behaviour with a fake conflict-trigger:
-        // call onConflict(v3) directly, then ask `pick` on a fresh session.
         val problem = Problem(
             numBoolVars = 5,
             numIntVars = 0,

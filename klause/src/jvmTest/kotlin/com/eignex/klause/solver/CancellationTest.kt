@@ -57,7 +57,6 @@ class CancellationTest {
         flagger.join()
 
         assertTrue(elapsed < 10_000, "LS samples should stop promptly after cancel; took ${elapsed}ms")
-        // Every yielded sample must be complete for the 20 unconstrained bools.
         samples.forEach { assertEquals(problem.numBoolVars, it.bools.size) }
     }
 

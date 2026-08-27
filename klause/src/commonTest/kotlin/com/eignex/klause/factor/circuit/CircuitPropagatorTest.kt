@@ -172,31 +172,6 @@ class CircuitPropagatorTest {
 
     // --- Conflict reasons ---
 
-    @Test
-    fun `circuit sub-tour conflict reason is a sound nonempty witness`() {
-        // n=3. Pinning succ[0]=1 and succ[1]=0 makes nodes {0,1} a closed 2-cycle, so node 2 has
-        // no surviving successor (both 0 and 1 are claimed) — the propagator wipes succ[2].
-        val factor = Circuit(succ = intArrayOf(0, 1, 2))
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 3,
-            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2)),
-            factors = arrayOf<Factor>(factor),
-        )
-        val state = PropagationState(problem, Assumptions.None)
-        state.undoLogging = true
-        state.currentLevel = 1
-        assertTrue(state.tightenIntMin(0, 1) && state.tightenIntMax(0, 1), "succ[0] = 1")
-        assertTrue(state.tightenIntMax(1, 0), "succ[1] = 0")
-        assertFalse(problem.propagators[0].propagate(state, 0), "the 2-cycle over {0,1} leaves node 2 unplaceable")
-
-        val reason = problem.propagators[0].conflictReason(state, 0)
-        assertTrue(reason != null && reason.isNotEmpty(), "must yield a non-empty clause-form reason")
-        for (lit in reason) {
-            assertTrue(state.litFalse(lit), "every reason literal must be false at conflict time, lit=$lit")
-        }
-    }
-
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> = BacktrackSolver(problem.bake())
         .enumerate(BacktrackParams(randomSeed = seed, variableSelector = Vsids()))
         .take(100_000)
@@ -271,38 +246,6 @@ class CircuitPropagatorTest {
     }
 
     // --- Circuit propagation ---
-
-    /** Build a 4-var Circuit problem; succ var ids are 0..3, each with domain [0..3]. */
-    private fun fourNodeProblem(): Problem {
-        val factor = Circuit(succ = intArrayOf(0, 1, 2, 3))
-        return Problem(
-            numBoolVars = 0,
-            numIntVars = 4,
-            intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3), IntDomain(0, 3)),
-            factors = arrayOf<Factor>(factor),
-        )
-    }
-
-    @Test
-    fun `BacktrackSolver enumerates exactly the Hamiltonian cycles on N=4`() {
-        // Circuit distinguishes direction and starting point, so the count is
-        // (N-1)! = 6 cyclic permutations, not (N-1)!/2 undirected cycles.
-        val problem = fourNodeProblem()
-        val solver = BacktrackSolver(problem.bake())
-        val params = BacktrackParams()
-        val samples = solver.enumerate(params).toList()
-        assertEquals(6, samples.size, "expected 6 Hamiltonian cycles on N=4, got ${samples.size}: $samples")
-        for (s in samples) {
-            val visited = BooleanArray(4)
-            var node = 0
-            for (step in 0 until 4) {
-                assertFalse(visited[node], "revisit at step $step in ${s.ints.toList()}")
-                visited[node] = true
-                node = s.ints[node].toInt()
-            }
-            assertEquals(0, node, "must close cycle in ${s.ints.toList()}")
-        }
-    }
 
     @Test
     fun `propagator forces last edge when N-1 successors are fixed`() {

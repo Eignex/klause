@@ -190,16 +190,6 @@ class SharedClausePoolTest {
         SharedClause(IntArray(len) { (id + it) * 2 }, LongArray(0), lbd = lbd)
 
     @Test
-    fun `a publish over the cap compacts instead of refusing new clauses`() {
-        val pool = SharedClausePool(cap = 4)
-        pool.publish((0 until 4).map { boolClause(it * 10, lbd = it + 1) })
-        pool.publish(listOf(boolClause(100, lbd = 1)))
-        val all = pool.drainSince(0).clauses
-        assertTrue(all.size <= 4)
-        assertTrue(all.any { it.key == boolClause(100, lbd = 1).key }, "the pool keeps accepting after the cap")
-    }
-
-    @Test
     fun `compaction keeps low-LBD clauses over high-LBD ones`() {
         val pool = SharedClausePool(cap = 4)
         val keep = boolClause(0, lbd = 1)

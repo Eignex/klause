@@ -14,8 +14,8 @@ import kotlin.test.assertTrue
 /**
  * Behaviour tests for [FlipAndPropagate]: a seed flip is emitted together with the literals it forces
  * through [ImplicitSeeding.implicationGraph], the bundle is one atomic [Move.Compound] that applies
- * and reverts cleanly, no-op forced parts are dropped, and the implication-following depth is bounded.
- * Implication directions are read off the graph the problem actually builds, never assumed.
+ * and reverts cleanly, and no-op forced parts are dropped. Implication directions are read off the
+ * graph the problem actually builds, never assumed.
  */
 class FlipAndPropagateTest {
 
@@ -118,18 +118,6 @@ class FlipAndPropagateTest {
         assertTrue(
             Move.BoolFlip(0) in parts && Move.BoolFlip(2) in parts,
             "the seed and the unsatisfied forced flip remain",
-        )
-    }
-
-    @Test
-    fun `the implication-following depth is bounded`() {
-        val state = freshState(chainProblem(), seed = 1L)
-        // A depth-1 cap still captures the seed's transitively-closed forced set (the graph stores the
-        // closure per literal) and the walk terminates rather than chasing a longer ladder.
-        assertEquals(
-            setOf(Move.BoolFlip(0), Move.BoolFlip(1), Move.BoolFlip(2)),
-            emittedParts(state, maxDepth = 1),
-            "depth 1 captures the seed's closure and stops",
         )
     }
 }

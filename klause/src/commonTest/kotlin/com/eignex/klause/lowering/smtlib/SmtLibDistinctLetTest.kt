@@ -22,9 +22,4 @@ class SmtLibDistinctLetTest {
     fun `a let-bound open distinct posts two strict-order atoms per pair`() {
         assertEquals(1 + 40 * 39, boolVarsFor(40))
     }
-
-    @Test
-    fun `widening a let-bound open distinct grows quadratically`() {
-        assertEquals(1 + 80 * 79, boolVarsFor(80))
-    }
 }

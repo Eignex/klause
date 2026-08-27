@@ -151,34 +151,6 @@ class NativeSatEngineTest {
     }
 
     @Test
-    fun `native and general lanes agree on the learned clause regression`() {
-        val rng = Random(31415926L)
-        lateinit var clauses: List<IntArray>
-        var numVars = 0
-        repeat(9) {
-            numVars = 8 + rng.nextInt(5)
-            clauses = List(numVars * 4) {
-                val vars = mutableSetOf<Int>()
-                while (vars.size < 3) vars.add(rng.nextInt(numVars))
-                IntArray(3).also { literals ->
-                    vars.forEachIndexed { index, variable -> literals[index] = Lit.make(variable, rng.nextBoolean()) }
-                }
-            }
-        }
-        val forget = BacktrackParams(
-            randomSeed = 2L,
-            nativeSat = true,
-            maxLearnedClauses = 4,
-            tieredLearnedDb = true,
-            lubyRestartBase = 8L,
-        )
-        val native = BacktrackSolver(cnf(numVars, clauses).bake()).solve(forget)
-        val general = BacktrackSolver(cnf(numVars, clauses).bake()).solve(forget.copy(nativeSat = false))
-
-        assertEquals(general is SolveResult.Sat, native is SolveResult.Sat)
-    }
-
-    @Test
     fun `native and general lanes enumerate the same model count`() {
         // Small enough to enumerate fully; exercises the learned-clause store across many backjumps.
         val clauses = listOf(

@@ -10,7 +10,6 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -117,24 +116,15 @@ class DifferenceFragmentsTest {
     }
 
     @Test
-    fun `complete difference coverage permits boolean structure`() {
-        assertTrue(
-            hasCompleteDifferenceCoverage(arrayOf(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true))))),
+    fun `complete difference coverage holds only when every row is a difference or boolean structure`() {
+        val cases = listOf(
+            arrayOf<Factor>(diff(0, 1, LinearOp.LE, 3), Clause(intArrayOf(Lit.make(0, true)))) to true,
+            arrayOf<Factor>(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)) to false,
+            arrayOf<Factor>(ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 3)) to false,
         )
-    }
-
-    @Test
-    fun `complete difference coverage rejects a general linear row`() {
-        assertFalse(hasCompleteDifferenceCoverage(arrayOf(Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3))))
-    }
-
-    @Test
-    fun `complete difference coverage rejects a reified equality`() {
-        assertFalse(
-            hasCompleteDifferenceCoverage(
-                arrayOf(ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 3)),
-            ),
-        )
+        for ((factors, expected) in cases) {
+            assertEquals(expected, hasCompleteDifferenceCoverage(factors), factors.toList().toString())
+        }
     }
 
     @Test

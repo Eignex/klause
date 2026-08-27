@@ -477,63 +477,44 @@ class ArithmeticPropagatorReifiedTest {
         .toHashSet()
 
     @Test
-    fun `enumerate matches brute force for reified LE`() {
-        // aux ↔ (v0 + v1 ≤ 2), both in [0, 3]. aux is free, so enumeration spans both polarities;
-        // each conflicting branch learns off the new indicator-aware nogood.
-        for (seed in 1L..5L) {
-            val problem = Problem(
-                numBoolVars = 1,
-                numIntVars = 2,
-                intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-                factors = arrayOf<Factor>(
-                    ReifiedLinear(
-                        auxBoolVar = 0,
-                        coeffs = intArrayOf(1, 1),
-                        vars = intArrayOf(0, 1),
-                        op = LinearOp.LE,
-                        bound = 2,
+    fun `enumerate matches brute force for reified LE and EQ`() {
+        // aux ↔ (v0 + v1 op bound), both in [0, 3]. aux is free, so enumeration spans both
+        // polarities; each conflicting branch learns off the new indicator-aware nogood.
+        // LE 2 exercises an inequality body; EQ 3 is a tight equality that drives many body conflicts.
+        val cases = listOf<Pair<LinearOp, (Int, Int) -> Boolean>>(
+            LinearOp.LE to { v0, v1 -> v0 + v1 <= 2 },
+            LinearOp.EQ to { v0, v1 -> v0 + v1 == 3 },
+        )
+        for ((op, rel) in cases) {
+            for (seed in 1L..5L) {
+                val problem = Problem(
+                    numBoolVars = 1,
+                    numIntVars = 2,
+                    intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
+                    factors = arrayOf<Factor>(
+                        ReifiedLinear(
+                            auxBoolVar = 0,
+                            coeffs = intArrayOf(1, 1),
+                            vars = intArrayOf(0, 1),
+                            op = op,
+                            bound = if (op == LinearOp.LE) 2 else 3,
+                        ),
                     ),
-                ),
-            )
-            val brute = HashSet<List<Int>>()
-            for (a in 0..1) {
-                for (v0 in 0..3) {
-                    for (v1 in 0..3) {
-                        if ((a == 1) == (v0 + v1 <= 2)) brute.add(listOf(a, v0, v1))
+                )
+                val brute = HashSet<List<Int>>()
+                for (a in 0..1) {
+                    for (v0 in 0..3) {
+                        for (v1 in 0..3) {
+                            if ((a == 1) == rel(v0, v1)) brute.add(listOf(a, v0, v1))
+                        }
                     }
                 }
+                assertEquals(
+                    brute,
+                    enumerateBoolInt(problem, seed),
+                    "op=$op seed=$seed: reified body must match brute force",
+                )
             }
-            assertEquals(brute, enumerateBoolInt(problem, seed), "seed=$seed: reified LE must match brute force")
-        }
-    }
-
-    @Test
-    fun `enumerate matches brute force for reified EQ`() {
-        // aux ↔ (v0 + v1 = 3), both in [0, 3] — a tight equality that drives many body conflicts.
-        for (seed in 1L..5L) {
-            val problem = Problem(
-                numBoolVars = 1,
-                numIntVars = 2,
-                intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 3)),
-                factors = arrayOf<Factor>(
-                    ReifiedLinear(
-                        auxBoolVar = 0,
-                        coeffs = intArrayOf(1, 1),
-                        vars = intArrayOf(0, 1),
-                        op = LinearOp.EQ,
-                        bound = 3,
-                    ),
-                ),
-            )
-            val brute = HashSet<List<Int>>()
-            for (a in 0..1) {
-                for (v0 in 0..3) {
-                    for (v1 in 0..3) {
-                        if ((a == 1) == (v0 + v1 == 3)) brute.add(listOf(a, v0, v1))
-                    }
-                }
-            }
-            assertEquals(brute, enumerateBoolInt(problem, seed), "seed=$seed: reified EQ must match brute force")
         }
     }
 

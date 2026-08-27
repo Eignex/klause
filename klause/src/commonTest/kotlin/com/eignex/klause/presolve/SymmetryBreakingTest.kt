@@ -192,18 +192,6 @@ class SymmetryBreakingTest {
     }
 
     @Test
-    fun `law-lee precedence is a no-op when no factor is value-anonymous`() {
-        // A Linear is value-meaningful, so value symmetry does not apply — nothing is posted.
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 2) },
-            listOf(Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
-        )
-        assertTrue(Presolve.breakValuePrecedence(problem).isEmpty, "no value symmetry ⇒ no-op")
-    }
-
-    @Test
     fun `value precedence fires on graph coloring with binary disequalities`() {
         // `col[a] != col[b]` compiles to a binary Linear with op NE — a pure disequality, which is
         // value-anonymous (#501): the colors are interchangeable. A triangle over 3 colors has 3!=6

@@ -64,15 +64,11 @@ class SmtLibIteChainTest {
     private fun elementCount(text: String): Int = SmtLib.parse(text).model.factors.count { it is Element }
 
     @Test
-    fun `a chain of equality tests should collapse to one element factor`() {
-        assertEquals(1, elementCount(model(chain("s") { "${it * 10}" })))
-    }
+    fun `a chain of equality tests should collapse to one element factor and answer every selector value`() {
+        val text = model(chain("s") { "${it * 10}" })
 
-    @Test
-    fun `a collapsed chain should answer every selector value with the arm the chain selects`() {
-        val results = resultPerSelector(model(chain("s") { "${it * 10}" }))
-
-        assertEquals((SEL_LO..SEL_HI).map { if (it in KEYS) it * 10L else it.toLong() }, results)
+        assertEquals(1, elementCount(text))
+        assertEquals((SEL_LO..SEL_HI).map { if (it in KEYS) it * 10L else it.toLong() }, resultPerSelector(text))
     }
 
     @Test

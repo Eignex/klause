@@ -88,8 +88,6 @@ class VsidsTest {
 
     @Test
     fun `vsids prefers highest-activity variable after onConflict bumps`() {
-        // Drive Vsids directly: bump var 3 a few times, then ask it to pick from an
-        // all-unpinned 5-bool problem. v3 should win.
         val problem = Problem(
             numBoolVars = 5,
             numIntVars = 0,
@@ -97,11 +95,14 @@ class VsidsTest {
             factors = emptyArray(),
         )
         val vsids = Vsids()
+        val session = PropagationSession(problem)
+        session.seed(Assumptions.None)
+        // onConflict is a no-op before the heap exists; size it with a throwaway pick first.
+        vsids.pick(session, Random(0L))
         // Empty Unsat record so only v3 (the failing decision) gets the bump.
         val emptyUnsat = Unsat()
         repeat(3) { vsids.onConflict(VarRef.Bool(3), emptyUnsat) }
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(variableSelector = vsids))
-        assertIs<SolveResult.Sat>(r)
+        assertEquals(VarRef.Bool(3), vsids.pick(session, Random(0L)))
     }
 
     @Test

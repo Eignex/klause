@@ -51,6 +51,8 @@ class CircuitInvariantTest {
         state.assignment.setInt(3, 2)
         state.recompute()
         assertEquals(1, state.cost, "two disjoint 2-cycles should violate Circuit")
+        // state.cost is Σ factorDegree, which for Circuit is read straight from intPayload.
+        assertEquals(1, state.intPayload[0], "cost should equal the factor's graded payload")
     }
 
     @Test
@@ -89,18 +91,9 @@ class CircuitInvariantTest {
     }
 
     @Test
-    fun `factor's internal graded cost reflects how broken the assignment is`() {
-        // Circuit's graded cost lives in state.intPayload[factorId]; state.cost is binary.
+    fun `4 self-loops rank as more broken than two disjoint 2-cycles`() {
         val problem = fourNodeProblem()
         val state = LocalSearchState(problem, Random(0))
-
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 3)
-        state.assignment.setInt(3, 2)
-        state.recompute()
-        val cost2 = state.intPayload[0]
-        assertEquals(1, cost2, "two 2-cycles should yield graded cost 1")
 
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 1)
@@ -110,7 +103,8 @@ class CircuitInvariantTest {
         val cost4 = state.intPayload[0]
         assertEquals(9, cost4, "4 self-loops should yield graded cost 9")
 
-        assertTrue(cost4 > cost2, "4-self-loop config should rank as more broken than 2-cycle config")
+        // The two-2-cycles config above (`sub-cycle 0_1_0...`) has graded cost 1.
+        assertTrue(cost4 > 1, "4-self-loop config should rank as more broken than 2-cycle config")
     }
 
     @Test
@@ -198,29 +192,20 @@ class CircuitInvariantTest {
     }
 
     @Test
-    fun `all self-loops is the empty subcircuit and satisfies the factor`() {
-        val problem = fourNodeSubcircuitProblem()
-        val state = LocalSearchState(problem, Random(0))
-        // All vars self-loop → all nodes excluded → empty subcircuit, valid.
-        state.assignment.setInt(0, 0)
-        state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 2)
-        state.assignment.setInt(3, 3)
-        state.recompute()
-        assertEquals(0, state.cost, "all-excluded should satisfy Subcircuit")
-    }
-
-    @Test
-    fun `two-node subcircuit with two excluded nodes is valid`() {
-        val problem = fourNodeSubcircuitProblem()
-        val state = LocalSearchState(problem, Random(0))
-        // Nodes 0 and 1 form a cycle; 2 and 3 excluded.
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 2)
-        state.assignment.setInt(3, 3)
-        state.recompute()
-        assertEquals(0, state.cost, "valid 2-cycle with 2 excluded should satisfy Subcircuit")
+    fun `valid subcircuit configurations satisfy the factor`() {
+        val cases = listOf(
+            // All vars self-loop → all nodes excluded → empty subcircuit, valid.
+            longArrayOf(0, 1, 2, 3) to "all-excluded should satisfy Subcircuit",
+            // Nodes 0 and 1 form a cycle; 2 and 3 excluded.
+            longArrayOf(1, 0, 2, 3) to "valid 2-cycle with 2 excluded should satisfy Subcircuit",
+        )
+        for ((succ, message) in cases) {
+            val problem = fourNodeSubcircuitProblem()
+            val state = LocalSearchState(problem, Random(0))
+            for (i in succ.indices) state.assignment.setInt(i, succ[i])
+            state.recompute()
+            assertEquals(0, state.cost, message)
+        }
     }
 
     @Test

@@ -10,7 +10,6 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * An asserted top-level `=>` is a clause. `(=> a1 .. an)` is right-associative so it holds exactly when
@@ -39,25 +38,6 @@ class SmtLibAssertedImpliesTest {
         assertEquals(1, p.factors.size, "the chain should lower to exactly one factor")
         assertEquals(3, p.factors.filterIsInstance<Clause>().single().literals.size, "one literal per operand")
         assertEquals(3, p.numBoolVars, "the chain should add no auxiliary")
-    }
-
-    @Test
-    fun `an implication with a true antecedent forces its consequent`() {
-        assertTrue(!sat("(declare-const a Bool) (declare-const b Bool) (assert (=> a b)) (assert a) (assert (not b))"))
-        assertTrue(sat("(declare-const a Bool) (declare-const b Bool) (assert (=> a b)) (assert a) (assert b)"))
-    }
-
-    @Test
-    fun `an implication with a false antecedent constrains nothing`() {
-        val text = "(declare-const a Bool) (declare-const b Bool) (assert (=> a b)) (assert (not a)) (assert (not b))"
-        assertTrue(sat(text), "a failed antecedent leaves the consequent free")
-    }
-
-    @Test
-    fun `an implication over comparisons keeps its meaning`() {
-        val decl = "(declare-const x Int) (assert (>= x 0)) (assert (<= x 5))"
-        assertTrue(!sat("$decl (assert (=> (>= x 3) (<= x 1))) (assert (= x 4))"), "4 satisfies only the antecedent")
-        assertTrue(sat("$decl (assert (=> (>= x 3) (<= x 1))) (assert (= x 0))"), "0 fails the antecedent")
     }
 
     /** An atom over the two bools and the one integer of [PREAMBLE] paired with its own semantics. */

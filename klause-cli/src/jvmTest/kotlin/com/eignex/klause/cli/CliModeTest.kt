@@ -557,32 +557,18 @@ class CliModeTest {
     }
 
     @Test
-    fun `ls bare recipe axes select sources scoring and acceptance`() {
+    fun `ls bare recipe axes and strategy-base overrides are all valid`() {
         val fzn = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        // A `sources=` spec with no `strategy=` is a bare four-axis recipe over the driver.
-        for (recipe in listOf(
+        // A `sources=` spec with no `strategy=` is a bare four-axis recipe over the driver; a named
+        // base strategy, and overriding a single axis on a base, are also valid.
+        for (args in listOf(
             arrayOf("--param", "sources=violated,argmin", "--param", "acceptance=walksat", "--param", "noise=0.2"),
             arrayOf("--param", "sources=violated,frontier", "--param", "scoring=raw", "--param", "acceptance=greedy"),
             arrayOf("--param", "sources=argmin", "--param", "acceptance=probsat", "--param", "cb=2.0"),
             arrayOf("--param", "sources=violated", "--param", "acceptance=sa", "--param", "cooling-rate=0.99"),
-        )) {
-            val out = capture { main(arrayOf("-e", "ls", "-t", "5000") + recipe + fzn.absolutePath) }
-            assertTrue("x = " in out, out)
-            assertTrue("----------" in out, out)
-        }
-    }
-
-    @Test
-    fun `ls strategy base plus per-axis overrides are all valid`() {
-        val fzn = File.createTempFile("cli", ".fzn").apply {
-            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
-            deleteOnExit()
-        }
-        // A named base strategy, and overriding a single axis on a base. Every combination is valid.
-        for (args in listOf(
             arrayOf("--param", "strategy=cbls"),
             arrayOf("--param", "strategy=feasibilityjump"),
             arrayOf("--param", "strategy=walksat"),
@@ -943,25 +929,20 @@ class CliModeTest {
     }
 
     @Test
-    fun `the presolve budget floor never takes more than its share of a short run`() {
-        // 0.1 of 5s is 500ms, which the 5000ms floor would raise to the whole time limit.
-        assertEquals(1250L, SolveCore.derivedPresolveBudgetMs(5_000L, 0.1))
-    }
-
-    @Test
-    fun `the presolve budget floor still lifts a mid-length run`() {
-        // 0.1 of 30s is 3s; the floor lifts it to 5s, which is under the 25% ceiling of 7.5s.
-        assertEquals(5_000L, SolveCore.derivedPresolveBudgetMs(30_000L, 0.1))
-    }
-
-    @Test
-    fun `the presolve budget is a plain share once the run is long enough`() {
-        assertEquals(12_000L, SolveCore.derivedPresolveBudgetMs(120_000L, 0.1))
-    }
-
-    @Test
-    fun `the presolve budget falls back to the flat backstop without a time limit`() {
-        assertEquals(CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS, SolveCore.derivedPresolveBudgetMs(null, 0.1))
+    fun `the presolve budget applies the floor cap, floor lift, plain share, and no-limit backstop`() {
+        val cases = listOf<Pair<Long?, Long>>(
+            // 0.1 of 5s is 500ms, which the 5000ms floor would raise to the whole time limit.
+            5_000L to 1250L,
+            // 0.1 of 30s is 3s; the floor lifts it to 5s, which is under the 25% ceiling of 7.5s.
+            30_000L to 5_000L,
+            // Long enough for the floor to no longer bind: a plain 0.1 share.
+            120_000L to 12_000L,
+            // No time limit at all falls back to the flat backstop.
+            null to CliKnobs.DEFAULT_PRESOLVE_BUDGET_MS,
+        )
+        for ((timeLimitMs, expected) in cases) {
+            assertEquals(expected, SolveCore.derivedPresolveBudgetMs(timeLimitMs, 0.1), "timeLimitMs=$timeLimitMs")
+        }
     }
 
     @Test

@@ -277,20 +277,28 @@ class Xcsp3IntegrationTest {
     }
 
     @Test
-    fun `a small-domain conflict table complements to a positive table for GAC`() {
-        val xml = "<instance type=\"CSP\"><variables><var id=\"a\"> 0..2 </var><var id=\"b\"> 0..2 </var></variables>" +
-            "<constraints><extension><list> a b </list><conflicts> (1,1) </conflicts></extension></constraints></instance>"
-        assertTrue(Xcsp3.parse(xml).problem.factors.any { it is Table }, "small conflict should complement to a Table")
-    }
-
-    @Test
-    fun `a conflict table whose complement is astronomically large stays clauses`() {
-        // Three 0..200 vars: the ~8.1M-tuple domain product is far past the materialize ceiling, so the
-        // negative table lowers to nogood clauses rather than materializing a positive Table complement.
-        val xml = "<instance type=\"CSP\"><variables>" +
-            "<var id=\"a\"> 0..200 </var><var id=\"b\"> 0..200 </var><var id=\"c\"> 0..200 </var></variables>" +
-            "<constraints><extension><list> a b c </list><conflicts> (1,1,1) </conflicts></extension></constraints></instance>"
-        assertTrue(Xcsp3.parse(xml).problem.factors.none { it is Table }, "huge complement ⇒ clauses")
+    fun `a conflict table complements to a Table only under the materialize ceiling`() {
+        // A small domain complements to a positive Table for GAC; three 0..200 vars put the ~8.1M-tuple
+        // complement far past the materialize ceiling, so it lowers to nogood clauses instead.
+        val cases = listOf(
+            (
+                "<instance type=\"CSP\"><variables><var id=\"a\"> 0..2 </var><var id=\"b\"> 0..2 </var></variables>" +
+                    "<constraints><extension><list> a b </list><conflicts> (1,1) </conflicts>" +
+                    "</extension></constraints></instance>"
+                ) to true,
+            (
+                "<instance type=\"CSP\"><variables><var id=\"a\"> 0..200 </var><var id=\"b\"> 0..200 </var>" +
+                    "<var id=\"c\"> 0..200 </var></variables><constraints><extension><list> a b c </list>" +
+                    "<conflicts> (1,1,1) </conflicts></extension></constraints></instance>"
+                ) to false,
+        )
+        for ((xml, expectTable) in cases) {
+            assertEquals(
+                expectTable,
+                Xcsp3.parse(xml).problem.factors.any { it is Table },
+                "expected complement-to-Table=$expectTable for: $xml",
+            )
+        }
     }
 
     @Test
@@ -689,13 +697,13 @@ class Xcsp3IntegrationTest {
     }
 
     @Test
-    fun `nValues counts distinct values`() {
-        val v = sat(
-            """
+    fun `nValues with a variable bound keeps the decomposition and enforces the count`() {
+        val xml = """
             <instance type="CSP"><variables><array id="x" size="[3]"> 0..2 </array><var id="z"> 2..2 </var></variables>
             <constraints><nValues><list> x[] </list><condition> (eq,z) </condition></nValues></constraints></instance>
-            """.trimIndent(),
-        )
+        """.trimIndent()
+        assertTrue(Xcsp3.parse(xml).problem.factors.none { it is NValue }, "variable bound keeps the decomposition")
+        val v = sat(xml)
         assertEquals(2, setOf(v[0], v[1], v[2]).size)
     }
 
@@ -708,15 +716,6 @@ class Xcsp3IntegrationTest {
         assertTrue(Xcsp3.parse(xml).problem.factors.any { it is NValue }, "constant bound should use native NValue")
         val v = sat(xml)
         assertTrue(setOf(v[0], v[1], v[2]).size > 1, "at least two distinct values")
-    }
-
-    @Test
-    fun `nValues with a variable bound keeps the decomposition`() {
-        val xml = """
-            <instance type="CSP"><variables><array id="x" size="[3]"> 0..2 </array><var id="z"> 2..2 </var></variables>
-            <constraints><nValues><list> x[] </list><condition> (eq,z) </condition></nValues></constraints></instance>
-        """.trimIndent()
-        assertTrue(Xcsp3.parse(xml).problem.factors.none { it is NValue }, "variable bound keeps the decomposition")
     }
 
     @Test

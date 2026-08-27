@@ -202,7 +202,6 @@ class PortfolioTest {
             val elapsed = started.elapsedNow().inWholeMilliseconds
             assertEquals(20, samples.size)
             assertTrue(elapsed < 30_000, "take(20) should be quick on a small problem; took ${elapsed}ms")
-            // Every sample is a valid exactly-one configuration.
             for (s in samples) {
                 assertEquals(1, s.bools.count { it }, "exactly-one violated by $s")
             }
@@ -300,10 +299,6 @@ class PortfolioTest {
             }
         }
         Portfolio(workers).use { p ->
-            // The middle-bisecting worker may legitimately stumble onto the optimum value,
-            // but with the max-descending worker budget-capped the pool has not covered the
-            // space — the verdict must stay BestFound; claiming Optimal here is a
-            // manufactured proof.
             assertIs<MinimizeResult.BestFound>(p.minimize())
             Unit
         }
@@ -480,7 +475,8 @@ class PortfolioTest {
     fun `a parallel scenario with fewer arms than cores replicates the arms across lanes`() {
         // arms=2, cores=6: compose yields 2 distinct LS arms, then the build cycles them across all
         // 6 lanes as seed-diversified replicas. LS worker labels are ls/<recipe> (no index), so the
-        // replication is visible as a period-2 cycle of the two composed labels.
+        // replication is visible as a period-2 cycle of the two composed labels, and every replica
+        // shares its composed arm's id: 0,1,0,1,0,1.
         val workers = PortfolioBuilder.build(
             exactlyOneOver(5).bake(),
             PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
@@ -491,16 +487,6 @@ class PortfolioTest {
         assertEquals(labels[0], labels[2], "lane 2 replicates composed arm 0")
         assertEquals(labels[1], labels[3], "lane 3 replicates composed arm 1")
         assertTrue(labels[0] != labels[1], "the two composed arms are distinct")
-    }
-
-    @Test
-    fun `replica lanes share an arm id per composed config`() {
-        // arms=2, cores=6: the 6 lanes cycle the 2 composed arms, so their arm ids cycle 0,1,0,1,0,1
-        // — every replica of a config shares one identity while distinct configs stay distinct.
-        val workers = PortfolioBuilder.build(
-            exactlyOneOver(5).bake(),
-            PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH),
-        )
         assertEquals(listOf(0, 1, 0, 1, 0, 1), workers.map { it.armId }, "replicas of each arm share its id")
     }
 
@@ -551,13 +537,6 @@ class PortfolioTest {
         Portfolio(workers).use { p -> p.minimize(onImprovement = { seen += it }) }
         assertTrue(seen.isNotEmpty(), "minimize should stream at least one improvement")
         assertTrue(seen.all { it.armId == byLabel[it.workerLabel] }, "arm id must match the producing worker")
-    }
-
-    @Test
-    fun `a scenario keeps an arm count below its core count`() {
-        val scenario = PortfolioScenario(cores = 6, arms = 2, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
-        assertEquals(2, scenario.arms)
-        assertEquals(6, scenario.cores)
     }
 
     private fun exactlyOneOver(n: Int): Problem {

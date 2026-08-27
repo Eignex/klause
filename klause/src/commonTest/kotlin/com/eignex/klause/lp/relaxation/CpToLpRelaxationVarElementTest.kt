@@ -42,9 +42,18 @@ class CpToLpRelaxationVarElementTest {
     @Test
     fun `var-array hull bound is sound for a free index`() {
         // arr[0] ∈ [4,10], arr[1] ∈ [2,8], idx ∈ {0,1}. True integer min(result) = 2 (idx=1, arr[1]=2).
-        val sol = minResult(IntDomain(0, 1), IntDomain(4, 10), IntDomain(2, 8))
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
-        assertTrue(sol.objectiveValue <= 2.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 2")
+        // arr[0] ∈ [6,9], arr[1] ∈ [5,7] tightened high: true integer min(result) = 5.
+        listOf(
+            Triple(IntDomain(4, 10), IntDomain(2, 8), 2.0),
+            Triple(IntDomain(6, 9), IntDomain(5, 7), 5.0),
+        ).forEach { (a0, a1, optimum) ->
+            val sol = minResult(IntDomain(0, 1), a0, a1)
+            assertEquals(LpVerdict.OPTIMAL, sol.status)
+            assertTrue(
+                sol.objectiveValue <= optimum + eps,
+                "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum $optimum",
+            )
+        }
     }
 
     @Test
@@ -56,13 +65,5 @@ class CpToLpRelaxationVarElementTest {
             assertEquals(LpVerdict.OPTIMAL, sol.status, "idx=$position: status")
             assertEquals(expected, sol.objectiveValue, eps, "idx=$position: LP min is arr[$position]'s minimum")
         }
-    }
-
-    @Test
-    fun `var-array hull bound stays sound when both arrays are tightened high`() {
-        // arr[0] ∈ [6,9], arr[1] ∈ [5,7], idx ∈ {0,1}. True integer min(result) = 5.
-        val sol = minResult(IntDomain(0, 1), IntDomain(6, 9), IntDomain(5, 7))
-        assertEquals(LpVerdict.OPTIMAL, sol.status)
-        assertTrue(sol.objectiveValue <= 5.0 + eps, "UNSOUND: LP min ${sol.objectiveValue} exceeds integer optimum 5")
     }
 }

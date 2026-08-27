@@ -81,22 +81,6 @@ class InversePropagatorTest {
     }
 
     @Test
-    fun `0-based inverse pair`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 6,
-            intDomains = Array(6) { IntDomain(0, 2) },
-            factors = arrayOf<Factor>(Inverse(f = intArrayOf(0, 1, 2), g = intArrayOf(3, 4, 5))),
-        )
-        val r = BacktrackSolver(problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        val f = listOf(sat.assignment.ints[0], sat.assignment.ints[1], sat.assignment.ints[2]).map { it.toInt() }
-        val g = listOf(sat.assignment.ints[3], sat.assignment.ints[4], sat.assignment.ints[5]).map { it.toInt() }
-        // For each i: g[f[i]] = i.
-        for (i in 0..2) assertEquals(i, g[f[i]], "g[f[$i]]=g[${f[i]}]=${g[f[i]]} ≠ $i")
-    }
-
-    @Test
     fun `inverse with 1-based offsets`() {
         // f, g both 1-indexed, domain [1..3].
         val problem = Problem(

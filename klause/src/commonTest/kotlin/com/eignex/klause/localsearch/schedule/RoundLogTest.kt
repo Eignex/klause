@@ -55,6 +55,8 @@ class RoundLogTest {
         assertEquals(0.0, log.costMean, 1e-9)
         assertEquals(0.0, log.costVariance, 1e-9)
         assertEquals(0.0, log.bestCost, 1e-9)
+        assertEquals(0.0, log.incumbentCost, 1e-9)
+        assertEquals(0L, log.step)
     }
 
     @Test
@@ -67,22 +69,6 @@ class RoundLogTest {
         assertEquals(3.0, log.bestCost, 1e-9)
         assertEquals(7.0, log.incumbentCost, 1e-9)
         assertEquals(42L, log.step)
-    }
-
-    @Test
-    fun `incumbent cost falls back to best when no cost was observed`() {
-        val log = RoundAccumulator().snapshot(temperature = 1.0)
-        assertEquals(0.0, log.incumbentCost, 1e-9)
-        assertEquals(0L, log.step)
-    }
-
-    @Test
-    fun `best cost tracks the minimum observed`() {
-        val acc = RoundAccumulator()
-        acc.observeCost(10.0)
-        acc.observeCost(3.0)
-        acc.observeCost(7.0)
-        assertEquals(3.0, acc.snapshot(temperature = 1.0).bestCost, 1e-9)
     }
 
     @Test

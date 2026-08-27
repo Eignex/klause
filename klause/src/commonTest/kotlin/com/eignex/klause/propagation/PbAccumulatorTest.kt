@@ -86,12 +86,15 @@ class PbAccumulatorTest {
     }
 
     @Test
-    fun `materialize emits a positive-literal constraint and drops trivial ones`() {
+    fun `materialize emits a positive-literal constraint`() {
         val a = acc { loadClause(intArrayOf(Lit.make(0, true), Lit.make(1, false))) }
         val m = assertNotNull(a.materialize())
         assertEquals(1L, m.degree)
         assertEquals(2, m.literals.size)
-        // A trivially-true constraint (degree ≤ 0) materializes to null.
+    }
+
+    @Test
+    fun `materialize of a trivially-true constraint is null`() {
         val trivial = acc { rhs = 0L }
         assertNull(trivial.materialize())
     }

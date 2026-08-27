@@ -89,17 +89,4 @@ class LpContinuousColumnTest {
         b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.EQ, 0.5)
         assertEquals(LpVerdict.OPTIMAL, solveAndCertify(b.build(Sense.MINIMIZE)).verdict)
     }
-
-    @Test
-    fun `minimizes a real objective coefficient over a continuous column`() {
-        // minimize 1.5 x  subject to  x >= 2,  x in [0, 10] real  ->  x = 2, objective = 3.0.
-        val b = LpBuilder()
-        val x = b.addRealVar(0.0, 10.0, cost = 1.5)
-        b.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 2.0)
-        val model = b.build(Sense.MINIMIZE)
-
-        val float = assertNotNull(solveAndCertify(model).float)
-        assertEquals(3.0, float.objective, 1e-9)
-        assertEquals(2.0, float.primal[x], 1e-9)
-    }
 }

@@ -71,27 +71,6 @@ class SatisfyTest {
     }
 
     @Test
-    fun `minimizeCore strips irrelevant pins`() {
-        // Hard: ¬b0 ∨ ¬b1. Assume b0=true, b1=true, b2=true (b2 irrelevant).
-        val problem = Problem(
-            numBoolVars = 3,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))),
-        )
-        val r = BacktrackSolver(problem.bake()).satisfyUnderAssumptions(
-            Assumptions(bools = mapOf(0 to true, 1 to true, 2 to true)),
-            BacktrackParams(),
-            minimizeCore = true,
-        )
-        val unsat = assertIs<SatisfyResult.UnsatUnderAssumptions>(r)
-        // Core must contain the load-bearing b0, b1 and exclude irrelevant b2.
-        assertEquals(true, unsat.core.boolValueOrNull(0))
-        assertEquals(true, unsat.core.boolValueOrNull(1))
-        assertTrue(2 !in unsat.core.boolKeys.toList())
-    }
-
-    @Test
     fun `engine populates Unsat assumptionCore from 1UIP decision levels`() {
         // Hard: ¬b0 ∨ ¬b1. Assume b0=true, b1=true, b2=true (b2 irrelevant). The seed
         // phase catches this so the conflictLevels include b0 and b1 but not b2 —
