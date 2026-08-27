@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   test:
-    name: Run tests and collect coverage
+    name: Run JVM tests and collect coverage
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -48,9 +48,10 @@ jobs:
       # and tests on release.
 
       # `check` runs tests without lintDocs (detekt + dokka), which the parallel `lint` job
-      # already covers. Keeping them separate avoids running lintDocs twice per push.
-      - name: Run tests with coverage
-        run: ./gradlew check koverXmlReport
+      # already covers. Keeping them separate avoids running lintDocs twice per push. Kover only
+      # reports JVM coverage, so native tests run in their own job without its instrumentation.
+      - name: Run JVM tests with coverage
+        run: ./gradlew check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport
 
       - name: Upload test reports
         if: always()
@@ -69,6 +70,49 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: klause/build/reports/kover/report.xml
           fail_ci_if_error: false
+
+  native-test:
+    name: Run Linux native tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: false
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Cache Kotlin/Native toolchain
+        uses: actions/cache@v5
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/*.gradle.kts') }}
+          restore-keys: ${{ runner.os }}-konan-
+
+      - name: Run Linux native tests
+        run: ./gradlew :klause:linuxX64Test :klause-cli:linuxX64Test
+
+      - name: Upload native test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-test-reports
+          path: |
+            klause/build/reports/tests/
+            klause/build/test-results/
+            klause-cli/build/reports/tests/
+            klause-cli/build/test-results/
+          if-no-files-found: ignore
 
   # Repo-wide lintDocs: detekt plus dokka with fail-on-warning, for KDoc-link validation
   # parity with the other modules. dokka's full doc generation is the slowest thing in CI,
