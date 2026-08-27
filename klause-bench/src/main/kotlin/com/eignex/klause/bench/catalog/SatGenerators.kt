@@ -17,7 +17,8 @@ import kotlin.random.Random
  */
 internal object SatGenerators {
     fun php(n: Int): Problem = Dimacs.parse(phpCnf(n)).toProblem()
-    fun random3Sat(n: Int, ratio: Double = 4.26, seed: Long = 1L): Problem = Dimacs.parse(random3SatCnf(n, ratio, seed)).toProblem()
+    fun random3Sat(n: Int, ratio: Double = 4.26, seed: Long = 1L): Problem =
+        Dimacs.parse(random3SatCnf(n, ratio, seed)).toProblem()
 
     /** PHPₙ as DIMACS CNF. Var `p*n+h+1` = "pigeon p sits in hole h". */
     private fun phpCnf(n: Int): String {
