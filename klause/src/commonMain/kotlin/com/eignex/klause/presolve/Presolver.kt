@@ -7,7 +7,6 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
 
 /**

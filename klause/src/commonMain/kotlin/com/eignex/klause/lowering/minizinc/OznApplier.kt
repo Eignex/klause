@@ -1,7 +1,6 @@
 package com.eignex.klause.lowering.minizinc
 
 import com.eignex.klause.formats.minizinc.*
-
 import com.eignex.klause.lowering.flatzinc.FlatZincArray
 import com.eignex.klause.lowering.flatzinc.FlatZincProgram
 import com.eignex.klause.lowering.flatzinc.SetVarLayout

@@ -1,9 +1,8 @@
 package com.eignex.klause.lowering.smtlib
 
-import com.eignex.klause.formats.smtlib.*
-
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.Increasing
+import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb

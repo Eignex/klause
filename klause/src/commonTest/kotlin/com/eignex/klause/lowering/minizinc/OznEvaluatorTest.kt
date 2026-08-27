@@ -1,7 +1,6 @@
 package com.eignex.klause.lowering.minizinc
 
 import com.eignex.klause.formats.minizinc.*
-
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

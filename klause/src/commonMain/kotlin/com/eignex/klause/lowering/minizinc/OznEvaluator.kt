@@ -1,7 +1,6 @@
 package com.eignex.klause.lowering.minizinc
 
 import com.eignex.klause.formats.minizinc.*
-
 import kotlin.math.abs
 
 /** Evaluates `.ozn` expressions against solver bindings and renders output text. */
