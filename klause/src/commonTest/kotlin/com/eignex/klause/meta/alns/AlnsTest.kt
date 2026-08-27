@@ -28,6 +28,17 @@ import kotlin.test.assertTrue
 
 class AlnsTest {
 
+    /** The default menu's five arms at fixture-sized budgets. The production `deep` arm carries
+     *  `flipsOverride = 5_000`, which replaces `maxFlips` rather than being capped by it, so a test that
+     *  asserts nothing about repair depth still pays that arm in full whenever the bandit draws it. */
+    private val scaledRepairOperators: List<RepairOperator> = listOf(
+        InnerLsRepair(label = "standard"),
+        InnerLsRepair(label = "quick", flipsOverride = 50L),
+        InnerLsRepair(label = "deep", flipsOverride = 250L),
+        GreedyConstructionRepair(),
+        GreedyConstructionRepair(noise = 0.1),
+    )
+
     @Test
     fun `random destroy returns expected fraction`() {
         val problem = Problem(numBoolVars = 10, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray())
@@ -435,6 +446,7 @@ class AlnsTest {
         val objective = LinearObjective(boolWeights = LongArray(20) { (it + 1).toLong() })
         val alns = Alns(
             inner = LocalSearchSolver(problem.bake()),
+            repairOperators = scaledRepairOperators,
             minDestroyFraction = 0.1,
             maxDestroyFraction = 0.6,
             maxIterations = 8,
