@@ -66,6 +66,17 @@ data class LpPlan(
      */
     val boundAdaptiveWork: Boolean = true,
     /**
+     * Deterministic ceiling on what the node LP may spend per node the search explores, in [LpWork]
+     * operations ([LpEffortGovernor]). Exceeding it, having pruned nothing, demotes the LP to its floor
+     * budget; a prune spares it permanently. `0` disables the rule.
+     *
+     * A ratio rather than a wall-clock fraction because it is scale-free and reproducible: it says *the
+     * LP is taxing the search* without needing to know how long the run may take or how fast the machine
+     * is, so two identical invocations demote at the same point. The wall clock survives only as a
+     * backstop ([lpWallBudgetFraction]) for cost the work meter cannot see.
+     */
+    val boundMaxOpsPerNode: Long = 20_000L,
+    /**
      * Warm-start each node's LP solve from a recent node's basis instead of re-solving cold. Branch
      * decisions only tighten bounds, which leaves a parent basis dual-feasible, so the child
      * re-optimises in a handful of dual pivots. The constraint matrix is identical across nodes

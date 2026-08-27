@@ -138,10 +138,11 @@ private fun LpEngine.solveNode(
  * the same set of solves. Taking the numbers from a [FloatLpResult] cannot do that: a dual-unbounded or
  * non-convergent solve has no result to read, and on a model that prunes often those are most of them.
  */
-private fun SolveStatsSink.observeSolveCost(solver: LpSolver) {
-    lp.observePivots(solver.lastPivots)
-    lp.observeWork(solver.lastWorkOps)
-    lp.observeStart(solver.lastWarmStarted, solver.lastRefactorizations)
+private fun LpEngine.observeSolveCost(sink: SolveStatsSink, solver: LpSolver) {
+    sink.lp.observePivots(solver.lastPivots)
+    sink.lp.observeWork(solver.lastWorkOps)
+    sink.lp.observeStart(solver.lastWarmStarted, solver.lastRefactorizations)
+    noteSolveOps(solver.lastWorkOps)
 }
 
 /** Outcome of one node LP pass: whether to prune, the basis to warm-start children from, and an
@@ -234,7 +235,7 @@ private fun LpEngine.foldSelectedCuts(
     val cutSimplex = dualSimplex(tightened.model, cancellation)
     val r = cutSimplex.solve()
     sink.lp.observeSolve()
-    sink.observeSolveCost(cutSimplex)
+    observeSolveCost(sink, cutSimplex)
     if (r == null) return base to res
     return tightened to r
 }
@@ -291,7 +292,7 @@ internal fun LpEngine.sparseSafePrune(
             }
             val gatedResult = filter.simplex.resolveGated(filter.enforced)
             if (gatedStrictSaved != null && gatedDv != null) gatedStrictSaved.copyInto(gatedDv.rhs)
-            sink.observeSolveCost(filter.simplex)
+            observeSolveCost(sink, filter.simplex)
             if (gatedResult != null) {
                 filter.enforced.copyInto(filter.lastEnforced)
                 filter.lastFeasible = true
@@ -340,7 +341,7 @@ internal fun LpEngine.sparseSafePrune(
     // Read the cost off the solver rather than the result: a solve that terminates dual-unbounded
     // returns none, and those are the solves that prune — costing only the ones that return a result
     // would drop the most valuable work from the average.
-    sink.observeSolveCost(simplex)
+    observeSolveCost(sink, simplex)
     // Feed the budget from the solve itself. A solve that produced no result at all was infeasible or
     // bailed numerically, which says nothing about how much budget the next one deserves.
     floatResult?.let {
@@ -429,7 +430,7 @@ internal fun LpEngine.sparseSafePrune(
             val roundSimplex = dualSimplex(tightened.model, cancellation)
             val r = roundSimplex.solve()
             sink.lp.observeSolve()
-            sink.observeSolveCost(roundSimplex)
+            observeSolveCost(sink, roundSimplex)
             if (r == null) break
             boundRel = tightened
             boundRes = r
@@ -649,7 +650,7 @@ internal fun LpEngine.sparseCertifiedPrune(
     sink.lp.observeSolve()
     val recoverySimplex = dualSimplex(relaxation.model, cancellation)
     val result = recoverySimplex.solve()
-    sink.observeSolveCost(recoverySimplex)
+    observeSolveCost(sink, recoverySimplex)
     if (result == null) return LpNodeOutcome(false, null)
     if (cancellation()) return LpNodeOutcome(false, null) // honor the deadline before the exact certify
     // The integer-multiplier 128-bit bound: round the float duals and evaluate the Lagrangian exactly.

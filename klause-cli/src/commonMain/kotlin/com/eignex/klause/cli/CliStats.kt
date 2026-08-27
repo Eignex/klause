@@ -44,6 +44,7 @@ internal fun lpStatPairs(stats: SolveStats): List<Pair<String, String>> {
     out += "lpCuts" to "${stats.lp.cuts.sum.toLong()}"
     out += "lpPivots" to "${stats.lp.pivots.sum.toLong()}"
     out += "lpWorkOps" to "${stats.lp.workOps.sum.toLong()}"
+    if (stats.lp.wallBackstop) out += "lpWallBackstop" to "1"
     if (stats.lp.luMaxFill.max.isFinite()) out += "lpLuMaxFill" to round4(stats.lp.luMaxFill.max)
     if (stats.lp.luMaxDensity.max.isFinite()) out += "lpLuMaxDensity" to round4(stats.lp.luMaxDensity.max)
     if (splits > 0.0) {
