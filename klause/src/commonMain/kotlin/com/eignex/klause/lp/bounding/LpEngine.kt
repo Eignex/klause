@@ -178,7 +178,10 @@ internal class LpEngine(
         var added = 0
         for (c in cuts) if (c.global && cutPool.add(c)) added++
         if (added == 0) return
-        if (cutPool.size > cutPool.maxCuts) cutPool.retainMostActive(primal)
+        if (cutPool.size > cutPool.maxCuts) {
+            cutPool.observe(primal)
+            cutPool.retainMostActive()
+        }
     }
     private val lagBound = if (params.lpPlan.lagrangian) {
         LagrangianBound(problem, objective).takeIf { it.applicable }

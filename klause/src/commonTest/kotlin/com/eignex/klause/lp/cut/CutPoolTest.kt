@@ -27,7 +27,8 @@ class CutPoolTest {
         val added = pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 6), cut(2, 1, 7)))
         assertEquals(3, added)
         // No eviction triggered: order and contents are exactly as inserted (behaviour-neutral).
-        pool.retainMostActive(doubleArrayOf(0.0, 0.0, 0.0))
+        pool.observe(doubleArrayOf(0.0, 0.0, 0.0))
+        pool.retainMostActive()
         assertEquals(listOf(5L, 6L, 7L), pool.cuts().map { it.rhs })
     }
 
@@ -39,7 +40,8 @@ class CutPoolTest {
         //   cut 2: slack |7 − 0| = 7   (loosest — least active)
         val pool = CutPool(maxCuts = 2)
         pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 6), cut(2, 1, 7)))
-        pool.retainMostActive(doubleArrayOf(5.0, 1.0, 0.0))
+        pool.observe(doubleArrayOf(5.0, 1.0, 0.0))
+        pool.retainMostActive()
         assertEquals(2, pool.size)
         val kept = pool.cuts().map { it.rhs }.toSet()
         assertEquals(setOf(5L, 6L), kept, "the two tightest cuts survive; the loosest is evicted")
@@ -50,8 +52,47 @@ class CutPoolTest {
         // Eviction rebuilds the dedup set, so a cut dropped for inactivity can re-enter a later harvest.
         val pool = CutPool(maxCuts = 1)
         pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 6)))
-        pool.retainMostActive(doubleArrayOf(5.0, 0.0)) // keeps cut 0 (tight), evicts cut 1
+        pool.observe(doubleArrayOf(5.0, 0.0)) // keeps cut 0 (tight), evicts cut 1
+        pool.retainMostActive()
         assertEquals(setOf(5L), pool.cuts().map { it.rhs }.toSet())
         assertTrue(pool.add(cut(1, 1, 6)), "the evicted cut is no longer marked seen")
+    }
+
+    @Test
+    fun `decayed activity retains cuts active across observations`() {
+        val pool = CutPool(maxCuts = 1)
+        pool.addAll(listOf(cut(0, 1, 5), cut(1, 1, 5)))
+
+        repeat(3) { pool.observe(doubleArrayOf(5.0, 0.0)) }
+        pool.observe(doubleArrayOf(0.0, 5.0))
+        pool.retainMostActive()
+
+        assertEquals(listOf(0), pool.cuts().map { it.cols.single() })
+    }
+
+    @Test
+    fun `active observation resets consecutive inactivity`() {
+        val pool = CutPool(maxConsecutiveInactive = 2)
+        pool.add(cut(0, 1, 5))
+
+        pool.observe(doubleArrayOf(0.0))
+        pool.observe(doubleArrayOf(5.0))
+        pool.observe(doubleArrayOf(0.0))
+
+        assertEquals(1, pool.size)
+    }
+
+    @Test
+    fun `evicts a cut at the consecutive inactivity threshold`() {
+        val pool = CutPool(maxConsecutiveInactive = 2)
+        val stale = cut(0, 1, 5)
+        pool.add(stale)
+
+        pool.observe(doubleArrayOf(0.0))
+        assertEquals(1, pool.size)
+        pool.observe(doubleArrayOf(0.0))
+
+        assertEquals(0, pool.size)
+        assertTrue(pool.add(stale), "an inactive eviction clears the dedup key")
     }
 }
