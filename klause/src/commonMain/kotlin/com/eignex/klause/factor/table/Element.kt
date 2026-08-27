@@ -16,6 +16,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -141,19 +143,19 @@ class Element private constructor(
         val idxDom = domains[idx]
         if (idxDom.min == idxDom.max) {
             val pos = idxDom.min - indexOffset
-            if (pos < 0 || pos >= arr.size) return FactorReduction.Unchanged
+            if (pos < 0 || pos >= arr.size) return Unchanged
             val p = pos.toInt()
-            if (!arrIsVars) return FactorReduction.Rewrite(listOf(resultEquals(arr[p])))
+            if (!arrIsVars) return Rewrite(listOf(resultEquals(arr[p])))
             val v = arr[p].toInt() // entry is a var id when arrIsVars
-            return if (v == result) FactorReduction.Rewrite(emptyList()) else FactorReduction.Rewrite(listOf(equate(v)))
+            return if (v == result) Rewrite(emptyList()) else Rewrite(listOf(equate(v)))
         }
         if (!arrIsVars && arr.all { it == arr[0] }) {
             val lo = indexOffset
             val hi = indexOffset + arr.size - 1
-            if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi.toLong())) return FactorReduction.Unchanged
-            return FactorReduction.Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi))
+            if (maxOf(idxDom.min, lo.toLong()) > minOf(idxDom.max, hi.toLong())) return Unchanged
+            return Rewrite(listOf(resultEquals(arr[0])), mapOf(idx to lo..hi))
         }
-        return FactorReduction.Unchanged
+        return Unchanged
     }
 
     /** The equality `result = [value]`. */

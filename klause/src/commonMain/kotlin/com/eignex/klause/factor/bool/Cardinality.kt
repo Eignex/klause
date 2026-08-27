@@ -17,6 +17,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -50,7 +52,7 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
     // `min == 0 && max == literals.size` accepts every assignment of the literals, so the constraint
     // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
-        if (min == 0 && max == literals.size) FactorReduction.Rewrite(emptyList()) else FactorReduction.Unchanged
+        if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
 
     override val extendsObjectiveCone: Boolean = true
 

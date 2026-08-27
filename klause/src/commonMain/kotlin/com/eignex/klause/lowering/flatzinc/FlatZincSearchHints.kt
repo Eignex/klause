@@ -28,18 +28,25 @@ data class FlatZincSearchTier(
 enum class FlatZincSearchVarSelector {
     /** Parse `input_order` as a variable selection heuristic. */
     InputOrder,
+
     /** Parse `first_fail`, `most_constrained`, or `dom_w_deg` as a variable heuristic. */
     SmallestDomain,
+
     /** Parse `anti_first_fail` or `occurrence` as a variable heuristic. */
     LargestDomain,
+
     /** Parse `dom_w_deg` when used as fallback-only variable selection. */
     DomWdeg,
+
     /** Parse `smallest` as a variable selection heuristic. */
     SmallestLowerBound,
+
     /** Parse `largest` as a variable selection heuristic. */
     LargestUpperBound,
+
     /** Parse `max_regret` as a variable selection heuristic. */
     MaxRegret,
+
     /** Parse `random_order` as a variable selection heuristic. */
     RandomOrder,
 }
@@ -48,14 +55,19 @@ enum class FlatZincSearchVarSelector {
 enum class FlatZincSearchValueSelector {
     /** Parse `indomain_min` as a value selection heuristic. */
     IndomainMin,
+
     /** Parse `indomain_max` as a value selection heuristic. */
     IndomainMax,
+
     /** Parse `indomain_middle` as a value selection heuristic. */
     IndomainMiddle,
+
     /** Parse `indomain_median` as a value selection heuristic. */
     IndomainMedian,
+
     /** Parse `indomain_split` as a value selection heuristic. */
     IndomainSplit,
+
     /** Parse `indomain_random` as a value selection heuristic. */
     IndomainRandom,
 }

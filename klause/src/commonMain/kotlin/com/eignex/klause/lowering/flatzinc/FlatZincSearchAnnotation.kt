@@ -31,11 +31,13 @@ internal fun isSearchAnnotation(a: FznAnnotation): Boolean =
 /** Flatten one search annotation to concrete tiers. */
 internal fun FlatZincCompiler.searchBlocksOf(a: FznAnnotation): List<FznAnnotation> = when (a.name) {
     "int_search", "bool_search", "set_search" -> listOf(a)
+
     "seq_search" -> {
         val list = (a.args.firstOrNull() as? FznExpr.ArrayLit)?.elements.orEmpty()
         list.filterIsInstance<FznExpr.AnnCall>()
             .flatMap { searchBlocksOf(FznAnnotation(it.name, it.args)) }
     }
+
     else -> emptyList()
 }
 
@@ -80,6 +82,7 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, 
                 is FlatZincArray.Vars -> {
                     when (arr.elementKind) {
                         FlatZincArray.Vars.ElementKind.Bool -> for (v in arr.varIds) bools.add(v)
+
                         FlatZincArray.Vars.ElementKind.Int,
                         FlatZincArray.Vars.ElementKind.Float,
                         -> for (v in arr.varIds) ints.add(v)
@@ -98,6 +101,7 @@ private fun FlatZincCompiler.collectSearchVars(e: FznExpr, bools: IntArrayList, 
             if (idx !in arr.varIds.indices) return
             when (arr.elementKind) {
                 FlatZincArray.Vars.ElementKind.Bool -> bools.add(arr.varIds[idx])
+
                 FlatZincArray.Vars.ElementKind.Int,
                 FlatZincArray.Vars.ElementKind.Float,
                 -> ints.add(arr.varIds[idx])

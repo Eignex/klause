@@ -1,9 +1,9 @@
 package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.formats.flatzinc.*
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lowering.FloatBucketing
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.IncrementalObjective
 
 /** Compiled FlatZinc model plus metadata used by solution writing and search defaults. */

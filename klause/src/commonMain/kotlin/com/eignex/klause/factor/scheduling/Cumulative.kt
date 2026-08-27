@@ -15,6 +15,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
 
@@ -128,12 +130,12 @@ class Cumulative(
     // report infeasible.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
         if (unary || durationVars.isNotEmpty() || resourceVars.isNotEmpty() || capacityVar >= 0 || n < 2) {
-            return FactorReduction.Unchanged
+            return Unchanged
         }
         var min1 = Long.MAX_VALUE
         var min2 = Long.MAX_VALUE
         for (r in resources) {
-            if (r > capacity) return FactorReduction.Unchanged
+            if (r > capacity) return Unchanged
             if (r < min1) {
                 min2 = min1
                 min1 = r
@@ -141,8 +143,8 @@ class Cumulative(
                 min2 = r
             }
         }
-        if (min1 + min2 <= capacity) return FactorReduction.Unchanged
-        return FactorReduction.Rewrite(listOf(unary(starts, durations, presents)))
+        if (min1 + min2 <= capacity) return Unchanged
+        return Rewrite(listOf(unary(starts, durations, presents)))
     }
 
     /** Position-faithful (task i is fixed by index): keeps every array in order and folds in all

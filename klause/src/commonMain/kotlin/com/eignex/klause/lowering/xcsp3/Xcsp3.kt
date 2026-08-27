@@ -8,9 +8,12 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.xcsp3.*
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
@@ -28,9 +31,6 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
-import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.CharSource

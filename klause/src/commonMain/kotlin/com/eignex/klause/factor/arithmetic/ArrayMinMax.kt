@@ -17,6 +17,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
@@ -39,9 +41,9 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
     // propagator and relaxation carry no strength over the equality once the array is a singleton.
     @Suppress("UNUSED_PARAMETER")
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction = if (xs.size == 1) {
-        FactorReduction.Rewrite(listOf(Linear(intArrayOf(1, -1), intArrayOf(result, xs[0]), LinearOp.EQ, 0)))
+        Rewrite(listOf(Linear(intArrayOf(1, -1), intArrayOf(result, xs[0]), LinearOp.EQ, 0)))
     } else {
-        FactorReduction.Unchanged
+        Unchanged
     }
 
     /** [max] (min vs max) and the output [result] are positional; the operands [xs] are a set

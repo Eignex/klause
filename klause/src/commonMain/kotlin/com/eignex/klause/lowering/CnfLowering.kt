@@ -2,9 +2,9 @@ package com.eignex.klause.lowering
 
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.Factor
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** Shared CNF-lowering hooks for schema compilation and textual front-ends. */

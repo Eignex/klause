@@ -17,6 +17,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -45,14 +47,14 @@ class Product(
         return when {
             aDom.min == aDom.max -> fixOperand(aDom.min, b)
             bDom.min == bDom.max -> fixOperand(bDom.min, a)
-            else -> FactorReduction.Unchanged
+            else -> Unchanged
         }
     }
 
     private fun fixOperand(c: Long, other: Int): FactorReduction = if (c == 0L) {
-        FactorReduction.Rewrite(listOf(Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, 0L)))
+        Rewrite(listOf(Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, 0L)))
     } else {
-        FactorReduction.Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
+        Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
     }
 
     /** Multiplication is commutative, so the operands [a] and [b] are a set; [result] is positional. */

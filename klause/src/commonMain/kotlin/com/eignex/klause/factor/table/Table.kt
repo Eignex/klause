@@ -20,6 +20,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
@@ -218,7 +220,7 @@ class Table private constructor(
      * logic), and capped by [REDUCE_TUPLE_CAP] so a giant table isn't rescanned each presolve round.
      */
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
-        if (hi != null || numTuples > REDUCE_TUPLE_CAP) return FactorReduction.Unchanged
+        if (hi != null || numTuples > REDUCE_TUPLE_CAP) return Unchanged
         val survivors = LongArrayList()
         for (t in 0 until numTuples) {
             var alive = true
@@ -234,13 +236,13 @@ class Table private constructor(
         }
         val survivorCount = survivors.size / arity
         return when {
-            survivorCount == numTuples || survivorCount == 0 -> FactorReduction.Unchanged
+            survivorCount == numTuples || survivorCount == 0 -> Unchanged
 
-            survivorCount == 1 -> FactorReduction.Rewrite(
+            survivorCount == 1 -> Rewrite(
                 List(arity) { c -> Linear(longArrayOf(1L), intArrayOf(xs[c]), LinearOp.EQ, survivors[c]) },
             )
 
-            else -> FactorReduction.Rewrite(listOf(Table(xs, survivors.toLongArray())))
+            else -> Rewrite(listOf(Table(xs, survivors.toLongArray())))
         }
     }
 

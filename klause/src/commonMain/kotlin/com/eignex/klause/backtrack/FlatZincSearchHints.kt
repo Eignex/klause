@@ -1,16 +1,16 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.backtrack.selector.DomWdeg
+import com.eignex.klause.backtrack.selector.DomainMaxRegret
 import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMedian
+import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.IndomainRandom
 import com.eignex.klause.backtrack.selector.IndomainSplit
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.LargestDomain
 import com.eignex.klause.backtrack.selector.LargestUpperBound
-import com.eignex.klause.backtrack.selector.IndomainMiddle
 import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.SmallestLowerBound
@@ -19,8 +19,8 @@ import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchTier
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchVarSelector
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchValueSelector
+import com.eignex.klause.lowering.flatzinc.FlatZincSearchVarSelector
 
 /** Convert format-side search hints to `BacktrackParams` in the backtrack engine package. */
 /** Convert format-side search hints into backtrack-ready parameters. */
@@ -33,10 +33,7 @@ fun FlatZincSearchHints.toBacktrackParams(
     valueSelector = toValueSelector(numBoolVars, numIntVars),
 )
 
-private fun FlatZincSearchHints.toValueSelector(
-    numBoolVars: Int,
-    numIntVars: Int,
-): ValueSelector {
+private fun FlatZincSearchHints.toValueSelector(numBoolVars: Int, numIntVars: Int): ValueSelector {
     val tiers = tiers.map { it.toSearchTier() }
     val fallback = fallbackValueSelector.toValueSelector()
     val tiered = TieredValueSelector(

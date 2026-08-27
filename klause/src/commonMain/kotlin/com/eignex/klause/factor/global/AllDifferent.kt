@@ -17,6 +17,8 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.solver.Rewrite
+import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -137,9 +139,9 @@ class AllDifferent(
     //    groups is automatic, so each group is its own (smaller, cheaper) all-different and any
     //    singleton group drops. Exact, and it exposes per-component symmetry the whole constraint hid.
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction {
-        if (presents.isNotEmpty() || exceptSet.isNotEmpty()) return FactorReduction.Unchanged
+        if (presents.isNotEmpty() || exceptSet.isNotEmpty()) return Unchanged
         if (vars.size == 2) {
-            return FactorReduction.Rewrite(
+            return Rewrite(
                 listOf(Linear(intArrayOf(1, -1), intArrayOf(vars[0], vars[1]), LinearOp.NE, 0)),
             )
         }
@@ -168,7 +170,7 @@ class AllDifferent(
             }
         }
         components.add(order.subList(start, order.size).map { vars[it] })
-        if (components.size == 1) return FactorReduction.Unchanged
+        if (components.size == 1) return Unchanged
         val replacement = ArrayList<Factor>(components.size)
         for (group in components) {
             if (group.size < 2) continue
@@ -182,10 +184,10 @@ class AllDifferent(
             // component whose value range overflows Int can't be represented, so leave the whole
             // constraint intact rather than emit an unsound split (matching GAC still runs on it).
             val span = hi - lo + 1
-            if (span > Int.MAX_VALUE) return FactorReduction.Unchanged
+            if (span > Int.MAX_VALUE) return Unchanged
             replacement.add(AllDifferent(group.toIntArray(), domainMin = lo, domainSize = span.toInt()))
         }
-        return FactorReduction.Rewrite(replacement)
+        return Rewrite(replacement)
     }
 
     override val variables: VarList = MixedVars(spanInts = vars, boolVars = OptPresence.presenceVarIds(presents))
