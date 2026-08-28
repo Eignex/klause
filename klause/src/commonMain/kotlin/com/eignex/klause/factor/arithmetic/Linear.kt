@@ -334,10 +334,6 @@ class Linear private constructor(
     // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself.
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (isBinaryValueRelation()) this else null
 
-    // A continuous row connects the objective through its integer terms via the LP double view, not the
-    // integer objective cone; keep it out of the cone probe (which reasons over integer CORE rows only).
-    override val extendsObjectiveCone: Boolean get() = constants is IntegerConstants
-
     // A continuous row is LP-only: it does not propagate in CP ([NoPropagator], so the occurrence index
     // never wakes it) — its feasibility is enforced by the LP relaxation and the search leaf. The
     // local-search engine is gated off for problems with real variables, so its invariant is never

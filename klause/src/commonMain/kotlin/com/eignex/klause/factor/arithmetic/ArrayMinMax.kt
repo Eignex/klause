@@ -59,8 +59,6 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
 
     override val variables: VarList = SpanIntVars(xs + intArrayOf(result))
 
-    override val extendsObjectiveCone: Boolean = true
-
     override val hullFamily: HullFamily = HullFamily.ARRAY_MIN_MAX
 
     /**

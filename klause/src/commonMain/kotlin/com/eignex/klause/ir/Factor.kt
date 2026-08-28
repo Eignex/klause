@@ -131,16 +131,6 @@ interface Factor {
     fun isValueAnonymous(): Boolean = false
 
     /**
-     * Whether this factor extends the LP **objective cone**: it emits feasibility-defining
-     * (CORE) linear or Boolean rows that connect its variables, so the minimal linear+Boolean
-     * sub-relaxation grows through it. Big-M reified factors (whose rows are dropped in cone mode) and
-     * hard globals (which contribute no CORE rows there) return the default `false`, keeping them out
-     * of the cone. Read only when building the cone relaxation, to decide membership without matching
-     * the concrete factor type.
-     */
-    val extendsObjectiveCone: Boolean get() = false
-
-    /**
      * A copy of this factor with every *value-dependent constant* relabeled through [valueMap]
      * (`newValue = valueMap(oldValue)`) — the value analog of [remap]. Relabels things that
      * name domain values: an [com.eignex.klause.factor.global.GlobalCardinality] cover, a

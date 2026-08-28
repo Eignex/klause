@@ -90,8 +90,6 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
         }
     }
 
-    override val extendsObjectiveCone: Boolean = true
-
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights, relation, bound)
     }

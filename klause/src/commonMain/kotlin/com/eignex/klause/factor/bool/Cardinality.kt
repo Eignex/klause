@@ -52,8 +52,6 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
 
-    override val extendsObjectiveCone: Boolean = true
-
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
         builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())

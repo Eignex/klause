@@ -60,8 +60,6 @@ class Clause(literals: IntArray) :
 
     override val exactTheoryOwnable: Boolean get() = true
 
-    override val extendsObjectiveCone: Boolean = true
-
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
      *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read
      *  once per clause fire on the BCP hot path and a boxed read costs a load + null-check +

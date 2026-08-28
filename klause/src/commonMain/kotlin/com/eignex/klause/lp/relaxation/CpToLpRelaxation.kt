@@ -430,13 +430,13 @@ internal class CpToLpRelaxation(
         return intIn to boolIn
     }
 
-    /** Whether [f] extends the cone (`Factor.extendsObjectiveCone`) and shares a variable with it. */
+    /** Whether [f] extends the LP cone and shares a variable with it. */
     private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean =
-        f.extendsObjectiveCone && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
+        f.extendsLpObjectiveCone() && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
 
     /** Add every variable of a cone-extending [f] to the cone; true when anything was newly added. */
     private fun coneMark(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean {
-        if (!f.extendsObjectiveCone) return false
+        if (!f.extendsLpObjectiveCone()) return false
         var changed = false
         for (v in f.intVars) {
             if (!intIn[v]) {
