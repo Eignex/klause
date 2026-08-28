@@ -8821,9 +8821,8 @@ public final class com/eignex/klause/solver/pipeline/FiniteExecutionKt {
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteExecutionRequest {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/backtrack/BacktrackParams;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)V
 	public final fun getAllSolutions ()Z
-	public final fun getAnnotatedBacktrackParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
 	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
 	public final fun getCores ()I
 	public final fun getDeadlineExceeded ()Lkotlin/jvm/functions/Function0;
@@ -8840,6 +8839,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteExecutionRequest {
 	public final fun getOptimize ()Z
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getRandomSeed ()Ljava/lang/Long;
+	public final fun getSearchHints ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
 	public final fun getSolutionCap ()Ljava/lang/Long;
 	public final fun getSolveBudgetMillis ()Ljava/lang/Long;
 }
@@ -8914,9 +8914,8 @@ public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/result/PresolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/result/PresolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getAnnotatedBacktrackParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
+	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/result/PresolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/result/PresolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun getFiniteProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getLinearObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
@@ -8926,6 +8925,7 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
 	public final fun getOptimize ()Z
 	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getSearchHints ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
 }
 
 public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlan {
