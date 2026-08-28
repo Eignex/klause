@@ -24,6 +24,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
+import com.eignex.klause.lp.estimateLpHull
 import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
@@ -250,7 +251,7 @@ object LpAutoConfig {
         } else {
             buildList {
                 fun admit(e: HullEstimate?) = e?.let { if (hullAdmitted(config, it)) add(it) }
-                // Per-factor hull sizes come from each factor's lpSizeEstimate (single source with
+                // Per-factor hull sizes come from each factor's LP hull estimate (single source with
                 // the build); the driver-emitted circuit arcs and time-indexed model keep their own.
                 if (circuit) admit(circuitEstimate(problem))
                 if (constArrayElement) admit(hullEstimate(problem, LpTechnique.ELEMENT, HullFamily.ELEMENT))
@@ -384,7 +385,7 @@ object LpAutoConfig {
     }
 
     /** The aggregate hull size of every factor in the [family] convex-hull family, summing each factor's
-     *  own `Factor.lpSizeEstimate` — the single source shared with the build, so
+     *  own LP hull estimate — the single source shared with the build, so
      *  the gating estimate cannot drift from the rows actually emitted. */
     private fun hullEstimate(problem: Problem, technique: LpTechnique, family: HullFamily): HullEstimate? {
         var cols = 0L
@@ -392,7 +393,7 @@ object LpAutoConfig {
         var any = false
         for (f in problem.factors) {
             if (f.lpHullFamily() != family) continue
-            val e = f.lpSizeEstimate(problem.requireFiniteIntDomains()) ?: continue
+            val e = f.estimateLpHull(problem.requireFiniteIntDomains()) ?: continue
             cols += e.cols
             rows += e.rows
             any = true

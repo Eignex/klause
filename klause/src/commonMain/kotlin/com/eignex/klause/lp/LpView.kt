@@ -68,7 +68,7 @@ class HullFlags(
     }
 }
 
-/** The LP columns and rows a factor's `Factor.lpSizeEstimate` predicts its
+/** The LP columns and rows an LP hull estimate predicts its
  *  hull adds (upper bounds). */
 class LpSizeEstimate(
     /** Upper bound on the LP columns the hull contribution adds. */

@@ -765,7 +765,6 @@ abstract interface com.eignex.klause.ir/Factor { // com.eignex.klause.ir/Factor|
     open fun canSubstituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/Factor.canSubstituteAffine|canSubstituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     open fun isValueAnonymous(): kotlin/Boolean // com.eignex.klause.ir/Factor.isValueAnonymous|isValueAnonymous(){}[0]
     open fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.ir/Factor.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    open fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.ir/Factor.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     open fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.ir/Factor.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     open fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor? // com.eignex.klause.ir/Factor.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     open fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.ir/Factor.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
@@ -4293,7 +4292,6 @@ final class com.eignex.klause.factor.global/GlobalCardinality : com.eignex.klaus
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/GlobalCardinality.xs.<get-xs>|<get-xs>(){}[0]
 
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/GlobalCardinality.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/GlobalCardinality.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.global/GlobalCardinality.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor? // com.eignex.klause.factor.global/GlobalCardinality.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/GlobalCardinality.structuralKey|structuralKey(){}[0]
@@ -4368,7 +4366,6 @@ final class com.eignex.klause.factor.global/NValue : com.eignex.klause.factor/Op
         final fun <get-xs>(): kotlin/IntArray // com.eignex.klause.factor.global/NValue.xs.<get-xs>|<get-xs>(){}[0]
 
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.global/NValue.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.global/NValue.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.global/NValue.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/NValue.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.factor.global/NValue.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
@@ -4591,7 +4588,6 @@ final class com.eignex.klause.factor.table/Element : com.eignex.klause.ir/Factor
         final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Element.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Element.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Element.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/Element.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.table/Element.structuralKey|structuralKey(){}[0]
     final fun structuralReduce(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/FactorReduction // com.eignex.klause.factor.table/Element.structuralReduce|structuralReduce(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
@@ -4623,7 +4619,6 @@ final class com.eignex.klause.factor.table/Mdd : com.eignex.klause.ir/Factor { /
         final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Mdd.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Mdd.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Mdd.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/Mdd.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Mdd.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/Mdd.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
@@ -4650,7 +4645,6 @@ final class com.eignex.klause.factor.table/Regular : com.eignex.klause.ir/Factor
         final fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.factor.table/Regular.variables.<get-variables>|<get-variables>(){}[0]
 
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Regular.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Regular.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/Regular.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Regular.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor? // com.eignex.klause.factor.table/Regular.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]
@@ -4678,7 +4672,6 @@ final class com.eignex.klause.factor.table/Table : com.eignex.klause.ir/Factor {
 
     final fun canSubstituteAffine(kotlin/Int, kotlin/Int, kotlin/Int, kotlin/Int): kotlin/Boolean // com.eignex.klause.factor.table/Table.canSubstituteAffine|canSubstituteAffine(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Int){}[0]
     final fun linearize(com.eignex.klause.lp/RelaxationBuilder, kotlin/Int) // com.eignex.klause.factor.table/Table.linearize|linearize(com.eignex.klause.lp.RelaxationBuilder;kotlin.Int){}[0]
-    final fun lpSizeEstimate(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.lp/LpSizeEstimate? // com.eignex.klause.factor.table/Table.lpSizeEstimate|lpSizeEstimate(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun remap(com.eignex.klause.ir/VarRemap): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/Table.remap|remap(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapStructuralHash(com.eignex.klause.ir/VarRemap): kotlin/Int // com.eignex.klause.factor.table/Table.remapStructuralHash|remapStructuralHash(com.eignex.klause.ir.VarRemap){}[0]
     final fun remapValues(kotlin/Function1<kotlin/Long, kotlin/Long>): com.eignex.klause.ir/Factor // com.eignex.klause.factor.table/Table.remapValues|remapValues(kotlin.Function1<kotlin.Long,kotlin.Long>){}[0]

@@ -180,7 +180,7 @@ class Element private constructor(
         if (arrIsVars) resultBigM(builder, selCols, positions) else resultChannel(builder, selCols, positions)
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         if (arr.size > MAX_ELEM) return null
         val declared = domains[idx]
         var k = 0L

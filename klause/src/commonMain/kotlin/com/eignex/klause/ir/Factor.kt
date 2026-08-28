@@ -1,6 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 
 /**
@@ -193,14 +192,6 @@ interface Factor {
     fun linearize(builder: RelaxationBuilder, factorId: Int) {
         for (row in linearRows) emitExactRow(builder, row)
     }
-
-    /**
-     * An upper-bound estimate of the LP columns and rows this factor's convex-hull contribution would
-     * add under the declared [domains], or `null` when it contributes no sized hull — over its size cap,
-     * no applicable structure, or no hull at all. The LP auto-config sums these to keep the per-node
-     * tableau under budget, so the estimate must track [linearize]'s own caps and structure. Default: `null`.
-     */
-    fun lpSizeEstimate(@Suppress("UNUSED_PARAMETER") domains: Array<IntDomain>): LpSizeEstimate? = null
 }
 
 /**

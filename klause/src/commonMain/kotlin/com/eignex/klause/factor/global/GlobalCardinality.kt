@@ -190,7 +190,7 @@ class GlobalCardinality(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         if (countVars == null || presents.isNotEmpty()) return null
         var cells = 0L
         for (x in xs) cells += domains[x].values.size.toLong()

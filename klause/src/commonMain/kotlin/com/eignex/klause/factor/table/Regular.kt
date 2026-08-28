@@ -189,7 +189,7 @@ class Regular(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         val reach = forwardReach { domains[it] } ?: return null
         // arc columns + conservation (≤ arcs) + channel (len) + source + acceptance.
         return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 2L)
@@ -199,7 +199,7 @@ class Regular(
 
     /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
      *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_REGULAR_ARCS].
-     *  Shared by [linearize] (which needs the states to lay out columns) and [lpSizeEstimate] (the count). */
+     *  Shared by [linearize] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
     private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
         val len = seq.size
         val s = alphabetSize
