@@ -28,48 +28,49 @@ internal class Solvable(
     val pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
 ) {
     constructor(
-    /** Finite CP problem. */
-    problem: Problem?,
-    optimize: Boolean,
-    /** True when the user goal is maximisation (the objectives below already negate for it). */
-    maximize: Boolean,
-    /** Per-move gradient view of the objective for the LS workers (null for satisfy / when
-     *  none); rides into `LocalSearchParams.lsObjective`. */
-    lsObjective: IncrementalObjective?,
-    /** The canonical linear objective every optimising backend minimises (null for satisfy). */
-    linearObjective: LinearObjective?,
-    /** Single objective int var id, when the objective is one variable — enables the
-     *  enumerate-over-objective fallback. Null for weighted-sum objectives / satisfy. */
-    objVarId: Int?,
-    /** FlatZinc definitional-sweep DAG; null for XCSP/SMT. */
-    definitionalSweep: DefinitionalSweep?,
-    render: (Sample) -> String,
-    /** Sign-corrected objective value in original problem units, or null for satisfy. Carries the
-     *  discrete terms only, so a model weighting a continuous column also sets [continuousObjectiveValue]
-     *  — this one stays exact for the integral formats, whose coefficients can outrun a `Double`. */
-    objectiveValue: ((Sample) -> Long)?,
-    /** Sign-corrected objective value including the continuous columns' contribution, set only when the
-     *  objective weights one: their values are real, so the total has no exact integral form. Null
-     *  leaves [objectiveValue] the whole objective. */
-    continuousObjectiveValue: ((Sample) -> Double)? = null,
-    /** Model-supplied backtrack search (FlatZinc `solve :: *_search(...)`); the driver uses
-     *  it unless `-f` (free search) is set. Null when the mode carries no search annotations
-     *  (XCSP/SMT), so the driver falls back to its default CDCL configuration. */
-    annotatedBacktrackParams: BacktrackParams? = null,
-    /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
-    presolve: PresolveStats? = null,
-    /** The component set selected once while loading the source model. */
-    pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
-) : this(
-    finite = FiniteSolveShape(
-        problem, optimize, maximize, lsObjective, linearObjective, objVarId, definitionalSweep,
-        annotatedBacktrackParams, presolve,
-    ),
-    render = render,
-    objectiveValue = objectiveValue,
-    continuousObjectiveValue = continuousObjectiveValue,
-    pipeline = pipeline,
-)
+        /** Finite CP problem. */
+        problem: Problem?,
+        optimize: Boolean,
+        /** True when the user goal is maximisation (the objectives below already negate for it). */
+        maximize: Boolean,
+        /** Per-move gradient view of the objective for the LS workers (null for satisfy / when
+         *  none); rides into `LocalSearchParams.lsObjective`. */
+        lsObjective: IncrementalObjective?,
+        /** The canonical linear objective every optimising backend minimises (null for satisfy). */
+        linearObjective: LinearObjective?,
+        /** Single objective int var id, when the objective is one variable — enables the
+         *  enumerate-over-objective fallback. Null for weighted-sum objectives / satisfy. */
+        objVarId: Int?,
+        /** FlatZinc definitional-sweep DAG; null for XCSP/SMT. */
+        definitionalSweep: DefinitionalSweep?,
+        render: (Sample) -> String,
+        /** Sign-corrected objective value in original problem units, or null for satisfy. Carries the
+         *  discrete terms only, so a model weighting a continuous column also sets [continuousObjectiveValue]
+         *  — this one stays exact for the integral formats, whose coefficients can outrun a `Double`. */
+        objectiveValue: ((Sample) -> Long)?,
+        /** Sign-corrected objective value including the continuous columns' contribution, set only when the
+         *  objective weights one: their values are real, so the total has no exact integral form. Null
+         *  leaves [objectiveValue] the whole objective. */
+        continuousObjectiveValue: ((Sample) -> Double)? = null,
+        /** Model-supplied backtrack search (FlatZinc `solve :: *_search(...)`); the driver uses
+         *  it unless `-f` (free search) is set. Null when the mode carries no search annotations
+         *  (XCSP/SMT), so the driver falls back to its default CDCL configuration. */
+        annotatedBacktrackParams: BacktrackParams? = null,
+        /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
+        presolve: PresolveStats? = null,
+        /** The component set selected once while loading the source model. */
+        pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
+    ) : this(
+        finite = FiniteSolveShape(
+            problem, optimize, maximize, lsObjective, linearObjective, objVarId, definitionalSweep,
+            annotatedBacktrackParams, presolve,
+        ),
+        render = render,
+        objectiveValue = objectiveValue,
+        continuousObjectiveValue = continuousObjectiveValue,
+        pipeline = pipeline,
+    )
+
     /** Finite CP problem. */
     val problem: Problem? get() = finite?.problem
     val optimize: Boolean get() = finite?.optimize ?: false
