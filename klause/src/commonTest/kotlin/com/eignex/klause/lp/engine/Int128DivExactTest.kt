@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.engine.Int128
+import com.eignex.klause.util.Int128
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

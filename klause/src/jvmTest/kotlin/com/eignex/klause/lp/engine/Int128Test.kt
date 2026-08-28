@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.engine.Int128
+import com.eignex.klause.util.Int128
 import java.math.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test

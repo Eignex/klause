@@ -3,9 +3,9 @@ package com.eignex.klause.factor.arithmetic.internals
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lp.engine.Int128
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.util.EmptyLongArray
+import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.IntIntMap

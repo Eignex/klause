@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.Int128
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.Int128
 
 /** A bound the objective cutoff proves on an integer variable: `varId ≤ hi`. */
 internal class CutoffBound(val varId: Int, val hi: Long)
