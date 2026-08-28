@@ -14,6 +14,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.values
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
@@ -32,7 +33,6 @@ import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
