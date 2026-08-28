@@ -2140,16 +2140,23 @@ sealed interface com.eignex.klause.propagation/PropagationResult { // com.eignex
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment|null[0]
+    abstract fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.boolValue|boolValue(kotlin.Int){}[0]
+    abstract fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.intValue|intValue(kotlin.Int){}[0]
+    abstract fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.realValue|realValue(kotlin.Int){}[0]
+
     final class Difference : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference|null[0]
         constructor <init>(com.eignex.klause.solver/Sample) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.<init>|<init>(com.eignex.klause.solver.Sample){}[0]
 
         final val sample // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.sample.<get-sample>|<get-sample>(){}[0]
 
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.boolValue|boolValue(kotlin.Int){}[0]
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.component1|component1(){}[0]
         final fun copy(com.eignex.klause.solver/Sample = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.copy|copy(com.eignex.klause.solver.Sample){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.hashCode|hashCode(){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.realValue|realValue(kotlin.Int){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.Difference.toString|toString(){}[0]
     }
 
@@ -2159,10 +2166,13 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.assignment.<get-assignment>|<get-assignment>(){}[0]
 
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.boolValue|boolValue(kotlin.Int){}[0]
         final fun component1(): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.component1|component1(){}[0]
         final fun copy(com.eignex.klause.theory.qflra/ExactLiraAssignment = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.copy|copy(com.eignex.klause.theory.qflra.ExactLiraAssignment){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.hashCode|hashCode(){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.realValue|realValue(kotlin.Int){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLira.toString|toString(){}[0]
     }
 
@@ -2172,10 +2182,13 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.theory.qflra/ExactLraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.assignment.<get-assignment>|<get-assignment>(){}[0]
 
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.boolValue|boolValue(kotlin.Int){}[0]
         final fun component1(): com.eignex.klause.theory.qflra/ExactLraAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.component1|component1(){}[0]
         final fun copy(com.eignex.klause.theory.qflra/ExactLraAssignment = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.copy|copy(com.eignex.klause.theory.qflra.ExactLraAssignment){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.hashCode|hashCode(){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.realValue|realValue(kotlin.Int){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.toString|toString(){}[0]
     }
 
@@ -2185,10 +2198,13 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.theory.lia/GeneralLiaAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.assignment.<get-assignment>|<get-assignment>(){}[0]
 
+        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.boolValue|boolValue(kotlin.Int){}[0]
         final fun component1(): com.eignex.klause.theory.lia/GeneralLiaAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.component1|component1(){}[0]
         final fun copy(com.eignex.klause.theory.lia/GeneralLiaAssignment = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.copy|copy(com.eignex.klause.theory.lia.GeneralLiaAssignment){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.hashCode|hashCode(){}[0]
+        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.intValue|intValue(kotlin.Int){}[0]
+        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.realValue|realValue(kotlin.Int){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.toString|toString(){}[0]
     }
 }

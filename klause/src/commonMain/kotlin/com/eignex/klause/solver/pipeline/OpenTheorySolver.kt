@@ -26,29 +26,54 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /** A complete witness emitted by an open-model theory route. */
 sealed interface OpenTheoryAssignment {
+    /** Boolean value at source variable [id]. */
+    fun boolValue(id: Int): Boolean
+
+    /** Exact integer value at source variable [id], in decimal form. */
+    fun intValue(id: Int): String
+
+    /** Exact real value at source variable [id], in rational or decimal form. */
+    fun realValue(id: Int): String
+
     /** A Long-backed integer witness from the difference theory. */
     data class Difference(
         /** Difference-theory witness. */
         val sample: Sample,
-    ) : OpenTheoryAssignment
+    ) : OpenTheoryAssignment {
+        override fun boolValue(id: Int): Boolean = sample.bools[id]
+        override fun intValue(id: Int): String = sample.ints[id].toString()
+        override fun realValue(id: Int): String = sample.reals.getOrElse(id) { 0.0 }.toString()
+    }
 
     /** An arbitrary-precision integer witness from General LIA. */
     data class GeneralLia(
         /** General LIA witness. */
         val assignment: GeneralLiaAssignment,
-    ) : OpenTheoryAssignment
+    ) : OpenTheoryAssignment {
+        override fun boolValue(id: Int): Boolean = assignment.bools[id]
+        override fun intValue(id: Int): String = assignment.ints[id].toString()
+        override fun realValue(id: Int): String = error("General LIA has no real variables: $id")
+    }
 
     /** A rational real witness from exact QF_LRA. */
     data class ExactLra(
         /** Exact QF_LRA witness. */
         val assignment: ExactLraAssignment,
-    ) : OpenTheoryAssignment
+    ) : OpenTheoryAssignment {
+        override fun boolValue(id: Int): Boolean = assignment.bools[id]
+        override fun intValue(id: Int): String = error("exact LRA has no integer variables: $id")
+        override fun realValue(id: Int): String = assignment.reals[id].toString()
+    }
 
     /** A mixed arbitrary-precision integer and rational witness from exact QF_LIRA. */
     data class ExactLira(
         /** Exact QF_LIRA witness. */
         val assignment: ExactLiraAssignment,
-    ) : OpenTheoryAssignment
+    ) : OpenTheoryAssignment {
+        override fun boolValue(id: Int): Boolean = assignment.bools[id]
+        override fun intValue(id: Int): String = assignment.ints[id].toString()
+        override fun realValue(id: Int): String = assignment.reals[id].toString()
+    }
 }
 
 /** The common verdict surface of the complete open-model theory routes. */

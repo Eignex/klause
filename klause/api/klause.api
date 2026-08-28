@@ -8771,49 +8771,64 @@ public final class com/eignex/klause/solver/pipeline/LsResolution {
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
+	public abstract fun boolValue (I)Z
+	public abstract fun intValue (I)Ljava/lang/String;
+	public abstract fun realValue (I)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public fun <init> (Lcom/eignex/klause/solver/Sample;)V
+	public fun boolValue (I)Z
 	public final fun component1 ()Lcom/eignex/klause/solver/Sample;
 	public final fun copy (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference;Lcom/eignex/klause/solver/Sample;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$Difference;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
 	public fun hashCode ()I
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLira : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public fun <init> (Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;)V
+	public fun boolValue (I)Z
 	public final fun component1 ()Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;
 	public final fun copy (Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLira;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLira;Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLira;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/theory/qflra/ExactLiraAssignment;
 	public fun hashCode ()I
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public fun <init> (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;)V
+	public fun boolValue (I)Z
 	public final fun component1 ()Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
 	public final fun copy (Lcom/eignex/klause/theory/qflra/ExactLraAssignment;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra;Lcom/eignex/klause/theory/qflra/ExactLraAssignment;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$ExactLra;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/theory/qflra/ExactLraAssignment;
 	public fun hashCode ()I
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia : com/eignex/klause/solver/pipeline/OpenTheoryAssignment {
 	public fun <init> (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;)V
+	public fun boolValue (I)Z
 	public final fun component1 ()Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
 	public final fun copy (Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia;
 	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia;Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment$GeneralLia;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/theory/lia/GeneralLiaAssignment;
 	public fun hashCode ()I
+	public fun intValue (I)Ljava/lang/String;
+	public fun realValue (I)Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
