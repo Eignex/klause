@@ -7,16 +7,12 @@ import com.eignex.klause.ir.BoolVars
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
 
 /**
  * `auxBoolVar ↔ ([min] ≤ #true [literals] ≤ [max])`. Created by the compiler when a
@@ -60,15 +56,4 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
         compressViolation(countDistance(state.longPayload[factorId]), softCap)
 
     private fun countDistance(n: Long): Long = (if (n < min) min - n else 0L) + (if (n > max) n - max else 0L)
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        val sum = BoolReifiedSum.fold(builder, literals, weights = null)
-        val a = builder.boolColumn(auxBoolVar)
-        val lo = subExact(min.toLong(), sum.constant)
-        val hi = subExact(max.toLong(), sum.constant)
-        val mHi = maxOf(0L, subExact(sum.lMax, hi)) // aux=1 ⇒ count ≤ max
-        sum.reifiedRow(builder, a, mHi, LinearOp.LE, addExact(hi, mHi))
-        val mLo = maxOf(0L, subExact(lo, sum.lMin)) // aux=1 ⇒ count ≥ min
-        sum.reifiedRow(builder, a, -mLo, LinearOp.GE, subExact(lo, mLo))
-    }
 }

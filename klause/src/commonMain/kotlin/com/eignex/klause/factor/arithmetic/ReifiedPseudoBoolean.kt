@@ -9,17 +9,13 @@ import com.eignex.klause.ir.BoolVars
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
@@ -71,38 +67,4 @@ class ReifiedPseudoBoolean(
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         pbDegree(state.longPayload[factorId], op, bound, softCap)
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        val sum = BoolReifiedSum.fold(builder, literals, weights)
-        val a = builder.boolColumn(auxBoolVar)
-        val b = subExact(bound, sum.constant)
-        when (op) {
-            PbOp.LE -> {
-                val m1 = maxOf(0L, subExact(sum.lMax, b)) // aux=1 ⇒ L ≤ bound
-                sum.reifiedRow(builder, a, m1, LinearOp.LE, addExact(b, m1))
-                if (b != Long.MAX_VALUE) {
-                    val falseBound = addExact(b, 1L)
-                    val m2 = maxOf(0L, subExact(falseBound, sum.lMin)) // aux=0 ⇒ L ≥ bound+1
-                    sum.reifiedRow(builder, a, m2, LinearOp.GE, falseBound)
-                }
-            }
-
-            PbOp.GE -> {
-                val m1 = maxOf(0L, subExact(b, sum.lMin)) // aux=1 ⇒ L ≥ bound
-                sum.reifiedRow(builder, a, -m1, LinearOp.GE, subExact(b, m1))
-                if (b != Long.MIN_VALUE) {
-                    val falseBound = subExact(b, 1L)
-                    val m2 = maxOf(0L, subExact(sum.lMax, falseBound)) // aux=0 ⇒ L ≤ bound-1
-                    sum.reifiedRow(builder, a, -m2, LinearOp.LE, falseBound)
-                }
-            }
-
-            PbOp.EQ -> {
-                val mHi = maxOf(0L, subExact(sum.lMax, b)) // aux=1 ⇒ L ≤ bound
-                sum.reifiedRow(builder, a, mHi, LinearOp.LE, addExact(b, mHi))
-                val mLo = maxOf(0L, subExact(b, sum.lMin)) // aux=1 ⇒ L ≥ bound
-                sum.reifiedRow(builder, a, -mLo, LinearOp.GE, subExact(b, mLo))
-            }
-        }
-    }
 }
