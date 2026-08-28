@@ -3,14 +3,12 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
 
 /**
@@ -20,7 +18,7 @@ import com.eignex.klause.propagation.NoPropagator
  * CP or local-search semantics ([NoPropagator] / [NoInvariant]); its feasibility is enforced entirely by
  * the LP relaxation and the search leaf, like a real-bearing [Linear] row.
  *
- * [emitLpRelaxation] adapts to how tightly [intOperand] is pinned in the build's domains:
+ * Its LP projection adapts to how tightly [intOperand] is pinned in the build's domains:
  *  - **Fixed** (`lo == hi == k`, always true at a search leaf, where every integer variable is a
  *    single-point domain) the product is the exact linear equality `result − k·realOperand = 0`. So the
  *    leaf relaxation models the product **exactly**, and the leaf feasibility verdict over it is sound.
@@ -64,35 +62,5 @@ class RealProduct(
         sink.realVar(result)
         sink.long(realOperandLo.toRawBits())
         sink.long(realOperandHi.toRawBits())
-    }
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        val resCol = builder.realColumn(result)
-        val opCol = builder.realColumn(realOperand)
-        if (resCol < 0 || opCol < 0) return // builder has no real-column backing (e.g. a presolve fake)
-        val dom = builder.liveDomain(intOperand)
-        val lo = dom.min
-        val hi = dom.max
-        if (lo == hi) {
-            // result = lo·realOperand exactly (the operand is a constant in this build).
-            builder.realRow(intArrayOf(resCol, opCol), doubleArrayOf(1.0, -lo.toDouble()), LinearOp.EQ, 0.0)
-            return
-        }
-        if (!realOperandLo.isFinite() || !realOperandHi.isFinite()) return
-
-        // McCormick envelope of `w = x·y` with `x = intOperand ∈ [lo, hi]`, `y = realOperand ∈ [yL, yH]`,
-        // `w = result`. Each row is `w + cy·y + cx·x ⟨op⟩ rhs` over columns `(result, realOperand, intOperand)`.
-        val nCol = builder.intColumn(intOperand)
-        val cols = intArrayOf(resCol, opCol, nCol)
-        val xL = lo.toDouble()
-        val xH = hi.toDouble()
-        val yL = realOperandLo
-        val yH = realOperandHi
-        // w ≥ xL·y + yL·x − xL·yL  and  w ≥ xH·y + yH·x − xH·yH
-        builder.realRow(cols, doubleArrayOf(1.0, -xL, -yL), LinearOp.GE, -xL * yL)
-        builder.realRow(cols, doubleArrayOf(1.0, -xH, -yH), LinearOp.GE, -xH * yH)
-        // w ≤ xH·y + yL·x − xH·yL  and  w ≤ xL·y + yH·x − xL·yH
-        builder.realRow(cols, doubleArrayOf(1.0, -xH, -yL), LinearOp.LE, -xH * yL)
-        builder.realRow(cols, doubleArrayOf(1.0, -xL, -yH), LinearOp.LE, -xL * yH)
     }
 }
