@@ -1,45 +1,31 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
 import com.eignex.klause.lp.bounding.LpConfig
-import com.eignex.klause.portfolio.AttributedImprovement
-import com.eignex.klause.portfolio.BacktrackCatalog
-import com.eignex.klause.portfolio.Kind
-import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.Solver
-import com.eignex.klause.solver.SolverParams
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.FiniteExecutionCallbacks
+import com.eignex.klause.solver.pipeline.FiniteExecutionRequest
+import com.eignex.klause.solver.pipeline.FiniteExecutionResult
+import com.eignex.klause.solver.pipeline.FiniteExecutionVerdict
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
-import com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.PortfolioPlan
-import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.autoArms
-import com.eignex.klause.solver.pipeline.backtrackSolver
-import com.eignex.klause.solver.pipeline.planFixedBacktrack
-import com.eignex.klause.solver.pipeline.planPortfolio
-import com.eignex.klause.solver.pipeline.portfolioExecutor
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.variablePartition
-import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
@@ -53,9 +39,8 @@ import kotlin.time.TimeSource
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
  * [Solvable] + [CommonOptions] in, and all terminal reporting goes out through the mode's
- * [OutputProtocol] — so engine selection, the `-p N` worker split, deadline/cancellation,
- * `--param` application, CP-seeding, the satisfy/`-a`/`-n` enumeration and optimize streaming
- * loops live here exactly once instead of being duplicated per front-end.
+ * [OutputProtocol]. It translates frontend flags, deadlines, and source annotations into pipeline
+ * requests, then renders their streamed models and terminal results.
  */
 internal object SolveCore {
 
@@ -302,57 +287,33 @@ internal object SolveCore {
         val lpConfig = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: solvable.annotatedBacktrackParams?.lpConfig ?: LpConfig.OFF
-        val plan = FinitePipeline.planFixedBacktrack(
-            FixedBacktrackPlanRequest(
-                annotatedParams = solvable.annotatedBacktrackParams,
+        executeFinite(
+            FiniteExecutionRequest(
+                problem = solvable.finiteProblem,
+                engine = FiniteEngine.FIXED,
+                optimize = solvable.optimize,
+                objective = solvable.linearObjective,
+                localSearchObjective = solvable.lsObjective,
+                definitionalSweep = solvable.definitionalSweep,
+                annotatedBacktrackParams = solvable.annotatedBacktrackParams,
+                cores = 1,
                 engineParams = common.engineParams,
                 randomSeed = common.randomSeed,
+                defaultArms = 1,
+                lpConfig = lpConfig,
                 cancellation = cancel,
                 nodeBudget = nodeBudget,
                 solveBudgetMillis = common.timeLimitMs,
-                lpConfig = lpConfig,
+                allSolutions = common.allSolutions,
+                solutionCap = common.solutionCap,
+                deadlineExceeded = { deadline != null && nowMillis() > deadline },
                 onEvent = verboseListener(common.verbose),
+                onPortfolioEvent = null,
             ),
+            solvable,
+            common,
+            output,
         )
-        val params = plan.params
-        cliLogger(common.verbose).v {
-            "engine cp: seed=${params.randomSeed} luby=${params.lubyRestartBase} maxLearned=${params.maxLearnedClauses}"
-        }
-        val solver = FinitePipeline.backtrackSolver(solvable.finiteProblem)
-        if (plan.dryRun) {
-            errPrintln("solver dry-run:")
-            errPrintln(solver.describe(params))
-            return
-        }
-        runGeneric(solver, params, solvable, common, output, complete = true, deadline)
-    }
-
-    /** Print the resolved LS arm pool (`dry-run`), one line per arm, to stderr so the solution
-     *  protocol on stdout stays clean. A null pool prints the curated catalog. */
-    private fun printLsPool(pool: List<() -> LocalSearchRecipe>?) {
-        val recipes = pool?.map { it() } ?: LocalSearchCatalog.ranked(Kind.COP)
-        errPrintln("ls dry-run: ${recipes.size} arm(s)")
-        for (r in recipes) {
-            val sources = r.strategy.sources.joinToString(",") { it.source.id.label }
-            val restart = r.strategy.schedule.restart?.let { it::class.simpleName } ?: "default"
-            val temperature = r.strategy.schedule.temperature?.let { it::class.simpleName } ?: "none"
-            errPrintln(
-                "  ${r.label}: sources=[$sources] scoring=${r.strategy.scoring} " +
-                    "acceptance=${r.strategy.acceptance} restart=$restart temperature=$temperature",
-            )
-        }
-    }
-
-    /** Print the resolved backtrack arm pool (`dry-run-solver`) to stderr, one `describe` block per
-     *  arm. A null pool prints the credit-ordered curated catalog for [kind]. */
-    private fun printBtPool(problem: Problem, pool: List<() -> BacktrackRecipe>?, kind: Kind) {
-        val recipes = pool?.map { it() } ?: BacktrackCatalog.ranked(kind)
-        errPrintln("solver dry-run: ${recipes.size} backtrack arm(s)")
-        val solver = FinitePipeline.backtrackSolver(problem)
-        for (r in recipes) {
-            errPrintln("  ${r.label}:")
-            for (line in solver.describe(r.build(0L, null)).lines()) errPrintln("    $line")
-        }
     }
 
     /** Print what presolve did (`dry-run-presolve`) to stderr: the presolve-phase wall time,
@@ -536,307 +497,87 @@ internal object SolveCore {
         val lpCeiling = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: LpConfig.AGGRESSIVE
-        val plan = FinitePipeline.planPortfolio(
-            PortfolioPlanRequest(
+        executeFinite(
+            FiniteExecutionRequest(
+                problem = solvable.finiteProblem,
                 engine = engine,
                 optimize = solvable.optimize,
+                objective = solvable.linearObjective,
+                localSearchObjective = solvable.lsObjective,
+                definitionalSweep = solvable.definitionalSweep,
+                annotatedBacktrackParams = solvable.annotatedBacktrackParams,
                 cores = cores,
                 engineParams = common.engineParams,
                 randomSeed = common.randomSeed,
                 defaultArms = defaultArms,
-                lpCeiling = lpCeiling,
+                lpConfig = lpCeiling,
+                cancellation = cancel,
                 nodeBudget = nodeBudget,
-                annotationArm = solvable.annotatedBacktrackParams,
+                solveBudgetMillis = null,
+                allSolutions = common.allSolutions,
+                solutionCap = common.solutionCap,
+                deadlineExceeded = { false },
+                onEvent = null,
+                onPortfolioEvent = portfolioVerboseListener(common.verbose),
+            ),
+            solvable,
+            common,
+            output,
+        )
+    }
+
+    private fun executeFinite(
+        request: FiniteExecutionRequest,
+        solvable: Solvable,
+        common: CommonOptions,
+        output: OutputProtocol,
+    ) {
+        val result = FinitePipeline.execute(
+            request,
+            FiniteExecutionCallbacks(
+                onSample = { sample -> emit(output, solvable, sample) },
+                onImprovement = { improvement ->
+                    emit(output, solvable, improvement.sample)
+                    if (common.statistics) {
+                        val objective = solvable.objectiveValue?.invoke(improvement.sample)
+                            ?: improvement.objective.toLong()
+                        output.onImprovement(improvement.workerLabel, objective, improvement.elapsedMs)
+                    }
+                },
             ),
         )
-        val scenario = when (plan) {
-            is PortfolioPlan.LocalSearchDryRun -> {
-                printLsPool(plan.pool)
-                return
+        when (result) {
+            is FiniteExecutionResult.DryRun -> {
+                errPrintln(result.heading)
+                result.lines.forEach(::errPrintln)
             }
 
-            is PortfolioPlan.BacktrackDryRun -> {
-                printBtPool(solvable.finiteProblem, plan.pool, plan.kind)
-                return
-            }
-
-            is PortfolioPlan.Execute -> plan.scenario
-        }
-        // Only a backtrack worker can prove UNSAT / optimality; a pure-LS pool reports UNKNOWN.
-        val complete = !engine.pureLocalSearch
-        val executor = FinitePipeline.portfolioExecutor(
-            solvable.finiteProblem,
-            scenario,
-            objective = solvable.linearObjective,
-            lsObjective = solvable.lsObjective,
-            definitionalSweep = solvable.definitionalSweep,
-            onEvent = portfolioVerboseListener(common.verbose),
-        )
-        val t0 = nowMillis()
-        // cores == 1 → the single-core bandit-scheduled SequentialPortfolio (it persists/shares learned
-        // clauses across its segments and bandit-schedules the whole arm pool on one core); cores > 1 →
-        // the concurrent Portfolio. Both are blocking (coroutine-free) and yield the same result types.
-        executor.use {
-            if (solvable.optimize) {
-                // Stream every improving incumbent live (the MiniZinc `-i` contract): emit its solution
-                // block the moment it is found, so a competition judge timestamps time-to-best from the
-                // stream instead of seeing the best only at the terminating flush. Under `-s` also
-                // attribute the improvement to its arm (`%%%klause-arm:`). The executor serialises this
-                // callback, so the interleaved output stays ordered.
-                var streamed = 0
-                val onImprovement: (AttributedImprovement) -> Unit = { imp ->
-                    val r = imp.result as MinimizeResult.WithSample
-                    emit(output, solvable, r.sample)
-                    streamed++
-                    if (common.statistics) {
-                        val obj = solvable.objectiveValue?.invoke(r.sample) ?: r.objectiveValue.toLong()
-                        output.onImprovement(imp.workerLabel, obj, imp.elapsed.inWholeMilliseconds)
-                    }
-                }
-                val result = it.minimize(cancel, onImprovement)
-                emitMinimize(result, solvable, common, output, complete, t0, streamedCount = streamed)
-            } else {
-                emitSolve(it.solve(cancel), solvable, common, output, t0, complete)
+            is FiniteExecutionResult.Completed -> {
+                output.onVerdictContext(
+                    VerdictContext(
+                        budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
+                        completePool = !request.engine.pureLocalSearch,
+                    ),
+                )
+                output.onComplete(result.verdict.toCliVerdict())
+                stats(
+                    common,
+                    output,
+                    solvable,
+                    withModelObjective(result.stats, solvable, result.bestSample),
+                    result.elapsedMs,
+                    result.solutions,
+                )
             }
         }
     }
 
-    /** Emit a satisfaction verdict + the sole model (if any) + stats. */
-    private fun emitSolve(
-        r: SolveResult,
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        t0: Long,
-        complete: Boolean = true,
-    ) {
-        output.onVerdictContext(
-            VerdictContext(budgetExhausted = budgetSpent(common, r.stats.run.timedOut), completePool = complete),
-        )
-        var produced = 0L
-        when (r) {
-            is SolveResult.Sat -> {
-                emit(output, solvable, r.assignment)
-                produced = 1L
-                output.onComplete(Verdict.SATISFIABLE)
-            }
-
-            is SolveResult.Unsat -> output.onComplete(Verdict.UNSATISFIABLE)
-
-            is SolveResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-        }
-        stats(common, output, solvable, r.stats, nowMillis() - t0, produced)
-    }
-
-    /** Emit an optimization verdict + the best model (if any) + stats. [complete] gates whether an
-     *  Infeasible result reports UNSATISFIABLE (a complete pool proved it) or UNKNOWN (LS only). */
-    private fun emitMinimize(
-        r: MinimizeResult,
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        complete: Boolean,
-        t0: Long,
-        streamedCount: Int,
-    ) {
-        output.onVerdictContext(
-            VerdictContext(budgetExhausted = budgetSpent(common, r.stats.run.timedOut), completePool = complete),
-        )
-        val alreadyStreamed = streamedCount > 0
-        var produced = 0L
-        var best: Sample? = null
-        // Improving incumbents were streamed live (see the optimize branch above), so the best is
-        // already on the stream; re-emit it only if nothing streamed (a defensive guard — the first
-        // feasible solution is itself an improvement, so this should not happen when a sample exists).
-        // [produced] carries the true streamed count into the `solutions=` statistic.
-        when (r) {
-            is MinimizeResult.Optimal -> {
-                if (!alreadyStreamed) emit(output, solvable, r.sample)
-                best = r.sample
-                produced = maxOf(streamedCount.toLong(), 1L)
-                output.onComplete(Verdict.OPTIMAL)
-            }
-
-            is MinimizeResult.BestFound -> {
-                if (!alreadyStreamed) emit(output, solvable, r.sample)
-                best = r.sample
-                produced = maxOf(streamedCount.toLong(), 1L)
-                output.onComplete(Verdict.BEST_FOUND)
-            }
-
-            is MinimizeResult.Infeasible ->
-                output.onComplete(if (complete) Verdict.UNSATISFIABLE else Verdict.UNKNOWN)
-
-            is MinimizeResult.Unknown -> output.onComplete(Verdict.UNKNOWN)
-        }
-        stats(common, output, solvable, withModelObjective(r.stats, solvable, best), nowMillis() - t0, produced)
-    }
-
-    private fun <P : SolverParams> runGeneric(
-        solver: Solver<P>,
-        params: P,
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        complete: Boolean,
-        deadline: Long?,
-    ) {
-        if (solvable.optimize) {
-            runOptimize(solver, params, solvable, common, output, complete, deadline)
-        } else {
-            runSatisfy(solver, params, solvable, common, output, complete, deadline)
-        }
-    }
-
-    private fun <P : SolverParams> runSatisfy(
-        solver: Solver<P>,
-        params: P,
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        complete: Boolean,
-        deadline: Long?,
-    ) {
-        val t0 = nowMillis()
-        val limit = if (common.allSolutions) common.solutionCap ?: Long.MAX_VALUE else 1L
-
-        // Single-solution satisfy (the standard invocation) goes through `solve`, whose result
-        // carries the engine's SolveStats for `-s`; enumeration is only needed under `-a`/`-n`.
-        if (limit == 1L) {
-            when (val r = solver.solve(params)) {
-                is SolveResult.Sat -> {
-                    emit(output, solvable, r.assignment)
-                    output.onComplete(Verdict.SATISFIABLE)
-                    stats(common, output, solvable, r.stats, nowMillis() - t0, 1L)
-                }
-
-                is SolveResult.Unsat -> {
-                    output.onComplete(if (complete) Verdict.UNSATISFIABLE else Verdict.UNKNOWN)
-                    stats(common, output, solvable, r.stats, nowMillis() - t0, 0L)
-                }
-
-                is SolveResult.Unknown -> {
-                    output.onComplete(Verdict.UNKNOWN)
-                    stats(common, output, solvable, r.stats, nowMillis() - t0, 0L)
-                }
-            }
-            return
-        }
-
-        var produced = 0L
-        var timedOut = false
-        for (sample in solver.enumerate(params)) {
-            if (deadline != null && nowMillis() > deadline) {
-                timedOut = true
-                break
-            }
-            emit(output, solvable, sample)
-            produced++
-            if (produced >= limit) break
-        }
-
-        val verdict = when {
-            timedOut && produced == 0L -> Verdict.UNKNOWN
-            produced == 0L -> if (complete) Verdict.UNSATISFIABLE else Verdict.UNKNOWN
-            else -> Verdict.SATISFIABLE
-        }
-        output.onComplete(verdict)
-        stats(common, output, solvable, SolveStats.EMPTY, nowMillis() - t0, produced)
-    }
-
-    private fun <P : SolverParams> runOptimize(
-        solver: Solver<P>,
-        params: P,
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        complete: Boolean,
-        deadline: Long?,
-    ) {
-        val optimizer = solver as? Optimizer<P>
-        if (optimizer == null) {
-            runOptimizeViaEnumerate(solver, params, solvable, common, output, complete, deadline)
-            return
-        }
-        // Every backend minimises the canonical linear objective; the LS engine additionally
-        // descends the model's per-move gradient view, threaded through its params by the caller.
-        val objective: LinearObjective = requireNotNull(solvable.linearObjective)
-        var produced = 0
-        val t0 = nowMillis()
-        var lastStats = SolveStats.EMPTY
-        var bestSample: Sample? = null
-        for (step in optimizer.improvements(objective, params)) {
-            lastStats = step.stats
-            when (step) {
-                is MinimizeResult.WithSample -> {
-                    emit(output, solvable, step.sample)
-                    bestSample = step.sample
-                    produced++
-                    if (step is MinimizeResult.Optimal) {
-                        output.onComplete(Verdict.OPTIMAL)
-                        val oriented = withModelObjective(step.stats, solvable, step.sample)
-                        stats(common, output, solvable, oriented, nowMillis() - t0, produced.toLong())
-                        return
-                    }
-                }
-
-                is MinimizeResult.Infeasible -> {
-                    output.onComplete(Verdict.UNSATISFIABLE)
-                    stats(common, output, solvable, step.stats, nowMillis() - t0, produced.toLong())
-                    return
-                }
-
-                is MinimizeResult.Unknown -> {
-                    output.onComplete(Verdict.UNKNOWN)
-                    stats(common, output, solvable, step.stats, nowMillis() - t0, produced.toLong())
-                    return
-                }
-            }
-        }
-        // Sequence ended without an Optimal verdict: optimality was NOT proven. Best-found
-        // incumbents were already streamed; report BEST_FOUND (or UNKNOWN if nothing feasible).
-        output.onComplete(if (produced == 0) Verdict.UNKNOWN else Verdict.BEST_FOUND)
-        val oriented = withModelObjective(lastStats, solvable, bestSample)
-        stats(common, output, solvable, oriented, nowMillis() - t0, produced.toLong())
-    }
-
-    private fun <P : SolverParams> runOptimizeViaEnumerate(
-        solver: Solver<P>,
-        params: P,
-        solvable: Solvable,
-        common: CommonOptions,
-        output: OutputProtocol,
-        complete: Boolean,
-        deadline: Long?,
-    ) {
-        val objVarId = solvable.objVarId
-        if (objVarId == null) {
-            // No single objective var to linear-search over and no native optimizer — cannot
-            // optimise this instance with this engine.
-            output.onComplete(Verdict.UNKNOWN)
-            return
-        }
-        val t0 = nowMillis()
-        var best: Sample? = null
-        var bestObj = if (solvable.maximize) Long.MIN_VALUE else Long.MAX_VALUE
-        for (sample in solver.enumerate(params)) {
-            if (deadline != null && nowMillis() > deadline) break
-            val v = sample.ints[objVarId]
-            val improved = if (solvable.maximize) v > bestObj else v < bestObj
-            if (improved) {
-                bestObj = v
-                best = sample
-                emit(output, solvable, sample)
-            }
-        }
-        val verdict = if (best == null) {
-            val timedOut = deadline != null && nowMillis() > deadline
-            if (complete && !timedOut) Verdict.UNSATISFIABLE else Verdict.UNKNOWN
-        } else {
-            Verdict.BEST_FOUND
-        }
-        output.onComplete(verdict)
-        stats(common, output, solvable, SolveStats.EMPTY, nowMillis() - t0, if (best == null) 0L else 1L)
+    private fun FiniteExecutionVerdict.toCliVerdict(): Verdict = when (this) {
+        FiniteExecutionVerdict.SAT -> Verdict.SATISFIABLE
+        FiniteExecutionVerdict.UNSAT -> Verdict.UNSATISFIABLE
+        FiniteExecutionVerdict.UNKNOWN -> Verdict.UNKNOWN
+        FiniteExecutionVerdict.OPTIMAL -> Verdict.OPTIMAL
+        FiniteExecutionVerdict.BEST_FOUND -> Verdict.BEST_FOUND
     }
 
     private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample) {
