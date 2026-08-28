@@ -755,7 +755,7 @@ class PropagationState(
      */
     internal fun addMidlifeFactor(factor: Factor): Int {
         require(incremental) { "mid-life factors require an incremental PropagationState" }
-        val prop = factor.asPropagator()
+        val prop = factor.propagatorProjection()
         val fid = totalFactorCount
         midlife.store.add(prop)
         midlife.factors.add(factor)

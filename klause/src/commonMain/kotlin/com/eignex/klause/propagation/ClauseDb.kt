@@ -113,7 +113,7 @@ internal fun PropagationState.addLearnedClause(clause: Clause, lbd: Int, permane
     // The native-SAT lane keeps learned clauses in its own arena-backed store with its own watches
     // and policy columns, not the general learned database.
     nativeEngine?.let { return it.addLearned(clause.literals, lbd, permanent) }
-    return addLearnedClause(clause.asPropagator() as ClausePropagator, lbd, permanent)
+    return addLearnedClause(clause.propagatorProjection() as ClausePropagator, lbd, permanent)
 }
 
 /** Read-only view of LBDs for tests / introspection. Parallel to [PropagationState.learnedClauses]. */

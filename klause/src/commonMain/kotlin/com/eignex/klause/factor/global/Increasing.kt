@@ -37,7 +37,7 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
     }
 
     /** Minimum gap between adjacent variables: `1` for strict (`<`), `0` for non-decreasing (`≤`). */
-    private val gap: Int = if (strict) 1 else 0
+    internal val gap: Int = if (strict) 1 else 0
 
     // The chain propagates prefix minima and suffix maxima, so it reads bounds and never a value set.
     override val variables: VarList = IntVars(xs)
