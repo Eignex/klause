@@ -14,6 +14,8 @@ import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
+import com.eignex.klause.presolve.PresolveBudget
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -23,8 +25,65 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
+
+/** A complete finite solve request, from model preparation through engine execution. */
+class FiniteSolveRequest(
+    /** Source-independent model data supplied by the frontend. */
+    val shape: FiniteSolveShape,
+    /** Finite engine route selected by the frontend. */
+    val engine: FiniteEngine,
+    /** Presolve configuration requested by the caller. */
+    val presolveConfig: PresolveConfig,
+    /** Whether [presolveConfig] was selected explicitly. */
+    val explicitPresolveConfig: Boolean,
+    /** Whether the caller needs the exact solution set. */
+    val solutionSetSensitive: Boolean,
+    /** Cancellation shared by every engine worker. */
+    val cancellation: Cancellation,
+    /** Cancellation applying only while the model is prepared. */
+    val presolveCancellation: Cancellation = cancellation,
+    /** Optional budget allocated to preparation. */
+    val presolveBudget: PresolveBudget?,
+    /** Portfolio worker count. */
+    val cores: Int,
+    /** Repeatable engine tuning parameters. */
+    val engineParams: List<String>,
+    /** Optional random seed. */
+    val randomSeed: Long?,
+    /** Default portfolio arm count. */
+    val defaultArms: Int,
+    /** Maximum LP emphasis for the selected route. */
+    val lpConfig: LpConfig,
+    /** Invocation-wide node allowance. */
+    val nodeBudget: NodeBudget?,
+    /** Advisory wall-clock allowance supplied to fixed-backtrack LP components. */
+    val solveBudgetMillis: Long?,
+    /** Whether satisfaction should enumerate models. */
+    val allSolutions: Boolean,
+    /** Optional cap applied to satisfaction enumeration. */
+    val solutionCap: Long?,
+    /** True after the frontend's shared wall-clock deadline has elapsed. */
+    val deadlineExceeded: () -> Boolean,
+    /** Optional fixed-backtrack engine event sink. */
+    val onEvent: ((SearchEvent) -> Unit)?,
+    /** Optional per-worker portfolio engine event sink. */
+    val onPortfolioEvent: ((worker: String, event: SearchEvent) -> Unit)?,
+    /** Whether to stop after preparation. */
+    val prepareOnly: Boolean = false,
+)
+
+/** The prepared model and terminal engine result of one finite solve. */
+class FiniteSolveResult(
+    /** Model preparation shared by the selected engine route. */
+    val preparation: FinitePipelinePreparation,
+    /** Time spent preparing [preparation]. */
+    val preparationElapsed: Duration,
+    /** Terminal result after preparation, or null when preparation was inspected only. */
+    val execution: FiniteExecutionResult?,
+)
 
 /** One finite solve request after a frontend has translated its flags and source-model annotations. */
 class FiniteExecutionRequest(
@@ -144,6 +203,88 @@ fun FinitePipeline.execute(
 
     FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
         executePortfolio(request, callbacks)
+}
+
+/** Prepare a finite model once, then execute the selected engine route. */
+fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteExecutionCallbacks): FiniteSolveResult {
+    val preparationStart = TimeSource.Monotonic.markNow()
+    val preparation = prepare(
+        FinitePipelineRequest(
+            problem = request.shape.finiteProblem,
+            engine = request.engine,
+            objective = request.shape.linearObjective,
+            presolveConfig = request.presolveConfig,
+            explicitPresolveConfig = request.explicitPresolveConfig,
+            solutionSetSensitive = request.solutionSetSensitive,
+            cancellation = request.presolveCancellation,
+            presolveBudget = request.presolveBudget,
+        ),
+    )
+    val preparationElapsed = preparationStart.elapsedNow()
+    if (request.prepareOnly) return FiniteSolveResult(preparation, preparationElapsed, null)
+    if (preparation.presolve?.infeasible == true) {
+        return FiniteSolveResult(
+            preparation,
+            preparationElapsed,
+            FiniteExecutionResult.Completed(
+                FiniteExecutionVerdict.UNSAT,
+                SolveStats.EMPTY,
+                0,
+                null,
+                0,
+            ),
+        )
+    }
+    val execution = execute(
+        FiniteExecutionRequest(
+            problem = preparation.problem,
+            engine = request.engine,
+            optimize = request.shape.optimize,
+            objective = preparation.objective,
+            localSearchObjective = request.shape.localSearchObjective,
+            definitionalSweep = request.shape.definitionalSweep,
+            searchHints = request.shape.searchHints,
+            cores = request.cores,
+            engineParams = request.engineParams,
+            randomSeed = request.randomSeed,
+            defaultArms = request.defaultArms,
+            lpConfig = request.lpConfig,
+            cancellation = request.cancellation,
+            nodeBudget = request.nodeBudget,
+            solveBudgetMillis = request.solveBudgetMillis,
+            allSolutions = request.allSolutions,
+            solutionCap = request.solutionCap,
+            deadlineExceeded = request.deadlineExceeded,
+            onEvent = request.onEvent,
+            onPortfolioEvent = request.onPortfolioEvent,
+        ),
+        FiniteExecutionCallbacks(
+            onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
+            onImprovement = { improvement ->
+                callbacks.onImprovement(
+                    FiniteImprovement(
+                        preparation.reconstruct(improvement.sample),
+                        improvement.workerLabel,
+                        improvement.elapsedMs,
+                        improvement.objective,
+                    ),
+                )
+            },
+        ),
+    )
+    return FiniteSolveResult(preparation, preparationElapsed, execution.reconstructed(preparation.reconstruct))
+}
+
+private fun FiniteExecutionResult.reconstructed(reconstruct: (Sample) -> Sample): FiniteExecutionResult = when (this) {
+    is FiniteExecutionResult.DryRun -> this
+
+    is FiniteExecutionResult.Completed -> FiniteExecutionResult.Completed(
+        verdict,
+        stats,
+        solutions,
+        bestSample?.let(reconstruct),
+        elapsedMs,
+    )
 }
 
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {

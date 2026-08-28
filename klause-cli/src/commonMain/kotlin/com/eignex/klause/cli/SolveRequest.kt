@@ -79,6 +79,7 @@ internal class Solvable(
     val definitionalSweep: DefinitionalSweep? get() = finite?.definitionalSweep
     val searchHints: FlatZincSearchHints? get() = finite?.searchHints
     val presolve: PresolveStats? get() = finite?.presolve
+    val finiteShape: FiniteSolveShape get() = requireNotNull(finite) { "open model was not materialized" }
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
 }
 
