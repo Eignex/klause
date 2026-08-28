@@ -21,6 +21,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFlags
+import com.eignex.klause.lp.LinearLpProjection
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
@@ -376,6 +377,8 @@ internal class CpToLpRelaxation(
      *  strength, so they contribute only their CORE rows (if any). */
     private val suppressedHullFactors: Set<Int> = emptySet(),
 ) {
+    private val linearProjection = LinearLpProjection()
+
     /** Verified makespan plans for the scheduling globals; null when disabled or none applicable. */
     private val cumulativeRelaxation: CumulativeRelaxation? =
         if (cumulative || diffn) {
@@ -873,7 +876,7 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags)
-                factor.emitLpRelaxation(this)
+                factor.emitLpRelaxation(this, linearProjection)
             }
 
             if (booleanRlt) buildBooleanRlt()
