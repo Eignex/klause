@@ -16,7 +16,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -133,21 +132,6 @@ class GlobalCardinality(
      *  propagation and LS delta computation; `-1` for values outside the cover. */
     internal val coverIndexByValue: MutableLongIntMap =
         MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
-
-    override fun asPropagator(): Propagator = GlobalCardinalityPropagator(
-        boolVars,
-        intVars,
-        xs,
-        cover,
-        countVars,
-        countLow,
-        countHigh,
-        closed,
-        presents,
-        coverIndexByValue,
-        { idx, state -> definitelyPresent(idx, state) },
-        { idx, state -> definitelyAbsent(idx, state) },
-    )
 
     override fun asInvariant(): Invariant = GlobalCardinalityInvariant(
         xs,

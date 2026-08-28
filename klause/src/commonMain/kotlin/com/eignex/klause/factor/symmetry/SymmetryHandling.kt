@@ -8,10 +8,8 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.PermutationGroup
 import com.eignex.klause.util.toSortedIntArray
 
 /**
@@ -54,15 +52,6 @@ class SymmetryHandling(
 
     private val nInt: Int = generators.first().first.size
     private val nBool: Int = generators.first().second.size
-
-    override fun asPropagator(): Propagator {
-        // Expand the raw generators with stabiliser-chain Schreier generators (still genuine group
-        // elements, so every lex-leader stays sound) for fuller group coverage than the generators
-        // alone, without materialising a static lex closure.
-        val unified = generators.map { toUnified(it) }
-        val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, STRONG_GENERATOR_CAP)
-        return SymmetryPropagator(strong.map { toSequence(it) }, strong, nInt)
-    }
 
     override fun asInvariant(): Invariant = NoInvariant
 

@@ -21,7 +21,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
@@ -245,9 +244,6 @@ class Table private constructor(
             else -> Rewrite(listOf(Table(xs, survivors.toLongArray())))
         }
     }
-
-    override fun asPropagator(): Propagator =
-        TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi, groupCache)
 
     override fun asInvariant(): Invariant =
         TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi)

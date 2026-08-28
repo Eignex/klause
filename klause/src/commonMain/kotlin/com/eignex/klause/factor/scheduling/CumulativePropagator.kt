@@ -13,7 +13,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.argsortBy
 
 /**
- * CP propagator for [Cumulative]. Constructed by [Cumulative.asPropagator] and holds the
+ * CP propagator for [Cumulative]. Constructed by the propagation projection and holds the
  * time-tabling and Θ-tree edge-finding logic so those data structures are only allocated
  * when a CP engine is initialised.
  */

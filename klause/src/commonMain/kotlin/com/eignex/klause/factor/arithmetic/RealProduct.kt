@@ -13,7 +13,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `result = intOperand · realOperand`: a mixed integer·continuous product where
@@ -67,8 +66,6 @@ class RealProduct(
         sink.long(realOperandLo.toRawBits())
         sink.long(realOperandHi.toRawBits())
     }
-
-    override fun asPropagator(): Propagator = NoPropagator
 
     override fun asInvariant(): Invariant = NoInvariant
 

@@ -6,7 +6,7 @@ import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 
-/** CP propagator for [Mdd]. Constructed by [Mdd.asPropagator]. */
+/** CP propagator for [Mdd]. Constructed by the propagation projection. */
 internal class MddPropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

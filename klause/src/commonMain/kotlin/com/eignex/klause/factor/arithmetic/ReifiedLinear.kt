@@ -21,7 +21,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.eignex.klause.util.CheckedLongOverflowException
@@ -156,20 +155,6 @@ class ReifiedLinear private constructor(
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         integerConstants?.let { linearResidual(state.longPayload[factorId], op, it.bound, softCap) } ?: softCap
-
-    override fun asPropagator(): Propagator = when (val c = constants) {
-        is WideConstants -> WideReifiedLinearPropagator(
-            auxBoolVar,
-            boolVars,
-            intVars,
-            c.coefficients.toTypedArray(),
-            vars,
-            op,
-            c.bound,
-        )
-
-        is IntegerConstants -> ReifiedLinearPropagator(auxBoolVar, boolVars, intVars, c.coeffs, vars, op, c.bound)
-    }
 
     override fun asInvariant(): Invariant =
         integerConstants?.let { ReifiedLinearInvariant(auxBoolVar, it.coeffs, vars, op, it.bound) } ?: NoInvariant

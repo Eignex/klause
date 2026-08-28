@@ -19,7 +19,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.subExact
 
@@ -73,9 +72,6 @@ class ReifiedPseudoBoolean(
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         pbDegree(state.longPayload[factorId], op, bound, softCap)
-
-    override fun asPropagator(): Propagator =
-        ReifiedPseudoBooleanPropagator(auxBoolVar, weights, literals, op, bound, boolVars, intVars)
 
     override fun asInvariant(): Invariant =
         ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)

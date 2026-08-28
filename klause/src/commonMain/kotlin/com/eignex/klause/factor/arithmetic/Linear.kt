@@ -18,7 +18,6 @@ import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.RealConsts
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
@@ -121,7 +120,7 @@ class Linear private constructor(
      * LP-only continuous (real) variable terms, additional to the integer terms: real var ids paired with
      * the double coefficients in [RealConstants.realCoefficients]. Empty for the integer/Boolean core. When
      * present the row reasons over a continuous variable, so it is absent from CP propagation
-     * ([asPropagator] is [NoPropagator]) and its feasibility is enforced by the LP relaxation and the
+     * (its propagation projection is [NoPropagator]) and its feasibility is enforced by the LP relaxation and the
      * search leaf.
      */
     val realVars: IntArray = realVarsIn
@@ -344,11 +343,6 @@ class Linear private constructor(
     // never wakes it) — its feasibility is enforced by the LP relaxation and the search leaf. The
     // local-search engine is gated off for problems with real variables, so its invariant is never
     // consulted; an inert one keeps the factory total without pretending to evaluate the real terms.
-    override fun asPropagator(): Propagator = when (val c = constants) {
-        is RealConstants -> NoPropagator
-        is WideConstants -> WideLinearPropagator(intVars, vars, c.coefficients.toTypedArray(), op, c.bound)
-        is IntegerConstants -> LinearPropagator(boolVars, intVars, c.coeffs, vars, op, c.bound)
-    }
 
     override fun asInvariant(): Invariant = integerConstants?.let { LinearInvariant(it.coeffs, vars, op, it.bound) }
         ?: NoInvariant

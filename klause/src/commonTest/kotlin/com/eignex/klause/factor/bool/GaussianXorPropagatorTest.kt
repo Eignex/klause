@@ -8,6 +8,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -105,7 +106,7 @@ class GaussianXorPropagatorTest {
     @Test
     fun `asPropagator returns a separate object distinct from the factor`() {
         val factor = GaussianXor(listOf(Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 0)))
-        val propagator = factor.asPropagator()
+        val propagator = factor.propagatorProjection()
         assertNotSame(
             factor as Any,
             propagator,

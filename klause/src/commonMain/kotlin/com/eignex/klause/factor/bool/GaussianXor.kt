@@ -64,7 +64,5 @@ class GaussianXor(
         variables = BoolVars(order.toIntArray())
     }
 
-    override fun asPropagator(): Propagator = GaussianXorPropagator(constraints, boolVars)
-
     override fun asInvariant(): Invariant = NoInvariant
 }

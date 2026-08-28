@@ -16,7 +16,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Term
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -89,8 +88,6 @@ class Clause(literals: IntArray) :
         pureBoolMemo = if (allBool) 1 else 0
         return allBool
     }
-
-    override fun asPropagator(): Propagator = ClausePropagator(boolVars, intVars, literals)
 
     override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals, tautological)
 

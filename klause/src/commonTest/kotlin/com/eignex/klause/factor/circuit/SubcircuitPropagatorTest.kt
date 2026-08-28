@@ -11,6 +11,7 @@ import com.eignex.klause.propagation.PropagationResult.Implied
 import com.eignex.klause.propagation.PropagationResult.Unsat
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -96,7 +97,7 @@ class SubcircuitPropagatorTest {
     fun `subcircuit subscribes to bound and value events on all succ vars`() {
         val n = 3
         val factor = Circuit(succ = IntArray(n) { it }, subcircuit = true)
-        val watches = factor.asPropagator().initialIntEventWatches
+        val watches = factor.propagatorProjection().initialIntEventWatches
         assertNotNull(watches, "SubcircuitPropagator must opt into typed int events")
         val pairs = watches.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
         for (v in 0 until n) {

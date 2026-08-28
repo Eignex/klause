@@ -22,6 +22,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
@@ -769,7 +770,6 @@ class CumulativePropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 
@@ -793,19 +793,19 @@ class CumulativePropagatorTest {
                 resources = longArrayOf(1, 1),
                 capacity = 1,
             )
-                .asPropagator().initialIntEventWatches,
+                .propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1),
         )
         assertBoundOnly(
             Diffn(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), widths = longArrayOf(1, 1), heights = longArrayOf(1, 1))
-                .asPropagator().initialIntEventWatches,
+                .propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
             Cumulative.unary(
                 starts = intArrayOf(0, 1, 2),
                 durations = longArrayOf(2, 1, 1),
-            ).asPropagator().initialIntEventWatches,
+            ).propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1, 2),
         )
         // Reified linear's int reasoning is interval-based (linearSumRange + propagateLinearBounds);
@@ -817,7 +817,7 @@ class CumulativePropagatorTest {
             op = LinearOp.LE,
             bound = 3,
         )
-        assertBoundOnly(reified.asPropagator().initialIntEventWatches, intArrayOf(1, 2))
+        assertBoundOnly(reified.propagatorProjection().initialIntEventWatches, intArrayOf(1, 2))
     }
 
     @Test

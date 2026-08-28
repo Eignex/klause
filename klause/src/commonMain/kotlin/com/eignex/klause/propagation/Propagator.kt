@@ -4,7 +4,7 @@ import com.eignex.klause.ir.Lit
 
 /**
  * The deductive contract of a constraint: propagation, watcher subscriptions, and conflict
- * explanation. Constructed by `Factor.asPropagator` and used by the CP engine
+ * explanation. Constructed from factor data by the CP engine and used by the propagation loop
  * ([com.eignex.klause.backtrack.BacktrackSolver]) when dispatching to factors.
  *
  * See `Factor` for the full constraint contract (structural + deductive + local-search).
@@ -124,7 +124,7 @@ interface Propagator {
 }
 
 /**
- * The absence of a deductive role. A factor whose `Factor.asPropagator` returns this is
+ * The absence of a deductive role. A factor whose propagation projection returns this is
  * **invariant-only**: it participates in local search but never filters domains. The CP
  * engine skips such factors entirely — they are dropped from the deductive occurrence lists
  * ([PropagationProblem.boolOccurrences] / [PropagationProblem.intOccurrences]) so propagation never wakes them. All

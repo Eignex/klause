@@ -20,7 +20,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -231,11 +230,6 @@ class Mdd(
             ),
         )
     }
-
-    override fun asPropagator(): Propagator = MddPropagator(
-        boolVars, intVars, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
-        transitionIndex,
-    )
 
     override fun asInvariant(): Invariant = MddInvariant(
         seq,

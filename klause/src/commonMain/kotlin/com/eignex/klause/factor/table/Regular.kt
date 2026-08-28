@@ -17,7 +17,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -101,9 +100,6 @@ class Regular(
     }
 
     override val variables: VarList = SpanIntVars(seq)
-
-    override fun asPropagator(): Propagator =
-        RegularPropagator(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
 
     override fun asInvariant(): Invariant = RegularInvariant(seq, numStates, alphabetSize, transitions, q0, accepting)
 

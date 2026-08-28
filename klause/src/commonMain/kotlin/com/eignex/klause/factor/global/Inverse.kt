@@ -10,7 +10,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntIntMap
 
 /**
@@ -78,17 +77,6 @@ class Inverse(
      *      and vice versa). Matching-based filtering on f and on g punches the Hall-set values the channel
      *      misses, reusing the shared `reginFilter`.
      */
-
-    override fun asPropagator(): Propagator = InversePropagator(
-        boolVars,
-        intVars,
-        f,
-        g,
-        fOffset,
-        gOffset,
-        fIndexOf,
-        gIndexOf,
-    )
 
     override fun asInvariant(): Invariant = InverseInvariant(f, g, fOffset, gOffset)
 }

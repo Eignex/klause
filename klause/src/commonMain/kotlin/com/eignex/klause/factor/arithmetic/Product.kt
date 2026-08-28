@@ -18,7 +18,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -68,8 +67,6 @@ class Product(
     }
 
     override val variables: VarList = SpanIntVars(intArrayOf(a, b, result))
-
-    override fun asPropagator(): Propagator = ProductPropagator(a, b, result, boolVars, intVars)
 
     override fun asInvariant(): Invariant = ProductInvariant(a, b, result)
 

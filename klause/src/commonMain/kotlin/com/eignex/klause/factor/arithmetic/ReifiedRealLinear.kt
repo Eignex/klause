@@ -13,8 +13,6 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 
 /**
  * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)` — the
@@ -95,8 +93,6 @@ class ReifiedRealLinear(
             sink.long(realCoeffs[j].toRawBits())
         }
     }
-
-    override fun asPropagator(): Propagator = NoPropagator
 
     override fun asInvariant(): Invariant = NoInvariant
 

@@ -10,7 +10,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
@@ -117,19 +116,6 @@ class Diffn(
 
     /** Index of the rectangle that owns [varId] (as an x, y, width, or height variable), or `-1`. */
     fun varToRectOf(varId: Int): Int = varToRect[varId]
-
-    override fun asPropagator(): Propagator = DiffnPropagator(
-        intVars = intVars,
-        xs = xs,
-        ys = ys,
-        widths = widths,
-        heights = heights,
-        widthVars = widthVars,
-        heightVars = heightVars,
-        nonStrict = nonStrict,
-        n = n,
-        varSize = varSize,
-    )
 
     override fun asInvariant(): Invariant = DiffnInvariant(
         xs = xs,

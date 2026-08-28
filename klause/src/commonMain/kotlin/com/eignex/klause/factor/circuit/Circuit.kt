@@ -12,7 +12,6 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.propagation.Propagator
 import kotlin.math.abs
 
 /**
@@ -139,9 +138,6 @@ class Circuit(
         val scan = cycleScan(next, n)
         return abs(scan.numCycles - 1) + (numIncluded - scan.nodesInCycles) + numPointToExcluded + numOob
     }
-
-    override fun asPropagator(): Propagator =
-        if (subcircuit) SubcircuitPropagator(succ, n) else CircuitPropagator(succ, n)
 
     override fun asInvariant(): Invariant =
         if (subcircuit) SubcircuitInvariant(succ, n, ::computeCost) else CircuitInvariant(succ, n, ::computeCost)

@@ -16,7 +16,6 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.subExact
 
@@ -62,9 +61,6 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
         compressViolation(countDistance(state.longPayload[factorId]), softCap)
 
     private fun countDistance(n: Long): Long = (if (n < min) min - n else 0L) + (if (n > max) n - max else 0L)
-
-    override fun asPropagator(): Propagator =
-        ReifiedCardinalityPropagator(auxBoolVar, literals, min, max, boolVars, intVars)
 
     override fun asInvariant(): Invariant = ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars)
 

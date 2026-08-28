@@ -21,7 +21,6 @@ import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -93,8 +92,6 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
     }
 
     override val extendsObjectiveCone: Boolean = true
-
-    override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
 
     override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
 

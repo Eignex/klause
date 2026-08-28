@@ -18,6 +18,17 @@ import com.eignex.klause.util.PermutationGroup
 
 /** Builds the propagation-engine view of immutable factor data. */
 internal fun Factor.propagatorProjection(): Propagator = when (this) {
+    is AllDifferent -> AllDifferentPropagator(
+        boolVars,
+        intVars,
+        vars,
+        presents,
+        exceptSet,
+        boundsConsistent,
+        exceptValues,
+        { idx, state -> definitelyPresent(idx, state) },
+    )
+
     is ArrayMinMax -> ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 
     is Cardinality -> CardinalityPropagator(boolVars, intVars, literals, min, max)
@@ -129,9 +140,9 @@ internal fun Factor.propagatorProjection(): Propagator = when (this) {
 
     is ValuePrecede -> ValuePrecedePropagator(boolVars, intVars, s, t, xs)
 
-    // Custom factors are an established extension point. Built-in factor data stays on the engine-owned
-    // projection path while the legacy hook preserves that compatibility during the migration.
-    else -> asPropagator()
+    is Xor -> XorPropagator(boolVars, intVars, literals, targetParity)
+
+    else -> this as? Propagator ?: error("no propagation projection for ${this::class.simpleName}")
 }
 
 private fun Cumulative.cumulativePropagator(): Propagator = if (unary) {

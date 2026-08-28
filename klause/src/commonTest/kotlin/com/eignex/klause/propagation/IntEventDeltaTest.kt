@@ -71,7 +71,6 @@ class IntEventDeltaTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 
@@ -92,7 +91,6 @@ class IntEventDeltaTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 

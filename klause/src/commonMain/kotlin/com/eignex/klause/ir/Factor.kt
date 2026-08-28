@@ -7,15 +7,12 @@ import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Term
-import com.eignex.klause.propagation.Propagator
 
 /**
  * Structural contract for a constraint in `Problem`: variable membership, remapping, and
- * structural identity. The deductive half is [Propagator] (returned by [asPropagator]) and the
- * local-search half is [Invariant] (returned by [asInvariant]); each is a separate object whose
- * allocation is deferred to when the corresponding engine is initialised, because it carries the
- * engine's per-constraint state and precomputed structures. The LP-relaxation half needs no such
- * state, so it is emitted directly by [linearize] rather than through a factory object.
+ * structural identity. Engine-specific projections are allocated by their respective engines from
+ * this immutable data. The LP-relaxation half needs no per-factor engine state, so it is emitted
+ * directly by [linearize] rather than through a factory object.
  *
  * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
  * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors
@@ -196,15 +193,12 @@ interface Factor {
      */
     val linearRows: List<LinearRow> get() = emptyList()
 
-    /** The [Propagator] the CP engine uses for this constraint. */
-    fun asPropagator(): Propagator
-
     /** The [Invariant] the LS engine uses for this constraint. */
     fun asInvariant(): Invariant
 
     /**
      * Emit this factor's LP-relaxation rows, columns, and auxiliary variables into [builder] — the
-     * LP-engine analogue of [asPropagator] / [asInvariant], but a stateless emitter rather than a
+     * LP-engine analogue of the propagation and local-search projections, but a stateless emitter rather than a
      * factory object. The driver calls it once per relaxation build, passing the factor's index in
      * `Problem.factors` as [factorId]. A single pass may mix [com.eignex.klause.lp.Contribution.CORE]
      * and [com.eignex.klause.lp.Contribution.HULL] rows — the kind is chosen per row at emit time.

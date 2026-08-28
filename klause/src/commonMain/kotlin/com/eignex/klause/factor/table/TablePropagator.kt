@@ -12,7 +12,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 
-/** CP propagator for [Table]. Constructed by [Table.asPropagator]. */
+/** CP propagator for [Table]. Constructed by the propagation projection. */
 internal class TablePropagator(
     val boolVars: IntArray,
     val intVars: IntArray,

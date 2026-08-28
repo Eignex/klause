@@ -18,7 +18,6 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -55,8 +54,6 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
 
     override val extendsObjectiveCone: Boolean = true
-
-    override fun asPropagator(): Propagator = CardinalityPropagator(boolVars, intVars, literals, min, max)
 
     override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, literals, min, max)
 

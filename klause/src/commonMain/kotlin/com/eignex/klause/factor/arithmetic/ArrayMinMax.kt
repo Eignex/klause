@@ -18,7 +18,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
@@ -62,8 +61,6 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
     override val variables: VarList = SpanIntVars(xs + intArrayOf(result))
 
     override val extendsObjectiveCone: Boolean = true
-
-    override fun asPropagator(): Propagator = ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
 
     override fun asInvariant(): Invariant = ArrayMinMaxInvariant(result, xs, max)
 

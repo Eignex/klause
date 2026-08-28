@@ -13,7 +13,6 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `increasing(xs)` — the integer chain `xs(0) ⟨≤|<⟩ xs(1) ⟨≤|<⟩ … ⟨≤|<⟩ xs(n−1)`. [strict] selects
@@ -54,8 +53,6 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
         sink.bool(strict)
         sink.intVars(xs)
     }
-
-    override fun asPropagator(): Propagator = IncreasingPropagator(xs, gap)
 
     override fun asInvariant(): Invariant = IncreasingInvariant(xs, gap)
 

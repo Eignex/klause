@@ -11,7 +11,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `XOR(lit_1, ..., lit_n) == targetParity`. `targetParity = 1` means an odd number of literals
@@ -43,8 +42,6 @@ class Xor(
     override fun remap(mapping: VarRemap): Factor = Xor(mapping.lits(literals), targetParity)
 
     override val variables: VarList = BoolVars(literals.litVars())
-
-    override fun asPropagator(): Propagator = XorPropagator(boolVars, intVars, literals, targetParity)
 
     override fun asInvariant(): Invariant = XorInvariant(boolVars, literals, targetParity)
 }

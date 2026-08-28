@@ -23,6 +23,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -55,14 +56,13 @@ class AllDifferentPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test
     fun `bounds-consistent alldifferent subscribes to exactly the bound events`() {
         val ad = AllDifferent(intArrayOf(5, 7), domainMin = 0, domainSize = 10, boundsConsistent = true)
-        val watches = ad.asPropagator().initialIntEventWatches
+        val watches = ad.propagatorProjection().initialIntEventWatches
         assertTrue(watches != null, "bounds-consistent alldifferent must opt into typed events")
         val pairs = watches.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
         assertEquals(
@@ -84,7 +84,11 @@ class AllDifferentPropagatorTest {
     fun `full-gac alldifferent keeps occurrence-list wakeup`() {
         // Default (full GAC) needs every value removal, so it must not opt into the bound-only path.
         assertNull(
-            AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 4).asPropagator().initialIntEventWatches,
+            AllDifferent(
+                intArrayOf(0, 1, 2),
+                domainMin = 0,
+                domainSize = 4,
+            ).propagatorProjection().initialIntEventWatches,
         )
     }
 
@@ -863,7 +867,6 @@ class AllDifferentPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
         override fun asInvariant(): Invariant = object : Invariant {}
     }
 
@@ -885,15 +888,22 @@ class AllDifferentPropagatorTest {
     @Test
     fun `sort lexless and symmetric-alldiff subscribe to only bound events`() {
         assertBoundOnly(
-            Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)).asPropagator().initialIntEventWatches,
+            Sort(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3)).propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
-            LexLess(xs = intArrayOf(0, 1), ys = intArrayOf(2, 3), strict = true).asPropagator().initialIntEventWatches,
+            LexLess(
+                xs = intArrayOf(0, 1),
+                ys = intArrayOf(2, 3),
+                strict = true,
+            ).propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
         assertBoundOnly(
-            SymmetricAllDifferent(xs = intArrayOf(0, 1, 2), indexOffset = 0).asPropagator().initialIntEventWatches,
+            SymmetricAllDifferent(
+                xs = intArrayOf(0, 1, 2),
+                indexOffset = 0,
+            ).propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1, 2),
         )
     }

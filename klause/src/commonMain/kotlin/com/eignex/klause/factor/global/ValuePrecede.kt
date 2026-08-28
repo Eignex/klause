@@ -10,7 +10,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `value_precede(s, t, xs)`: value [t] may appear in [xs] only at a position after value [s]
@@ -55,8 +54,6 @@ class ValuePrecede(val s: Long, val t: Long, val xs: IntArray) : Factor {
     override fun remapValues(valueMap: (Long) -> Long): Factor = ValuePrecede(valueMap(s), valueMap(t), xs)
 
     override val variables: VarList = SpanIntVars(xs)
-
-    override fun asPropagator(): Propagator = ValuePrecedePropagator(boolVars, intVars, s, t, xs)
 
     override fun asInvariant(): Invariant = ValuePrecedeInvariant(s, t, xs)
 }

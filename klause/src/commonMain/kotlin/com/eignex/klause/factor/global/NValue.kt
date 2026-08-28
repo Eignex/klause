@@ -20,8 +20,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.IntEvent
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -121,41 +119,6 @@ class NValue(
         spanInts = xs + intArrayOf(n),
         boolVars = OptPresence.presenceVarIds(presents),
     )
-
-    override fun asPropagator(): Propagator {
-        // Advisor subscription for the non-optional variant: the distinct-count bounds read each
-        // variable's full domain (union membership + domain-overlap disjointness), so subscribe to every
-        // kind and consume the dirty-variable delta to skip fires where nothing changed. The optional
-        // variant keeps occurrence wakeup — a presence-bool flip changes the count but is not in the
-        // int-domain delta, so it must not be gated out.
-        val initialIntEventWatchesVal: IntArray? = if (presents.isNotEmpty()) {
-            null
-        } else {
-            val distinct = intVars.toHashSet()
-            val out = IntArray(distinct.size * IntEvent.COUNT)
-            var w = 0
-            for (v in distinct) {
-                out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-                out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-                out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-                out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-            }
-            out
-        }
-        val consumesIntEventDeltaVal = presents.isEmpty()
-        return NValuePropagator(
-            boolVars,
-            intVars,
-            n,
-            xs,
-            mode,
-            presents,
-            initialIntEventWatchesVal,
-            consumesIntEventDeltaVal,
-            { idx, state -> definitelyAbsent(idx, state) },
-            { idx, state -> definitelyPresent(idx, state) },
-        )
-    }
 
     override fun asInvariant(): Invariant = NValueInvariant(
         n,

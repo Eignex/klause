@@ -17,7 +17,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -163,16 +162,6 @@ class Element private constructor(
 
     /** The equality `result = [v]` between the result and an array variable. */
     private fun equate(v: Int): Linear = Linear(intArrayOf(1, -1), intArrayOf(result, v), LinearOp.EQ, 0)
-
-    override fun asPropagator(): Propagator = ElementPropagator(
-        boolVars,
-        intVars,
-        idx,
-        result,
-        arr,
-        arrIsVars,
-        indexOffset,
-    )
 
     override fun asInvariant(): Invariant = ElementInvariant(
         idx,
