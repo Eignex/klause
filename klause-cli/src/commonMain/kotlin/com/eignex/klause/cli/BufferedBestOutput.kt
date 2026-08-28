@@ -81,6 +81,7 @@ internal abstract class BufferedBestOutput : OutputProtocol {
         // behind the backend check — a run that records no backend can still have solved relaxations.
         if (stats.run.backend.isNotEmpty()) {
             printStatPairs(commentPrefix, searchStatPairs(stats).filter { (k, _) -> keepStat(k) })
+            printStatPairs(commentPrefix, openTheoryStatPairs(stats).filter { (k, _) -> keepStat(k) })
         }
         printStatPairs(commentPrefix, lpStatPairs(stats))
     }

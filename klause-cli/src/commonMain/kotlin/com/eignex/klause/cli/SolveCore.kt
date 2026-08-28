@@ -18,6 +18,7 @@ import com.eignex.klause.solver.pipeline.FiniteExecutionVerdict
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
+import com.eignex.klause.solver.pipeline.OPEN_WORK_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -72,6 +73,7 @@ internal object SolveCore {
         // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
         // poll, which burns the whole deadline and overshoots the cap several times over.
         val nodeBudget = takeNodeBudget(common)
+        val openWorkLimit = takeOpenWorkLimit(common)
         val (deadline, deadlineCancel) = deadlineCancellation(common)
         val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
         when (val pipeline = rawSolvable.pipeline) {
@@ -79,7 +81,12 @@ internal object SolveCore {
                 if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
-                val theoryParams = TheoryParams(maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE, cancellation = cancel)
+                val theoryParams = TheoryParams(
+                    maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE,
+                    openWorkLimit = openWorkLimit ?: Long.MAX_VALUE,
+                    cancellation = cancel,
+                    timeout = deadlineCancel,
+                )
                 val request = pipeline.request
                 val objective = request.objective
                 if (objective != null) {
@@ -97,7 +104,10 @@ internal object SolveCore {
                     ) as OpenTheoryExecution.Satisfy
                     ).result
                 output.onVerdictContext(
-                    VerdictContext(budgetExhausted = budgetSpent(common, result.stats.run.timedOut)),
+                    VerdictContext(
+                        budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
+                        terminationReason = (result as? OpenTheoryResult.Unknown)?.reason,
+                    ),
                 )
                 when (result) {
                     is OpenTheoryResult.Sat -> {
@@ -220,6 +230,17 @@ internal object SolveCore {
             ?: usageError("engine param `$NODE_LIMIT_KEY` expects an integer, got `$raw`")
         if (limit <= 0) usageError("engine param `$NODE_LIMIT_KEY` expects a positive node count, got $limit")
         return NodeBudget(limit)
+    }
+
+    /** Consume the open-theory-only fixed-work limit before generic engine-param validation. */
+    private fun takeOpenWorkLimit(common: CommonOptions): Long? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("$OPEN_WORK_LIMIT_KEY=") } ?: return null
+        common.engineParams.remove(entry)
+        val raw = entry.substringAfter('=')
+        val limit = raw.toLongOrNull()
+            ?: usageError("engine param `$OPEN_WORK_LIMIT_KEY` expects a non-negative integer, got `$raw`")
+        if (limit < 0) usageError("engine param `$OPEN_WORK_LIMIT_KEY` expects a non-negative integer, got $limit")
+        return limit
     }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {
@@ -674,7 +695,10 @@ private fun solveOpenTheoryOptimum(
         if (signed >= LONG_MIN_BIG && signed <= LONG_MAX_BIG) signed.longValue() else null
     }
     output.onVerdictContext(
-        VerdictContext(budgetExhausted = budgetExhausted(result.stats.run.timedOut)),
+        VerdictContext(
+            budgetExhausted = budgetExhausted(result.stats.run.timedOut),
+            terminationReason = (result as? OpenTheoryOptimum.Bounded)?.reason,
+        ),
     )
     when (result) {
         is OpenTheoryOptimum.Optimal -> {

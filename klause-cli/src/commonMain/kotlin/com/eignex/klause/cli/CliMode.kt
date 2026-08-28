@@ -22,6 +22,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 
 /*
  * Generic multi-mode CLI framework.
@@ -434,6 +435,8 @@ internal enum class Verdict {
 internal class VerdictContext(
     /** The wall-clock budget fired before the search finished. */
     val budgetExhausted: Boolean = false,
+    /** Precise open-theory stop reason when one is available. */
+    val terminationReason: TerminationReason? = null,
     /** Whether the pool carried an arm that can prove. A pure-local-search pool reports `unknown` at
      *  every budget, so its `unknown` is structural rather than a matter of time. */
     val completePool: Boolean = true,
@@ -448,6 +451,9 @@ internal class VerdictContext(
  */
 internal fun VerdictContext.softVerdictCause(): String = when {
     !completePool -> "no arm in the pool can prove a verdict"
+    terminationReason == TerminationReason.Timeout -> "wall timeout"
+    terminationReason == TerminationReason.BudgetExhausted -> "fixed work exhausted"
+    terminationReason == TerminationReason.Cancelled -> "cancelled"
     budgetExhausted -> "budget exhausted"
     else -> "search stopped without a verdict"
 }

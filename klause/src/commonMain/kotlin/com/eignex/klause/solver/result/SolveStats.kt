@@ -64,6 +64,8 @@ data class SolveStats(
     val scheduling: SchedulingStats = SchedulingStats(),
     /** Local-search telemetry (moves, stalls, incumbent). See [LocalSearchStats]. */
     val ls: LocalSearchStats = LocalSearchStats(),
+    /** Deterministic complete open-theory work accounting. */
+    val openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats(),
     /** Presolve outcome, set by the CLI after presolve runs (null when presolve was off / a no-op).
      *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
     val presolve: PresolveStats? = null,
@@ -84,6 +86,15 @@ data class SolveStats(
             lp = lp.mergedWith(other.lp),
             scheduling = scheduling.mergedWith(other.scheduling),
             ls = ls.mergedWith(other.ls),
+            openTheory = OpenTheoryWorkStats(
+                openTheory.openBoolDecisions + other.openTheory.openBoolDecisions,
+                openTheory.openIntDecisions + other.openTheory.openIntDecisions,
+                openTheory.openTheoryDecisions + other.openTheory.openTheoryDecisions,
+                openTheory.openTheoryChecks + other.openTheory.openTheoryChecks,
+                openTheory.openLiaRowVisits + other.openTheory.openLiaRowVisits,
+                openTheory.openCancellationPolls + other.openTheory.openCancellationPolls,
+                openTheory.openWork + other.openTheory.openWork,
+            ),
             presolve = presolve ?: other.presolve,
         )
     }
@@ -111,6 +122,7 @@ internal class SolveStatsSink(val backend: String) {
     val lp: LpStatsSink = LpStatsSink()
     val scheduling: SchedulingStatsSink = SchedulingStatsSink()
     val ls: LocalSearchStatsSink = LocalSearchStatsSink()
+    var openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats()
 
     private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
@@ -146,6 +158,7 @@ internal class SolveStatsSink(val backend: String) {
             lp = lp.snapshot(),
             scheduling = scheduling.snapshot(),
             ls = ls.snapshot(),
+            openTheory = openTheory,
         )
     }
 }

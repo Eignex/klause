@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntIntMap
@@ -48,6 +49,8 @@ class SearchSession(
     private var conflictOwner: SearchComponent? = null
     private var lastPushCreatedLevel = false
     private var checks = 0L
+    private var checksExhausted = false
+    private var openTheoryWork: OpenTheoryWorkSink? = null
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -127,7 +130,36 @@ class SearchSession(
         }
     }
 
-    override fun consumeCheck(): Boolean = checks++ < maxChecks
+    override fun consumeCheck(): Boolean {
+        if (checks++ >= maxChecks) {
+            checksExhausted = true
+            return false
+        }
+        return openTheoryWork?.theoryCheck() != false
+    }
+
+    internal fun consumeLiaRowVisit(): Boolean = openTheoryWork?.liaRowVisit() != false
+    internal fun recordCancellationPoll() {
+        openTheoryWork?.cancellationPoll()
+    }
+    internal fun workExhausted(): Boolean = openTheoryWork?.exhausted == true
+    internal fun checkBudgetExhausted(): Boolean = checksExhausted
+
+    internal fun attachOpenTheoryWork(work: OpenTheoryWorkSink) {
+        check(openTheoryWork == null) { "open-theory work is attached once per search session" }
+        openTheoryWork = work
+    }
+
+    internal fun canCommitOpenTheoryDecision(): Boolean = openTheoryWork?.hasAllowance() != false
+
+    internal fun recordOpenTheoryDecision(decision: SearchDecision): Boolean = when (decision) {
+        is SearchDecision.Bool -> openTheoryWork?.boolDecision() != false
+
+        is SearchDecision.IntAtMost, is SearchDecision.IntAtLeast, is SearchDecision.IntEqual ->
+            openTheoryWork?.intDecision() != false
+
+        is SearchDecision.Theory -> openTheoryWork?.theoryDecision() != false
+    }
 
     override fun cancelled(): Boolean = cancellation()
 
@@ -943,11 +975,13 @@ class SearchRun internal constructor(
             val level = session.decisionLevel
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
+            if (!session.canCommitOpenTheoryDecision()) return Advance.Budget
             decisions++
             decisionsSinceRestart++
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
                     if (!session.lastPushCreatedLevel()) continue
+                    if (!session.recordOpenTheoryDecision(decision)) return Advance.Budget
                     observer.onCommit(decision, session.decisionLevel)
                     if (!decisionBudget.consume()) return Advance.Budget
                     return Advance.Expanded

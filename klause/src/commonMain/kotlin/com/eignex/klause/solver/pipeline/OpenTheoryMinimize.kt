@@ -7,7 +7,9 @@ import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.TheoryParams
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
@@ -46,6 +48,8 @@ sealed interface OpenTheoryOptimum {
         val incumbent: OpenTheoryAssignment?,
         /** Objective value of [incumbent], or null when there is none. */
         val value: BigInteger?,
+        /** Why the descent stopped before an optimum proof. */
+        val reason: TerminationReason,
         override val stats: SolveStats,
     ) : OpenTheoryOptimum
 }
@@ -102,11 +106,12 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
     /** Minimizes the objective, tightening the bound until a round refutes it. */
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
         val plan = base.componentPlan()
+        val work = OpenTheoryWorkSink(params.openWorkLimit)
         var incumbent: OpenTheoryAssignment? = null
         var best: BigInteger? = null
         var spec = base
         while (true) {
-            val result = OpenTheoryEngine(spec, route, plan).solve(params)
+            val result = OpenTheoryEngine(spec, route, plan).solve(params, work)
             when (result) {
                 is OpenTheoryResult.Sat -> {
                     // Nothing to improve on a constant objective: the first witness is already optimal,
@@ -135,7 +140,12 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
                         OpenTheoryOptimum.Optimal(incumbent, best!!, result.stats)
                     }
 
-                is OpenTheoryResult.Unknown -> return OpenTheoryOptimum.Bounded(incumbent, best, result.stats)
+                is OpenTheoryResult.Unknown -> return OpenTheoryOptimum.Bounded(
+                    incumbent,
+                    best,
+                    result.reason,
+                    result.stats,
+                )
             }
         }
     }

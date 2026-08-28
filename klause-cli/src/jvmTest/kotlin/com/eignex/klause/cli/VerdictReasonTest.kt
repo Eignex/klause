@@ -1,5 +1,9 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.solver.result.OpenTheoryWorkStats
+import com.eignex.klause.solver.result.RunStats
+import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import kotlin.test.Test
@@ -31,6 +35,46 @@ class VerdictReasonTest {
     fun `an exhausted budget is named as the cause`() {
         val out = smt(VerdictContext(budgetExhausted = true), Verdict.UNKNOWN)
         assertTrue("; budget exhausted" in out, out)
+    }
+
+    @Test
+    fun `open theory stop reasons remain distinct`() {
+        val timeout = smt(VerdictContext(terminationReason = TerminationReason.Timeout), Verdict.UNKNOWN)
+        val fixedWork = smt(
+            VerdictContext(terminationReason = TerminationReason.BudgetExhausted),
+            Verdict.UNKNOWN,
+        )
+        val cancelled = smt(VerdictContext(terminationReason = TerminationReason.Cancelled), Verdict.UNKNOWN)
+
+        assertTrue("wall timeout" in timeout, timeout)
+        assertTrue("fixed work exhausted" in fixedWork, fixedWork)
+        assertTrue("cancelled" in cancelled, cancelled)
+    }
+
+    @Test
+    fun `SMT-LIB statistics include every deterministic open theory counter`() {
+        val out = capture {
+            SmtLibOutput().onStatistics(
+                SolveStats(
+                    run = RunStats(backend = "general-lia"),
+                    openTheory = OpenTheoryWorkStats(1, 2, 3, 4, 5, 6, 21),
+                ),
+                solveTimeMs = 0,
+                solutions = 0,
+            )
+        }
+
+        for (key in listOf(
+            "openBoolDecisions",
+            "openIntDecisions",
+            "openTheoryDecisions",
+            "openTheoryChecks",
+            "openLiaRowVisits",
+            "openCancellationPolls",
+            "openWork",
+        )) {
+            assertTrue("; $key=" in out, "missing $key in: $out")
+        }
     }
 
     @Test

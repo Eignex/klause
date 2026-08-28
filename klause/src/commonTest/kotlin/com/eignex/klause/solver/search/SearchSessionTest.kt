@@ -2,12 +2,53 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class SearchSessionTest {
+
+    @Test
+    fun `open work counts each committed public decision kind`() {
+        val decisions = listOf(
+            SearchDecision.Bool(0),
+            SearchDecision.IntAtMost(0, 1),
+            SearchDecision.IntAtLeast(0, 0),
+            SearchDecision.IntEqual(0, 0),
+            SearchDecision.Theory(object : SearchTheoryDecision {}),
+        )
+
+        for (decision in decisions) {
+            val work = OpenTheoryWorkSink()
+            val brancher = object : SearchBrancher {
+                override fun nextBranch(context: SearchContext): List<SearchDecision>? =
+                    if (context.decisionLevel == 0) listOf(decision) else null
+            }
+            val component = object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+            }
+            val session = SearchComponentSet(listOf(component), listOf(brancher)).session()
+            session.attachOpenTheoryWork(work)
+
+            assertIs<SearchResult.Satisfied>(session.solve(numBoolVars = 0))
+            val stats = work.snapshot()
+            assertEquals(if (decision is SearchDecision.Bool) 1L else 0L, stats.openBoolDecisions)
+            assertEquals(
+                if (decision is SearchDecision.IntAtMost || decision is SearchDecision.IntAtLeast ||
+                    decision is SearchDecision.IntEqual
+                ) {
+                    1L
+                } else {
+                    0L
+                },
+                stats.openIntDecisions,
+            )
+            assertEquals(if (decision is SearchDecision.Theory) 1L else 0L, stats.openTheoryDecisions)
+            assertEquals(1L, stats.openWork)
+        }
+    }
 
     @Test
     fun `shared session retracts every component to the same decision level`() {
