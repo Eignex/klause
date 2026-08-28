@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.integration
-
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver

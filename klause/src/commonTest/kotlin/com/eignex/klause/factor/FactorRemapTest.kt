@@ -26,9 +26,9 @@ import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

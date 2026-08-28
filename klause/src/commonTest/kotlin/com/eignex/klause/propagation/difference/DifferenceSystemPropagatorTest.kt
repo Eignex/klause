@@ -6,11 +6,11 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.solver.IntBounds
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.differenceFragmentOf
 import kotlin.random.Random
 import kotlin.test.Test

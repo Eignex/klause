@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.StructuralKeyBuilder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

@@ -37,7 +37,7 @@ class ReifiedPseudoBoolean(
 ) : ReifiedFactor {
 
     init {
-        require(literals.none { com.eignex.klause.solver.Lit.variable(it) == auxBoolVar }) {
+        require(literals.none { com.eignex.klause.ir.Lit.variable(it) == auxBoolVar }) {
             "reified pseudo-Boolean auxiliary variable $auxBoolVar occurs in its body"
         }
     }

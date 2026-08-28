@@ -1,4 +1,5 @@
 package com.eignex.klause.solver
+import com.eignex.klause.ir.Lit
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver

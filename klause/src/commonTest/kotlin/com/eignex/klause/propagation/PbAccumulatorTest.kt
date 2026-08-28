@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.solver.Lit
+import com.eignex.klause.ir.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

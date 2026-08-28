@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.cut
 
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.solver.Lit
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals

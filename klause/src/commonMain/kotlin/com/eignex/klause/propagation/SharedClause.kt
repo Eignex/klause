@@ -9,7 +9,7 @@ import com.eignex.klause.util.LongArrayList
  * solver whose int-bound *atoms* are allocated lazily per session, so a clause's atom ids differ
  * between sessions and cannot be copied raw. This form keeps the two literal kinds separately:
  *
- *  - [boolLits] — literals over real boolean variables (id `< numBoolVars`), [com.eignex.klause.solver.Lit]-encoded.
+ *  - [boolLits] — literals over real boolean variables (id `< numBoolVars`), [com.eignex.klause.ir.Lit]-encoded.
  *    Boolean var ids are stable across sessions of the same problem, so these travel as-is.
  *  - [atomQuads] — int-bound atom literals, flattened as `[intVar, kind, threshold, sign]` per atom
  *    (`kind` 0 = `≥`, 1 = `≤`, 2 = `=`; `sign` 0 = positive). Stored as `Long` because the atom

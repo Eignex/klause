@@ -6,12 +6,12 @@ import com.eignex.klause.backtrack.selector.Vsids
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SpanIntVars
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.SpanIntVars
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

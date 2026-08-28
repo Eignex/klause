@@ -1,10 +1,10 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Cardinality
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.strategy.WalkSat
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Lit
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
