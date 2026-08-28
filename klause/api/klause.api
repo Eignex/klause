@@ -10996,6 +10996,16 @@ public final class com/eignex/klause/util/CharSourceKt {
 	public static final fun readText (Lcom/eignex/klause/util/CharSource;)Ljava/lang/String;
 }
 
+public final class com/eignex/klause/util/CheckedLongOverflowException : java/lang/ArithmeticException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class com/eignex/klause/util/CheckedLongOverflowExceptionKt {
+	public static final fun addExact (JJ)J
+	public static final fun mulExact (JJ)J
+	public static final fun subExact (JJ)J
+}
+
 public final class com/eignex/klause/util/FloatInterval {
 	public fun <init> (DD)V
 	public final fun component1 ()D
