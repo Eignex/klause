@@ -11,9 +11,6 @@ import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.pipelineRoute
-import com.eignex.klause.theory.lia.GeneralLiaAssignment
-import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.theory.qflra.ExactLraAssignment
 
 /**
  * SMT-LIB 2 front-end (`.smt2` / `.smt`; QF_LIA / QF_LRA / QF_LIRA). Emits the SMT-LIB convention: a
@@ -63,18 +60,7 @@ internal object SmtLibMode : CliMode {
                         throw UnsupportedSmtException("open theory optimization is unsupported")
                     }
                     openTheorySolvable(route.request) { assignment ->
-                        when (assignment) {
-                            is OpenTheoryAssignment.Difference -> render(assignment.sample)
-
-                            is OpenTheoryAssignment.GeneralLia ->
-                                renderGeneralLiaModel(ints, bools, reals, assignment.assignment)
-
-                            is OpenTheoryAssignment.ExactLra ->
-                                renderExactLraModel(ints, bools, reals, assignment.assignment)
-
-                            is OpenTheoryAssignment.ExactLira ->
-                                renderExactLiraModel(ints, bools, reals, assignment.assignment)
-                        }
+                        renderOpenTheoryModel(ints, bools, reals, assignment)
                     }
                 }
 
@@ -101,45 +87,17 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals:
         append(")")
     }
 
-/** Render an exact General LIA model without narrowing its integer values to [Long]. */
-internal fun renderGeneralLiaModel(
+/** Render an exact open-theory model through the pipeline's mode-neutral witness surface. */
+internal fun renderOpenTheoryModel(
     ints: Map<String, Int>,
     bools: Map<String, Int>,
     reals: Map<String, Int>,
-    assignment: GeneralLiaAssignment,
-): String = buildString {
-    check(reals.isEmpty()) { "General LIA does not admit real variables" }
-    append("(\n")
-    for ((name, id) in ints) append("  (define-fun $name () Int ${assignment.ints[id]})\n")
-    for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.bools[id]})\n")
-    append(")")
-}
-
-/** Render an exact rational QF_LRA model without converting its witness to [Double]. */
-internal fun renderExactLraModel(
-    ints: Map<String, Int>,
-    bools: Map<String, Int>,
-    reals: Map<String, Int>,
-    assignment: ExactLraAssignment,
-): String = buildString {
-    check(ints.isEmpty()) { "exact LRA does not admit integer variables" }
-    append("(\n")
-    for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.bools[id]})\n")
-    for ((name, id) in reals) append("  (define-fun $name () Real ${assignment.reals[id]})\n")
-    append(")")
-}
-
-/** Render an exact QF_LIRA model without narrowing either half of its witness. */
-internal fun renderExactLiraModel(
-    ints: Map<String, Int>,
-    bools: Map<String, Int>,
-    reals: Map<String, Int>,
-    assignment: ExactLiraAssignment,
+    assignment: OpenTheoryAssignment,
 ): String = buildString {
     append("(\n")
-    for ((name, id) in ints) append("  (define-fun $name () Int ${assignment.ints[id]})\n")
-    for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.bools[id]})\n")
-    for ((name, id) in reals) append("  (define-fun $name () Real ${assignment.reals[id]})\n")
+    for ((name, id) in ints) append("  (define-fun $name () Int ${assignment.intValue(id)})\n")
+    for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.boolValue(id)})\n")
+    for ((name, id) in reals) append("  (define-fun $name () Real ${assignment.realValue(id)})\n")
     append(")")
 }
 

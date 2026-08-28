@@ -9,8 +9,6 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
-import com.eignex.klause.theory.lia.GeneralLiaAssignment
-import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -61,24 +59,7 @@ internal object MpsMode : CliMode {
                     if (compiled.objective?.realCoefficients?.any { it != 0.0 } == true) {
                         throw MpsLoweringException("open MPS optimization over a continuous objective is unsupported")
                     }
-                    openTheorySolvable(route.request) { assignment ->
-                        when (assignment) {
-                            is OpenTheoryAssignment.Difference -> render(assignment.sample)
-
-                            is OpenTheoryAssignment.GeneralLia -> renderMpsGeneralLiaModel(
-                                compiled,
-                                assignment.assignment,
-                            )
-
-                            is OpenTheoryAssignment.ExactLira -> renderMpsExactLiraModel(
-                                compiled,
-                                assignment.assignment,
-                            )
-
-                            is OpenTheoryAssignment.ExactLra ->
-                                error("MPS does not support pure real open-theory rendering")
-                        }
-                    }
+                    openTheorySolvable(route.request) { assignment -> renderMpsOpenModel(compiled, assignment) }
                 }
 
                 SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
@@ -102,21 +83,11 @@ internal fun renderMpsModel(compiled: MpsCompiled, s: Sample): String = buildStr
     }
 }
 
-/** Render an exact General LIA witness without narrowing arbitrary-precision values to [Long]. */
-internal fun renderMpsGeneralLiaModel(compiled: MpsCompiled, assignment: GeneralLiaAssignment): String = buildString {
+/** Render an open-theory witness without depending on the concrete theory that produced it. */
+internal fun renderMpsOpenModel(compiled: MpsCompiled, assignment: OpenTheoryAssignment): String = buildString {
     append("v")
     for (col in compiled.columns) {
-        check(!col.real) { "General LIA does not admit continuous columns" }
-        append(" ${col.name}=${assignment.ints[col.id]}")
-    }
-}
-
-/** Render an exact mixed witness: an integer column at full precision, a continuous one as its exact
- *  rational value rather than a rounding of it. */
-internal fun renderMpsExactLiraModel(compiled: MpsCompiled, assignment: ExactLiraAssignment): String = buildString {
-    append("v")
-    for (col in compiled.columns) {
-        val value = if (col.real) assignment.reals[col.id].toString() else assignment.ints[col.id].toString()
+        val value = if (col.real) assignment.realValue(col.id) else assignment.intValue(col.id)
         append(" ${col.name}=$value")
     }
 }
