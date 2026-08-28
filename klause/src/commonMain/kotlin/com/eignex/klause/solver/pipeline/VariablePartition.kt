@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Problem
-import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.pipeline.isTheoryOwnable
 
 /** Partition integer variables by whether finite-domain search must branch on them. */

@@ -6,7 +6,7 @@ import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.ShortestPaths
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.ComponentCheck

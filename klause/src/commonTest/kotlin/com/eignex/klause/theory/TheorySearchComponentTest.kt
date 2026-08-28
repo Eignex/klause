@@ -1,7 +1,7 @@
 package com.eignex.klause.theory
 
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent

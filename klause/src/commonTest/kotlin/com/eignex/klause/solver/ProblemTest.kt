@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntColumn
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.pipeline.FactorOwner
 import com.eignex.klause.solver.pipeline.IntVariableOwner

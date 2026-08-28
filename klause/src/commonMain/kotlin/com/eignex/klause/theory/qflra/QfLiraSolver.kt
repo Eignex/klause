@@ -12,6 +12,7 @@ import com.eignex.klause.factor.arithmetic.linearRow
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
@@ -20,7 +21,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalTableauRow
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
-import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.pipeline.supportsExactLira
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult

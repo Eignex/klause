@@ -6,7 +6,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.admitsGeneralLia
 import com.eignex.klause.solver.pipeline.componentPlan

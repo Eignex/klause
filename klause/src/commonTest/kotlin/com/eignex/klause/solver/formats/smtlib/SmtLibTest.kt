@@ -39,37 +39,37 @@ import kotlin.test.assertTrue
 class SmtLibTest {
 
     private fun openSolve(
-        model: com.eignex.klause.solver.ProblemSpec,
+        model: com.eignex.klause.ir.ProblemSpec,
         params: TheoryParams = TheoryParams(),
     ): OpenTheoryResult = OpenTheoryEngine(model, model.componentPlan().theoryPipeline).solve(params)
 
     private fun liraSat(
-        model: com.eignex.klause.solver.ProblemSpec,
+        model: com.eignex.klause.ir.ProblemSpec,
         params: TheoryParams = TheoryParams(),
     ): ExactLiraAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model, params))
         return assertIs<OpenTheoryAssignment.ExactLira>(sat.assignment).assignment
     }
 
-    private fun liraUnsat(model: com.eignex.klause.solver.ProblemSpec, params: TheoryParams = TheoryParams()) {
+    private fun liraUnsat(model: com.eignex.klause.ir.ProblemSpec, params: TheoryParams = TheoryParams()) {
         assertIs<OpenTheoryResult.Unsat>(openSolve(model, params))
     }
 
-    private fun lraSat(model: com.eignex.klause.solver.ProblemSpec): ExactLraAssignment {
+    private fun lraSat(model: com.eignex.klause.ir.ProblemSpec): ExactLraAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
         return assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment).assignment
     }
 
-    private fun lraUnsat(model: com.eignex.klause.solver.ProblemSpec) {
+    private fun lraUnsat(model: com.eignex.klause.ir.ProblemSpec) {
         assertIs<OpenTheoryResult.Unsat>(openSolve(model))
     }
 
-    private fun liaSat(model: com.eignex.klause.solver.ProblemSpec): GeneralLiaAssignment {
+    private fun liaSat(model: com.eignex.klause.ir.ProblemSpec): GeneralLiaAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
         return assertIs<OpenTheoryAssignment.GeneralLia>(sat.assignment).assignment
     }
 
-    private fun differenceSat(model: com.eignex.klause.solver.ProblemSpec): Sample {
+    private fun differenceSat(model: com.eignex.klause.ir.ProblemSpec): Sample {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
         return assertIs<OpenTheoryAssignment.Difference>(sat.assignment).sample
     }

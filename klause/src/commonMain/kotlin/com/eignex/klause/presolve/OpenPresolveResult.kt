@@ -8,13 +8,13 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.exactBoundsInfeasible
 import com.eignex.klause.lp.longOrNull
 import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.structuralIntBounds
 import com.eignex.klause.lp.tightenOpenIntBounds
-import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 

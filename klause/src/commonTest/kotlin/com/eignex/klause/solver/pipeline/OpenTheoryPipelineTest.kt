@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
