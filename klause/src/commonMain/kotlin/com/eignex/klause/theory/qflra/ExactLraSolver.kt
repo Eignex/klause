@@ -1,9 +1,9 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
-import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.pipeline.supportsExactLra
 import com.eignex.klause.theory.Theory
 import com.eignex.klause.theory.TheoryCheck

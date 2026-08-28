@@ -1,6 +1,6 @@
 package com.eignex.klause.theory
 
-import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.search.SearchExplanation
 
 /** A complete decision procedure for one open-model theory fragment. */
