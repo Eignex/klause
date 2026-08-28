@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.Int128
 import com.eignex.klause.util.IntArrayList
 
 /**

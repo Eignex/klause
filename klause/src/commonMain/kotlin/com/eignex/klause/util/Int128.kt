@@ -1,4 +1,4 @@
-package com.eignex.klause.lp.engine
+package com.eignex.klause.util
 
 /**
  * Minimal signed 128-bit integer accumulator for the integer-multiplier LP certification. It is
