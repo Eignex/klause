@@ -1,17 +1,94 @@
-package com.eignex.klause.lowering.flatzinc
+package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
+import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
+import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.lowering.flatzinc.*
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
+import com.eignex.klause.solver.objective.IncrementalObjective
+import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.StringCharSource
+
+/** FlatZinc lowering plus local-search metadata built for finite execution. */
+data class FlatZincExecutionProgram(
+    /** Engine-neutral lowered program. */
+    val program: FlatZincProgram,
+    /** Local-search objective when its defining cone can be represented exactly. */
+    val localSearchObjective: IncrementalObjective?,
+    /** Definitions to maintain while evaluating local-search moves. */
+    val definitionalSweep: DefinitionalSweep?,
+)
+
+private data class FlatZincExecutionMetadata(
+    val localSearchObjective: IncrementalObjective?,
+    val definitionalSweep: DefinitionalSweep?,
+)
+
+/** Parse FlatZinc and build the engine metadata required by finite execution. */
+fun parseFlatZincExecution(
+    source: String,
+    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    floatScale: Long = DEFAULT_FLOAT_SCALE,
+    forLocalSearch: Boolean = false,
+    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+): FlatZincExecutionProgram = parseFlatZincExecution(
+    StringCharSource(source),
+    floatBuckets,
+    floatScale,
+    forLocalSearch,
+    unboundedIntLo,
+    unboundedIntHi,
+)
+
+/** Parse a streamed FlatZinc source and build its finite-execution metadata. */
+fun parseFlatZincExecution(
+    source: CharSource,
+    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    floatScale: Long = DEFAULT_FLOAT_SCALE,
+    forLocalSearch: Boolean = false,
+    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+): FlatZincExecutionProgram {
+    var metadata: FlatZincExecutionMetadata? = null
+    val program = parseFlatZincWithMetadata(
+        source,
+        floatBuckets,
+        floatScale,
+        forLocalSearch,
+        unboundedIntLo,
+        unboundedIntHi,
+    ) { compiler, solve ->
+        metadata = compiler.buildExecutionMetadata(solve)
+    }
+    val executionMetadata = requireNotNull(metadata)
+    return FlatZincExecutionProgram(
+        program,
+        executionMetadata.localSearchObjective,
+        executionMetadata.definitionalSweep,
+    )
+}
+
+private fun FlatZincCompiler.buildExecutionMetadata(solve: SolveDirective): FlatZincExecutionMetadata {
+    val localSearchObjective = when (solve) {
+        is SolveDirective.Minimize -> buildFunctionalObjective(solve.objVar, minimize = true)
+        is SolveDirective.Maximize -> buildFunctionalObjective(solve.objVar, minimize = false)
+        SolveDirective.Satisfy -> null
+    }
+    return FlatZincExecutionMetadata(localSearchObjective, buildDefinitionalSweep())
+}
 
 /** Build an exact [FunctionalObjective] from `defines_var` annotations when possible: a bool-count
  *  objective `Σ w_i·bool2int(and_i)` (`array_bool_and` / `_or` indicators, whose defining sweep already

@@ -66,7 +66,7 @@ internal class FlatZincCompiler(
 
     internal val setVarsByName = LinkedHashMap<String, SetVarLayout>()
 
-    fun compile(): FlatZincProgram {
+    internal fun compile(onLowered: ((FlatZincCompiler, SolveDirective) -> Unit)? = null): FlatZincProgram {
         for (c in model.constraints) {
             if (c.name == "int2float" && c.args.size == 2) {
                 (c.args[1] as? FznExpr.Ident)?.let { int2floatSource[it.name] = c.args[0] }
@@ -91,22 +91,14 @@ internal class FlatZincCompiler(
             if (redundant || symmetry) for (i in before until factors.size) impliedFactorIds.add(i)
         }
         val solveDirective = compileSolve()
+        // Execution metadata may resolve constraint arguments, allocating a singleton int var per integer
+        // literal. Build it before snapshotting [Problem] so those vars are counted in its domains.
+        onLowered?.invoke(this, solveDirective)
         val impliedFactorMask = if (impliedFactorIds.isEmpty()) {
             null
         } else {
             BooleanArray(factors.size).also { mask -> impliedFactorIds.forEach { i -> mask[i] = true } }
         }
-        // The LS functional objective and definitional sweep resolve constraint args, which allocates a
-        // singleton int var per integer-literal argument ([resolveIntVar] on an `IntLit` appends to
-        // [requireFiniteIntDomains]). Build them BEFORE snapshotting the `Problem` so those vars are counted in
-        // numIntVars/intDomains — otherwise the sweep references a var id the Problem lacks and the LS
-        // invariant network indexes out of bounds.
-        val lsObjective = when (solveDirective) {
-            is SolveDirective.Minimize -> buildFunctionalObjective(solveDirective.objVar, minimize = true)
-            is SolveDirective.Maximize -> buildFunctionalObjective(solveDirective.objVar, minimize = false)
-            else -> null
-        }
-        val definitionalSweep = buildDefinitionalSweep()
         // A plain base-baked `Problem`; the SAC / failed-literal probing resolved from the presolve
         // config runs later in the presolve lane via [RootBaker] (the kernel never probes itself).
         val problem = Problem(
@@ -131,8 +123,6 @@ internal class FlatZincCompiler(
             searchHints = compileSearchAnnotation(),
             enumLabelsByVar = enumLabelsByVar.toMap(),
             setVarsByName = setVarsByName.toMap(),
-            lsObjective = lsObjective,
-            definitionalSweep = definitionalSweep,
         )
     }
 
@@ -706,6 +696,23 @@ fun parseFlatZinc(
     forLocalSearch: Boolean = false,
     unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
     unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+): FlatZincProgram = parseFlatZincWithMetadata(
+    source,
+    floatBuckets,
+    floatScale,
+    forLocalSearch,
+    unboundedIntLo,
+    unboundedIntHi,
+) { _, _ -> }
+
+internal fun parseFlatZincWithMetadata(
+    source: CharSource,
+    floatBuckets: Int = DEFAULT_FLOAT_BUCKETS,
+    floatScale: Long = DEFAULT_FLOAT_SCALE,
+    forLocalSearch: Boolean = false,
+    unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
+    unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
+    onLowered: (FlatZincCompiler, SolveDirective) -> Unit,
 ): FlatZincProgram {
     val model = FlatZincParser(FlatZincLexer(CharReader(source))).parse()
     return FlatZincCompiler(
@@ -715,5 +722,5 @@ fun parseFlatZinc(
         forLocalSearch = forLocalSearch,
         unboundedIntLo = unboundedIntLo,
         unboundedIntHi = unboundedIntHi,
-    ).compile()
+    ).compile(onLowered)
 }

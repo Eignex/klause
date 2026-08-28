@@ -2,11 +2,9 @@ package com.eignex.klause.lowering.flatzinc
 
 import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lowering.FloatBucketing
-import com.eignex.klause.solver.objective.IncrementalObjective
 
-/** Compiled FlatZinc model plus metadata used by solution writing and search defaults. */
+/** Compiled FlatZinc model plus metadata used by solution writing and search configuration. */
 data class FlatZincProgram(
     /** Compiled solver problem. */
     val problem: Problem,
@@ -28,10 +26,6 @@ data class FlatZincProgram(
     val enumLabelsByVar: Map<String, List<String>> = emptyMap(),
     /** Set variable layouts by name. */
     val setVarsByName: Map<String, SetVarLayout> = emptyMap(),
-    /** Local-search incremental objective when available. */
-    val lsObjective: IncrementalObjective? = null,
-    /** Local-search definitional sweep when available. */
-    val definitionalSweep: DefinitionalSweep? = null,
 )
 
 /** Bool-indicator layout of one FlatZinc set variable. */
