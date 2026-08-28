@@ -31,9 +31,7 @@ import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.util.addExact
 import com.eignex.klause.lp.engine.solveAndCertify
-import com.eignex.klause.util.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -45,6 +43,8 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.subExact
 
 /**
  * An LP relaxation of a `Problem` at one search node, plus the metadata mapping each LP column

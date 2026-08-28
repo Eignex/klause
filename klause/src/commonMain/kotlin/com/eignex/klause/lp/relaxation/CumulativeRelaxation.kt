@@ -8,16 +8,16 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.LpRowPremises
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 /**
  * Sound LP makespan lower bound for the scheduling globals ([Cumulative]).

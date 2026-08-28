@@ -8,10 +8,6 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
@@ -19,10 +15,14 @@ import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 internal object AffineSingletons {
 

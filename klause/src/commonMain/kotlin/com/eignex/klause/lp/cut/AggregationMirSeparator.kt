@@ -6,14 +6,14 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
-import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
 import com.eignex.klause.model.PbOp
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 
 /**
  * Aggregation MIR cuts of the {0,½} Chvátal–Gomory family over the integer [Linear] rows. A single

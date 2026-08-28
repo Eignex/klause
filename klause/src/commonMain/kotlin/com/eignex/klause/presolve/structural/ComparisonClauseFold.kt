@@ -8,14 +8,14 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.propagation.PropagationProblem
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 
 /**
  * Folds the reified encoding of an intension comparison disjunction into one [ComparisonClause]. A

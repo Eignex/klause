@@ -3,18 +3,18 @@ package com.eignex.klause.lp.bound
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntIntMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import kotlin.math.ceil
 
 /**

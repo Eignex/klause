@@ -12,18 +12,18 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.bound.MinCostAssignment
 import com.eignex.klause.lp.engine.Cut
-import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
 import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 
 /**
  * Variable groups that are pairwise all-different, harvested from the LP-relevant globals so the

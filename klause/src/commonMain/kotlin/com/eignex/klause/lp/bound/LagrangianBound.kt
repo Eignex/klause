@@ -5,18 +5,18 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableLongIntMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import kotlin.math.ceil
 
 /**

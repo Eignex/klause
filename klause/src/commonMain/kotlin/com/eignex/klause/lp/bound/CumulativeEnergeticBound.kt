@@ -3,13 +3,13 @@ package com.eignex.klause.lp.bound
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.IntArrayList
+import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
-import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.IntArrayList
-import com.eignex.klause.util.LongArrayList
 
 /**
  * Energetic-reasoning infeasibility check for Cumulative globals. For a time window

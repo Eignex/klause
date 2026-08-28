@@ -18,10 +18,10 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.subExact
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the
