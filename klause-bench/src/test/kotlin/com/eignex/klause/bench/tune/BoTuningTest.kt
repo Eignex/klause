@@ -8,6 +8,7 @@ import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.opb.Opb
 import com.eignex.klause.lowering.opb.toProblem
+import com.eignex.klause.solver.objective.toLinearObjective
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,9 @@ class BoTuningTest {
                 Expected.Unknown,
             ),
             ingest = lazyOf(parsed.problem),
-            objective = requireNotNull(parsed.objective) { "OPB test instance needs a min: objective" },
+            objective = requireNotNull(parsed.objective) {
+                "OPB test instance needs a min: objective"
+            }.toLinearObjective(),
         )
     }
 

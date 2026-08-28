@@ -6,6 +6,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
@@ -13,7 +14,6 @@ import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
@@ -44,7 +44,7 @@ data class MpsCompiled(
      *  variable per (bounded or unbounded) float column. */
     val model: ProblemSpec,
     /** Objective, or `null` for a feasibility instance (no `N` row). */
-    val objective: LinearObjective?,
+    val objective: LinearObjectiveSpec?,
     /** True when the objective is a maximise. */
     val maximize: Boolean,
     /** Columns in declaration order, each mapping a name to its integer- or real-variable id. */
@@ -492,7 +492,7 @@ private fun MpsModel.buildObjective(
     numInt: Int,
     numReal: Int,
     scale: RowScale,
-): LinearObjective {
+): LinearObjectiveSpec {
     val intCoefficients = LongArray(numInt)
     val realCoefficients = DoubleArray(numReal)
     objective.indices.forEachIndexed { k, idx ->
@@ -502,7 +502,7 @@ private fun MpsModel.buildObjective(
             intCoefficients[intVarOf[idx]] = scale.scale(objective.coeffs[k])
         }
     }
-    return LinearObjective(
+    return LinearObjectiveSpec(
         // Indicator guards carry no objective weight, but the weight vector may not outrun `numBoolVars`.
         boolWeights = if (numBool == 0) EmptyLongArray else LongArray(numBool),
         intCoefficients = intCoefficients,

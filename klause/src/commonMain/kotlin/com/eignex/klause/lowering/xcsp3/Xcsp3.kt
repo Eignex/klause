@@ -10,6 +10,7 @@ import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.xcsp3.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
@@ -32,7 +33,6 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
@@ -46,7 +46,7 @@ data class Xcsp3Problem(
     /** Compiled solver problem. */
     val problem: Problem,
     /** Objective, or null for satisfaction instances. */
-    val objective: LinearObjective?,
+    val objective: LinearObjectiveSpec?,
     /** Declared variable name to int var id. */
     val intVarNames: Map<String, Int> = emptyMap(),
     /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
@@ -169,7 +169,7 @@ object Xcsp3 {
         internal val domains = ArrayList<IntDomain>()
         override val factors = ArrayList<Factor>()
         internal var nextBool = 0
-        internal var objective: LinearObjective? = null
+        internal var objective: LinearObjectiveSpec? = null
         internal var objectiveMaximize = false
 
         // A fixed var for an integer constant is shared across its occurrences. An Element/sum `<list>`
@@ -765,7 +765,7 @@ object Xcsp3 {
                     require(coeffs.size == termVars.size) { "objective: <coeffs> length != term count" }
                     val arr = LongArray(domains.size)
                     termVars.forEachIndexed { i, v -> arr[v] += (if (maximize) -coeffs[i] else coeffs[i]).toLong() }
-                    objective = LinearObjective(intCoefficients = arr)
+                    objective = LinearObjectiveSpec(intCoefficients = arr)
                 }
 
                 "maximum", "minimum" -> {
@@ -781,10 +781,10 @@ object Xcsp3 {
         }
 
         /** An objective that minimizes (or, when [maximize], maximizes) a single variable. */
-        internal fun singleVarObjective(v: Int, maximize: Boolean): LinearObjective {
+        internal fun singleVarObjective(v: Int, maximize: Boolean): LinearObjectiveSpec {
             val arr = LongArray(domains.size)
             arr[v] = if (maximize) -1L else 1L
-            return LinearObjective(intCoefficients = arr)
+            return LinearObjectiveSpec(intCoefficients = arr)
         }
 
         internal fun linear(e: FExpr): IntComb = linearFold(e)

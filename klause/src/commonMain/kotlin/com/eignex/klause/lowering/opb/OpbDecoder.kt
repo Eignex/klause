@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -13,7 +14,6 @@ import com.eignex.klause.lowering.ProblemBuilder
 import com.eignex.klause.lowering.channelBoolTo01
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -29,7 +29,7 @@ data class OpbProblem(
     /** Compiled solver problem. */
     val problem: Problem,
     /** Objective, or null for satisfaction instances. */
-    val objective: LinearObjective?,
+    val objective: LinearObjectiveSpec?,
     /** AND-indicator definitions for product terms. */
     val boolFolds: List<BoolFoldDefinition> = emptyList(),
     /** Number of source Boolean variables, excluding auxiliary indicators. */
@@ -138,7 +138,7 @@ internal object OpbDecoder {
         }
 
         val objective = if (hasObjective) {
-            LinearObjective(
+            LinearObjectiveSpec(
                 boolWeights = LongArray(
                     builder.numBoolVars,
                 ).also { weights ->

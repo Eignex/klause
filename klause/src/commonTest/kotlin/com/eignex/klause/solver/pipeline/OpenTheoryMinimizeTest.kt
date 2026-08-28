@@ -7,6 +7,7 @@ import com.eignex.klause.lowering.mps.MpsVar
 import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -101,7 +102,7 @@ class OpenTheoryMinimizeTest {
             listOf(MpsConstraint("c", intArrayOf(0), doubleArrayOf(1.0), lower = 7.0, upper = null)),
         ).toProblem()
 
-        val result = OpenTheoryMinimizer(compiled.model, compiled.objective!!).minimize()
+        val result = OpenTheoryMinimizer(compiled.model, compiled.objective!!.toLinearObjective()).minimize()
 
         assertEquals("7", assertIs<OpenTheoryOptimum.Optimal>(result).value.toString())
     }

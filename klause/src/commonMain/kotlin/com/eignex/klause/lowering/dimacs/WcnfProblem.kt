@@ -4,16 +4,16 @@ package com.eignex.klause.lowering.dimacs
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.objective.LinearObjective
 
 /** A WCNF document lowered to hard clauses and a weighted soft-clause objective. */
 data class WcnfProblem(
     /** Compiled solver problem. */
     val problem: Problem,
     /** Soft-clause objective. */
-    val objective: LinearObjective,
+    val objective: LinearObjectiveSpec,
     /** Number of original, non-relaxation variables. */
     val numOriginalBoolVars: Int,
 )
@@ -49,7 +49,7 @@ fun WcnfDocument.toProblem(): WcnfProblem {
     }
     return WcnfProblem(
         Problem(totalVars, 0, emptyArray(), factors.toTypedArray()),
-        LinearObjective(boolWeights = weights, constant = fixedCost),
+        LinearObjectiveSpec(boolWeights = weights, constant = fixedCost),
         numOriginalBoolVars,
     )
 }

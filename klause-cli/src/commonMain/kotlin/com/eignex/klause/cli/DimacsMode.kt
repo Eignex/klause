@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.LinearObjective
 
 /**
  * DIMACS **CNF** front-end (`.cnf`) for Boolean satisfiability. Emits the SAT-competition
@@ -25,7 +26,7 @@ internal object DimacsMode : CliMode {
                 "parsed ${fileName(path)}: bool=${problem.numBoolVars} factors=${problem.numFactors}"
             }
             val render: (Sample) -> String = { s -> renderDimacsModel(problem.numBoolVars, s) }
-            return linearSolvable(problem, null, false, render)
+            return linearSolvable(problem, null as LinearObjective?, false, render)
         }
 
         override fun output(common: CommonOptions): OutputProtocol = DimacsOutput()

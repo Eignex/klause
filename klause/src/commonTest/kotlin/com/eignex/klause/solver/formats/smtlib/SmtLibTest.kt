@@ -14,6 +14,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -474,7 +475,7 @@ class SmtLibTest {
         """.trimIndent()
         val parsed = SmtLib.parse(text)
         val obj = requireNotNull(parsed.objective)
-        val r = BacktrackSolver(parsed.bounded().bake()).minimize(obj, BacktrackParams())
+        val r = BacktrackSolver(parsed.bounded().bake()).minimize(obj.toLinearObjective(), BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(7.0, r.objective)
     }

@@ -3,6 +3,7 @@ package com.eignex.klause.lowering.smtlib
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.formats.smtlib.*
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LinComb
@@ -12,7 +13,6 @@ import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.solver.objective.LinearObjective
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 // Real-arithmetic lowering for the SMT-LIB front-end (LRA / the real half of LIRA): real variables
@@ -386,7 +386,7 @@ internal fun SmtLib.Builder.realTerm(t: SExpr): RealComb = (evalTerm(t, Sort.REA
 
 /** A real OMT objective: exact-double coefficients over real and int variables. Rejects a rational
  *  coefficient a double cannot carry exactly rather than silently mis-reporting the optimum. */
-internal fun SmtLib.Builder.realObjective(t: SExpr, negate: Boolean): LinearObjective {
+internal fun SmtLib.Builder.realObjective(t: SExpr, negate: Boolean): LinearObjectiveSpec {
     val comb0 = realTerm(t)
     val comb = if (negate) comb0.scaled(BigFraction.MINUS_ONE) else comb0
     val intCoeffs = LongArray(nextInt)
@@ -401,7 +401,7 @@ internal fun SmtLib.Builder.realObjective(t: SExpr, negate: Boolean): LinearObje
     }
     val const = comb.constant.toExactLongOrNull()
         ?: smtUnsupported("objective constant is not an exact integer")
-    return LinearObjective(intCoefficients = intCoeffs, constant = const, realCoefficients = realCoeffs)
+    return LinearObjectiveSpec(intCoefficients = intCoeffs, constant = const, realCoefficients = realCoeffs)
 }
 
 internal fun BigFraction.toExactLongOrNull(): Long? =

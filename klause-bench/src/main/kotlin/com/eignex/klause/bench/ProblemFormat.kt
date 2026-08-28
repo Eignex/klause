@@ -14,6 +14,7 @@ import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.sourceRoute
 import java.io.File
@@ -46,7 +47,7 @@ internal object WcnfFormat : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val wcnf = Dimacs.parseWcnf(file.readText()).toProblem()
-        return Ingested(wcnf.problem, wcnf.objective)
+        return Ingested(wcnf.problem, wcnf.objective.toLinearObjective())
     }
 }
 
@@ -55,7 +56,7 @@ internal object OpbFormat : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val opb = Opb.parse(file.readText()).toProblem()
-        return Ingested(opb.problem, opb.objective)
+        return Ingested(opb.problem, opb.objective?.toLinearObjective())
     }
 }
 
@@ -78,7 +79,7 @@ internal object Xcsp3Format : ProblemFormat {
     override val inProcess = true
     override fun ingest(file: File): Ingested {
         val parsed = Xcsp3.parse(file.readText())
-        return Ingested(parsed.problem, parsed.objective)
+        return Ingested(parsed.problem, parsed.objective?.toLinearObjective())
     }
 }
 
@@ -90,7 +91,7 @@ internal object SmtLibFormat : ProblemFormat {
     override fun ingest(file: File): Ingested {
         val strict = System.getProperty("klause.bench.smtlib.strictBounds")?.toBooleanStrictOrNull() ?: false
         val parsed = SmtLib.parse(file.readText(), strictBounds = strict)
-        return Ingested(parsed.model.requireFiniteBenchModel(file), parsed.objective)
+        return Ingested(parsed.model.requireFiniteBenchModel(file), parsed.objective?.toLinearObjective())
     }
 }
 
@@ -104,7 +105,8 @@ internal object MpsFormat : ProblemFormat {
     override fun ingest(file: File): Ingested {
         val compiled = Mps.parse(file.readText()).toProblem()
         val problem = compiled.model.requireFiniteBenchModel(file)
-        val objective = if (compiled.maximize) compiled.objective?.negated() else compiled.objective
+        val rawObjective = compiled.objective?.toLinearObjective()
+        val objective = if (compiled.maximize) rawObjective?.negated() else rawObjective
         return Ingested(problem, objective)
     }
 
