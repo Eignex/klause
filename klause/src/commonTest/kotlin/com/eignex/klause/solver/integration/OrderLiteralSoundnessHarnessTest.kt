@@ -9,6 +9,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.PropagationState

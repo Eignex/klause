@@ -2,6 +2,7 @@ package com.eignex.klause.factor.table
 
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.SpanIntVars
@@ -10,14 +11,13 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
+import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList

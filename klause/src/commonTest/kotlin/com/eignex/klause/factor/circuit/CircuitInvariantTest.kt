@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -10,7 +11,6 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.IntDomain
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

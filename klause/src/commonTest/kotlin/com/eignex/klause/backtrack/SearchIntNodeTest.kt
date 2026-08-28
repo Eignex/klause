@@ -3,9 +3,9 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.backtrack.selector.boundsMidpoint
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.search.SearchDecision
 import kotlin.test.Test
 import kotlin.test.assertEquals

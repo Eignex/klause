@@ -9,13 +9,13 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Element
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals

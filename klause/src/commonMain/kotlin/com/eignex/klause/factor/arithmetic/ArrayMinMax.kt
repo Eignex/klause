@@ -5,6 +5,7 @@ import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.FactorReduction.Rewrite
 import com.eignex.klause.ir.FactorReduction.Unchanged
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.SpanIntVars
@@ -18,7 +19,6 @@ import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntDomain
 
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,

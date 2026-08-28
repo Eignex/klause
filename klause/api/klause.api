@@ -8421,11 +8421,6 @@ public final class com/eignex/klause/solver/IntConsts : com/eignex/klause/solver
 	public fun toLongArray ()[J
 }
 
-public final class com/eignex/klause/solver/IntDomainKt {
-	public static final fun getValues (Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/ir/IntSpan;
-	public static final fun randomValue (Lcom/eignex/klause/ir/IntDomain;Lkotlin/random/Random;)J
-}
-
 public abstract interface class com/eignex/klause/solver/LongConstList : com/eignex/klause/solver/ConstList {
 	public abstract fun at (I)J
 	public abstract fun getMaxAbs ()J

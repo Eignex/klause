@@ -9,9 +9,9 @@ import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.kumulant.bandit.univariate.MultiArmedBandit

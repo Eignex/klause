@@ -1,5 +1,8 @@
 package com.eignex.klause.solver
 
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.randomValue
+import com.eignex.klause.ir.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

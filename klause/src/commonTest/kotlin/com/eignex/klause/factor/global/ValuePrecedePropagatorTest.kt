@@ -2,9 +2,9 @@ package com.eignex.klause.factor.global
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.IntDomain
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch.strategy
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
@@ -18,7 +19,6 @@ import com.eignex.klause.localsearch.schedule.Geometric
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.WeightSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.solver.IntDomain
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

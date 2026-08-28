@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.global.internals
 
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.RevInt
 import com.eignex.klause.propagation.RevIntArray
 import com.eignex.klause.propagation.RevRef
-import com.eignex.klause.solver.IntDomain
 
 /** Per-cover-index count under the current assignment (LS state). */
 internal class GccState(val counts: IntArray)

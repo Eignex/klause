@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.CnfLowering
@@ -67,7 +68,6 @@ import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.FloatInterval
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntObjectMap

@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.AllDifferent
@@ -53,7 +54,6 @@ import com.eignex.klause.model.SubcircuitExpr
 import com.eignex.klause.model.SymmetricAllDifferent
 import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.XorExpr
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import kotlin.math.ceil

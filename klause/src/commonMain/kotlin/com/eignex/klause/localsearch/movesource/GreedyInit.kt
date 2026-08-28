@@ -1,8 +1,8 @@
 package com.eignex.klause.localsearch.movesource
 
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.solver.randomValue
 
 /**
  * Greedy-repair restart initializer. Walks variables in randomized order; for each, commits the

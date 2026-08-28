@@ -7,6 +7,7 @@ import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -17,7 +18,6 @@ import com.eignex.klause.model.IntRef
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
