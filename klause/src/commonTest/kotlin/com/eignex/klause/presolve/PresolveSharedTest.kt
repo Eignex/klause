@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.mergeCliques
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -138,7 +139,7 @@ class PresolveSharedTest {
     fun `a literal joins a clique only when it conflicts with every member`() {
         // 3 is adjacent to 1 and 2 but not to 0, so it may not extend the base clique {0,1,2}; the pair
         // it does form survives on its own.
-        val merged = PresolveShared.mergeCliques(
+        val merged = mergeCliques(
             listOf(setOf(0, 1, 2), setOf(1, 3), setOf(2, 3)),
         )
         assertEquals(setOf(setOf(0, 1, 2), setOf(1, 2, 3)), merged.toSet())
@@ -146,14 +147,14 @@ class PresolveSharedTest {
 
     @Test
     fun `a clique that is a subset of a larger one is dropped`() {
-        val merged = PresolveShared.mergeCliques(listOf(setOf(0, 1, 2), setOf(0, 1)))
+        val merged = mergeCliques(listOf(setOf(0, 1, 2), setOf(0, 1)))
         assertEquals(listOf(setOf(0, 1, 2)), merged)
     }
 
     @Test
     fun `disjoint cliques are left unmerged`() {
         val cliques = listOf(setOf(0, 1), setOf(2, 3))
-        assertEquals(cliques.toSet(), PresolveShared.mergeCliques(cliques).toSet())
+        assertEquals(cliques.toSet(), mergeCliques(cliques).toSet())
     }
 
     @Test
@@ -161,10 +162,10 @@ class PresolveSharedTest {
         // Extension is greedy, so it is only deterministic because candidates are taken in id order —
         // permuting the input must not change the result.
         val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2), setOf(2, 3), setOf(1, 3), setOf(0, 3))
-        val expected = PresolveShared.mergeCliques(base).toSet()
+        val expected = mergeCliques(base).toSet()
 
-        assertEquals(expected, PresolveShared.mergeCliques(base.reversed()).toSet())
-        assertEquals(expected, PresolveShared.mergeCliques(base.sortedBy { it.sum() }).toSet())
+        assertEquals(expected, mergeCliques(base.reversed()).toSet())
+        assertEquals(expected, mergeCliques(base.sortedBy { it.sum() }).toSet())
     }
 
     @Test
@@ -172,7 +173,7 @@ class PresolveSharedTest {
         // The triangle would collapse to one size-3 clique; cancelling forgoes the growth but every
         // returned clique is still a valid at-most-one.
         val base = listOf(setOf(0, 1), setOf(1, 2), setOf(0, 2))
-        val merged = PresolveShared.mergeCliques(base) { true }
+        val merged = mergeCliques(base) { true }
 
         assertEquals(base.toSet(), merged.toSet())
     }
@@ -181,7 +182,7 @@ class PresolveSharedTest {
     fun `negative literals merge like positive ones`() {
         // Lit encoding makes members arbitrary ints, including negative ones, so the conflict graph
         // cannot assume dense non-negative keys.
-        val merged = PresolveShared.mergeCliques(listOf(setOf(-1, -2), setOf(-2, -3), setOf(-1, -3)))
+        val merged = mergeCliques(listOf(setOf(-1, -2), setOf(-2, -3), setOf(-1, -3)))
         assertEquals(listOf(setOf(-1, -2, -3)), merged)
     }
 

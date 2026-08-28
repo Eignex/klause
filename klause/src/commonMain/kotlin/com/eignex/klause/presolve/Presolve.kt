@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.factor.bool.internals.maximalAmoCliques
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.CoefficientStrengthening
@@ -81,8 +82,8 @@ object Presolve {
 
     /** Maximal at-most-one cliques (Lit-encoded, at most one satisfied) recognised from [problem]'s
      *  factors — including those implied by pseudo-Boolean knapsacks — and grown into maximal cliques,
-     *  for clique-aware consumers such as local search. See [PresolveShared]. */
-    fun amoCliques(problem: Problem): List<Set<Int>> = PresolveShared.maximalAmoCliques(problem.factors.asList())
+     *  for clique-aware consumers such as local search. */
+    fun amoCliques(problem: Problem): List<Set<Int>> = maximalAmoCliques(problem.factors.asList())
 
     /** The widest integer-variable domain span (see [PresolveShared.maxIntSpan]); a cheap O(numIntVars)
      *  gate for the span-sensitive presolve steps. */

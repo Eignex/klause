@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.factor.bool.internals.maximalPersistentAmoCliques
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -562,7 +563,7 @@ internal object RedundantConstraints {
      * soundness is preserved). The greedy cover yields *some* valid activity upper bound; a looser
      * cover only misses drops, never makes an unsound one.
      *
-     * Only [PresolveShared.maximalPersistentAmoCliques] (cliques backed by [Cardinality] / [Clause],
+     * Only [maximalPersistentAmoCliques] (cliques backed by [Cardinality] / [Clause],
      * never a knapsack) are used: a clique implied by a knapsack holds only while that knapsack stays,
      * so dropping by it could remove the very constraint it rests on.
      *
@@ -570,7 +571,7 @@ internal object RedundantConstraints {
      * the naive clamp to the clique-reduced slack is unsound — and is left to a follow-up.
      */
     private fun dropCliqueImpliedKnapsacks(factors: List<Factor>, cancellation: Cancellation): List<Factor> {
-        val cliques = PresolveShared.maximalPersistentAmoCliques(factors, cancellation)
+        val cliques = maximalPersistentAmoCliques(factors, cancellation)
         if (cliques.isEmpty()) return factors
         val out = ArrayList<Factor>(factors.size)
         for (f in factors) {

@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.factor.bool.internals.maximalPersistentAmoCliques
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -14,7 +15,7 @@ import com.eignex.klause.util.MutableIntObjectMap
  * At-most-one clique merging. The scattered
  * pairwise exclusion constraints of a problem — a binary clause `(a ∨ b)` excludes the literal pair
  * `{¬a, ¬b}`, a `Cardinality(max = 1)` excludes every pair of its literals — form a conflict graph;
- * [PresolveShared.maximalPersistentAmoCliques] grows the base cliques into maximal ones. This pass
+ * [maximalPersistentAmoCliques] grows the base cliques into maximal ones. This pass
  * *materialises* each maximal clique as one `Cardinality(clique, 0, 1)` and drops the smaller
  * constraints it subsumes, collapsing `O(k²)` binary clauses into a single `O(k)` at-most-one.
  *
@@ -36,7 +37,7 @@ internal object AmoCliqueMerge {
 
     fun mergeAmoCliques(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
         val factors = problem.factors
-        val cliques = PresolveShared.maximalPersistentAmoCliques(factors.asList(), cancellation)
+        val cliques = maximalPersistentAmoCliques(factors.asList(), cancellation)
             .filter { it.size >= MIN_CLIQUE_SIZE }
         if (cliques.isEmpty()) return PassDelta()
 

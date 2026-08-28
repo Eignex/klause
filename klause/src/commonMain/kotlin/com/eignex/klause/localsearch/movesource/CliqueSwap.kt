@@ -1,14 +1,14 @@
 package com.eignex.klause.localsearch.movesource
 
+import com.eignex.klause.factor.bool.internals.maximalAmoCliques
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.presolve.Presolve
 
 /**
- * At-most-one clique swap proposals. Each clique from [Presolve.amoCliques] (Lit-encoded, at most one
+ * At-most-one clique swap proposals. Each clique from [maximalAmoCliques] (Lit-encoded, at most one
  * member satisfied) is treated as a categorical "which member is on, or none" choice. A clique-swap
  * turns the currently-on member off and a chosen other member on in one atomic [Move.Compound], so
  * the search steps directly between clique-feasible states instead of dwelling in the doubly-on
@@ -42,7 +42,7 @@ class CliqueSwap(
 
     private fun cliquesFor(problem: Problem): Array<IntArray> {
         if (cachedProblem === problem) return cachedCliques
-        val recognised = Presolve.amoCliques(problem)
+        val recognised = maximalAmoCliques(problem.factors.asList())
             .asSequence()
             .map { it.toIntArray() }
             .filter { it.size >= 2 } // singleton/empty cliques admit no swap
