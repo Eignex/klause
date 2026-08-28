@@ -655,6 +655,9 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? 
  *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
 const val NODE_LIMIT_KEY = "node-limit"
 
+/** The `--param` key for deterministic solve-wide open-theory work. */
+const val OPEN_WORK_LIMIT_KEY = "open-work-limit"
+
 /** [pool], or the curated pool when it is null, with every arm spending [budget]. */
 fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeBudget): List<() -> BacktrackRecipe> =
     (pool ?: BacktrackCatalog.factories(kind)).map { factory ->

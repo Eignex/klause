@@ -9,6 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
@@ -43,7 +44,7 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `open route reports a spent budget as a timed-out run`() {
+    fun `open route distinguishes external cancellation from a wall timeout`() {
         val openUpper = Bits(1).also { it.set(0) }
         val model = ProblemSpec(
             numBoolVars = 1,
@@ -54,8 +55,72 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
             .solve(TheoryParams(cancellation = Cancellation { true }))
 
-        assertIs<OpenTheoryResult.Unknown>(result)
-        assertEquals(true, result.stats.run.timedOut, "a cancelled open run reports its budget as spent")
+        assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(false, result.stats.run.timedOut)
+    }
+
+    @Test
+    fun `open route reports a wall timeout separately from cancellation`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = emptyArray(),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(
+            TheoryParams(cancellation = Cancellation { true }, timeout = Cancellation { true }),
+        )
+
+        assertEquals(TerminationReason.Timeout, assertIs<OpenTheoryResult.Unknown>(result).reason)
+        assertEquals(true, result.stats.run.timedOut)
+    }
+
+    @Test
+    fun `open work limit stops General LIA during a shared-bound sweep`() {
+        val openUpper = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
+            factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve(
+            TheoryParams(openWorkLimit = 3),
+        )
+
+        val unknown = assertIs<OpenTheoryResult.Unknown>(result)
+        assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
+        assertEquals(1L, unknown.stats.openTheory.openTheoryChecks)
+        assertEquals(2L, unknown.stats.openTheory.openLiaRowVisits)
+        assertEquals(3L, unknown.stats.openTheory.openWork)
+    }
+
+    @Test
+    fun `unlimited open work counters are repeatable`() {
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(
+                lowerBounds = longArrayOf(0),
+                upperBounds = longArrayOf(0),
+                openLo = null,
+                openHi = Bits(1).also { it.set(0) },
+            ),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                Clause(intArrayOf(0)),
+            ),
+        )
+
+        val first = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
+        val second = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
+
+        assertIs<OpenTheoryResult.Sat>(first)
+        assertIs<OpenTheoryResult.Sat>(second)
+        assertEquals(first.stats.openTheory, second.stats.openTheory)
     }
 
     @Test

@@ -45,5 +45,9 @@ fun ComponentPlan.search(
     val theory = theoryComponent(spec)
     if (theory != null) components += theory
     cp?.rebase()
-    return PlannedSearch(SearchComponentSet(components).session(maxChecks, cancellation), cp, theory)
+    return PlannedSearch(
+        SearchComponentSet(components).session(maxChecks, cancellation),
+        cp,
+        theory,
+    )
 }

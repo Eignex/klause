@@ -17,6 +17,7 @@ import com.eignex.klause.solver.search.SearchBrancher
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.theory.Theory
@@ -480,7 +481,8 @@ class GeneralLiaSearchComponent(
         val bound = model.generalLiaWitnessBound(context::cancelled) ?: return ComponentResult.Indeterminate
         witnessBound = bound
         pollStride = pollStrideFor(bound.bitLength())
-        domainsByLevel.put(0, initialDomains(context))
+        val initialDomains = initialDomains(context) ?: return ComponentResult.Indeterminate
+        domainsByLevel.put(0, initialDomains)
         return if (domainsByLevel.getValue(
                 0,
             ).any { it.lo > it.hi }
@@ -529,7 +531,12 @@ class GeneralLiaSearchComponent(
             return null
         }
         val domains = currentDomains().copyOf()
-        if (!applyPublishedBounds(domains, context)) {
+        val imported = applyPublishedBounds(domains, context)
+        if (imported == null) {
+            outcome = ComponentCheck.Indeterminate
+            return null
+        }
+        if (!imported) {
             outcome = ComponentCheck.Infeasible()
             return null
         }
@@ -549,7 +556,10 @@ class GeneralLiaSearchComponent(
         }
         val variable = widestOpenVariable(domains)
         if (variable < 0) {
-            outcome = if (factorsHold(domains)) {
+            val holds = factorsHold(domains, context)
+            outcome = if (holds == null) {
+                ComponentCheck.Indeterminate
+            } else if (holds) {
                 assignment = GeneralLiaAssignment(
                     BooleanArray(bools.size) { bools[it] == TRUE },
                     Array(domains.size) { domains[it].lo },
@@ -577,22 +587,25 @@ class GeneralLiaSearchComponent(
         }
     }
 
-    private fun initialDomains(context: SearchContext): Array<BigInterval> = Array(model.numIntVars) { variable ->
+    private fun initialDomains(context: SearchContext): Array<BigInterval>? {
         val witnessBound = checkNotNull(witnessBound)
-        val lo = if (model.intBounds.hasLower(variable)) {
-            maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(variable)))
-        } else {
-            -witnessBound
+        return Array(model.numIntVars) { variable ->
+            if (!context.consumeGeneralLiaWork()) return null
+            val lo = if (model.intBounds.hasLower(variable)) {
+                maxOf(-witnessBound, BigInteger.fromLong(model.intBounds.lower(variable)))
+            } else {
+                -witnessBound
+            }
+            val hi = if (model.intBounds.hasUpper(variable)) {
+                minOf(witnessBound, BigInteger.fromLong(model.intBounds.upper(variable)))
+            } else {
+                witnessBound
+            }
+            BigInterval(
+                context.intLowerBound(variable)?.let { maxOf(lo, BigInteger.fromLong(it)) } ?: lo,
+                context.intUpperBound(variable)?.let { minOf(hi, BigInteger.fromLong(it)) } ?: hi,
+            )
         }
-        val hi = if (model.intBounds.hasUpper(variable)) {
-            minOf(witnessBound, BigInteger.fromLong(model.intBounds.upper(variable)))
-        } else {
-            witnessBound
-        }
-        BigInterval(
-            context.intLowerBound(variable)?.let { maxOf(lo, BigInteger.fromLong(it)) } ?: lo,
-            context.intUpperBound(variable)?.let { minOf(hi, BigInteger.fromLong(it)) } ?: hi,
-        )
     }
 
     private fun currentDomains(): Array<BigInterval> = domainsByLevel.valueAtMaxKey()
@@ -618,8 +631,10 @@ class GeneralLiaSearchComponent(
             if (context.cancelled()) return null
             changed = false
             for (factor in model.factors) {
+                if (!context.consumeGeneralLiaWork()) return null
                 if (--untilPoll <= 0) {
                     untilPoll = pollStride
+                    context.recordGeneralLiaPoll()
                     if (context.cancelled()) return null
                 }
                 val row = when (factor) {
@@ -644,6 +659,7 @@ class GeneralLiaSearchComponent(
                     // outlast a budget a factor-boundary poll would have caught.
                     if (--untilPoll <= 0) {
                         untilPoll = pollStride
+                        context.recordGeneralLiaPoll()
                         if (context.cancelled()) return null
                     }
                     val coefficient = row.coeffs[index]
@@ -687,8 +703,9 @@ class GeneralLiaSearchComponent(
         return BigInterval(lo, hi)
     }
 
-    private fun applyPublishedBounds(domains: Array<BigInterval>, context: SearchContext): Boolean {
+    private fun applyPublishedBounds(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         for (variable in domains.indices) {
+            if (!context.consumeGeneralLiaWork()) return null
             val current = domains[variable]
             val lower = context.intLowerBound(variable)?.let { BigInteger.fromLong(it) } ?: current.lo
             val upper = context.intUpperBound(variable)?.let { BigInteger.fromLong(it) } ?: current.hi
@@ -716,8 +733,10 @@ class GeneralLiaSearchComponent(
     private fun factorsPossible(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         var untilPoll = pollStride
         return model.factors.all { factor ->
+            if (!context.consumeGeneralLiaWork()) return null
             if (--untilPoll <= 0) {
                 untilPoll = pollStride
+                context.recordGeneralLiaPoll()
                 if (context.cancelled()) return null
             }
             when (factor) {
@@ -745,28 +764,39 @@ class GeneralLiaSearchComponent(
         }
     }
 
-    private fun factorsHold(domains: Array<BigInterval>): Boolean = model.factors.all { factor ->
-        when (factor) {
-            is Clause -> factor.literals.any { literal -> bools[literal ushr 1] == truth(literal) }
-
-            is Linear -> relationHolds(rowValue(factor, domains), factor.op, linearBound(factor))
-
-            is ReifiedLinear -> relationHolds(
-                rowValue(factor, domains),
-                factor.op,
-                reifiedBound(factor),
-            ) == (bools[factor.auxBoolVar] == TRUE)
-
-            is ComparisonClause -> factor.vars.indices.any { index ->
-                relationHolds(
-                    domains[factor.vars[index]].lo,
-                    factor.ops[index],
-                    BigInteger.fromLong(factor.consts[index]),
-                )
+    private fun factorsHold(domains: Array<BigInterval>, context: SearchContext): Boolean? {
+        var untilPoll = pollStride
+        for (factor in model.factors) {
+            if (!context.consumeGeneralLiaWork()) return null
+            if (--untilPoll <= 0) {
+                untilPoll = pollStride
+                context.recordGeneralLiaPoll()
+                if (context.cancelled()) return null
             }
+            val holds = when (factor) {
+                is Clause -> factor.literals.any { literal -> bools[literal ushr 1] == truth(literal) }
 
-            else -> false
+                is Linear -> relationHolds(rowValue(factor, domains), factor.op, linearBound(factor))
+
+                is ReifiedLinear -> relationHolds(
+                    rowValue(factor, domains),
+                    factor.op,
+                    reifiedBound(factor),
+                ) == (bools[factor.auxBoolVar] == TRUE)
+
+                is ComparisonClause -> factor.vars.indices.any { index ->
+                    relationHolds(
+                        domains[factor.vars[index]].lo,
+                        factor.ops[index],
+                        BigInteger.fromLong(factor.consts[index]),
+                    )
+                }
+
+                else -> false
+            }
+            if (!holds) return false
         }
+        return true
     }
 
     private fun rowRange(factor: Linear, domains: Array<BigInterval>): BigInterval =
@@ -943,4 +973,10 @@ private sealed interface GeneralLiaSearchOutcome {
     data object Infeasible : GeneralLiaSearchOutcome
     data object Cancelled : GeneralLiaSearchOutcome
     data object BudgetCapped : GeneralLiaSearchOutcome
+}
+
+private fun SearchContext.consumeGeneralLiaWork(): Boolean = (this as? SearchSession)?.consumeLiaRowVisit() != false
+
+private fun SearchContext.recordGeneralLiaPoll() {
+    (this as? SearchSession)?.recordCancellationPoll()
 }

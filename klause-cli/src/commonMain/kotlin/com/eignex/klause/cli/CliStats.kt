@@ -104,6 +104,19 @@ internal fun searchStatPairs(stats: SolveStats): List<Pair<String, String>> {
     return out
 }
 
+/** Exact deterministic open-theory accounting pairs for `-s`. */
+internal fun openTheoryStatPairs(stats: SolveStats): List<Pair<String, String>> = with(stats.openTheory) {
+    listOf(
+        "openBoolDecisions" to "$openBoolDecisions",
+        "openIntDecisions" to "$openIntDecisions",
+        "openTheoryDecisions" to "$openTheoryDecisions",
+        "openTheoryChecks" to "$openTheoryChecks",
+        "openLiaRowVisits" to "$openLiaRowVisits",
+        "openCancellationPolls" to "$openCancellationPolls",
+        "openWork" to "$openWork",
+    )
+}
+
 /** Conflict-analysis diagnostic counters for `-s` — why 1UIP learning was skipped or rejected.
  *  Only the MiniZinc mode reports them today; kept apart from [searchStatPairs] so the other
  *  modes' leaner blocks stay lean. */

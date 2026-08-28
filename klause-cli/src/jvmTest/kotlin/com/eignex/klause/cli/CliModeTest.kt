@@ -64,7 +64,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an open theory run that spends its budget names the cause`() {
+    fun `an open theory wall timeout names the cause`() {
         val smt = File.createTempFile("clibudget", ".smt2").apply {
             writeText(
                 """
@@ -77,12 +77,39 @@ class CliModeTest {
         }
 
         var code = -1
-        // A zero budget is already spent at the first poll, so the cause is decided rather than raced.
+        // A zero wall budget is already spent at the first poll, so the cause is decided rather than raced.
         val out = capture { code = runCli(arrayOf("-s", "-t", "0", smt.absolutePath)) }
 
         assertEquals(0, code, out)
         assertTrue(out.lines().firstOrNull() == "unknown", out)
-        assertTrue("; budget exhausted" in out, out)
+        assertTrue("; wall timeout" in out, out)
+    }
+
+    @Test
+    fun `an open theory fixed work limit names the cause and prints counters`() {
+        val smt = File.createTempFile("cliopenwork", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (declare-const y Int)
+                (declare-const b Bool)
+                (assert (<= (+ (* 2 x) y) 3))
+                (assert (or b (not b)))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture {
+            code = runCli(arrayOf("-s", "--param", "open-work-limit=0", smt.absolutePath))
+        }
+
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "unknown", out)
+        assertTrue("; fixed work exhausted" in out, out)
+        assertTrue("; openWork=0" in out, out)
     }
 
     @Test

@@ -157,7 +157,11 @@ internal class SmtLibOutput : BufferedBestOutput() {
     override fun keepStat(key: String): Boolean = key in SMT_SEARCH_KEYS
 
     private companion object {
-        private val SMT_SEARCH_KEYS = setOf("nodes", "failures", "propagations")
+        private val SMT_SEARCH_KEYS = setOf(
+            "nodes", "failures", "propagations",
+            "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
+            "openLiaRowVisits", "openCancellationPolls", "openWork",
+        )
     }
 }
 
