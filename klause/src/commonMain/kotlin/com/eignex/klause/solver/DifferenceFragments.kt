@@ -6,6 +6,7 @@ import com.eignex.klause.arithmetic.difference.appendDifferenceEdges
 import com.eignex.klause.arithmetic.difference.appendNegatedDifferenceEdges
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.Lit
 

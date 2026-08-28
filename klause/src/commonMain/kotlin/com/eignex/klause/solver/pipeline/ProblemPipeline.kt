@@ -1,10 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lp.admitsSmallModelBound
 import com.eignex.klause.lp.smallModelBigIntBound
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Cancellation

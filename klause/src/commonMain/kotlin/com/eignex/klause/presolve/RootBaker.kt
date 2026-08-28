@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
@@ -13,7 +14,6 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.isFoldedPropagationView
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagationCancellation
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.util.LongHashSet
 import kotlin.random.Random
 

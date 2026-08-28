@@ -4,9 +4,9 @@ import com.eignex.klause.backtrack.selector.IndomainMax
 import com.eignex.klause.backtrack.selector.IndomainMin
 import com.eignex.klause.backtrack.selector.InputOrder
 import com.eignex.klause.backtrack.selector.VarRef
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import kotlin.random.Random
 import kotlin.test.Test

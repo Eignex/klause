@@ -3,10 +3,10 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.count.CountConfig
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.SpanIntVars
@@ -10,7 +11,6 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 
 /**
  * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int

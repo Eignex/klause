@@ -1,7 +1,11 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.table.internals.MddTransitionIndex
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.FactorReduction
+import com.eignex.klause.ir.FactorReduction.Rewrite
+import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.SpanIntVars
@@ -16,11 +20,7 @@ import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Rewrite
-import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList

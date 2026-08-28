@@ -4,6 +4,7 @@ import com.eignex.klause.factor.ReifiedFactor
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.BoolVars
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
@@ -18,7 +19,6 @@ import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.engine.addExact
 import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 
 /**
  * `auxBoolVar ↔ ([min] ≤ #true [literals] ≤ [max])`. Created by the compiler when a

@@ -28,17 +28,17 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 
 /**
- * Brute-force oracle pass over every [com.eignex.klause.solver.Factor]. For each factor we
+ * Brute-force oracle pass over every [com.eignex.klause.ir.Factor]. For each factor we
  * build a small enough instance for [com.eignex.klause.brute.BruteForceSolver] to
  * enumerate the full assignment space, then assert:
  *  - [FactorPropagationOracle.assertSound] — propagate's deductions hold on every satisfying

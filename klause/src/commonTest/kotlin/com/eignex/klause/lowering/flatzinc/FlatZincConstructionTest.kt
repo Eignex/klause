@@ -58,5 +58,5 @@ class FlatZincConstructionTest {
         assertTrue(error.message.orEmpty().contains("outside the finite range"))
     }
 
-    private fun assertIsClause(factor: com.eignex.klause.solver.Factor): Clause = assertIs<Clause>(factor)
+    private fun assertIsClause(factor: com.eignex.klause.ir.Factor): Clause = assertIs<Clause>(factor)
 }

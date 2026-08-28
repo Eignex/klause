@@ -1,8 +1,8 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertTrue

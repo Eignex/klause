@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.util.EmptyDoubleArray
 import com.eignex.klause.util.EmptyIntArray
 import com.ionspin.kotlin.bignum.integer.BigInteger

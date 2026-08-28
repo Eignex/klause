@@ -1,5 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
@@ -11,7 +12,6 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 
 /**
  * A disjunction of single-variable comparison literals: `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))`, holding

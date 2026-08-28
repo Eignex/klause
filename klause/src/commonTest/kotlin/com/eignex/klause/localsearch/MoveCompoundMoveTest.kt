@@ -1,6 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.*

@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test

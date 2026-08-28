@@ -6,11 +6,11 @@ import com.eignex.klause.count.ApproxCountConfig
 import com.eignex.klause.count.SampleQuality
 import com.eignex.klause.count.SamplingConfig
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
