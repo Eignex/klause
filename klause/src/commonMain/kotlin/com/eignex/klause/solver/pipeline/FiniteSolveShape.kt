@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
@@ -23,8 +23,8 @@ class FiniteSolveShape(
     val objectiveIntVar: Int?,
     /** Source-level definitional sweep for local-search workers. */
     val definitionalSweep: DefinitionalSweep?,
-    /** Source-provided fixed-backtrack search parameters. */
-    val annotatedBacktrackParams: BacktrackParams? = null,
+    /** Source-provided search hints, decoded by the pipeline for the fixed route. */
+    val searchHints: FlatZincSearchHints? = null,
     /** Presolve summary attached once preparation completes. */
     val presolve: PresolveStats? = null,
 ) {

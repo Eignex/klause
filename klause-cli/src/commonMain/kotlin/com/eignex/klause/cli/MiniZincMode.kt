@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lowering.flatzinc.SolveDirective
 import com.eignex.klause.solver.Sample
@@ -80,10 +79,7 @@ internal object MiniZincMode : CliMode {
                     definitionalSweep = executionProgram.definitionalSweep,
                     render = render,
                     objectiveValue = null,
-                    annotatedBacktrackParams = program.searchHints?.toBacktrackParams(
-                        program.problem.numBoolVars,
-                        program.problem.numIntVars,
-                    ),
+                    searchHints = program.searchHints,
                 )
 
                 is SolveDirective.Minimize, is SolveDirective.Maximize -> {
@@ -115,10 +111,7 @@ internal object MiniZincMode : CliMode {
                         // CliMode) feeds arm attribution and the LS incumbent statistic, which the engine
                         // produces in its internal minimise frame. Reuse one lambda for all three.
                         objectiveValue = { s -> linear.evaluateLong(s).let { if (maximize) -it else it } },
-                        annotatedBacktrackParams = program.searchHints?.toBacktrackParams(
-                            program.problem.numBoolVars,
-                            program.problem.numIntVars,
-                        ),
+                        searchHints = program.searchHints,
                     )
                 }
             }

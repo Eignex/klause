@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -52,10 +52,8 @@ internal class Solvable(
          *  objective weights one: their values are real, so the total has no exact integral form. Null
          *  leaves [objectiveValue] the whole objective. */
         continuousObjectiveValue: ((Sample) -> Double)? = null,
-        /** Model-supplied backtrack search (FlatZinc `solve :: *_search(...)`); the driver uses
-         *  it unless `-f` (free search) is set. Null when the mode carries no search annotations
-         *  (XCSP/SMT), so the driver falls back to its default CDCL configuration. */
-        annotatedBacktrackParams: BacktrackParams? = null,
+        /** Model-supplied FlatZinc search annotation. */
+        searchHints: FlatZincSearchHints? = null,
         /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
         presolve: PresolveStats? = null,
         /** The component set selected once while loading the source model. */
@@ -63,7 +61,7 @@ internal class Solvable(
     ) : this(
         finite = FiniteSolveShape(
             problem, optimize, maximize, lsObjective, linearObjective, objVarId, definitionalSweep,
-            annotatedBacktrackParams, presolve,
+            searchHints, presolve,
         ),
         render = render,
         objectiveValue = objectiveValue,
@@ -79,7 +77,7 @@ internal class Solvable(
     val linearObjective: LinearObjective? get() = finite?.linearObjective
     val objVarId: Int? get() = finite?.objectiveIntVar
     val definitionalSweep: DefinitionalSweep? get() = finite?.definitionalSweep
-    val annotatedBacktrackParams: BacktrackParams? get() = finite?.annotatedBacktrackParams
+    val searchHints: FlatZincSearchHints? get() = finite?.searchHints
     val presolve: PresolveStats? get() = finite?.presolve
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
 }

@@ -297,7 +297,7 @@ private fun Solvable.copyWith(
     render = render,
     objectiveValue = objectiveValue,
     continuousObjectiveValue = continuousObjectiveValue,
-    annotatedBacktrackParams = annotatedBacktrackParams,
+    searchHints = searchHints,
 )
 
 /**
