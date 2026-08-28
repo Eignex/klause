@@ -66,7 +66,7 @@ class LinearLinearizerTest {
         val linear = Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 5)
         val builder = RecordingBuilder()
 
-        linear.emitLpRelaxation(builder, factorId = 0)
+        linear.emitLpRelaxation(builder)
 
         assertEquals(1, builder.rows.size)
         assertEquals(LinearOp.LE, builder.rows[0].op)
@@ -81,7 +81,7 @@ class LinearLinearizerTest {
         val allDifferent = AllDifferent(intArrayOf(0, 1, 2), domainMin = 0, domainSize = 3)
         val builder = RecordingBuilder()
 
-        allDifferent.emitLpRelaxation(builder, factorId = 0)
+        allDifferent.emitLpRelaxation(builder)
         assertTrue(builder.rows.isEmpty())
     }
 }

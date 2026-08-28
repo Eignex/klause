@@ -108,7 +108,7 @@ class Regular(
      * ([MAX_REGULAR_ARCS]); above the cap, or when no accepting path survives, it is skipped. HULL.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val len = seq.size

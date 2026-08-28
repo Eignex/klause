@@ -66,7 +66,7 @@ class RealProduct(
         sink.long(realOperandHi.toRawBits())
     }
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val resCol = builder.realColumn(result)
         val opCol = builder.realColumn(realOperand)
         if (resCol < 0 || opCol < 0) return // builder has no real-column backing (e.g. a presolve fake)

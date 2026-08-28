@@ -90,7 +90,7 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
         }
     }
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         builder.boolRow(literals, weights, relation, bound)
     }
 

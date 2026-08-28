@@ -60,7 +60,7 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
             }
         }
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val coeffs = longArrayOf(1, -1)
         for (i in 0 until xs.size - 1) {
             builder.linearRow(LinearOp.GE, intArrayOf(xs[i + 1], xs[i]), coeffs, gap.toLong())

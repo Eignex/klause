@@ -154,7 +154,7 @@ class ReifiedLinear private constructor(
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         integerConstants?.let { linearResidual(state.longPayload[factorId], op, it.bound, softCap) } ?: softCap
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         // A wide reified row is excluded from the LP relaxation entirely — no 64-bit reading of it may
         // enter the LP; [WideReifiedLinearPropagator] is the sole enforcer.
         val row = integerConstants ?: return

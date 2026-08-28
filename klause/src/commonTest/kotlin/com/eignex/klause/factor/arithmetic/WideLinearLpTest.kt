@@ -78,7 +78,7 @@ class WideLinearLpTest {
     fun `a wide at-most row over a nonnegative variable is an outward relaxation`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b, factorId = 0)
+        row.emitLpRelaxation(b)
         assertEquals(1, b.realRows.size)
         val r = b.realRows[0]
         assertEquals(LinearOp.LE, r.op)
@@ -91,7 +91,7 @@ class WideLinearLpTest {
     fun `a wide row over a sign-straddling variable splits into nonnegative parts`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.LE, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(-5, 5)))
-        row.emitLpRelaxation(b, factorId = 0)
+        row.emitLpRelaxation(b)
         // A link row x = x⁺ − x⁻ and one outer ≤ row over the two nonnegative split columns.
         assertEquals(2, b.realRows.size)
         val link = b.realRows.first { it.op == LinearOp.EQ }
@@ -114,7 +114,7 @@ class WideLinearLpTest {
         val huge = BigInteger.ONE.shl(2000)
         val row = Linear(intArrayOf(0), arrayOf(huge), LinearOp.LE, huge)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b, factorId = 0)
+        row.emitLpRelaxation(b)
         assertEquals(0, b.realRows.size, "no row is emitted for values the LP cannot represent")
     }
 
@@ -125,7 +125,7 @@ class WideLinearLpTest {
         val big = BigInteger.ONE.shl(1023)
         val row = Linear(intArrayOf(0), arrayOf(big), LinearOp.LE, big)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b, factorId = 0)
+        row.emitLpRelaxation(b)
         assertEquals(1, b.realRows.size)
         assertTrue(b.realRows[0].coeffs.all { it.isFinite() }, "the emitted coefficients are finite")
     }
@@ -137,7 +137,7 @@ class WideLinearLpTest {
         val overflowing = BigInteger.ONE.shl(1024) - BigInteger.ONE.shl(969)
         val row = Linear(intArrayOf(0), arrayOf(overflowing), LinearOp.LE, overflowing)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b, factorId = 0)
+        row.emitLpRelaxation(b)
         assertEquals(0, b.realRows.size, "no row is emitted for values the LP cannot represent")
     }
 
@@ -145,7 +145,7 @@ class WideLinearLpTest {
     fun `a wide equality emits a bracketing pair of outer rows`() {
         val row = Linear(intArrayOf(0), arrayOf(w), LinearOp.EQ, w)
         val b = RecordingBuilder(mapOf(0 to IntDomain(0, 10)))
-        row.emitLpRelaxation(b, factorId = 0)
+        row.emitLpRelaxation(b)
         assertEquals(2, b.realRows.size)
         assertEquals(setOf(LinearOp.LE, LinearOp.GE), b.realRows.map { it.op }.toSet())
     }

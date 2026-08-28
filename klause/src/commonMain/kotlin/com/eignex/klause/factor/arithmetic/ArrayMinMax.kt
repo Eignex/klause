@@ -64,7 +64,7 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
      * per-operand big-M row forcing `result = xs[i]` when `z_i = 1`. Each `M_i` comes from the declared
      * domains, so it bounds `|result − xs[i]|` globally and the rows hold at every integer solution.
      */
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val resultCol = builder.intColumn(result)
         val op = if (max) LinearOp.GE else LinearOp.LE
         for (x in xs) {

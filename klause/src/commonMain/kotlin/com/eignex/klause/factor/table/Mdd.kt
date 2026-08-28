@@ -239,7 +239,7 @@ class Mdd(
      * transition table relaxes soundly; `src`/`dst` are per-layer state ids, always in [Int] range.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val n = seq.size

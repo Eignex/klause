@@ -24,26 +24,26 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 
 /** Emit this factor's LP relaxation into [builder]. */
-internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder) {
     when (this) {
-        is ArrayMinMax -> emitLpRelaxation(builder, factorId)
-        is Cardinality -> emitLpRelaxation(builder, factorId)
-        is Clause -> emitLpRelaxation(builder, factorId)
-        is Element -> emitLpRelaxation(builder, factorId)
-        is GlobalCardinality -> emitLpRelaxation(builder, factorId)
-        is Increasing -> emitLpRelaxation(builder, factorId)
-        is Linear -> emitLpRelaxation(builder, factorId)
-        is Mdd -> emitLpRelaxation(builder, factorId)
-        is NValue -> emitLpRelaxation(builder, factorId)
-        is Product -> emitLpRelaxation(builder, factorId)
-        is PseudoBoolean -> emitLpRelaxation(builder, factorId)
-        is RealProduct -> emitLpRelaxation(builder, factorId)
-        is Regular -> emitLpRelaxation(builder, factorId)
-        is ReifiedCardinality -> emitLpRelaxation(builder, factorId)
-        is ReifiedLinear -> emitLpRelaxation(builder, factorId)
-        is ReifiedPseudoBoolean -> emitLpRelaxation(builder, factorId)
-        is ReifiedRealLinear -> emitLpRelaxation(builder, factorId)
-        is Table -> emitLpRelaxation(builder, factorId)
+        is ArrayMinMax -> emitLpRelaxation(builder)
+        is Cardinality -> emitLpRelaxation(builder)
+        is Clause -> emitLpRelaxation(builder)
+        is Element -> emitLpRelaxation(builder)
+        is GlobalCardinality -> emitLpRelaxation(builder)
+        is Increasing -> emitLpRelaxation(builder)
+        is Linear -> emitLpRelaxation(builder)
+        is Mdd -> emitLpRelaxation(builder)
+        is NValue -> emitLpRelaxation(builder)
+        is Product -> emitLpRelaxation(builder)
+        is PseudoBoolean -> emitLpRelaxation(builder)
+        is RealProduct -> emitLpRelaxation(builder)
+        is Regular -> emitLpRelaxation(builder)
+        is ReifiedCardinality -> emitLpRelaxation(builder)
+        is ReifiedLinear -> emitLpRelaxation(builder)
+        is ReifiedPseudoBoolean -> emitLpRelaxation(builder)
+        is ReifiedRealLinear -> emitLpRelaxation(builder)
+        is Table -> emitLpRelaxation(builder)
         else -> for (row in linearRows) builder.emitExactRow(row)
     }
 }

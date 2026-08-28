@@ -52,7 +52,7 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
         builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())
     }

@@ -873,7 +873,7 @@ internal class CpToLpRelaxation(
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags)
-                factor.emitLpRelaxation(this, factorId)
+                factor.emitLpRelaxation(this)
             }
 
             if (booleanRlt) buildBooleanRlt()
@@ -933,7 +933,7 @@ internal class CpToLpRelaxation(
 
         /**
          * Emit [f]'s atom row AND its exact complement row unconditionally (contrast
-         * [ReifiedRealLinear.linearize], which consults the live pin and emits at most one): the model's
+         * relaxation projection, which consults the live pin and emits at most one): the model's
          * row set is then pin-independent, and a node merely re-points each row's rhs at its pin state
          * ([gatedEnforcement]) — at most one of the pair is ever active. Premises stay the activating
          * literal, so certificates cite exactly as on the per-node build.

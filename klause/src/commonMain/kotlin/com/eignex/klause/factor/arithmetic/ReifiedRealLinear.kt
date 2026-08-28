@@ -92,7 +92,7 @@ class ReifiedRealLinear(
         }
     }
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val pin = builder.liveBool(aux) ?: return
         val cols = IntArray(vars.size + realVars.size)
         val coeffs = DoubleArray(cols.size)

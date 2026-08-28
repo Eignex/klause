@@ -86,7 +86,7 @@ class Clause(literals: IntArray) :
         return allBool
     }
 
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
     }
 

@@ -138,7 +138,7 @@ class GlobalCardinality(
      * counts(k)` — so a count variable in the objective reads a true LP bound. Gated by [MAX_GCC_CELLS]; the
      * constant-bound and optional-presence forms are skipped. HULL.
      */
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         val counts = countVars ?: return // constant-bound form has no count var to bound

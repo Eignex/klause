@@ -72,7 +72,7 @@ class Product(
      * the declared domains, so the rows are global and the relaxation never cuts a feasible point. For
      * `a = b` (a square) the `a` and `b` coefficients coalesce into the secant/tangent relaxation. HULL.
      */
-    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         val aDom = builder.declaredDomain(a)
         val bDom = builder.declaredDomain(b)
