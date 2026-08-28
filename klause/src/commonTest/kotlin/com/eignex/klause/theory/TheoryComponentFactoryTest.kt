@@ -6,6 +6,7 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.theoryComponent
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.util.Bits
 import kotlin.test.Test

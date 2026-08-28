@@ -11,7 +11,6 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
-import com.eignex.klause.theory.theoryComponent
 import com.eignex.klause.util.Cancellation
 
 /** Components and session built from a [ComponentPlan]. */

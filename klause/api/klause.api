@@ -9048,7 +9048,6 @@ public final class com/eignex/klause/solver/pipeline/ProblemPipelineKt {
 	public static final fun pipelineRoute (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZZ)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static synthetic fun pipelineRoute$default (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;ZZILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute;
 	public static final fun sourceRoute (Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
-	public static final fun supportsExactLra (Lcom/eignex/klause/ir/ProblemSpec;)Z
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/SourceProblemRoute {
@@ -10576,10 +10575,6 @@ public final class com/eignex/klause/theory/TheoryCheck$Sat : com/eignex/klause/
 	public fun toString ()Ljava/lang/String;
 }
 
-public final class com/eignex/klause/theory/TheoryComponentFactoryKt {
-	public static final fun theoryComponent (Lcom/eignex/klause/solver/pipeline/ComponentPlan;Lcom/eignex/klause/ir/ProblemSpec;)Lcom/eignex/klause/solver/search/TheoryComponent;
-}
-
 public abstract interface class com/eignex/klause/theory/TheoryContext {
 	public abstract fun cancelled ()Z
 	public abstract fun consumeCheck ()Z
@@ -10658,6 +10653,10 @@ public final class com/eignex/klause/theory/lia/GeneralLiaSolver : com/eignex/kl
 	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;)V
 	public fun check ([ZLcom/eignex/klause/theory/TheoryContext;)Lcom/eignex/klause/theory/TheoryCheck;
 	public fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
+}
+
+public final class com/eignex/klause/theory/qflra/ExactLinearFragmentKt {
+	public static final fun supportsExactLra (Lcom/eignex/klause/ir/ProblemSpec;)Z
 }
 
 public final class com/eignex/klause/theory/qflra/ExactLiraAssignment {

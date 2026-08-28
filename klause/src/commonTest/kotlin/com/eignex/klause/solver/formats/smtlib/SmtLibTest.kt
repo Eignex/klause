@@ -22,11 +22,11 @@ import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.sourceRoute
-import com.eignex.klause.solver.pipeline.supportsExactLra
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
+import com.eignex.klause.theory.qflra.supportsExactLra
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.math.abs
 import kotlin.test.Test

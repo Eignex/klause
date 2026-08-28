@@ -10,6 +10,9 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
+import com.eignex.klause.theory.lia.admitsGeneralLia
+import com.eignex.klause.theory.qflra.supportsExactLira
+import com.eignex.klause.theory.qflra.supportsExactLra
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
