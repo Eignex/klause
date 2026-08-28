@@ -3,6 +3,7 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import kotlin.test.Test
 import kotlin.test.assertEquals

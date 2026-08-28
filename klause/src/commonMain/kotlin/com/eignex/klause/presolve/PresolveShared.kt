@@ -7,6 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.isFoldedPropagationView
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem
@@ -350,7 +351,7 @@ internal object PresolveShared {
             numIntVars = problem.numIntVars,
             intDomains = intDomains,
             factors = factors,
-            alreadyFolded = problem.sharedDomains,
+            alreadyFolded = problem.isFoldedPropagationView,
             // The LP-only continuous columns are a separate namespace presolve never touches (real-bearing
             // rows are guarded out of every pass, and int renumbering leaves real ids alone), so carry it
             // through unchanged — else the solve loses the reals and the leaf verdict silently no-ops.

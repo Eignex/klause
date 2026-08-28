@@ -1360,6 +1360,37 @@ sealed interface com.eignex.klause.ir/FactorReduction { // com.eignex.klause.ir/
     final object Unchanged : com.eignex.klause.ir/FactorReduction // com.eignex.klause.ir/FactorReduction.Unchanged|null[0]
 }
 
+sealed interface com.eignex.klause.ir/IntColumn { // com.eignex.klause.ir/IntColumn|null[0]
+    final class Bounded : com.eignex.klause.ir/IntColumn { // com.eignex.klause.ir/IntColumn.Bounded|null[0]
+        constructor <init>(kotlin/Long?, kotlin/Long?) // com.eignex.klause.ir/IntColumn.Bounded.<init>|<init>(kotlin.Long?;kotlin.Long?){}[0]
+
+        final val lower // com.eignex.klause.ir/IntColumn.Bounded.lower|{}lower[0]
+            final fun <get-lower>(): kotlin/Long? // com.eignex.klause.ir/IntColumn.Bounded.lower.<get-lower>|<get-lower>(){}[0]
+        final val upper // com.eignex.klause.ir/IntColumn.Bounded.upper|{}upper[0]
+            final fun <get-upper>(): kotlin/Long? // com.eignex.klause.ir/IntColumn.Bounded.upper.<get-upper>|<get-upper>(){}[0]
+
+        final fun component1(): kotlin/Long? // com.eignex.klause.ir/IntColumn.Bounded.component1|component1(){}[0]
+        final fun component2(): kotlin/Long? // com.eignex.klause.ir/IntColumn.Bounded.component2|component2(){}[0]
+        final fun copy(kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.ir/IntColumn.Bounded // com.eignex.klause.ir/IntColumn.Bounded.copy|copy(kotlin.Long?;kotlin.Long?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/IntColumn.Bounded.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/IntColumn.Bounded.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/IntColumn.Bounded.toString|toString(){}[0]
+    }
+
+    final class Finite : com.eignex.klause.ir/IntColumn { // com.eignex.klause.ir/IntColumn.Finite|null[0]
+        constructor <init>(com.eignex.klause.ir/IntDomain) // com.eignex.klause.ir/IntColumn.Finite.<init>|<init>(com.eignex.klause.ir.IntDomain){}[0]
+
+        final val domain // com.eignex.klause.ir/IntColumn.Finite.domain|{}domain[0]
+            final fun <get-domain>(): com.eignex.klause.ir/IntDomain // com.eignex.klause.ir/IntColumn.Finite.domain.<get-domain>|<get-domain>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/IntDomain // com.eignex.klause.ir/IntColumn.Finite.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/IntDomain = ...): com.eignex.klause.ir/IntColumn.Finite // com.eignex.klause.ir/IntColumn.Finite.copy|copy(com.eignex.klause.ir.IntDomain){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/IntColumn.Finite.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.ir/IntColumn.Finite.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.ir/IntColumn.Finite.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.ir/VarList { // com.eignex.klause.ir/VarList|null[0]
     open val boolVars // com.eignex.klause.ir/VarList.boolVars|{}boolVars[0]
         open fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/VarList.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
@@ -2291,6 +2322,40 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryResult { // com.eig
     }
 }
 
+sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute|null[0]
+    final class Finite : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite|null[0]
+        constructor <init>(com.eignex.klause.ir/Problem) // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.<init>|<init>(com.eignex.klause.ir.Problem){}[0]
+
+        final val problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem|{}problem[0]
+            final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.problem.<get-problem>|<get-problem>(){}[0]
+
+        final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.ir/Problem = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.copy|copy(com.eignex.klause.ir.Problem){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.Finite.toString|toString(){}[0]
+    }
+
+    final class OpenTheory : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryRequest) // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
+
+        final val request // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.request|{}request[0]
+            final fun <get-request>(): com.eignex.klause.solver.pipeline/OpenTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.request.<get-request>|<get-request>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryRequest // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryRequest = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryRequest){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.toString|toString(){}[0]
+    }
+
+    final object UnsupportedOpen : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.toString|toString(){}[0]
+    }
+}
+
 sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.klause.solver.result/MinimizeResult|null[0]
     abstract val assignment // com.eignex.klause.solver.result/MinimizeResult.assignment|{}assignment[0]
         abstract fun <get-assignment>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.result/MinimizeResult.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -2953,37 +3018,6 @@ sealed interface com.eignex.klause.solver.search/SearchRunEvent { // com.eignex.
 sealed interface com.eignex.klause.solver/ConstList { // com.eignex.klause.solver/ConstList|null[0]
     abstract val size // com.eignex.klause.solver/ConstList.size|{}size[0]
         abstract fun <get-size>(): kotlin/Int // com.eignex.klause.solver/ConstList.size.<get-size>|<get-size>(){}[0]
-}
-
-sealed interface com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn|null[0]
-    final class Bounded : com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn.Bounded|null[0]
-        constructor <init>(kotlin/Long?, kotlin/Long?) // com.eignex.klause.solver/IntColumn.Bounded.<init>|<init>(kotlin.Long?;kotlin.Long?){}[0]
-
-        final val lower // com.eignex.klause.solver/IntColumn.Bounded.lower|{}lower[0]
-            final fun <get-lower>(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.lower.<get-lower>|<get-lower>(){}[0]
-        final val upper // com.eignex.klause.solver/IntColumn.Bounded.upper|{}upper[0]
-            final fun <get-upper>(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.upper.<get-upper>|<get-upper>(){}[0]
-
-        final fun component1(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.component1|component1(){}[0]
-        final fun component2(): kotlin/Long? // com.eignex.klause.solver/IntColumn.Bounded.component2|component2(){}[0]
-        final fun copy(kotlin/Long? = ..., kotlin/Long? = ...): com.eignex.klause.solver/IntColumn.Bounded // com.eignex.klause.solver/IntColumn.Bounded.copy|copy(kotlin.Long?;kotlin.Long?){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/IntColumn.Bounded.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.solver/IntColumn.Bounded.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.solver/IntColumn.Bounded.toString|toString(){}[0]
-    }
-
-    final class Finite : com.eignex.klause.solver/IntColumn { // com.eignex.klause.solver/IntColumn.Finite|null[0]
-        constructor <init>(com.eignex.klause.ir/IntDomain) // com.eignex.klause.solver/IntColumn.Finite.<init>|<init>(com.eignex.klause.ir.IntDomain){}[0]
-
-        final val domain // com.eignex.klause.solver/IntColumn.Finite.domain|{}domain[0]
-            final fun <get-domain>(): com.eignex.klause.ir/IntDomain // com.eignex.klause.solver/IntColumn.Finite.domain.<get-domain>|<get-domain>(){}[0]
-
-        final fun component1(): com.eignex.klause.ir/IntDomain // com.eignex.klause.solver/IntColumn.Finite.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.ir/IntDomain = ...): com.eignex.klause.solver/IntColumn.Finite // com.eignex.klause.solver/IntColumn.Finite.copy|copy(com.eignex.klause.ir.IntDomain){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/IntColumn.Finite.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.solver/IntColumn.Finite.hashCode|hashCode(){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.solver/IntColumn.Finite.toString|toString(){}[0]
-    }
 }
 
 sealed interface com.eignex.klause.solver/LongConstList : com.eignex.klause.solver/ConstList { // com.eignex.klause.solver/LongConstList|null[0]
@@ -4804,6 +4838,16 @@ final class com.eignex.klause.ir/BoolVars : com.eignex.klause.ir/VarList { // co
         final fun <get-boolVars>(): kotlin/IntArray // com.eignex.klause.ir/BoolVars.boolVars.<get-boolVars>|<get-boolVars>(){}[0]
 }
 
+final class com.eignex.klause.ir/FiniteIntColumns : com.eignex.klause.ir/IntColumns { // com.eignex.klause.ir/FiniteIntColumns|null[0]
+    constructor <init>(kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Boolean = ...) // com.eignex.klause.ir/FiniteIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Boolean){}[0]
+
+    final val size // com.eignex.klause.ir/FiniteIntColumns.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/FiniteIntColumns.size.<get-size>|<get-size>(){}[0]
+
+    final fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.ir/FiniteIntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
+    final fun column(kotlin/Int): com.eignex.klause.ir/IntColumn // com.eignex.klause.ir/FiniteIntColumns.column|column(kotlin.Int){}[0]
+}
+
 final class com.eignex.klause.ir/IntBounds { // com.eignex.klause.ir/IntBounds|null[0]
     final val size // com.eignex.klause.ir/IntBounds.size|{}size[0]
         final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/IntBounds.size.<get-size>|<get-size>(){}[0]
@@ -4827,6 +4871,16 @@ final class com.eignex.klause.ir/IntVars : com.eignex.klause.ir/VarList { // com
         final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.ir/IntVars.ints.<get-ints>|<get-ints>(){}[0]
 }
 
+final class com.eignex.klause.ir/MixedIntColumns : com.eignex.klause.ir/IntColumns { // com.eignex.klause.ir/MixedIntColumns|null[0]
+    constructor <init>(kotlin/Array<com.eignex.klause.ir/IntColumn>) // com.eignex.klause.ir/MixedIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.ir.IntColumn>){}[0]
+
+    final val size // com.eignex.klause.ir/MixedIntColumns.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // com.eignex.klause.ir/MixedIntColumns.size.<get-size>|<get-size>(){}[0]
+
+    final fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.ir/IntDomain>? // com.eignex.klause.ir/MixedIntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
+    final fun column(kotlin/Int): com.eignex.klause.ir/IntColumn // com.eignex.klause.ir/MixedIntColumns.column|column(kotlin.Int){}[0]
+}
+
 final class com.eignex.klause.ir/MixedVars : com.eignex.klause.ir/VarList { // com.eignex.klause.ir/MixedVars|null[0]
     constructor <init>(kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ..., kotlin/IntArray = ...) // com.eignex.klause.ir/MixedVars.<init>|<init>(kotlin.IntArray;kotlin.IntArray;kotlin.IntArray;kotlin.IntArray){}[0]
 
@@ -4841,10 +4895,8 @@ final class com.eignex.klause.ir/MixedVars : com.eignex.klause.ir/VarList { // c
 }
 
 final class com.eignex.klause.ir/ProblemSpec { // com.eignex.klause.ir/ProblemSpec|null[0]
-    constructor <init>(kotlin/Int, com.eignex.klause.ir/IntBounds, kotlin/Array<com.eignex.klause.ir/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.ir/ProblemSpec.<init>|<init>(kotlin.Int;com.eignex.klause.ir.IntBounds;kotlin.Array<com.eignex.klause.ir.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
+    constructor <init>(kotlin/Int, com.eignex.klause.ir/IntBounds, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ...) // com.eignex.klause.ir/ProblemSpec.<init>|<init>(kotlin.Int;com.eignex.klause.ir.IntBounds;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray){}[0]
 
-    final val cancellation // com.eignex.klause.ir/ProblemSpec.cancellation|{}cancellation[0]
-        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.ir/ProblemSpec.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
     final val factors // com.eignex.klause.ir/ProblemSpec.factors|{}factors[0]
         final fun <get-factors>(): kotlin/Array<com.eignex.klause.ir/Factor> // com.eignex.klause.ir/ProblemSpec.factors.<get-factors>|<get-factors>(){}[0]
     final val hasSymmetryBreaking // com.eignex.klause.ir/ProblemSpec.hasSymmetryBreaking|{}hasSymmetryBreaking[0]
@@ -4863,10 +4915,8 @@ final class com.eignex.klause.ir/ProblemSpec { // com.eignex.klause.ir/ProblemSp
         final fun <get-realLower>(): kotlin/DoubleArray // com.eignex.klause.ir/ProblemSpec.realLower.<get-realLower>|<get-realLower>(){}[0]
     final val realUpper // com.eignex.klause.ir/ProblemSpec.realUpper|{}realUpper[0]
         final fun <get-realUpper>(): kotlin/DoubleArray // com.eignex.klause.ir/ProblemSpec.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
-    final val seedDeductions // com.eignex.klause.ir/ProblemSpec.seedDeductions|{}seedDeductions[0]
-        final fun <get-seedDeductions>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.ir/ProblemSpec.seedDeductions.<get-seedDeductions>|<get-seedDeductions>(){}[0]
 
-    final fun materialize(com.eignex.klause.solver/IntColumns): com.eignex.klause.ir/Problem // com.eignex.klause.ir/ProblemSpec.materialize|materialize(com.eignex.klause.solver.IntColumns){}[0]
+    final fun materialize(com.eignex.klause.ir/IntColumns): com.eignex.klause.ir/Problem // com.eignex.klause.ir/ProblemSpec.materialize|materialize(com.eignex.klause.ir.IntColumns){}[0]
     final fun materialize(kotlin/Array<com.eignex.klause.ir/IntDomain>): com.eignex.klause.ir/Problem // com.eignex.klause.ir/ProblemSpec.materialize|materialize(kotlin.Array<com.eignex.klause.ir.IntDomain>){}[0]
     final fun materializeFiniteBounds(): com.eignex.klause.ir/Problem // com.eignex.klause.ir/ProblemSpec.materializeFiniteBounds|materializeFiniteBounds(){}[0]
 }
@@ -9185,7 +9235,10 @@ final class com.eignex.klause.propagation/Assumptions { // com.eignex.klause.pro
     }
 }
 
-final class com.eignex.klause.propagation/BakedProblem : com.eignex.klause.ir/Problem // com.eignex.klause.propagation/BakedProblem|null[0]
+final class com.eignex.klause.propagation/BakedProblem : com.eignex.klause.ir/Problem { // com.eignex.klause.propagation/BakedProblem|null[0]
+    final val bakeElapsed // com.eignex.klause.propagation/BakedProblem.bakeElapsed|{}bakeElapsed[0]
+        final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.propagation/BakedProblem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
+}
 
 final class com.eignex.klause.propagation/CpSearchComponent : com.eignex.klause.solver.search/SearchBrancher, com.eignex.klause.solver.search/SearchConflictResolver, com.eignex.klause.solver.search/SearchModelBlocker { // com.eignex.klause.propagation/CpSearchComponent|null[0]
     constructor <init>(com.eignex.klause.propagation/PropagationSession, kotlin/IntArray? = ..., com.eignex.klause.propagation/CpBranching = ...) // com.eignex.klause.propagation/CpSearchComponent.<init>|<init>(com.eignex.klause.propagation.PropagationSession;kotlin.IntArray?;com.eignex.klause.propagation.CpBranching){}[0]
@@ -9842,6 +9895,8 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.
         final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.solver.pipeline/OpenTheoryRequest.model.<get-model>|<get-model>(){}[0]
     final val objective // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective|{}objective[0]
         final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/OpenTheoryRequest.objective.<get-objective>|<get-objective>(){}[0]
+    final val route // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route|{}route[0]
+        final fun <get-route>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route.<get-route>|<get-route>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/PipelineConfigException : kotlin/RuntimeException { // com.eignex.klause.solver.pipeline/PipelineConfigException|null[0]
@@ -10390,16 +10445,6 @@ final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/As
     final fun snapshot(): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Assignment.snapshot|snapshot(){}[0]
 }
 
-final class com.eignex.klause.solver/FiniteIntColumns : com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/FiniteIntColumns|null[0]
-    constructor <init>(kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Boolean = ...) // com.eignex.klause.solver/FiniteIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Boolean){}[0]
-
-    final val size // com.eignex.klause.solver/FiniteIntColumns.size|{}size[0]
-        final fun <get-size>(): kotlin/Int // com.eignex.klause.solver/FiniteIntColumns.size.<get-size>|<get-size>(){}[0]
-
-    final fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.solver/FiniteIntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
-    final fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/FiniteIntColumns.column|column(kotlin.Int){}[0]
-}
-
 final class com.eignex.klause.solver/IntConsts : com.eignex.klause.solver/LongConstList { // com.eignex.klause.solver/IntConsts|null[0]
     constructor <init>(kotlin/IntArray) // com.eignex.klause.solver/IntConsts.<init>|<init>(kotlin.IntArray){}[0]
 
@@ -10424,16 +10469,6 @@ final class com.eignex.klause.solver/LongConsts : com.eignex.klause.solver/LongC
     final fun at(kotlin/Int): kotlin/Long // com.eignex.klause.solver/LongConsts.at|at(kotlin.Int){}[0]
     final fun negated(): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/LongConsts.negated|negated(){}[0]
     final fun toLongArray(): kotlin/LongArray // com.eignex.klause.solver/LongConsts.toLongArray|toLongArray(){}[0]
-}
-
-final class com.eignex.klause.solver/MixedIntColumns : com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/MixedIntColumns|null[0]
-    constructor <init>(kotlin/Array<com.eignex.klause.solver/IntColumn>) // com.eignex.klause.solver/MixedIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.solver.IntColumn>){}[0]
-
-    final val size // com.eignex.klause.solver/MixedIntColumns.size|{}size[0]
-        final fun <get-size>(): kotlin/Int // com.eignex.klause.solver/MixedIntColumns.size.<get-size>|<get-size>(){}[0]
-
-    final fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.ir/IntDomain>? // com.eignex.klause.solver/MixedIntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
-    final fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/MixedIntColumns.column|column(kotlin.Int){}[0]
 }
 
 final class com.eignex.klause.solver/RealConsts : com.eignex.klause.solver/ConstList { // com.eignex.klause.solver/RealConsts|null[0]
@@ -10754,14 +10789,10 @@ open class com.eignex.klause.formats/FormatException : kotlin/RuntimeException {
 }
 
 open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0]
-    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.solver/IntColumns, kotlin/Array<com.eignex.klause.ir/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.solver.IntColumns;kotlin.Array<com.eignex.klause.ir.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin.collections/List<com.eignex.klause.ir/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.collections.List<com.eignex.klause.ir.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
-    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Array<com.eignex.klause.ir/Factor>, com.eignex.klause.propagation/PropagationResult = ..., com.eignex.klause.util/Cancellation = ..., kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<com.eignex.klause.ir.Factor>;com.eignex.klause.propagation.PropagationResult;com.eignex.klause.util.Cancellation;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, com.eignex.klause.ir/IntColumns, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;com.eignex.klause.ir.IntColumns;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin.collections/List<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.collections.List<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
+    constructor <init>(kotlin/Int, kotlin/Int, kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/Array<com.eignex.klause.ir/Factor>, kotlin/BooleanArray? = ..., kotlin/Boolean = ..., kotlin/Int = ..., kotlin/DoubleArray = ..., kotlin/DoubleArray = ..., kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.util/Bits? = ..., com.eignex.klause.ir/IntBounds? = ...) // com.eignex.klause.ir/Problem.<init>|<init>(kotlin.Int;kotlin.Int;kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.Array<com.eignex.klause.ir.Factor>;kotlin.BooleanArray?;kotlin.Boolean;kotlin.Int;kotlin.DoubleArray;kotlin.DoubleArray;kotlin.BooleanArray?;kotlin.BooleanArray?;com.eignex.klause.util.Bits?;com.eignex.klause.util.Bits?;com.eignex.klause.ir.IntBounds?){}[0]
 
-    final val baked // com.eignex.klause.ir/Problem.baked|{}baked[0]
-        final fun <get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.ir/Problem.baked.<get-baked>|<get-baked>(){}[0]
-    final val cancellation // com.eignex.klause.ir/Problem.cancellation|{}cancellation[0]
-        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.ir/Problem.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
     final val factors // com.eignex.klause.ir/Problem.factors|{}factors[0]
         final fun <get-factors>(): kotlin/Array<com.eignex.klause.ir/Factor> // com.eignex.klause.ir/Problem.factors.<get-factors>|<get-factors>(){}[0]
     final val hasFiniteIntDomains // com.eignex.klause.ir/Problem.hasFiniteIntDomains|{}hasFiniteIntDomains[0]
@@ -10773,7 +10804,7 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
     final val intBounds // com.eignex.klause.ir/Problem.intBounds|{}intBounds[0]
         final fun <get-intBounds>(): com.eignex.klause.ir/IntBounds // com.eignex.klause.ir/Problem.intBounds.<get-intBounds>|<get-intBounds>(){}[0]
     final val intColumns // com.eignex.klause.ir/Problem.intColumns|{}intColumns[0]
-        final fun <get-intColumns>(): com.eignex.klause.solver/IntColumns // com.eignex.klause.ir/Problem.intColumns.<get-intColumns>|<get-intColumns>(){}[0]
+        final fun <get-intColumns>(): com.eignex.klause.ir/IntColumns // com.eignex.klause.ir/Problem.intColumns.<get-intColumns>|<get-intColumns>(){}[0]
     final val numBoolVars // com.eignex.klause.ir/Problem.numBoolVars|{}numBoolVars[0]
         final fun <get-numBoolVars>(): kotlin/Int // com.eignex.klause.ir/Problem.numBoolVars.<get-numBoolVars>|<get-numBoolVars>(){}[0]
     final val numFactors // com.eignex.klause.ir/Problem.numFactors|{}numFactors[0]
@@ -10786,16 +10817,8 @@ open class com.eignex.klause.ir/Problem { // com.eignex.klause.ir/Problem|null[0
         final fun <get-realLower>(): kotlin/DoubleArray // com.eignex.klause.ir/Problem.realLower.<get-realLower>|<get-realLower>(){}[0]
     final val realUpper // com.eignex.klause.ir/Problem.realUpper|{}realUpper[0]
         final fun <get-realUpper>(): kotlin/DoubleArray // com.eignex.klause.ir/Problem.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
-    final val sharedDomains // com.eignex.klause.ir/Problem.sharedDomains|{}sharedDomains[0]
-        final fun <get-sharedDomains>(): kotlin/Boolean // com.eignex.klause.ir/Problem.sharedDomains.<get-sharedDomains>|<get-sharedDomains>(){}[0]
 
-    final var bakeElapsed // com.eignex.klause.ir/Problem.bakeElapsed|{}bakeElapsed[0]
-        final fun <get-bakeElapsed>(): kotlin.time/Duration // com.eignex.klause.ir/Problem.bakeElapsed.<get-bakeElapsed>|<get-bakeElapsed>(){}[0]
-        final fun <set-bakeElapsed>(kotlin.time/Duration) // com.eignex.klause.ir/Problem.bakeElapsed.<set-bakeElapsed>|<set-bakeElapsed>(kotlin.time.Duration){}[0]
-
-    final fun bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.ir/Problem.bake|bake(com.eignex.klause.util.Cancellation){}[0]
     final fun intDomainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.ir/Problem.intDomainOrNull|intDomainOrNull(kotlin.Int){}[0]
-    final fun propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.ir/Problem.propagate|propagate(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
     final fun requireFiniteIntDomains(): kotlin/Array<com.eignex.klause.ir/IntDomain> // com.eignex.klause.ir/Problem.requireFiniteIntDomains|requireFiniteIntDomains(){}[0]
     final fun withIntDomains(kotlin/Array<com.eignex.klause.ir/IntDomain>, kotlin/BooleanArray? = ..., kotlin/BooleanArray? = ...): com.eignex.klause.ir/Problem // com.eignex.klause.ir/Problem.withIntDomains|withIntDomains(kotlin.Array<com.eignex.klause.ir.IntDomain>;kotlin.BooleanArray?;kotlin.BooleanArray?){}[0]
 }
@@ -10817,6 +10840,15 @@ open class com.eignex.klause.schema/VariableSchema : com.eignex.skema/Schema<com
     final fun optNominal(kotlin/Array<out kotlin/String>...): kotlin.properties/PropertyDelegateProvider<com.eignex.klause.schema/VariableSchema, kotlin.properties/ReadOnlyProperty<com.eignex.klause.schema/VariableSchema, com.eignex.klause.schema/OptNominalHandle>> // com.eignex.klause.schema/VariableSchema.optNominal|optNominal(kotlin.Array<out|kotlin.String>...){}[0]
     final fun setVar(kotlin.collections/List<kotlin/Int>): kotlin.properties/PropertyDelegateProvider<com.eignex.skema/Schema<com.eignex.klause.model/SchemaEntry>, kotlin.properties/ReadOnlyProperty<com.eignex.skema/Schema<com.eignex.klause.model/SchemaEntry>, com.eignex.klause.schema/IntSetHandle>> // com.eignex.klause.schema/VariableSchema.setVar|setVar(kotlin.collections.List<kotlin.Int>){}[0]
     final fun setVar(kotlin.ranges/IntRange): kotlin.properties/PropertyDelegateProvider<com.eignex.skema/Schema<com.eignex.klause.model/SchemaEntry>, kotlin.properties/ReadOnlyProperty<com.eignex.skema/Schema<com.eignex.klause.model/SchemaEntry>, com.eignex.klause.schema/IntSetHandle>> // com.eignex.klause.schema/VariableSchema.setVar|setVar(kotlin.ranges.IntRange){}[0]
+}
+
+sealed class com.eignex.klause.ir/IntColumns { // com.eignex.klause.ir/IntColumns|null[0]
+    abstract val size // com.eignex.klause.ir/IntColumns.size|{}size[0]
+        abstract fun <get-size>(): kotlin/Int // com.eignex.klause.ir/IntColumns.size.<get-size>|<get-size>(){}[0]
+
+    abstract fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.ir/IntDomain>? // com.eignex.klause.ir/IntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
+    abstract fun column(kotlin/Int): com.eignex.klause.ir/IntColumn // com.eignex.klause.ir/IntColumns.column|column(kotlin.Int){}[0]
+    final fun domainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.ir/IntColumns.domainOrNull|domainOrNull(kotlin.Int){}[0]
 }
 
 sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.klause.solver.pipeline/PortfolioPlan|null[0]
@@ -10842,15 +10874,6 @@ sealed class com.eignex.klause.solver.pipeline/PortfolioPlan { // com.eignex.kla
         final val pool // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.pool|{}pool[0]
             final fun <get-pool>(): kotlin.collections/List<kotlin/Function0<com.eignex.klause.localsearch.strategy/LocalSearchRecipe>>? // com.eignex.klause.solver.pipeline/PortfolioPlan.LocalSearchDryRun.pool.<get-pool>|<get-pool>(){}[0]
     }
-}
-
-sealed class com.eignex.klause.solver/IntColumns { // com.eignex.klause.solver/IntColumns|null[0]
-    abstract val size // com.eignex.klause.solver/IntColumns.size|{}size[0]
-        abstract fun <get-size>(): kotlin/Int // com.eignex.klause.solver/IntColumns.size.<get-size>|<get-size>(){}[0]
-
-    abstract fun allFiniteOrNull(): kotlin/Array<com.eignex.klause.ir/IntDomain>? // com.eignex.klause.solver/IntColumns.allFiniteOrNull|allFiniteOrNull(){}[0]
-    abstract fun column(kotlin/Int): com.eignex.klause.solver/IntColumn // com.eignex.klause.solver/IntColumns.column|column(kotlin.Int){}[0]
-    final fun domainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.solver/IntColumns.domainOrNull|domainOrNull(kotlin.Int){}[0]
 }
 
 final object com.eignex.klause.backtrack.selector/DomainMaxRegret : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/DomainMaxRegret|null[0]
@@ -11167,6 +11190,8 @@ final const val com.eignex.klause.solver.pipeline/NODE_LIMIT_KEY // com.eignex.k
 
 final val com.eignex.klause.ir/values // com.eignex.klause.ir/values|@com.eignex.klause.ir.IntDomain{}values[0]
     final fun (com.eignex.klause.ir/IntDomain).<get-values>(): com.eignex.klause.ir/IntSpan // com.eignex.klause.ir/values.<get-values>|<get-values>@com.eignex.klause.ir.IntDomain(){}[0]
+final val com.eignex.klause.propagation/baked // com.eignex.klause.propagation/baked|@com.eignex.klause.ir.Problem{}baked[0]
+    final fun (com.eignex.klause.ir/Problem).<get-baked>(): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/baked.<get-baked>|<get-baked>@com.eignex.klause.ir.Problem(){}[0]
 final val com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS|{}BACKTRACK_OVERRIDE_KEYS[0]
     final fun <get-BACKTRACK_OVERRIDE_KEYS>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/BACKTRACK_OVERRIDE_KEYS.<get-BACKTRACK_OVERRIDE_KEYS>|<get-BACKTRACK_OVERRIDE_KEYS>(){}[0]
 final val com.eignex.klause.solver/NoConsts // com.eignex.klause.solver/NoConsts|{}NoConsts[0]
@@ -11180,11 +11205,14 @@ final fun (com.eignex.klause.ir/Factor).com.eignex.klause.factor.arithmetic/line
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.ir/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.util.Cancellation){}[0]
+final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/propagate|propagate@com.eignex.klause.ir.Problem(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/maximizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/maximizeInt|maximizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.objective/minimizeInt(kotlin/Int): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/minimizeInt|minimizeInt@com.eignex.klause.ir.Problem(kotlin.Int){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.Problem(){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.presolve/presolveOpen(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.presolve/OpenPresolveResult // com.eignex.klause.presolve/presolveOpen|presolveOpen@com.eignex.klause.ir.ProblemSpec(com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/componentPlan(): com.eignex.klause.solver.pipeline/ComponentPlan // com.eignex.klause.solver.pipeline/componentPlan|componentPlan@com.eignex.klause.ir.ProblemSpec(){}[0]
+final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/pipelineRoute(com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute // com.eignex.klause.solver.pipeline/pipelineRoute|pipelineRoute@com.eignex.klause.ir.ProblemSpec(com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.Boolean){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/sourceRoute(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/sourceRoute|sourceRoute@com.eignex.klause.ir.ProblemSpec(){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/supportsExactLra(): kotlin/Boolean // com.eignex.klause.solver.pipeline/supportsExactLra|supportsExactLra@com.eignex.klause.ir.ProblemSpec(){}[0]
 final fun (com.eignex.klause.ir/ProblemSpec).com.eignex.klause.solver.pipeline/variablePartition(): com.eignex.klause.solver.pipeline/VariablePartition // com.eignex.klause.solver.pipeline/variablePartition|variablePartition@com.eignex.klause.ir.ProblemSpec(){}[0]

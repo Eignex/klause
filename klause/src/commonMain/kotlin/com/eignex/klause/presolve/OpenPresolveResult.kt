@@ -199,8 +199,6 @@ private fun ProblemSpec.withBounds(bounds: Array<OpenIntBounds>): ProblemSpec {
         numBoolVars = numBoolVars,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLo, openHi),
         factors = factors,
-        seedDeductions = seedDeductions,
-        cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         numRealVars = numRealVars,

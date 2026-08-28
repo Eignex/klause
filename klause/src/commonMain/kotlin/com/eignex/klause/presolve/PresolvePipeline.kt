@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lp.bounding.LpPlan
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.difference.withDifferenceSystem
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample

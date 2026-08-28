@@ -1,9 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.solver.IntColumns
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
 
 /**
@@ -20,10 +16,6 @@ class ProblemSpec(
     val intBounds: IntBounds,
     /** Constraints over the variables. */
     val factors: Array<Factor>,
-    /** Root deductions supplied by a frontend or compiler. */
-    val seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
-    /** Cancellation token for eventual finite materialization. */
-    val cancellation: Cancellation = Cancellation.Never,
     /** Model-declared implied-factor mask, parallel to [factors]. */
     val impliedFactorMask: BooleanArray? = null,
     /** Whether the source model already includes symmetry breaking. */
@@ -51,8 +43,6 @@ class ProblemSpec(
             numIntVars = numIntVars,
             intDomains = intDomains,
             factors = factors,
-            seedDeductions = seedDeductions,
-            cancellation = cancellation,
             impliedFactorMask = impliedFactorMask,
             hasSymmetryBreaking = hasSymmetryBreaking,
             numRealVars = numRealVars,
@@ -68,8 +58,6 @@ class ProblemSpec(
         numIntVars = numIntVars,
         intColumns = intColumns,
         factors = factors,
-        seedDeductions = seedDeductions,
-        cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,
         hasSymmetryBreaking = hasSymmetryBreaking,
         numRealVars = numRealVars,

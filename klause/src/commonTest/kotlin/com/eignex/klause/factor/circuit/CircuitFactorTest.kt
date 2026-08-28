@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

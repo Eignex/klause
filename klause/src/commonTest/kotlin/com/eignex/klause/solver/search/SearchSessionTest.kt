@@ -1,6 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.propagation.propagate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

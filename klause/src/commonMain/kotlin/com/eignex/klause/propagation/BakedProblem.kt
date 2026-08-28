@@ -1,5 +1,6 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.FiniteIntColumns
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
@@ -7,6 +8,7 @@ import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
+import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /**
@@ -21,7 +23,7 @@ class BakedProblem internal constructor(
     numIntVars: Int,
     intDomains: Array<IntDomain>,
     factors: Array<Factor>,
-    seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
+    private val seedDeductions: PropagationResult = PropagationResult.Implied.EMPTY,
     impliedFactorMask: BooleanArray? = null,
     hasSymmetryBreaking: Boolean = false,
     numRealVars: Int,
@@ -32,18 +34,15 @@ class BakedProblem internal constructor(
     packedOpenIntLo: Bits? = null,
     packedOpenIntHi: Bits? = null,
     modelBounds: IntBounds? = null,
-    cancellation: Cancellation = Cancellation.Never,
-    alreadyFolded: Boolean = false,
+    internal val cancellation: Cancellation = Cancellation.Never,
+    internal val alreadyFolded: Boolean = false,
 ) : Problem(
     numBoolVars = numBoolVars,
     numIntVars = numIntVars,
-    intDomains = intDomains,
+    intColumns = FiniteIntColumns(intDomains, shared = alreadyFolded),
     factors = factors,
-    seedDeductions = seedDeductions,
-    cancellation = cancellation,
     impliedFactorMask = impliedFactorMask,
     hasSymmetryBreaking = hasSymmetryBreaking,
-    sharedDomains = alreadyFolded,
     numRealVars = numRealVars,
     realLower = realLower,
     realUpper = realUpper,
@@ -53,11 +52,19 @@ class BakedProblem internal constructor(
     packedOpenIntHi = packedOpenIntHi,
     modelBounds = modelBounds,
 ) {
+    /** Deductions established while constructing this propagation projection. */
+    internal val rootDeductions: PropagationResult = rootBake(this, seedDeductions, cancellation)
+
+    /** Time spent building and folding this propagation projection. */
+    val bakeElapsed: Duration
+
     init {
         if (!alreadyFolded) {
             val mark = TimeSource.Monotonic.markNow()
-            foldRootDeductionsIntoDomains(baked)
+            foldRootDeductionsIntoDomains(rootDeductions)
             bakeElapsed = mark.elapsedNow()
+        } else {
+            bakeElapsed = Duration.ZERO
         }
     }
 

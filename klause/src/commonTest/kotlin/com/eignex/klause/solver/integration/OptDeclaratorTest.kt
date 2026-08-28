@@ -10,6 +10,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.PresenceSpec
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferentOpt
 import com.eignex.klause.schema.cumulativeOpt

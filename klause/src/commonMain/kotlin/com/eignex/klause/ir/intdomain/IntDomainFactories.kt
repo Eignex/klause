@@ -1,7 +1,7 @@
-package com.eignex.klause.solver.intdomain
+package com.eignex.klause.ir.intdomain
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.klause.solver.IntDomain
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.LongArrayList
 

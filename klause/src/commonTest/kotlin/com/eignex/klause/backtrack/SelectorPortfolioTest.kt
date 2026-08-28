@@ -8,6 +8,7 @@ import com.eignex.klause.backtrack.selector.RandomVariable
 import com.eignex.klause.backtrack.selector.SmallestDomain
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.global.AllDifferent
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

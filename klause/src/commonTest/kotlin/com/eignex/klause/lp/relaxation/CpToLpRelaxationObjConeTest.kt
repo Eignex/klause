@@ -9,6 +9,7 @@ import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Problem

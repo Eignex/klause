@@ -16,6 +16,7 @@ import com.eignex.klause.model.NamedConstraint
 import com.eignex.klause.model.Not
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult

@@ -3,7 +3,9 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.admitsSmallModelBound
 import com.eignex.klause.lp.smallModelBigIntBound
 import com.eignex.klause.solver.Factor
+import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ProblemSpec
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Cancellation
 
@@ -31,6 +33,48 @@ enum class ProblemPipeline {
 
     /** An open integer side reaches a factor no available theory decides. */
     UNSUPPORTED_OPEN,
+}
+
+/** A source model prepared for the finite or complete open-theory pipeline. */
+sealed interface SourceProblemRoute {
+    /** A fully bounded source model materialized for finite-domain search. */
+    data class Finite(
+        /** The materialized finite-domain model. */
+        val problem: Problem,
+    ) : SourceProblemRoute
+
+    /** A supported open source model with its selected theory request. */
+    data class OpenTheory(
+        /** The complete open-theory request. */
+        val request: OpenTheoryRequest,
+    ) : SourceProblemRoute
+
+    /** An open source model for which no complete route exists. */
+    data object UnsupportedOpen : SourceProblemRoute
+}
+
+/**
+ * Select a pipeline once for this source model.
+ *
+ * Finite source ranges materialize their declared bounds for CP. Open models carry a complete theory
+ * request when one exists; callers only need to render its uniform assignment surface. A frontend that
+ * supports exact pure-real solving sets [routePureRealToTheory] to select that lane instead of finite CP.
+ */
+fun ProblemSpec.pipelineRoute(
+    objective: LinearObjective? = null,
+    maximize: Boolean = false,
+    routePureRealToTheory: Boolean = false,
+): SourceProblemRoute {
+    val finiteIntegerRanges = (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }
+    if (finiteIntegerRanges && (!routePureRealToTheory || !supportsExactLra())) {
+        return SourceProblemRoute.Finite(materializeFiniteBounds())
+    }
+    val request = OpenTheoryRequest(this, objective, maximize)
+    return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {
+        SourceProblemRoute.UnsupportedOpen
+    } else {
+        SourceProblemRoute.OpenTheory(request)
+    }
 }
 
 /**

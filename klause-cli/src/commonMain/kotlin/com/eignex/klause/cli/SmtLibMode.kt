@@ -6,10 +6,10 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.pipeline.ProblemPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.componentPlan
-import com.eignex.klause.solver.pipeline.sourceRoute
-import com.eignex.klause.solver.pipeline.supportsExactLra
+import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
@@ -42,55 +42,43 @@ internal object SmtLibMode : CliMode {
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
-            val pipeline = if (parsed.model.supportsExactLra()) {
-                ProblemPipeline.EXACT_LRA
-            } else {
-                parsed.model.sourceRoute()
-            }
-            when (pipeline) {
-                ProblemPipeline.UNSUPPORTED_OPEN ->
-                    throw UnsupportedSmtException(unsupportedOpenReason(parsed.model, ints))
+            return when (
+                val route = parsed.model.pipelineRoute(
+                    parsed.objective,
+                    parsed.sense == ObjectiveSense.MAXIMIZE,
+                    routePureRealToTheory = true,
+                )
+            ) {
+                is SourceProblemRoute.Finite -> linearSolvable(
+                    route.problem,
+                    parsed.objective,
+                    parsed.sense == ObjectiveSense.MAXIMIZE,
+                    render,
+                )
 
-                ProblemPipeline.DIFFERENCE_THEORY, ProblemPipeline.GENERAL_LIA, ProblemPipeline.EXACT_LRA,
-                ProblemPipeline.EXACT_LIRA,
-                -> {
+                is SourceProblemRoute.OpenTheory -> {
                     if (parsed.objective != null) {
-                        val theory = when (pipeline) {
-                            ProblemPipeline.DIFFERENCE_THEORY -> "difference-theory"
-                            ProblemPipeline.GENERAL_LIA -> "General LIA"
-                            ProblemPipeline.EXACT_LRA -> "exact LRA"
-                            ProblemPipeline.EXACT_LIRA -> "exact LIRA"
-                            else -> error("finite and unsupported pipelines do not reach open optimization")
-                        }
-                        throw UnsupportedSmtException("open $theory optimization is unsupported")
+                        throw UnsupportedSmtException("open theory optimization is unsupported")
                     }
-                    return when (pipeline) {
-                        ProblemPipeline.DIFFERENCE_THEORY -> differenceTheorySolvable(parsed.model, render)
+                    openTheorySolvable(route.request) { assignment ->
+                        when (assignment) {
+                            is OpenTheoryAssignment.Difference -> render(assignment.sample)
 
-                        ProblemPipeline.GENERAL_LIA -> generalLiaSolvable(parsed.model) { assignment ->
-                            renderGeneralLiaModel(ints, bools, reals, assignment)
+                            is OpenTheoryAssignment.GeneralLia ->
+                                renderGeneralLiaModel(ints, bools, reals, assignment.assignment)
+
+                            is OpenTheoryAssignment.ExactLra ->
+                                renderExactLraModel(ints, bools, reals, assignment.assignment)
+
+                            is OpenTheoryAssignment.ExactLira ->
+                                renderExactLiraModel(ints, bools, reals, assignment.assignment)
                         }
-
-                        ProblemPipeline.EXACT_LRA -> exactLraSolvable(parsed.model) { assignment ->
-                            renderExactLraModel(ints, bools, reals, assignment)
-                        }
-
-                        ProblemPipeline.EXACT_LIRA -> exactLiraSolvable(parsed.model) { assignment ->
-                            renderExactLiraModel(ints, bools, reals, assignment)
-                        }
-
-                        else -> error("finite and unsupported pipelines do not reach exact theory routing")
                     }
                 }
 
-                ProblemPipeline.FINITE_CP -> Unit
+                SourceProblemRoute.UnsupportedOpen ->
+                    throw UnsupportedSmtException(unsupportedOpenReason(parsed.model, ints))
             }
-            return linearSolvable(
-                parsed.model.materializeFiniteBounds(),
-                parsed.objective,
-                parsed.sense == ObjectiveSense.MAXIMIZE,
-                render,
-            )
         }
 
         override fun output(common: CommonOptions): OutputProtocol = SmtLibOutput()

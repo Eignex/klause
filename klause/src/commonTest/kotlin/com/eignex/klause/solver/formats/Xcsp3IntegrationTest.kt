@@ -16,6 +16,7 @@ import com.eignex.klause.factor.table.Table
 import com.eignex.klause.formats.xcsp3.FExpr
 import com.eignex.klause.lowering.xcsp3.UnsupportedXcsp3Exception
 import com.eignex.klause.lowering.xcsp3.Xcsp3
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs

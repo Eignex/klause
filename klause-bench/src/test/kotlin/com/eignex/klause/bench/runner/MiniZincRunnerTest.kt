@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Expected
 import com.eignex.klause.localsearch.LocalSearchState
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.util.Cancellation

@@ -6,6 +6,7 @@ import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Factor
 import kotlin.test.Test
 import kotlin.test.assertContentEquals

@@ -3,6 +3,8 @@ package com.eignex.klause.factor
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import kotlin.test.assertEquals

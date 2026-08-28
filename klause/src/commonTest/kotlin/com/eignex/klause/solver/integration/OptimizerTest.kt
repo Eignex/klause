@@ -7,6 +7,7 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test

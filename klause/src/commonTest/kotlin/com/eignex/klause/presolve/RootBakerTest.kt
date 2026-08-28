@@ -5,6 +5,8 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.PropagationResult
+import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.baked
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
@@ -120,8 +122,7 @@ class RootBakerTest {
                 Linear(coeffs = intArrayOf(1, -1), vars = intArrayOf(0, 1), op = LinearOp.EQ, bound = 0),
                 Linear(coeffs = intArrayOf(1, 1), vars = intArrayOf(0, 1), op = LinearOp.GE, bound = 2),
             ),
-            cancellation = cancelled,
-        )
+        ).bake(cancelled)
         val baked = assertIs<PropagationResult.Implied>(bake(p, BakeConfig(probeIntBounds = true)))
         assertEquals(null, baked.intMinOrNullCompat(0), "a fired cancellation should skip SAC tightening")
     }

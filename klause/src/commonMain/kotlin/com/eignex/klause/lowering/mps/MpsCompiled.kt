@@ -13,7 +13,6 @@ import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
-import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.EmptyDoubleArray
@@ -91,14 +90,23 @@ fun MpsModel.toProblem(): MpsCompiled {
     // Real-variable bounds use ±∞. Integer source sides remain genuinely open when MPS omits them.
     val realLower = DoubleArray(numReal)
     val realUpper = DoubleArray(numReal)
-    val declaredBounds = arrayOfNulls<OpenIntBounds>(numInt)
+    val lower = LongArray(numInt)
+    val upper = LongArray(numInt)
+    var openLoBits: Bits? = null
+    var openHiBits: Bits? = null
     for (i in variables.indices) {
         val v = variables[i]
         if (isFloat[i]) {
             realLower[realVarOf[i]] = openLower(v.lower)
             realUpper[realVarOf[i]] = openUpper(v.upper)
         } else {
-            declaredBounds[intVarOf[i]] = OpenIntBounds(intLowerOrNull(v.lower), intUpperOrNull(v.upper))
+            val id = intVarOf[i]
+            val lo = intLowerOrNull(v.lower)
+            val hi = intUpperOrNull(v.upper)
+            lower[id] = lo ?: 0L
+            upper[id] = hi ?: 0L
+            if (lo == null) (openLoBits ?: Bits(numInt).also { openLoBits = it }).set(id)
+            if (hi == null) (openHiBits ?: Bits(numInt).also { openHiBits = it }).set(id)
         }
     }
 
@@ -135,20 +143,10 @@ fun MpsModel.toProblem(): MpsCompiled {
 
     // A declared crossing is infeasible. Keep both stated bounds in the model by restating the upper side
     // as a row; the canonicalized range only lets the finite-domain representation exist if materialized.
-    val lower = LongArray(numInt)
-    val upper = LongArray(numInt)
-    var openLoBits: Bits? = null
-    var openHiBits: Bits? = null
     for (j in 0 until numInt) {
-        val lo = declaredBounds[j]!!.lo
-        val hi = declaredBounds[j]!!.hi
-        lower[j] = lo ?: 0L
-        upper[j] = hi ?: 0L
-        if (lo == null) (openLoBits ?: Bits(numInt).also { openLoBits = it }).set(j)
-        if (hi == null) (openHiBits ?: Bits(numInt).also { openHiBits = it }).set(j)
-        if (lo != null && hi != null && lo > hi) {
-            factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, hi))
-            upper[j] = lo
+        if (openLoBits?.get(j) != true && openHiBits?.get(j) != true && lower[j] > upper[j]) {
+            factors.add(Linear(longArrayOf(1L), intArrayOf(j), LinearOp.LE, upper[j]))
+            upper[j] = lower[j]
         }
     }
 

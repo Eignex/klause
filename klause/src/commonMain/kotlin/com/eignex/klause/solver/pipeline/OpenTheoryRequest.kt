@@ -13,7 +13,13 @@ class OpenTheoryRequest(
     val objective: LinearObjective? = null,
     /** Whether [objective] is maximized rather than minimized. */
     val maximize: Boolean = false,
-)
+) {
+    /** Source decomposition selected once for a satisfiability solve. */
+    internal val componentPlan: ComponentPlan = model.componentPlan()
+
+    /** Complete open-theory route selected for [model]. */
+    val route: ProblemPipeline get() = componentPlan.theoryPipeline
+}
 
 /** The common execution result for a complete open-model request. */
 sealed interface OpenTheoryExecution {
@@ -36,8 +42,9 @@ object OpenTheoryPipeline {
     fun execute(request: OpenTheoryRequest, params: TheoryParams = TheoryParams()): OpenTheoryExecution {
         val objective = request.objective
         if (objective == null) {
-            val plan = request.model.componentPlan()
-            return OpenTheoryExecution.Satisfy(OpenTheoryEngine(request.model, plan.theoryPipeline, plan).solve(params))
+            return OpenTheoryExecution.Satisfy(
+                OpenTheoryEngine(request.model, request.route, request.componentPlan).solve(params),
+            )
         }
         val driven = if (request.maximize) objective.negated() else objective
         return OpenTheoryExecution.Optimize(OpenTheoryMinimizer(request.model, driven).minimize(params))
