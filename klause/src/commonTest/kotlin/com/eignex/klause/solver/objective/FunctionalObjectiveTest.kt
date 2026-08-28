@@ -3,8 +3,8 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.lowering.flatzinc.FlatZincProgram
-import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import com.eignex.klause.solver.values
 import kotlin.math.abs
 import kotlin.random.Random
@@ -29,8 +29,9 @@ class FunctionalObjectiveTest {
             constraint int_lin_eq([1,-1,-1],[objective,ad1,ad2],0):: defines_var(objective);
             solve minimize objective;
         """.trimIndent()
-        val program = parseFlatZinc(src)
-        val obj = program.lsObjective
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val obj = execution.localSearchObjective
         assertNotNull(obj, "expected a functional objective for the decomposed minimize")
         assertTrue(obj is FunctionalObjective)
         val fo = obj
@@ -90,8 +91,9 @@ class FunctionalObjectiveTest {
             constraint int_lin_eq([1,1,-1],[t1,t2,obj],0):: defines_var(obj);
             solve maximize obj;
         """.trimIndent()
-        val program = parseFlatZinc(src)
-        val obj = program.lsObjective
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val obj = execution.localSearchObjective
         assertNotNull(obj, "expected a bool-count functional objective")
         assertTrue(obj is FunctionalObjective)
         val x = intArrayOf(1, 2, 3, 4).map { program.boolVarsByName.getValue("x$it") }

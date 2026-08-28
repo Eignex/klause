@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.lowering.flatzinc.parseFlatZinc
+import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,8 +36,9 @@ class InvariantNetworkTest {
 
     @Test
     fun `defined vars track their inputs across applied moves`() {
-        val program = parseFlatZinc(src)
-        val sweep = assertNotNull(program.definitionalSweep)
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep)
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         val iv = program.intVarsByName
         val state = LocalSearchState(program.problem, Random(5))
@@ -62,8 +63,9 @@ class InvariantNetworkTest {
 
     @Test
     fun `defined vars are excluded from move generation`() {
-        val program = parseFlatZinc(src)
-        val sweep = assertNotNull(program.definitionalSweep)
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep)
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         val iv = program.intVarsByName
         assertTrue(net.isDefinedInt(iv.getValue("s")))

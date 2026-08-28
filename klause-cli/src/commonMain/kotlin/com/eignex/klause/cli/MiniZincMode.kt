@@ -3,12 +3,12 @@ package com.eignex.klause.cli
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.lowering.flatzinc.SolveDirective
-import com.eignex.klause.lowering.flatzinc.parseFlatZinc
-import com.eignex.klause.solver.pipeline.OznApplier
-import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.maximizeInt
 import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.pipeline.OznApplier
+import com.eignex.klause.solver.pipeline.parseFlatZincExecution
+import com.eignex.klause.solver.pipeline.writeFlatZincSolution
 import com.eignex.klause.solver.result.SolveStats
 
 /**
@@ -53,13 +53,14 @@ internal object MiniZincMode : CliMode {
             // Stream the .fzn straight from disk: the lexer/parser pull characters incrementally, so the
             // whole source is never held as one String. Parsing only reads; the base bake runs as
             // presolve step 0, bounded by the presolve deadline.
-            val program = parseFlatZinc(
+            val executionProgram = parseFlatZincExecution(
                 source = openFileSource(path),
                 floatBuckets = config.floatBuckets,
                 floatScale = config.floatScale,
                 unboundedIntLo = unboundedIntLo ?: config.unboundedIntLo,
                 unboundedIntHi = unboundedIntHi ?: config.unboundedIntHi,
             )
+            val program = executionProgram.program
             cliLogger(common.verbose).v {
                 "parsed $path: bools=${program.problem.numBoolVars} ints=${program.problem.numIntVars} " +
                     "factors=${program.problem.numFactors}"
@@ -76,7 +77,7 @@ internal object MiniZincMode : CliMode {
                     lsObjective = null,
                     linearObjective = null,
                     objVarId = null,
-                    definitionalSweep = program.definitionalSweep,
+                    definitionalSweep = executionProgram.definitionalSweep,
                     render = render,
                     objectiveValue = null,
                     annotatedBacktrackParams = program.searchHints?.toBacktrackParams(
@@ -103,10 +104,10 @@ internal object MiniZincMode : CliMode {
                         problem = program.problem,
                         optimize = true,
                         maximize = maximize,
-                        lsObjective = program.lsObjective,
+                        lsObjective = executionProgram.localSearchObjective,
                         linearObjective = linear,
                         objVarId = objVarId,
-                        definitionalSweep = program.definitionalSweep,
+                        definitionalSweep = executionProgram.definitionalSweep,
                         render = render,
                         // The MiniZinc protocol carries the objective inside the rendered solution, so
                         // onSolution ignores this value — but the same sign-corrected objective (the

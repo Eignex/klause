@@ -3,9 +3,9 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,8 +43,9 @@ class FznDefinitionalSweepTest {
 
     @Test
     fun `builds the full DAG and evaluates defined vars from decisions`() {
-        val program = parseFlatZinc(src)
-        val sweep = assertNotNull(program.definitionalSweep, "defines_var model must yield a sweep")
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep, "defines_var model must yield a sweep")
         assertEquals(6, sweep.size, "all six definitional constraints are evaluable")
         val xId = program.intVarsByName.getValue("x")
         val yId = program.intVarsByName.getValue("y")
@@ -75,8 +76,9 @@ class FznDefinitionalSweepTest {
         // s declared 0..3 but a+b can reach 20: the sweep clamps s to 3 and the lin_eq factor
         // stays violated — the sweep must not write out-of-domain values to force feasibility.
         val tight = src.replace("var 0..20: s;", "var 0..3: s;")
-        val program = parseFlatZinc(tight)
-        val sweep = assertNotNull(program.definitionalSweep)
+        val execution = parseFlatZincExecution(tight)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep)
         val state = LocalSearchState(program.problem, Random(1))
         state.assignment.setInt(program.intVarsByName.getValue("x"), 0) // a = 7
         state.assignment.setInt(program.intVarsByName.getValue("y"), 10) // b = 8 -> s would be 15
@@ -104,8 +106,9 @@ class FznDefinitionalSweepTest {
             constraint array_int_element(i, [7, 8, 9], e) :: defines_var(e);
             solve satisfy;
         """.trimIndent()
-        val program = parseFlatZinc(src2)
-        val sweep = assertNotNull(program.definitionalSweep)
+        val execution = parseFlatZincExecution(src2)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep)
         assertEquals(4, sweep.size, "reif + bool2int + lin + element must all build")
         val state = LocalSearchState(program.problem, Random(2))
         val iv = program.intVarsByName
@@ -136,8 +139,9 @@ class FznDefinitionalSweepTest {
             constraint array_var_int_element(idx, [x, 5, y], e) :: defines_var(e);
             solve satisfy;
         """.trimIndent()
-        val program = parseFlatZinc(src2)
-        val sweep = assertNotNull(program.definitionalSweep, "the element definition must yield a sweep")
+        val execution = parseFlatZincExecution(src2)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep, "the element definition must yield a sweep")
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         assertTrue(net.isDefinedInt(program.intVarsByName.getValue("e")), "e is definitionally determined")
         val solver = LocalSearchSolver(program.problem.bake(), definitionalSweep = sweep)
@@ -153,13 +157,14 @@ class FznDefinitionalSweepTest {
             constraint int_le(x, y);
             solve satisfy;
         """.trimIndent()
-        assertNull(parseFlatZinc(plain).definitionalSweep)
+        assertNull(parseFlatZincExecution(plain).definitionalSweep)
     }
 
     @Test
     fun `local search with the sweep solves the decomposed model`() {
-        val program = parseFlatZinc(src)
-        val solver = LocalSearchSolver(program.problem.bake(), definitionalSweep = program.definitionalSweep)
+        val execution = parseFlatZincExecution(src)
+        val program = execution.program
+        val solver = LocalSearchSolver(program.problem.bake(), definitionalSweep = execution.definitionalSweep)
         val r = solver.solve(LocalSearchParams(maxFlips = 50_000, randomSeed = 3L))
         assertTrue(r is SolveResult.Sat, "decomposed model must be satisfiable under the sweep; got $r")
     }
@@ -181,8 +186,9 @@ class FznDefinitionalSweepTest {
             constraint int_lin_eq([1, -1], [x, c], 3) :: defines_var(c);
             solve satisfy;
         """.trimIndent()
-        val program = parseFlatZinc(cyclic)
-        val sweep = assertNotNull(program.definitionalSweep, "the acyclic definitions must still yield a sweep")
+        val execution = parseFlatZincExecution(cyclic)
+        val program = execution.program
+        val sweep = assertNotNull(execution.definitionalSweep, "the acyclic definitions must still yield a sweep")
         assertEquals(2, sweep.size, "one cycle member is dropped; the other and the independent def survive")
         val net = sweep.network(program.problem.numIntVars, program.problem.numBoolVars)
         val aId = program.intVarsByName.getValue("a")
