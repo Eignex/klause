@@ -5,10 +5,10 @@ import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.lowering.flatzinc.SolveDirective
-import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.maximizeInt
 import com.eignex.klause.solver.objective.minimizeInt
+import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Resolves [Format.MINIZINC] problems. The system `minizinc` CLI is used **only to compile**
  * `.mzn`(+`.dzn`) → `.fzn` against klause's redefinition library; the resulting FlatZinc is
- * then parsed in-process (`parseFlatZinc`) into a klause [com.eignex.klause.solver.Problem].
+ * then parsed in-process into a klause [com.eignex.klause.solver.Problem].
  * No external solver is invoked — solving is uniform across runners via the solver axis.
  */
 internal class MiniZincRunner(
@@ -28,7 +28,8 @@ internal class MiniZincRunner(
     override fun supports(ref: ProblemRef): Boolean = ref.format == Format.MINIZINC
 
     override fun resolve(ref: ProblemRef): ResolvedProblem {
-        val program = parseFlatZinc(compileFzn(ref).readText())
+        val executionProgram = parseFlatZincExecution(compileFzn(ref).readText())
+        val program = executionProgram.program
         val objective: LinearObjective? = when (val s = program.solve) {
             is SolveDirective.Minimize -> program.intVarsByName[s.objVar]?.let { program.problem.minimizeInt(it) }
             is SolveDirective.Maximize -> program.intVarsByName[s.objVar]?.let { program.problem.maximizeInt(it) }
@@ -39,8 +40,8 @@ internal class MiniZincRunner(
             lazyOf(program.problem),
             objective,
             maximize = program.solve is SolveDirective.Maximize,
-            lsObjective = program.lsObjective,
-            definitionalSweep = program.definitionalSweep,
+            lsObjective = executionProgram.localSearchObjective,
+            definitionalSweep = executionProgram.definitionalSweep,
             searchParams = program.searchHints?.toBacktrackParams(
                 program.problem.numBoolVars,
                 program.problem.numIntVars,
