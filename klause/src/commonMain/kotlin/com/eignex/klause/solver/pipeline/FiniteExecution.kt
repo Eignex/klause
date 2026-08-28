@@ -6,9 +6,9 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
+import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
@@ -149,7 +149,10 @@ fun FinitePipeline.execute(
 private fun executeFixed(request: FiniteExecutionRequest, callbacks: FiniteExecutionCallbacks): FiniteExecutionResult {
     val plan = FinitePipeline.planFixedBacktrack(
         FixedBacktrackPlanRequest(
-            annotatedParams = request.searchHints?.toBacktrackParams(request.problem.numBoolVars, request.problem.numIntVars),
+            annotatedParams = request.searchHints?.toBacktrackParams(
+                request.problem.numBoolVars,
+                request.problem.numIntVars,
+            ),
             engineParams = request.engineParams,
             randomSeed = request.randomSeed,
             cancellation = request.cancellation,
@@ -296,7 +299,10 @@ private fun executePortfolio(
             defaultArms = request.defaultArms,
             lpCeiling = request.lpConfig,
             nodeBudget = request.nodeBudget,
-            annotationArm = request.searchHints?.toBacktrackParams(request.problem.numBoolVars, request.problem.numIntVars),
+            annotationArm = request.searchHints?.toBacktrackParams(
+                request.problem.numBoolVars,
+                request.problem.numIntVars,
+            ),
         ),
     )
     when (plan) {
