@@ -1,9 +1,11 @@
 package com.eignex.klause.solver
+
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntColumn
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
