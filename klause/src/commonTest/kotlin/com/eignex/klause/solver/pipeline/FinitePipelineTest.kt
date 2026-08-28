@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
@@ -42,6 +43,26 @@ class FinitePipelineTest {
         )
 
         assertSame(problem, preparation.problem)
+    }
+
+    @Test
+    fun `reports construction bake time through the preparation`() {
+        val problem = Problem(
+            numBoolVars = 0,
+            numIntVars = 0,
+            intDomains = emptyArray<IntDomain>(),
+            factors = emptyArray<Factor>(),
+        ).bake()
+
+        val preparation = FinitePipeline.prepare(
+            FinitePipelineRequest(
+                problem = problem,
+                engine = FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.NONE,
+            ),
+        )
+
+        assertEquals(problem.bakeElapsed, preparation.constructionBakeElapsed)
     }
 
     @Test
