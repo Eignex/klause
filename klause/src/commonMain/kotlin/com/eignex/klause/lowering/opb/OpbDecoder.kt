@@ -3,6 +3,10 @@ package com.eignex.klause.lowering.opb
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.formats.opb.OpbDocument
+import com.eignex.klause.formats.opb.OpbRelation
+import com.eignex.klause.formats.opb.OpbStatement
+import com.eignex.klause.formats.opb.OpbTerm
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearObjectiveSpec
