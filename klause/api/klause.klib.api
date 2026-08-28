@@ -9719,8 +9719,10 @@ final class com.eignex.klause.solver.pipeline/EngineParams { // com.eignex.klaus
 }
 
 final class com.eignex.klause.solver.pipeline/FinitePipelinePreparation { // com.eignex.klause.solver.pipeline/FinitePipelinePreparation|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?, kotlin.time/Duration = ...) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?;kotlin.time.Duration){}[0]
 
+    final val constructionBakeElapsed // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.constructionBakeElapsed|{}constructionBakeElapsed[0]
+        final fun <get-constructionBakeElapsed>(): kotlin.time/Duration // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.constructionBakeElapsed.<get-constructionBakeElapsed>|<get-constructionBakeElapsed>(){}[0]
     final val objective // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.objective|{}objective[0]
         final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.objective.<get-objective>|<get-objective>(){}[0]
     final val presolve // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.presolve|{}presolve[0]

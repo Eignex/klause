@@ -5,10 +5,12 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.util.Cancellation
+import kotlin.time.Duration
 
 /** Inputs the finite orchestration layer needs before selecting and constructing an engine. */
 class FinitePipelineRequest(
@@ -40,6 +42,8 @@ class FinitePipelinePreparation(
     val reconstruct: (Sample) -> Sample,
     /** Presolve statistics when preparation changed the model. */
     val presolve: PresolveStats?,
+    /** Time spent baking the source problem before this preparation began. */
+    val constructionBakeElapsed: Duration = Duration.ZERO,
 )
 
 /** Owns finite-route presolve policy before a concrete engine is constructed. */
@@ -73,6 +77,7 @@ object FinitePipeline {
             objective = outcome.objective ?: request.objective,
             reconstruct = outcome.reconstruct,
             presolve = outcome.stats.takeIf { outcome.changed },
+            constructionBakeElapsed = (request.problem as? BakedProblem)?.bakeElapsed ?: Duration.ZERO,
         )
     }
 }
