@@ -1,18 +1,17 @@
-package com.eignex.klause.theory
+package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ProblemSpec
-import com.eignex.klause.solver.pipeline.ComponentPlan
-import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.TheoryComponent
+import com.eignex.klause.theory.TheorySearchComponent
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
 import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraSolver
 
 /** Builds the theory component selected by this plan. */
-fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
+internal fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
@@ -23,7 +22,7 @@ fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
 
         ProblemPipeline.GENERAL_LIA -> GeneralLiaSearchComponent(fragment, theoryIntVars) { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->
-                if (intOwner(variable) == com.eignex.klause.solver.pipeline.IntVariableOwner.THEORY) {
+                if (intOwner(variable) == IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)
                 }
             }
@@ -35,7 +34,7 @@ fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
 
         ProblemPipeline.EXACT_LIRA -> ExactLiraSearchComponent(fragment) { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->
-                if (intOwner(variable) == com.eignex.klause.solver.pipeline.IntVariableOwner.THEORY) {
+                if (intOwner(variable) == IntVariableOwner.THEORY) {
                     model.put(SearchIntValue(variable), value)
                 }
             }

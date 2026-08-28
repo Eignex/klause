@@ -7,10 +7,6 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
-import com.eignex.klause.solver.pipeline.ProblemPipeline
-import com.eignex.klause.solver.pipeline.admitsGeneralLia
-import com.eignex.klause.solver.pipeline.componentPlan
-import com.eignex.klause.solver.pipeline.generalLiaWitnessBound
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBrancher
@@ -95,7 +91,7 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
     private val pollStride = witnessBound?.let { pollStrideFor(it.bitLength()) } ?: MAX_POLL_FACTORS
 
     init {
-        require(model.componentPlan().theoryPipeline == ProblemPipeline.GENERAL_LIA) {
+        require(model.admitsGeneralLia()) {
             "general LIA search requires an open pure-integer linear model"
         }
     }
