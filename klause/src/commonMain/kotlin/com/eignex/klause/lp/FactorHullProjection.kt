@@ -34,6 +34,6 @@ internal fun Factor.estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? =
     is Mdd -> estimateLpHull(domains)
     is NValue -> estimateLpHull(domains)
     is Regular -> estimateLpHull(domains)
-    is Table -> estimateLpHull(domains)
+    is Table -> estimateLpHull()
     else -> null
 }

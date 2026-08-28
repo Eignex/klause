@@ -299,7 +299,7 @@ class Table private constructor(
         }
     }
 
-    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(): LpSizeEstimate? {
         if (hi != null) return null
         if (numTuples > MAX_TUPLES) return null
         // One selector per tuple (upper bound on the declared-feasible ones) + Σ y = 1 + one channel
