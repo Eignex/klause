@@ -19,7 +19,7 @@ import com.eignex.klause.lp.RelaxationBuilder
  * local-search invariant (like a real-bearing [Linear]) and its two directions are enforced by the
  * LP relaxation:
  *
- *  - [linearize] consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
+ *  - [emitLpRelaxation] consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
  *    false emits its exact complement (`¬(a ≤ b) ⟺ a > b`, strictness flipping through the
  *    delta-rational machinery), unpinned emits nothing (a sound weakening — every leaf pins every
  *    Boolean, so leaf feasibility enforces the equivalence and search stays complete).
@@ -92,7 +92,7 @@ class ReifiedRealLinear(
         }
     }
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         val pin = builder.liveBool(aux) ?: return
         val cols = IntArray(vars.size + realVars.size)
         val coeffs = DoubleArray(cols.size)

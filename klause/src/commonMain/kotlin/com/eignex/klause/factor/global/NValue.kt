@@ -124,7 +124,7 @@ class NValue(
      * distinct count `Σ_v y_v` relates to `n` by the mode (`Eq → =`, `AtMost → ≥`, `AtLeast → ≤`), so
      * minimising `n` reads a real lower bound. Gated by [MAX_NVALUE_CELLS]; optional-presence is skipped.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         var cells = 0L

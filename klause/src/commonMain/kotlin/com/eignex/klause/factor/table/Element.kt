@@ -169,7 +169,7 @@ class Element private constructor(
      * bilinear result channel with two big-M rows per position forcing `result = arr[p]` when `y_p = 1`.
      * Arrays longer than [MAX_ELEM] are skipped.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
         if (arr.size > MAX_ELEM) return
         val selCols = IntArrayList()

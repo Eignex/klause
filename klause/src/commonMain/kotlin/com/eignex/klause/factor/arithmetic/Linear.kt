@@ -341,7 +341,7 @@ class Linear private constructor(
 
     override val linearRows: List<LinearRow> get() = listOfNotNull(integerConstants)
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         when (val c = constants) {
             // A wide row enters the LP only as directionally-rounded double outer-relaxation rows; its
             // exact coefficients never enter the LP (see [emitWideOuterRows]).

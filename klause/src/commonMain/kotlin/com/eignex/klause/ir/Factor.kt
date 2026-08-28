@@ -1,12 +1,9 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.lp.RelaxationBuilder
-
 /**
  * Structural contract for a constraint in `Problem`: variable membership, remapping, and
  * structural identity. Engine-specific projections are allocated by their respective engines from
- * this immutable data. The LP-relaxation half needs no per-factor engine state, so it is emitted
- * directly by [linearize] rather than through a factory object.
+ * this immutable data. Engine-specific relaxation projections are allocated by their engines.
  *
  * Variables touched by a factor split into two id spaces: Boolean vars in [boolVars] and
  * integer vars in [intVars]. Pure-Boolean factors leave [intVars] empty; pure-integer factors
@@ -167,7 +164,7 @@ interface Factor {
      * variables and Boolean literals, or the empty list (the default) when the factor has no exact
      * linear form. "Exact" means the conjunction of the returned rows accepts exactly the assignments
      * this factor accepts — it *is* the constraint, not a relaxation. A factor whose only linear form is
-     * a relaxation (big-M, convex hull) leaves this empty and exposes that through [linearize] instead.
+     * a relaxation (big-M, convex hull) leaves this empty for the LP projection to handle separately.
      *
      * Lets presolve analyses (redundancy, domination) read the linear content of any factor
      * uniformly instead of pattern-matching the concrete factor type. Read-only: it carries no
@@ -176,22 +173,6 @@ interface Factor {
      * per call.
      */
     val linearRows: List<LinearRow> get() = emptyList()
-
-    /**
-     * Emit this factor's LP-relaxation rows, columns, and auxiliary variables into [builder] — the
-     * LP-engine analogue of the propagation and local-search projections, but a stateless emitter rather than a
-     * factory object. The driver calls it once per relaxation build, passing the factor's index in
-     * `Problem.factors` as [factorId]. A single pass may mix [com.eignex.klause.lp.Contribution.CORE]
-     * and [com.eignex.klause.lp.Contribution.HULL] rows — the kind is chosen per row at emit time.
-     *
-     * An exact linear row *is* the tightest valid relaxation, so the default emits the factor's
-     * [linearRows] when it exposes any; a factor whose only linear form is a relaxation (big-M, convex
-     * hull) leaves [linearRows] empty and overrides this to emit that relaxation. Default when neither
-     * applies: nothing (no relaxation).
-     */
-    fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        for (row in linearRows) emitExactRow(builder, row)
-    }
 }
 
 /**
@@ -209,35 +190,4 @@ sealed interface FactorReduction {
      */
     class Rewrite(val replacement: List<Factor>, val tightenedBounds: Map<Int, IntRange> = emptyMap()) :
         FactorReduction
-}
-
-/**
- * Emit one exact [LinearRow] into [builder]. A pure integer row goes through
- * [RelaxationBuilder.linearRow] verbatim; a row carrying Boolean literals is folded to mixed columns,
- * each negative literal's `coeff · (1 − x)` moving its constant to the right-hand side. Used by the
- * default `Factor.linearize` so a factor exposing exact rows needs no bespoke relaxation code.
- */
-private fun emitExactRow(builder: RelaxationBuilder, row: LinearRow) {
-    val n = row.size
-    val columns = IntArray(n)
-    val coeffs = LongArray(n)
-    var rhs = row.bound
-    for (k in 0 until n) {
-        val ref = row.ref(k)
-        val c = row.coeff(k)
-        if (Term.isBool(ref)) {
-            val lit = Term.lit(ref)
-            columns[k] = builder.boolColumn(Lit.variable(lit))
-            if (Lit.isPositive(lit)) {
-                coeffs[k] = c
-            } else {
-                coeffs[k] = -c
-                rhs -= c
-            }
-        } else {
-            columns[k] = builder.intColumn(Term.intVar(ref))
-            coeffs[k] = c
-        }
-    }
-    builder.row(columns, coeffs, row.relation, rhs)
 }

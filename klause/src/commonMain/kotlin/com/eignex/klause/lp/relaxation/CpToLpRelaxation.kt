@@ -24,6 +24,7 @@ import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
+import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
@@ -506,7 +507,7 @@ internal class CpToLpRelaxation(
     private fun realCost(r: Int): Double = objective?.realCoefficients?.getOrElse(r) { 0.0 } ?: 0.0
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
-     *  [RelaxationBuilder] so a factor's `Factor.linearize` can emit into it. */
+     *  [RelaxationBuilder] so an LP factor projection can emit into it. */
     private inner class Assembler(private val domains: RelaxationDomains, private val gated: Boolean = false) :
         RelaxationBuilder {
         private val builder = LpBuilder()
@@ -538,7 +539,7 @@ internal class CpToLpRelaxation(
 
         /** Whether the factor currently being linearized may contribute HULL rows: its convex-hull
          *  family flag is on and we are not in objective-cone mode (where the column-heavy hulls are
-         *  forced off). Set per factor before `Factor.linearize`; consulted by the row emitters so a
+         *  forced off). Set per factor before its LP projection; consulted by the row emitters so a
          *  disabled family contributes only its CORE rows. CORE rows ignore it. */
         private var currentHullEnabled = true
 
@@ -868,11 +869,11 @@ internal class CpToLpRelaxation(
                     continue
                 }
                 // Each factor emits its own rows; factors with no linear relaxation (hard globals,
-                // cut-only or scheduling-view factors) keep the default no-op `Factor.linearize` and
+                // cut-only or scheduling-view factors) have no LP projection and
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
                     factor.lpHullEnabled(hullFlags)
-                factor.linearize(this, factorId)
+                factor.emitLpRelaxation(this, factorId)
             }
 
             if (booleanRlt) buildBooleanRlt()

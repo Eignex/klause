@@ -61,7 +61,7 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
 
     private fun countDistance(n: Long): Long = (if (n < min) min - n else 0L) + (if (n > max) n - max else 0L)
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         val sum = BoolReifiedSum.fold(builder, literals, weights = null)
         val a = builder.boolColumn(auxBoolVar)
         val lo = subExact(min.toLong(), sum.constant)

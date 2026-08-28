@@ -72,7 +72,7 @@ class ReifiedPseudoBoolean(
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         pbDegree(state.longPayload[factorId], op, bound, softCap)
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         val sum = BoolReifiedSum.fold(builder, literals, weights)
         val a = builder.boolColumn(auxBoolVar)
         val b = subExact(bound, sum.constant)

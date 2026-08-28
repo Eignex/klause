@@ -90,7 +90,7 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
         }
     }
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights, relation, bound)
     }
 

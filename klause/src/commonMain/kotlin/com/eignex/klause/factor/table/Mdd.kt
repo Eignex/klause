@@ -239,7 +239,7 @@ class Mdd(
      * transition table relaxes soundly; `src`/`dst` are per-layer state ids, always in [Int] range.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val n = seq.size
@@ -351,7 +351,7 @@ class Mdd(
 
     /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
      *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_MDD_ARCS].
-     *  Shared by [linearize] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
+     *  Shared by [emitLpRelaxation] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
     private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
         val n = seq.size
         val stride = recordStride

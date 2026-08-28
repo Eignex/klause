@@ -25,7 +25,7 @@ import com.eignex.klause.lp.RelaxationBuilder
  * bounds-consistency — no global algorithm is stronger. Keeping it one factor (rather than
  * decomposing to pairwise [com.eignex.klause.factor.arithmetic.Linear]) buys the local-search
  * invariant, which re-monotonises the whole chain in one cascading step. The exact pairwise rows in
- * [linearRows] are still surfaced to presolve and, via the `Factor.linearize` default, to the LP
+ * [linearRows] are still surfaced to presolve and to the LP
  * relaxation.
  */
 class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
@@ -60,7 +60,7 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
             }
         }
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         val coeffs = longArrayOf(1, -1)
         for (i in 0 until xs.size - 1) {
             builder.linearRow(LinearOp.GE, intArrayOf(xs[i + 1], xs[i]), coeffs, gap.toLong())

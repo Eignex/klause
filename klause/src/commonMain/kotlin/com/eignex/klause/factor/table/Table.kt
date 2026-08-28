@@ -250,7 +250,7 @@ class Table private constructor(
      * variable and is pinned to 0 when any entry left the live domain. Tables with more than [MAX_TUPLES]
      * rows are skipped. HULL.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
         // An interval/wildcard cell doesn't pin its variable for that tuple, so the per-tuple channel
         // would be ill-defined; short tables skip the hull relaxation (propagation still enforces it).

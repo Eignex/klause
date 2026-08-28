@@ -108,7 +108,7 @@ class Regular(
      * ([MAX_REGULAR_ARCS]); above the cap, or when no accepting path survives, it is skipped. HULL.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         if (!builder.hullEnabled()) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val len = seq.size
@@ -199,7 +199,7 @@ class Regular(
 
     /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
      *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_REGULAR_ARCS].
-     *  Shared by [linearize] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
+     *  Shared by [emitLpRelaxation] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
     private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
         val len = seq.size
         val s = alphabetSize

@@ -86,7 +86,7 @@ class Clause(literals: IntArray) :
         return allBool
     }
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
     }
 
