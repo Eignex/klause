@@ -23,14 +23,14 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 
 /** Emit this factor's LP relaxation into [builder]. */
-internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder) {
+internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder, linearProjection: LinearLpProjection? = null) {
     when (this) {
         is ArrayMinMax -> emitLpRelaxation(builder)
         is Cardinality -> emitLpRelaxation(builder)
         is Clause -> emitLpRelaxation(builder)
         is Element -> emitLpRelaxation(builder)
         is GlobalCardinality -> emitLpRelaxation(builder)
-        is Linear -> emitLpRelaxation(builder)
+        is Linear -> emitLpRelaxation(builder, linearProjection)
         is Mdd -> emitLpRelaxation(builder)
         is NValue -> emitLpRelaxation(builder)
         is Product -> emitLpRelaxation(builder)
