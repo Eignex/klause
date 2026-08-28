@@ -583,6 +583,7 @@ class SearchSessionTest {
 
         assertIs<SearchResult.Satisfied>(result)
         assertEquals(1, restarts)
+        assertEquals(1L, session.learnedClauseStats().restarts)
         assertEquals(true, session.boolValue(0))
     }
 
@@ -591,6 +592,35 @@ class SearchSessionTest {
         val session = SearchSession(emptyList())
 
         assertIs<SearchResult.Indeterminate>(session.solve(2, SearchSolveParams(maxDecisions = 1)))
+    }
+
+    @Test
+    fun `rejected alternatives do not spend the committed decision allowance`() {
+        val rejected = object : SearchTheoryDecision {}
+        val accepted = object : SearchTheoryDecision {}
+        val work = OpenTheoryWorkSink()
+        val component = object : SearchComponent {
+            override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                if ((decision as SearchDecision.Theory).decision === rejected) {
+                    ComponentResult.Conflict()
+                } else {
+                    ComponentResult.Consistent
+                }
+        }
+        val brancher = object : SearchBrancher {
+            override fun nextBranch(context: SearchContext): List<SearchDecision>? = if (context.decisionLevel == 0) {
+                listOf(SearchDecision.Theory(rejected), SearchDecision.Theory(accepted))
+            } else {
+                null
+            }
+        }
+        val session = SearchComponentSet(listOf(component), listOf(brancher)).session()
+        session.attachOpenTheoryWork(work)
+
+        val result = session.solve(numBoolVars = 0, SearchSolveParams(maxDecisions = 1))
+
+        assertIs<SearchResult.Satisfied>(result)
+        assertEquals(1L, work.snapshot().openTheoryDecisions)
     }
 
     @Test

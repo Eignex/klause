@@ -7,7 +7,6 @@ import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
-import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.ionspin.kotlin.bignum.integer.BigInteger
@@ -105,12 +104,12 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
     /** Minimizes the objective, tightening the bound until a round refutes it. */
     fun minimize(params: TheoryParams = TheoryParams()): OpenTheoryOptimum {
         val plan = base.componentPlan()
-        val work = OpenTheoryWorkSink(params.openWorkLimit)
+        val state = OpenTheorySolveState(params)
         var incumbent: OpenTheoryAssignment? = null
         var best: BigInteger? = null
         var spec = base
         while (true) {
-            val result = OpenTheoryEngine(spec, route, plan).solve(params, work)
+            val result = OpenTheoryEngine(spec, route, plan).solve(params, state)
             when (result) {
                 is OpenTheoryResult.Sat -> {
                     // Nothing to improve on a constant objective: the first witness is already optimal,

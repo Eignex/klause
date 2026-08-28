@@ -11,6 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ComponentPlan
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
@@ -129,28 +130,29 @@ class OpenTheoryEngine internal constructor(
     /** Decides the model through its component plan. */
     fun solve(params: TheoryParams = TheoryParams()): OpenTheoryResult = solve(
         params,
-        OpenTheoryWorkSink(params.openWorkLimit),
+        OpenTheorySolveState(params),
     )
 
-    /** Execute one feasibility round against the caller's solve-wide [work] sink. */
-    internal fun solve(params: TheoryParams, work: OpenTheoryWorkSink): OpenTheoryResult {
+    /** Execute one feasibility round against the caller's solve-wide [state]. */
+    internal fun solve(params: TheoryParams, state: OpenTheorySolveState): OpenTheoryResult {
+        val work = state.work
         val cancellation = Cancellation { params.timeout() || params.cancellation() }
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
         // Building the components reads the whole model, so a budget already spent is answered before
         // that work starts rather than after it.
-        if (cancellation()) return unknown(params.timeout(), stats = stats, work = work)
+        if (cancellation()) return unknown(params.timeout(), stats = stats, state = state)
         // Presolve the open sides before the theory sees them. A proved bound narrows the box the theory
         // searches; a refutation here is over the genuinely open ranges, so it refutes the unbounded model
         // rather than an invented box, and is reportable as unsat.
         val (model, plan) = when (val presolved = presolveOpen(cancellation)) {
-            OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(work))
+            OpenPresolveResult.Refuted -> return OpenTheoryResult.Unsat(stats.finish(state))
             is OpenPresolveResult.Tightened -> adopt(presolved)
         }
         // A model that still has an open side is the case the witness box serves worst: the box is derived
         // from the model's own coefficients and runs to millions of bits on the hard instances, and one
         // that wide cannot be bisected. A cube needs no box at all.
-        cubeWitness(model, cancellation)?.let { return OpenTheoryResult.Sat(it, stats.finish(work)) }
+        cubeWitness(model, cancellation)?.let { return OpenTheoryResult.Sat(it, stats.finish(state)) }
         val cpDomains = plan.cpIntVars.associateWith { column ->
             IntDomain(model.intBounds.lower(column), model.intBounds.upper(column))
         }
@@ -166,33 +168,33 @@ class OpenTheoryEngine internal constructor(
             ComponentResult.Consistent -> Unit
 
             is ComponentResult.Conflict -> return OpenTheoryResult.Unsat(
-                stats.finish(work),
+                stats.finish(state),
             )
 
             ComponentResult.Indeterminate -> return unknown(
                 params.timeout(),
                 planned.session.checkBudgetExhausted(),
                 stats,
-                work,
+                state,
             )
         }
         val solveParams = SearchSolveParams(
-            maxDecisions = params.maxDecisions,
+            maxDecisions = state.remainingDecisions(),
             restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
         )
         return when (val result = planned.session.solve(model.numBoolVars, solveParams)) {
             is SearchResult.Satisfied -> OpenTheoryResult.Sat(
                 assignment(result.model, checkNotNull(planned.theory)),
-                stats.finish(work, planned.session),
+                stats.finish(state, planned.session),
             )
 
-            SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(work, planned.session))
+            SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(state, planned.session))
 
             SearchResult.Indeterminate -> unknown(
                 params.timeout(),
-                planned.session.checkBudgetExhausted(),
+                planned.session.checkBudgetExhausted() || planned.session.decisionBudgetExhausted(),
                 stats,
-                work,
+                state,
                 planned.session,
             )
         }
@@ -258,30 +260,29 @@ class OpenTheoryEngine internal constructor(
         timedOut: Boolean,
         budgetExhausted: Boolean = false,
         stats: SolveStatsSink,
-        work: OpenTheoryWorkSink? = null,
+        state: OpenTheorySolveState,
         session: com.eignex.klause.solver.search.SearchSession? = null,
     ): OpenTheoryResult.Unknown {
         stats.timedOut = timedOut
-        stats.openTheory = work?.snapshot() ?: stats.openTheory
-        session?.let { stats.openTheoryClauses = it.learnedClauseStats() }
         return OpenTheoryResult.Unknown(
             if (timedOut) {
                 TerminationReason.Timeout
-            } else if (budgetExhausted || work?.exhausted == true) {
+            } else if (budgetExhausted || state.work.exhausted) {
                 TerminationReason.BudgetExhausted
             } else {
                 TerminationReason.Cancelled
             },
-            stats.finish(work),
+            stats.finish(state, session),
         )
     }
 
     private fun SolveStatsSink.finish(
-        work: OpenTheoryWorkSink? = null,
+        state: OpenTheorySolveState,
         session: com.eignex.klause.solver.search.SearchSession? = null,
     ): SolveStats {
-        openTheory = work?.snapshot() ?: openTheory
-        session?.let { openTheoryClauses = it.learnedClauseStats() }
+        state.capture(session)
+        openTheory = state.work.snapshot()
+        openTheoryClauses = state.clauses
         stop()
         return snapshot()
     }
@@ -315,5 +316,24 @@ class OpenTheoryEngine internal constructor(
         )
 
         ProblemPipeline.FINITE_CP, ProblemPipeline.UNSUPPORTED_OPEN -> error("validated open theory route changed")
+    }
+}
+
+/** Solve-wide controls and telemetry shared by every feasibility round of one open optimization. */
+internal class OpenTheorySolveState(params: TheoryParams) {
+    val work = OpenTheoryWorkSink(params.openWorkLimit)
+    private val maxDecisions = params.maxDecisions
+    var clauses = OpenTheoryClauseStats()
+        private set
+
+    fun remainingDecisions(): Long {
+        val workStats = work.snapshot()
+        val committed = workStats.openBoolDecisions + workStats.openIntDecisions + workStats.openTheoryDecisions
+        return maxDecisions - committed
+    }
+
+    fun capture(session: com.eignex.klause.solver.search.SearchSession?) {
+        session ?: return
+        clauses = clauses.mergedWith(session.learnedClauseStats())
     }
 }
