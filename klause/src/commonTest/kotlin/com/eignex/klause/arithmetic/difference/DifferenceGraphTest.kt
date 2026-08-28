@@ -103,6 +103,66 @@ class DifferenceGraphTest {
     }
 
     @Test
+    fun `shortest paths preserve reachability and direction`() {
+        val g = graph(
+            4,
+            Triple(0, 1, 7L),
+            Triple(1, 2, -2L),
+            Triple(3, 0, -4L),
+        )
+
+        val forward = g.shortestPaths(0)
+        val reverse = g.shortestPaths(0, reversed = true)
+
+        assertTrue(forward is ShortestPaths.Found)
+        assertTrue(reverse is ShortestPaths.Found)
+        assertEquals(5L, forward.values[2])
+        assertTrue(forward.reachable[2])
+        assertEquals(-4L, reverse.values[3])
+        assertTrue(reverse.reachable[3])
+        assertTrue(!forward.reachable[3])
+    }
+
+    @Test
+    fun `overflow abandons one shortest path without inventing a bound`() {
+        val g = graph(3, Triple(0, 1, Long.MAX_VALUE), Triple(1, 2, 1L))
+
+        val paths = g.shortestPaths(0)
+
+        assertTrue(paths is ShortestPaths.Found)
+        assertTrue(paths.reachable[1])
+        assertEquals(Long.MAX_VALUE, paths.values[1])
+        assertTrue(!paths.reachable[2])
+    }
+
+    @Test
+    fun `a spent budget abandons shortest paths`() {
+        val g = graph(2, Triple(0, 1, 1L))
+
+        assertEquals(ShortestPaths.Abandoned, g.shortestPaths(0) { true })
+    }
+
+    @Test
+    fun `shortest paths report only a reachable negative cycle`() {
+        val reachable = graph(3, Triple(0, 1, 0L), Triple(1, 2, -1L), Triple(2, 1, 0L))
+        val disconnected = graph(4, Triple(0, 1, 0L), Triple(2, 3, -1L), Triple(3, 2, 0L))
+
+        assertEquals(ShortestPaths.Infeasible, reachable.shortestPaths(0))
+        assertTrue(disconnected.shortestPaths(0) is ShortestPaths.Found)
+    }
+
+    @Test
+    fun `shortest paths notice cancellation between relaxation passes`() {
+        val g = graph(3, Triple(1, 2, 1L), Triple(0, 1, 1L))
+        var polls = 0
+
+        val paths = g.shortestPaths(0) { ++polls >= 2 }
+
+        assertEquals(ShortestPaths.Abandoned, paths)
+        assertEquals(2, polls)
+    }
+
+    @Test
     fun `a budget spent partway through one pass is noticed inside it`() {
         // Two vertices give three relaxation passes, so a poll that only ran per pass could not land
         // inside a pass over an edge set this size, and the sweep would run to completion first.
