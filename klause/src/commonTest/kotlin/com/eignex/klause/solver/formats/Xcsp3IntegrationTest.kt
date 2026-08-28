@@ -18,6 +18,7 @@ import com.eignex.klause.lowering.xcsp3.UnsupportedXcsp3Exception
 import com.eignex.klause.lowering.xcsp3.Xcsp3
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.math.abs
 import kotlin.random.Random
@@ -232,7 +233,7 @@ class Xcsp3IntegrationTest {
         """.trimIndent()
         val parsed = Xcsp3.parse(xml)
         val obj = requireNotNull(parsed.objective)
-        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj, BacktrackParams())
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj.toLinearObjective(), BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(-10.0, r.objective)
     }
@@ -728,7 +729,10 @@ class Xcsp3IntegrationTest {
             <objectives><minimize type="nValues"><list> x[] </list></minimize></objectives></instance>
             """.trimIndent(),
         )
-        val r = BacktrackSolver(parsed.problem.bake()).minimize(requireNotNull(parsed.objective), BacktrackParams())
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(
+            requireNotNull(parsed.objective).toLinearObjective(),
+            BacktrackParams(),
+        )
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(1.0, r.objective)
     }
@@ -1235,7 +1239,7 @@ class Xcsp3IntegrationTest {
         """.trimIndent()
         val parsed = Xcsp3.parse(xml)
         val obj = requireNotNull(parsed.objective)
-        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj, BacktrackParams())
+        val r = BacktrackSolver(parsed.problem.bake()).minimize(obj.toLinearObjective(), BacktrackParams())
         assertTrue(r is MinimizeResult.Optimal, "expected Optimal, got $r")
         assertEquals(2.0, r.objective)
     }

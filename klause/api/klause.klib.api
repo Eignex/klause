@@ -4885,6 +4885,28 @@ final class com.eignex.klause.ir/IntVars : com.eignex.klause.ir/VarList { // com
         final fun <get-ints>(): kotlin/IntArray // com.eignex.klause.ir/IntVars.ints.<get-ints>|<get-ints>(){}[0]
 }
 
+final class com.eignex.klause.ir/LinearObjectiveSpec { // com.eignex.klause.ir/LinearObjectiveSpec|null[0]
+    constructor <init>(kotlin/LongArray = ..., kotlin/LongArray = ..., kotlin/Long = ..., kotlin/DoubleArray = ...) // com.eignex.klause.ir/LinearObjectiveSpec.<init>|<init>(kotlin.LongArray;kotlin.LongArray;kotlin.Long;kotlin.DoubleArray){}[0]
+
+    final val boolWeights // com.eignex.klause.ir/LinearObjectiveSpec.boolWeights|{}boolWeights[0]
+        final fun <get-boolWeights>(): kotlin/LongArray // com.eignex.klause.ir/LinearObjectiveSpec.boolWeights.<get-boolWeights>|<get-boolWeights>(){}[0]
+    final val constant // com.eignex.klause.ir/LinearObjectiveSpec.constant|{}constant[0]
+        final fun <get-constant>(): kotlin/Long // com.eignex.klause.ir/LinearObjectiveSpec.constant.<get-constant>|<get-constant>(){}[0]
+    final val intCoefficients // com.eignex.klause.ir/LinearObjectiveSpec.intCoefficients|{}intCoefficients[0]
+        final fun <get-intCoefficients>(): kotlin/LongArray // com.eignex.klause.ir/LinearObjectiveSpec.intCoefficients.<get-intCoefficients>|<get-intCoefficients>(){}[0]
+    final val realCoefficients // com.eignex.klause.ir/LinearObjectiveSpec.realCoefficients|{}realCoefficients[0]
+        final fun <get-realCoefficients>(): kotlin/DoubleArray // com.eignex.klause.ir/LinearObjectiveSpec.realCoefficients.<get-realCoefficients>|<get-realCoefficients>(){}[0]
+
+    final fun component1(): kotlin/LongArray // com.eignex.klause.ir/LinearObjectiveSpec.component1|component1(){}[0]
+    final fun component2(): kotlin/LongArray // com.eignex.klause.ir/LinearObjectiveSpec.component2|component2(){}[0]
+    final fun component3(): kotlin/Long // com.eignex.klause.ir/LinearObjectiveSpec.component3|component3(){}[0]
+    final fun component4(): kotlin/DoubleArray // com.eignex.klause.ir/LinearObjectiveSpec.component4|component4(){}[0]
+    final fun copy(kotlin/LongArray = ..., kotlin/LongArray = ..., kotlin/Long = ..., kotlin/DoubleArray = ...): com.eignex.klause.ir/LinearObjectiveSpec // com.eignex.klause.ir/LinearObjectiveSpec.copy|copy(kotlin.LongArray;kotlin.LongArray;kotlin.Long;kotlin.DoubleArray){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.ir/LinearObjectiveSpec.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.ir/LinearObjectiveSpec.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.ir/LinearObjectiveSpec.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.ir/MixedIntColumns : com.eignex.klause.ir/IntColumns { // com.eignex.klause.ir/MixedIntColumns|null[0]
     constructor <init>(kotlin/Array<com.eignex.klause.ir/IntColumn>) // com.eignex.klause.ir/MixedIntColumns.<init>|<init>(kotlin.Array<com.eignex.klause.ir.IntColumn>){}[0]
 
@@ -6098,19 +6120,19 @@ final class com.eignex.klause.lowering.dimacs/WcnfDocument { // com.eignex.klaus
 }
 
 final class com.eignex.klause.lowering.dimacs/WcnfProblem { // com.eignex.klause.lowering.dimacs/WcnfProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective, kotlin/Int) // com.eignex.klause.lowering.dimacs/WcnfProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective;kotlin.Int){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec, kotlin/Int) // com.eignex.klause.lowering.dimacs/WcnfProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec;kotlin.Int){}[0]
 
     final val numOriginalBoolVars // com.eignex.klause.lowering.dimacs/WcnfProblem.numOriginalBoolVars|{}numOriginalBoolVars[0]
         final fun <get-numOriginalBoolVars>(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfProblem.numOriginalBoolVars.<get-numOriginalBoolVars>|<get-numOriginalBoolVars>(){}[0]
     final val objective // com.eignex.klause.lowering.dimacs/WcnfProblem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.lowering.dimacs/WcnfProblem.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec // com.eignex.klause.lowering.dimacs/WcnfProblem.objective.<get-objective>|<get-objective>(){}[0]
     final val problem // com.eignex.klause.lowering.dimacs/WcnfProblem.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.dimacs/WcnfProblem.problem.<get-problem>|<get-problem>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.dimacs/WcnfProblem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.lowering.dimacs/WcnfProblem.component2|component2(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec // com.eignex.klause.lowering.dimacs/WcnfProblem.component2|component2(){}[0]
     final fun component3(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfProblem.component3|component3(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.solver.objective/LinearObjective = ..., kotlin/Int = ...): com.eignex.klause.lowering.dimacs/WcnfProblem // com.eignex.klause.lowering.dimacs/WcnfProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective;kotlin.Int){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec = ..., kotlin/Int = ...): com.eignex.klause.lowering.dimacs/WcnfProblem // com.eignex.klause.lowering.dimacs/WcnfProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.dimacs/WcnfProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.dimacs/WcnfProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.dimacs/WcnfProblem.toString|toString(){}[0]
@@ -6255,7 +6277,7 @@ final class com.eignex.klause.lowering.mps/MpsColumn { // com.eignex.klause.lowe
 }
 
 final class com.eignex.klause.lowering.mps/MpsCompiled { // com.eignex.klause.lowering.mps/MpsCompiled|null[0]
-    constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Boolean, kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn>, kotlin/Long, kotlin/Double?, kotlin/Boolean, kotlin/Int) // com.eignex.klause.lowering.mps/MpsCompiled.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.lowering.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
+    constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin/Boolean, kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn>, kotlin/Long, kotlin/Double?, kotlin/Boolean, kotlin/Int) // com.eignex.klause.lowering.mps/MpsCompiled.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.lowering.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
 
     final val columns // com.eignex.klause.lowering.mps/MpsCompiled.columns|{}columns[0]
         final fun <get-columns>(): kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> // com.eignex.klause.lowering.mps/MpsCompiled.columns.<get-columns>|<get-columns>(){}[0]
@@ -6268,21 +6290,21 @@ final class com.eignex.klause.lowering.mps/MpsCompiled { // com.eignex.klause.lo
     final val model // com.eignex.klause.lowering.mps/MpsCompiled.model|{}model[0]
         final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.lowering.mps/MpsCompiled.model.<get-model>|<get-model>(){}[0]
     final val objective // com.eignex.klause.lowering.mps/MpsCompiled.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.mps/MpsCompiled.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.mps/MpsCompiled.objective.<get-objective>|<get-objective>(){}[0]
     final val objectiveErrorBound // com.eignex.klause.lowering.mps/MpsCompiled.objectiveErrorBound|{}objectiveErrorBound[0]
         final fun <get-objectiveErrorBound>(): kotlin/Double? // com.eignex.klause.lowering.mps/MpsCompiled.objectiveErrorBound.<get-objectiveErrorBound>|<get-objectiveErrorBound>(){}[0]
     final val objectiveScale // com.eignex.klause.lowering.mps/MpsCompiled.objectiveScale|{}objectiveScale[0]
         final fun <get-objectiveScale>(): kotlin/Long // com.eignex.klause.lowering.mps/MpsCompiled.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.lowering.mps/MpsCompiled.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.mps/MpsCompiled.component2|component2(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.mps/MpsCompiled.component2|component2(){}[0]
     final fun component3(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.component3|component3(){}[0]
     final fun component4(): kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> // com.eignex.klause.lowering.mps/MpsCompiled.component4|component4(){}[0]
     final fun component5(): kotlin/Long // com.eignex.klause.lowering.mps/MpsCompiled.component5|component5(){}[0]
     final fun component6(): kotlin/Double? // com.eignex.klause.lowering.mps/MpsCompiled.component6|component6(){}[0]
     final fun component7(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.component7|component7(){}[0]
     final fun component8(): kotlin/Int // com.eignex.klause.lowering.mps/MpsCompiled.component8|component8(){}[0]
-    final fun copy(com.eignex.klause.ir/ProblemSpec = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin/Boolean = ..., kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> = ..., kotlin/Long = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/MpsCompiled.copy|copy(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.lowering.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
+    final fun copy(com.eignex.klause.ir/ProblemSpec = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin/Boolean = ..., kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> = ..., kotlin/Long = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/MpsCompiled.copy|copy(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.lowering.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.mps/MpsCompiled.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.mps/MpsCompiled.toString|toString(){}[0]
@@ -6426,22 +6448,22 @@ final class com.eignex.klause.lowering.opb/OpbLoweringException : kotlin/Illegal
 }
 
 final class com.eignex.klause.lowering.opb/OpbProblem { // com.eignex.klause.lowering.opb/OpbProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.lowering.opb/OpbProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.lowering.opb/OpbProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
 
     final val boolFolds // com.eignex.klause.lowering.opb/OpbProblem.boolFolds|{}boolFolds[0]
         final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.lowering.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
     final val numDeclaredVars // com.eignex.klause.lowering.opb/OpbProblem.numDeclaredVars|{}numDeclaredVars[0]
         final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
     final val objective // com.eignex.klause.lowering.opb/OpbProblem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.opb/OpbProblem.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.opb/OpbProblem.objective.<get-objective>|<get-objective>(){}[0]
     final val problem // com.eignex.klause.lowering.opb/OpbProblem.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.opb/OpbProblem.problem.<get-problem>|<get-problem>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.opb/OpbProblem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.opb/OpbProblem.component2|component2(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.opb/OpbProblem.component2|component2(){}[0]
     final fun component3(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.lowering.opb/OpbProblem.component3|component3(){}[0]
     final fun component4(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.component4|component4(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/OpbProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/OpbProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbProblem.toString|toString(){}[0]
@@ -6483,7 +6505,7 @@ final class com.eignex.klause.lowering.opb/OpbTerm { // com.eignex.klause.loweri
 }
 
 final class com.eignex.klause.lowering.smtlib/SmtLibProblem { // com.eignex.klause.lowering.smtlib/SmtLibProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...) // com.eignex.klause.lowering.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
+    constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...) // com.eignex.klause.lowering.smtlib/SmtLibProblem.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
 
     final val boolVarNames // com.eignex.klause.lowering.smtlib/SmtLibProblem.boolVarNames|{}boolVarNames[0]
         final fun <get-boolVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.smtlib/SmtLibProblem.boolVarNames.<get-boolVarNames>|<get-boolVarNames>(){}[0]
@@ -6492,19 +6514,19 @@ final class com.eignex.klause.lowering.smtlib/SmtLibProblem { // com.eignex.klau
     final val model // com.eignex.klause.lowering.smtlib/SmtLibProblem.model|{}model[0]
         final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.lowering.smtlib/SmtLibProblem.model.<get-model>|<get-model>(){}[0]
     final val objective // com.eignex.klause.lowering.smtlib/SmtLibProblem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.smtlib/SmtLibProblem.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.smtlib/SmtLibProblem.objective.<get-objective>|<get-objective>(){}[0]
     final val realVarNames // com.eignex.klause.lowering.smtlib/SmtLibProblem.realVarNames|{}realVarNames[0]
         final fun <get-realVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.smtlib/SmtLibProblem.realVarNames.<get-realVarNames>|<get-realVarNames>(){}[0]
     final val sense // com.eignex.klause.lowering.smtlib/SmtLibProblem.sense|{}sense[0]
         final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.lowering.smtlib/SmtLibProblem.sense.<get-sense>|<get-sense>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.lowering.smtlib/SmtLibProblem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.smtlib/SmtLibProblem.component2|component2(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.smtlib/SmtLibProblem.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.smtlib/SmtLibProblem.component3|component3(){}[0]
     final fun component4(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.smtlib/SmtLibProblem.component4|component4(){}[0]
     final fun component5(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.smtlib/SmtLibProblem.component5|component5(){}[0]
     final fun component6(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.lowering.smtlib/SmtLibProblem.component6|component6(){}[0]
-    final fun copy(com.eignex.klause.ir/ProblemSpec = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.lowering.smtlib/SmtLibProblem // com.eignex.klause.lowering.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
+    final fun copy(com.eignex.klause.ir/ProblemSpec = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.lowering.smtlib/SmtLibProblem // com.eignex.klause.lowering.smtlib/SmtLibProblem.copy|copy(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.smtlib/SmtLibProblem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.smtlib/SmtLibProblem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.smtlib/SmtLibProblem.toString|toString(){}[0]
@@ -6515,25 +6537,25 @@ final class com.eignex.klause.lowering.xcsp3/UnsupportedXcsp3Exception : com.eig
 }
 
 final class com.eignex.klause.lowering.xcsp3/Xcsp3Problem { // com.eignex.klause.lowering.xcsp3/Xcsp3Problem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...) // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
 
     final val definedVars // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.definedVars|{}definedVars[0]
         final fun <get-definedVars>(): kotlin/IntArray // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.definedVars.<get-definedVars>|<get-definedVars>(){}[0]
     final val intVarNames // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.intVarNames|{}intVarNames[0]
         final fun <get-intVarNames>(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.intVarNames.<get-intVarNames>|<get-intVarNames>(){}[0]
     final val objective // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.objective.<get-objective>|<get-objective>(){}[0]
     final val problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.problem.<get-problem>|<get-problem>(){}[0]
     final val sense // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.sense|{}sense[0]
         final fun <get-sense>(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.sense.<get-sense>|<get-sense>(){}[0]
 
     final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component2|component2(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component2|component2(){}[0]
     final fun component3(): kotlin.collections/Map<kotlin/String, kotlin/Int> // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component3|component3(){}[0]
     final fun component4(): com.eignex.klause.ir/ObjectiveSense // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component4|component4(){}[0]
     final fun component5(): kotlin/IntArray // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.component5|component5(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.solver.objective/LinearObjective? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.lowering.xcsp3/Xcsp3Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/Map<kotlin/String, kotlin/Int> = ..., com.eignex.klause.ir/ObjectiveSense = ..., kotlin/IntArray = ...): com.eignex.klause.lowering.xcsp3/Xcsp3Problem // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.Map<kotlin.String,kotlin.Int>;com.eignex.klause.ir.ObjectiveSense;kotlin.IntArray){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.xcsp3/Xcsp3Problem.toString|toString(){}[0]
@@ -11324,6 +11346,7 @@ final val com.eignex.klause.solver/values // com.eignex.klause.solver/values|@co
 final fun (com.eignex.klause.ir/Factor).com.eignex.klause.factor.arithmetic/linearRow(): com.eignex.klause.factor.arithmetic/FactorRow? // com.eignex.klause.factor.arithmetic/linearRow|linearRow@com.eignex.klause.ir.Factor(){}[0]
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.ir/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.solver/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.solver/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
+final fun (com.eignex.klause.ir/LinearObjectiveSpec).com.eignex.klause.solver.objective/toLinearObjective(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/toLinearObjective|toLinearObjective@com.eignex.klause.ir.LinearObjectiveSpec(){}[0]
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.factor.arithmetic/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/bake(com.eignex.klause.util/Cancellation = ...): com.eignex.klause.propagation/BakedProblem // com.eignex.klause.propagation/bake|bake@com.eignex.klause.ir.Problem(com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.ir/Problem).com.eignex.klause.propagation/propagate(com.eignex.klause.propagation/Assumptions = ..., com.eignex.klause.util/Cancellation = ..., kotlin/Boolean = ...): com.eignex.klause.propagation/PropagationResult // com.eignex.klause.propagation/propagate|propagate@com.eignex.klause.ir.Problem(com.eignex.klause.propagation.Assumptions;com.eignex.klause.util.Cancellation;kotlin.Boolean){}[0]

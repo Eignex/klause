@@ -6,6 +6,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.componentPlan
@@ -42,16 +43,17 @@ internal object SmtLibMode : CliMode {
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
             val render: (Sample) -> String = { s -> renderModel(ints, bools, reals, s) }
+            val objective = parsed.objective?.toLinearObjective()
             return when (
                 val route = parsed.model.pipelineRoute(
-                    parsed.objective,
+                    objective,
                     parsed.sense == ObjectiveSense.MAXIMIZE,
                     routePureRealToTheory = true,
                 )
             ) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
-                    parsed.objective,
+                    objective,
                     parsed.sense == ObjectiveSense.MAXIMIZE,
                     render,
                 )

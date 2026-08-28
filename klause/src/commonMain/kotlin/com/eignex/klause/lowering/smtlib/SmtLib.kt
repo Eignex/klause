@@ -4,12 +4,12 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
@@ -24,7 +24,7 @@ data class SmtLibProblem(
     /** Compiled model. Open integer sides remain open until a finite-search backend materializes them. */
     val model: ProblemSpec,
     /** Objective, or null for satisfaction instances. */
-    val objective: LinearObjective?,
+    val objective: LinearObjectiveSpec?,
     /** Declared `Int` variable name to int id. */
     val intVarNames: Map<String, Int> = emptyMap(),
     /** Declared `Bool` variable name to bool id. */

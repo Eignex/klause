@@ -10,6 +10,7 @@ import com.eignex.klause.lowering.mps.problem
 import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,7 +44,10 @@ class MpsSolveTest {
         assertTrue(x in 0.0..10.0 && x + y <= 5.0 + 1e-6)
 
         val best = assertIs<MinimizeResult.Optimal>(
-            BacktrackSolver(compiled.problem.bake()).minimize(compiled.objective!!, BacktrackParams()),
+            BacktrackSolver(compiled.problem.bake()).minimize(
+                compiled.objective!!.toLinearObjective(),
+                BacktrackParams(),
+            ),
         )
         assertEquals(0.0, best.sample.reals[0], 1e-6)
         assertEquals(0.0, best.objective, 1e-6)

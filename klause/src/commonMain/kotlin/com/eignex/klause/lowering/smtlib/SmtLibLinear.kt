@@ -3,6 +3,7 @@ package com.eignex.klause.lowering.smtlib
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.formats.smtlib.*
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
@@ -15,7 +16,6 @@ import com.eignex.klause.lowering.linCombDiff
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.wideConstHolds
-import com.eignex.klause.solver.objective.LinearObjective
 
 // `=` is an arithmetic (integer) equality iff its operands are integer-sorted — i.e. not
 // boolean. Deciding by the first operand's sort (via the scope- and ite-aware [isBoolExpr])
@@ -195,11 +195,11 @@ internal fun SmtLib.Builder.isRealLiteral(s: String): Boolean = '.' in s && s.to
 internal fun SmtLib.Builder.diff(a: LinComb, b: LinComb): Triple<IntArray, LongArray, Long> =
     foldChecked { linCombDiff(a, b) }
 
-internal fun SmtLib.Builder.linearObjective(t: SExpr, negate: Boolean): LinearObjective {
+internal fun SmtLib.Builder.linearObjective(t: SExpr, negate: Boolean): LinearObjectiveSpec {
     val lt = linearTermNarrow(t)
     val coeffs = LongArray(nextInt)
     for ((v, c) in lt.coeffs) coeffs[v] = if (negate) -c else c
-    return LinearObjective(
+    return LinearObjectiveSpec(
         intCoefficients = coeffs,
         constant = if (negate) -lt.constant else lt.constant,
     )

@@ -5,6 +5,7 @@ import com.eignex.klause.lowering.mps.MpsCompiled
 import com.eignex.klause.lowering.mps.MpsLoweringException
 import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.pipelineRoute
@@ -44,10 +45,11 @@ internal object MpsMode : CliMode {
                     "objScale=${compiled.objectiveScale}"
             }
             val render: (Sample) -> String = { s -> renderMpsModel(compiled, s) }
-            return when (val route = compiled.model.pipelineRoute(compiled.objective, compiled.maximize)) {
+            val objective = compiled.objective?.toLinearObjective()
+            return when (val route = compiled.model.pipelineRoute(objective, compiled.maximize)) {
                 is SourceProblemRoute.Finite -> linearSolvable(
                     route.problem,
-                    compiled.objective,
+                    objective,
                     compiled.maximize,
                     render,
                 )

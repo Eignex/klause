@@ -1,4 +1,5 @@
 package com.eignex.klause.solver.objective
+import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
@@ -169,3 +170,11 @@ data class LinearObjective(
  * consumed by branch-and-bound to bound the objective variable on each incumbent.
  */
 data class SingleIntObjective(val varId: Int, val ascending: Boolean)
+
+/** Materialize a lowered objective for engine evaluation and bounding. */
+fun LinearObjectiveSpec.toLinearObjective(): LinearObjective = LinearObjective(
+    boolWeights = boolWeights,
+    intCoefficients = intCoefficients,
+    constant = constant,
+    realCoefficients = realCoefficients,
+)
