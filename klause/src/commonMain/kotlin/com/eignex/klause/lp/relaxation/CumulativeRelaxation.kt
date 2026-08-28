@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpOverflowException
@@ -12,7 +13,6 @@ import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.addExact
 import com.eignex.klause.lp.engine.mulExact
 import com.eignex.klause.lp.engine.subExact
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

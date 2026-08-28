@@ -4,11 +4,11 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

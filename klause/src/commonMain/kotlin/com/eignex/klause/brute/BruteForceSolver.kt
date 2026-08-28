@@ -1,9 +1,9 @@
 package com.eignex.klause.brute
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver

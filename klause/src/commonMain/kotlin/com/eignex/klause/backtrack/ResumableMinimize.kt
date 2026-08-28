@@ -10,6 +10,7 @@ import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.VarRef
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootCuts
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
@@ -24,7 +25,6 @@ import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective

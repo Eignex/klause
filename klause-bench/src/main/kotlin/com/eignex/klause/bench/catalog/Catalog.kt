@@ -1,7 +1,7 @@
 package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.bench.source.CorpusSelection
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 
 /*
  * The bench problem catalog — a declarative, in-code registry of problems grouped into

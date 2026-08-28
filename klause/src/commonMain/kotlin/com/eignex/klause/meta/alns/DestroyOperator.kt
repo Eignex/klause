@@ -1,9 +1,9 @@
 package com.eignex.klause.meta.alns
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray

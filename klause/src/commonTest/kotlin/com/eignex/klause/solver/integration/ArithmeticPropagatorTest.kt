@@ -7,6 +7,7 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.IntEvent
@@ -19,7 +20,6 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.MixedVars
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StructuralKey
 import com.eignex.klause.solver.VarList

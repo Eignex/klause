@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bounding.LP_HARVEST_MAX_RELAXATION_COST
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
@@ -12,7 +13,6 @@ import com.eignex.klause.lp.bounding.rootLpInfeasibleNoBake
 import com.eignex.klause.lp.bounding.rootRelaxationSize
 import com.eignex.klause.lp.bounding.shaveObjectiveLb
 import com.eignex.klause.lp.bounding.shaveVariableBounds
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpHarvestReport
 import com.eignex.klause.solver.result.SolveStatsSink

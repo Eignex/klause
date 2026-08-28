@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.Presolve
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
@@ -14,7 +15,6 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test

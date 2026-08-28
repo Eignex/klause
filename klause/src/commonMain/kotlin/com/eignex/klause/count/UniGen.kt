@@ -1,6 +1,6 @@
 package com.eignex.klause.count
 
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import kotlin.math.ceil
 import kotlin.math.floor

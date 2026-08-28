@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.arithmetic.Product
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.FixedCadenceRestart
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

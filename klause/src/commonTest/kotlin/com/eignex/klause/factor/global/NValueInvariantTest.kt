@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.global
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

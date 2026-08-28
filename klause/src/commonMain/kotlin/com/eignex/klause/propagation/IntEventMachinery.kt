@@ -1,6 +1,6 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

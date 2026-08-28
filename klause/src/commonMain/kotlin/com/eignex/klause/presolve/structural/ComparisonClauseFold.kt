@@ -5,6 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpOverflowException
 import com.eignex.klause.lp.engine.mulExact
 import com.eignex.klause.lp.engine.subExact
@@ -12,7 +13,6 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntObjectMap

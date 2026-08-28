@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 
 /**
  * Tabu / activity bookkeeping for an ongoing solve: the accepted-move [step] clock, the per-variable

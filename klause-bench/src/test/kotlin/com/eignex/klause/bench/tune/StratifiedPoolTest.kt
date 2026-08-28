@@ -9,7 +9,7 @@ import com.eignex.klause.bench.metric.ReferenceEntry
 import com.eignex.klause.bench.metric.ReferenceStore
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.runner.Runners
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

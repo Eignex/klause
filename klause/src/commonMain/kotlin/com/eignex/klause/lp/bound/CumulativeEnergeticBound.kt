@@ -2,12 +2,12 @@ package com.eignex.klause.lp.bound
 
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpOverflowException
 import com.eignex.klause.lp.engine.addExact
 import com.eignex.klause.lp.engine.mulExact
 import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 

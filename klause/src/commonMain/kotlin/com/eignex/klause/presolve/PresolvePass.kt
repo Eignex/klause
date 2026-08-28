@@ -1,8 +1,8 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Cancellation
 
 private const val PROBE_PASS_MAX_CANDIDATES = 2_048

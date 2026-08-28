@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Resolves [Format.MINIZINC] problems. The system `minizinc` CLI is used **only to compile**
  * `.mzn`(+`.dzn`) → `.fzn` against klause's redefinition library; the resulting FlatZinc is
- * then parsed in-process into a klause [com.eignex.klause.solver.Problem].
+ * then parsed in-process into a klause [com.eignex.klause.ir.Problem].
  * No external solver is invoked — solving is uniform across runners via the solver axis.
  */
 internal class MiniZincRunner(

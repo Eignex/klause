@@ -2,10 +2,10 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import kotlin.test.Test
 import kotlin.test.assertEquals

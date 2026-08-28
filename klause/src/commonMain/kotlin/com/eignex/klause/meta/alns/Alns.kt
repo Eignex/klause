@@ -2,6 +2,7 @@ package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
@@ -9,7 +10,6 @@ import com.eignex.klause.localsearch.PooledSolutionImporter
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective

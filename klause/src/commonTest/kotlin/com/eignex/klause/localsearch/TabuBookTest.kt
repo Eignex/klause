@@ -1,5 +1,6 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.*
 import kotlin.random.Random
 import kotlin.test.Test

@@ -1,5 +1,5 @@
 package com.eignex.klause.solver.objective
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 
 /**
  * MiniZinc-style `solve minimize x` builders. Return a [LinearObjective] sized to the

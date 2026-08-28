@@ -1,6 +1,6 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 import kotlin.reflect.KClass
 
 /**

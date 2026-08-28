@@ -3,9 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList

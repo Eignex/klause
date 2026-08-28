@@ -1,8 +1,8 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.CumulativeFlowBound
-import com.eignex.klause.solver.Problem
 
 /**
  * A [Cumulative] normalized to the constant data the LP relaxations and the flow

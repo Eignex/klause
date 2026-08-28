@@ -2,6 +2,7 @@ package com.eignex.klause.factor.circuit
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult.Implied
@@ -10,7 +11,6 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.SolveResult
 import kotlin.random.Random
 import kotlin.test.Test

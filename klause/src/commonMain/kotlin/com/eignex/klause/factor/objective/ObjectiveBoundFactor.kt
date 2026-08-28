@@ -4,6 +4,7 @@ import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.MixedVars
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
@@ -16,7 +17,6 @@ import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**

@@ -3,6 +3,7 @@ package com.eignex.klause.compile
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackPresets
 import com.eignex.klause.compile.SetLayout
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.FloatSpec
 import com.eignex.klause.schema.BoolHandle
 import com.eignex.klause.schema.FloatHandle
@@ -14,7 +15,6 @@ import com.eignex.klause.schema.OptBoolHandle
 import com.eignex.klause.schema.OptFloatHandle
 import com.eignex.klause.schema.OptIntHandle
 import com.eignex.klause.schema.OptNominalHandle
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.maximizeBool
