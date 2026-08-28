@@ -12,7 +12,6 @@ import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.factor.global.GlobalCardinality
-import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.NValue
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Mdd
@@ -31,7 +30,6 @@ internal fun Factor.emitLpRelaxation(builder: RelaxationBuilder) {
         is Clause -> emitLpRelaxation(builder)
         is Element -> emitLpRelaxation(builder)
         is GlobalCardinality -> emitLpRelaxation(builder)
-        is Increasing -> emitLpRelaxation(builder)
         is Linear -> emitLpRelaxation(builder)
         is Mdd -> emitLpRelaxation(builder)
         is NValue -> emitLpRelaxation(builder)

@@ -11,7 +11,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.RelaxationBuilder
 
 /**
  * `increasing(xs)` — the integer chain `xs(0) ⟨≤|<⟩ xs(1) ⟨≤|<⟩ … ⟨≤|<⟩ xs(n−1)`. [strict] selects
@@ -59,11 +58,4 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
                 add(LinearRow.ofInts(intArrayOf(xs[i + 1], xs[i]), longArrayOf(1, -1), LinearOp.GE, gap.toLong()))
             }
         }
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        val coeffs = longArrayOf(1, -1)
-        for (i in 0 until xs.size - 1) {
-            builder.linearRow(LinearOp.GE, intArrayOf(xs[i + 1], xs[i]), coeffs, gap.toLong())
-        }
-    }
 }
