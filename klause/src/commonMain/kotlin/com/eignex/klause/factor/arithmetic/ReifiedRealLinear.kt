@@ -4,13 +4,11 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.RelaxationBuilder
 
 /**
  * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)` — the
@@ -19,7 +17,7 @@ import com.eignex.klause.lp.RelaxationBuilder
  * local-search invariant (like a real-bearing [Linear]) and its two directions are enforced by the
  * LP relaxation:
  *
- *  - [emitLpRelaxation] consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
+ *  - The LP relaxation consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
  *    false emits its exact complement (`¬(a ≤ b) ⟺ a > b`, strictness flipping through the
  *    delta-rational machinery), unpinned emits nothing (a sound weakening — every leaf pins every
  *    Boolean, so leaf feasibility enforces the equivalence and search stays complete).
@@ -89,30 +87,6 @@ class ReifiedRealLinear(
         for (j in realVars.indices) {
             sink.realVar(realVars[j])
             sink.long(realCoeffs[j].toRawBits())
-        }
-    }
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        val pin = builder.liveBool(aux) ?: return
-        val cols = IntArray(vars.size + realVars.size)
-        val coeffs = DoubleArray(cols.size)
-        for (i in vars.indices) {
-            cols[i] = builder.intColumn(vars[i])
-            coeffs[i] = intCoeffs[i]
-        }
-        for (j in realVars.indices) {
-            val c = builder.realColumn(realVars[j])
-            if (c < 0) return // builder has no real-column backing (e.g. a presolve fake)
-            cols[vars.size + j] = c
-            coeffs[vars.size + j] = realCoeffs[j]
-        }
-        val premise = intArrayOf(Lit.make(aux, pin))
-        if (pin) {
-            builder.realRow(cols, coeffs, op, bound, strict, premise)
-        } else {
-            // Exact complement over the same terms: ¬(a ≤ b) ⟺ a > b, ¬(a < b) ⟺ a ≥ b (mirrored for ≥).
-            val flipped = if (op == LinearOp.LE) LinearOp.GE else LinearOp.LE
-            builder.realRow(cols, coeffs, flipped, bound, !strict, premise)
         }
     }
 }
