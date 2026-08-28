@@ -9924,6 +9924,31 @@ final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eig
         final fun <get-solutionSetSensitive>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive.<get-solutionSetSensitive>|<get-solutionSetSensitive>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.klause.solver.pipeline/FiniteSolveShape|null[0]
+    constructor <init>(com.eignex.klause.ir/Problem?, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.backtrack/BacktrackParams? = ..., com.eignex.klause.solver.result/PresolveStats? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.ir.Problem?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.backtrack.BacktrackParams?;com.eignex.klause.solver.result.PresolveStats?){}[0]
+
+    final val annotatedBacktrackParams // com.eignex.klause.solver.pipeline/FiniteSolveShape.annotatedBacktrackParams|{}annotatedBacktrackParams[0]
+        final fun <get-annotatedBacktrackParams>(): com.eignex.klause.backtrack/BacktrackParams? // com.eignex.klause.solver.pipeline/FiniteSolveShape.annotatedBacktrackParams.<get-annotatedBacktrackParams>|<get-annotatedBacktrackParams>(){}[0]
+    final val definitionalSweep // com.eignex.klause.solver.pipeline/FiniteSolveShape.definitionalSweep|{}definitionalSweep[0]
+        final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.solver.pipeline/FiniteSolveShape.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
+    final val finiteProblem // com.eignex.klause.solver.pipeline/FiniteSolveShape.finiteProblem|{}finiteProblem[0]
+        final fun <get-finiteProblem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.finiteProblem.<get-finiteProblem>|<get-finiteProblem>(){}[0]
+    final val linearObjective // com.eignex.klause.solver.pipeline/FiniteSolveShape.linearObjective|{}linearObjective[0]
+        final fun <get-linearObjective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/FiniteSolveShape.linearObjective.<get-linearObjective>|<get-linearObjective>(){}[0]
+    final val localSearchObjective // com.eignex.klause.solver.pipeline/FiniteSolveShape.localSearchObjective|{}localSearchObjective[0]
+        final fun <get-localSearchObjective>(): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.solver.pipeline/FiniteSolveShape.localSearchObjective.<get-localSearchObjective>|<get-localSearchObjective>(){}[0]
+    final val maximize // com.eignex.klause.solver.pipeline/FiniteSolveShape.maximize|{}maximize[0]
+        final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveShape.maximize.<get-maximize>|<get-maximize>(){}[0]
+    final val objectiveIntVar // com.eignex.klause.solver.pipeline/FiniteSolveShape.objectiveIntVar|{}objectiveIntVar[0]
+        final fun <get-objectiveIntVar>(): kotlin/Int? // com.eignex.klause.solver.pipeline/FiniteSolveShape.objectiveIntVar.<get-objectiveIntVar>|<get-objectiveIntVar>(){}[0]
+    final val optimize // com.eignex.klause.solver.pipeline/FiniteSolveShape.optimize|{}optimize[0]
+        final fun <get-optimize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveShape.optimize.<get-optimize>|<get-optimize>(){}[0]
+    final val presolve // com.eignex.klause.solver.pipeline/FiniteSolveShape.presolve|{}presolve[0]
+        final fun <get-presolve>(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.pipeline/FiniteSolveShape.presolve.<get-presolve>|<get-presolve>(){}[0]
+    final val problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem? // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem.<get-problem>|<get-problem>(){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/FixedBacktrackPlan { // com.eignex.klause.solver.pipeline/FixedBacktrackPlan|null[0]
     constructor <init>(com.eignex.klause.backtrack/BacktrackParams, kotlin/Boolean) // com.eignex.klause.solver.pipeline/FixedBacktrackPlan.<init>|<init>(com.eignex.klause.backtrack.BacktrackParams;kotlin.Boolean){}[0]
 

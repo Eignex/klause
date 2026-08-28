@@ -8913,6 +8913,21 @@ public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
 	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
 }
 
+public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/result/PresolveStats;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/result/PresolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getAnnotatedBacktrackParams ()Lcom/eignex/klause/backtrack/BacktrackParams;
+	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
+	public final fun getFiniteProblem ()Lcom/eignex/klause/ir/Problem;
+	public final fun getLinearObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
+	public final fun getLocalSearchObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
+	public final fun getMaximize ()Z
+	public final fun getObjectiveIntVar ()Ljava/lang/Integer;
+	public final fun getOptimize ()Z
+	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
+}
+
 public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlan {
 	public fun <init> (Lcom/eignex/klause/backtrack/BacktrackParams;Z)V
 	public final fun getDryRun ()Z
