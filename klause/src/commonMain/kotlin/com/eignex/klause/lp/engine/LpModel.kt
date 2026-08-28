@@ -6,6 +6,9 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntDoubleMap
 import com.eignex.klause.util.MutableIntLongMap
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.util.toSortedIntArray
 
 /** Constraint relation for a row added to the builder, before normalization to `<=` form. */

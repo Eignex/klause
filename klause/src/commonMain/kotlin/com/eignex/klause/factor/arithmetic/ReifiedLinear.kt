@@ -21,10 +21,10 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
@@ -197,7 +197,7 @@ class ReifiedLinear private constructor(
         try {
             if (emitExactBinaryEquality(builder, row)) return
             emitBigMRows(builder, row)
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             return
         }
     }

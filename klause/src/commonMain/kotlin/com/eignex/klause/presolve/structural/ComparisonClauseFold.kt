@@ -8,9 +8,9 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.util.IntArrayList
@@ -114,7 +114,7 @@ internal object ComparisonClauseFold {
                     return null // a second free variable — not a single-variable literal
                 }
             }
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             return null
         }
         // freeVar < 0: every term was fixed (a constant relation, not a comparison literal). A free

@@ -3,7 +3,7 @@ package com.eignex.klause.backtrack.lp
 import com.eignex.klause.backtrack.snapshotAssignment
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.dualSimplex
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
@@ -38,7 +38,7 @@ internal fun LpEngine.lpRoundingProbe(objective: LinearObjective, cancellation: 
     if (relaxation.model.n == 0) return null
     val result = try {
         dualSimplex(relaxation.model, cancellation).solve()
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
     val primal = result.primal
@@ -195,7 +195,7 @@ private fun LpEngine.solveRelaxation(
     val result = try {
         dualSimplex(relaxation.model, cancellation).solvePrimal()
             ?: dualSimplex(relaxation.model, cancellation).solve()
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
     return relaxation to result.primal

@@ -12,10 +12,10 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.bound.MinCostAssignment
 import com.eignex.klause.lp.engine.Cut
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
@@ -264,7 +264,7 @@ internal class AssignmentObjectiveCut(private val intCoef: LongArray) : CutSepar
             }
             val r = assign.solve()
             if (r.feasible) r.cost else null
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             null
         }
     }
@@ -380,7 +380,7 @@ internal class GccSeparator : CutSeparator {
                 fill(forcedSum, n - forcedSlots, cover, cap, order),
                 fill(forcedSum, n - forcedSlots, cover, cap, order.asReversed()),
             )
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             null
         }
     }

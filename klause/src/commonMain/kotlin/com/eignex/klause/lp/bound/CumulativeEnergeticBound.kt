@@ -3,10 +3,10 @@ package com.eignex.klause.lp.bound
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -48,7 +48,7 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
         for (c in factors) {
             val clause = try {
                 explainChecked(c, session)
-            } catch (_: LpOverflowException) {
+            } catch (_: CheckedLongOverflowException) {
                 null
             }
             if (clause != null) return clause
@@ -61,7 +61,7 @@ internal class CumulativeEnergeticBound(problem: Problem) : SchedulingFeasibilit
     // infeasible" (false) — the same sound skip the exact LP path takes on overflow.
     private fun overSubscribed(c: Cumulative, session: PropagationSession): Boolean = try {
         overSubscribedChecked(c, session)
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         false
     }
 

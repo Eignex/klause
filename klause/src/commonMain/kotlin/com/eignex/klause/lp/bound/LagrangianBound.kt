@@ -5,10 +5,10 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.EmptyIntArray
@@ -222,7 +222,7 @@ internal class LagrangianBound(problem: Problem, objective: LinearObjective?) : 
                 if (!incumbent.isFinite() || multiplierCount == 0) return@repeat
                 if (!subgradientStep(eval.values, p, num, incumbent, prevDir)) return@repeat
             }
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             if (bestNum == Long.MIN_VALUE) return null
         }
         return if (bestNum == Long.MIN_VALUE) null else LagrangianResult(false, bestNum, Q, p)

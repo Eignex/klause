@@ -6,16 +6,16 @@ import com.eignex.klause.lp.engine.Basis
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.lp.engine.addExact
+import com.eignex.klause.util.addExact
 import com.eignex.klause.lp.engine.columnNeighborhood
-import com.eignex.klause.lp.engine.mulExact
+import com.eignex.klause.util.mulExact
 import com.eignex.klause.lp.engine.newLpSolver
 import com.eignex.klause.lp.engine.rowIndex
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.lp.engine.tightVariableBound
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyDoubleArray
@@ -107,7 +107,7 @@ internal fun tightenOpenIntBounds(
     val negCol = rx.negCol
     val base = try {
         builder.build(Sense.MINIMIZE)
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return prefiltered // cannot relax; leave every open side to the caller's clamp
     }
 
@@ -145,7 +145,7 @@ internal fun tightenOpenIntBounds(
             prevNeg = negCol[v]
             val result = try {
                 newLpSolver(model, cancellation).solvePrimal(warm)
-            } catch (_: LpOverflowException) {
+            } catch (_: CheckedLongOverflowException) {
                 null
             }
             if (result != null) {
@@ -195,7 +195,7 @@ private fun tightenByNeighborhoodProbes(
             val model = nb.model.withSingleColumnObjective(p, if (maximize) -1L else 1L, prevCol = -1, negCol = q)
             val result = try {
                 newLpSolver(model, cancellation).solvePrimal(null)
-            } catch (_: LpOverflowException) {
+            } catch (_: CheckedLongOverflowException) {
                 null
             }
             if (result != null) {
@@ -445,7 +445,7 @@ private fun propagateRow(coeffs: LongArray, vars: IntArray, bound: Long, sign: L
             }
         }
         changed
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         false
     }
 

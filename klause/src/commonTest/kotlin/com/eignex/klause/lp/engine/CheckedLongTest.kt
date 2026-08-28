@@ -1,10 +1,9 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.gcdLong
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,21 +21,21 @@ class CheckedLongTest {
 
     @Test
     fun `addExact detects overflow`() {
-        assertFailsWith<LpOverflowException> { addExact(Long.MAX_VALUE, 1L) }
-        assertFailsWith<LpOverflowException> { addExact(Long.MIN_VALUE, -1L) }
+        assertFailsWith<CheckedLongOverflowException> { addExact(Long.MAX_VALUE, 1L) }
+        assertFailsWith<CheckedLongOverflowException> { addExact(Long.MIN_VALUE, -1L) }
     }
 
     @Test
     fun `subExact detects overflow`() {
-        assertFailsWith<LpOverflowException> { subExact(Long.MIN_VALUE, 1L) }
-        assertFailsWith<LpOverflowException> { subExact(Long.MAX_VALUE, -1L) }
+        assertFailsWith<CheckedLongOverflowException> { subExact(Long.MIN_VALUE, 1L) }
+        assertFailsWith<CheckedLongOverflowException> { subExact(Long.MAX_VALUE, -1L) }
     }
 
     @Test
     fun `mulExact detects overflow`() {
-        assertFailsWith<LpOverflowException> { mulExact(Long.MAX_VALUE, 2L) }
-        assertFailsWith<LpOverflowException> { mulExact(Long.MIN_VALUE, -1L) }
-        assertFailsWith<LpOverflowException> { mulExact(3_037_000_500L, 3_037_000_500L) }
+        assertFailsWith<CheckedLongOverflowException> { mulExact(Long.MAX_VALUE, 2L) }
+        assertFailsWith<CheckedLongOverflowException> { mulExact(Long.MIN_VALUE, -1L) }
+        assertFailsWith<CheckedLongOverflowException> { mulExact(3_037_000_500L, 3_037_000_500L) }
     }
 
     @Test

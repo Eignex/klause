@@ -1,10 +1,10 @@
 package com.eignex.klause.lp.bound
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.lp.relaxation.SchedulingView
 import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.propagation.PropagationSession
@@ -51,7 +51,7 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
 
     private fun infeasible(view: SchedulingView, session: PropagationSession): Boolean = try {
         deficit(view, session) > 0L
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         false // overflow ⇒ cannot prove infeasible (sound skip), never a wrapped verdict
     }
 
@@ -60,7 +60,7 @@ internal class CumulativeFlowBound(problem: Problem) : SchedulingFeasibilityBoun
         for (view in views) {
             val clause = try {
                 if (deficit(view, session) > 0L) windowClause(view, session) else null
-            } catch (_: LpOverflowException) {
+            } catch (_: CheckedLongOverflowException) {
                 null
             }
             if (clause != null) return clause

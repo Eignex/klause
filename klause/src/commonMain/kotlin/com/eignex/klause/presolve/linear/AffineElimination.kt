@@ -8,10 +8,10 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.presolve.AffinePivotOrder
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.Presolve
@@ -301,7 +301,7 @@ internal object AffineSingletons {
             // `y` admits no representable `x`, so drop it from the restricted partner domain.
             val num = try {
                 subExact(c, mulExact(b, y))
-            } catch (_: LpOverflowException) {
+            } catch (_: CheckedLongOverflowException) {
                 continue
             }
             if (num % a != 0L) continue
@@ -1096,7 +1096,7 @@ internal class AffineElimination(private val subs: List<AffineSub>) {
 
 /** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would overflow
  *  64-bit arithmetic in the shifted bound or any folded coefficient. Each product/sum runs through the
- *  checked helpers, so an overflow surfaces as [LpOverflowException]; a `true` result lets the caller
+ *  checked helpers, so an overflow surfaces as [CheckedLongOverflowException]; a `true` result lets the caller
  *  leave `x` un-eliminated (sound) rather than wrap a coefficient (e.g. DeBruijn-sequence instances). */
 private fun foldRowOverflowsLong(
     f: Linear,
@@ -1124,7 +1124,7 @@ private fun foldRowOverflowsLong(
             if (yi >= 0) addExact(row.coeff(yi), prod)
         }
         false
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         true
     }
 }

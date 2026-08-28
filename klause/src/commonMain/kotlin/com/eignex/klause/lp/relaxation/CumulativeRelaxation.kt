@@ -8,11 +8,11 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.LpRowPremises
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
@@ -115,7 +115,7 @@ internal class CumulativeRelaxation(
 
         val energetic = try {
             energeticRhs(cap, estLive, plan.durations, plan.resources)
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             null
         }
         if (energetic == null || energetic <= floor) {
@@ -132,7 +132,7 @@ internal class CumulativeRelaxation(
      * `t1` with `+` → `−` slope changes only at the earliest-starts, so its maximum over the valid
      * range `t1 ≤ max ectᵢ` is attained at some `estᵢ` (or the right endpoint `max ectᵢ`). The sweep
      * visits the earliest-starts in ascending order, maintaining the full-energy / partial-energy
-     * partition incrementally in `O(n log n)`. Throws [LpOverflowException] on any product overflow.
+     * partition incrementally in `O(n log n)`. Throws [CheckedLongOverflowException] on any product overflow.
      */
     private fun energeticRhs(cap: Long, est: LongArray, dur: LongArray, res: LongArray): Long {
         val n = est.size

@@ -16,8 +16,8 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.propagation.Propagator
 
 /**
