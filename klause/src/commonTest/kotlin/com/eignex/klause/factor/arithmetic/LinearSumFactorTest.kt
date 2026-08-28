@@ -1,13 +1,13 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.IntDomain
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

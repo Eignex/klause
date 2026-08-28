@@ -3,6 +3,7 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState

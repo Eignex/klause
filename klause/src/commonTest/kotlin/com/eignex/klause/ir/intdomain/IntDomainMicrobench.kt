@@ -1,7 +1,7 @@
 package com.eignex.klause.ir.intdomain
 
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Ignore

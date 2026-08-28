@@ -1,10 +1,10 @@
 package com.eignex.klause.localsearch.movesource
 
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.MoveSizeDistribution
-import com.eignex.klause.solver.randomValue
 import com.eignex.klause.util.IntHashSet
 
 /**

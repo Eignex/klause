@@ -3,10 +3,10 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.collectLinearTightenAntecedents
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntDomain
 
 /** CP propagator for [Product]: bounds propagation for `a * b = result`. */
 internal class ProductPropagator(

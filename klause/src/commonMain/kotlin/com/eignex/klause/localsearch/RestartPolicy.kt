@@ -1,10 +1,10 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
 import com.eignex.klause.localsearch.schedule.RoundLog
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.randomValue
 import com.eignex.klause.util.LubyIterator
 
 /**

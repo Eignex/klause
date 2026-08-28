@@ -1,6 +1,7 @@
 package com.eignex.klause.meta.alns
 
 import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.ir.randomValue
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSession
 import com.eignex.klause.localsearch.LocalSearchState
@@ -10,7 +11,6 @@ import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.RepairSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.randomValue
 import kotlin.math.abs
 import kotlin.random.Random
 

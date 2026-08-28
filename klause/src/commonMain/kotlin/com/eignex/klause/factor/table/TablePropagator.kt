@@ -5,10 +5,10 @@ import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecede
 import com.eignex.klause.factor.table.internals.TableGroupCache
 import com.eignex.klause.factor.table.internals.TableStr2State
 import com.eignex.klause.factor.table.internals.allEventWatches
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.values
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.LongHashSet
 

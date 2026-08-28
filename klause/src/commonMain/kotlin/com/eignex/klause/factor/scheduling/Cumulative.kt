@@ -7,6 +7,7 @@ import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.FactorReduction
 import com.eignex.klause.ir.FactorReduction.Rewrite
 import com.eignex.klause.ir.FactorReduction.Unchanged
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
@@ -16,7 +17,6 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntIntMap
 

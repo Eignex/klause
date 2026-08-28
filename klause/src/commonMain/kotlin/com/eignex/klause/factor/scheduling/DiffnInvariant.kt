@@ -2,12 +2,12 @@ package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.factor.scheduling.internals.DiffnLsState
+import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.values
 
 /**
  * LS invariant for [Diffn]. Constructed by [Diffn.asInvariant] and maintains an

@@ -10,12 +10,13 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.reifiedIntCompare
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.values
 import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.solver.*
-import com.eignex.klause.solver.values
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

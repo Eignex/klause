@@ -1,7 +1,8 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.config.DEFAULT_BITSET_THRESHOLD
-import com.eignex.klause.solver.values
+import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.values
 import com.eignex.klause.util.LongArrayList
 import kotlin.random.Random
 import kotlin.test.Test

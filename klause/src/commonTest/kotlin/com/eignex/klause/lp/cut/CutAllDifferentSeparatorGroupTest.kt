@@ -3,6 +3,7 @@ package com.eignex.klause.lp.cut
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.Relation
@@ -10,7 +11,6 @@ import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
