@@ -8,7 +8,6 @@ import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
