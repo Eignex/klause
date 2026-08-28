@@ -1,10 +1,9 @@
-package com.eignex.klause.lowering.opb
+package com.eignex.klause.formats.opb
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
-import com.eignex.klause.formats.opb.OpbFormatException
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
 import kotlin.test.Test

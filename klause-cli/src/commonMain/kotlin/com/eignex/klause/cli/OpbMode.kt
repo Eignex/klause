@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.opb.Opb
-import com.eignex.klause.lowering.opb.toProblem
+import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.solver.Sample
 
 /**
