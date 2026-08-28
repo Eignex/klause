@@ -12,12 +12,9 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -102,13 +99,6 @@ class Regular(
 
     override val variables: VarList = SpanIntVars(seq)
 
-    override fun asPropagator(): Propagator =
-        RegularPropagator(boolVars, intVars, seq, numStates, alphabetSize, transitions, q0, accepting)
-
-    override fun asInvariant(): Invariant = RegularInvariant(seq, numStates, alphabetSize, transitions, q0, accepting)
-
-    override val hullFamily: HullFamily = HullFamily.REGULAR
-
     /**
      * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc
      * variable `y ∈ [0,1]` per reachable `(position t, state q, symbol s)` whose transition `δ(q, s)` is
@@ -118,7 +108,7 @@ class Regular(
      * ([MAX_REGULAR_ARCS]); above the cap, or when no accepting path survives, it is skipped. HULL.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val len = seq.size
@@ -199,7 +189,7 @@ class Regular(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         val reach = forwardReach { domains[it] } ?: return null
         // arc columns + conservation (≤ arcs) + channel (len) + source + acceptance.
         return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 2L)
@@ -209,7 +199,7 @@ class Regular(
 
     /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
      *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_REGULAR_ARCS].
-     *  Shared by [linearize] (which needs the states to lay out columns) and [lpSizeEstimate] (the count). */
+     *  Shared by [emitLpRelaxation] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
     private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
         val len = seq.size
         val s = alphabetSize

@@ -14,11 +14,8 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `result = max(xs)` or `result = min(xs)` — covers the FlatZinc `array_int_maximum(result,
@@ -61,21 +58,13 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
 
     override val variables: VarList = SpanIntVars(xs + intArrayOf(result))
 
-    override val extendsObjectiveCone: Boolean = true
-
-    override fun asPropagator(): Propagator = ArrayMinMaxPropagator(result, xs, max, boolVars, intVars)
-
-    override fun asInvariant(): Invariant = ArrayMinMaxInvariant(result, xs, max)
-
-    override val hullFamily: HullFamily = HullFamily.ARRAY_MIN_MAX
-
     /**
      * LP relaxation: the always-emitted envelope (`result ≥ xs[i]` for max, `result ≤ xs[i]` for min) as
      * CORE rows, plus the tight convex-hull face as HULL — one-hot selectors `z_i` with `Σ z_i = 1` and a
      * per-operand big-M row forcing `result = xs[i]` when `z_i = 1`. Each `M_i` comes from the declared
      * domains, so it bounds `|result − xs[i]|` globally and the rows hold at every integer solution.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val resultCol = builder.intColumn(result)
         val op = if (max) LinearOp.GE else LinearOp.LE
         for (x in xs) {

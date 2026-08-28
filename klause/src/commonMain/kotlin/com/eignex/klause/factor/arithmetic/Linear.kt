@@ -7,6 +7,7 @@ import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
@@ -14,11 +15,8 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.solver.RealConsts
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
@@ -121,7 +119,7 @@ class Linear private constructor(
      * LP-only continuous (real) variable terms, additional to the integer terms: real var ids paired with
      * the double coefficients in [RealConstants.realCoefficients]. Empty for the integer/Boolean core. When
      * present the row reasons over a continuous variable, so it is absent from CP propagation
-     * ([asPropagator] is [NoPropagator]) and its feasibility is enforced by the LP relaxation and the
+     * (its propagation projection is [NoPropagator]) and its feasibility is enforced by the LP relaxation and the
      * search leaf.
      */
     val realVars: IntArray = realVarsIn
@@ -336,29 +334,14 @@ class Linear private constructor(
     // A value-anonymous factor names no value as a constant, so a relabeling maps it to itself.
     override fun remapValues(valueMap: (Long) -> Long): Factor? = if (isBinaryValueRelation()) this else null
 
-    // A continuous row connects the objective through its integer terms via the LP double view, not the
-    // integer objective cone; keep it out of the cone probe (which reasons over integer CORE rows only).
-    override val extendsObjectiveCone: Boolean get() = constants is IntegerConstants
-
     // A continuous row is LP-only: it does not propagate in CP ([NoPropagator], so the occurrence index
     // never wakes it) — its feasibility is enforced by the LP relaxation and the search leaf. The
     // local-search engine is gated off for problems with real variables, so its invariant is never
     // consulted; an inert one keeps the factory total without pretending to evaluate the real terms.
-    override fun asPropagator(): Propagator = when (val c = constants) {
-        is RealConstants -> NoPropagator
-        is WideConstants -> WideLinearPropagator(intVars, vars, c.coefficients.toTypedArray(), op, c.bound)
-        is IntegerConstants -> LinearPropagator(boolVars, intVars, c.coeffs, vars, op, c.bound)
-    }
 
-    override fun asInvariant(): Invariant = integerConstants?.let { LinearInvariant(it.coeffs, vars, op, it.bound) }
-        ?: NoInvariant
-
-    // The integer reading is itself the exact [LinearRow], held by the row's own constants, so presolve
-    // reads it with no extra allocation. A wide or continuous row has no integer LinearRow — its content
-    // is not integer-valued — and emits a relaxation row instead.
     override val linearRows: List<LinearRow> get() = listOfNotNull(integerConstants)
 
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         when (val c = constants) {
             // A wide row enters the LP only as directionally-rounded double outer-relaxation rows; its
             // exact coefficients never enter the LP (see [emitWideOuterRows]).

@@ -25,7 +25,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * LS invariant for [Cumulative]. Constructed by [Cumulative.asInvariant] and maintains the
+ * LS invariant for [Cumulative]. Constructed by the local-search projection and maintains the
  * usage timeline and computes graded overage deltas.
  */
 internal class CumulativeInvariant(

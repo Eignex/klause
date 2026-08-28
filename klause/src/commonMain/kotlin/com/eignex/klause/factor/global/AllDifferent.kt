@@ -18,7 +18,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -210,25 +209,4 @@ class AllDifferent(
             absent = 0,
         )
     }
-
-    override fun asPropagator(): Propagator = AllDifferentPropagator(
-        boolVars,
-        intVars,
-        vars,
-        presents,
-        exceptSet,
-        boundsConsistent,
-        exceptValues,
-        { idx, state -> definitelyPresent(idx, state) },
-    )
-
-    override fun asInvariant(): Invariant = AllDifferentInvariant(
-        vars,
-        domainMin,
-        domainSize,
-        presents,
-        exceptValues,
-        occurrencesByVar,
-        { state, idx -> present(state, idx) },
-    )
 }

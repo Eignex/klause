@@ -10,11 +10,7 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 
 /**
  * A reified real linear atom `aux ⟺ (Σ intCoeffs·vars + Σ realCoeffs·realVars ⟨op⟩ bound)` — the
@@ -23,7 +19,7 @@ import com.eignex.klause.propagation.Propagator
  * local-search invariant (like a real-bearing [Linear]) and its two directions are enforced by the
  * LP relaxation:
  *
- *  - [linearize] consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
+ *  - [emitLpRelaxation] consults the build's live pin of [aux]: pinned true emits the atom's row, pinned
  *    false emits its exact complement (`¬(a ≤ b) ⟺ a > b`, strictness flipping through the
  *    delta-rational machinery), unpinned emits nothing (a sound weakening — every leaf pins every
  *    Boolean, so leaf feasibility enforces the equivalence and search stays complete).
@@ -96,11 +92,7 @@ class ReifiedRealLinear(
         }
     }
 
-    override fun asPropagator(): Propagator = NoPropagator
-
-    override fun asInvariant(): Invariant = NoInvariant
-
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val pin = builder.liveBool(aux) ?: return
         val cols = IntArray(vars.size + realVars.size)
         val coeffs = DoubleArray(cols.size)

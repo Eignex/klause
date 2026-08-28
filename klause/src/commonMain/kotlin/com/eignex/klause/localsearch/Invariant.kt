@@ -204,7 +204,7 @@ interface Invariant {
 }
 
 /**
- * The absence of a local-search role. A factor whose `Factor.asInvariant` returns this is
+ * The absence of a local-search role. A factor whose local-search projection returns this is
  * **propagator-only**: it participates in CP propagation but contributes nothing to local
  * search. The LS engine skips such factors entirely — they are dropped from the LS occurrence lists
  * ([LocalSearchProblem.boolOccurrences] / [LocalSearchProblem.intOccurrences]) so a move never queries them and they

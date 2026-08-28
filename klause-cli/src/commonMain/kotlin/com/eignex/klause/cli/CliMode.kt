@@ -17,10 +17,8 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
-import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 
@@ -259,45 +257,6 @@ internal fun commonFlagSpecs(o: CommonOptions): List<FlagSpec> = listOf(
         FlagGroup.KLAUSE,
         help = "print the solver version and exit",
     ) { o.showVersion = true },
-)
-
-/**
- * Adapt a prepared finite pipeline into this mode's rendering shape. The CLI keeps reconstruction only
- * because rendering belongs to the front-end; presolve policy and model preparation live in the pipeline.
- */
-internal fun Solvable.withPreparation(preparation: FinitePipelinePreparation): Solvable {
-    if (preparation.problem === finiteProblem) return this
-    return copyWith(
-        preparation.problem,
-        preparation.presolve,
-        { sample -> render(preparation.reconstruct(sample)) },
-        objectiveValue?.let { objectiveValue -> { sample -> objectiveValue(preparation.reconstruct(sample)) } },
-        continuousObjectiveValue?.let { exact -> { sample -> exact(preparation.reconstruct(sample)) } },
-        preparation.objective,
-    )
-}
-
-/** Rebuild a [Solvable] with a new [problem]/[presolve]/[render]/[objectiveValue]. */
-private fun Solvable.copyWith(
-    problem: Problem,
-    presolve: PresolveStats?,
-    render: (Sample) -> String,
-    objectiveValue: ((Sample) -> Long)?,
-    continuousObjectiveValue: ((Sample) -> Double)?,
-    linearObjective: LinearObjective? = this.linearObjective,
-): Solvable = Solvable(
-    problem = problem,
-    presolve = presolve,
-    optimize = optimize,
-    maximize = maximize,
-    lsObjective = lsObjective,
-    linearObjective = linearObjective,
-    objVarId = objVarId,
-    definitionalSweep = definitionalSweep,
-    render = render,
-    objectiveValue = objectiveValue,
-    continuousObjectiveValue = continuousObjectiveValue,
-    searchHints = searchHints,
 )
 
 /**

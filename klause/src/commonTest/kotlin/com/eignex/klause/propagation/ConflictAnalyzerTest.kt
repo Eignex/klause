@@ -228,9 +228,9 @@ class ConflictAnalyzerTest {
         )
         val state = PropagationState(problem, Assumptions.None)
         val baseFid = problem.numFactors
-        val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))).asPropagator() as ClausePropagator
-        val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))).asPropagator() as ClausePropagator
-        val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))).asPropagator() as ClausePropagator
+        val c0 = Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))).propagatorProjection() as ClausePropagator
+        val c1 = Clause(intArrayOf(Lit.make(1, false), Lit.make(2, true))).propagatorProjection() as ClausePropagator
+        val c2 = Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))).propagatorProjection() as ClausePropagator
         val fid0 = state.addLearnedClause(c0, lbd = 1)
         val fid1 = state.addLearnedClause(c1, lbd = 5)
         val fid2 = state.addLearnedClause(c2, lbd = 1)

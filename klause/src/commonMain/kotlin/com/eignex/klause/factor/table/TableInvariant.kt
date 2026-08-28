@@ -9,7 +9,7 @@ import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.MutableIntObjectMap
 
-/** LS invariant for [Table]. Constructed by [Table.asInvariant]. */
+/** LS invariant for [Table]. Constructed by the local-search projection. */
 internal class TableInvariant(
     private val xs: IntArray,
     private val tuples: LongArray,

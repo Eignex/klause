@@ -690,6 +690,18 @@ class CliModeTest {
     }
 
     @Test
+    fun `finite solve reports its presolve summary`() {
+        val fzn = File.createTempFile("cli", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+
+        val out = capture { main(arrayOf("-s", fzn.absolutePath)) }
+
+        assertTrue("%%%mzn-stat: presolvePasses=" in out, out)
+    }
+
+    @Test
     fun `an open wide General LIA witness is rendered without Long narrowing`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(

@@ -10,7 +10,7 @@ import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.MutableIntIntMap
 
 /**
- * CP propagator for [GaussianXor]. Constructed by [GaussianXor.asPropagator] and holds the
+ * CP propagator for [GaussianXor]. Constructed by the propagation projection and holds the
  * Gaussian elimination data structures so they are only allocated when a CP engine is
  * initialised.
  *

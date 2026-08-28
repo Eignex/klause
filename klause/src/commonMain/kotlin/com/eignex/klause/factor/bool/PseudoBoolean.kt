@@ -11,17 +11,14 @@ import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.Term
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `Σ weights(i) * lit(i) ⟨op⟩ bound` over Boolean literals (each contributing its weight when
@@ -90,17 +87,6 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
                 Unchanged // infeasible
             }
         }
-    }
-
-    override val extendsObjectiveCone: Boolean = true
-
-    override fun asPropagator(): Propagator = PseudoBooleanPropagator(boolVars, intVars, weights, literals, op, bound)
-
-    override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
-
-    /** LP relaxation: the feasibility-defining row `Σ weights·literals ⟨op⟩ bound`. */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        builder.boolRow(literals, weights, relation, bound)
     }
 
     // The factor *is* its own exact linear row over its Boolean literals, read by presolve with no

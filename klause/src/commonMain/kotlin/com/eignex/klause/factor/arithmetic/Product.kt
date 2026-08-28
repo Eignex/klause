@@ -14,11 +14,8 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `a * b = result`. Operates on signed integer domains (any min/max). The bit-blaster lowers
@@ -69,19 +66,13 @@ class Product(
 
     override val variables: VarList = SpanIntVars(intArrayOf(a, b, result))
 
-    override fun asPropagator(): Propagator = ProductPropagator(a, b, result, boolVars, intVars)
-
-    override fun asInvariant(): Invariant = ProductInvariant(a, b, result)
-
-    override val hullFamily: HullFamily = HullFamily.PRODUCT
-
     /**
      * LP relaxation — the four McCormick envelope inequalities `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`,
      * `(aH−a)(b−bL) ≥ 0`, `(a−aL)(bH−b) ≥ 0`, each expanded to a linear row in `result, a, b`. Bounds are
      * the declared domains, so the rows are global and the relaxation never cuts a feasible point. For
      * `a = b` (a square) the `a` and `b` coefficients coalesce into the secant/tangent relaxation. HULL.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         val aDom = builder.declaredDomain(a)
         val bDom = builder.declaredDomain(b)

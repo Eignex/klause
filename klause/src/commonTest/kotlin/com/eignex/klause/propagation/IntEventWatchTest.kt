@@ -10,7 +10,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.Propagator
 import kotlin.test.Test
@@ -49,8 +48,6 @@ class IntEventWatchTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     /** `x ≠ y`, propagating only on assignment: when one side is fixed, carve its value from the
@@ -76,8 +73,6 @@ class IntEventWatchTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =
@@ -161,8 +156,6 @@ class IntEventWatchTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test

@@ -7,8 +7,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.Propagator
 
 /**
@@ -63,8 +61,4 @@ class GaussianXor(
         for (c in constraints) for (lit in c.literals) order.add(Lit.variable(lit))
         variables = BoolVars(order.toIntArray())
     }
-
-    override fun asPropagator(): Propagator = GaussianXorPropagator(constraints, boolVars)
-
-    override fun asInvariant(): Invariant = NoInvariant
 }

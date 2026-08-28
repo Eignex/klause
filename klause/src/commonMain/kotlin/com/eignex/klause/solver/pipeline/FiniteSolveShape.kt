@@ -5,7 +5,6 @@ import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.PresolveStats
 
 /** Source-independent finite model data consumed by the solver pipeline. */
 class FiniteSolveShape(
@@ -25,8 +24,6 @@ class FiniteSolveShape(
     val definitionalSweep: DefinitionalSweep?,
     /** Source-provided search hints, decoded by the pipeline for the fixed route. */
     val searchHints: FlatZincSearchHints? = null,
-    /** Presolve summary attached once preparation completes. */
-    val presolve: PresolveStats? = null,
 ) {
     /** Finite problem, rejecting an open source model before materialization. */
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }

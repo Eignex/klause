@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.LongArrayList
 
 /**
- * CP propagator for [Diffn]. Constructed by [Diffn.asPropagator] and holds pairwise
+ * CP propagator for [Diffn]. Constructed by the propagation projection and holds pairwise
  * compulsory-parts / disjunctive propagation for the constant-size case, plus a
  * sound-only infeasibility check for the variable-size case.
  */

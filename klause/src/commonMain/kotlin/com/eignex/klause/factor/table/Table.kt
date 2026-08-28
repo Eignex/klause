@@ -16,12 +16,9 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
@@ -246,14 +243,6 @@ class Table private constructor(
         }
     }
 
-    override fun asPropagator(): Propagator =
-        TablePropagator(boolVars, intVars, xs, tuples, arity, numTuples, hi, groupCache)
-
-    override fun asInvariant(): Invariant =
-        TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi)
-
-    override val hullFamily: HullFamily = HullFamily.TABLE
-
     /**
      * Convex-hull LP relaxation: a selector column `y_t ∈ [0,1]` per allowed tuple with `Σ_t y_t = 1` and a
      * per-column channel `xs[j] = Σ_t tuple_t[j]·y_t` — the projection onto `xs` is exactly the convex hull
@@ -261,7 +250,7 @@ class Table private constructor(
      * variable and is pinned to 0 when any entry left the live domain. Tables with more than [MAX_TUPLES]
      * rows are skipped. HULL.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         // An interval/wildcard cell doesn't pin its variable for that tuple, so the per-tuple channel
         // would be ill-defined; short tables skip the hull relaxation (propagation still enforces it).
@@ -310,7 +299,7 @@ class Table private constructor(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(): LpSizeEstimate? {
         if (hi != null) return null
         if (numTuples > MAX_TUPLES) return null
         // One selector per tuple (upper bound on the declared-feasible ones) + Σ y = 1 + one channel

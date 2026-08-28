@@ -9,11 +9,9 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `result = intOperand · realOperand`: a mixed integer·continuous product where
@@ -22,7 +20,7 @@ import com.eignex.klause.propagation.Propagator
  * CP or local-search semantics ([NoPropagator] / [NoInvariant]); its feasibility is enforced entirely by
  * the LP relaxation and the search leaf, like a real-bearing [Linear] row.
  *
- * [linearize] adapts to how tightly [intOperand] is pinned in the build's domains:
+ * [emitLpRelaxation] adapts to how tightly [intOperand] is pinned in the build's domains:
  *  - **Fixed** (`lo == hi == k`, always true at a search leaf, where every integer variable is a
  *    single-point domain) the product is the exact linear equality `result − k·realOperand = 0`. So the
  *    leaf relaxation models the product **exactly**, and the leaf feasibility verdict over it is sound.
@@ -68,11 +66,7 @@ class RealProduct(
         sink.long(realOperandHi.toRawBits())
     }
 
-    override fun asPropagator(): Propagator = NoPropagator
-
-    override fun asInvariant(): Invariant = NoInvariant
-
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         val resCol = builder.realColumn(result)
         val opCol = builder.realColumn(realOperand)
         if (resCol < 0 || opCol < 0) return // builder has no real-column backing (e.g. a presolve fake)

@@ -15,13 +15,9 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.IntEvent
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -122,58 +118,13 @@ class NValue(
         boolVars = OptPresence.presenceVarIds(presents),
     )
 
-    override fun asPropagator(): Propagator {
-        // Advisor subscription for the non-optional variant: the distinct-count bounds read each
-        // variable's full domain (union membership + domain-overlap disjointness), so subscribe to every
-        // kind and consume the dirty-variable delta to skip fires where nothing changed. The optional
-        // variant keeps occurrence wakeup — a presence-bool flip changes the count but is not in the
-        // int-domain delta, so it must not be gated out.
-        val initialIntEventWatchesVal: IntArray? = if (presents.isNotEmpty()) {
-            null
-        } else {
-            val distinct = intVars.toHashSet()
-            val out = IntArray(distinct.size * IntEvent.COUNT)
-            var w = 0
-            for (v in distinct) {
-                out[w++] = IntEvent.pack(v, IntEvent.LB_RAISED)
-                out[w++] = IntEvent.pack(v, IntEvent.UB_LOWERED)
-                out[w++] = IntEvent.pack(v, IntEvent.VALUE_REMOVED)
-                out[w++] = IntEvent.pack(v, IntEvent.FIXED)
-            }
-            out
-        }
-        val consumesIntEventDeltaVal = presents.isEmpty()
-        return NValuePropagator(
-            boolVars,
-            intVars,
-            n,
-            xs,
-            mode,
-            presents,
-            initialIntEventWatchesVal,
-            consumesIntEventDeltaVal,
-            { idx, state -> definitelyAbsent(idx, state) },
-            { idx, state -> definitelyPresent(idx, state) },
-        )
-    }
-
-    override fun asInvariant(): Invariant = NValueInvariant(
-        n,
-        xs,
-        mode,
-        presents,
-        { state, idx -> present(state, idx) },
-    )
-
-    override val hullFamily: HullFamily = HullFamily.NVALUE
-
     /**
      * One-hot value model: a per-value "used" column `y_v ∈ [0,1]`, a one-hot selector `z_iv ∈ [0,1]`
      * per variable/value with `Σ_v z_iv = 1` and the channel `Σ_v v·z_iv = xs(i)`, and `y_v ≥ z_iv`. The
      * distinct count `Σ_v y_v` relates to `n` by the mode (`Eq → =`, `AtMost → ≥`, `AtLeast → ≤`), so
      * minimising `n` reads a real lower bound. Gated by [MAX_NVALUE_CELLS]; optional-presence is skipped.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         var cells = 0L
@@ -236,7 +187,7 @@ class NValue(
         builder.row(cols, vals, op, 0L, Contribution.HULL)
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         if (presents.isNotEmpty()) return null
         var cells = 0L
         for (x in xs) cells += domains[x].values.size.toLong()

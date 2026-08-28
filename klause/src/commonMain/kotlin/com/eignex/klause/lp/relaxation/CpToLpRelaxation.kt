@@ -24,6 +24,7 @@ import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.cut.CircuitArcModel
 import com.eignex.klause.lp.cut.CircuitSeparator
+import com.eignex.klause.lp.emitLpRelaxation
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
@@ -32,6 +33,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.lp.lpHullEnabled
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -430,13 +432,13 @@ internal class CpToLpRelaxation(
         return intIn to boolIn
     }
 
-    /** Whether [f] extends the cone (`Factor.extendsObjectiveCone`) and shares a variable with it. */
+    /** Whether [f] extends the LP cone and shares a variable with it. */
     private fun coneTouches(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean =
-        f.extendsObjectiveCone && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
+        f.extendsLpObjectiveCone() && (f.intVars.any { intIn[it] } || f.boolVars.any { boolIn[it] })
 
     /** Add every variable of a cone-extending [f] to the cone; true when anything was newly added. */
     private fun coneMark(f: Factor, intIn: BooleanArray, boolIn: BooleanArray): Boolean {
-        if (!f.extendsObjectiveCone) return false
+        if (!f.extendsLpObjectiveCone()) return false
         var changed = false
         for (v in f.intVars) {
             if (!intIn[v]) {
@@ -505,7 +507,7 @@ internal class CpToLpRelaxation(
     private fun realCost(r: Int): Double = objective?.realCoefficients?.getOrElse(r) { 0.0 } ?: 0.0
 
     /** Per-build mutable state: the builder, the column maps, and the row emitters. Implements
-     *  [RelaxationBuilder] so a factor's `Factor.linearize` can emit into it. */
+     *  [RelaxationBuilder] so an LP factor projection can emit into it. */
     private inner class Assembler(private val domains: RelaxationDomains, private val gated: Boolean = false) :
         RelaxationBuilder {
         private val builder = LpBuilder()
@@ -537,7 +539,7 @@ internal class CpToLpRelaxation(
 
         /** Whether the factor currently being linearized may contribute HULL rows: its convex-hull
          *  family flag is on and we are not in objective-cone mode (where the column-heavy hulls are
-         *  forced off). Set per factor before `Factor.linearize`; consulted by the row emitters so a
+         *  forced off). Set per factor before its LP projection; consulted by the row emitters so a
          *  disabled family contributes only its CORE rows. CORE rows ignore it. */
         private var currentHullEnabled = true
 
@@ -548,7 +550,7 @@ internal class CpToLpRelaxation(
         private val hullFactorIds = LinkedHashSet<Int>()
 
         /** The per-family convex-hull switches for this build, read polymorphically by each hull factor's
-         *  `Factor.hullFamilyEnabled`; combined with the cone and per-factor suppression gates when
+         *  [lpHullEnabled]; combined with the cone and per-factor suppression gates when
          *  [currentHullEnabled] is set, so the driver never matches factor types. */
         private val hullFlags = HullFlags(
             element = elementHull,
@@ -867,11 +869,11 @@ internal class CpToLpRelaxation(
                     continue
                 }
                 // Each factor emits its own rows; factors with no linear relaxation (hard globals,
-                // cut-only or scheduling-view factors) keep the default no-op `Factor.linearize` and
+                // cut-only or scheduling-view factors) have no LP projection and
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
-                    factor.hullFamilyEnabled(hullFlags)
-                factor.linearize(this, factorId)
+                    factor.lpHullEnabled(hullFlags)
+                factor.emitLpRelaxation(this)
             }
 
             if (booleanRlt) buildBooleanRlt()
@@ -931,7 +933,7 @@ internal class CpToLpRelaxation(
 
         /**
          * Emit [f]'s atom row AND its exact complement row unconditionally (contrast
-         * [ReifiedRealLinear.linearize], which consults the live pin and emits at most one): the model's
+         * relaxation projection, which consults the live pin and emits at most one): the model's
          * row set is then pin-independent, and a node merely re-points each row's rhs at its pin state
          * ([gatedEnforcement]) — at most one of the pair is ever active. Premises stay the activating
          * literal, so certificates cite exactly as on the per-node build.

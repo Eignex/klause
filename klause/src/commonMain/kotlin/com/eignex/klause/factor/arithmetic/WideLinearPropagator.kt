@@ -16,7 +16,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
  *
  * The integer variables keep their ordinary `Long` domains and are branched normally; this propagator is
  * the only place the wide coefficients are read, and the wide value never reaches the domains, the trail,
- * or the LP relaxation (a wide row is excluded from the relaxation — see [Linear.linearize]).
+ * or the LP relaxation (a wide row is excluded from the relaxation projection).
  */
 internal class WideLinearPropagator(
     val intVars: IntArray,

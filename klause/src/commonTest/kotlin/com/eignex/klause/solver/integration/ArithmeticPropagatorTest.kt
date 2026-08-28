@@ -14,7 +14,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationResult
@@ -23,6 +22,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,14 +87,12 @@ class ArithmeticPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test
     fun `linear subscribes to only bound events on every term`() {
         val lin = Linear(intArrayOf(1, 2, -1), intArrayOf(0, 1, 2), LinearOp.LE, 5)
-        val watches = lin.asPropagator().initialIntEventWatches!!
+        val watches = lin.propagatorProjection().initialIntEventWatches!!
         val pairs = watches.map { IntEvent.intVarOf(it) to IntEvent.kindOf(it) }.toSet()
         assertEquals(
             setOf(
@@ -326,8 +324,6 @@ class ArithmeticPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerateWithVsids(problem: BakedProblem, seed: Long): HashSet<List<Int>> =
@@ -350,9 +346,12 @@ class ArithmeticPropagatorTest {
 
     @Test
     fun `product and array-minmax subscribe to only bound events`() {
-        assertBoundOnly(Product(a = 0, b = 1, result = 2).asPropagator().initialIntEventWatches, intArrayOf(0, 1, 2))
         assertBoundOnly(
-            ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true).asPropagator().initialIntEventWatches,
+            Product(a = 0, b = 1, result = 2).propagatorProjection().initialIntEventWatches,
+            intArrayOf(0, 1, 2),
+        )
+        assertBoundOnly(
+            ArrayMinMax(result = 3, xs = intArrayOf(0, 1, 2), max = true).propagatorProjection().initialIntEventWatches,
             intArrayOf(0, 1, 2, 3),
         )
     }

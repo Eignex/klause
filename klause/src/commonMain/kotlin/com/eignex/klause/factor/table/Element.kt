@@ -12,12 +12,9 @@ import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 
 /**
@@ -164,26 +161,6 @@ class Element private constructor(
     /** The equality `result = [v]` between the result and an array variable. */
     private fun equate(v: Int): Linear = Linear(intArrayOf(1, -1), intArrayOf(result, v), LinearOp.EQ, 0)
 
-    override fun asPropagator(): Propagator = ElementPropagator(
-        boolVars,
-        intVars,
-        idx,
-        result,
-        arr,
-        arrIsVars,
-        indexOffset,
-    )
-
-    override fun asInvariant(): Invariant = ElementInvariant(
-        idx,
-        result,
-        arr,
-        arrIsVars,
-        indexOffset,
-    )
-
-    override val hullFamily: HullFamily = HullFamily.ELEMENT
-
     /**
      * LP relaxation. A *constant* array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per
      * position whose index value is in `idx`'s declared domain (pinned to 0 when that value left the live
@@ -192,7 +169,7 @@ class Element private constructor(
      * bilinear result channel with two big-M rows per position forcing `result = arr[p]` when `y_p = 1`.
      * Arrays longer than [MAX_ELEM] are skipped.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         if (arr.size > MAX_ELEM) return
         val selCols = IntArrayList()
@@ -203,7 +180,7 @@ class Element private constructor(
         if (arrIsVars) resultBigM(builder, selCols, positions) else resultChannel(builder, selCols, positions)
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         if (arr.size > MAX_ELEM) return null
         val declared = domains[idx]
         var k = 0L

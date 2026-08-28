@@ -6,12 +6,9 @@ import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
-import com.eignex.klause.util.PermutationGroup
 import com.eignex.klause.util.toSortedIntArray
 
 /**
@@ -23,7 +20,7 @@ import com.eignex.klause.util.toSortedIntArray
  * Each generator is a kind-preserving permutation given as `(intImage, boolImage)` over the current
  * variable ids (`intImage[i]` / `boolImage[b]` is the image of integer / Boolean variable `i` / `b`;
  * an identity entry means the variable is fixed). The factor watches only the moved variables (the
- * group's support). It has no local-search role — [asInvariant] is [NoInvariant] — so local search
+ * group's support). It has no local-search role — its local-search projection is [NoInvariant] — so local search
  * skips it entirely (symmetry breaking is a backtrack-only device).
  */
 class SymmetryHandling(
@@ -55,20 +52,6 @@ class SymmetryHandling(
     private val nInt: Int = generators.first().first.size
     private val nBool: Int = generators.first().second.size
 
-    override fun asPropagator(): Propagator {
-        // Expand the raw generators with stabiliser-chain Schreier generators (still genuine group
-        // elements, so every lex-leader stays sound) for fuller group coverage than the generators
-        // alone, without materialising a static lex closure.
-        val unified = generators.map { toUnified(it) }
-        val strong = PermutationGroup.strongGenerators(unified, nInt + nBool, STRONG_GENERATOR_CAP)
-        return SymmetryPropagator(strong.map { toSequence(it) }, strong, nInt)
-    }
-
-    override fun asInvariant(): Invariant = NoInvariant
-
-    /** Pack a `(intImage, boolImage)` generator into one permutation over `[0, nInt+nBool)`: integer
-     *  ids stay in place, Boolean ids are offset by [nInt]. Detection is kind-preserving, so the
-     *  packed permutation maps the integer block and Boolean block to themselves. */
     private fun toUnified(g: Pair<IntArray, IntArray>): IntArray {
         val out = IntArray(nInt + nBool)
         for (i in 0 until nInt) out[i] = g.first[i]

@@ -10,7 +10,7 @@ import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 
 /**
- * LS invariant for [Diffn]. Constructed by [Diffn.asInvariant] and maintains an
+ * LS invariant for [Diffn]. Constructed by the local-search projection and maintains an
  * overlapping-pair count, computing deltas using the affected-pair trick.
  */
 internal class DiffnInvariant(

@@ -15,7 +15,6 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.NoPropagator
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.withAppendedFactor
 import com.eignex.klause.solver.objective.LinearObjective
 
@@ -62,15 +61,15 @@ internal class MutableObjectiveBound(private val objectiveConstant: Long) {
  * `cost == 0` means "hard constraints satisfied AND objective beats the incumbent" — turning objective
  * optimization back into violation repair for the SAT-style feasibility arms (probSAT / WalkSAT).
  *
- * [asPropagator] is [NoPropagator]: the bound is an LS artifact and must never enter CP (the objective
+ * Its propagation projection is [NoPropagator]: the bound is an LS artifact and must never enter CP (the objective
  * is already enforced there through branch-and-bound), so this factor belongs only in an LS overlay.
  */
 internal class ObjectiveBoundFactor(
     private val objectiveBoolVars: IntArray,
-    private val boolWeights: LongArray,
+    internal val boolWeights: LongArray,
     private val objectiveIntVars: IntArray,
-    private val intCoeffs: LongArray,
-    private val bound: MutableObjectiveBound,
+    internal val intCoeffs: LongArray,
+    internal val bound: MutableObjectiveBound,
 ) : Factor {
 
     override val variables: VarList = MixedVars(spanInts = objectiveIntVars, boolVars = objectiveBoolVars)
@@ -92,10 +91,6 @@ internal class ObjectiveBoundFactor(
         sink.sortedBoolVars(boolVars)
         sink.sortedIntVars(intVars)
     }
-
-    override fun asPropagator(): Propagator = NoPropagator
-
-    override fun asInvariant(): Invariant = ObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, bound)
 
     companion object {
         /** The objective-bound factor for [objective] sharing [bound], or `null` when the objective has
@@ -121,7 +116,7 @@ internal class ObjectiveBoundFactor(
  * moves push the sum down (toward the bound), so a SAT-style arm repairs the objective slack exactly
  * as it repairs any violated constraint.
  */
-private class ObjectiveBoundInvariant(
+internal class ObjectiveBoundInvariant(
     private val boolVars: IntArray,
     private val boolWeights: LongArray,
     private val intVars: IntArray,

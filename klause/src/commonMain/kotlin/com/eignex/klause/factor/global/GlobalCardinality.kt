@@ -11,12 +11,9 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -134,35 +131,6 @@ class GlobalCardinality(
     internal val coverIndexByValue: MutableLongIntMap =
         MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
 
-    override fun asPropagator(): Propagator = GlobalCardinalityPropagator(
-        boolVars,
-        intVars,
-        xs,
-        cover,
-        countVars,
-        countLow,
-        countHigh,
-        closed,
-        presents,
-        coverIndexByValue,
-        { idx, state -> definitelyPresent(idx, state) },
-        { idx, state -> definitelyAbsent(idx, state) },
-    )
-
-    override fun asInvariant(): Invariant = GlobalCardinalityInvariant(
-        xs,
-        cover,
-        countVars,
-        countLow,
-        countHigh,
-        closed,
-        presents,
-        coverIndexByValue,
-        { state, idx -> present(state, idx) },
-    )
-
-    override val hullFamily: HullFamily = HullFamily.GCC_COUNT
-
     /**
      * One-hot selector model for the count-variable form `counts(k) = #{i : xs(i) = cover(k)}`: a one-hot
      * selector `z_iv ∈ [0,1]` per variable/value over `xs[i]`'s declared domain with `Σ_v z_iv = 1` and the
@@ -170,7 +138,7 @@ class GlobalCardinality(
      * counts(k)` — so a count variable in the objective reads a true LP bound. Gated by [MAX_GCC_CELLS]; the
      * constant-bound and optional-presence forms are skipped. HULL.
      */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         if (presents.isNotEmpty()) return // count is over present vars only — defer
         val counts = countVars ?: return // constant-bound form has no count var to bound
@@ -222,7 +190,7 @@ class GlobalCardinality(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         if (countVars == null || presents.isNotEmpty()) return null
         var cells = 0L
         for (x in xs) cells += domains[x].values.size.toLong()

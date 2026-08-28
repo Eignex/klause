@@ -1,8 +1,8 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.Term
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Term
 import com.eignex.klause.solver.LongConstList
 import com.eignex.klause.solver.RealConsts
 import com.eignex.klause.solver.WideConsts

@@ -15,12 +15,9 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongArrayList
@@ -232,26 +229,6 @@ class Mdd(
         )
     }
 
-    override fun asPropagator(): Propagator = MddPropagator(
-        boolVars, intVars, seq, numStatesPerLayer, layerStarts, transitions, initial, accepting, recordStride, cost,
-        transitionIndex,
-    )
-
-    override fun asInvariant(): Invariant = MddInvariant(
-        seq,
-        numStatesPerLayer,
-        layerStarts,
-        transitions,
-        initial,
-        accepting,
-        recordStride,
-        cost,
-    )
-
-    // The LP relaxation's arc presence column is Int-typed; skip it when a symbol exceeds Int range
-    // (the propagator/invariant still enforce the diagram). Sound — a relaxation may omit a factor.
-    override val hullFamily: HullFamily = HullFamily.MDD
-
     /**
      * Layered flow hull — the exact convex hull of the diagram's accepting paths. An arc variable
      * `y ∈ [0,1]` per forward-reachable transition record `(src, value, dst[, weight])` at each layer
@@ -262,7 +239,7 @@ class Mdd(
      * transition table relaxes soundly; `src`/`dst` are per-layer state ids, always in [Int] range.
      */
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
+    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
         if (!builder.hullEnabled()) return
         val reach = forwardReach(builder::declaredDomain)?.states ?: return
         val n = seq.size
@@ -364,7 +341,7 @@ class Mdd(
         }
     }
 
-    override fun lpSizeEstimate(domains: Array<IntDomain>): LpSizeEstimate? {
+    internal fun estimateLpHull(domains: Array<IntDomain>): LpSizeEstimate? {
         val reach = forwardReach { domains[it] } ?: return null
         // arc columns + conservation (≤ arcs) + value channel (n) + source + acceptance + cost.
         return LpSizeEstimate(cols = reach.arcCount, rows = reach.arcCount + seq.size + 3L)
@@ -374,7 +351,7 @@ class Mdd(
 
     /** Forward-reachable states per layer over [domainOf]'s domains plus the total candidate-arc count,
      *  or null when a layer empties (no accepting path) or the arc count is 0 or over [MAX_MDD_ARCS].
-     *  Shared by [linearize] (which needs the states to lay out columns) and [lpSizeEstimate] (the count). */
+     *  Shared by [emitLpRelaxation] (which needs the states to lay out columns) and [estimateLpHull] (the count). */
     private fun forwardReach(domainOf: (Int) -> IntDomain): Reach? {
         val n = seq.size
         val stride = recordStride

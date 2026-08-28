@@ -22,7 +22,7 @@ class PropagationProblem(
             problem.factors.all { it is Clause }
 
     /** One propagator per model factor. */
-    val propagators: Array<out Propagator> = Array(problem.numFactors) { problem.factors[it].asPropagator() }
+    val propagators: Array<out Propagator> = Array(problem.numFactors) { problem.factors[it].propagatorProjection() }
 
     /** Propagator occurrences indexed by Boolean variable. */
     val boolOccurrences: Array<IntArray> = invert(

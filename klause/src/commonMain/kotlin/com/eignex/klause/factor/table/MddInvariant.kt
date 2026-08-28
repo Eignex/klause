@@ -6,7 +6,7 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.util.MutableIntObjectMap
 
-/** LS invariant for [Mdd]. Constructed by [Mdd.asInvariant]. */
+/** LS invariant for [Mdd]. Constructed by the local-search projection. */
 internal class MddInvariant(
     private val seq: IntArray,
     private val numStatesPerLayer: IntArray,

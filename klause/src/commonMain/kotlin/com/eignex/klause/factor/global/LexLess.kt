@@ -9,8 +9,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `lex_less(xs, ys)` / `lex_lesseq(xs, ys)` — lexicographic ordering on equal-length int
@@ -49,8 +47,4 @@ class LexLess(
     }
 
     override val variables: VarList = SpanIntVars(xs + ys)
-
-    override fun asPropagator(): Propagator = LexLessPropagator(boolVars, intVars, xs, ys, strict)
-
-    override fun asInvariant(): Invariant = LexLessInvariant(xs, ys, strict)
 }

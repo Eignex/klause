@@ -9,8 +9,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `sort(xs, ys)` — [ys] is the non-decreasing sorted permutation of [xs] (same multiset
@@ -41,8 +39,4 @@ class Sort(val xs: IntArray, val ys: IntArray) : Factor {
     }
 
     override val variables: VarList = SpanIntVars(xs + ys)
-
-    override fun asPropagator(): Propagator = SortPropagator(boolVars, intVars, xs, ys)
-
-    override fun asInvariant(): Invariant = SortInvariant(xs, ys)
 }

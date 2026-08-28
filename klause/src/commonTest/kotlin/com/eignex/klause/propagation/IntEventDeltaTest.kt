@@ -10,7 +10,6 @@ import com.eignex.klause.ir.SpanIntVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Propagator
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -71,8 +70,6 @@ class IntEventDeltaTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     /** Carves [src]'s fixed value out of [dst] when [src] is fixed — punches interior holes that
@@ -92,8 +89,6 @@ class IntEventDeltaTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerate(problem: Problem, seed: Long): HashSet<List<Int>> =

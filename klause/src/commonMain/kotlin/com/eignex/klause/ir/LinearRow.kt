@@ -1,22 +1,15 @@
-package com.eignex.klause.lp
-
-import com.eignex.klause.ir.LinearOp
+package com.eignex.klause.ir
 
 /**
- * One linear constraint `Σ coeff(k) · value(ref(k)) ⟨op⟩ bound`, as exposed by `Factor.linearRows`.
+ * One exact linear constraint `Σ coeff(k) · value(ref(k)) ⟨op⟩ bound` from a [Factor].
  *
- * An **interface**, not a data holder: a factor implements it directly (or hands back a lightweight
- * view) so a clause-heavy model does not materialise a coefficient array per constraint. Each term
- * references either an integer variable or a Boolean literal through the single tagged [ref] space (see
- * [Term]): `value` is the variable's integer value for an integer term and the literal's 0/1 truth for a
- * Boolean term (a negative literal counts `1 − x`). A consumer iterates `k in 0 until size`, reading
- * `ref(k)` / `coeff(k)` **uniformly**, and only decodes the term kind ([Term.isBool]) when it must —
- * e.g. to look up an integer domain versus a `[0, 1]` literal. Integer-variable and Boolean-literal refs
- * occupy disjoint tag ranges, so a key over the refs keeps an integer constraint and a Boolean one in
- * separate buckets with no extra discriminator.
+ * An interface, not a data holder: a factor implements it directly (or hands back a lightweight view)
+ * so a clause-heavy model does not materialise a coefficient array per constraint. Each term references
+ * either an integer variable or a Boolean literal through the single tagged [Term] space. A Boolean
+ * literal has its 0/1 truth value, so a negative literal counts `1 − x`.
  *
- * A read-only structural view for presolve. Distinct from a `Factor.linearize` relaxation row: a
- * [LinearRow] is **solution-set exact** for its originating factor; a relaxation row may be a superset.
+ * A row is structural model data. Presolve can consume it directly, while an LP relaxation may project it
+ * into columns; a relaxation row itself need not be exact.
  */
 interface LinearRow {
     /** The number of terms. */
@@ -28,9 +21,7 @@ interface LinearRow {
     /** The coefficient of term [k], `0 ≤ k < size`. */
     fun coeff(k: Int): Long
 
-    /** The relational operator comparing the weighted sum against [bound]. Named [relation] rather than
-     *  `op` so a factor whose native operator is a different type (a pseudo-Boolean's `PbOp`) can still
-     *  implement this interface directly. */
+    /** The relational operator comparing the weighted sum against [bound]. */
     val relation: LinearOp
 
     /** The right-hand side the weighted sum is compared against. */
@@ -43,17 +34,17 @@ interface LinearRow {
             return true
         }
 
-    /** Views over a factor's own arrays, for a factor whose linear form is not itself a [LinearRow]. */
+    /** Views over a factor's own arrays, without copying them. */
     companion object {
-        /** A view of `Σ coeffs·vars ⟨op⟩ bound` over integer variables (raw ids); the arrays are not copied. */
+        /** A view of `Σ coeffs·vars ⟨op⟩ bound` over integer variables (raw ids). */
         fun ofInts(vars: IntArray, coeffs: LongArray, op: LinearOp, bound: Long): LinearRow =
             IntLinearRow(vars, coeffs, op, bound)
 
-        /** A view of `Σ coeffs·value(lits) ⟨op⟩ bound` over Boolean literals (Lit-encoded); not copied. */
+        /** A view of `Σ coeffs·value(lits) ⟨op⟩ bound` over Boolean literals (Lit-encoded). */
         fun ofBools(lits: IntArray, coeffs: LongArray, op: LinearOp, bound: Long): LinearRow =
             BoolLinearRow(lits, coeffs, op, bound)
 
-        /** A view of `Σ value(lits) ⟨op⟩ bound` over Boolean literals with unit coefficients (no array). */
+        /** A view of `Σ value(lits) ⟨op⟩ bound` over Boolean literals with unit coefficients. */
         fun ofBools(lits: IntArray, op: LinearOp, bound: Long): LinearRow = BoolLinearRow(lits, null, op, bound)
     }
 }
@@ -85,9 +76,8 @@ internal class BoolLinearRow(
 }
 
 /**
- * The tagged term-reference space of a [LinearRow]. An integer-variable reference and a Boolean-literal
- * reference are packed into one [Int] with disjoint low-bit tags, so a single pass over a row's terms is
- * kind-agnostic and references of the two kinds never collide in a key.
+ * The tagged term-reference space of a [LinearRow]. Integer-variable references and Boolean-literal
+ * references occupy disjoint ranges, so consumers can retain a single structural key space.
  */
 object Term {
     /** Reference to integer variable [v]. */

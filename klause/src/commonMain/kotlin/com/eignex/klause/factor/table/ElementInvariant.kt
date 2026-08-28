@@ -5,7 +5,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 
-/** LS invariant for [Element]. Constructed by [Element.asInvariant]. */
+/** LS invariant for [Element]. Constructed by the local-search projection. */
 internal class ElementInvariant(
     private val idx: Int,
     private val result: Int,

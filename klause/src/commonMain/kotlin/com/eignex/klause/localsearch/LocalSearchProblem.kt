@@ -10,7 +10,7 @@ class LocalSearchProblem(
     val problem: Problem,
 ) {
     /** One local-search invariant per model factor. */
-    val invariants: Array<out Invariant> = Array(problem.numFactors) { problem.factors[it].asInvariant() }
+    val invariants: Array<out Invariant> = Array(problem.numFactors) { problem.factors[it].invariantProjection() }
 
     /** Invariant occurrences indexed by Boolean variable. */
     val boolOccurrences: Array<IntArray> = invert(problem.numBoolVars) { it.boolVars }

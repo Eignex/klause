@@ -10,15 +10,12 @@ import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -53,18 +50,6 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
     // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
-
-    override val extendsObjectiveCone: Boolean = true
-
-    override fun asPropagator(): Propagator = CardinalityPropagator(boolVars, intVars, literals, min, max)
-
-    override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, literals, min, max)
-
-    /** LP relaxation: the feasibility-defining bounds `min ≤ Σ literals ≤ max`. */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
-        builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())
-    }
 
     /** Exact linear view: the bounds `min ≤ Σ literals ≤ max` over its Boolean literals (unit-weight views). */
     override val linearRows: List<LinearRow>

@@ -13,13 +13,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -173,14 +173,12 @@ class ElementPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asPropagator(): Propagator = this
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test
     fun `variable-array element subscribes to all kinds and consumes the delta`() {
         val varArr = Element(idx = 0, result = 1, arr = longArrayOf(2, 3), arrIsVars = true, indexOffset = 0)
-        val varArrProp = varArr.asPropagator() as ElementPropagator
+        val varArrProp = varArr.propagatorProjection() as ElementPropagator
         assertTrue(varArrProp.consumesIntEventDelta, "var-array element must consume the dirty-var delta")
         val watches = varArrProp.initialIntEventWatches
         assertTrue(watches != null)
@@ -199,7 +197,7 @@ class ElementPropagatorTest {
     fun `constant-array element keeps occurrence wakeup`() {
         // The constant-array path has its own reversible domRef fast path, so it takes no delta.
         val constArr = Element(idx = 0, result = 1, arr = longArrayOf(5, 6, 7), arrIsVars = false, indexOffset = 0)
-        val constArrProp = constArr.asPropagator() as ElementPropagator
+        val constArrProp = constArr.propagatorProjection() as ElementPropagator
         assertNull(constArrProp.initialIntEventWatches)
         assertFalse(constArrProp.consumesIntEventDelta)
     }

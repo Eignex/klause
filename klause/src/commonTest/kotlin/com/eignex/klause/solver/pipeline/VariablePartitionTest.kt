@@ -11,9 +11,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
-import com.eignex.klause.propagation.Propagator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -91,7 +88,5 @@ class VariablePartitionTest {
         override val variables: VarList = variables
         override fun remap(mapping: VarRemap): Factor = this
         override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
-        override fun asPropagator(): Propagator = object : Propagator {}
-        override fun asInvariant(): Invariant = NoInvariant
     }
 }

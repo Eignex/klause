@@ -9,8 +9,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `symmetric_all_different(xs)` — `xs` is a self-inverse permutation: `xs(xs(i)) = i` for
@@ -49,8 +47,4 @@ class SymmetricAllDifferent(
     }
 
     override val variables: VarList = SpanIntVars(xs)
-
-    override fun asPropagator(): Propagator = SymmetricAllDifferentPropagator(boolVars, intVars, xs, indexOffset)
-
-    override fun asInvariant(): Invariant = SymmetricAllDifferentInvariant(xs, indexOffset)
 }

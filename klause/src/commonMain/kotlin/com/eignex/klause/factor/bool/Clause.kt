@@ -6,17 +6,14 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.lp.LinearRow
-import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.Term
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -38,7 +35,7 @@ class Clause(literals: IntArray) :
     // Factors may outlive a frontend's scratch buffer.
     val literals: IntArray = distinctLiterals(literals)
 
-    private val tautological: Boolean = hasComplementaryLiterals(this.literals)
+    internal val tautological: Boolean = hasComplementaryLiterals(this.literals)
 
     init {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
@@ -61,8 +58,6 @@ class Clause(literals: IntArray) :
     override val integerTheoryOwnable: Boolean get() = true
 
     override val exactTheoryOwnable: Boolean get() = true
-
-    override val extendsObjectiveCone: Boolean = true
 
     /** CP-only memo: are all literals plain bool vars (no atom-lits)? Encoded as a primitive
      *  tri-state (−1 unknown / 0 no / 1 yes) rather than a boxed `Boolean?`, since this is read
@@ -88,15 +83,6 @@ class Clause(literals: IntArray) :
         }
         pureBoolMemo = if (allBool) 1 else 0
         return allBool
-    }
-
-    override fun asPropagator(): Propagator = ClausePropagator(boolVars, intVars, literals)
-
-    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals, tautological)
-
-    /** LP relaxation: the feasibility-defining row `Σ literals ≥ 1`. */
-    override fun linearize(builder: RelaxationBuilder, factorId: Int) {
-        builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
     }
 
     // The clause *is* its own exact linear row `Σ literals ≥ 1`, read by presolve with no allocation.

@@ -23,6 +23,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.pinBoolAsDecision
 import com.eignex.klause.propagation.propagate
+import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
@@ -673,7 +674,7 @@ class ArithmeticPropagatorReifiedTest {
             op = LinearOp.EQ,
             bound = 2,
         )
-        val reason = reif.asPropagator().conflictReason(state, 0) ?: error("expected a conflict reason")
+        val reason = reif.propagatorProjection().conflictReason(state, 0) ?: error("expected a conflict reason")
         // The feasible witness aux = true, x = 2 must satisfy the reason clause (≥ 1 literal true).
         val nbv = problem.numBoolVars
         fun satUnderWitness(lit: Int): Boolean {

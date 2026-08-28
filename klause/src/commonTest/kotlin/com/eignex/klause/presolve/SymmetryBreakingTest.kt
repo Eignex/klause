@@ -28,6 +28,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.NoInvariant
+import com.eignex.klause.localsearch.invariantProjection
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.Assumptions
@@ -427,7 +428,7 @@ class SymmetryBreakingTest {
         val broken = broken(problem)
         assertEquals(problem.numIntVars, broken.numIntVars, "dynamic handling must not grow the integer space")
         val symmetry = broken.factors.filterIsInstance<SymmetryHandling>().single()
-        assertSame(NoInvariant, symmetry.asInvariant(), "symmetry handling must be propagator-only")
+        assertSame(NoInvariant, symmetry.invariantProjection(), "symmetry handling must be propagator-only")
     }
 
     @Test
