@@ -705,6 +705,27 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `learned clause telemetry records a reduction at its restart boundary`() {
+        val session = SearchSession(
+            emptyList(),
+            learnedDb = SearchLearnedDbParams(maxClauses = 1, glueLbd = 0),
+        )
+        session.learn(SearchExplanation(intArrayOf(0, 2)))
+        session.learn(SearchExplanation(intArrayOf(4, 6)))
+        assertIs<ComponentResult.Consistent>(session.propagate())
+
+        assertIs<ComponentResult.Consistent>(session.restart())
+
+        val stats = session.learnedClauseStats()
+        assertEquals(2L, stats.learned)
+        assertEquals(1L, stats.restarts)
+        assertEquals(1L, stats.reductions)
+        assertEquals(1L, stats.dropped)
+        assertEquals(1L, stats.retained)
+        assertEquals(2L, stats.peakRetained)
+    }
+
+    @Test
     fun `a clause retained through a reduction still propagates`() {
         val session = SearchSession(
             emptyList(),

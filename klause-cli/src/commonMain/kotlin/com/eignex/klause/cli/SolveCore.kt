@@ -81,6 +81,10 @@ internal object SolveCore {
                 val theoryParams = TheoryParams(
                     maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE,
                     openWorkLimit = openWorkLimit ?: Long.MAX_VALUE,
+                    maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
+                    sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
+                    maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
+                    lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
                     cancellation = cancel,
                     timeout = deadlineCancel,
                 )
@@ -201,6 +205,26 @@ internal object SolveCore {
         if (limit < 0) usageError("engine param `$OPEN_WORK_LIMIT_KEY` expects a non-negative integer, got $limit")
         return limit
     }
+
+    private fun takeOpenLongParam(common: CommonOptions, key: String, nonNegative: Boolean): Long? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("$key=") } ?: return null
+        common.engineParams.remove(entry)
+        val raw = entry.substringAfter('=')
+        val value = raw.toLongOrNull() ?: usageError("engine param `$key` expects an integer, got `$raw`")
+        val invalid = if (nonNegative) value < 0 else value <= 0
+        if (invalid) {
+            usageError(
+                "engine param `$key` expects a ${if (nonNegative) "non-negative" else "positive"} integer, got $value",
+            )
+        }
+        return value
+    }
+
+    private fun takeOpenIntParam(common: CommonOptions, key: String, nonNegative: Boolean): Int? =
+        takeOpenLongParam(common, key, nonNegative)?.let {
+            if (it > Int.MAX_VALUE) usageError("engine param `$key` exceeds Int.MAX_VALUE")
+            it.toInt()
+        }
 
     private fun deadlineCancellation(common: CommonOptions): Pair<Long?, Cancellation> {
         // Anchored once at process start (see CommonOptions.deadlineAtMs) so the bake and the

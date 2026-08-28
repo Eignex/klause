@@ -66,6 +66,8 @@ data class SolveStats(
     val ls: LocalSearchStats = LocalSearchStats(),
     /** Deterministic complete open-theory work accounting. */
     val openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats(),
+    /** Shared learned-clause telemetry for an open-theory solve. */
+    val openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats(),
     /** Presolve outcome, set by the CLI after presolve runs (null when presolve was off / a no-op).
      *  Surfaced under `-s` as a terse summary — see [PresolveStats]. */
     val presolve: PresolveStats? = null,
@@ -95,6 +97,7 @@ data class SolveStats(
                 openTheory.openCancellationPolls + other.openTheory.openCancellationPolls,
                 openTheory.openWork + other.openTheory.openWork,
             ),
+            openTheoryClauses = openTheoryClauses.mergedWith(other.openTheoryClauses),
             presolve = presolve ?: other.presolve,
         )
     }
@@ -123,6 +126,7 @@ internal class SolveStatsSink(val backend: String) {
     val scheduling: SchedulingStatsSink = SchedulingStatsSink()
     val ls: LocalSearchStatsSink = LocalSearchStatsSink()
     var openTheory: OpenTheoryWorkStats = OpenTheoryWorkStats()
+    var openTheoryClauses: OpenTheoryClauseStats = OpenTheoryClauseStats()
 
     private var startMark: TimeMark? = null
     private var endElapsedMs: Long? = null
@@ -159,6 +163,7 @@ internal class SolveStatsSink(val backend: String) {
             scheduling = scheduling.snapshot(),
             ls = ls.snapshot(),
             openTheory = openTheory,
+            openTheoryClauses = openTheoryClauses,
         )
     }
 }

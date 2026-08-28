@@ -114,7 +114,18 @@ internal fun openTheoryStatPairs(stats: SolveStats): List<Pair<String, String>> 
         "openLiaRowVisits" to "$openLiaRowVisits",
         "openCancellationPolls" to "$openCancellationPolls",
         "openWork" to "$openWork",
-    )
+    ) + with(stats.openTheoryClauses) {
+        listOf(
+            "openLearned" to "$learned",
+            "openRelearned" to "$relearned",
+            "openRestarts" to "$restarts",
+            "openReductions" to "$reductions",
+            "openDropped" to "$dropped",
+            "openRetained" to "$retained",
+            "openPeakRetained" to "$peakRetained",
+            "openLearnedWatchVisits" to "$watchVisits",
+        )
+    }
 }
 
 /** Conflict-analysis diagnostic counters for `-s` — why 1UIP learning was skipped or rejected.

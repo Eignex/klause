@@ -117,7 +117,9 @@ internal class SmtLibOutput : BufferedBestOutput() {
         private val SMT_SEARCH_KEYS = setOf(
             "nodes", "failures", "propagations",
             "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
-            "openLiaRowVisits", "openCancellationPolls", "openWork",
+            "openLiaRowVisits", "openCancellationPolls", "openWork", "openLearned", "openRelearned",
+            "openRestarts", "openReductions", "openDropped", "openRetained", "openPeakRetained",
+            "openLearnedWatchVisits",
         )
     }
 }
