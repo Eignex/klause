@@ -1,4 +1,4 @@
-package com.eignex.klause.theory
+package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.util.Cancellation
 

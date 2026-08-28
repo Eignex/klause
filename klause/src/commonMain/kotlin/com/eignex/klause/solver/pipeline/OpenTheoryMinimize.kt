@@ -10,7 +10,6 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.theory.TheoryParams
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**

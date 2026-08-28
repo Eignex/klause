@@ -8834,8 +8834,8 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryAssignment$Genera
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryEngine {
 	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/pipeline/ProblemPipeline;)V
-	public final fun solve (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
-	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryEngine;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public final fun solve (Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
+	public static synthetic fun solve$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryEngine;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryResult;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryExecution {
@@ -8866,8 +8866,8 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryExecution$Satisfy
 public final class com/eignex/klause/solver/pipeline/OpenTheoryMinimizer {
 	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/solver/objective/LinearObjective;)V
 	public final fun getTheoryPipeline ()Lcom/eignex/klause/solver/pipeline/ProblemPipeline;
-	public final fun minimize (Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
-	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryMinimizer;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
+	public final fun minimize (Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
+	public static synthetic fun minimize$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryMinimizer;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum;
 }
 
 public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
@@ -8919,8 +8919,8 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal :
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryPipeline {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;
-	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/theory/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
-	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/theory/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public final fun execute (Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
+	public static synthetic fun execute$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryPipeline;Lcom/eignex/klause/solver/pipeline/OpenTheoryRequest;Lcom/eignex/klause/solver/pipeline/TheoryParams;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryExecution;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryRequest {
@@ -9077,6 +9077,25 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheo
 public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen : com/eignex/klause/solver/pipeline/SourceProblemRoute {
 	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
 	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/TheoryParams {
+	public fun <init> ()V
+	public fun <init> (JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
+	public synthetic fun <init> (JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()J
+	public final fun component2 ()J
+	public final fun component3 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun component4 ()Lcom/eignex/klause/util/Cancellation;
+	public final fun copy (JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/TheoryParams;JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/TheoryParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
+	public final fun getMaxLeaves ()J
+	public final fun getOpenWorkLimit ()J
+	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -10569,25 +10588,6 @@ public abstract interface class com/eignex/klause/theory/TheoryContext {
 public final class com/eignex/klause/theory/TheoryContext$DefaultImpls {
 	public static fun intLowerBound (Lcom/eignex/klause/theory/TheoryContext;I)Ljava/lang/Long;
 	public static fun intUpperBound (Lcom/eignex/klause/theory/TheoryContext;I)Ljava/lang/Long;
-}
-
-public final class com/eignex/klause/theory/TheoryParams {
-	public fun <init> ()V
-	public fun <init> (JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)V
-	public synthetic fun <init> (JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1 ()J
-	public final fun component2 ()J
-	public final fun component3 ()Lcom/eignex/klause/util/Cancellation;
-	public final fun component4 ()Lcom/eignex/klause/util/Cancellation;
-	public final fun copy (JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;)Lcom/eignex/klause/theory/TheoryParams;
-	public static synthetic fun copy$default (Lcom/eignex/klause/theory/TheoryParams;JJLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;ILjava/lang/Object;)Lcom/eignex/klause/theory/TheoryParams;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
-	public final fun getMaxLeaves ()J
-	public final fun getOpenWorkLimit ()J
-	public final fun getTimeout ()Lcom/eignex/klause/util/Cancellation;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/theory/TheorySearchComponent : com/eignex/klause/solver/search/TheoryComponent {

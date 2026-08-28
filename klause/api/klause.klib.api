@@ -9918,7 +9918,7 @@ final class com.eignex.klause.solver.pipeline/LsResolution { // com.eignex.klaus
 final class com.eignex.klause.solver.pipeline/OpenTheoryEngine { // com.eignex.klause.solver.pipeline/OpenTheoryEngine|null[0]
     constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.solver.pipeline/ProblemPipeline) // com.eignex.klause.solver.pipeline/OpenTheoryEngine.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.solver.pipeline.ProblemPipeline){}[0]
 
-    final fun solve(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryEngine.solve|solve(com.eignex.klause.theory.TheoryParams){}[0]
+    final fun solve(com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryResult // com.eignex.klause.solver.pipeline/OpenTheoryEngine.solve|solve(com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/OpenTheoryMinimizer { // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer|null[0]
@@ -9927,7 +9927,7 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryMinimizer { // com.eigne
     final val theoryPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline|{}theoryPipeline[0]
         final fun <get-theoryPipeline>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.theoryPipeline.<get-theoryPipeline>|<get-theoryPipeline>(){}[0]
 
-    final fun minimize(com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.minimize|minimize(com.eignex.klause.theory.TheoryParams){}[0]
+    final fun minimize(com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum // com.eignex.klause.solver.pipeline/OpenTheoryMinimizer.minimize|minimize(com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.klause.solver.pipeline/OpenTheoryRequest|null[0]
@@ -9983,6 +9983,28 @@ final class com.eignex.klause.solver.pipeline/PortfolioPlanRequest { // com.eign
         final fun <get-optimize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.optimize.<get-optimize>|<get-optimize>(){}[0]
     final val randomSeed // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.randomSeed|{}randomSeed[0]
         final fun <get-randomSeed>(): kotlin/Long? // com.eignex.klause.solver.pipeline/PortfolioPlanRequest.randomSeed.<get-randomSeed>|<get-randomSeed>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/TheoryParams { // com.eignex.klause.solver.pipeline/TheoryParams|null[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.solver.pipeline/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+
+    final val cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation|{}cancellation[0]
+        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+    final val maxLeaves // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves|{}maxLeaves[0]
+        final fun <get-maxLeaves>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.maxLeaves.<get-maxLeaves>|<get-maxLeaves>(){}[0]
+    final val openWorkLimit // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit|{}openWorkLimit[0]
+        final fun <get-openWorkLimit>(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.openWorkLimit.<get-openWorkLimit>|<get-openWorkLimit>(){}[0]
+    final val timeout // com.eignex.klause.solver.pipeline/TheoryParams.timeout|{}timeout[0]
+        final fun <get-timeout>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
+
+    final fun component1(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component1|component1(){}[0]
+    final fun component2(): kotlin/Long // com.eignex.klause.solver.pipeline/TheoryParams.component2|component2(){}[0]
+    final fun component3(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component3|component3(){}[0]
+    final fun component4(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/TheoryParams.component4|component4(){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/TheoryParams // com.eignex.klause.solver.pipeline/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TheoryParams.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TheoryParams.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TheoryParams.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/UnplaceableColumn { // com.eignex.klause.solver.pipeline/UnplaceableColumn|null[0]
@@ -10744,28 +10766,6 @@ final class com.eignex.klause.theory.qflra/ExactLraSolver : com.eignex.klause.th
     final fun check(kotlin/BooleanArray, com.eignex.klause.theory/TheoryContext): com.eignex.klause.theory/TheoryCheck<com.eignex.klause.theory.qflra/ExactLraAssignment> // com.eignex.klause.theory.qflra/ExactLraSolver.check|check(kotlin.BooleanArray;com.eignex.klause.theory.TheoryContext){}[0]
 }
 
-final class com.eignex.klause.theory/TheoryParams { // com.eignex.klause.theory/TheoryParams|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...) // com.eignex.klause.theory/TheoryParams.<init>|<init>(kotlin.Long;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
-
-    final val cancellation // com.eignex.klause.theory/TheoryParams.cancellation|{}cancellation[0]
-        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.theory/TheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
-    final val maxLeaves // com.eignex.klause.theory/TheoryParams.maxLeaves|{}maxLeaves[0]
-        final fun <get-maxLeaves>(): kotlin/Long // com.eignex.klause.theory/TheoryParams.maxLeaves.<get-maxLeaves>|<get-maxLeaves>(){}[0]
-    final val openWorkLimit // com.eignex.klause.theory/TheoryParams.openWorkLimit|{}openWorkLimit[0]
-        final fun <get-openWorkLimit>(): kotlin/Long // com.eignex.klause.theory/TheoryParams.openWorkLimit.<get-openWorkLimit>|<get-openWorkLimit>(){}[0]
-    final val timeout // com.eignex.klause.theory/TheoryParams.timeout|{}timeout[0]
-        final fun <get-timeout>(): com.eignex.klause.util/Cancellation // com.eignex.klause.theory/TheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
-
-    final fun component1(): kotlin/Long // com.eignex.klause.theory/TheoryParams.component1|component1(){}[0]
-    final fun component2(): kotlin/Long // com.eignex.klause.theory/TheoryParams.component2|component2(){}[0]
-    final fun component3(): com.eignex.klause.util/Cancellation // com.eignex.klause.theory/TheoryParams.component3|component3(){}[0]
-    final fun component4(): com.eignex.klause.util/Cancellation // com.eignex.klause.theory/TheoryParams.component4|component4(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.theory/TheoryParams // com.eignex.klause.theory/TheoryParams.copy|copy(kotlin.Long;kotlin.Long;com.eignex.klause.util.Cancellation;com.eignex.klause.util.Cancellation){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory/TheoryParams.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.theory/TheoryParams.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.theory/TheoryParams.toString|toString(){}[0]
-}
-
 final class com.eignex.klause.util/Bits { // com.eignex.klause.util/Bits|null[0]
     constructor <init>(kotlin/Int) // com.eignex.klause.util/Bits.<init>|<init>(kotlin.Int){}[0]
 
@@ -11298,7 +11298,7 @@ final object com.eignex.klause.solver.pipeline/FinitePipeline { // com.eignex.kl
 }
 
 final object com.eignex.klause.solver.pipeline/OpenTheoryPipeline { // com.eignex.klause.solver.pipeline/OpenTheoryPipeline|null[0]
-    final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.theory/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.theory.TheoryParams){}[0]
+    final fun execute(com.eignex.klause.solver.pipeline/OpenTheoryRequest, com.eignex.klause.solver.pipeline/TheoryParams = ...): com.eignex.klause.solver.pipeline/OpenTheoryExecution // com.eignex.klause.solver.pipeline/OpenTheoryPipeline.execute|execute(com.eignex.klause.solver.pipeline.OpenTheoryRequest;com.eignex.klause.solver.pipeline.TheoryParams){}[0]
 }
 
 final object com.eignex.klause.util/PermutationGroup { // com.eignex.klause.util/PermutationGroup|null[0]
