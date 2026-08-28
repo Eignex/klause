@@ -18,7 +18,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.model.PbOp
 
 /**
@@ -88,10 +87,6 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
                 Unchanged // infeasible
             }
         }
-    }
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        builder.boolRow(literals, weights, relation, bound)
     }
 
     // The factor *is* its own exact linear row over its Boolean literals, read by presolve with no

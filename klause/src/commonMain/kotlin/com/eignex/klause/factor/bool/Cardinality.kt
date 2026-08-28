@@ -16,7 +16,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.RelaxationBuilder
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true
@@ -51,11 +50,6 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
     // is vacuous and drops (propagation never prunes it but keeps the factor around otherwise).
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction =
         if (min == 0 && max == literals.size) Rewrite(emptyList()) else Unchanged
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
-        builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())
-    }
 
     /** Exact linear view: the bounds `min ≤ Σ literals ≤ max` over its Boolean literals (unit-weight views). */
     override val linearRows: List<LinearRow>

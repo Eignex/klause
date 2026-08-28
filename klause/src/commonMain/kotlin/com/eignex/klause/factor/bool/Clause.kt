@@ -14,7 +14,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.IntHashSet
 
 /**
@@ -84,10 +83,6 @@ class Clause(literals: IntArray) :
         }
         pureBoolMemo = if (allBool) 1 else 0
         return allBool
-    }
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
     }
 
     // The clause *is* its own exact linear row `Σ literals ≥ 1`, read by presolve with no allocation.
