@@ -51,6 +51,25 @@ class SearchSessionTest {
     }
 
     @Test
+    fun `a refused sibling after fixed work exhaustion is indeterminate`() {
+        val work = OpenTheoryWorkSink(limit = 1)
+        val session = SearchSession(
+            listOf(object : SearchComponent {
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Infeasible()
+            }),
+        )
+        session.attachOpenTheoryWork(work)
+
+        val result = session.solve(numBoolVars = 1)
+
+        assertIs<SearchResult.Indeterminate>(result)
+        assertEquals(true, work.exhausted)
+        assertEquals(1L, work.snapshot().openBoolDecisions)
+        assertEquals(0L, work.snapshot().openTheoryChecks)
+        assertEquals(1L, work.snapshot().openWork)
+    }
+
+    @Test
     fun `shared session retracts every component to the same decision level`() {
         val first = RecordingComponent()
         val second = RecordingComponent()

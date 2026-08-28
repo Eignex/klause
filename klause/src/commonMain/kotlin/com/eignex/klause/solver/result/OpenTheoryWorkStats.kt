@@ -45,7 +45,10 @@ class OpenTheoryWorkSink(private val limit: Long = Long.MAX_VALUE) {
     }
 
     /** Whether one more fixed-work event can be committed. */
-    fun hasAllowance(): Boolean = work < limit
+    fun hasAllowance(): Boolean {
+        if (work >= limit) exhausted = true
+        return !exhausted
+    }
 
     /** Charge one committed shared Boolean decision. */
     fun boolDecision(): Boolean = consume().also { if (it) boolDecisions++ }

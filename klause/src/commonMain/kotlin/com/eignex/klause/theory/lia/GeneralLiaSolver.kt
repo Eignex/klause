@@ -478,7 +478,11 @@ class GeneralLiaSearchComponent(
     }
 
     override fun initialize(context: SearchContext): ComponentResult {
-        val bound = model.generalLiaWitnessBound(context::cancelled) ?: return ComponentResult.Indeterminate
+        val bound = model.generalLiaWitnessBound(
+            context::pollGeneralLiaCancellation,
+        ) ?: run {
+            return ComponentResult.Indeterminate
+        }
         witnessBound = bound
         pollStride = pollStrideFor(bound.bitLength())
         val initialDomains = initialDomains(context) ?: return ComponentResult.Indeterminate
@@ -526,7 +530,7 @@ class GeneralLiaSearchComponent(
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (bools.any { it == UNASSIGNED } || outcome != null) return null
-        if (context.cancelled() || !context.consumeCheck()) {
+        if (context.pollGeneralLiaCancellation() || !context.consumeCheck()) {
             outcome = ComponentCheck.Indeterminate
             return null
         }
@@ -628,14 +632,14 @@ class GeneralLiaSearchComponent(
         var changed: Boolean
         var untilPoll = pollStride
         do {
-            if (context.cancelled()) return null
+            if (context.pollGeneralLiaCancellation()) return null
             changed = false
             for (factor in model.factors) {
                 if (!context.consumeGeneralLiaWork()) return null
                 if (--untilPoll <= 0) {
                     untilPoll = pollStride
                     context.recordGeneralLiaPoll()
-                    if (context.cancelled()) return null
+                    if (context.pollGeneralLiaCancellation()) return null
                 }
                 val row = when (factor) {
                     is Linear -> if (factor.op == LinearOp.EQ) LiaRow.of(factor) else null
@@ -660,7 +664,7 @@ class GeneralLiaSearchComponent(
                     if (--untilPoll <= 0) {
                         untilPoll = pollStride
                         context.recordGeneralLiaPoll()
-                        if (context.cancelled()) return null
+                        if (context.pollGeneralLiaCancellation()) return null
                     }
                     val coefficient = row.coeffs[index]
                     if (coefficient == BigInteger.ZERO) continue
@@ -737,7 +741,7 @@ class GeneralLiaSearchComponent(
             if (--untilPoll <= 0) {
                 untilPoll = pollStride
                 context.recordGeneralLiaPoll()
-                if (context.cancelled()) return null
+                if (context.pollGeneralLiaCancellation()) return null
             }
             when (factor) {
                 is Clause -> factor.literals.any { literal ->
@@ -771,7 +775,7 @@ class GeneralLiaSearchComponent(
             if (--untilPoll <= 0) {
                 untilPoll = pollStride
                 context.recordGeneralLiaPoll()
-                if (context.cancelled()) return null
+                if (context.pollGeneralLiaCancellation()) return null
             }
             val holds = when (factor) {
                 is Clause -> factor.literals.any { literal -> bools[literal ushr 1] == truth(literal) }
@@ -979,4 +983,9 @@ private fun SearchContext.consumeGeneralLiaWork(): Boolean = (this as? SearchSes
 
 private fun SearchContext.recordGeneralLiaPoll() {
     (this as? SearchSession)?.recordCancellationPoll()
+}
+
+private fun SearchContext.pollGeneralLiaCancellation(): Boolean {
+    recordGeneralLiaPoll()
+    return cancelled()
 }

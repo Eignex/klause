@@ -791,6 +791,7 @@ class SearchRun internal constructor(
     private var consumedModel = false
     private var terminal: SearchRunEvent? = null
     private var started = false
+    private var budgetInterrupted = false
     private val cancellationPoller = SearchCancellationPoller()
 
     /**
@@ -1030,8 +1031,14 @@ class SearchRun internal constructor(
             if (session.decisionLevel > frame.level) session.popTo(frame.level)
             when (advanceFrame()) {
                 Advance.Expanded -> return true
-                Advance.Budget -> return false
+
+                Advance.Budget -> {
+                    budgetInterrupted = true
+                    return false
+                }
+
                 Advance.Exhausted -> Unit
+
                 Advance.Restart -> return restart() == null
             }
         }
@@ -1136,7 +1143,11 @@ class SearchRun internal constructor(
             return lifecycle.onCancellation(session).toEvent()
                 ?: finish(SearchRunEvent.Indeterminate.Cancelled)
         }
-        return if (indeterminate) finish(SearchRunEvent.Indeterminate.Component) else finish(exhausted())
+        return when {
+            budgetInterrupted -> finish(SearchRunEvent.Indeterminate.Budget)
+            indeterminate -> finish(SearchRunEvent.Indeterminate.Component)
+            else -> finish(exhausted())
+        }
     }
 
     /** Return the shared session to its root and run every mode-specific restart action. */
