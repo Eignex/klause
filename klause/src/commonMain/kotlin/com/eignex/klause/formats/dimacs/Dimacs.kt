@@ -3,9 +3,6 @@ package com.eignex.klause.formats.dimacs
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.dimacs.CnfDocument
-import com.eignex.klause.lowering.dimacs.WcnfDocument
-import com.eignex.klause.lowering.dimacs.WeightedCnfClause
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.StringCharSource

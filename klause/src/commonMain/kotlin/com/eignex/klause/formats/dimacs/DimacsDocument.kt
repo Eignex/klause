@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.dimacs
+package com.eignex.klause.formats.dimacs
 
 /** A parsed DIMACS CNF document before lowering to a solver problem. */
 data class CnfDocument(

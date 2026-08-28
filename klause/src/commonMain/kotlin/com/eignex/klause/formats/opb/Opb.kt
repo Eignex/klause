@@ -1,7 +1,6 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.formats.FormatException
-import com.eignex.klause.lowering.opb.OpbDocument
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 

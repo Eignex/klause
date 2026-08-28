@@ -1,10 +1,6 @@
 package com.eignex.klause.formats.opb
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lowering.opb.OpbDocument
-import com.eignex.klause.lowering.opb.OpbRelation
-import com.eignex.klause.lowering.opb.OpbStatement
-import com.eignex.klause.lowering.opb.OpbTerm
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList

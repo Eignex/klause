@@ -1,5 +1,11 @@
 package com.eignex.klause.lowering.mps
 
+import com.eignex.klause.formats.mps.MpsConstraint
+import com.eignex.klause.formats.mps.MpsIndicator
+import com.eignex.klause.formats.mps.MpsModel
+import com.eignex.klause.formats.mps.MpsObjective
+import com.eignex.klause.formats.mps.MpsVar
+
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.pipeline.ProblemPipeline
