@@ -1,8 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.ReifiedFactor
-import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
-import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.bool.internals.linearHolds
@@ -18,13 +16,8 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
-import com.eignex.klause.util.CheckedLongOverflowException
-import com.eignex.klause.util.addExact
-import com.eignex.klause.util.mulExact
-import com.eignex.klause.util.subExact
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
@@ -153,135 +146,4 @@ class ReifiedLinear private constructor(
 
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         integerConstants?.let { linearResidual(state.longPayload[factorId], op, it.bound, softCap) } ?: softCap
-
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        // A wide reified row is excluded from the LP relaxation entirely — no 64-bit reading of it may
-        // enter the LP; [WideReifiedLinearPropagator] is the sole enforcer.
-        val row = integerConstants ?: return
-        // Best-effort: a reified row whose activity or big-M overflows Long is left unrelaxed (the
-        // exact helpers below signal it); the propagator and invariant still enforce the constraint.
-        try {
-            if (emitExactBinaryEquality(builder, row)) return
-            emitBigMRows(builder, row)
-        } catch (_: CheckedLongOverflowException) {
-            return
-        }
-    }
-
-    /**
-     * Exact convex-hull rows for the common case `aux ⇔ (c·v == bound)` where `v`'s declared domain is a
-     * single pair `{lo, hi}`. Then `c·v` is two-valued, so the indicator is an affine function of it —
-     * `c·v = c·lo + (c·hi − c·lo)·aux` when `bound` is the high value (symmetrically for the low), or
-     * `aux = 0` when `bound` is unreachable. This is the tight replacement for the big-M reification a
-     * binary variable would otherwise get, and it is global (declared-domain based, valid at every node).
-     * It covers the ubiquitous bool↔`{0,1}` channel (`channelBoolTo01`) as well as `±1` product encodings.
-     * Returns whether it emitted (and the caller should skip the big-M rows).
-     */
-    private fun emitExactBinaryEquality(builder: RelaxationBuilder, row: IntegerConstants): Boolean {
-        if (op != LinearOp.EQ || vars.size != 1) return false
-        val c = row.coeff(0)
-        if (c == 0L) return false
-        val dec = builder.declaredDomain(vars[0])
-        // Only the count is needed, and a wide column has one without being walked: the two values of a
-        // size-2 domain are exactly its min and max.
-        if (dec.valueCount != 2L) return false
-        val loValue = mulExact(c, dec.min)
-        val hiValue = mulExact(c, dec.max)
-        val vCol = builder.intColumn(vars[0])
-        val auxCol = builder.boolColumn(auxBoolVar)
-        when (row.bound) {
-            // aux ⇔ (c·v == hi): c·v − (hi − lo)·aux = lo.
-            hiValue -> builder.row(
-                intArrayOf(vCol, auxCol),
-                longArrayOf(c, -subExact(hiValue, loValue)),
-                LinearOp.EQ,
-                loValue,
-            )
-
-            // aux ⇔ (c·v == lo): c·v − (lo − hi)·aux = hi.
-            loValue -> builder.row(
-                intArrayOf(vCol, auxCol),
-                longArrayOf(c, -subExact(loValue, hiValue)),
-                LinearOp.EQ,
-                hiValue,
-            )
-
-            // bound is neither reachable value, so the equality never holds and the indicator is false.
-            else -> builder.row(intArrayOf(auxCol), longArrayOf(1L), LinearOp.EQ, 0L)
-        }
-        return true
-    }
-
-    private fun emitBigMRows(builder: RelaxationBuilder, row: IntegerConstants) {
-        var lMin = 0L
-        var lMax = 0L
-        var lMinD = 0L
-        var lMaxD = 0L
-        for (k in vars.indices) {
-            val c = row.coeff(k)
-            val dom = builder.liveDomain(vars[k])
-            val dec = builder.declaredDomain(vars[k])
-            if (c >= 0L) {
-                lMin = addExact(lMin, mulExact(c, dom.min))
-                lMax = addExact(lMax, mulExact(c, dom.max))
-                lMinD = addExact(lMinD, mulExact(c, dec.min))
-                lMaxD = addExact(lMaxD, mulExact(c, dec.max))
-            } else {
-                lMin = addExact(lMin, mulExact(c, dom.max))
-                lMax = addExact(lMax, mulExact(c, dom.min))
-                lMinD = addExact(lMinD, mulExact(c, dec.max))
-                lMaxD = addExact(lMaxD, mulExact(c, dec.min))
-            }
-        }
-        val a = builder.boolColumn(auxBoolVar)
-        val b = row.bound
-
-        // Emit `Σ coeffs·vars + auxCoeff·aux  op  rhs`, marked [global] when the live M matches the
-        // declared-range M; non-global rows cite their [maxSide] live bounds as premises.
-        fun emit(auxCoeff: Long, rowOp: LinearOp, rhs: Long, global: Boolean, maxSide: Boolean) {
-            val cols = IntArray(vars.size + 1)
-            val vals = LongArray(vars.size + 1)
-            for (k in vars.indices) {
-                cols[k] = builder.intColumn(vars[k])
-                vals[k] = row.coeff(k)
-            }
-            cols[vars.size] = a
-            vals[vars.size] = auxCoeff
-            builder.bigMRow(cols, vals, rowOp, rhs, global, maxSide)
-        }
-
-        when (op) {
-            LinearOp.LE -> {
-                val m1 = maxOf(0L, subExact(lMax, b)) // aux=1 ⇒ L ≤ bound
-                emit(m1, LinearOp.LE, addExact(b, m1), m1 == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-                successorOrNull(b)?.let { boundUp ->
-                    val m2 = maxOf(0L, subExact(boundUp, lMin)) // aux=0 ⇒ L ≥ bound+1
-                    emit(m2, LinearOp.GE, boundUp, m2 == maxOf(0L, subExact(boundUp, lMinD)), maxSide = false)
-                }
-            }
-
-            LinearOp.GE -> {
-                val m1 = maxOf(0L, subExact(b, lMin)) // aux=1 ⇒ L ≥ bound
-                emit(-m1, LinearOp.GE, subExact(b, m1), m1 == maxOf(0L, subExact(b, lMinD)), maxSide = false)
-                predecessorOrNull(b)?.let { boundDown ->
-                    val m2 = maxOf(0L, subExact(lMax, boundDown)) // aux=0 ⇒ L ≤ bound-1
-                    emit(-m2, LinearOp.LE, boundDown, m2 == maxOf(0L, subExact(lMaxD, boundDown)), maxSide = true)
-                }
-            }
-
-            LinearOp.EQ -> {
-                val mHi = maxOf(0L, subExact(lMax, b)) // aux=1 ⇒ L ≤ bound
-                emit(mHi, LinearOp.LE, addExact(b, mHi), mHi == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-                val mLo = maxOf(0L, subExact(b, lMin)) // aux=1 ⇒ L ≥ bound
-                emit(-mLo, LinearOp.GE, subExact(b, mLo), mLo == maxOf(0L, subExact(b, lMinD)), maxSide = false)
-            }
-
-            LinearOp.NE -> {
-                val mHi = maxOf(0L, subExact(lMax, b)) // aux=0 ⇒ L ≤ bound
-                emit(-mHi, LinearOp.LE, b, mHi == maxOf(0L, subExact(lMaxD, b)), maxSide = true)
-                val mLo = maxOf(0L, subExact(b, lMin)) // aux=0 ⇒ L ≥ bound
-                emit(mLo, LinearOp.GE, b, mLo == maxOf(0L, subExact(b, lMinD)), maxSide = false)
-            }
-        }
-    }
 }
