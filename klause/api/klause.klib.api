@@ -10909,6 +10909,10 @@ final class com.eignex.klause.util/CharReader { // com.eignex.klause.util/CharRe
     final fun peek(kotlin/Int = ...): kotlin/Int // com.eignex.klause.util/CharReader.peek|peek(kotlin.Int){}[0]
 }
 
+final class com.eignex.klause.util/CheckedLongOverflowException : kotlin/ArithmeticException { // com.eignex.klause.util/CheckedLongOverflowException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.util/CheckedLongOverflowException.<init>|<init>(kotlin.String){}[0]
+}
+
 final class com.eignex.klause.util/FloatInterval { // com.eignex.klause.util/FloatInterval|null[0]
     constructor <init>(kotlin/Double, kotlin/Double) // com.eignex.klause.util/FloatInterval.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
 
@@ -11608,3 +11612,6 @@ final fun com.eignex.klause.solver.pipeline/withNodeBudget(kotlin.collections/Li
 final fun com.eignex.klause.solver.pipeline/writeFlatZincSolution(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.solver.pipeline/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/IntArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/LongArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.LongArray){}[0]
+final fun com.eignex.klause.util/addExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/addExact|addExact(kotlin.Long;kotlin.Long){}[0]
+final fun com.eignex.klause.util/mulExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/mulExact|mulExact(kotlin.Long;kotlin.Long){}[0]
+final fun com.eignex.klause.util/subExact(kotlin/Long, kotlin/Long): kotlin/Long // com.eignex.klause.util/subExact|subExact(kotlin.Long;kotlin.Long){}[0]
