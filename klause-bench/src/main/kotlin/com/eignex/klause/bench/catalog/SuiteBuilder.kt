@@ -1,6 +1,6 @@
 package com.eignex.klause.bench.catalog
 
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 
 /**
  * Small Kotlin DSL for declaring [Suite]s. Suite-level defaults ([format], [category],

@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.SingleIntObjective
 import kotlin.math.ceil
 

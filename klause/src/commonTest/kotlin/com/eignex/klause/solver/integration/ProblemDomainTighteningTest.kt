@@ -2,6 +2,7 @@ package com.eignex.klause.solver.integration
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.RootBaker
 import com.eignex.klause.propagation.PropagationResult

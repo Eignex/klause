@@ -1,11 +1,11 @@
 package com.eignex.klause.portfolio
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.SharedClause
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

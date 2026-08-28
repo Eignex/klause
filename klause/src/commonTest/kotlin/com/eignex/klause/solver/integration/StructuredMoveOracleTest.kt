@@ -3,9 +3,9 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.factor.MoveSetOracle
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 
 /**

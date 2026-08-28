@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

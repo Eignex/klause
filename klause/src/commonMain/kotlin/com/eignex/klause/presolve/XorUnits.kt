@@ -3,8 +3,8 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.MutableIntIntMap

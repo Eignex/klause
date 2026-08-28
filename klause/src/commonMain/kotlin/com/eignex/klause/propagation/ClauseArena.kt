@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 
 /**
  * Flat, arena-packed store of the clauses of a pure-Boolean (native-SAT) problem. Every clause

@@ -1,7 +1,7 @@
 package com.eignex.klause.backtrack
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Int128
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 
 /** A bound the objective cutoff proves on an integer variable: `varId ≤ hi`. */

@@ -1,6 +1,6 @@
 package com.eignex.klause.lowering.mps
 
-import com.eignex.klause.solver.Problem
+import com.eignex.klause.ir.Problem
 
 /** Explicit finite materialization for legacy assertions over fully bounded MPS fixtures. */
 internal val MpsCompiled.problem: Problem

@@ -1,5 +1,6 @@
 package com.eignex.klause.presolve
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.CoefficientStrengthening
 import com.eignex.klause.presolve.linear.DiophantineReduction
@@ -10,7 +11,6 @@ import com.eignex.klause.presolve.structural.ComparisonClauseFold
 import com.eignex.klause.presolve.structural.DuplicateColumns
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.StructuralReduction
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.Cancellation
 
 /**

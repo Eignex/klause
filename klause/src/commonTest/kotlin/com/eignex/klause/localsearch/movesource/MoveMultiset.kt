@@ -1,9 +1,9 @@
 package com.eignex.klause.localsearch.movesource
 
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
-import com.eignex.klause.solver.Problem
 import kotlin.random.Random
 import kotlin.test.assertEquals
 

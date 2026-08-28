@@ -1,10 +1,10 @@
 package com.eignex.klause.lp.cut
 
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.propagation.propagatedImplicationGraph
-import com.eignex.klause.solver.Problem
 
 /**
  * Implied-bound cuts from the binary **implication graph**. Probing

@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.engine.LpOverflowException
 import com.eignex.klause.lp.engine.addExact
@@ -16,7 +17,6 @@ import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList

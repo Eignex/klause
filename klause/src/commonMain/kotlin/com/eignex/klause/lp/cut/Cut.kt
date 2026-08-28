@@ -8,6 +8,7 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.factor.global.Inverse
 import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.bound.MinCostAssignment
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpOverflowException
@@ -17,7 +18,6 @@ import com.eignex.klause.lp.engine.mulExact
 import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet

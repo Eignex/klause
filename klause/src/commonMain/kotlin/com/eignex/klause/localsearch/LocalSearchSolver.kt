@@ -5,6 +5,7 @@ import com.eignex.klause.compile.compile
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.objective.MutableObjectiveBound
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.movesource.GreedyInit
 import com.eignex.klause.localsearch.schedule.AdaptivePolicy
@@ -21,7 +22,6 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver

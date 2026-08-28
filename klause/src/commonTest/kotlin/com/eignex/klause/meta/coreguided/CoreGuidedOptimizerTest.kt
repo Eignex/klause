@@ -2,8 +2,8 @@ package com.eignex.klause.meta.coreguided
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Lit
-import com.eignex.klause.solver.Problem
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

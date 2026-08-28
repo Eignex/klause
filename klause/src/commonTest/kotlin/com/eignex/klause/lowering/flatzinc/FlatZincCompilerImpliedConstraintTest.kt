@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 /**
  * The klause MZN library tags `redundant_constraint` / `symmetry_breaking_constraint` with the
  * `klause_redundant` / `klause_symmetry` annotations so the marker survives flatten. These tests
- * pin the parser→compiler path that lifts those tags onto [com.eignex.klause.solver.Problem]:
+ * pin the parser→compiler path that lifts those tags onto [com.eignex.klause.ir.Problem]:
  * `impliedFactorMask` for the local-search weight seed, `hasSymmetryBreaking` for the presolve gate.
  */
 class FlatZincCompilerImpliedConstraintTest {

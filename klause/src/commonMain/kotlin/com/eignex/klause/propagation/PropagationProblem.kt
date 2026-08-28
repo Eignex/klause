@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntHashSet
 

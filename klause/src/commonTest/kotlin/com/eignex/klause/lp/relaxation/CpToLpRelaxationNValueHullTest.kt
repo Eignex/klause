@@ -1,12 +1,12 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.global.NValue
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.solveLp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Problem
 import com.eignex.klause.solver.objective.LinearObjective
 import kotlin.test.Test
 import kotlin.test.assertEquals
