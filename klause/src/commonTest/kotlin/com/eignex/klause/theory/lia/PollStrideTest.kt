@@ -4,9 +4,12 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
+import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.TheoryCheck
 import com.eignex.klause.theory.TheoryContext
 import com.eignex.klause.util.Bits
+import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,6 +22,24 @@ import kotlin.test.assertTrue
  * overshoots the budget on a wide box or costs more than it guards on a narrow one.
  */
 class PollStrideTest {
+
+    @Test
+    fun `a cooperative poll is recorded exactly once`() {
+        var cancellations = 0
+        val work = OpenTheoryWorkSink()
+        val session = SearchSession(
+            emptyList(),
+            cancellation = Cancellation {
+                cancellations++
+                false
+            },
+        )
+        session.attachOpenTheoryWork(work)
+
+        assertEquals(false, session.pollGeneralLiaCancellation())
+        assertEquals(1, cancellations)
+        assertEquals(1L, work.snapshot().openCancellationPolls)
+    }
 
     @Test
     fun `a wide row is skipped when shared bounds fix a satisfying witness`() {
