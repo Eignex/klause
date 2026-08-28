@@ -32,6 +32,9 @@ internal interface ClauseWatchHost {
  * [literalsAt] and never retain the array.
  */
 internal class WatchedClauseStore {
+    /** Watch entries inspected by [propagate]. */
+    var watchVisits: Long = 0
+        private set
     private val clauses = ArrayList<IntArray>()
     private val lbds = IntArrayList()
     private val used = ArrayList<Boolean>()
@@ -210,6 +213,7 @@ internal class WatchedClauseStore {
         var target = 0
         var outcome: ComponentResult = ComponentResult.Consistent
         while (source < watching.size) {
+            watchVisits++
             val index = watching[source++]
             val literals = clauses[index]
             if (literals[0] == falsified && literals.size > 1) {

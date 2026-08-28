@@ -9,6 +9,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.search.ClauseSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchComponentSet
+import com.eignex.klause.solver.search.SearchLearnedDbParams
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TheoryComponent
 import com.eignex.klause.util.Cancellation
@@ -29,6 +30,7 @@ fun ComponentPlan.search(
     cpDomains: Map<Int, IntDomain>,
     maxChecks: Long = Long.MAX_VALUE,
     cancellation: Cancellation = Cancellation.Never,
+    learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
 ): PlannedSearch {
     val components = ArrayList<SearchComponent>(3)
     val cp = if (hasCpComponent) {
@@ -45,7 +47,7 @@ fun ComponentPlan.search(
     if (theory != null) components += theory
     cp?.rebase()
     return PlannedSearch(
-        SearchComponentSet(components).session(maxChecks, cancellation),
+        SearchComponentSet(components).session(maxChecks, cancellation, learnedDb),
         cp,
         theory,
     )

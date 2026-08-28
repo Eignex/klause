@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.search
 
+import com.eignex.klause.solver.result.OpenTheoryClauseStats
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.IntArrayList
@@ -51,6 +52,12 @@ class SearchSession(
     private var checks = 0L
     private var checksExhausted = false
     private var openTheoryWork: OpenTheoryWorkSink? = null
+    private var learnedClauses = 0L
+    private var relearnedClauses = 0L
+    private var restarts = 0L
+    private var reductions = 0L
+    private var droppedClauses = 0L
+    private var peakLearnedClauses = 0L
 
     /** Current shared decision level. */
     override val decisionLevel: Int get() = trail.size
@@ -441,6 +448,7 @@ class SearchSession(
     fun restart(): ComponentResult {
         popTo(0)
         reduceLearnedDb()
+        restarts++
         singleComponent?.onRestart(this) ?: components.forEach { it.onRestart(this) }
         return propagate()
     }
@@ -561,6 +569,18 @@ class SearchSession(
     /** Number of sound clause-form explanations retained by the shared Boolean engine. */
     val learnedClauseCount: Int get() = learned.size
 
+    /** Snapshot learned-clause telemetry for a completed open-theory solve. */
+    fun learnedClauseStats(): OpenTheoryClauseStats = OpenTheoryClauseStats(
+        learnedClauses,
+        relearnedClauses,
+        restarts,
+        reductions,
+        droppedClauses,
+        learned.size.toLong(),
+        peakLearnedClauses,
+        learned.watchVisits,
+    )
+
     /** Retain a sound clause-form explanation for subsequent propagation. */
     fun learn(explanation: SearchExplanation?) {
         val literals = explanation?.literals ?: return
@@ -570,7 +590,13 @@ class SearchSession(
     private fun learn(literals: IntArray) {
         if (literals.isEmpty()) return
         val index = learned.add(literals.copyOf(), lbdOf(literals))
-        if (index >= 0) pendingAttach.addLast(index)
+        if (index >= 0) {
+            learnedClauses++
+            peakLearnedClauses = maxOf(peakLearnedClauses, learned.size.toLong())
+            pendingAttach.addLast(index)
+        } else {
+            relearnedClauses++
+        }
     }
 
     private fun lbdOf(literals: IntArray): Int {
@@ -607,6 +633,8 @@ class SearchSession(
         val dropped = HashSet<Int>(droppable.size - survivors)
         for (position in survivors until droppable.size) dropped.add(droppable[position])
         learned.retain { index -> index !in dropped }
+        reductions++
+        droppedClauses += dropped.size
         learned.clearUsed()
         unitsPending = learned.units.size > 0
     }

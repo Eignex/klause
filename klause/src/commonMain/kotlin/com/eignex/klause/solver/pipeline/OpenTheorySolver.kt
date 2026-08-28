@@ -16,7 +16,10 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchLearnedDbParams
+import com.eignex.klause.solver.search.SearchRestart
 import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
@@ -156,6 +159,7 @@ class OpenTheoryEngine internal constructor(
             cpDomains,
             maxChecks = params.maxLeaves,
             cancellation = cancellation,
+            learnedDb = SearchLearnedDbParams(params.maxLearnedClauses, params.lbdGlue),
         )
         planned.session.attachOpenTheoryWork(work)
         when (planned.session.initialize()) {
@@ -172,15 +176,25 @@ class OpenTheoryEngine internal constructor(
                 work,
             )
         }
-        return when (val result = planned.session.solve(model.numBoolVars)) {
+        val solveParams = SearchSolveParams(
+            maxDecisions = params.maxDecisions,
+            restart = params.sharedRestart?.let(SearchRestart::Every) ?: SearchRestart.Never,
+        )
+        return when (val result = planned.session.solve(model.numBoolVars, solveParams)) {
             is SearchResult.Satisfied -> OpenTheoryResult.Sat(
                 assignment(result.model, checkNotNull(planned.theory)),
-                stats.finish(work),
+                stats.finish(work, planned.session),
             )
 
-            SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(work))
+            SearchResult.Exhausted -> OpenTheoryResult.Unsat(stats.finish(work, planned.session))
 
-            SearchResult.Indeterminate -> unknown(params.timeout(), planned.session.checkBudgetExhausted(), stats, work)
+            SearchResult.Indeterminate -> unknown(
+                params.timeout(),
+                planned.session.checkBudgetExhausted(),
+                stats,
+                work,
+                planned.session,
+            )
         }
     }
 
@@ -245,9 +259,11 @@ class OpenTheoryEngine internal constructor(
         budgetExhausted: Boolean = false,
         stats: SolveStatsSink,
         work: OpenTheoryWorkSink? = null,
+        session: com.eignex.klause.solver.search.SearchSession? = null,
     ): OpenTheoryResult.Unknown {
         stats.timedOut = timedOut
         stats.openTheory = work?.snapshot() ?: stats.openTheory
+        session?.let { stats.openTheoryClauses = it.learnedClauseStats() }
         return OpenTheoryResult.Unknown(
             if (timedOut) {
                 TerminationReason.Timeout
@@ -260,8 +276,12 @@ class OpenTheoryEngine internal constructor(
         )
     }
 
-    private fun SolveStatsSink.finish(work: OpenTheoryWorkSink? = null): SolveStats {
+    private fun SolveStatsSink.finish(
+        work: OpenTheoryWorkSink? = null,
+        session: com.eignex.klause.solver.search.SearchSession? = null,
+    ): SolveStats {
         openTheory = work?.snapshot() ?: openTheory
+        session?.let { openTheoryClauses = it.learnedClauseStats() }
         stop()
         return snapshot()
     }
