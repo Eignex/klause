@@ -11,11 +11,11 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.FiniteExecutionCallbacks
-import com.eignex.klause.solver.pipeline.FiniteExecutionResult
-import com.eignex.klause.solver.pipeline.FiniteExecutionVerdict
 import com.eignex.klause.solver.pipeline.FinitePipeline
+import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
+import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OPEN_WORK_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -525,7 +525,7 @@ internal object SolveCore {
     ) {
         val result = FinitePipeline.solve(
             request,
-            FiniteExecutionCallbacks(
+            FiniteSolveCallbacks(
                 onSample = { sample -> emit(output, solvable, sample) },
                 onImprovement = { improvement ->
                     emit(output, solvable, improvement.sample)
@@ -544,50 +544,51 @@ internal object SolveCore {
             "presolve [${request.engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
                 "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}"
         }
-        val execution = result.execution
-        if (execution == null) {
-            printPresolved(
-                solvable.finiteProblem,
-                preparation.problem,
-                preparation.presolve,
-                result.preparationElapsed,
-                common.loadElapsedMs,
-            )
-            return
-        }
-        output.begin(solvable.optimize, solvable.maximize)
-        when (execution) {
-            is FiniteExecutionResult.DryRun -> {
-                errPrintln(execution.heading)
-                execution.lines.forEach(::errPrintln)
+        when (val outcome = result.outcome) {
+            FiniteSolveOutcome.PreparedOnly -> {
+                printPresolved(
+                    solvable.finiteProblem,
+                    preparation.problem,
+                    preparation.presolve,
+                    result.preparationElapsed,
+                    common.loadElapsedMs,
+                )
+                return
             }
 
-            is FiniteExecutionResult.Completed -> {
+            is FiniteSolveOutcome.DryRun -> {
+                output.begin(solvable.optimize, solvable.maximize)
+                errPrintln(outcome.heading)
+                outcome.lines.forEach(::errPrintln)
+            }
+
+            is FiniteSolveOutcome.Completed -> {
+                output.begin(solvable.optimize, solvable.maximize)
                 output.onVerdictContext(
                     VerdictContext(
-                        budgetExhausted = budgetSpent(common, execution.stats.run.timedOut),
+                        budgetExhausted = budgetSpent(common, outcome.stats.run.timedOut),
                         completePool = !request.engine.pureLocalSearch,
                     ),
                 )
-                output.onComplete(execution.verdict.toCliVerdict())
+                output.onComplete(outcome.verdict.toCliVerdict())
                 stats(
                     common,
                     output,
-                    solvable,
-                    withModelObjective(execution.stats, solvable, execution.bestSample),
-                    execution.elapsedMs,
-                    execution.solutions,
+                    withModelObjective(outcome.stats, solvable, outcome.bestSample),
+                    outcome.elapsedMs,
+                    outcome.solutions,
+                    preparation.presolve,
                 )
             }
         }
     }
 
-    private fun FiniteExecutionVerdict.toCliVerdict(): Verdict = when (this) {
-        FiniteExecutionVerdict.SAT -> Verdict.SATISFIABLE
-        FiniteExecutionVerdict.UNSAT -> Verdict.UNSATISFIABLE
-        FiniteExecutionVerdict.UNKNOWN -> Verdict.UNKNOWN
-        FiniteExecutionVerdict.OPTIMAL -> Verdict.OPTIMAL
-        FiniteExecutionVerdict.BEST_FOUND -> Verdict.BEST_FOUND
+    private fun FiniteSolveVerdict.toCliVerdict(): Verdict = when (this) {
+        FiniteSolveVerdict.SAT -> Verdict.SATISFIABLE
+        FiniteSolveVerdict.UNSAT -> Verdict.UNSATISFIABLE
+        FiniteSolveVerdict.UNKNOWN -> Verdict.UNKNOWN
+        FiniteSolveVerdict.OPTIMAL -> Verdict.OPTIMAL
+        FiniteSolveVerdict.BEST_FOUND -> Verdict.BEST_FOUND
     }
 
     private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample) {
@@ -601,13 +602,12 @@ internal object SolveCore {
     private fun stats(
         common: CommonOptions,
         output: OutputProtocol,
-        solvable: Solvable,
         s: SolveStats,
         ms: Long,
         solutions: Long,
+        presolve: PresolveStats?,
     ) {
-        // Fold the CLI-computed presolve summary into the solver's stats so `-s` reports it uniformly.
-        if (common.statistics) output.onStatistics(s.copy(presolve = solvable.presolve), ms, solutions)
+        if (common.statistics) output.onStatistics(s.copy(presolve = presolve), ms, solutions)
     }
 
     /** Re-express the LS incumbent objective in the model's orientation, reusing the same sign-corrected

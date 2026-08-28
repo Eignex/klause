@@ -9,7 +9,6 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
-import com.eignex.klause.solver.result.PresolveStats
 
 /**
  * A parsed instance, lowered to exactly what [SolveCore] needs — mode-neutral. Both the
@@ -54,14 +53,18 @@ internal class Solvable(
         continuousObjectiveValue: ((Sample) -> Double)? = null,
         /** Model-supplied FlatZinc search annotation. */
         searchHints: FlatZincSearchHints? = null,
-        /** Terse presolve summary for `-s`, set by [presolved] (null when presolve was off / a no-op). */
-        presolve: PresolveStats? = null,
         /** The component set selected once while loading the source model. */
         pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
     ) : this(
         finite = FiniteSolveShape(
-            problem, optimize, maximize, lsObjective, linearObjective, objVarId, definitionalSweep,
-            searchHints, presolve,
+            problem,
+            optimize,
+            maximize,
+            lsObjective,
+            linearObjective,
+            objVarId,
+            definitionalSweep,
+            searchHints,
         ),
         render = render,
         objectiveValue = objectiveValue,
@@ -78,7 +81,6 @@ internal class Solvable(
     val objVarId: Int? get() = finite?.objectiveIntVar
     val definitionalSweep: DefinitionalSweep? get() = finite?.definitionalSweep
     val searchHints: FlatZincSearchHints? get() = finite?.searchHints
-    val presolve: PresolveStats? get() = finite?.presolve
     val finiteShape: FiniteSolveShape get() = requireNotNull(finite) { "open model was not materialized" }
     val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
 }

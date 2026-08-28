@@ -8810,76 +8810,8 @@ public final class com/eignex/klause/solver/pipeline/FiniteEngine$Companion {
 	public final fun getDEFAULT ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
 }
 
-public final class com/eignex/klause/solver/pipeline/FiniteExecutionCallbacks {
-	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
-	public final fun getOnImprovement ()Lkotlin/jvm/functions/Function1;
-	public final fun getOnSample ()Lkotlin/jvm/functions/Function1;
-}
-
 public final class com/eignex/klause/solver/pipeline/FiniteExecutionKt {
-	public static final fun execute (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/pipeline/FiniteExecutionRequest;Lcom/eignex/klause/solver/pipeline/FiniteExecutionCallbacks;)Lcom/eignex/klause/solver/pipeline/FiniteExecutionResult;
-	public static final fun solve (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/pipeline/FiniteSolveRequest;Lcom/eignex/klause/solver/pipeline/FiniteExecutionCallbacks;)Lcom/eignex/klause/solver/pipeline/FiniteSolveResult;
-}
-
-public final class com/eignex/klause/solver/pipeline/FiniteExecutionRequest {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/solver/pipeline/FiniteEngine;ZLcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)V
-	public final fun getAllSolutions ()Z
-	public final fun getCancellation ()Lcom/eignex/klause/util/Cancellation;
-	public final fun getCores ()I
-	public final fun getDeadlineExceeded ()Lkotlin/jvm/functions/Function0;
-	public final fun getDefaultArms ()I
-	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
-	public final fun getEngine ()Lcom/eignex/klause/solver/pipeline/FiniteEngine;
-	public final fun getEngineParams ()Ljava/util/List;
-	public final fun getLocalSearchObjective ()Lcom/eignex/klause/solver/objective/IncrementalObjective;
-	public final fun getLpConfig ()Lcom/eignex/klause/lp/bounding/LpConfig;
-	public final fun getNodeBudget ()Lcom/eignex/klause/backtrack/NodeBudget;
-	public final fun getObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
-	public final fun getOnEvent ()Lkotlin/jvm/functions/Function1;
-	public final fun getOnPortfolioEvent ()Lkotlin/jvm/functions/Function2;
-	public final fun getOptimize ()Z
-	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
-	public final fun getRandomSeed ()Ljava/lang/Long;
-	public final fun getSearchHints ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
-	public final fun getSolutionCap ()Ljava/lang/Long;
-	public final fun getSolveBudgetMillis ()Ljava/lang/Long;
-}
-
-public abstract class com/eignex/klause/solver/pipeline/FiniteExecutionResult {
-}
-
-public final class com/eignex/klause/solver/pipeline/FiniteExecutionResult$Completed : com/eignex/klause/solver/pipeline/FiniteExecutionResult {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;Lcom/eignex/klause/solver/result/SolveStats;JLcom/eignex/klause/solver/Sample;J)V
-	public final fun getBestSample ()Lcom/eignex/klause/solver/Sample;
-	public final fun getElapsedMs ()J
-	public final fun getSolutions ()J
-	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getVerdict ()Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-}
-
-public final class com/eignex/klause/solver/pipeline/FiniteExecutionResult$DryRun : com/eignex/klause/solver/pipeline/FiniteExecutionResult {
-	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
-	public final fun getHeading ()Ljava/lang/String;
-	public final fun getLines ()Ljava/util/List;
-}
-
-public final class com/eignex/klause/solver/pipeline/FiniteExecutionVerdict : java/lang/Enum {
-	public static final field BEST_FOUND Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-	public static final field OPTIMAL Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-	public static final field SAT Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-	public static final field UNKNOWN Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-	public static final field UNSAT Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-	public static fun getEntries ()Lkotlin/enums/EnumEntries;
-	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-	public static fun values ()[Lcom/eignex/klause/solver/pipeline/FiniteExecutionVerdict;
-}
-
-public final class com/eignex/klause/solver/pipeline/FiniteImprovement {
-	public fun <init> (Lcom/eignex/klause/solver/Sample;Ljava/lang/String;JD)V
-	public final fun getElapsedMs ()J
-	public final fun getObjective ()D
-	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
-	public final fun getWorkerLabel ()Ljava/lang/String;
+	public static final fun solve (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/solver/pipeline/FiniteSolveRequest;Lcom/eignex/klause/solver/pipeline/FiniteSolveCallbacks;)Lcom/eignex/klause/solver/pipeline/FiniteSolveResult;
 }
 
 public final class com/eignex/klause/solver/pipeline/FinitePipeline {
@@ -8914,6 +8846,45 @@ public final class com/eignex/klause/solver/pipeline/FinitePortfolioExecutorKt {
 	public static final fun portfolioExecutor (Lcom/eignex/klause/solver/pipeline/FinitePipeline;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/portfolio/PortfolioScenario;Lcom/eignex/klause/solver/objective/LinearObjective;Lcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lkotlin/jvm/functions/Function2;)Lcom/eignex/klause/portfolio/PortfolioExecutor;
 }
 
+public final class com/eignex/klause/solver/pipeline/FiniteSolveCallbacks {
+	public fun <init> (Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public final fun getOnImprovement ()Lkotlin/jvm/functions/Function1;
+	public final fun getOnSample ()Lkotlin/jvm/functions/Function1;
+}
+
+public final class com/eignex/klause/solver/pipeline/FiniteSolveImprovement {
+	public fun <init> (Lcom/eignex/klause/solver/Sample;Ljava/lang/String;JD)V
+	public final fun getElapsedMs ()J
+	public final fun getObjective ()D
+	public final fun getSample ()Lcom/eignex/klause/solver/Sample;
+	public final fun getWorkerLabel ()Ljava/lang/String;
+}
+
+public abstract class com/eignex/klause/solver/pipeline/FiniteSolveOutcome {
+}
+
+public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$Completed : com/eignex/klause/solver/pipeline/FiniteSolveOutcome {
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;Lcom/eignex/klause/solver/result/SolveStats;JLcom/eignex/klause/solver/Sample;J)V
+	public final fun getBestSample ()Lcom/eignex/klause/solver/Sample;
+	public final fun getElapsedMs ()J
+	public final fun getSolutions ()J
+	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
+	public final fun getVerdict ()Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+}
+
+public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$DryRun : com/eignex/klause/solver/pipeline/FiniteSolveOutcome {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public final fun getHeading ()Ljava/lang/String;
+	public final fun getLines ()Ljava/util/List;
+}
+
+public final class com/eignex/klause/solver/pipeline/FiniteSolveOutcome$PreparedOnly : com/eignex/klause/solver/pipeline/FiniteSolveOutcome {
+	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/FiniteSolveOutcome$PreparedOnly;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/FiniteSolveRequest {
 	public fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;Z)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FiniteSolveShape;Lcom/eignex/klause/solver/pipeline/FiniteEngine;Lcom/eignex/klause/presolve/PresolveConfig;ZZLcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/util/Cancellation;Lcom/eignex/klause/presolve/PresolveBudget;ILjava/util/List;Ljava/lang/Long;ILcom/eignex/klause/lp/bounding/LpConfig;Lcom/eignex/klause/backtrack/NodeBudget;Ljava/lang/Long;ZLjava/lang/Long;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -8941,15 +8912,15 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveRequest {
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveResult {
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;JLcom/eignex/klause/solver/pipeline/FiniteExecutionResult;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getExecution ()Lcom/eignex/klause/solver/pipeline/FiniteExecutionResult;
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;JLcom/eignex/klause/solver/pipeline/FiniteSolveOutcome;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getOutcome ()Lcom/eignex/klause/solver/pipeline/FiniteSolveOutcome;
 	public final fun getPreparation ()Lcom/eignex/klause/solver/pipeline/FinitePipelinePreparation;
 	public final fun getPreparationElapsed-UwyO8pc ()J
 }
 
 public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/result/PresolveStats;)V
-	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;Lcom/eignex/klause/solver/result/PresolveStats;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;)V
+	public synthetic fun <init> (Lcom/eignex/klause/ir/Problem;ZZLcom/eignex/klause/solver/objective/IncrementalObjective;Lcom/eignex/klause/solver/objective/LinearObjective;Ljava/lang/Integer;Lcom/eignex/klause/localsearch/DefinitionalSweep;Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDefinitionalSweep ()Lcom/eignex/klause/localsearch/DefinitionalSweep;
 	public final fun getFiniteProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getLinearObjective ()Lcom/eignex/klause/solver/objective/LinearObjective;
@@ -8957,9 +8928,19 @@ public final class com/eignex/klause/solver/pipeline/FiniteSolveShape {
 	public final fun getMaximize ()Z
 	public final fun getObjectiveIntVar ()Ljava/lang/Integer;
 	public final fun getOptimize ()Z
-	public final fun getPresolve ()Lcom/eignex/klause/solver/result/PresolveStats;
 	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public final fun getSearchHints ()Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchHints;
+}
+
+public final class com/eignex/klause/solver/pipeline/FiniteSolveVerdict : java/lang/Enum {
+	public static final field BEST_FOUND Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static final field OPTIMAL Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static final field SAT Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static final field UNKNOWN Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static final field UNSAT Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
+	public static fun values ()[Lcom/eignex/klause/solver/pipeline/FiniteSolveVerdict;
 }
 
 public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlan {

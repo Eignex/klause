@@ -421,18 +421,18 @@ final enum class com.eignex.klause.solver.pipeline/FiniteEngine : kotlin/Enum<co
     }
 }
 
-final enum class com.eignex.klause.solver.pipeline/FiniteExecutionVerdict : kotlin/Enum<com.eignex.klause.solver.pipeline/FiniteExecutionVerdict> { // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict|null[0]
-    enum entry BEST_FOUND // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.BEST_FOUND|null[0]
-    enum entry OPTIMAL // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.OPTIMAL|null[0]
-    enum entry SAT // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.SAT|null[0]
-    enum entry UNKNOWN // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.UNKNOWN|null[0]
-    enum entry UNSAT // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.UNSAT|null[0]
+final enum class com.eignex.klause.solver.pipeline/FiniteSolveVerdict : kotlin/Enum<com.eignex.klause.solver.pipeline/FiniteSolveVerdict> { // com.eignex.klause.solver.pipeline/FiniteSolveVerdict|null[0]
+    enum entry BEST_FOUND // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.BEST_FOUND|null[0]
+    enum entry OPTIMAL // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.OPTIMAL|null[0]
+    enum entry SAT // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.SAT|null[0]
+    enum entry UNKNOWN // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.UNKNOWN|null[0]
+    enum entry UNSAT // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.UNSAT|null[0]
 
-    final val entries // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.entries|#static{}entries[0]
-        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/FiniteExecutionVerdict> // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val entries // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<com.eignex.klause.solver.pipeline/FiniteSolveVerdict> // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.entries.<get-entries>|<get-entries>#static(){}[0]
 
-    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/FiniteExecutionVerdict // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.valueOf|valueOf#static(kotlin.String){}[0]
-    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/FiniteExecutionVerdict> // com.eignex.klause.solver.pipeline/FiniteExecutionVerdict.values|values#static(){}[0]
+    final fun valueOf(kotlin/String): com.eignex.klause.solver.pipeline/FiniteSolveVerdict // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<com.eignex.klause.solver.pipeline/FiniteSolveVerdict> // com.eignex.klause.solver.pipeline/FiniteSolveVerdict.values|values#static(){}[0]
 }
 
 final enum class com.eignex.klause.solver.pipeline/IntVariableOwner : kotlin/Enum<com.eignex.klause.solver.pipeline/IntVariableOwner> { // com.eignex.klause.solver.pipeline/IntVariableOwner|null[0]
@@ -9823,73 +9823,6 @@ final class com.eignex.klause.solver.pipeline/EngineParams { // com.eignex.klaus
     final fun string(kotlin/String): kotlin/String? // com.eignex.klause.solver.pipeline/EngineParams.string|string(kotlin.String){}[0]
 }
 
-final class com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks { // com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks|null[0]
-    constructor <init>(kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Unit>, kotlin/Function1<com.eignex.klause.solver.pipeline/FiniteImprovement, kotlin/Unit>) // com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks.<init>|<init>(kotlin.Function1<com.eignex.klause.solver.Sample,kotlin.Unit>;kotlin.Function1<com.eignex.klause.solver.pipeline.FiniteImprovement,kotlin.Unit>){}[0]
-
-    final val onImprovement // com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks.onImprovement|{}onImprovement[0]
-        final fun <get-onImprovement>(): kotlin/Function1<com.eignex.klause.solver.pipeline/FiniteImprovement, kotlin/Unit> // com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks.onImprovement.<get-onImprovement>|<get-onImprovement>(){}[0]
-    final val onSample // com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks.onSample|{}onSample[0]
-        final fun <get-onSample>(): kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Unit> // com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks.onSample.<get-onSample>|<get-onSample>(){}[0]
-}
-
-final class com.eignex.klause.solver.pipeline/FiniteExecutionRequest { // com.eignex.klause.solver.pipeline/FiniteExecutionRequest|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.pipeline/FiniteEngine, kotlin/Boolean, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.lowering.flatzinc/FlatZincSearchHints?, kotlin/Int, kotlin.collections/List<kotlin/String>, kotlin/Long?, kotlin/Int, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.util/Cancellation, com.eignex.klause.backtrack/NodeBudget?, kotlin/Long?, kotlin/Boolean, kotlin/Long?, kotlin/Function0<kotlin/Boolean>, kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?) // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.pipeline.FiniteEngine;kotlin.Boolean;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.lowering.flatzinc.FlatZincSearchHints?;kotlin.Int;kotlin.collections.List<kotlin.String>;kotlin.Long?;kotlin.Int;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.util.Cancellation;com.eignex.klause.backtrack.NodeBudget?;kotlin.Long?;kotlin.Boolean;kotlin.Long?;kotlin.Function0<kotlin.Boolean>;kotlin.Function1<com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
-
-    final val allSolutions // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.allSolutions|{}allSolutions[0]
-        final fun <get-allSolutions>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.allSolutions.<get-allSolutions>|<get-allSolutions>(){}[0]
-    final val cancellation // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.cancellation|{}cancellation[0]
-        final fun <get-cancellation>(): com.eignex.klause.util/Cancellation // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
-    final val cores // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.cores|{}cores[0]
-        final fun <get-cores>(): kotlin/Int // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.cores.<get-cores>|<get-cores>(){}[0]
-    final val deadlineExceeded // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.deadlineExceeded|{}deadlineExceeded[0]
-        final fun <get-deadlineExceeded>(): kotlin/Function0<kotlin/Boolean> // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.deadlineExceeded.<get-deadlineExceeded>|<get-deadlineExceeded>(){}[0]
-    final val defaultArms // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.defaultArms|{}defaultArms[0]
-        final fun <get-defaultArms>(): kotlin/Int // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.defaultArms.<get-defaultArms>|<get-defaultArms>(){}[0]
-    final val definitionalSweep // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.definitionalSweep|{}definitionalSweep[0]
-        final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
-    final val engine // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.engine|{}engine[0]
-        final fun <get-engine>(): com.eignex.klause.solver.pipeline/FiniteEngine // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.engine.<get-engine>|<get-engine>(){}[0]
-    final val engineParams // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.engineParams|{}engineParams[0]
-        final fun <get-engineParams>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.engineParams.<get-engineParams>|<get-engineParams>(){}[0]
-    final val localSearchObjective // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.localSearchObjective|{}localSearchObjective[0]
-        final fun <get-localSearchObjective>(): com.eignex.klause.solver.objective/IncrementalObjective? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.localSearchObjective.<get-localSearchObjective>|<get-localSearchObjective>(){}[0]
-    final val lpConfig // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.lpConfig|{}lpConfig[0]
-        final fun <get-lpConfig>(): com.eignex.klause.lp.bounding/LpConfig // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.lpConfig.<get-lpConfig>|<get-lpConfig>(){}[0]
-    final val nodeBudget // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.nodeBudget|{}nodeBudget[0]
-        final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
-    final val objective // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.solver.objective/LinearObjective? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.objective.<get-objective>|<get-objective>(){}[0]
-    final val onEvent // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.onEvent|{}onEvent[0]
-        final fun <get-onEvent>(): kotlin/Function1<com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.onEvent.<get-onEvent>|<get-onEvent>(){}[0]
-    final val onPortfolioEvent // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.onPortfolioEvent|{}onPortfolioEvent[0]
-        final fun <get-onPortfolioEvent>(): kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.onPortfolioEvent.<get-onPortfolioEvent>|<get-onPortfolioEvent>(){}[0]
-    final val optimize // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.optimize|{}optimize[0]
-        final fun <get-optimize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.optimize.<get-optimize>|<get-optimize>(){}[0]
-    final val problem // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.problem.<get-problem>|<get-problem>(){}[0]
-    final val randomSeed // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.randomSeed|{}randomSeed[0]
-        final fun <get-randomSeed>(): kotlin/Long? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.randomSeed.<get-randomSeed>|<get-randomSeed>(){}[0]
-    final val searchHints // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.searchHints|{}searchHints[0]
-        final fun <get-searchHints>(): com.eignex.klause.lowering.flatzinc/FlatZincSearchHints? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.searchHints.<get-searchHints>|<get-searchHints>(){}[0]
-    final val solutionCap // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.solutionCap|{}solutionCap[0]
-        final fun <get-solutionCap>(): kotlin/Long? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.solutionCap.<get-solutionCap>|<get-solutionCap>(){}[0]
-    final val solveBudgetMillis // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.solveBudgetMillis|{}solveBudgetMillis[0]
-        final fun <get-solveBudgetMillis>(): kotlin/Long? // com.eignex.klause.solver.pipeline/FiniteExecutionRequest.solveBudgetMillis.<get-solveBudgetMillis>|<get-solveBudgetMillis>(){}[0]
-}
-
-final class com.eignex.klause.solver.pipeline/FiniteImprovement { // com.eignex.klause.solver.pipeline/FiniteImprovement|null[0]
-    constructor <init>(com.eignex.klause.solver/Sample, kotlin/String, kotlin/Long, kotlin/Double) // com.eignex.klause.solver.pipeline/FiniteImprovement.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.String;kotlin.Long;kotlin.Double){}[0]
-
-    final val elapsedMs // com.eignex.klause.solver.pipeline/FiniteImprovement.elapsedMs|{}elapsedMs[0]
-        final fun <get-elapsedMs>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteImprovement.elapsedMs.<get-elapsedMs>|<get-elapsedMs>(){}[0]
-    final val objective // com.eignex.klause.solver.pipeline/FiniteImprovement.objective|{}objective[0]
-        final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.pipeline/FiniteImprovement.objective.<get-objective>|<get-objective>(){}[0]
-    final val sample // com.eignex.klause.solver.pipeline/FiniteImprovement.sample|{}sample[0]
-        final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/FiniteImprovement.sample.<get-sample>|<get-sample>(){}[0]
-    final val workerLabel // com.eignex.klause.solver.pipeline/FiniteImprovement.workerLabel|{}workerLabel[0]
-        final fun <get-workerLabel>(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteImprovement.workerLabel.<get-workerLabel>|<get-workerLabel>(){}[0]
-}
-
 final class com.eignex.klause.solver.pipeline/FinitePipelinePreparation { // com.eignex.klause.solver.pipeline/FinitePipelinePreparation|null[0]
     constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Function1<com.eignex.klause.solver/Sample, com.eignex.klause.solver/Sample>, com.eignex.klause.solver.result/PresolveStats?) // com.eignex.klause.solver.pipeline/FinitePipelinePreparation.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Function1<com.eignex.klause.solver.Sample,com.eignex.klause.solver.Sample>;com.eignex.klause.solver.result.PresolveStats?){}[0]
 
@@ -9922,6 +9855,28 @@ final class com.eignex.klause.solver.pipeline/FinitePipelineRequest { // com.eig
         final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.solver.pipeline/FinitePipelineRequest.problem.<get-problem>|<get-problem>(){}[0]
     final val solutionSetSensitive // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive|{}solutionSetSensitive[0]
         final fun <get-solutionSetSensitive>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FinitePipelineRequest.solutionSetSensitive.<get-solutionSetSensitive>|<get-solutionSetSensitive>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/FiniteSolveCallbacks { // com.eignex.klause.solver.pipeline/FiniteSolveCallbacks|null[0]
+    constructor <init>(kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Unit>, kotlin/Function1<com.eignex.klause.solver.pipeline/FiniteSolveImprovement, kotlin/Unit>) // com.eignex.klause.solver.pipeline/FiniteSolveCallbacks.<init>|<init>(kotlin.Function1<com.eignex.klause.solver.Sample,kotlin.Unit>;kotlin.Function1<com.eignex.klause.solver.pipeline.FiniteSolveImprovement,kotlin.Unit>){}[0]
+
+    final val onImprovement // com.eignex.klause.solver.pipeline/FiniteSolveCallbacks.onImprovement|{}onImprovement[0]
+        final fun <get-onImprovement>(): kotlin/Function1<com.eignex.klause.solver.pipeline/FiniteSolveImprovement, kotlin/Unit> // com.eignex.klause.solver.pipeline/FiniteSolveCallbacks.onImprovement.<get-onImprovement>|<get-onImprovement>(){}[0]
+    final val onSample // com.eignex.klause.solver.pipeline/FiniteSolveCallbacks.onSample|{}onSample[0]
+        final fun <get-onSample>(): kotlin/Function1<com.eignex.klause.solver/Sample, kotlin/Unit> // com.eignex.klause.solver.pipeline/FiniteSolveCallbacks.onSample.<get-onSample>|<get-onSample>(){}[0]
+}
+
+final class com.eignex.klause.solver.pipeline/FiniteSolveImprovement { // com.eignex.klause.solver.pipeline/FiniteSolveImprovement|null[0]
+    constructor <init>(com.eignex.klause.solver/Sample, kotlin/String, kotlin/Long, kotlin/Double) // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.String;kotlin.Long;kotlin.Double){}[0]
+
+    final val elapsedMs // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.elapsedMs|{}elapsedMs[0]
+        final fun <get-elapsedMs>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.elapsedMs.<get-elapsedMs>|<get-elapsedMs>(){}[0]
+    final val objective // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.objective|{}objective[0]
+        final fun <get-objective>(): kotlin/Double // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.objective.<get-objective>|<get-objective>(){}[0]
+    final val sample // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.sample|{}sample[0]
+        final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.sample.<get-sample>|<get-sample>(){}[0]
+    final val workerLabel // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.workerLabel|{}workerLabel[0]
+        final fun <get-workerLabel>(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteSolveImprovement.workerLabel.<get-workerLabel>|<get-workerLabel>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveRequest { // com.eignex.klause.solver.pipeline/FiniteSolveRequest|null[0]
@@ -9972,10 +9927,10 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveRequest { // com.eignex
 }
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveResult { // com.eignex.klause.solver.pipeline/FiniteSolveResult|null[0]
-    constructor <init>(com.eignex.klause.solver.pipeline/FinitePipelinePreparation, kotlin.time/Duration, com.eignex.klause.solver.pipeline/FiniteExecutionResult?) // com.eignex.klause.solver.pipeline/FiniteSolveResult.<init>|<init>(com.eignex.klause.solver.pipeline.FinitePipelinePreparation;kotlin.time.Duration;com.eignex.klause.solver.pipeline.FiniteExecutionResult?){}[0]
+    constructor <init>(com.eignex.klause.solver.pipeline/FinitePipelinePreparation, kotlin.time/Duration, com.eignex.klause.solver.pipeline/FiniteSolveOutcome) // com.eignex.klause.solver.pipeline/FiniteSolveResult.<init>|<init>(com.eignex.klause.solver.pipeline.FinitePipelinePreparation;kotlin.time.Duration;com.eignex.klause.solver.pipeline.FiniteSolveOutcome){}[0]
 
-    final val execution // com.eignex.klause.solver.pipeline/FiniteSolveResult.execution|{}execution[0]
-        final fun <get-execution>(): com.eignex.klause.solver.pipeline/FiniteExecutionResult? // com.eignex.klause.solver.pipeline/FiniteSolveResult.execution.<get-execution>|<get-execution>(){}[0]
+    final val outcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.outcome|{}outcome[0]
+        final fun <get-outcome>(): com.eignex.klause.solver.pipeline/FiniteSolveOutcome // com.eignex.klause.solver.pipeline/FiniteSolveResult.outcome.<get-outcome>|<get-outcome>(){}[0]
     final val preparation // com.eignex.klause.solver.pipeline/FiniteSolveResult.preparation|{}preparation[0]
         final fun <get-preparation>(): com.eignex.klause.solver.pipeline/FinitePipelinePreparation // com.eignex.klause.solver.pipeline/FiniteSolveResult.preparation.<get-preparation>|<get-preparation>(){}[0]
     final val preparationElapsed // com.eignex.klause.solver.pipeline/FiniteSolveResult.preparationElapsed|{}preparationElapsed[0]
@@ -9983,7 +9938,7 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveResult { // com.eignex.
 }
 
 final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.klause.solver.pipeline/FiniteSolveShape|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem?, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.lowering.flatzinc/FlatZincSearchHints? = ..., com.eignex.klause.solver.result/PresolveStats? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.ir.Problem?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.lowering.flatzinc.FlatZincSearchHints?;com.eignex.klause.solver.result.PresolveStats?){}[0]
+    constructor <init>(com.eignex.klause.ir/Problem?, kotlin/Boolean, kotlin/Boolean, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.solver.objective/LinearObjective?, kotlin/Int?, com.eignex.klause.localsearch/DefinitionalSweep?, com.eignex.klause.lowering.flatzinc/FlatZincSearchHints? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveShape.<init>|<init>(com.eignex.klause.ir.Problem?;kotlin.Boolean;kotlin.Boolean;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.solver.objective.LinearObjective?;kotlin.Int?;com.eignex.klause.localsearch.DefinitionalSweep?;com.eignex.klause.lowering.flatzinc.FlatZincSearchHints?){}[0]
 
     final val definitionalSweep // com.eignex.klause.solver.pipeline/FiniteSolveShape.definitionalSweep|{}definitionalSweep[0]
         final fun <get-definitionalSweep>(): com.eignex.klause.localsearch/DefinitionalSweep? // com.eignex.klause.solver.pipeline/FiniteSolveShape.definitionalSweep.<get-definitionalSweep>|<get-definitionalSweep>(){}[0]
@@ -9999,8 +9954,6 @@ final class com.eignex.klause.solver.pipeline/FiniteSolveShape { // com.eignex.k
         final fun <get-objectiveIntVar>(): kotlin/Int? // com.eignex.klause.solver.pipeline/FiniteSolveShape.objectiveIntVar.<get-objectiveIntVar>|<get-objectiveIntVar>(){}[0]
     final val optimize // com.eignex.klause.solver.pipeline/FiniteSolveShape.optimize|{}optimize[0]
         final fun <get-optimize>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveShape.optimize.<get-optimize>|<get-optimize>(){}[0]
-    final val presolve // com.eignex.klause.solver.pipeline/FiniteSolveShape.presolve|{}presolve[0]
-        final fun <get-presolve>(): com.eignex.klause.solver.result/PresolveStats? // com.eignex.klause.solver.pipeline/FiniteSolveShape.presolve.<get-presolve>|<get-presolve>(){}[0]
     final val problem // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem|{}problem[0]
         final fun <get-problem>(): com.eignex.klause.ir/Problem? // com.eignex.klause.solver.pipeline/FiniteSolveShape.problem.<get-problem>|<get-problem>(){}[0]
     final val searchHints // com.eignex.klause.solver.pipeline/FiniteSolveShape.searchHints|{}searchHints[0]
@@ -11113,29 +11066,35 @@ sealed class com.eignex.klause.ir/IntColumns { // com.eignex.klause.ir/IntColumn
     final fun domainOrNull(kotlin/Int): com.eignex.klause.ir/IntDomain? // com.eignex.klause.ir/IntColumns.domainOrNull|domainOrNull(kotlin.Int){}[0]
 }
 
-sealed class com.eignex.klause.solver.pipeline/FiniteExecutionResult { // com.eignex.klause.solver.pipeline/FiniteExecutionResult|null[0]
-    final class Completed : com.eignex.klause.solver.pipeline/FiniteExecutionResult { // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/FiniteExecutionVerdict, com.eignex.klause.solver.result/SolveStats, kotlin/Long, com.eignex.klause.solver/Sample?, kotlin/Long) // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteExecutionVerdict;com.eignex.klause.solver.result.SolveStats;kotlin.Long;com.eignex.klause.solver.Sample?;kotlin.Long){}[0]
+sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome|null[0]
+    final class Completed : com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveVerdict, com.eignex.klause.solver.result/SolveStats, kotlin/Long, com.eignex.klause.solver/Sample?, kotlin/Long) // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveVerdict;com.eignex.klause.solver.result.SolveStats;kotlin.Long;com.eignex.klause.solver.Sample?;kotlin.Long){}[0]
 
-        final val bestSample // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.bestSample|{}bestSample[0]
-            final fun <get-bestSample>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.bestSample.<get-bestSample>|<get-bestSample>(){}[0]
-        final val elapsedMs // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.elapsedMs|{}elapsedMs[0]
-            final fun <get-elapsedMs>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.elapsedMs.<get-elapsedMs>|<get-elapsedMs>(){}[0]
-        final val solutions // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.solutions|{}solutions[0]
-            final fun <get-solutions>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.solutions.<get-solutions>|<get-solutions>(){}[0]
-        final val stats // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.stats|{}stats[0]
-            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.stats.<get-stats>|<get-stats>(){}[0]
-        final val verdict // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.verdict|{}verdict[0]
-            final fun <get-verdict>(): com.eignex.klause.solver.pipeline/FiniteExecutionVerdict // com.eignex.klause.solver.pipeline/FiniteExecutionResult.Completed.verdict.<get-verdict>|<get-verdict>(){}[0]
+        final val bestSample // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.bestSample|{}bestSample[0]
+            final fun <get-bestSample>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.bestSample.<get-bestSample>|<get-bestSample>(){}[0]
+        final val elapsedMs // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.elapsedMs|{}elapsedMs[0]
+            final fun <get-elapsedMs>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.elapsedMs.<get-elapsedMs>|<get-elapsedMs>(){}[0]
+        final val solutions // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.solutions|{}solutions[0]
+            final fun <get-solutions>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.solutions.<get-solutions>|<get-solutions>(){}[0]
+        final val stats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats|{}stats[0]
+            final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats.<get-stats>|<get-stats>(){}[0]
+        final val verdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict|{}verdict[0]
+            final fun <get-verdict>(): com.eignex.klause.solver.pipeline/FiniteSolveVerdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict.<get-verdict>|<get-verdict>(){}[0]
     }
 
-    final class DryRun : com.eignex.klause.solver.pipeline/FiniteExecutionResult { // com.eignex.klause.solver.pipeline/FiniteExecutionResult.DryRun|null[0]
-        constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String>) // com.eignex.klause.solver.pipeline/FiniteExecutionResult.DryRun.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+    final class DryRun : com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.DryRun|null[0]
+        constructor <init>(kotlin/String, kotlin.collections/List<kotlin/String>) // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.DryRun.<init>|<init>(kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
 
-        final val heading // com.eignex.klause.solver.pipeline/FiniteExecutionResult.DryRun.heading|{}heading[0]
-            final fun <get-heading>(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteExecutionResult.DryRun.heading.<get-heading>|<get-heading>(){}[0]
-        final val lines // com.eignex.klause.solver.pipeline/FiniteExecutionResult.DryRun.lines|{}lines[0]
-            final fun <get-lines>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/FiniteExecutionResult.DryRun.lines.<get-lines>|<get-lines>(){}[0]
+        final val heading // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.DryRun.heading|{}heading[0]
+            final fun <get-heading>(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.DryRun.heading.<get-heading>|<get-heading>(){}[0]
+        final val lines // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.DryRun.lines|{}lines[0]
+            final fun <get-lines>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.DryRun.lines.<get-lines>|<get-lines>(){}[0]
+    }
+
+    final object PreparedOnly : com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.PreparedOnly|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.PreparedOnly.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.PreparedOnly.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.PreparedOnly.toString|toString(){}[0]
     }
 }
 
@@ -11566,11 +11525,10 @@ final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/co
 final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.solver.pipeline/search(com.eignex.klause.ir/ProblemSpec, kotlin.collections/Map<kotlin/Int, com.eignex.klause.ir/IntDomain>, kotlin/Long = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.solver.pipeline/PlannedSearch // com.eignex.klause.solver.pipeline/search|search@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.ir.ProblemSpec;kotlin.collections.Map<kotlin.Int,com.eignex.klause.ir.IntDomain>;kotlin.Long;com.eignex.klause.util.Cancellation){}[0]
 final fun (com.eignex.klause.solver.pipeline/ComponentPlan).com.eignex.klause.theory/theoryComponent(com.eignex.klause.ir/ProblemSpec): com.eignex.klause.solver.search/TheoryComponent? // com.eignex.klause.theory/theoryComponent|theoryComponent@com.eignex.klause.solver.pipeline.ComponentPlan(com.eignex.klause.ir.ProblemSpec){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/backtrackSolver(com.eignex.klause.ir/Problem): com.eignex.klause.backtrack/BacktrackSolver // com.eignex.klause.solver.pipeline/backtrackSolver|backtrackSolver@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.ir.Problem){}[0]
-final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/FiniteExecutionRequest, com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks): com.eignex.klause.solver.pipeline/FiniteExecutionResult // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteExecutionRequest;com.eignex.klause.solver.pipeline.FiniteExecutionCallbacks){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planFixedBacktrack(com.eignex.klause.solver.pipeline/FixedBacktrackPlanRequest): com.eignex.klause.solver.pipeline/FixedBacktrackPlan // com.eignex.klause.solver.pipeline/planFixedBacktrack|planFixedBacktrack@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FixedBacktrackPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/planPortfolio(com.eignex.klause.solver.pipeline/PortfolioPlanRequest): com.eignex.klause.solver.pipeline/PortfolioPlan // com.eignex.klause.solver.pipeline/planPortfolio|planPortfolio@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.PortfolioPlanRequest){}[0]
 final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/portfolioExecutor(com.eignex.klause.ir/Problem, com.eignex.klause.portfolio/PortfolioScenario, com.eignex.klause.solver.objective/LinearObjective?, com.eignex.klause.solver.objective/IncrementalObjective?, com.eignex.klause.localsearch/DefinitionalSweep?, kotlin/Function2<kotlin/String, com.eignex.klause.solver.result/SearchEvent, kotlin/Unit>?): com.eignex.klause.portfolio/PortfolioExecutor // com.eignex.klause.solver.pipeline/portfolioExecutor|portfolioExecutor@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.ir.Problem;com.eignex.klause.portfolio.PortfolioScenario;com.eignex.klause.solver.objective.LinearObjective?;com.eignex.klause.solver.objective.IncrementalObjective?;com.eignex.klause.localsearch.DefinitionalSweep?;kotlin.Function2<kotlin.String,com.eignex.klause.solver.result.SearchEvent,kotlin.Unit>?){}[0]
-final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteExecutionCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteExecutionCallbacks){}[0]
+final fun (com.eignex.klause.solver.pipeline/FinitePipeline).com.eignex.klause.solver.pipeline/solve(com.eignex.klause.solver.pipeline/FiniteSolveRequest, com.eignex.klause.solver.pipeline/FiniteSolveCallbacks): com.eignex.klause.solver.pipeline/FiniteSolveResult // com.eignex.klause.solver.pipeline/solve|solve@com.eignex.klause.solver.pipeline.FinitePipeline(com.eignex.klause.solver.pipeline.FiniteSolveRequest;com.eignex.klause.solver.pipeline.FiniteSolveCallbacks){}[0]
 final fun (com.eignex.klause.solver/ConstList).com.eignex.klause.solver/longsOrNull(): com.eignex.klause.solver/LongConstList? // com.eignex.klause.solver/longsOrNull|longsOrNull@com.eignex.klause.solver.ConstList(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/lineSequence(): kotlin.sequences/Sequence<kotlin/String> // com.eignex.klause.util/lineSequence|lineSequence@com.eignex.klause.util.CharSource(){}[0]
 final fun (com.eignex.klause.util/CharSource).com.eignex.klause.util/readText(): kotlin/String // com.eignex.klause.util/readText|readText@com.eignex.klause.util.CharSource(){}[0]

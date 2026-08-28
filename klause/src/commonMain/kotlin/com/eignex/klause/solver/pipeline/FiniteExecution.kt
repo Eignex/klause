@@ -81,12 +81,78 @@ class FiniteSolveResult(
     val preparation: FinitePipelinePreparation,
     /** Time spent preparing [preparation]. */
     val preparationElapsed: Duration,
-    /** Terminal result after preparation, or null when preparation was inspected only. */
-    val execution: FiniteExecutionResult?,
+    /** Terminal result after preparation. */
+    val outcome: FiniteSolveOutcome,
 )
 
+/** Streaming hooks exposed by the finite solve facade. */
+class FiniteSolveCallbacks(
+    /** A satisfying assignment or fixed-route improving incumbent. */
+    val onSample: (Sample) -> Unit,
+    /** A portfolio improving incumbent. */
+    val onImprovement: (FiniteSolveImprovement) -> Unit,
+)
+
+/** A portfolio improvement exposed by the finite solve facade. */
+class FiniteSolveImprovement(
+    /** Improving assignment in the source model. */
+    val sample: Sample,
+    /** Label of the portfolio worker that produced the assignment. */
+    val workerLabel: String,
+    /** Elapsed milliseconds since portfolio minimization began. */
+    val elapsedMs: Long,
+    /** Engine-normalized objective value at [sample]. */
+    val objective: Double,
+)
+
+/** Terminal outcome exposed by the finite solve facade. */
+sealed class FiniteSolveOutcome {
+    /** Preparation was inspected without executing an engine. */
+    data object PreparedOnly : FiniteSolveOutcome()
+
+    /** The engine route was inspected instead of executed. */
+    class DryRun(
+        /** Heading printed before [lines]. */
+        val heading: String,
+        /** Render-ready dry-run detail lines. */
+        val lines: List<String>,
+    ) : FiniteSolveOutcome()
+
+    /** A completed solve. */
+    class Completed(
+        /** Final finite-search verdict. */
+        val verdict: FiniteSolveVerdict,
+        /** Aggregate engine statistics. */
+        val stats: SolveStats,
+        /** Number of streamed models. */
+        val solutions: Long,
+        /** Best source-model assignment, when optimization found one. */
+        val bestSample: Sample?,
+        /** Elapsed engine execution time. */
+        val elapsedMs: Long,
+    ) : FiniteSolveOutcome()
+}
+
+/** Verdict vocabulary exposed by the finite solve facade. */
+enum class FiniteSolveVerdict {
+    /** A satisfying assignment was found. */
+    SAT,
+
+    /** The model was proven infeasible. */
+    UNSAT,
+
+    /** No definitive result was produced. */
+    UNKNOWN,
+
+    /** An optimum was proven. */
+    OPTIMAL,
+
+    /** A feasible incumbent was found without an optimality proof. */
+    BEST_FOUND,
+}
+
 /** One finite solve request after a frontend has translated its flags and source-model annotations. */
-class FiniteExecutionRequest(
+internal class FiniteExecutionRequest(
     /** Prepared finite model to solve. */
     val problem: Problem,
     /** Finite engine route selected by the frontend. */
@@ -130,7 +196,7 @@ class FiniteExecutionRequest(
 )
 
 /** Streaming hooks owned by a rendering frontend. */
-class FiniteExecutionCallbacks(
+private class FiniteExecutionCallbacks(
     /** A satisfaction model or a fixed-backtrack improving incumbent. */
     val onSample: (Sample) -> Unit,
     /** A portfolio improving incumbent, with its worker attribution. */
@@ -138,7 +204,7 @@ class FiniteExecutionCallbacks(
 )
 
 /** A strict portfolio incumbent emitted while [FiniteExecutionRequest.optimize] is true. */
-class FiniteImprovement(
+private class FiniteImprovement(
     /** Improving assignment. */
     val sample: Sample,
     /** Label of the portfolio worker that produced the assignment. */
@@ -150,7 +216,7 @@ class FiniteImprovement(
 )
 
 /** Terminal outcome of a finite execution. */
-sealed class FiniteExecutionResult {
+private sealed class FiniteExecutionResult {
     /** Execution completed and the frontend should render [verdict] plus [stats]. */
     class Completed(
         /** Final finite-search verdict. */
@@ -175,7 +241,7 @@ sealed class FiniteExecutionResult {
 }
 
 /** Verdict vocabulary shared by finite engines, independent of a frontend protocol. */
-enum class FiniteExecutionVerdict {
+private enum class FiniteExecutionVerdict {
     /** A satisfying assignment was found. */
     SAT,
 
@@ -195,7 +261,7 @@ enum class FiniteExecutionVerdict {
 }
 
 /** Owns finite engine planning, construction, and execution. */
-fun FinitePipeline.execute(
+private fun FinitePipeline.execute(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult = when (request.engine) {
@@ -206,7 +272,7 @@ fun FinitePipeline.execute(
 }
 
 /** Prepare a finite model once, then execute the selected engine route. */
-fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteExecutionCallbacks): FiniteSolveResult {
+fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteSolveCallbacks): FiniteSolveResult {
     val preparationStart = TimeSource.Monotonic.markNow()
     val preparation = prepare(
         FinitePipelineRequest(
@@ -221,7 +287,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteExecution
         ),
     )
     val preparationElapsed = preparationStart.elapsedNow()
-    if (request.prepareOnly) return FiniteSolveResult(preparation, preparationElapsed, null)
+    if (request.prepareOnly) return FiniteSolveResult(preparation, preparationElapsed, FiniteSolveOutcome.PreparedOnly)
     if (preparation.presolve?.infeasible == true) {
         return FiniteSolveResult(
             preparation,
@@ -232,7 +298,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteExecution
                 0,
                 null,
                 0,
-            ),
+            ).toSolveOutcome(),
         )
     }
     val execution = execute(
@@ -262,7 +328,7 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteExecution
             onSample = { sample -> callbacks.onSample(preparation.reconstruct(sample)) },
             onImprovement = { improvement ->
                 callbacks.onImprovement(
-                    FiniteImprovement(
+                    FiniteSolveImprovement(
                         preparation.reconstruct(improvement.sample),
                         improvement.workerLabel,
                         improvement.elapsedMs,
@@ -272,7 +338,23 @@ fun FinitePipeline.solve(request: FiniteSolveRequest, callbacks: FiniteExecution
             },
         ),
     )
-    return FiniteSolveResult(preparation, preparationElapsed, execution.reconstructed(preparation.reconstruct))
+    return FiniteSolveResult(
+        preparation,
+        preparationElapsed,
+        execution.reconstructed(preparation.reconstruct).toSolveOutcome(),
+    )
+}
+
+private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (this) {
+    is FiniteExecutionResult.DryRun -> FiniteSolveOutcome.DryRun(heading, lines)
+
+    is FiniteExecutionResult.Completed -> FiniteSolveOutcome.Completed(
+        FiniteSolveVerdict.valueOf(verdict.name),
+        stats,
+        solutions,
+        bestSample,
+        elapsedMs,
+    )
 }
 
 private fun FiniteExecutionResult.reconstructed(reconstruct: (Sample) -> Sample): FiniteExecutionResult = when (this) {
