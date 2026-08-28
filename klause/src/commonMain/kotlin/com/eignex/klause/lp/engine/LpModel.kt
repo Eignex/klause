@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.exact.ExactSimplexDoubleView
+import com.eignex.klause.simplex.exact.ExactSimplexModel
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray
 import com.eignex.klause.util.IntArrayList
@@ -70,21 +72,21 @@ internal const val LP_UNBOUNDED_PROBE: Long = Long.MAX_VALUE / 4
  */
 internal class LpModel(
     /** Number of structural (original) variables. */
-    val n: Int,
+    override val n: Int,
     /** Number of constraint rows, equivalently the number of slack variables. */
-    val m: Int,
+    override val m: Int,
     /** Sparse CSC of the structural columns — the sole coefficient store (the sparse revised simplex
      *  is the only LP engine). Read column-wise through [forEachInColumn]; slack columns are the
      *  implicit unit vectors and are never stored. */
     val csc: Csc,
     /** Right-hand side per row, after the lower-bound shift. */
-    val rhs: LongArray,
+    override val rhs: LongArray,
     /** Objective coefficient per variable (length `n + m`); minimization sense, slacks are `0`. */
     val cost: LongArray,
     /** Upper bound per variable (length `n + m`); meaningful only where [hasUpper] is true. */
-    val upper: LongArray,
+    override val upper: LongArray,
     /** Whether the variable has a finite upper bound; `false` means `+∞` (inequality slacks). */
-    val hasUpper: BooleanArray,
+    override val hasUpper: BooleanArray,
     /** Lower bound that was shifted out of each structural variable (length `n`). */
     val loShift: LongArray,
     /** Constant folded into the objective by the shift; the true objective is `c·x' + objConstant`. */
@@ -105,7 +107,7 @@ internal class LpModel(
     val rowGlobal: BooleanArray = BooleanArray(m) { true },
     /** Per row, whether the inequality is strict over the reals (`<` rather than `≤`). The float
      *  simplex ignores it (a sound relaxation); the exact deciders enforce it. */
-    val rowStrict: BooleanArray = BooleanArray(m),
+    override val rowStrict: BooleanArray = BooleanArray(m),
     /**
      * Per-row citation fallback for non-global rows: the live bounds whose atoms make row `i`
      * valid ([LpRowPremises]), or null when the row's validity is not expressible as bound atoms
@@ -125,9 +127,9 @@ internal class LpModel(
      *  real bound (length `n`, all false for ordinary [LpBuilder.addVar] columns). The reject-at-cap
      *  logic in [safeVariableBound] consults this so an optimum riding to the probe frontier is reported
      *  unbounded rather than as a spurious finite bound. */
-    val probeClampedLo: BooleanArray = BooleanArray(n),
+    override val probeClampedLo: BooleanArray = BooleanArray(n),
     /** Counterpart to [probeClampedLo] for the upper bound (`+∞` stand-in). */
-    val probeClampedHi: BooleanArray = BooleanArray(n),
+    override val probeClampedHi: BooleanArray = BooleanArray(n),
     /** Per structural column, true when it is an LP-only continuous (real) column rather than an
      *  integer/bool one (length `n`, all false for the pure-integer core). A continuous column is present
      *  in this relaxation but absent from CP search. Informational; the exact-certification decline keys
@@ -140,10 +142,10 @@ internal class LpModel(
      * split matters only to certification, which declines while it is present. Its coefficients, bounds,
      * costs and shift are all `Double`; the CSC mirrors [csc] (structural columns only, slacks implicit).
      */
-    val doubleView: LpDoubleView? = null,
-) {
+    override val doubleView: LpDoubleView? = null,
+) : ExactSimplexModel {
     /** Total variable count: structural plus slack. */
-    val numVars: Int get() = n + m
+    override val numVars: Int get() = n + m
 
     /** Whether the model carries real coefficients, so it is solved through [doubleView] and the exact
      *  128-bit integer certification declines (a real coefficient is not integrally certifiable here). */
@@ -162,7 +164,7 @@ internal class LpModel(
     fun hasFiniteUpper(j: Int): Boolean = doubleView?.hasUpper?.get(j) ?: hasUpper[j]
 
     /** Lower-bound shift of structural column [j] as a double. */
-    fun loShiftD(j: Int): Double = doubleView?.loShift?.get(j) ?: loShift[j].toDouble()
+    override fun loShiftD(j: Int): Double = doubleView?.loShift?.get(j) ?: loShift[j].toDouble()
 
     /** Objective constant as a double. */
     val objConstantD: Double get() = doubleView?.objConstant ?: objConstant.toDouble()
@@ -303,6 +305,10 @@ internal class LpModel(
     inline fun forEachInColumn(j: Int, action: (row: Int, value: Long) -> Unit) {
         for (k in csc.colPtr[j] until csc.colPtr[j + 1]) action(csc.rowIdx[k], csc.colVal[k])
     }
+
+    override fun forEachExactColumn(j: Int, action: (row: Int, value: Long) -> Unit) {
+        for (k in csc.colPtr[j] until csc.colPtr[j + 1]) action(csc.rowIdx[k], csc.colVal[k])
+    }
 }
 
 /**
@@ -320,18 +326,18 @@ internal class Csc(val colPtr: IntArray, val rowIdx: IntArray, val colVal: LongA
  * `>=`-to-`<=` normalizations the [Long] core applies.
  */
 internal class LpDoubleView(
-    val colPtr: IntArray,
-    val rowIdx: IntArray,
-    val colVal: DoubleArray,
-    val rhs: DoubleArray,
+    override val colPtr: IntArray,
+    override val rowIdx: IntArray,
+    override val colVal: DoubleArray,
+    override val rhs: DoubleArray,
     val cost: DoubleArray,
-    val upper: DoubleArray,
-    val hasUpper: BooleanArray,
+    override val upper: DoubleArray,
+    override val hasUpper: BooleanArray,
     /** `Σ cost·loShift` folded out by the lower-bound shift; mutable because
      *  [LpModel.withSingleColumnObjective] rewrites [cost] in place and must keep this consistent. */
     var objConstant: Double,
     val loShift: DoubleArray,
-)
+) : ExactSimplexDoubleView
 
 /**
  * Builds an [LpModel] from structural variables and constraint rows. Coefficients are accumulated

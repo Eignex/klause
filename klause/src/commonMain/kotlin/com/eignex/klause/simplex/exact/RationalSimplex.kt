@@ -1,13 +1,12 @@
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayList
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
- * Exact rational feasibility of an [LpModel]: slack-form rows `A·x = rhs` over boxes `0 ≤ xⱼ ≤ uⱼ`
+ * Exact rational feasibility of an [ExactSimplexModel]: slack-form rows `A·x = rhs` over boxes `0 ≤ xⱼ ≤ uⱼ`
  * (`hasUpper[j]` false ⇒ open above). Coefficients come from the double view when the model has one —
  * every finite double is exactly a rational `±m·2ᵉ`, so no scaling ladder or tolerance is involved —
  * and from the Long arrays otherwise. The last-resort certifier runs
@@ -129,14 +128,42 @@ internal object BigFracOps : FracOps<BigFraction> {
     override fun isZero(a: BigFraction): Boolean = a.isZero
 }
 
+/** Engine-neutral normalized LP input consumed by the exact feasibility simplex. */
+internal interface ExactSimplexModel {
+    val n: Int
+    val m: Int
+    val numVars: Int
+    val rhs: LongArray
+    val upper: LongArray
+    val hasUpper: BooleanArray
+    val rowStrict: BooleanArray
+    val probeClampedLo: BooleanArray
+    val probeClampedHi: BooleanArray
+    val doubleView: ExactSimplexDoubleView?
+
+    fun forEachExactColumn(j: Int, action: (row: Int, value: Long) -> Unit)
+
+    fun loShiftD(j: Int): Double
+}
+
+/** Double-precision normalized LP input used when the model contains real data. */
+internal interface ExactSimplexDoubleView {
+    val colPtr: IntArray
+    val rowIdx: IntArray
+    val colVal: DoubleArray
+    val rhs: DoubleArray
+    val upper: DoubleArray
+    val hasUpper: BooleanArray
+}
+
 internal fun rationalFeasible(
-    model: LpModel,
+    model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
 ): RationalFeasibility = rationalOutcome(model, cancellation, maxPivots).feasibility
 
 internal fun rationalOutcome(
-    model: LpModel,
+    model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
 ): RationalOutcome {
@@ -149,7 +176,7 @@ internal fun rationalOutcome(
 
 /** Decide [model] entirely with arbitrary-precision rationals and retain its structural witness. */
 internal fun bigRationalOutcome(
-    model: LpModel,
+    model: ExactSimplexModel,
     cancellation: Cancellation = Cancellation.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
 ): BigRationalOutcome {
@@ -186,7 +213,7 @@ internal fun bigRationalOutcome(
  *  the caller maps that to UNKNOWN. */
 private fun <F> runSimplex(
     ops: FracOps<F>,
-    model: LpModel,
+    model: ExactSimplexModel,
     cancellation: Cancellation,
     maxPivots: Int,
 ): RationalOutcome? {
@@ -221,7 +248,7 @@ private fun unknownOutcome(): RationalOutcome = RationalOutcome(RationalFeasibil
  * sparsity first, so the tableau starts at the model's nonzero count and nothing quadratic in the
  * model size is ever allocated up front.
  */
-private fun <F> buildState(ops: FracOps<F>, model: LpModel): SimplexState<F>? {
+private fun <F> buildState(ops: FracOps<F>, model: ExactSimplexModel): SimplexState<F>? {
     val m = model.m
     val dv = model.doubleView
     val tab = SparseTableau(ops, m, model.numVars)
@@ -229,7 +256,7 @@ private fun <F> buildState(ops: FracOps<F>, model: LpModel): SimplexState<F>? {
     if (dv != null) {
         for (j in 0 until model.n) for (p in dv.colPtr[j] until dv.colPtr[j + 1]) counts[dv.rowIdx[p]]++
     } else {
-        for (j in 0 until model.n) model.forEachInColumn(j) { i, _ -> counts[i]++ }
+        for (j in 0 until model.n) model.forEachExactColumn(j) { i, _ -> counts[i]++ }
     }
     for (i in 0 until m) tab.reserveRow(i, counts[i] + 1)
     if (dv != null) {
@@ -239,7 +266,7 @@ private fun <F> buildState(ops: FracOps<F>, model: LpModel): SimplexState<F>? {
             }
         }
     } else {
-        for (j in 0 until model.n) model.forEachInColumn(j) { i, a -> tab.append(i, j, ops.ofLong(a)) }
+        for (j in 0 until model.n) model.forEachExactColumn(j) { i, a -> tab.append(i, j, ops.ofLong(a)) }
     }
     for (i in 0 until m) tab.append(i, model.n + i, ops.one)
     // A strict row `a·x < b` enters the delta-ordered field as `a·x ≤ b − δ`: the rhs carries a −1
@@ -263,7 +290,7 @@ private fun <F> buildState(ops: FracOps<F>, model: LpModel): SimplexState<F>? {
  *  flags, and the basic values derived from them. */
 private class SimplexState<F>(
     val ops: FracOps<F>,
-    val model: LpModel,
+    val model: ExactSimplexModel,
     val tab: SparseTableau<F>,
     val rhsA: MutableList<F>,
     val rhsD: MutableList<F>,
@@ -713,7 +740,7 @@ private fun bigWitnessDelta(st: SimplexState<BigFraction>): BigFraction {
 }
 
 /** Pivot cap: generous for the small leaf models the fallback targets, tiny relative to a search. */
-internal fun defaultRationalPivotCap(model: LpModel): Int = 200 + 20 * (model.m + model.n)
+internal fun defaultRationalPivotCap(model: ExactSimplexModel): Int = 200 + 20 * (model.m + model.n)
 
 /** Immutable rational number over the multiplatform big integer, always normalized (gcd 1, positive
  *  denominator). The unbounded second level of the exact rational arithmetic — the 128-bit
