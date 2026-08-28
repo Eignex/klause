@@ -5,15 +5,15 @@ import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntBounds
+import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.IntVars
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

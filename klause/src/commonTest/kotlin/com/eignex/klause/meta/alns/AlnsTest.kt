@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
@@ -13,7 +14,6 @@ import com.eignex.klause.portfolio.SharedClausePool
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.Optimizer
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective

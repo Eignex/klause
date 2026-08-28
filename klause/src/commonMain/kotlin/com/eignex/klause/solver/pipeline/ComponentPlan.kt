@@ -8,7 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.MixedIntColumns
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSpec
-import com.eignex.klause.solver.VarRemap
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 
 /** Ownership of an integer column selected once before a search begins. */

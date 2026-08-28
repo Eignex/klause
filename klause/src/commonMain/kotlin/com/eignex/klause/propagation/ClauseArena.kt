@@ -12,7 +12,7 @@ import com.eignex.klause.ir.Problem
  * per-fire virtual dispatch, object dereference, or payload cast.
  *
  * Built only for a native-SAT-eligible propagation projection: no integer variables and every factor a
- * [Clause]. The literals keep their original [com.eignex.klause.solver.Lit] encoding, and clause
+ * [Clause]. The literals keep their original [com.eignex.klause.ir.Lit] encoding, and clause
  * indices line up 1:1 with `Problem.factors`, so a learned reason expressed as a clause index maps
  * straight back to the originating factor.
  *

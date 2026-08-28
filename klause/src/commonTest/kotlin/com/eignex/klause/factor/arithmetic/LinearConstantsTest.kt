@@ -1,7 +1,7 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.solver.VarRemap
+import com.eignex.klause.ir.VarRemap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals

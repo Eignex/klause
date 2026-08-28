@@ -7,7 +7,11 @@ import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.global.internals.computeBoundsAllDifferent
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.VarList
+import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Assumptions
@@ -19,11 +23,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.solver.MixedVars
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.solver.StructuralKey
-import com.eignex.klause.solver.VarList
-import com.eignex.klause.solver.VarRemap
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContains

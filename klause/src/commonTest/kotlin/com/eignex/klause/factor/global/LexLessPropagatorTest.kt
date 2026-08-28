@@ -5,6 +5,7 @@ import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ConflictAnalyzer
@@ -12,7 +13,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.addLearnedClause
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -10,6 +10,7 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
@@ -18,7 +19,6 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.allDifferent
-import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation

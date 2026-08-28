@@ -3,11 +3,11 @@ package com.eignex.klause.solver.integration
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.bool.PseudoBoolean
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move.BoolFlip
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Lit
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

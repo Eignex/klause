@@ -813,7 +813,7 @@ internal object SymmetryBreaking {
 
 /**
  * A `LongArray`-backed colour-refinement signature — the non-string analog of
- * [com.eignex.klause.solver.StructuralKey]. WL refinement composes signatures by appending integer
+ * [com.eignex.klause.ir.StructuralKey]. WL refinement composes signatures by appending integer
  * words (variable colours and folded-in factor keys) rather than building and hashing decimal
  * strings, which dominated presolve CPU and allocation on large structured models. Structural
  * [equals]/[hashCode] make it a hash key; [compareTo] gives the canonical total order colour ids are
