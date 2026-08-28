@@ -25,7 +25,7 @@ internal fun differenceFragmentOf(factors: Array<Factor>, numIntVars: Int, intBo
         if (intBounds.hasUpper(variable)) {
             edges.add(DifferenceEdge(zero, variable, intBounds.upper(variable), domainBound = true))
         }
-        if (intBounds.hasLower(variable)) {
+        if (intBounds.hasLower(variable) && intBounds.lower(variable) != Long.MIN_VALUE) {
             edges.add(DifferenceEdge(variable, zero, -intBounds.lower(variable), domainBound = true))
         }
     }

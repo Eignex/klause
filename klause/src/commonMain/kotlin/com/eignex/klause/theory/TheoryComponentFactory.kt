@@ -15,7 +15,11 @@ import com.eignex.klause.theory.qflra.ExactLraSolver
 fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
     val fragment = theoryFragment(spec)
     return when (theoryPipeline) {
-        ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent(fragment, theoryIntVars)
+        ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
+            fragment,
+            theoryIntVars,
+            cpIntVars,
+        )
 
         ProblemPipeline.GENERAL_LIA -> GeneralLiaSearchComponent(fragment, theoryIntVars) { assignment, model ->
             assignment.ints.forEachIndexed { variable, value ->

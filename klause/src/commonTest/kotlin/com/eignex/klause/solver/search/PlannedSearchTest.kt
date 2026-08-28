@@ -2,9 +2,12 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
+import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.ProblemSpec
 import com.eignex.klause.solver.Sample
@@ -16,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class PlannedSearchTest {
 
@@ -169,5 +173,71 @@ class PlannedSearchTest {
         val planned = model.componentPlan().search(model, mapOf(0 to IntDomain(0, 3), 2 to IntDomain(0, 3)))
 
         assertIs<ComponentResult.Conflict>(planned.session.initialize())
+    }
+
+    @Test
+    fun `root difference equality pins a finite peer and its model value before branching`() {
+        val model = differenceHybridFixture()
+        val planned = model.componentPlan().search(model, differenceHybridDomains())
+
+        assertIs<ComponentResult.Consistent>(planned.session.initialize())
+
+        assertEquals(7L, planned.session.intLowerBound(HYBRID_X))
+        assertEquals(7L, planned.session.intUpperBound(HYBRID_X))
+        assertEquals(7L, planned.session.model().valueOf<Long>(SearchIntValue(HYBRID_X)))
+        val branch = assertNotNull(planned.session.branchAlternatives())
+        assertTrue(
+            branch.all { decision ->
+                when (decision) {
+                    is SearchDecision.IntAtLeast -> decision.variable == HYBRID_Z
+                    is SearchDecision.IntAtMost -> decision.variable == HYBRID_Z
+                    is SearchDecision.IntEqual -> decision.variable == HYBRID_Z
+                    is SearchDecision.Bool, is SearchDecision.Theory -> false
+                }
+            },
+        )
+    }
+
+    @Test
+    fun `unconditional difference root bounds expose a hybrid root conflict`() {
+        val model = differenceHybridFixture(fixZAtSeven = true)
+        val planned = model.componentPlan().search(model, differenceHybridDomains())
+
+        assertIs<ComponentResult.Conflict>(planned.session.initialize())
+    }
+
+    private fun differenceHybridDomains(): Map<Int, IntDomain> =
+        mapOf(HYBRID_X to IntDomain(0, 7), HYBRID_Z to IntDomain(0, 7))
+
+    private fun differenceHybridFixture(fixZAtSeven: Boolean = false): ProblemSpec {
+        val openLower = Bits(3).also { it.set(HYBRID_Y) }
+        val openUpper = Bits(3).also { it.set(HYBRID_Y) }
+        val factors = ArrayList<Factor>().apply {
+            add(Clause(intArrayOf(Lit.make(0, true))))
+            add(Linear(intArrayOf(1), intArrayOf(HYBRID_X), LinearOp.GE, 0))
+            add(Linear(intArrayOf(1), intArrayOf(HYBRID_X), LinearOp.LE, 7))
+            add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.GE, 0))
+            add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.LE, 7))
+            add(AllDifferent(intArrayOf(HYBRID_X, HYBRID_Z), domainMin = 0, domainSize = 8))
+            add(Linear(intArrayOf(1), intArrayOf(HYBRID_Y), LinearOp.EQ, 0))
+            add(Linear(intArrayOf(1, -1), intArrayOf(HYBRID_X, HYBRID_Y), LinearOp.EQ, 7))
+            if (fixZAtSeven) add(Linear(intArrayOf(1), intArrayOf(HYBRID_Z), LinearOp.EQ, 7))
+        }
+        return ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0, 0),
+                longArrayOf(7, 7, 0),
+                openLower,
+                openUpper,
+            ),
+            factors = factors.toTypedArray(),
+        )
+    }
+
+    private companion object {
+        const val HYBRID_X = 0
+        const val HYBRID_Z = 1
+        const val HYBRID_Y = 2
     }
 }

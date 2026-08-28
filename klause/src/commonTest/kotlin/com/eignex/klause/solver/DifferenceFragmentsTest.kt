@@ -1,6 +1,7 @@
 package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
+import com.eignex.klause.arithmetic.difference.DifferenceFragment
 import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.factor.arithmetic.Linear
@@ -10,7 +11,6 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -110,6 +110,22 @@ class DifferenceFragmentsTest {
     }
 
     @Test
+    fun `a Long minimum lower bound does not wrap into an upper bound`() {
+        val modelBounds = IntBounds.fromModelBounds(
+            longArrayOf(Long.MIN_VALUE),
+            longArrayOf(3),
+            null,
+            null,
+        )
+
+        val fragment = assertNotNull(
+            differenceFragmentOf(arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)), 1, modelBounds),
+        )
+
+        assertTrue(fragment.edges.none { it.source == 0 && it.target == DifferenceFragment.ZERO && it.domainBound })
+    }
+
+    @Test
     fun `a model with no difference rows yields nothing`() {
         val general = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 3)
         assertNull(frag(listOf(general), 2), "no edges is not a fragment")
@@ -130,7 +146,9 @@ class DifferenceFragmentsTest {
     @Test
     fun `potential sample satisfies active difference edges`() {
         val fragment = assertNotNull(frag(listOf(diff(0, 1, LinearOp.LE, 3)), 2))
-        val values = assertIs<Potentials.Found>(fragment.potentialSample(2, BooleanArray(0))).values
+        val sample = fragment.potentialSample(2, BooleanArray(0))
+        assertTrue(sample is Potentials.Found)
+        val values = sample.values
         assertTrue(values[0] - values[1] <= 3L)
     }
 
