@@ -10,12 +10,22 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
+/**
+ * Largest witness bound this implementation materializes exactly.
+ *
+ * This is a work policy, not a theorem restriction: an estimate above this size leaves the General LIA
+ * route admitted but declines its finite-witness search, which reports `unknown`. It prevents one opaque
+ * arbitrary-precision multiplication from consuming a session after cancellation can no longer be observed.
+ */
+internal const val MAX_MATERIALIZED_SMALL_MODEL_BOUND_BITS = 1_048_576
+
 /*
  * Papadimitriou, *On the Complexity of Integer Programming* (JACM 1981): a feasible integer system of
  * `m` rows over `n` variables with largest entry `a` has a solution inside `n(ma)^(2m+1)`. Exponential
  * in the row count, which is why it fits only small systems and why the structural transformations are
  * preferred where they apply.
  */
+
 /**
  * The theorem's inputs for this system — largest entry `a` and row count `m` — or null when some factor
  * is outside the admitted fragment.
@@ -104,11 +114,34 @@ internal fun smallModelBigIntBound(
     factors: List<Factor>,
     intBounds: IntBounds,
     cancellation: Cancellation = Cancellation.Never,
+    maxMaterializedBits: Int = MAX_MATERIALIZED_SMALL_MODEL_BOUND_BITS,
 ): BigInteger? {
     val (a, m) = smallModelInputs(numIntVars, factors, intBounds, cancellation) ?: return null
     if (m == 0) return BigInteger.ONE
-    val power = cancellablePow(BigInteger.fromInt(m) * (a + BigInteger.ONE), 2 * m + 1, cancellation) ?: return null
+    val base = BigInteger.fromInt(m) * (a + BigInteger.ONE)
+    val exponent = 2 * m + 1
+    if (smallModelBoundMayExceedBits(base, exponent, numIntVars + m, maxMaterializedBits)) return null
+    val power = cancellablePow(base, exponent, cancellation) ?: return null
     return if (cancellation()) null else BigInteger.fromInt(numIntVars + m) * power
+}
+
+/**
+ * Whether the bit-length upper bound of `multiplier * base^exponent` exceeds a materialization budget.
+ *
+ * The estimate is deliberately conservative and uses only operand metadata. Its purpose is to avoid starting
+ * a multiplication whose execution cannot observe cancellation, not to approximate a theorem witness.
+ */
+internal fun smallModelBoundMayExceedBits(
+    base: BigInteger,
+    exponent: Int,
+    multiplier: Int,
+    maxMaterializedBits: Int,
+): Boolean {
+    require(exponent >= 0)
+    require(multiplier > 0)
+    require(maxMaterializedBits >= 0)
+    val maximumBits = base.bitLength().toLong() * exponent + BigInteger.fromInt(multiplier).bitLength()
+    return maximumBits > maxMaterializedBits
 }
 
 /** Exact exponentiation that observes [cancellation] between arbitrary-precision multiplications. */

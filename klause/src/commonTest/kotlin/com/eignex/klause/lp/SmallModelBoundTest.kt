@@ -8,8 +8,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Whether the General LIA lane admits a system, and what witness box it would search, are two questions
@@ -28,7 +28,7 @@ class SmallModelBoundTest {
         val factors = listOf<Factor>(row(0, 1), row(1, 2))
 
         assertEquals(true, admitsSmallModelBound(3, factors, openBounds))
-        assertNotNull(smallModelBigIntBound(3, factors, openBounds))
+        assertEquals("18492652781568", smallModelBigIntBound(3, factors, openBounds).toString())
     }
 
     @Test
@@ -51,5 +51,21 @@ class SmallModelBoundTest {
         val factors = listOf<Factor>(row(0, 1), row(1, 2))
 
         assertNull(smallModelBigIntBound(3, factors, openBounds, Cancellation { true }))
+    }
+
+    @Test
+    fun `witness-bound construction abandons work above its materialization boundary`() {
+        val factors = List<Factor>(20) { row(0) }
+
+        assertEquals(true, admitsSmallModelBound(1, factors, openBounds))
+        assertTrue(
+            smallModelBoundMayExceedBits(
+                base = com.ionspin.kotlin.bignum.integer.BigInteger.fromInt(240),
+                exponent = 81,
+                multiplier = 41,
+                maxMaterializedBits = 512,
+            ),
+        )
+        assertNull(smallModelBigIntBound(1, factors, openBounds, maxMaterializedBits = 512))
     }
 }

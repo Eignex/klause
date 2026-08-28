@@ -16,6 +16,7 @@ import com.eignex.klause.theory.TheoryParams
 import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
+import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -309,6 +310,28 @@ class OpenTheoryEngineTest {
         val session = SearchSession(listOf(component), cancellation = Cancellation { true })
 
         assertIs<ComponentResult.Indeterminate>(session.initialize())
+    }
+
+    @Test
+    fun `general LIA materialization boundary reports unknown rather than unsat`() {
+        val wide = BigInteger.ONE shl 300_000
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(
+                longArrayOf(0, 0),
+                longArrayOf(0, 0),
+                null,
+                Bits(2).also {
+                    it.set(0)
+                    it.set(1)
+                },
+            ),
+            factors = arrayOf(Linear(intArrayOf(0, 1), arrayOf(wide, BigInteger.ONE), LinearOp.LE, BigInteger.ZERO)),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
+
+        assertIs<OpenTheoryResult.Unknown>(result)
     }
 
     @Test
