@@ -307,7 +307,7 @@ internal object SolveCore {
         // route default (LP off for naked CP).
         val lpConfig = (common.lp ?: defaultLp())?.let {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
-        } ?: solvable.annotatedBacktrackParams?.lpConfig ?: LpConfig.OFF
+        } ?: LpConfig.OFF
         executeFinite(
             FiniteExecutionRequest(
                 problem = solvable.finiteProblem,
@@ -316,7 +316,7 @@ internal object SolveCore {
                 objective = solvable.linearObjective,
                 localSearchObjective = solvable.lsObjective,
                 definitionalSweep = solvable.definitionalSweep,
-                annotatedBacktrackParams = solvable.annotatedBacktrackParams,
+                searchHints = solvable.searchHints,
                 cores = 1,
                 engineParams = common.engineParams,
                 randomSeed = common.randomSeed,
@@ -526,7 +526,7 @@ internal object SolveCore {
                 objective = solvable.linearObjective,
                 localSearchObjective = solvable.lsObjective,
                 definitionalSweep = solvable.definitionalSweep,
-                annotatedBacktrackParams = solvable.annotatedBacktrackParams,
+                searchHints = solvable.searchHints,
                 cores = cores,
                 engineParams = common.engineParams,
                 randomSeed = common.randomSeed,
