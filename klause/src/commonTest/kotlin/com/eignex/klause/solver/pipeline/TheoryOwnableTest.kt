@@ -11,8 +11,6 @@ import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -28,7 +26,6 @@ class TheoryOwnableTest {
         override val exactTheoryOwnable: Boolean get() = exact
         override fun remap(mapping: VarRemap): Factor = this
         override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
-        override fun asInvariant(): Invariant = NoInvariant
     }
 
     private fun specOf(vararg factors: Factor) = ProblemSpec(

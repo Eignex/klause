@@ -16,7 +16,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
@@ -244,9 +243,6 @@ class Table private constructor(
             else -> Rewrite(listOf(Table(xs, survivors.toLongArray())))
         }
     }
-
-    override fun asInvariant(): Invariant =
-        TableInvariant(xs, tuples, arity, numTuples, singleColumnByVar, multiColumnsByVar, hi)
 
     override val hullFamily: HullFamily = HullFamily.TABLE
 

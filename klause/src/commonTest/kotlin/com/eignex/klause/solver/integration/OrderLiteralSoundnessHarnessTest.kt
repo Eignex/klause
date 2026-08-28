@@ -15,7 +15,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
@@ -73,7 +72,6 @@ class OrderLiteralSoundnessHarnessTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     /** Recursive brute-force solution set: every full assignment over [domains] satisfying [ok]. */

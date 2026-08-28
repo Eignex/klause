@@ -10,7 +10,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import kotlin.math.abs
 
@@ -65,7 +64,7 @@ class Circuit(
     }
 
     /** Graded cost, dispatched by mode; 0 iff the assignment forms the required single (sub)cycle. */
-    private fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int =
+    internal fun computeCost(state: LocalSearchState, replaceAt: Int, replaceWith: Long): Int =
         if (subcircuit) subcircuitCost(state, replaceAt, replaceWith) else circuitCost(state, replaceAt, replaceWith)
 
     /**
@@ -138,7 +137,4 @@ class Circuit(
         val scan = cycleScan(next, n)
         return abs(scan.numCycles - 1) + (numIncluded - scan.nodesInCycles) + numPointToExcluded + numOob
     }
-
-    override fun asInvariant(): Invariant =
-        if (subcircuit) SubcircuitInvariant(succ, n, ::computeCost) else CircuitInvariant(succ, n, ::computeCost)
 }

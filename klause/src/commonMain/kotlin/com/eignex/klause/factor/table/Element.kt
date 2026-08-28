@@ -12,7 +12,6 @@ import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
@@ -162,14 +161,6 @@ class Element private constructor(
 
     /** The equality `result = [v]` between the result and an array variable. */
     private fun equate(v: Int): Linear = Linear(intArrayOf(1, -1), intArrayOf(result, v), LinearOp.EQ, 0)
-
-    override fun asInvariant(): Invariant = ElementInvariant(
-        idx,
-        result,
-        arr,
-        arrIsVars,
-        indexOffset,
-    )
 
     override val hullFamily: HullFamily = HullFamily.ELEMENT
 

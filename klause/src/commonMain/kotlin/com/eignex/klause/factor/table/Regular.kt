@@ -12,7 +12,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
@@ -100,8 +99,6 @@ class Regular(
     }
 
     override val variables: VarList = SpanIntVars(seq)
-
-    override fun asInvariant(): Invariant = RegularInvariant(seq, numStates, alphabetSize, transitions, q0, accepting)
 
     override val hullFamily: HullFamily = HullFamily.REGULAR
 

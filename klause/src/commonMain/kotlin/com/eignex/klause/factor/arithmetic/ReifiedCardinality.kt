@@ -13,7 +13,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.addExact
@@ -62,13 +61,6 @@ class ReifiedCardinality(override val auxBoolVar: Int, val literals: IntArray, v
 
     private fun countDistance(n: Long): Long = (if (n < min) min - n else 0L) + (if (n > max) n - max else 0L)
 
-    override fun asInvariant(): Invariant = ReifiedCardinalityInvariant(auxBoolVar, literals, min, max, boolVars)
-
-    /**
-     * Indicator rows for `auxBoolVar ↔ (min ≤ #true literals ≤ max)`. Only the `aux = 1 ⇒ (count ≥ min ∧
-     * count ≤ max)` direction yields LP cuts (the `aux = 0` side is the disjunction `count < min ∨ count >
-     * max`, whose hull is the whole interval), so two CORE rows are emitted with declared `[0, 1]` big-Ms.
-     */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         val sum = BoolReifiedSum.fold(builder, literals, weights = null)
         val a = builder.boolColumn(auxBoolVar)

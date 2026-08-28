@@ -10,7 +10,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 
@@ -54,10 +53,6 @@ class Increasing(val xs: IntArray, val strict: Boolean) : Factor {
         sink.intVars(xs)
     }
 
-    override fun asInvariant(): Invariant = IncreasingInvariant(xs, gap)
-
-    // Each adjacent pair is the exact row `xs(i+1) − xs(i) ≥ gap`; their conjunction is the chain. The
-    // rows are surfaced to presolve; the LP relaxation emits the same pairwise rows directly.
     override val linearRows: List<LinearRow>
         get() = buildList {
             for (i in 0 until xs.size - 1) {

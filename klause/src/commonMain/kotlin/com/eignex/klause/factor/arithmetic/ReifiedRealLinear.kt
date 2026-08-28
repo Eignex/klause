@@ -10,8 +10,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
 
 /**
@@ -93,8 +91,6 @@ class ReifiedRealLinear(
             sink.long(realCoeffs[j].toRawBits())
         }
     }
-
-    override fun asInvariant(): Invariant = NoInvariant
 
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         val pin = builder.liveBool(aux) ?: return

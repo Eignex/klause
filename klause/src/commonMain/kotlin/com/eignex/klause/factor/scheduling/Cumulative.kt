@@ -192,7 +192,7 @@ class Cumulative(
 
     /**
      * No-overlap (unary-resource / one-machine) shape: constant unit demands over a constant capacity of
-     * 1, so the resource is never shared. In this shape propagation / [asInvariant] dispatch the
+     * 1, so the resource is never shared. In this shape propagation / local-search dispatch the
      * stronger disjunctive reasoning (time-tabling, detectable precedences, unit Θ-tree edge-finding);
      * the propagator reads only the start/duration windows. Build one directly with [Cumulative.unary].
      */
@@ -229,34 +229,6 @@ class Cumulative(
 
     /** Index of [varId] in `resourceVars`, or `-1` if it is not a resource variable. */
     fun resPosOf(varId: Int): Int = resPos[varId]
-
-    override fun asInvariant(): Invariant = if (unary) {
-        // The unit-resource / capacity-1 cumulative cost model is the no-overlap gradient.
-        DisjunctiveInvariant(
-            starts = starts,
-            durations = durations,
-            presents = presents,
-            durationVars = durationVars,
-            cumulativeBacking = cumulativeInvariant(),
-        )
-    } else {
-        cumulativeInvariant()
-    }
-
-    private fun cumulativeInvariant(): CumulativeInvariant = CumulativeInvariant(
-        starts = starts,
-        durations = durations,
-        resources = resources,
-        capacity = capacity,
-        presents = presents,
-        durationVars = durationVars,
-        resourceVars = resourceVars,
-        capacityVar = capacityVar,
-        n = n,
-        startPosOf = ::startPosOf,
-        durPosOf = ::durPosOf,
-        resPosOf = ::resPosOf,
-    )
 
     /** Factories for the [Cumulative] special cases. */
     companion object {

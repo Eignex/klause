@@ -16,7 +16,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Term
@@ -93,9 +92,6 @@ class PseudoBoolean(weights: LongArray, literals: IntArray, val op: PbOp, overri
 
     override val extendsObjectiveCone: Boolean = true
 
-    override fun asInvariant(): Invariant = PseudoBooleanInvariant(boolVars, weights, literals, op, bound)
-
-    /** LP relaxation: the feasibility-defining row `Σ weights·literals ⟨op⟩ bound`. */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights, relation, bound)
     }

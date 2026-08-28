@@ -14,7 +14,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
@@ -61,8 +60,6 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
     override val variables: VarList = SpanIntVars(xs + intArrayOf(result))
 
     override val extendsObjectiveCone: Boolean = true
-
-    override fun asInvariant(): Invariant = ArrayMinMaxInvariant(result, xs, max)
 
     override val hullFamily: HullFamily = HullFamily.ARRAY_MIN_MAX
 

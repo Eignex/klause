@@ -15,7 +15,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
@@ -118,14 +117,6 @@ class NValue(
     override val variables: VarList = MixedVars(
         spanInts = xs + intArrayOf(n),
         boolVars = OptPresence.presenceVarIds(presents),
-    )
-
-    override fun asInvariant(): Invariant = NValueInvariant(
-        n,
-        xs,
-        mode,
-        presents,
-        { state, idx -> present(state, idx) },
     )
 
     override val hullFamily: HullFamily = HullFamily.NVALUE

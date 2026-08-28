@@ -11,7 +11,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
@@ -132,18 +131,6 @@ class GlobalCardinality(
      *  propagation and LS delta computation; `-1` for values outside the cover. */
     internal val coverIndexByValue: MutableLongIntMap =
         MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
-
-    override fun asInvariant(): Invariant = GlobalCardinalityInvariant(
-        xs,
-        cover,
-        countVars,
-        countLow,
-        countHigh,
-        closed,
-        presents,
-        coverIndexByValue,
-        { state, idx -> present(state, idx) },
-    )
 
     override val hullFamily: HullFamily = HullFamily.GCC_COUNT
 

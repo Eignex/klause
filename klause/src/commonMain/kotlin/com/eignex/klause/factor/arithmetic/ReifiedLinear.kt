@@ -17,9 +17,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
@@ -156,23 +154,6 @@ class ReifiedLinear private constructor(
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         integerConstants?.let { linearResidual(state.longPayload[factorId], op, it.bound, softCap) } ?: softCap
 
-    override fun asInvariant(): Invariant =
-        integerConstants?.let { ReifiedLinearInvariant(auxBoolVar, it.coeffs, vars, op, it.bound) } ?: NoInvariant
-
-    /**
-     * Indicator rows for `auxBoolVar ↔ (L op bound)`, where `L = Σ coeffs·vars`. The big-Ms are the
-     * tightest possible from the live range `[lMin, lMax]` of `L`, and the `¬(L op bound)` side uses
-     * integrality (`¬(L ≤ bound) ⇔ L ≥ bound + 1`) so the rows are as strong as a single indicator allows.
-     * For `EQ` only the `aux = 1 ⇒ L = bound` direction is emitted, and for `NE` only the `aux = 0 ⇒ L =
-     * bound` direction (the complement is a disjunction with no single LP cut).
-     *
-     * A live big-M bakes branch-tightened bounds into a row's constants, so the row is marked global only
-     * when its M equals the M the declared range would give; a non-global row carries the live bounds it
-     * leaned on as premises (the engine derives them — see [RelaxationBuilder.bigMRow]).
-     *
-     * Best-effort: a reified row whose activity or big-M overflows Long is left unrelaxed (the
-     * propagator/invariant still enforce it). Sound to skip.
-     */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         // A wide reified row is excluded from the LP relaxation entirely — no 64-bit reading of it may
         // enter the LP; [WideReifiedLinearPropagator] is the sole enforcer.

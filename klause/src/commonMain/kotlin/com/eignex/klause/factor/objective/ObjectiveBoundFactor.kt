@@ -66,10 +66,10 @@ internal class MutableObjectiveBound(private val objectiveConstant: Long) {
  */
 internal class ObjectiveBoundFactor(
     private val objectiveBoolVars: IntArray,
-    private val boolWeights: LongArray,
+    internal val boolWeights: LongArray,
     private val objectiveIntVars: IntArray,
-    private val intCoeffs: LongArray,
-    private val bound: MutableObjectiveBound,
+    internal val intCoeffs: LongArray,
+    internal val bound: MutableObjectiveBound,
 ) : Factor {
 
     override val variables: VarList = MixedVars(spanInts = objectiveIntVars, boolVars = objectiveBoolVars)
@@ -91,8 +91,6 @@ internal class ObjectiveBoundFactor(
         sink.sortedBoolVars(boolVars)
         sink.sortedIntVars(intVars)
     }
-
-    override fun asInvariant(): Invariant = ObjectiveBoundInvariant(boolVars, boolWeights, intVars, intCoeffs, bound)
 
     companion object {
         /** The objective-bound factor for [objective] sharing [bound], or `null` when the objective has
@@ -118,7 +116,7 @@ internal class ObjectiveBoundFactor(
  * moves push the sum down (toward the bound), so a SAT-style arm repairs the objective slack exactly
  * as it repairs any violated constraint.
  */
-private class ObjectiveBoundInvariant(
+internal class ObjectiveBoundInvariant(
     private val boolVars: IntArray,
     private val boolWeights: LongArray,
     private val intVars: IntArray,

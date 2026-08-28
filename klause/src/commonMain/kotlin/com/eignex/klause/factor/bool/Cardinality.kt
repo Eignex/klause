@@ -15,7 +15,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 
@@ -55,9 +54,6 @@ class Cardinality(literals: IntArray, val min: Int, val max: Int) : Factor {
 
     override val extendsObjectiveCone: Boolean = true
 
-    override fun asInvariant(): Invariant = CardinalityInvariant(boolVars, literals, min, max)
-
-    /** LP relaxation: the feasibility-defining bounds `min ≤ Σ literals ≤ max`. */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = min.toLong())
         builder.boolRow(literals, weights = null, op = LinearOp.LE, bound = max.toLong())

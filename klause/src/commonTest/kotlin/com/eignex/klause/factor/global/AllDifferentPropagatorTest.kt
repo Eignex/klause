@@ -13,7 +13,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.IntEvent
@@ -56,7 +55,6 @@ class AllDifferentPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     @Test
@@ -867,7 +865,6 @@ class AllDifferentPropagatorTest {
         override fun structuralKey(): StructuralKey = error("test double has no structural key")
 
         override fun conflictReason(state: PropagationState, factorId: Int): IntArray? = null
-        override fun asInvariant(): Invariant = object : Invariant {}
     }
 
     private fun enumerateWithVsids(problem: BakedProblem, seed: Long): HashSet<List<Int>> =

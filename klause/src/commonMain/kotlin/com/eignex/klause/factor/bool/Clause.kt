@@ -12,7 +12,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.lp.Term
@@ -37,7 +36,7 @@ class Clause(literals: IntArray) :
     // Factors may outlive a frontend's scratch buffer.
     val literals: IntArray = distinctLiterals(literals)
 
-    private val tautological: Boolean = hasComplementaryLiterals(this.literals)
+    internal val tautological: Boolean = hasComplementaryLiterals(this.literals)
 
     init {
         require(literals.isNotEmpty()) { "Clause must have at least one literal" }
@@ -89,9 +88,6 @@ class Clause(literals: IntArray) :
         return allBool
     }
 
-    override fun asInvariant(): Invariant = ClauseInvariant(boolVars, literals, tautological)
-
-    /** LP relaxation: the feasibility-defining row `Σ literals ≥ 1`. */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         builder.boolRow(literals, weights = null, op = LinearOp.GE, bound = 1L)
     }

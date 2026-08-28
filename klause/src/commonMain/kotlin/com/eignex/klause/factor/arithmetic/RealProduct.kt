@@ -9,7 +9,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
@@ -66,8 +65,6 @@ class RealProduct(
         sink.long(realOperandLo.toRawBits())
         sink.long(realOperandHi.toRawBits())
     }
-
-    override fun asInvariant(): Invariant = NoInvariant
 
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         val resCol = builder.realColumn(result)

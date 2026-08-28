@@ -15,7 +15,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
@@ -231,19 +230,6 @@ class Mdd(
         )
     }
 
-    override fun asInvariant(): Invariant = MddInvariant(
-        seq,
-        numStatesPerLayer,
-        layerStarts,
-        transitions,
-        initial,
-        accepting,
-        recordStride,
-        cost,
-    )
-
-    // The LP relaxation's arc presence column is Int-typed; skip it when a symbol exceeds Int range
-    // (the propagator/invariant still enforce the diagram). Sound — a relaxation may omit a factor.
     override val hullFamily: HullFamily = HullFamily.MDD
 
     /**

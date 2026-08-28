@@ -1,6 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LinearRow
@@ -192,9 +191,6 @@ interface Factor {
      * per call.
      */
     val linearRows: List<LinearRow> get() = emptyList()
-
-    /** The [Invariant] the LS engine uses for this constraint. */
-    fun asInvariant(): Invariant
 
     /**
      * Emit this factor's LP-relaxation rows, columns, and auxiliary variables into [builder] — the

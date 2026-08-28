@@ -15,7 +15,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.model.PbOp
@@ -73,14 +72,6 @@ class ReifiedPseudoBoolean(
     override fun residualNow(state: LocalSearchState, factorId: Int, softCap: Int): Int =
         pbDegree(state.longPayload[factorId], op, bound, softCap)
 
-    override fun asInvariant(): Invariant =
-        ReifiedPseudoBooleanInvariant(auxBoolVar, weights, literals, op, bound, boolVars)
-
-    /**
-     * Indicator rows for `auxBoolVar ↔ (Σ weights·literal ⟨op⟩ bound)` over Boolean literals. The big-M
-     * comes from the declared `[0, 1]` ranges (so the rows are global / CORE), and for `EQ` only the
-     * `aux = 1 ⇒ L = bound` direction is emitted (its complement is a disjunction with no single LP cut).
-     */
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {
         val sum = BoolReifiedSum.fold(builder, literals, weights)
         val a = builder.boolColumn(auxBoolVar)

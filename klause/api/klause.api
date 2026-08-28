@@ -975,7 +975,6 @@ public final class com/eignex/klause/factor/ReifiedFactor$DefaultImpls {
 
 public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/klause/ir/Factor {
 	public fun <init> (I[IZ)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1009,7 +1008,6 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMaxState {
 
 public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[Lcom/eignex/klause/ir/LinearOp;[J)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getConsts ()[J
@@ -1104,7 +1102,6 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun <init> ([I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
 	public fun <init> ([J[ILcom/eignex/klause/ir/LinearOp;J)V
 	public fun <init> ([J[I[D[ILcom/eignex/klause/ir/LinearOp;J)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/LinearConstants;
@@ -1140,7 +1137,6 @@ public abstract interface class com/eignex/klause/factor/arithmetic/LinearConsta
 
 public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klause/ir/Factor {
 	public fun <init> (III)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getA ()I
 	public final fun getB ()I
@@ -1176,7 +1172,6 @@ public final class com/eignex/klause/factor/arithmetic/RealConstants : com/eigne
 
 public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/klause/ir/Factor {
 	public fun <init> (IIIDD)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1206,7 +1201,6 @@ public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/eignex/klause/factor/ReifiedFactor {
 	public fun <init> (I[III)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
@@ -1239,7 +1233,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun <init> (I[I[ILcom/eignex/klause/ir/LinearOp;I)V
 	public fun <init> (I[I[Lcom/ionspin/kotlin/bignum/integer/BigInteger;Lcom/eignex/klause/ir/LinearOp;Lcom/ionspin/kotlin/bignum/integer/BigInteger;)V
 	public fun <init> (I[J[ILcom/eignex/klause/ir/LinearOp;J)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
@@ -1272,7 +1265,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 
 public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : com/eignex/klause/factor/ReifiedFactor {
 	public fun <init> (I[J[ILcom/eignex/klause/model/PbOp;J)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
@@ -1305,7 +1297,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/eignex/klause/ir/Factor {
 	public fun <init> (I[I[D[I[DLcom/eignex/klause/ir/LinearOp;DZ)V
 	public synthetic fun <init> (I[I[D[I[DLcom/eignex/klause/ir/LinearOp;DZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getAux ()I
 	public fun getBoolVars ()[I
@@ -1347,7 +1338,6 @@ public final class com/eignex/klause/factor/arithmetic/WideConstants : com/eigne
 public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause/ir/Factor {
 	public static final field Companion Lcom/eignex/klause/factor/bool/Cardinality$Companion;
 	public fun <init> ([III)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1382,7 +1372,6 @@ public final class com/eignex/klause/factor/bool/Cardinality$Companion {
 public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/Factor, com/eignex/klause/lp/LinearRow {
 	public fun <init> ([I)V
 	public final fun allLiteralsBool (I)Z
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun coeff (I)J
 	public fun getBoolVars ()[I
@@ -1414,7 +1403,6 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/F
 
 public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause/ir/Factor {
 	public fun <init> (Ljava/util/List;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public final fun getConstraints ()Ljava/util/List;
@@ -1440,7 +1428,6 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 
 public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klause/ir/Factor, com/eignex/klause/lp/LinearRow {
 	public fun <init> ([J[ILcom/eignex/klause/model/PbOp;J)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun coeff (I)J
 	public fun getBoolVars ()[I
@@ -1474,7 +1461,6 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 
 public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/ir/Factor {
 	public fun <init> ([II)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1502,7 +1488,6 @@ public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/ir/Fact
 public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/ir/Factor {
 	public fun <init> ([IZ)V
 	public synthetic fun <init> ([IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1531,7 +1516,6 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([IJI[I[JZ)V
 	public synthetic fun <init> ([IJI[I[JZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
@@ -1566,7 +1550,6 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 public final class com/eignex/klause/factor/global/GlobalCardinality : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> ([I[J[I[I[IZ[I)V
 	public synthetic fun <init> ([I[J[I[I[IZ[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
@@ -1601,7 +1584,6 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 
 public final class com/eignex/klause/factor/global/Increasing : com/eignex/klause/ir/Factor {
 	public fun <init> ([IZ)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1629,7 +1611,6 @@ public final class com/eignex/klause/factor/global/Increasing : com/eignex/klaus
 public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[III)V
 	public synthetic fun <init> ([I[IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1658,7 +1639,6 @@ public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/i
 
 public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[IZ)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1687,7 +1667,6 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/i
 public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/factor/OptionalFactor, com/eignex/klause/ir/Factor {
 	public fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[I)V
 	public synthetic fun <init> (I[ILcom/eignex/klause/factor/global/NValue$Mode;[IILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
@@ -1728,7 +1707,6 @@ public final class com/eignex/klause/factor/global/NValue$Mode : java/lang/Enum 
 
 public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[I)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1756,7 +1734,6 @@ public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/ir/F
 public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/eignex/klause/ir/Factor {
 	public fun <init> ([II)V
 	public synthetic fun <init> ([IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1783,7 +1760,6 @@ public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/e
 
 public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/klause/ir/Factor {
 	public fun <init> (JJ[I)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1813,7 +1789,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public static final field Companion Lcom/eignex/klause/factor/scheduling/Cumulative$Companion;
 	public fun <init> ([I[J[JJ[I[I[II)V
 	public synthetic fun <init> ([I[J[JJ[I[I[IIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun definitelyAbsent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
@@ -1862,7 +1837,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative$Companion {
 public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[I[J[J[I[IZ)V
 	public synthetic fun <init> ([I[I[J[J[I[IZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1948,7 +1922,6 @@ public final class com/eignex/klause/factor/scheduling/internals/DiffnLsState {
 
 public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eignex/klause/ir/Factor {
 	public fun <init> (Ljava/util/List;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
@@ -1975,7 +1948,6 @@ public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eign
 public final class com/eignex/klause/factor/table/Element : com/eignex/klause/ir/Factor {
 	public fun <init> (II[JZI)V
 	public synthetic fun <init> (II[JZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getArr ()[J
 	public final fun getArrIsVars ()Z
@@ -2006,7 +1978,6 @@ public final class com/eignex/klause/factor/table/Element : com/eignex/klause/ir
 public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[I[I[JI[III)V
 	public synthetic fun <init> ([I[I[I[JI[IIIILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getAccepting ()[I
 	public fun getBoolVars ()[I
@@ -2039,7 +2010,6 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/ir/Fac
 
 public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/ir/Factor {
 	public fun <init> ([III[JI[I)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getAccepting ()[I
 	public final fun getAlphabetSize ()I
@@ -2071,7 +2041,6 @@ public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/ir
 public final class com/eignex/klause/factor/table/Table : com/eignex/klause/ir/Factor {
 	public fun <init> ([I[J)V
 	public fun <init> ([I[J[J)V
-	public fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public final fun getArity ()I
 	public fun getBoolVars ()[I
@@ -2494,7 +2463,6 @@ public final class com/eignex/klause/ir/BoolVars : com/eignex/klause/ir/VarList 
 }
 
 public abstract interface class com/eignex/klause/ir/Factor {
-	public abstract fun asInvariant ()Lcom/eignex/klause/localsearch/Invariant;
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z

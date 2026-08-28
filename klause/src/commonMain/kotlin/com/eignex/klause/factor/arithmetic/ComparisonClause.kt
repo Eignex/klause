@@ -10,7 +10,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 
 /**
  * A disjunction of single-variable comparison literals: `⋁ᵢ (vars(i) ⟨ops(i)⟩ consts(i))`, holding
@@ -49,6 +48,4 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
             sink.long(consts[i])
         }
     }
-
-    override fun asInvariant(): Invariant = ComparisonClauseInvariant(vars, ops, consts)
 }

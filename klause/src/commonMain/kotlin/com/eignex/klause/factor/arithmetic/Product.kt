@@ -14,7 +14,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.Contribution
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
@@ -67,8 +66,6 @@ class Product(
     }
 
     override val variables: VarList = SpanIntVars(intArrayOf(a, b, result))
-
-    override fun asInvariant(): Invariant = ProductInvariant(a, b, result)
 
     override val hullFamily: HullFamily = HullFamily.PRODUCT
 

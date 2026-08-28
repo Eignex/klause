@@ -209,14 +209,4 @@ class AllDifferent(
             absent = 0,
         )
     }
-
-    override fun asInvariant(): Invariant = AllDifferentInvariant(
-        vars,
-        domainMin,
-        domainSize,
-        presents,
-        exceptValues,
-        occurrencesByVar,
-        { state, idx -> present(state, idx) },
-    )
 }

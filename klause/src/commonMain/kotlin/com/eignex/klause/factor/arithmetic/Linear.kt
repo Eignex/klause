@@ -14,7 +14,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
@@ -344,12 +343,6 @@ class Linear private constructor(
     // local-search engine is gated off for problems with real variables, so its invariant is never
     // consulted; an inert one keeps the factory total without pretending to evaluate the real terms.
 
-    override fun asInvariant(): Invariant = integerConstants?.let { LinearInvariant(it.coeffs, vars, op, it.bound) }
-        ?: NoInvariant
-
-    // The integer reading is itself the exact [LinearRow], held by the row's own constants, so presolve
-    // reads it with no extra allocation. A wide or continuous row has no integer LinearRow — its content
-    // is not integer-valued — and emits a relaxation row instead.
     override val linearRows: List<LinearRow> get() = listOfNotNull(integerConstants)
 
     override fun linearize(builder: RelaxationBuilder, factorId: Int) {

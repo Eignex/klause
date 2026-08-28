@@ -9,8 +9,6 @@ import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.localsearch.Invariant
-import com.eignex.klause.localsearch.NoInvariant
 
 /**
  * A *system* of difference constraints `x − y ≤ c` propagated jointly as a weighted digraph.
@@ -85,6 +83,4 @@ internal class DifferenceSystem(
             int(if (e.domainBound) 1 else 0)
         }
     }
-
-    override fun asInvariant(): Invariant = NoInvariant
 }
