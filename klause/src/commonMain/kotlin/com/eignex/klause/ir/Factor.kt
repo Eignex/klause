@@ -1,7 +1,5 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.lp.HullFamily
-import com.eignex.klause.lp.HullFlags
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 
@@ -203,24 +201,6 @@ interface Factor {
      * tableau under budget, so the estimate must track [linearize]'s own caps and structure. Default: `null`.
      */
     fun lpSizeEstimate(@Suppress("UNUSED_PARAMETER") domains: Array<IntDomain>): LpSizeEstimate? = null
-
-    /**
-     * The gated convex-hull family this factor's [linearize] contributes to, or `null` (default) when it
-     * has no gated hull. Named once here and used both by [hullFamilyEnabled] (the relaxation driver's
-     * per-build gate) and by the LP auto-config (which groups factors by family), so neither place
-     * pattern-matches the concrete factor type.
-     */
-    val hullFamily: HullFamily? get() = null
-
-    /**
-     * Whether this factor's convex-hull family is switched on by the relaxation's [flags] for this
-     * build. Derived from [hullFamily]: a hull-emitting factor's family flag, else `true` (a factor with
-     * no gated hull emits no [com.eignex.klause.lp.Contribution.HULL] rows, so the flag never applies).
-     * The driver combines this with the build-level cone and per-factor suppression gates and exposes the
-     * result through [RelaxationBuilder.hullEnabled], which [linearize] consults before allocating its
-     * hull columns and rows.
-     */
-    fun hullFamilyEnabled(flags: HullFlags): Boolean = hullFamily?.let(flags::enabled) ?: true
 }
 
 /**

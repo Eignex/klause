@@ -15,7 +15,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
 
 /**
@@ -66,8 +65,6 @@ class Product(
     }
 
     override val variables: VarList = SpanIntVars(intArrayOf(a, b, result))
-
-    override val hullFamily: HullFamily = HullFamily.PRODUCT
 
     /**
      * LP relaxation — the four McCormick envelope inequalities `(a−aL)(b−bL) ≥ 0`, `(a−aH)(b−bH) ≥ 0`,

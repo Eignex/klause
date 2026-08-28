@@ -16,7 +16,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.EmptyIntArray
@@ -118,8 +117,6 @@ class NValue(
         spanInts = xs + intArrayOf(n),
         boolVars = OptPresence.presenceVarIds(presents),
     )
-
-    override val hullFamily: HullFamily = HullFamily.NVALUE
 
     /**
      * One-hot value model: a per-value "used" column `y_v ∈ [0,1]`, a one-hot selector `z_iv ∈ [0,1]`

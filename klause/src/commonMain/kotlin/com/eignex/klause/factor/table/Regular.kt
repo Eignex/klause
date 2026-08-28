@@ -13,7 +13,6 @@ import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.IntArrayList
@@ -99,8 +98,6 @@ class Regular(
     }
 
     override val variables: VarList = SpanIntVars(seq)
-
-    override val hullFamily: HullFamily = HullFamily.REGULAR
 
     /**
      * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc

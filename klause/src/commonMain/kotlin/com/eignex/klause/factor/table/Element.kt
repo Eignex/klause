@@ -13,7 +13,6 @@ import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.IntArrayList
@@ -161,8 +160,6 @@ class Element private constructor(
 
     /** The equality `result = [v]` between the result and an array variable. */
     private fun equate(v: Int): Linear = Linear(intArrayOf(1, -1), intArrayOf(result, v), LinearOp.EQ, 0)
-
-    override val hullFamily: HullFamily = HullFamily.ELEMENT
 
     /**
      * LP relaxation. A *constant* array gives the exact convex hull: a one-hot selector `y_p ∈ [0,1]` per

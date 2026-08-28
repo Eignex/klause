@@ -12,7 +12,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.EmptyIntArray
@@ -131,8 +130,6 @@ class GlobalCardinality(
      *  propagation and LS delta computation; `-1` for values outside the cover. */
     internal val coverIndexByValue: MutableLongIntMap =
         MutableLongIntMap().apply { for (i in cover.indices) put(cover[i], i) }
-
-    override val hullFamily: HullFamily = HullFamily.GCC_COUNT
 
     /**
      * One-hot selector model for the count-variable form `counts(k) = #{i : xs(i) = cover(k)}`: a one-hot

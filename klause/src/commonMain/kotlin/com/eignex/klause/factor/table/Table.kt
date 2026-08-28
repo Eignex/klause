@@ -17,7 +17,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.IntArrayList
@@ -243,8 +242,6 @@ class Table private constructor(
             else -> Rewrite(listOf(Table(xs, survivors.toLongArray())))
         }
     }
-
-    override val hullFamily: HullFamily = HullFamily.TABLE
 
     /**
      * Convex-hull LP relaxation: a selector column `y_t ∈ [0,1]` per allowed tuple with `Σ_t y_t = 1` and a

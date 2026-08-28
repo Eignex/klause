@@ -24,6 +24,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.bound.CumulativeEnergeticBound
+import com.eignex.klause.lp.lpHullFamily
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.schedulingViews
@@ -390,7 +391,7 @@ object LpAutoConfig {
         var rows = 0L
         var any = false
         for (f in problem.factors) {
-            if (f.hullFamily != family) continue
+            if (f.lpHullFamily() != family) continue
             val e = f.lpSizeEstimate(problem.requireFiniteIntDomains()) ?: continue
             cols += e.cols
             rows += e.rows

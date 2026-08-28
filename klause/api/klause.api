@@ -957,12 +957,10 @@ public final class com/eignex/klause/factor/ReifiedFactor$DefaultImpls {
 	public static fun canSubstituteAffine (Lcom/eignex/klause/factor/ReifiedFactor;IIII)Z
 	public static fun getBoolVars (Lcom/eignex/klause/factor/ReifiedFactor;)[I
 	public static fun getExactTheoryOwnable (Lcom/eignex/klause/factor/ReifiedFactor;)Z
-	public static fun getHullFamily (Lcom/eignex/klause/factor/ReifiedFactor;)Lcom/eignex/klause/lp/HullFamily;
 	public static fun getIntVars (Lcom/eignex/klause/factor/ReifiedFactor;)[I
 	public static fun getIntegerTheoryOwnable (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun getLinearRows (Lcom/eignex/klause/factor/ReifiedFactor;)Ljava/util/List;
 	public static fun getStructuralKeyWeight (Lcom/eignex/klause/factor/ReifiedFactor;)I
-	public static fun hullFamilyEnabled (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/lp/HullFlags;)Z
 	public static fun isValueAnonymous (Lcom/eignex/klause/factor/ReifiedFactor;)Z
 	public static fun linearize (Lcom/eignex/klause/factor/ReifiedFactor;Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public static fun lpSizeEstimate (Lcom/eignex/klause/factor/ReifiedFactor;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -977,7 +975,6 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -986,7 +983,6 @@ public final class com/eignex/klause/factor/arithmetic/ArrayMinMax : com/eignex/
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1010,7 +1006,6 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun getBoolVars ()[I
 	public final fun getConsts ()[J
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1018,7 +1013,6 @@ public final class com/eignex/klause/factor/arithmetic/ComparisonClause : com/ei
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1103,7 +1097,6 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun getBoolVars ()[I
 	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/LinearConstants;
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
 	public fun getIntegerTheoryOwnable ()Z
@@ -1116,7 +1109,6 @@ public final class com/eignex/klause/factor/arithmetic/Linear : com/eignex/klaus
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
 	public final fun getWideConstants ()Lcom/eignex/klause/factor/arithmetic/WideConstants;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1138,14 +1130,12 @@ public final class com/eignex/klause/factor/arithmetic/Product : com/eignex/klau
 	public final fun getB ()I
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1170,7 +1160,6 @@ public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIntOperand ()I
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
@@ -1181,7 +1170,6 @@ public final class com/eignex/klause/factor/arithmetic/RealProduct : com/eignex/
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1199,7 +1187,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 	public fun getAuxBoolVar ()I
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1209,7 +1196,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedCardinality : com/
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1231,7 +1217,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public fun getBoolVars ()[I
 	public final fun getConstants ()Lcom/eignex/klause/factor/arithmetic/IntegralConstants;
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public final fun getIntegerConstants ()Lcom/eignex/klause/factor/arithmetic/IntegerConstants;
 	public fun getIntegerTheoryOwnable ()Z
@@ -1242,7 +1227,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedLinear : com/eigne
 	public final fun getVars ()[I
 	public final fun getWideConstants ()Lcom/eignex/klause/factor/arithmetic/WideConstants;
 	public fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1262,7 +1246,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 	public fun getBoolVars ()[I
 	public final fun getBound ()J
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1272,7 +1255,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedPseudoBoolean : co
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getWeights ()[J
 	public fun holdsNow (Lcom/eignex/klause/localsearch/LocalSearchState;I)Z
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1293,7 +1275,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public fun getBoolVars ()[I
 	public final fun getBound ()D
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIntCoeffs ()[D
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
@@ -1305,7 +1286,6 @@ public final class com/eignex/klause/factor/arithmetic/ReifiedRealLinear : com/e
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1331,7 +1311,6 @@ public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1340,7 +1319,6 @@ public final class com/eignex/klause/factor/bool/Cardinality : com/eignex/klause
 	public final fun getMin ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1366,7 +1344,6 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/F
 	public fun getBoolVars ()[I
 	public fun getBound ()J
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1375,7 +1352,6 @@ public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/F
 	public fun getSize ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isIntegerOnly ()Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
@@ -1395,13 +1371,11 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 	public fun getBoolVars ()[I
 	public final fun getConstraints ()Ljava/util/List;
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1420,7 +1394,6 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 	public fun getBoolVars ()[I
 	public fun getBound ()J
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1431,7 +1404,6 @@ public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klau
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getWeights ()[J
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isIntegerOnly ()Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
@@ -1450,7 +1422,6 @@ public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/ir/Fact
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1458,7 +1429,6 @@ public final class com/eignex/klause/factor/bool/Xor : com/eignex/klause/ir/Fact
 	public fun getStructuralKeyWeight ()I
 	public final fun getTargetParity ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1476,7 +1446,6 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1485,7 +1454,6 @@ public final class com/eignex/klause/factor/circuit/Circuit : com/eignex/klause/
 	public final fun getSubcircuit ()Z
 	public final fun getSucc ()[I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1509,7 +1477,6 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public final fun getDomainSize ()I
 	public fun getExactTheoryOwnable ()Z
 	public final fun getExceptSet ()[J
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1517,7 +1484,6 @@ public final class com/eignex/klause/factor/global/AllDifferent : com/eignex/kla
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getVars ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1543,7 +1509,6 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public final fun getCountVars ()[I
 	public final fun getCover ()[J
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1551,7 +1516,6 @@ public final class com/eignex/klause/factor/global/GlobalCardinality : com/eigne
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1569,7 +1533,6 @@ public final class com/eignex/klause/factor/global/Increasing : com/eignex/klaus
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1577,7 +1540,6 @@ public final class com/eignex/klause/factor/global/Increasing : com/eignex/klaus
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1599,13 +1561,11 @@ public final class com/eignex/klause/factor/global/Inverse : com/eignex/klause/i
 	public final fun getFOffset ()I
 	public final fun getG ()[I
 	public final fun getGOffset ()I
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1622,7 +1582,6 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/i
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1631,7 +1590,6 @@ public final class com/eignex/klause/factor/global/LexLess : com/eignex/klause/i
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
 	public final fun getYs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1651,7 +1609,6 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun definitelyPresent (ILcom/eignex/klause/propagation/PropagationState;)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1661,7 +1618,6 @@ public final class com/eignex/klause/factor/global/NValue : com/eignex/klause/fa
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1688,7 +1644,6 @@ public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/ir/F
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1696,7 +1651,6 @@ public final class com/eignex/klause/factor/global/Sort : com/eignex/klause/ir/F
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
 	public final fun getYs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1714,7 +1668,6 @@ public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/e
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIndexOffset ()I
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
@@ -1722,7 +1675,6 @@ public final class com/eignex/klause/factor/global/SymmetricAllDifferent : com/e
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1739,7 +1691,6 @@ public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/kla
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1748,7 +1699,6 @@ public final class com/eignex/klause/factor/global/ValuePrecede : com/eignex/kla
 	public final fun getT ()J
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1775,7 +1725,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public final fun getDurationVars ()[I
 	public final fun getDurations ()[J
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1788,7 +1737,6 @@ public final class com/eignex/klause/factor/scheduling/Cumulative : com/eignex/k
 	public fun getStructuralKeyWeight ()I
 	public final fun getUnary ()Z
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1816,7 +1764,6 @@ public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause
 	public fun getExactTheoryOwnable ()Z
 	public final fun getHeightVars ()[I
 	public final fun getHeights ()[J
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1829,7 +1776,6 @@ public final class com/eignex/klause/factor/scheduling/Diffn : com/eignex/klause
 	public final fun getWidths ()[J
 	public final fun getXs ()[I
 	public final fun getYs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1899,13 +1845,11 @@ public final class com/eignex/klause/factor/symmetry/SymmetryHandling : com/eign
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
 	public final fun getGenerators ()Ljava/util/List;
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1925,7 +1869,6 @@ public final class com/eignex/klause/factor/table/Element : com/eignex/klause/ir
 	public final fun getArrIsVars ()Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getIdx ()I
 	public final fun getIndexOffset ()I
 	public fun getIntVars ()[I
@@ -1934,7 +1877,6 @@ public final class com/eignex/klause/factor/table/Element : com/eignex/klause/ir
 	public final fun getResult ()I
 	public fun getStructuralKeyWeight ()I
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1954,7 +1896,6 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/ir/Fac
 	public fun getBoolVars ()[I
 	public final fun getCost ()I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public final fun getInitial ()I
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
@@ -1966,7 +1907,6 @@ public final class com/eignex/klause/factor/table/Mdd : com/eignex/klause/ir/Fac
 	public fun getStructuralKeyWeight ()I
 	public final fun getTransitions ()[J
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -1985,7 +1925,6 @@ public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/ir
 	public final fun getAlphabetSize ()I
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -1995,7 +1934,6 @@ public final class com/eignex/klause/factor/table/Regular : com/eignex/klause/ir
 	public fun getStructuralKeyWeight ()I
 	public final fun getTransitions ()[J
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -2015,7 +1953,6 @@ public final class com/eignex/klause/factor/table/Table : com/eignex/klause/ir/F
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
 	public final fun getHi ()[J
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
@@ -2024,7 +1961,6 @@ public final class com/eignex/klause/factor/table/Table : com/eignex/klause/ir/F
 	public final fun getTuples ()[J
 	public fun getVariables ()Lcom/eignex/klause/ir/VarList;
 	public final fun getXs ()[I
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -2434,13 +2370,11 @@ public abstract interface class com/eignex/klause/ir/Factor {
 	public fun canSubstituteAffine (IIII)Z
 	public fun getBoolVars ()[I
 	public fun getExactTheoryOwnable ()Z
-	public fun getHullFamily ()Lcom/eignex/klause/lp/HullFamily;
 	public fun getIntVars ()[I
 	public fun getIntegerTheoryOwnable ()Z
 	public fun getLinearRows ()Ljava/util/List;
 	public fun getStructuralKeyWeight ()I
 	public abstract fun getVariables ()Lcom/eignex/klause/ir/VarList;
-	public fun hullFamilyEnabled (Lcom/eignex/klause/lp/HullFlags;)Z
 	public fun isValueAnonymous ()Z
 	public fun linearize (Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public fun lpSizeEstimate ([Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;
@@ -2456,12 +2390,10 @@ public final class com/eignex/klause/ir/Factor$DefaultImpls {
 	public static fun canSubstituteAffine (Lcom/eignex/klause/ir/Factor;IIII)Z
 	public static fun getBoolVars (Lcom/eignex/klause/ir/Factor;)[I
 	public static fun getExactTheoryOwnable (Lcom/eignex/klause/ir/Factor;)Z
-	public static fun getHullFamily (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/lp/HullFamily;
 	public static fun getIntVars (Lcom/eignex/klause/ir/Factor;)[I
 	public static fun getIntegerTheoryOwnable (Lcom/eignex/klause/ir/Factor;)Z
 	public static fun getLinearRows (Lcom/eignex/klause/ir/Factor;)Ljava/util/List;
 	public static fun getStructuralKeyWeight (Lcom/eignex/klause/ir/Factor;)I
-	public static fun hullFamilyEnabled (Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/lp/HullFlags;)Z
 	public static fun isValueAnonymous (Lcom/eignex/klause/ir/Factor;)Z
 	public static fun linearize (Lcom/eignex/klause/ir/Factor;Lcom/eignex/klause/lp/RelaxationBuilder;I)V
 	public static fun lpSizeEstimate (Lcom/eignex/klause/ir/Factor;[Lcom/eignex/klause/ir/IntDomain;)Lcom/eignex/klause/lp/LpSizeEstimate;

@@ -16,7 +16,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.util.IntArrayList
@@ -229,8 +228,6 @@ class Mdd(
             ),
         )
     }
-
-    override val hullFamily: HullFamily = HullFamily.MDD
 
     /**
      * Layered flow hull — the exact convex hull of the diagram's accepting paths. An arc variable

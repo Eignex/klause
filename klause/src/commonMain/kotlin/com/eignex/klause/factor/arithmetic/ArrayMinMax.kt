@@ -15,7 +15,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.RelaxationBuilder
 
 /**
@@ -58,8 +57,6 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
     }
 
     override val variables: VarList = SpanIntVars(xs + intArrayOf(result))
-
-    override val hullFamily: HullFamily = HullFamily.ARRAY_MIN_MAX
 
     /**
      * LP relaxation: the always-emitted envelope (`result ≥ xs[i]` for max, `result ≤ xs[i]` for min) as

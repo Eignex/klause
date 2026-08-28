@@ -32,6 +32,7 @@ import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.solveAndCertify
+import com.eignex.klause.lp.lpHullEnabled
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -548,7 +549,7 @@ internal class CpToLpRelaxation(
         private val hullFactorIds = LinkedHashSet<Int>()
 
         /** The per-family convex-hull switches for this build, read polymorphically by each hull factor's
-         *  `Factor.hullFamilyEnabled`; combined with the cone and per-factor suppression gates when
+         *  [lpHullEnabled]; combined with the cone and per-factor suppression gates when
          *  [currentHullEnabled] is set, so the driver never matches factor types. */
         private val hullFlags = HullFlags(
             element = elementHull,
@@ -870,7 +871,7 @@ internal class CpToLpRelaxation(
                 // cut-only or scheduling-view factors) keep the default no-op `Factor.linearize` and
                 // contribute nothing here — they are handled by the separators and the blocks above.
                 currentHullEnabled = factorId !in suppressedHullFactors && !objectiveCone &&
-                    factor.hullFamilyEnabled(hullFlags)
+                    factor.lpHullEnabled(hullFlags)
                 factor.linearize(this, factorId)
             }
 
