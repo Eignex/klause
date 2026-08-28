@@ -3,11 +3,11 @@ package com.eignex.klause.propagation.difference
 import com.eignex.klause.factor.ConflictReasonOracle
 import com.eignex.klause.factor.FactorPropagationOracle
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.IntBounds
 import com.eignex.klause.solver.IntDomain
 import com.eignex.klause.solver.Lit

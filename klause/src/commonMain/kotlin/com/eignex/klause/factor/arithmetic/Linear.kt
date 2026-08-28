@@ -2,6 +2,7 @@ package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.KeySink
@@ -18,7 +19,6 @@ import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.RealConsts
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf

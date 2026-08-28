@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.objective
 
 import com.eignex.klause.factor.compressViolation
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.MixedVars
@@ -16,7 +17,6 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.withAppendedFactor
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.objective.LinearObjective
 
 /**

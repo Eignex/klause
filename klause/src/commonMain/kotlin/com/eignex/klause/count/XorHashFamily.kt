@@ -2,9 +2,9 @@ package com.eignex.klause.count
 
 import com.eignex.klause.factor.bool.GaussianXor
 import com.eignex.klause.factor.bool.Xor
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.util.IntArrayList
 import kotlin.random.Random
 

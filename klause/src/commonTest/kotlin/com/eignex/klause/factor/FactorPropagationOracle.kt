@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Brute-force oracle for [com.eignex.klause.solver.Factor.propagate]. Builds the ground-truth
+ * Brute-force oracle for [com.eignex.klause.ir.Factor.propagate]. Builds the ground-truth
  * set of satisfying assignments via [BruteForceSolver] and asserts the propagator's deductions
  * are consistent.
  *

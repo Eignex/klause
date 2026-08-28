@@ -6,6 +6,7 @@ import com.eignex.klause.factor.bool.internals.pbHolds
 import com.eignex.klause.factor.bool.internals.validatePseudoBoolean
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.BoolVars
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
@@ -21,7 +22,6 @@ import com.eignex.klause.lp.engine.addExact
 import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 
 /**
  * `auxBoolVar ↔ (Σ weights(i) * lit(i) ⟨op⟩ bound)`. Payload at `intPayload(factorId)` is the

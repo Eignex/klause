@@ -1,7 +1,7 @@
 package com.eignex.klause.localsearch
 
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.util.EmptyIntArray
 
 /** Local-search-engine projection of an immutable `Problem`. */

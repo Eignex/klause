@@ -3,7 +3,11 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.OptPresence
 import com.eignex.klause.factor.OptionalFactor
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.FactorReduction
+import com.eignex.klause.ir.FactorReduction.Rewrite
+import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.MixedVars
 import com.eignex.klause.ir.StructuralKey
@@ -16,11 +20,7 @@ import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.IntEvent
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Rewrite
-import com.eignex.klause.solver.Unchanged
 import com.eignex.klause.solver.values
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.EmptyLongArray

@@ -2,10 +2,10 @@ package com.eignex.klause.presolve.linear
 
 import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableIntLongMap
 import com.eignex.klause.util.MutableIntObjectMap

@@ -1,10 +1,10 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -27,9 +27,9 @@ import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import com.eignex.klause.solver.VarRemap
 import com.ionspin.kotlin.bignum.integer.BigInteger

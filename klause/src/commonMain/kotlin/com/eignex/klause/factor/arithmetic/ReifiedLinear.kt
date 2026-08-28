@@ -7,6 +7,7 @@ import com.eignex.klause.factor.bool.internals.CoalescedTerms
 import com.eignex.klause.factor.bool.internals.coalesceLinearTerms
 import com.eignex.klause.factor.bool.internals.linearHolds
 import com.eignex.klause.factor.bool.internals.linearResidual
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
@@ -25,7 +26,6 @@ import com.eignex.klause.lp.engine.addExact
 import com.eignex.klause.lp.engine.mulExact
 import com.eignex.klause.lp.engine.subExact
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.WideConsts
 import com.eignex.klause.solver.constsOf
 import com.ionspin.kotlin.bignum.integer.BigInteger

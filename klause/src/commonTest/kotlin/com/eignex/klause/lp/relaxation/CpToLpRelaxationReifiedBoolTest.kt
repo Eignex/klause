@@ -2,10 +2,10 @@ package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.solver.Factor
 import com.eignex.klause.solver.Lit
 import kotlin.test.Test
 import kotlin.test.assertTrue

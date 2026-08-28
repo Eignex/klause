@@ -2,7 +2,11 @@ package com.eignex.klause.factor.bool
 
 import com.eignex.klause.factor.litVars
 import com.eignex.klause.ir.BoolVars
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
+import com.eignex.klause.ir.FactorReduction
+import com.eignex.klause.ir.FactorReduction.Rewrite
+import com.eignex.klause.ir.FactorReduction.Unchanged
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.StructuralKey
@@ -14,11 +18,7 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
-import com.eignex.klause.solver.FactorReduction
 import com.eignex.klause.solver.IntDomain
-import com.eignex.klause.solver.Rewrite
-import com.eignex.klause.solver.Unchanged
 
 /**
  * `[min] ≤ (#true [literals]) ≤ [max]`. Payload at `longPayload(factorId)` is the count of true

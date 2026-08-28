@@ -1,6 +1,7 @@
 package com.eignex.klause.factor.bool
 
 import com.eignex.klause.ir.BoolVars
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
@@ -9,7 +10,6 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.Factor
 
 /**
  * A *system* of parity (XOR) constraints propagated jointly by Gauss-Jordan elimination over

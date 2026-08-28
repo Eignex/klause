@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
 
 /**
  * Per-factor structural reduction ([Presolve.reduceStructural]), exercised through the factors that
- * implement [com.eignex.klause.solver.Factor.structuralReduce]. Each test asserts the global is
+ * implement [com.eignex.klause.ir.Factor.structuralReduce]. Each test asserts the global is
  * rewritten into the simpler factor its structure implies, or left untouched when nothing pins it.
  */
 class StructuralReductionTest {
