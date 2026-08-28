@@ -1,6 +1,7 @@
 package com.eignex.klause.lowering.minizinc
 
 import com.eignex.klause.formats.minizinc.*
+import com.eignex.klause.solver.pipeline.OznEvaluator
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 

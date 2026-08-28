@@ -6241,12 +6241,6 @@ final class com.eignex.klause.lowering.flatzinc/SetVarLayout { // com.eignex.kla
     final fun toString(): kotlin/String // com.eignex.klause.lowering.flatzinc/SetVarLayout.toString|toString(){}[0]
 }
 
-final class com.eignex.klause.lowering.minizinc/OznApplier { // com.eignex.klause.lowering.minizinc/OznApplier|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.lowering.minizinc/OznApplier.<init>|<init>(kotlin.String){}[0]
-
-    final fun render(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample): kotlin/String // com.eignex.klause.lowering.minizinc/OznApplier.render|render(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample){}[0]
-}
-
 final class com.eignex.klause.lowering.mps/MpsColumn { // com.eignex.klause.lowering.mps/MpsColumn|null[0]
     constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Int) // com.eignex.klause.lowering.mps/MpsColumn.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Int){}[0]
 
@@ -9980,6 +9974,12 @@ final class com.eignex.klause.solver.pipeline/OpenTheoryRequest { // com.eignex.
         final fun <get-route>(): com.eignex.klause.solver.pipeline/ProblemPipeline // com.eignex.klause.solver.pipeline/OpenTheoryRequest.route.<get-route>|<get-route>(){}[0]
 }
 
+final class com.eignex.klause.solver.pipeline/OznApplier { // com.eignex.klause.solver.pipeline/OznApplier|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.solver.pipeline/OznApplier.<init>|<init>(kotlin.String){}[0]
+
+    final fun render(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample): kotlin/String // com.eignex.klause.solver.pipeline/OznApplier.render|render(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample){}[0]
+}
+
 final class com.eignex.klause.solver.pipeline/PipelineConfigException : kotlin/RuntimeException { // com.eignex.klause.solver.pipeline/PipelineConfigException|null[0]
     constructor <init>(kotlin/String) // com.eignex.klause.solver.pipeline/PipelineConfigException.<init>|<init>(kotlin.String){}[0]
 }
@@ -11424,7 +11424,6 @@ final fun com.eignex.klause.localsearch.strategy/Cbls(kotlin/Double = ..., kotli
 final fun com.eignex.klause.localsearch.strategy/FeasibilityJump(kotlin/Int = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Int = ...): com.eignex.klause.localsearch.strategy/SourceDrivenStrategy // com.eignex.klause.localsearch.strategy/FeasibilityJump|FeasibilityJump(kotlin.Int;kotlin.Int;kotlin.Int;kotlin.Double;kotlin.Double;kotlin.Int){}[0]
 final fun com.eignex.klause.lowering.flatzinc/parseFlatZinc(com.eignex.klause.util/CharSource, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.lowering.flatzinc/FlatZincProgram // com.eignex.klause.lowering.flatzinc/parseFlatZinc|parseFlatZinc(com.eignex.klause.util.CharSource;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long){}[0]
 final fun com.eignex.klause.lowering.flatzinc/parseFlatZinc(kotlin/String, kotlin/Int = ..., kotlin/Long = ..., kotlin/Boolean = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.lowering.flatzinc/FlatZincProgram // com.eignex.klause.lowering.flatzinc/parseFlatZinc|parseFlatZinc(kotlin.String;kotlin.Int;kotlin.Long;kotlin.Boolean;kotlin.Long;kotlin.Long){}[0]
-final fun com.eignex.klause.lowering.flatzinc/writeFlatZincSolution(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.lowering.flatzinc/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.presolve/lpHarvest(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.lp.bounding/LpPlan, com.eignex.klause.presolve/BakeConfig = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.ir/Problem // com.eignex.klause.presolve/lpHarvest|lpHarvest(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.lp.bounding.LpPlan;com.eignex.klause.presolve.BakeConfig;com.eignex.klause.util.Cancellation){}[0]
 final fun com.eignex.klause.presolve/lpHarvestReporting(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.lp.bounding/LpPlan, com.eignex.klause.presolve/BakeConfig = ..., com.eignex.klause.util/Cancellation = ...): com.eignex.klause.presolve/LpHarvestResult // com.eignex.klause.presolve/lpHarvestReporting|lpHarvestReporting(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.lp.bounding.LpPlan;com.eignex.klause.presolve.BakeConfig;com.eignex.klause.util.Cancellation){}[0]
 final fun com.eignex.klause.presolve/lpRootBounds(com.eignex.klause.ir/Problem, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.lp.bounding/LpPlan, com.eignex.klause.util/Cancellation = ...): com.eignex.klause.ir/Problem // com.eignex.klause.presolve/lpRootBounds|lpRootBounds(com.eignex.klause.ir.Problem;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.lp.bounding.LpPlan;com.eignex.klause.util.Cancellation){}[0]
@@ -11485,5 +11484,6 @@ final fun com.eignex.klause.solver.pipeline/pipelineConfigError(kotlin/String): 
 final fun com.eignex.klause.solver.pipeline/resolveBtRecipes(com.eignex.klause.solver.pipeline/EngineParams, com.eignex.klause.portfolio/Kind): kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>? // com.eignex.klause.solver.pipeline/resolveBtRecipes|resolveBtRecipes(com.eignex.klause.solver.pipeline.EngineParams;com.eignex.klause.portfolio.Kind){}[0]
 final fun com.eignex.klause.solver.pipeline/resolveLocalSearchRecipes(com.eignex.klause.solver.pipeline/EngineParams): com.eignex.klause.solver.pipeline/LsResolution // com.eignex.klause.solver.pipeline/resolveLocalSearchRecipes|resolveLocalSearchRecipes(com.eignex.klause.solver.pipeline.EngineParams){}[0]
 final fun com.eignex.klause.solver.pipeline/withNodeBudget(kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>>?, com.eignex.klause.portfolio/Kind, com.eignex.klause.backtrack/NodeBudget): kotlin.collections/List<kotlin/Function0<com.eignex.klause.backtrack/BacktrackRecipe>> // com.eignex.klause.solver.pipeline/withNodeBudget|withNodeBudget(kotlin.collections.List<kotlin.Function0<com.eignex.klause.backtrack.BacktrackRecipe>>?;com.eignex.klause.portfolio.Kind;com.eignex.klause.backtrack.NodeBudget){}[0]
+final fun com.eignex.klause.solver.pipeline/writeFlatZincSolution(com.eignex.klause.lowering.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.solver.pipeline/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.lowering.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/IntArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.solver/constsOf(kotlin/LongArray): com.eignex.klause.solver/LongConstList // com.eignex.klause.solver/constsOf|constsOf(kotlin.LongArray){}[0]

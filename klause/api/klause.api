@@ -4306,11 +4306,6 @@ public final class com/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector
 	public static fun values ()[Lcom/eignex/klause/lowering/flatzinc/FlatZincSearchVarSelector;
 }
 
-public final class com/eignex/klause/lowering/flatzinc/FlatZincWriterKt {
-	public static final fun writeFlatZincSolution (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;Z)Ljava/lang/String;
-	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;ZILjava/lang/Object;)Ljava/lang/String;
-}
-
 public abstract interface class com/eignex/klause/lowering/flatzinc/OutputItem {
 }
 
@@ -4405,11 +4400,6 @@ public final class com/eignex/klause/lowering/flatzinc/SolveDirective$Satisfy : 
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/lowering/minizinc/OznApplier {
-	public fun <init> (Ljava/lang/String;)V
-	public final fun render (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/lowering/mps/MpsColumn {
@@ -8926,6 +8916,11 @@ public final class com/eignex/klause/solver/pipeline/FixedBacktrackPlanRequest {
 	public final fun getSolveBudgetMillis ()Ljava/lang/Long;
 }
 
+public final class com/eignex/klause/solver/pipeline/FlatZincSolutionWriterKt {
+	public static final fun writeFlatZincSolution (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;Z)Ljava/lang/String;
+	public static synthetic fun writeFlatZincSolution$default (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;ZILjava/lang/Object;)Ljava/lang/String;
+}
+
 public final class com/eignex/klause/solver/pipeline/IntVariableOwner : java/lang/Enum {
 	public static final field CP Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
 	public static final field THEORY Lcom/eignex/klause/solver/pipeline/IntVariableOwner;
@@ -9126,6 +9121,11 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryResult$Unsat : co
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/solver/pipeline/OznApplier {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun render (Lcom/eignex/klause/lowering/flatzinc/FlatZincProgram;Lcom/eignex/klause/solver/Sample;)Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/PipelineConfigException : java/lang/RuntimeException {
