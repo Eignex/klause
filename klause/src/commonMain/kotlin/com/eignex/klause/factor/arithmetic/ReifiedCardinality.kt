@@ -16,9 +16,9 @@ import com.eignex.klause.ir.materializeKey
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.subExact
-import com.eignex.klause.propagation.Propagator
 
 /**
  * `auxBoolVar ↔ ([min] ≤ #true [literals] ≤ [max])`. Created by the compiler when a

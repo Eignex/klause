@@ -3,7 +3,6 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
@@ -13,6 +12,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.IntHashSet
 import com.eignex.klause.util.LongHashSet
 import kotlin.math.ceil

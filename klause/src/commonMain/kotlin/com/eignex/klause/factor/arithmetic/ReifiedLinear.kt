@@ -21,13 +21,13 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.NoInvariant
 import com.eignex.klause.lp.RelaxationBuilder
+import com.eignex.klause.propagation.Propagator
+import com.eignex.klause.solver.WideConsts
+import com.eignex.klause.solver.constsOf
 import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.util.addExact
 import com.eignex.klause.util.mulExact
 import com.eignex.klause.util.subExact
-import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.solver.WideConsts
-import com.eignex.klause.solver.constsOf
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
 /**
