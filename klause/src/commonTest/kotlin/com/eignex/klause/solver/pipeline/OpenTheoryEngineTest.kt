@@ -59,6 +59,59 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `a spent shared decision allowance reports budget exhaustion`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = emptyArray(),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
+            .solve(TheoryParams(maxDecisions = 0))
+
+        val unknown = assertIs<OpenTheoryResult.Unknown>(result)
+        assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
+        assertEquals(0L, unknown.stats.openTheory.openBoolDecisions)
+    }
+
+    @Test
+    fun `shared decision allowance spans feasibility rounds`() {
+        val openUpper = Bits(1).also { it.set(0) }
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            factors = emptyArray(),
+        )
+        val params = TheoryParams(maxDecisions = 1)
+        val state = OpenTheorySolveState(params)
+        val engine = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
+
+        assertIs<OpenTheoryResult.Sat>(engine.solve(params, state))
+        val second = assertIs<OpenTheoryResult.Unknown>(engine.solve(params, state))
+
+        assertEquals(TerminationReason.BudgetExhausted, second.reason)
+        assertEquals(1L, second.stats.openTheory.openBoolDecisions)
+    }
+
+    @Test
+    fun `clause telemetry accumulates across feasibility rounds`() {
+        val state = OpenTheorySolveState(TheoryParams())
+        val first = SearchSession(emptyList())
+        first.learn(com.eignex.klause.solver.search.SearchExplanation(intArrayOf(0, 2)))
+        val second = SearchSession(emptyList())
+        second.learn(com.eignex.klause.solver.search.SearchExplanation(intArrayOf(4, 6)))
+        second.learn(com.eignex.klause.solver.search.SearchExplanation(intArrayOf(8, 10)))
+
+        state.capture(first)
+        state.capture(second)
+
+        assertEquals(3L, state.clauses.learned)
+        assertEquals(3L, state.clauses.retained)
+        assertEquals(2L, state.clauses.peakRetained)
+    }
+
+    @Test
     fun `open route reports a wall timeout without external cancellation`() {
         val openUpper = Bits(1).also { it.set(0) }
         val model = ProblemSpec(

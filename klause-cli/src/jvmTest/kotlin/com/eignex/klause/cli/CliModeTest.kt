@@ -113,6 +113,31 @@ class CliModeTest {
     }
 
     @Test
+    fun `an open theory shared decision limit names the cause and prints counters`() {
+        val smt = File.createTempFile("clidecisions", ".smt2").apply {
+            writeText(
+                """
+                (declare-const x Int)
+                (declare-const b Bool)
+                (assert (>= x 5))
+                (check-sat)
+                """.trimIndent(),
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val out = capture {
+            code = runCli(arrayOf("-s", "--param", "max-decisions=0", smt.absolutePath))
+        }
+
+        assertEquals(0, code, out)
+        assertTrue(out.lines().firstOrNull() == "unknown", out)
+        assertTrue("; fixed work exhausted" in out, out)
+        assertTrue("; openBoolDecisions=0" in out, out)
+    }
+
+    @Test
     fun `an open SMT general LIA model is solved without finite lowering`() {
         val smt = File.createTempFile("cliopen", ".smt2").apply {
             writeText(

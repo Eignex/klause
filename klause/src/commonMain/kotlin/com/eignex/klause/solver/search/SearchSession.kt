@@ -51,6 +51,7 @@ class SearchSession(
     private var lastPushCreatedLevel = false
     private var checks = 0L
     private var checksExhausted = false
+    private var decisionsExhausted = false
     private var openTheoryWork: OpenTheoryWorkSink? = null
     private var learnedClauses = 0L
     private var relearnedClauses = 0L
@@ -151,6 +152,11 @@ class SearchSession(
     }
     internal fun workExhausted(): Boolean = openTheoryWork?.exhausted == true
     internal fun checkBudgetExhausted(): Boolean = checksExhausted
+    internal fun decisionBudgetExhausted(): Boolean = decisionsExhausted
+
+    internal fun markDecisionBudgetExhausted() {
+        decisionsExhausted = true
+    }
 
     internal fun attachOpenTheoryWork(work: OpenTheoryWorkSink) {
         check(openTheoryWork == null) { "open-theory work is attached once per search session" }
@@ -519,17 +525,20 @@ class SearchSession(
         modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll,
         nodePolicy: SearchNodePolicy = SearchNodePolicy.ExpandAll,
         lifecycle: SearchRunLifecycle = SearchRunLifecycle.None,
-    ): SearchRun = SearchRun(
-        this,
-        params,
-        booleanBranching,
-        decisionBudget,
-        observer,
-        modelContinuation,
-        modelPolicy,
-        nodePolicy,
-        lifecycle,
-    )
+    ): SearchRun {
+        decisionsExhausted = false
+        return SearchRun(
+            this,
+            params,
+            booleanBranching,
+            decisionBudget,
+            observer,
+            modelContinuation,
+            modelPolicy,
+            nodePolicy,
+            lifecycle,
+        )
+    }
 
     /** Open a run from one mode-specific [SearchTraversalPolicy]. */
     internal fun openRun(numBoolVars: Int, policy: SearchTraversalPolicy): SearchRun = openRun(
@@ -1000,17 +1009,20 @@ class SearchRun internal constructor(
     private fun advanceFrame(): Advance {
         val frame = frames.last()
         while (frame.next < frame.decisions.size) {
-            if (decisions == params.maxDecisions) return Advance.Budget
+            if (decisions == params.maxDecisions) {
+                session.markDecisionBudgetExhausted()
+                return Advance.Budget
+            }
             val level = session.decisionLevel
             val decision = frame.decisions[frame.next++]
             if (!decision.tightens(session)) continue
             if (!session.canCommitOpenTheoryDecision()) return Advance.Budget
-            decisions++
-            decisionsSinceRestart++
             when (val result = session.push(decision)) {
                 ComponentResult.Consistent -> {
                     if (!session.lastPushCreatedLevel()) continue
                     if (!session.recordOpenTheoryDecision(decision)) return Advance.Budget
+                    decisions++
+                    decisionsSinceRestart++
                     observer.onCommit(decision, session.decisionLevel)
                     if (!decisionBudget.consume()) return Advance.Budget
                     return Advance.Expanded
