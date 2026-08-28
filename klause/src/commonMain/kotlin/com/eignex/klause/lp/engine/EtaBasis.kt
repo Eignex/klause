@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.util.IntArrayList
 import com.eignex.koblas.Workspace
 import com.eignex.koblas.koblas
-import com.eignex.koblas.sparse.SparseFactorization
+import com.eignex.koblas.sparse.F64SparseFactorization
 
 /**
  * Maintains a basis factorization across rank-1 basis updates using the **product-form of the inverse**
@@ -23,7 +23,7 @@ import com.eignex.koblas.sparse.SparseFactorization
  * index spaces match the base factorization's (basis-slot in, original-row out).
  */
 internal class EtaBasis private constructor(
-    private val base: SparseFactorization,
+    private val base: F64SparseFactorization,
     private val baseOps: Int,
     private val work: LpWork,
 ) {
@@ -44,7 +44,7 @@ internal class EtaBasis private constructor(
      * Solve `B x = b`, or `Bᵀ x = b` when [transpose], into a fresh result.
      *
      * Spelled `solve` rather than `ftran`/`btran` so the sparse and dense halves share one vocabulary:
-     * this is what `Lapack.solve` and `SparseFactorization.solve` do, with the same transpose flag. The
+     * this is what `Lapack.solve` and `F64SparseFactorization.solve` do, with the same transpose flag. The
      * FTRAN and BTRAN names survive on the private halves below, where they name which sweep runs rather
      * than standing in for "solve".
      */
@@ -119,10 +119,10 @@ internal class EtaBasis private constructor(
         /**
          * Wrap an already-factorized basis as a fresh, empty eta chain.
          *
-         * Takes any [SparseFactorization], not just a sparse LU: the chain only ever asks its base to
+         * Takes any [F64SparseFactorization], not just a sparse LU: the chain only ever asks its base to
          * solve, so a host solver's factors work here too. The dimension comes from the factorization
          * rather than being passed alongside it, which removes a way for the two to disagree.
          */
-        fun of(base: SparseFactorization, baseOps: Int, work: LpWork): EtaBasis = EtaBasis(base, baseOps, work)
+        fun of(base: F64SparseFactorization, baseOps: Int, work: LpWork): EtaBasis = EtaBasis(base, baseOps, work)
     }
 }
