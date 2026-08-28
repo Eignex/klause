@@ -638,7 +638,6 @@ class GeneralLiaSearchComponent(
                 if (!context.consumeGeneralLiaWork()) return null
                 if (--untilPoll <= 0) {
                     untilPoll = pollStride
-                    context.recordGeneralLiaPoll()
                     if (context.pollGeneralLiaCancellation()) return null
                 }
                 val row = when (factor) {
@@ -663,7 +662,6 @@ class GeneralLiaSearchComponent(
                     // outlast a budget a factor-boundary poll would have caught.
                     if (--untilPoll <= 0) {
                         untilPoll = pollStride
-                        context.recordGeneralLiaPoll()
                         if (context.pollGeneralLiaCancellation()) return null
                     }
                     val coefficient = row.coeffs[index]
@@ -740,7 +738,6 @@ class GeneralLiaSearchComponent(
             if (!context.consumeGeneralLiaWork()) return null
             if (--untilPoll <= 0) {
                 untilPoll = pollStride
-                context.recordGeneralLiaPoll()
                 if (context.pollGeneralLiaCancellation()) return null
             }
             when (factor) {
@@ -774,7 +771,6 @@ class GeneralLiaSearchComponent(
             if (!context.consumeGeneralLiaWork()) return null
             if (--untilPoll <= 0) {
                 untilPoll = pollStride
-                context.recordGeneralLiaPoll()
                 if (context.pollGeneralLiaCancellation()) return null
             }
             val holds = when (factor) {
@@ -981,11 +977,7 @@ private sealed interface GeneralLiaSearchOutcome {
 
 private fun SearchContext.consumeGeneralLiaWork(): Boolean = (this as? SearchSession)?.consumeLiaRowVisit() != false
 
-private fun SearchContext.recordGeneralLiaPoll() {
+internal fun SearchContext.pollGeneralLiaCancellation(): Boolean {
     (this as? SearchSession)?.recordCancellationPoll()
-}
-
-private fun SearchContext.pollGeneralLiaCancellation(): Boolean {
-    recordGeneralLiaPoll()
     return cancelled()
 }
