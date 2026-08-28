@@ -8,7 +8,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.formats.opb.Opb
-import com.eignex.klause.lowering.opb.toProblem
+import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals

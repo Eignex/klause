@@ -3,11 +3,11 @@ package com.eignex.klause.util
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.opb.Opb
+import com.eignex.klause.formats.opb.toProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.lowering.flatzinc.parseFlatZinc
 import com.eignex.klause.lowering.mps.toProblem
-import com.eignex.klause.lowering.opb.toProblem
 import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.lowering.xcsp3.Xcsp3
 import kotlin.test.Test

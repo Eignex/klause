@@ -4874,6 +4874,32 @@ final class com.eignex.klause.formats.opb/OpbFormatException : com.eignex.klause
     constructor <init>(kotlin/String) // com.eignex.klause.formats.opb/OpbFormatException.<init>|<init>(kotlin.String){}[0]
 }
 
+final class com.eignex.klause.formats.opb/OpbLoweringException : kotlin/IllegalArgumentException { // com.eignex.klause.formats.opb/OpbLoweringException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.formats.opb/OpbLoweringException.<init>|<init>(kotlin.String){}[0]
+}
+
+final class com.eignex.klause.formats.opb/OpbProblem { // com.eignex.klause.formats.opb/OpbProblem|null[0]
+    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.formats.opb/OpbProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
+
+    final val boolFolds // com.eignex.klause.formats.opb/OpbProblem.boolFolds|{}boolFolds[0]
+        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
+    final val numDeclaredVars // com.eignex.klause.formats.opb/OpbProblem.numDeclaredVars|{}numDeclaredVars[0]
+        final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
+    final val objective // com.eignex.klause.formats.opb/OpbProblem.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.opb/OpbProblem.objective.<get-objective>|<get-objective>(){}[0]
+    final val problem // com.eignex.klause.formats.opb/OpbProblem.problem|{}problem[0]
+        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.opb/OpbProblem.problem.<get-problem>|<get-problem>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.opb/OpbProblem.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.opb/OpbProblem.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.formats.opb/OpbProblem.component3|component3(){}[0]
+    final fun component4(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.component4|component4(){}[0]
+    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/OpbProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.opb/OpbProblem.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.opb/OpbProblem.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.opb/OpbProblem.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.formats.opb/OpbRelation { // com.eignex.klause.formats.opb/OpbRelation|null[0]
     constructor <init>(kotlin.collections/List<com.eignex.klause.formats.opb/OpbTerm>, com.eignex.klause.model/PbOp, com.ionspin.kotlin.bignum.integer/BigInteger) // com.eignex.klause.formats.opb/OpbRelation.<init>|<init>(kotlin.collections.List<com.eignex.klause.formats.opb.OpbTerm>;com.eignex.klause.model.PbOp;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
 
@@ -6358,32 +6384,6 @@ final class com.eignex.klause.lowering.mps/MpsCompiled { // com.eignex.klause.lo
 
 final class com.eignex.klause.lowering.mps/MpsLoweringException : kotlin/IllegalArgumentException { // com.eignex.klause.lowering.mps/MpsLoweringException|null[0]
     constructor <init>(kotlin/String) // com.eignex.klause.lowering.mps/MpsLoweringException.<init>|<init>(kotlin.String){}[0]
-}
-
-final class com.eignex.klause.lowering.opb/OpbLoweringException : kotlin/IllegalArgumentException { // com.eignex.klause.lowering.opb/OpbLoweringException|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.lowering.opb/OpbLoweringException.<init>|<init>(kotlin.String){}[0]
-}
-
-final class com.eignex.klause.lowering.opb/OpbProblem { // com.eignex.klause.lowering.opb/OpbProblem|null[0]
-    constructor <init>(com.eignex.klause.ir/Problem, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...) // com.eignex.klause.lowering.opb/OpbProblem.<init>|<init>(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
-
-    final val boolFolds // com.eignex.klause.lowering.opb/OpbProblem.boolFolds|{}boolFolds[0]
-        final fun <get-boolFolds>(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.lowering.opb/OpbProblem.boolFolds.<get-boolFolds>|<get-boolFolds>(){}[0]
-    final val numDeclaredVars // com.eignex.klause.lowering.opb/OpbProblem.numDeclaredVars|{}numDeclaredVars[0]
-        final fun <get-numDeclaredVars>(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.numDeclaredVars.<get-numDeclaredVars>|<get-numDeclaredVars>(){}[0]
-    final val objective // com.eignex.klause.lowering.opb/OpbProblem.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.opb/OpbProblem.objective.<get-objective>|<get-objective>(){}[0]
-    final val problem // com.eignex.klause.lowering.opb/OpbProblem.problem|{}problem[0]
-        final fun <get-problem>(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.opb/OpbProblem.problem.<get-problem>|<get-problem>(){}[0]
-
-    final fun component1(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.opb/OpbProblem.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.opb/OpbProblem.component2|component2(){}[0]
-    final fun component3(): kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> // com.eignex.klause.lowering.opb/OpbProblem.component3|component3(){}[0]
-    final fun component4(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.component4|component4(){}[0]
-    final fun copy(com.eignex.klause.ir/Problem = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin.collections/List<com.eignex.klause.ir/BoolFoldDefinition> = ..., kotlin/Int = ...): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/OpbProblem.copy|copy(com.eignex.klause.ir.Problem;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.collections.List<com.eignex.klause.ir.BoolFoldDefinition>;kotlin.Int){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.opb/OpbProblem.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.opb/OpbProblem.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.lowering.opb/OpbProblem.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.lowering.smtlib/SmtLibProblem { // com.eignex.klause.lowering.smtlib/SmtLibProblem|null[0]
@@ -11330,7 +11330,7 @@ final val com.eignex.klause.solver/indices // com.eignex.klause.solver/indices|@
 final fun (com.eignex.klause.formats.dimacs/CnfDocument).com.eignex.klause.lowering.dimacs/toProblem(): com.eignex.klause.ir/Problem // com.eignex.klause.lowering.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.CnfDocument(){}[0]
 final fun (com.eignex.klause.formats.dimacs/WcnfDocument).com.eignex.klause.lowering.dimacs/toProblem(): com.eignex.klause.lowering.dimacs/WcnfProblem // com.eignex.klause.lowering.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.WcnfDocument(){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.lowering.mps/toProblem(): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(){}[0]
-final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.lowering.opb/toProblem(): com.eignex.klause.lowering.opb/OpbProblem // com.eignex.klause.lowering.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(){}[0]
+final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(){}[0]
 final fun (com.eignex.klause.ir/Factor).com.eignex.klause.factor.arithmetic/linearRow(): com.eignex.klause.factor.arithmetic/FactorRow? // com.eignex.klause.factor.arithmetic/linearRow|linearRow@com.eignex.klause.ir.Factor(){}[0]
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.ir/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]
 final fun (com.eignex.klause.ir/LinearObjectiveSpec).com.eignex.klause.solver.objective/toLinearObjective(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/toLinearObjective|toLinearObjective@com.eignex.klause.ir.LinearObjectiveSpec(){}[0]
