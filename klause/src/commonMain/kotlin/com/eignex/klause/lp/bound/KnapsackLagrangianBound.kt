@@ -3,10 +3,10 @@ package com.eignex.klause.lp.bound
 import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
-import com.eignex.klause.lp.engine.subExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
+import com.eignex.klause.util.subExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
@@ -202,7 +202,7 @@ internal class KnapsackLagrangianBound(problem: Problem, objective: LinearObject
                 if (!incumbent.isFinite() || multiplierCount == 0) return@repeat
                 if (!subgradientStep(eval.x, p, num, incumbent, prevDir)) return@repeat
             }
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             if (bestNum == Long.MIN_VALUE) return null
         }
         return if (bestNum == Long.MIN_VALUE) null else LagrangianResult(false, bestNum, Q, p)

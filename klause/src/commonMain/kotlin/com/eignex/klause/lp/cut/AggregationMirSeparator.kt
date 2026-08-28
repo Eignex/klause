@@ -6,10 +6,10 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.engine.Cut
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.lp.engine.addExact
-import com.eignex.klause.lp.engine.mulExact
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.LongArrayList
@@ -149,7 +149,7 @@ internal class AggregationMirSeparator : CutSeparator {
                 a[i] = coef.getOrDefault(order[i], 0L)
             }
             out.add(Row(cols, a, b))
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             return // an overflowing accumulation is dropped, not approximated
         }
     }
@@ -178,7 +178,7 @@ internal class AggregationMirSeparator : CutSeparator {
                 b = addExact(b, -mulExact(coeff, lo)) // shift to y_j = x_j − lo_j
             }
             out.add(Row(cols, a, b))
-        } catch (_: LpOverflowException) {
+        } catch (_: CheckedLongOverflowException) {
             return // a coefficient × bound that overflows Long is dropped, not approximated
         }
     }
@@ -211,7 +211,7 @@ internal class AggregationMirSeparator : CutSeparator {
         if (cols.size == 0) return null
         if (lhs <= rhsX.toDouble() + tol) return null // not violated by the LP point
         Cut(cols.toIntArray(), coeffs.toLongArray(), Relation.LE, rhsX, global = true)
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         null
     }
 

@@ -2,7 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.LpVerdict
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
@@ -53,7 +53,7 @@ internal fun unitCubeSolution(
     }
     val model = try {
         cb.builder.build(Sense.MINIMIZE)
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     }
     if (model.n == 0 || cancellation()) return null

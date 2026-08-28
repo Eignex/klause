@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.bound
 
-import com.eignex.klause.lp.engine.LpOverflowException
-import com.eignex.klause.lp.engine.addExact
+import com.eignex.klause.util.CheckedLongOverflowException
+import com.eignex.klause.util.addExact
 import com.eignex.klause.util.EmptyIntArray
 import com.eignex.klause.util.IntArrayDeque
 import com.eignex.klause.util.IntArrayList
@@ -17,7 +17,7 @@ import com.eignex.klause.util.LongArrayList
  * each variable connects to its allowed values at the option cost, and each value feeds one unit to
  * the sink. Shortest paths are found with SPFA (Bellman–Ford queue) so negative option costs — which
  * arise once Lagrangian multipliers adjust the objective coefficients — are handled directly. All
- * arithmetic is exact; an overflow surfaces as [LpOverflowException] for the caller to treat as
+ * arithmetic is exact; an overflow surfaces as [CheckedLongOverflowException] for the caller to treat as
  * "skip the Lagrangian bound at this node".
  */
 internal class MinCostAssignment(private val numVars: Int, private val numValues: Int) {
@@ -68,7 +68,7 @@ internal class MinCostAssignment(private val numVars: Int, private val numValues
     /**
      * Solve. Returns the optimal complete assignment, or [Result.infeasible] when fewer than
      * [numVars] variables can be matched (which, for an AllDifferent subproblem, proves the node
-     * infeasible). Throws [LpOverflowException] if the accumulated cost exceeds 64 bits.
+     * infeasible). Throws [CheckedLongOverflowException] if the accumulated cost exceeds 64 bits.
      */
     fun solve(): Result {
         var total = 0L

@@ -8,16 +8,16 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.FloatLpResult
 import com.eignex.klause.lp.engine.IntegerCertificate
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.LpSolver
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.TableauCutSolver
 import com.eignex.klause.lp.engine.VarStatus
-import com.eignex.klause.lp.engine.addExact
+import com.eignex.klause.util.addExact
 import com.eignex.klause.lp.engine.integerCertify
 import com.eignex.klause.lp.engine.integerDualLowerBoundCeil
 import com.eignex.klause.lp.engine.integerFarkasRay
-import com.eignex.klause.lp.engine.mulExact
+import com.eignex.klause.util.mulExact
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.LpExplanation
@@ -52,7 +52,7 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
         total = addExact(total, mulExact(c, if (c >= 0L) d.min else d.max))
     }
     total
-} catch (_: LpOverflowException) {
+} catch (_: CheckedLongOverflowException) {
     // A wrapped accumulation could overshoot the incumbent and prune wrongly; no bound is the
     // sound fallback.
     Long.MIN_VALUE
@@ -62,7 +62,7 @@ internal fun LpEngine.linearLowerBound(obj: LinearObjective, session: Propagatio
  * The `Σ_b contribution(b)` bool part of [linearLowerBound]. Maintained incrementally on the reversible
  * trail once installed at the root — an O(1) read instead of the O(numBoolVars) rescan that dominated
  * CPU on large pseudo-Boolean optimization; identical value either way. Before the root install is
- * possible (not at level 0), it rescans directly. Throws [LpOverflowException] via [addExact] on the
+ * possible (not at level 0), it rescans directly. Throws [CheckedLongOverflowException] via [addExact] on the
  * rescan path so the caller falls back to no bound.
  */
 private fun LpEngine.boolLowerBoundPart(obj: LinearObjective, session: PropagationSession): Long {
@@ -199,7 +199,7 @@ internal fun LpEngine.lpBoundAndFix(
         relaxer, session, bound, sink, cancellation, objectiveVar, objectiveAscending, hints, learn, warm,
         cutsAllowed,
     )
-} catch (_: LpOverflowException) {
+} catch (_: CheckedLongOverflowException) {
     // A coefficient overflow in the relaxation build loses the bound; recover a sound one via the
     // integer-multiplier 128-bit certification. A failure just keeps the node.
     sparseCertifiedPrune(relaxer, session, bound, sink, cancellation)
@@ -231,7 +231,7 @@ private fun LpEngine.foldSelectedCuts(
     if (selected.isEmpty()) return base to res
     val tightened = try {
         relaxer.build(session, selected)
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return base to res // overflow in the cut-augmented build: keep the prior (sound) relaxation
     }
     val cutSimplex = dualSimplex(tightened.model, cancellation)
@@ -429,7 +429,7 @@ internal fun LpEngine.sparseSafePrune(
                     session,
                     cutPool.select(boundRes.primal, objectiveCoefficients(boundRel.model), cutPool.maxCuts) + localCuts,
                 )
-            } catch (_: LpOverflowException) {
+            } catch (_: CheckedLongOverflowException) {
                 break // overflow in the cut-augmented build: keep the prior (sound) relaxation
             }
             val roundSimplex = dualSimplex(tightened.model, cancellation)
@@ -665,7 +665,7 @@ internal fun LpEngine.sparseCertifiedPrune(
         ?: return LpNodeOutcome(false, null)
     val full = try {
         addExact(lb, relaxation.objectiveConstant)
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return LpNodeOutcome(false, null)
     }
     return if (full.toDouble() >= bound) {
@@ -695,7 +695,7 @@ internal fun LpEngine.rootLpRelaxationBound(
         val safe = result?.let { safeObjectiveLowerBound(relaxation.model, it.duals) }
         if (safe != null) safe + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
-} catch (_: LpOverflowException) {
+} catch (_: CheckedLongOverflowException) {
     Double.NaN
 }
 
@@ -717,7 +717,7 @@ internal fun LpEngine.rootLpObjective(
         val result = dualSimplex(relaxation.model, cancellation).solve()
         if (result != null) result.objective + relaxation.objectiveConstant.toDouble() else Double.NaN
     }
-} catch (_: LpOverflowException) {
+} catch (_: CheckedLongOverflowException) {
     Double.NaN
 }
 
@@ -766,7 +766,7 @@ internal fun LpEngine.harvestRootCuts(
         // Bound the pool the search nodes inherit by per-cut activity (tightness at the final LP point):
         // a large harvest is trimmed to the most-active cuts, the rest evicted (sound — all global).
         pool.retainMostActive()
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return pool.cuts() // keep whatever stayed within 64-bit determinants — still globally valid
     }
     return pool.cuts()

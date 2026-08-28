@@ -3,7 +3,7 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.engine.LpOverflowException
+import com.eignex.klause.util.CheckedLongOverflowException
 import com.eignex.klause.lp.engine.RevisedSimplex
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
@@ -177,7 +177,7 @@ private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: Cancellati
     if (relaxation.model.n == 0) return null
     val result = try {
         dualSimplex(relaxation.model, token).solvePrimal()
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
     val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
@@ -194,13 +194,13 @@ private fun LpEngine.safeMax(prob: Problem, coeffs: LongArray, token: Cancellati
 private fun LpEngine.safeMinNoBake(coeffs: LongArray, token: Cancellation): Double? {
     val relaxation = try {
         CpToLpRelaxation(problem, LinearObjective(intCoefficients = coeffs)).build(RootDomains(problem))
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     }
     if (relaxation.model.n == 0) return null
     val result = try {
         dualSimplex(relaxation.model, token).solvePrimal()
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     } ?: return null
     val safe = safeObjectiveLowerBound(relaxation.model, result.duals) ?: return null
@@ -279,7 +279,7 @@ internal fun LpEngine.rootLpInfeasibleNoBake(token: Cancellation): Boolean {
     if (token()) return false
     val model = try {
         relaxer.build(RootDomains(problem)).model
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return false // a relaxation the row arithmetic cannot express yields no verdict, never a crash
     }
     if (model.n == 0) return false
@@ -307,7 +307,7 @@ internal fun LpEngine.rootRelaxationSize(): RootRelaxationSize? {
     if (session.isUnsatAtRoot) return null
     val model = try {
         relaxer.build(session).model
-    } catch (_: LpOverflowException) {
+    } catch (_: CheckedLongOverflowException) {
         return null
     }
     return RootRelaxationSize(model.n, model.m, model.csc.colPtr[model.n])

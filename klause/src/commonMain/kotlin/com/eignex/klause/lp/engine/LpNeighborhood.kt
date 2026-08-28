@@ -2,6 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntHashSet
+import com.eignex.klause.util.addExact
+import com.eignex.klause.util.mulExact
 
 /**
  * A row-capped neighborhood restriction of an [LpModel]: the sub-model over the rows a breadth-first
