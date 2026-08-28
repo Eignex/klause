@@ -16,10 +16,6 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.Contribution
-import com.eignex.klause.lp.LpSizeEstimate
-import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.IntIntMap
 import com.eignex.klause.util.LongArrayList
 import com.eignex.klause.util.MutableIntObjectMap
@@ -243,74 +239,7 @@ class Table private constructor(
         }
     }
 
-    /**
-     * Convex-hull LP relaxation: a selector column `y_t ∈ [0,1]` per allowed tuple with `Σ_t y_t = 1` and a
-     * per-column channel `xs[j] = Σ_t tuple_t[j]·y_t` — the projection onto `xs` is exactly the convex hull
-     * of the allowed tuples. A tuple's column exists when every entry is in the declared domain of its
-     * variable and is pinned to 0 when any entry left the live domain. Tables with more than [MAX_TUPLES]
-     * rows are skipped. HULL.
-     */
-    internal fun emitLpRelaxation(builder: RelaxationBuilder) {
-        if (!builder.hullEnabled()) return
-        // An interval/wildcard cell doesn't pin its variable for that tuple, so the per-tuple channel
-        // would be ill-defined; short tables skip the hull relaxation (propagation still enforces it).
-        if (hi != null) return
-        if (numTuples > MAX_TUPLES) return
-        val declared = Array(arity) { c -> builder.declaredDomain(xs[c]) }
-        val live = Array(arity) { c -> builder.liveDomain(xs[c]) }
-        val selCols = IntArrayList()
-        val rows = IntArrayList()
-        for (t in 0 until numTuples) {
-            var declaredFeasible = true
-            var liveFeasible = true
-            for (col in 0 until arity) {
-                val v = tuples[t * arity + col]
-                if (v !in declared[col]) {
-                    declaredFeasible = false
-                    break
-                }
-                if (v !in live[col]) liveFeasible = false
-            }
-            if (!declaredFeasible) continue
-            // The selector is present while every entry stays in its column's live domain — the
-            // membership conjunction that lets the persistent relaxation re-bind this column.
-            val presence = LongArray(arity * 2)
-            for (col in 0 until arity) {
-                presence[col * 2] = xs[col].toLong()
-                presence[col * 2 + 1] = tuples[t * arity + col]
-            }
-            selCols.add(builder.auxColumn(0L, if (liveFeasible) 1L else 0L, presence = presence))
-            rows.add(t)
-        }
-        val k = selCols.size
-        if (k == 0) return // no tuple feasible under the declared domains — leave it to propagation
-        builder.row(selCols.toIntArray(), LongArray(k) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
-        // xs[col] − Σ_t tuple_t[col]·y_t = 0 for each column.
-        for (col in 0 until arity) {
-            val cols = IntArray(k + 1)
-            val vals = LongArray(k + 1)
-            for (s in 0 until k) {
-                cols[s] = selCols[s]
-                vals[s] = -tuples[rows[s] * arity + col]
-            }
-            cols[k] = builder.intColumn(xs[col])
-            vals[k] = 1L
-            builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
-        }
-    }
-
-    internal fun estimateLpHull(): LpSizeEstimate? {
-        if (hi != null) return null
-        if (numTuples > MAX_TUPLES) return null
-        // One selector per tuple (upper bound on the declared-feasible ones) + Σ y = 1 + one channel
-        // per column.
-        return LpSizeEstimate(cols = numTuples.toLong(), rows = 1L + arity)
-    }
-
     private companion object {
-        /** Tables with more than this many tuples are skipped — the selector columns would dominate. */
-        const val MAX_TUPLES: Int = 1024
-
         /** Above this many tuples [structuralReduce] skips the dead-tuple scan, so a giant table is not
          *  re-swept every presolve round. */
         const val REDUCE_TUPLE_CAP: Int = 4096
