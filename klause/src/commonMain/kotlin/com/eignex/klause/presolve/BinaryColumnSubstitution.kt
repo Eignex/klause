@@ -199,7 +199,8 @@ internal object BinaryColumnSubstitution {
             unit && bound == 1L -> listOf(Clause(lits))
 
             // `Σ l ≥ n − 1` is `Σ ¬l ≤ 1`, and it is the `max == 1` form the at-most-one clique detector
-            // reads ([PresolveShared.amoCliques]) — the same constraint, in the shape its consumers see.
+            // reads ([com.eignex.klause.factor.bool.internals.amoCliques]) — the same constraint, in the
+            // shape its consumers see.
             unit && bound == n - 1L -> listOf(Cardinality(IntArray(n) { Lit.negate(lits[it]) }, 0, 1))
 
             unit && bound <= n.toLong() -> listOf(Cardinality(lits, bound.toInt(), n))
