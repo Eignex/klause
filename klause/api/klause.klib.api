@@ -760,7 +760,7 @@ abstract interface com.eignex.klause.ir/Factor { // com.eignex.klause.ir/Factor|
     open val integerTheoryOwnable // com.eignex.klause.ir/Factor.integerTheoryOwnable|{}integerTheoryOwnable[0]
         open fun <get-integerTheoryOwnable>(): kotlin/Boolean // com.eignex.klause.ir/Factor.integerTheoryOwnable.<get-integerTheoryOwnable>|<get-integerTheoryOwnable>(){}[0]
     open val linearRows // com.eignex.klause.ir/Factor.linearRows|{}linearRows[0]
-        open fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.ir/Factor.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+        open fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.ir/Factor.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     open val structuralKeyWeight // com.eignex.klause.ir/Factor.structuralKeyWeight|{}structuralKeyWeight[0]
         open fun <get-structuralKeyWeight>(): kotlin/Int // com.eignex.klause.ir/Factor.structuralKeyWeight.<get-structuralKeyWeight>|<get-structuralKeyWeight>(){}[0]
 
@@ -814,6 +814,26 @@ abstract interface com.eignex.klause.ir/IntSpan { // com.eignex.klause.ir/IntSpa
 
     abstract fun forEach(com.eignex.klause.ir/IntConsumer) // com.eignex.klause.ir/IntSpan.forEach|forEach(com.eignex.klause.ir.IntConsumer){}[0]
     abstract fun valueAt(kotlin/Int): kotlin/Long // com.eignex.klause.ir/IntSpan.valueAt|valueAt(kotlin.Int){}[0]
+}
+
+abstract interface com.eignex.klause.ir/LinearRow { // com.eignex.klause.ir/LinearRow|null[0]
+    abstract val bound // com.eignex.klause.ir/LinearRow.bound|{}bound[0]
+        abstract fun <get-bound>(): kotlin/Long // com.eignex.klause.ir/LinearRow.bound.<get-bound>|<get-bound>(){}[0]
+    abstract val relation // com.eignex.klause.ir/LinearRow.relation|{}relation[0]
+        abstract fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.ir/LinearRow.relation.<get-relation>|<get-relation>(){}[0]
+    abstract val size // com.eignex.klause.ir/LinearRow.size|{}size[0]
+        abstract fun <get-size>(): kotlin/Int // com.eignex.klause.ir/LinearRow.size.<get-size>|<get-size>(){}[0]
+    open val isIntegerOnly // com.eignex.klause.ir/LinearRow.isIntegerOnly|{}isIntegerOnly[0]
+        open fun <get-isIntegerOnly>(): kotlin/Boolean // com.eignex.klause.ir/LinearRow.isIntegerOnly.<get-isIntegerOnly>|<get-isIntegerOnly>(){}[0]
+
+    abstract fun coeff(kotlin/Int): kotlin/Long // com.eignex.klause.ir/LinearRow.coeff|coeff(kotlin.Int){}[0]
+    abstract fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.ir/LinearRow.ref|ref(kotlin.Int){}[0]
+
+    final object Companion { // com.eignex.klause.ir/LinearRow.Companion|null[0]
+        final fun ofBools(kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.ir/LinearRow // com.eignex.klause.ir/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
+        final fun ofBools(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.ir/LinearRow // com.eignex.klause.ir/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
+        final fun ofInts(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.ir/LinearRow // com.eignex.klause.ir/LinearRow.Companion.ofInts|ofInts(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
+    }
 }
 
 abstract interface com.eignex.klause.localsearch.movesource/MoveSource { // com.eignex.klause.localsearch.movesource/MoveSource|null[0]
@@ -879,26 +899,6 @@ abstract interface com.eignex.klause.lp.cut/CutExchange { // com.eignex.klause.l
 abstract interface com.eignex.klause.lp.cut/CutSharing { // com.eignex.klause.lp.cut/CutSharing|null[0]
     abstract fun exportGlobalCuts(): kotlin.collections/List<com.eignex.klause.lp.cut/SharedCut> // com.eignex.klause.lp.cut/CutSharing.exportGlobalCuts|exportGlobalCuts(){}[0]
     abstract fun importCuts(kotlin.collections/List<com.eignex.klause.lp.cut/SharedCut>) // com.eignex.klause.lp.cut/CutSharing.importCuts|importCuts(kotlin.collections.List<com.eignex.klause.lp.cut.SharedCut>){}[0]
-}
-
-abstract interface com.eignex.klause.lp/LinearRow { // com.eignex.klause.lp/LinearRow|null[0]
-    abstract val bound // com.eignex.klause.lp/LinearRow.bound|{}bound[0]
-        abstract fun <get-bound>(): kotlin/Long // com.eignex.klause.lp/LinearRow.bound.<get-bound>|<get-bound>(){}[0]
-    abstract val relation // com.eignex.klause.lp/LinearRow.relation|{}relation[0]
-        abstract fun <get-relation>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.lp/LinearRow.relation.<get-relation>|<get-relation>(){}[0]
-    abstract val size // com.eignex.klause.lp/LinearRow.size|{}size[0]
-        abstract fun <get-size>(): kotlin/Int // com.eignex.klause.lp/LinearRow.size.<get-size>|<get-size>(){}[0]
-    open val isIntegerOnly // com.eignex.klause.lp/LinearRow.isIntegerOnly|{}isIntegerOnly[0]
-        open fun <get-isIntegerOnly>(): kotlin/Boolean // com.eignex.klause.lp/LinearRow.isIntegerOnly.<get-isIntegerOnly>|<get-isIntegerOnly>(){}[0]
-
-    abstract fun coeff(kotlin/Int): kotlin/Long // com.eignex.klause.lp/LinearRow.coeff|coeff(kotlin.Int){}[0]
-    abstract fun ref(kotlin/Int): kotlin/Int // com.eignex.klause.lp/LinearRow.ref|ref(kotlin.Int){}[0]
-
-    final object Companion { // com.eignex.klause.lp/LinearRow.Companion|null[0]
-        final fun ofBools(kotlin/IntArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
-        final fun ofBools(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofBools|ofBools(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
-        final fun ofInts(kotlin/IntArray, kotlin/LongArray, com.eignex.klause.ir/LinearOp, kotlin/Long): com.eignex.klause.lp/LinearRow // com.eignex.klause.lp/LinearRow.Companion.ofInts|ofInts(kotlin.IntArray;kotlin.LongArray;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
-    }
 }
 
 abstract interface com.eignex.klause.lp/RelaxationBuilder { // com.eignex.klause.lp/RelaxationBuilder|null[0]
@@ -3884,7 +3884,7 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ComparisonClause.structuralKey|structuralKey(){}[0]
 }
 
-final class com.eignex.klause.factor.arithmetic/IntegerConstants : com.eignex.klause.factor.arithmetic/IntegralConstants, com.eignex.klause.lp/LinearRow { // com.eignex.klause.factor.arithmetic/IntegerConstants|null[0]
+final class com.eignex.klause.factor.arithmetic/IntegerConstants : com.eignex.klause.factor.arithmetic/IntegralConstants, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.arithmetic/IntegerConstants|null[0]
     constructor <init>(kotlin/IntArray, com.eignex.klause.solver/LongConstList, com.eignex.klause.ir/LinearOp, kotlin/Long) // com.eignex.klause.factor.arithmetic/IntegerConstants.<init>|<init>(kotlin.IntArray;com.eignex.klause.solver.LongConstList;com.eignex.klause.ir.LinearOp;kotlin.Long){}[0]
 
     final val bound // com.eignex.klause.factor.arithmetic/IntegerConstants.bound|{}bound[0]
@@ -3929,7 +3929,7 @@ final class com.eignex.klause.factor.arithmetic/Linear : com.eignex.klause.ir/Fa
     final val integralConstants // com.eignex.klause.factor.arithmetic/Linear.integralConstants|{}integralConstants[0]
         final fun <get-integralConstants>(): com.eignex.klause.factor.arithmetic/IntegralConstants? // com.eignex.klause.factor.arithmetic/Linear.integralConstants.<get-integralConstants>|<get-integralConstants>(){}[0]
     final val linearRows // com.eignex.klause.factor.arithmetic/Linear.linearRows|{}linearRows[0]
-        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.arithmetic/Linear.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.factor.arithmetic/Linear.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val op // com.eignex.klause.factor.arithmetic/Linear.op|{}op[0]
         final fun <get-op>(): com.eignex.klause.ir/LinearOp // com.eignex.klause.factor.arithmetic/Linear.op.<get-op>|<get-op>(){}[0]
     final val realConstants // com.eignex.klause.factor.arithmetic/Linear.realConstants|{}realConstants[0]
@@ -4132,7 +4132,7 @@ final class com.eignex.klause.factor.bool/Cardinality : com.eignex.klause.ir/Fac
     final val extendsObjectiveCone // com.eignex.klause.factor.bool/Cardinality.extendsObjectiveCone|{}extendsObjectiveCone[0]
         final fun <get-extendsObjectiveCone>(): kotlin/Boolean // com.eignex.klause.factor.bool/Cardinality.extendsObjectiveCone.<get-extendsObjectiveCone>|<get-extendsObjectiveCone>(){}[0]
     final val linearRows // com.eignex.klause.factor.bool/Cardinality.linearRows|{}linearRows[0]
-        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.bool/Cardinality.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.factor.bool/Cardinality.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val literals // com.eignex.klause.factor.bool/Cardinality.literals|{}literals[0]
         final fun <get-literals>(): kotlin/IntArray // com.eignex.klause.factor.bool/Cardinality.literals.<get-literals>|<get-literals>(){}[0]
     final val max // com.eignex.klause.factor.bool/Cardinality.max|{}max[0]
@@ -4155,7 +4155,7 @@ final class com.eignex.klause.factor.bool/Cardinality : com.eignex.klause.ir/Fac
     }
 }
 
-final class com.eignex.klause.factor.bool/Clause : com.eignex.klause.ir/Factor, com.eignex.klause.lp/LinearRow { // com.eignex.klause.factor.bool/Clause|null[0]
+final class com.eignex.klause.factor.bool/Clause : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.bool/Clause|null[0]
     constructor <init>(kotlin/IntArray) // com.eignex.klause.factor.bool/Clause.<init>|<init>(kotlin.IntArray){}[0]
 
     final val bound // com.eignex.klause.factor.bool/Clause.bound|{}bound[0]
@@ -4169,7 +4169,7 @@ final class com.eignex.klause.factor.bool/Clause : com.eignex.klause.ir/Factor, 
     final val isIntegerOnly // com.eignex.klause.factor.bool/Clause.isIntegerOnly|{}isIntegerOnly[0]
         final fun <get-isIntegerOnly>(): kotlin/Boolean // com.eignex.klause.factor.bool/Clause.isIntegerOnly.<get-isIntegerOnly>|<get-isIntegerOnly>(){}[0]
     final val linearRows // com.eignex.klause.factor.bool/Clause.linearRows|{}linearRows[0]
-        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.bool/Clause.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.factor.bool/Clause.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val literals // com.eignex.klause.factor.bool/Clause.literals|{}literals[0]
         final fun <get-literals>(): kotlin/IntArray // com.eignex.klause.factor.bool/Clause.literals.<get-literals>|<get-literals>(){}[0]
     final val relation // com.eignex.klause.factor.bool/Clause.relation|{}relation[0]
@@ -4200,7 +4200,7 @@ final class com.eignex.klause.factor.bool/GaussianXor : com.eignex.klause.ir/Fac
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.bool/GaussianXor.structuralKey|structuralKey(){}[0]
 }
 
-final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.ir/Factor, com.eignex.klause.lp/LinearRow { // com.eignex.klause.factor.bool/PseudoBoolean|null[0]
+final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.ir/Factor, com.eignex.klause.ir/LinearRow { // com.eignex.klause.factor.bool/PseudoBoolean|null[0]
     constructor <init>(kotlin/LongArray, kotlin/IntArray, com.eignex.klause.model/PbOp, kotlin/Long) // com.eignex.klause.factor.bool/PseudoBoolean.<init>|<init>(kotlin.LongArray;kotlin.IntArray;com.eignex.klause.model.PbOp;kotlin.Long){}[0]
 
     final val bound // com.eignex.klause.factor.bool/PseudoBoolean.bound|{}bound[0]
@@ -4210,7 +4210,7 @@ final class com.eignex.klause.factor.bool/PseudoBoolean : com.eignex.klause.ir/F
     final val isIntegerOnly // com.eignex.klause.factor.bool/PseudoBoolean.isIntegerOnly|{}isIntegerOnly[0]
         final fun <get-isIntegerOnly>(): kotlin/Boolean // com.eignex.klause.factor.bool/PseudoBoolean.isIntegerOnly.<get-isIntegerOnly>|<get-isIntegerOnly>(){}[0]
     final val linearRows // com.eignex.klause.factor.bool/PseudoBoolean.linearRows|{}linearRows[0]
-        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.bool/PseudoBoolean.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.factor.bool/PseudoBoolean.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val literals // com.eignex.klause.factor.bool/PseudoBoolean.literals|{}literals[0]
         final fun <get-literals>(): kotlin/IntArray // com.eignex.klause.factor.bool/PseudoBoolean.literals.<get-literals>|<get-literals>(){}[0]
     final val op // com.eignex.klause.factor.bool/PseudoBoolean.op|{}op[0]
@@ -4324,7 +4324,7 @@ final class com.eignex.klause.factor.global/Increasing : com.eignex.klause.ir/Fa
     constructor <init>(kotlin/IntArray, kotlin/Boolean) // com.eignex.klause.factor.global/Increasing.<init>|<init>(kotlin.IntArray;kotlin.Boolean){}[0]
 
     final val linearRows // com.eignex.klause.factor.global/Increasing.linearRows|{}linearRows[0]
-        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.lp/LinearRow> // com.eignex.klause.factor.global/Increasing.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
+        final fun <get-linearRows>(): kotlin.collections/List<com.eignex.klause.ir/LinearRow> // com.eignex.klause.factor.global/Increasing.linearRows.<get-linearRows>|<get-linearRows>(){}[0]
     final val strict // com.eignex.klause.factor.global/Increasing.strict|{}strict[0]
         final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.factor.global/Increasing.strict.<get-strict>|<get-strict>(){}[0]
     final val variables // com.eignex.klause.factor.global/Increasing.variables|{}variables[0]
@@ -11193,6 +11193,14 @@ final object com.eignex.klause.ir/NoVars : com.eignex.klause.ir/VarList { // com
     final fun toString(): kotlin/String // com.eignex.klause.ir/NoVars.toString|toString(){}[0]
 }
 
+final object com.eignex.klause.ir/Term { // com.eignex.klause.ir/Term|null[0]
+    final fun intVar(kotlin/Int): kotlin/Int // com.eignex.klause.ir/Term.intVar|intVar(kotlin.Int){}[0]
+    final fun isBool(kotlin/Int): kotlin/Boolean // com.eignex.klause.ir/Term.isBool|isBool(kotlin.Int){}[0]
+    final fun lit(kotlin/Int): kotlin/Int // com.eignex.klause.ir/Term.lit|lit(kotlin.Int){}[0]
+    final fun ofIntVar(kotlin/Int): kotlin/Int // com.eignex.klause.ir/Term.ofIntVar|ofIntVar(kotlin.Int){}[0]
+    final fun ofLit(kotlin/Int): kotlin/Int // com.eignex.klause.ir/Term.ofLit|ofLit(kotlin.Int){}[0]
+}
+
 final object com.eignex.klause.localsearch.movesource/MoveSourceCatalog { // com.eignex.klause.localsearch.movesource/MoveSourceCatalog|null[0]
     final val labels // com.eignex.klause.localsearch.movesource/MoveSourceCatalog.labels|{}labels[0]
         final fun <get-labels>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.localsearch.movesource/MoveSourceCatalog.labels.<get-labels>|<get-labels>(){}[0]
@@ -11248,14 +11256,6 @@ final object com.eignex.klause.lp.bounding/LpAutoConfig { // com.eignex.klause.l
 
     final fun recommend(com.eignex.klause.ir/Problem, com.eignex.klause.lp.bounding/LpPlan = ...): com.eignex.klause.lp.bounding/LpPlan // com.eignex.klause.lp.bounding/LpAutoConfig.recommend|recommend(com.eignex.klause.ir.Problem;com.eignex.klause.lp.bounding.LpPlan){}[0]
     final fun resolve(com.eignex.klause.ir/Problem, com.eignex.klause.lp.bounding/LpConfig, com.eignex.klause.lp.bounding/LpPlan = ...): com.eignex.klause.lp.bounding/LpPlan // com.eignex.klause.lp.bounding/LpAutoConfig.resolve|resolve(com.eignex.klause.ir.Problem;com.eignex.klause.lp.bounding.LpConfig;com.eignex.klause.lp.bounding.LpPlan){}[0]
-}
-
-final object com.eignex.klause.lp/Term { // com.eignex.klause.lp/Term|null[0]
-    final fun intVar(kotlin/Int): kotlin/Int // com.eignex.klause.lp/Term.intVar|intVar(kotlin.Int){}[0]
-    final fun isBool(kotlin/Int): kotlin/Boolean // com.eignex.klause.lp/Term.isBool|isBool(kotlin.Int){}[0]
-    final fun lit(kotlin/Int): kotlin/Int // com.eignex.klause.lp/Term.lit|lit(kotlin.Int){}[0]
-    final fun ofIntVar(kotlin/Int): kotlin/Int // com.eignex.klause.lp/Term.ofIntVar|ofIntVar(kotlin.Int){}[0]
-    final fun ofLit(kotlin/Int): kotlin/Int // com.eignex.klause.lp/Term.ofLit|ofLit(kotlin.Int){}[0]
 }
 
 final object com.eignex.klause.model/BoolSpec : com.eignex.klause.model/VarSpec, kotlinx.serialization.internal/SerializerFactory { // com.eignex.klause.model/BoolSpec|null[0]

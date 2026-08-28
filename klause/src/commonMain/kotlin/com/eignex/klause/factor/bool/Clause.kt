@@ -6,15 +6,15 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.KeySink
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.StructuralKey
+import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.Term
 import com.eignex.klause.util.IntHashSet
 
 /**

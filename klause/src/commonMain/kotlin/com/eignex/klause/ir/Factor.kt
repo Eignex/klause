@@ -2,10 +2,8 @@ package com.eignex.klause.ir
 
 import com.eignex.klause.lp.HullFamily
 import com.eignex.klause.lp.HullFlags
-import com.eignex.klause.lp.LinearRow
 import com.eignex.klause.lp.LpSizeEstimate
 import com.eignex.klause.lp.RelaxationBuilder
-import com.eignex.klause.lp.Term
 
 /**
  * Structural contract for a constraint in `Problem`: variable membership, remapping, and

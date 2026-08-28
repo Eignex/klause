@@ -1075,7 +1075,7 @@ public final class com/eignex/klause/factor/arithmetic/FactorRowKt {
 	public static final fun linearRow (Lcom/eignex/klause/ir/Factor;)Lcom/eignex/klause/factor/arithmetic/FactorRow;
 }
 
-public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/eignex/klause/factor/arithmetic/IntegralConstants, com/eignex/klause/lp/LinearRow {
+public final class com/eignex/klause/factor/arithmetic/IntegerConstants : com/eignex/klause/factor/arithmetic/IntegralConstants, com/eignex/klause/ir/LinearRow {
 	public fun <init> ([ILcom/eignex/klause/solver/LongConstList;Lcom/eignex/klause/ir/LinearOp;J)V
 	public fun coeff (I)J
 	public fun exactCoeff (I)Lcom/ionspin/kotlin/bignum/integer/BigInteger;
@@ -1369,7 +1369,7 @@ public final class com/eignex/klause/factor/bool/Cardinality$Companion {
 	public final fun exactlyOne ([I)Lcom/eignex/klause/factor/bool/Cardinality;
 }
 
-public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/Factor, com/eignex/klause/lp/LinearRow {
+public final class com/eignex/klause/factor/bool/Clause : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {
 	public fun <init> ([I)V
 	public final fun allLiteralsBool (I)Z
 	public fun canSubstituteAffine (IIII)Z
@@ -1426,7 +1426,7 @@ public final class com/eignex/klause/factor/bool/GaussianXor : com/eignex/klause
 	public fun substituteAffine (IIII)Lcom/eignex/klause/ir/Factor;
 }
 
-public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klause/ir/Factor, com/eignex/klause/lp/LinearRow {
+public final class com/eignex/klause/factor/bool/PseudoBoolean : com/eignex/klause/ir/Factor, com/eignex/klause/ir/LinearRow {
 	public fun <init> ([J[ILcom/eignex/klause/model/PbOp;J)V
 	public fun canSubstituteAffine (IIII)Z
 	public fun coeff (I)J
@@ -2666,6 +2666,26 @@ public final class com/eignex/klause/ir/LinearOp : java/lang/Enum {
 	public static fun values ()[Lcom/eignex/klause/ir/LinearOp;
 }
 
+public abstract interface class com/eignex/klause/ir/LinearRow {
+	public static final field Companion Lcom/eignex/klause/ir/LinearRow$Companion;
+	public abstract fun coeff (I)J
+	public abstract fun getBound ()J
+	public abstract fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
+	public abstract fun getSize ()I
+	public fun isIntegerOnly ()Z
+	public abstract fun ref (I)I
+}
+
+public final class com/eignex/klause/ir/LinearRow$Companion {
+	public final fun ofBools ([ILcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/ir/LinearRow;
+	public final fun ofBools ([I[JLcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/ir/LinearRow;
+	public final fun ofInts ([I[JLcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/ir/LinearRow;
+}
+
+public final class com/eignex/klause/ir/LinearRow$DefaultImpls {
+	public static fun isIntegerOnly (Lcom/eignex/klause/ir/LinearRow;)Z
+}
+
 public final class com/eignex/klause/ir/Lit {
 	public static final field INSTANCE Lcom/eignex/klause/ir/Lit;
 	public final fun evaluate (IZ)Z
@@ -2775,6 +2795,15 @@ public final class com/eignex/klause/ir/StructuralKey : java/lang/Comparable {
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/ir/Term {
+	public static final field INSTANCE Lcom/eignex/klause/ir/Term;
+	public final fun intVar (I)I
+	public final fun isBool (I)Z
+	public final fun lit (I)I
+	public final fun ofIntVar (I)I
+	public final fun ofLit (I)I
 }
 
 public abstract interface class com/eignex/klause/ir/VarList {
@@ -4689,26 +4718,6 @@ public final class com/eignex/klause/lp/HullFlags {
 	public final fun getTable ()Z
 }
 
-public abstract interface class com/eignex/klause/lp/LinearRow {
-	public static final field Companion Lcom/eignex/klause/lp/LinearRow$Companion;
-	public abstract fun coeff (I)J
-	public abstract fun getBound ()J
-	public abstract fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
-	public abstract fun getSize ()I
-	public fun isIntegerOnly ()Z
-	public abstract fun ref (I)I
-}
-
-public final class com/eignex/klause/lp/LinearRow$Companion {
-	public final fun ofBools ([ILcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
-	public final fun ofBools ([I[JLcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
-	public final fun ofInts ([I[JLcom/eignex/klause/ir/LinearOp;J)Lcom/eignex/klause/lp/LinearRow;
-}
-
-public final class com/eignex/klause/lp/LinearRow$DefaultImpls {
-	public static fun isIntegerOnly (Lcom/eignex/klause/lp/LinearRow;)Z
-}
-
 public final class com/eignex/klause/lp/LpSizeEstimate {
 	public fun <init> (JJ)V
 	public final fun getCols ()J
@@ -4745,15 +4754,6 @@ public final class com/eignex/klause/lp/RelaxationBuilder$DefaultImpls {
 	public static fun realRow (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[I)V
 	public static synthetic fun realRow$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[DLcom/eignex/klause/ir/LinearOp;DZ[IILjava/lang/Object;)V
 	public static synthetic fun row$default (Lcom/eignex/klause/lp/RelaxationBuilder;[I[JLcom/eignex/klause/ir/LinearOp;JLcom/eignex/klause/lp/Contribution;ILjava/lang/Object;)V
-}
-
-public final class com/eignex/klause/lp/Term {
-	public static final field INSTANCE Lcom/eignex/klause/lp/Term;
-	public final fun intVar (I)I
-	public final fun isBool (I)Z
-	public final fun lit (I)I
-	public final fun ofIntVar (I)I
-	public final fun ofLit (I)I
 }
 
 public final class com/eignex/klause/lp/bounding/LpAutoConfig {
