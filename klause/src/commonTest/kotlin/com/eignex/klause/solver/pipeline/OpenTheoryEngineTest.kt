@@ -60,7 +60,7 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `open route reports a wall timeout separately from cancellation`() {
+    fun `open route reports a wall timeout without external cancellation`() {
         val openUpper = Bits(1).also { it.set(0) }
         val model = ProblemSpec(
             numBoolVars = 1,
@@ -69,7 +69,7 @@ class OpenTheoryEngineTest {
         )
 
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY).solve(
-            TheoryParams(cancellation = Cancellation { true }, timeout = Cancellation { true }),
+            TheoryParams(timeout = Cancellation { true }),
         )
 
         assertEquals(TerminationReason.Timeout, assertIs<OpenTheoryResult.Unknown>(result).reason)
@@ -121,6 +121,29 @@ class OpenTheoryEngineTest {
         assertIs<OpenTheoryResult.Sat>(first)
         assertIs<OpenTheoryResult.Sat>(second)
         assertEquals(first.stats.openTheory, second.stats.openTheory)
+    }
+
+    @Test
+    fun `General LIA records every cooperative cancellation poll`() {
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(
+                lowerBounds = longArrayOf(0),
+                upperBounds = longArrayOf(0),
+                openLo = null,
+                openHi = Bits(1).also { it.set(0) },
+            ),
+            factors = arrayOf(
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                Clause(intArrayOf(0)),
+            ),
+        )
+
+        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+        assertEquals(10L, result.stats.openTheory.openCancellationPolls)
+        assertEquals(9L, result.stats.openTheory.openWork)
     }
 
     @Test

@@ -107,7 +107,7 @@ class OpenTheoryEngine internal constructor(
 
     /** Execute one feasibility round against the caller's solve-wide [work] sink. */
     internal fun solve(params: TheoryParams, work: OpenTheoryWorkSink): OpenTheoryResult {
-        val cancellation = Cancellation { params.cancellation() }
+        val cancellation = Cancellation { params.timeout() || params.cancellation() }
         val stats = SolveStatsSink(backend = route.backendName())
         stats.start()
         // Building the components reads the whole model, so a budget already spent is answered before
