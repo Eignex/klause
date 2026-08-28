@@ -12,11 +12,10 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteExecutionCallbacks
-import com.eignex.klause.solver.pipeline.FiniteExecutionRequest
 import com.eignex.klause.solver.pipeline.FiniteExecutionResult
 import com.eignex.klause.solver.pipeline.FiniteExecutionVerdict
 import com.eignex.klause.solver.pipeline.FinitePipeline
-import com.eignex.klause.solver.pipeline.FinitePipelineRequest
+import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OPEN_WORK_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -25,7 +24,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.autoArms
-import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.variablePartition
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
@@ -35,7 +34,6 @@ import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.TimeSource
 
 /**
  * The unified, mode-agnostic solve driver. Every CLI mode (MiniZinc, XCSP3, SMT-LIB) feeds a
@@ -131,51 +129,7 @@ internal object SolveCore {
 
             SolvablePipeline.FiniteCp -> Unit
         }
-        val presolveStart = TimeSource.Monotonic.markNow()
         val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
-        val solvable = rawSolvable.withPreparation(
-            FinitePipeline.prepare(
-                FinitePipelineRequest(
-                    problem = rawSolvable.finiteProblem,
-                    engine = engine,
-                    objective = rawSolvable.linearObjective,
-                    presolveConfig = config,
-                    explicitPresolveConfig = common.presolve != null,
-                    solutionSetSensitive = solutionSetSensitive,
-                    cancellation = presolveCancel,
-                    presolveBudget = presolveBudget,
-                ),
-            ),
-        )
-        val presolveElapsed = presolveStart.elapsedNow()
-        // `dry-run-presolve` prints what presolve produced and exits without solving — a fast,
-        // engine-independent way to inspect/A-B a presolve config (engine param, like dry-run-solver).
-        if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) {
-            printPresolved(
-                rawSolvable.problem ?: solvable.finiteProblem,
-                solvable.finiteProblem,
-                solvable.presolve,
-                presolveElapsed,
-                common.loadElapsedMs,
-            )
-            return
-        }
-        cliLogger(common.verbose).v {
-            val p0 = rawSolvable.problem ?: solvable.finiteProblem
-            val p1 = solvable.finiteProblem
-            "presolve [${engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
-                "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}"
-        }
-        output.begin(solvable.optimize, solvable.maximize)
-
-        // Presolve already proved infeasibility (e.g. a gcd-indivisible equality caught by the
-        // first-running coefficient-strengthening pass): report it directly rather than invoking a
-        // solver, whose root bake would re-derive it by O(span) bound-narrowing on a wide domain.
-        if (solvable.presolve?.infeasible == true) {
-            output.onComplete(Verdict.UNSATISFIABLE)
-            return
-        }
-
         // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
         // engine (fixed) is inherently single-core.
@@ -185,7 +139,10 @@ internal object SolveCore {
             // annotation decides the heuristic, so per-solver selector --params are rejected.
             FiniteEngine.FIXED -> {
                 rejectParallel(engine, cores, alt = null)
-                runBacktrack(solvable, common, output, cancel, deadline, nodeBudget)
+                runBacktrack(
+                    rawSolvable, common, output, config, solutionSetSensitive, presolveCancel, presolveBudget,
+                    cancel, deadline, nodeBudget,
+                )
             }
 
             // The parallel-capable portfolio engines: their mix is carried on the enum. `ls` resolves
@@ -193,7 +150,10 @@ internal object SolveCore {
             // resolves a per-solver override pool from its --params (var-/val-selector, luby, …). A
             // single resolved arm runs as a one-arm pool.
             FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH, FiniteEngine.MIXED, FiniteEngine.ALNS ->
-                runPortfolio(solvable, common, output, cores, engine, cancel, nodeBudget)
+                runPortfolio(
+                    rawSolvable, common, output, cores, engine, config, solutionSetSensitive, presolveCancel,
+                    presolveBudget, cancel, nodeBudget,
+                )
         }
     }
 
@@ -298,6 +258,10 @@ internal object SolveCore {
         solvable: Solvable,
         common: CommonOptions,
         output: OutputProtocol,
+        presolveConfig: PresolveConfig,
+        solutionSetSensitive: Boolean,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
         cancel: Cancellation,
         deadline: Long?,
         nodeBudget: NodeBudget?,
@@ -309,20 +273,20 @@ internal object SolveCore {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: LpConfig.OFF
         executeFinite(
-            FiniteExecutionRequest(
-                problem = solvable.finiteProblem,
+            FiniteSolveRequest(
+                shape = solvable.finiteShape,
                 engine = FiniteEngine.FIXED,
-                optimize = solvable.optimize,
-                objective = solvable.linearObjective,
-                localSearchObjective = solvable.lsObjective,
-                definitionalSweep = solvable.definitionalSweep,
-                searchHints = solvable.searchHints,
+                presolveConfig = presolveConfig,
+                explicitPresolveConfig = common.presolve != null,
+                solutionSetSensitive = solutionSetSensitive,
+                presolveBudget = presolveBudget,
                 cores = 1,
                 engineParams = common.engineParams,
                 randomSeed = common.randomSeed,
                 defaultArms = 1,
                 lpConfig = lpConfig,
                 cancellation = cancel,
+                presolveCancellation = presolveCancellation,
                 nodeBudget = nodeBudget,
                 solveBudgetMillis = common.timeLimitMs,
                 allSolutions = common.allSolutions,
@@ -330,6 +294,7 @@ internal object SolveCore {
                 deadlineExceeded = { deadline != null && nowMillis() > deadline },
                 onEvent = verboseListener(common.verbose),
                 onPortfolioEvent = null,
+                prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
             ),
             solvable,
             common,
@@ -507,6 +472,10 @@ internal object SolveCore {
         output: OutputProtocol,
         cores: Int,
         engine: FiniteEngine,
+        presolveConfig: PresolveConfig,
+        solutionSetSensitive: Boolean,
+        presolveCancellation: Cancellation,
+        presolveBudget: PresolveBudget?,
         cancel: Cancellation,
         nodeBudget: NodeBudget?,
     ) {
@@ -519,20 +488,20 @@ internal object SolveCore {
             runCatching { LpConfig.parse(it) }.getOrElse { e -> usageError("--lp: ${e.message}") }
         } ?: LpConfig.AGGRESSIVE
         executeFinite(
-            FiniteExecutionRequest(
-                problem = solvable.finiteProblem,
+            FiniteSolveRequest(
+                shape = solvable.finiteShape,
                 engine = engine,
-                optimize = solvable.optimize,
-                objective = solvable.linearObjective,
-                localSearchObjective = solvable.lsObjective,
-                definitionalSweep = solvable.definitionalSweep,
-                searchHints = solvable.searchHints,
+                presolveConfig = presolveConfig,
+                explicitPresolveConfig = common.presolve != null,
+                solutionSetSensitive = solutionSetSensitive,
+                presolveBudget = presolveBudget,
                 cores = cores,
                 engineParams = common.engineParams,
                 randomSeed = common.randomSeed,
                 defaultArms = defaultArms,
                 lpConfig = lpCeiling,
                 cancellation = cancel,
+                presolveCancellation = presolveCancellation,
                 nodeBudget = nodeBudget,
                 solveBudgetMillis = null,
                 allSolutions = common.allSolutions,
@@ -540,6 +509,7 @@ internal object SolveCore {
                 deadlineExceeded = { false },
                 onEvent = null,
                 onPortfolioEvent = portfolioVerboseListener(common.verbose),
+                prepareOnly = EngineParams(common.engineParams).bool("dry-run-presolve") == true,
             ),
             solvable,
             common,
@@ -548,12 +518,12 @@ internal object SolveCore {
     }
 
     private fun executeFinite(
-        request: FiniteExecutionRequest,
+        request: FiniteSolveRequest,
         solvable: Solvable,
         common: CommonOptions,
         output: OutputProtocol,
     ) {
-        val result = FinitePipeline.execute(
+        val result = FinitePipeline.solve(
             request,
             FiniteExecutionCallbacks(
                 onSample = { sample -> emit(output, solvable, sample) },
@@ -567,27 +537,46 @@ internal object SolveCore {
                 },
             ),
         )
-        when (result) {
+        val preparation = result.preparation
+        cliLogger(common.verbose).v {
+            val p0 = solvable.finiteProblem
+            val p1 = preparation.problem
+            "presolve [${request.engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
+                "ints ${p0.numIntVars}→${p1.numIntVars}, bools ${p0.numBoolVars}→${p1.numBoolVars}"
+        }
+        val execution = result.execution
+        if (execution == null) {
+            printPresolved(
+                solvable.finiteProblem,
+                preparation.problem,
+                preparation.presolve,
+                result.preparationElapsed,
+                common.loadElapsedMs,
+            )
+            return
+        }
+        output.begin(solvable.optimize, solvable.maximize)
+        when (execution) {
             is FiniteExecutionResult.DryRun -> {
-                errPrintln(result.heading)
-                result.lines.forEach(::errPrintln)
+                errPrintln(execution.heading)
+                execution.lines.forEach(::errPrintln)
             }
 
             is FiniteExecutionResult.Completed -> {
                 output.onVerdictContext(
                     VerdictContext(
-                        budgetExhausted = budgetSpent(common, result.stats.run.timedOut),
+                        budgetExhausted = budgetSpent(common, execution.stats.run.timedOut),
                         completePool = !request.engine.pureLocalSearch,
                     ),
                 )
-                output.onComplete(result.verdict.toCliVerdict())
+                output.onComplete(execution.verdict.toCliVerdict())
                 stats(
                     common,
                     output,
                     solvable,
-                    withModelObjective(result.stats, solvable, result.bestSample),
-                    result.elapsedMs,
-                    result.solutions,
+                    withModelObjective(execution.stats, solvable, execution.bestSample),
+                    execution.elapsedMs,
+                    execution.solutions,
                 )
             }
         }
