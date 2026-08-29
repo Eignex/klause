@@ -8,6 +8,7 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
@@ -41,5 +42,12 @@ class UnplaceableColumnTest {
         )
 
         assertNull(model.componentPlan().unplaceable)
+    }
+
+    @Test
+    fun `a refused source route carries its unplaceable column`() {
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(withAllDifferentOverOpenColumn().pipelineRoute())
+
+        assertEquals(1, assertNotNull(route.unplaceable).column)
     }
 }

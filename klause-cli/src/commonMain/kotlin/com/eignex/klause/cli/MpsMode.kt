@@ -62,7 +62,7 @@ internal object MpsMode : CliMode {
                     openTheorySolvable(route.request) { assignment -> renderMpsOpenModel(compiled, assignment) }
                 }
 
-                SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
+                is SourceProblemRoute.UnsupportedOpen -> unsupportedOpenMpsModel()
             }
         }
 
