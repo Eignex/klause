@@ -1,7 +1,6 @@
-package com.eignex.klause.lowering.dimacs
+package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.dimacs.DimacsFormatException
 import com.eignex.klause.ir.Lit
 import kotlin.test.Test
 import kotlin.test.assertEquals

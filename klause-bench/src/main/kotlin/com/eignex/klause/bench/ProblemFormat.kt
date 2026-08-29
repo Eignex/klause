@@ -3,6 +3,7 @@ package com.eignex.klause.bench
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.compile.compile
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.formats.json.JsonSchema
 import com.eignex.klause.formats.mps.Mps
 import com.eignex.klause.formats.opb.Opb
@@ -11,7 +12,6 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.xcsp3.Xcsp3
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSpec
-import com.eignex.klause.lowering.dimacs.toProblem
 import com.eignex.klause.lowering.mps.toProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective

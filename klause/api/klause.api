@@ -1936,6 +1936,11 @@ public final class com/eignex/klause/formats/dimacs/Dimacs {
 	public final fun parseWcnf (Ljava/lang/String;)Lcom/eignex/klause/formats/dimacs/WcnfDocument;
 }
 
+public final class com/eignex/klause/formats/dimacs/DimacsDecoderKt {
+	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/CnfDocument;)Lcom/eignex/klause/ir/Problem;
+	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/WcnfDocument;)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
+}
+
 public final class com/eignex/klause/formats/dimacs/DimacsFormatException : com/eignex/klause/formats/FormatException {
 	public fun <init> (Ljava/lang/String;)V
 }
@@ -1955,6 +1960,21 @@ public final class com/eignex/klause/formats/dimacs/WcnfDocument {
 	public final fun getNumOriginalBoolVars ()I
 	public final fun getSoftClauses ()Ljava/util/List;
 	public final fun getTriviallyUnsat ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/dimacs/WcnfProblem {
+	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;I)V
+	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
+	public final fun component2 ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
+	public final fun component3 ()I
+	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;I)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/dimacs/WcnfProblem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;IILjava/lang/Object;)Lcom/eignex/klause/formats/dimacs/WcnfProblem;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNumOriginalBoolVars ()I
+	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
+	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -4145,26 +4165,6 @@ public final class com/eignex/klause/lowering/FloatBucketing {
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 	public final fun valueOf (I)D
-}
-
-public final class com/eignex/klause/lowering/dimacs/WcnfProblem {
-	public fun <init> (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;I)V
-	public final fun component1 ()Lcom/eignex/klause/ir/Problem;
-	public final fun component2 ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
-	public final fun component3 ()I
-	public final fun copy (Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;I)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/dimacs/WcnfProblem;Lcom/eignex/klause/ir/Problem;Lcom/eignex/klause/ir/LinearObjectiveSpec;IILjava/lang/Object;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getNumOriginalBoolVars ()I
-	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
-	public final fun getProblem ()Lcom/eignex/klause/ir/Problem;
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/lowering/dimacs/WcnfProblemKt {
-	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/CnfDocument;)Lcom/eignex/klause/ir/Problem;
-	public static final fun toProblem (Lcom/eignex/klause/formats/dimacs/WcnfDocument;)Lcom/eignex/klause/lowering/dimacs/WcnfProblem;
 }
 
 public abstract interface class com/eignex/klause/lowering/flatzinc/FlatZincArray {
