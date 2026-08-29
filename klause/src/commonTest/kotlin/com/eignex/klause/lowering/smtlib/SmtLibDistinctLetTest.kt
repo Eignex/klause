@@ -3,6 +3,7 @@ package com.eignex.klause.lowering.smtlib
 import com.eignex.klause.formats.smtlib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import com.eignex.klause.formats.smtlib.SmtLib as FormatSmtLib
 
 /**
  * A `let`-bound term that an assertion forces true should be posted, not reified.
@@ -15,7 +16,7 @@ class SmtLibDistinctLetTest {
         val names = (0 until operands).joinToString(" ") { "x$it" }
         val decls = (0 until operands).joinToString("\n") { "(declare-fun x$it () Int)" }
         val text = "(set-logic QF_LIA)\n$decls\n(assert (let ((b (distinct $names))) b))\n(check-sat)"
-        return SmtLib.parse(text).model.numBoolVars
+        return FormatSmtLib.parse(text).model.numBoolVars
     }
 
     @Test

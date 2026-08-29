@@ -4,8 +4,8 @@ import com.eignex.klause.formats.mps.MpsConstraint
 import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.MpsObjective
 import com.eignex.klause.formats.mps.MpsVar
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.lowering.mps.toProblem
-import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.util.Cancellation

@@ -1,17 +1,12 @@
 package com.eignex.klause.lowering.smtlib
 
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
-import com.eignex.klause.util.CharSource
-import com.eignex.klause.util.StringCharSource
 
 /** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)
@@ -19,51 +14,12 @@ internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtExceptio
 /** One lowered linear relation `Σ coeffs·vars ⟨op⟩ bound` (shared by bound inference and lowering). */
 internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: LinearOp, val bound: Long)
 
-/** A parsed SMT-LIB instance lifted into klause's representation. */
-data class SmtLibProblem(
-    /** Compiled model. Open integer sides remain open until a finite-search backend materializes them. */
-    val model: ProblemSpec,
-    /** Objective, or null for satisfaction instances. */
-    val objective: LinearObjectiveSpec?,
-    /** Declared `Int` variable name to int id. */
-    val intVarNames: Map<String, Int> = emptyMap(),
-    /** Declared `Bool` variable name to bool id. */
-    val boolVarNames: Map<String, Int> = emptyMap(),
-    /** Declared `Real` variable name to LP-only real id. */
-    val realVarNames: Map<String, Int> = emptyMap(),
-    /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
-    val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-)
-
-/** Parser/compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
+/** Compiler for the supported SMT-LIB linear-arithmetic subset (QF_LIA / QF_LRA / QF_LIRA
  *  fragments). The [Builder]'s per-concern compilation steps live in sibling files as extension
  *  functions: bound inference in `SmtLibBounds.kt`, boolean / assert / distinct compilation in
  *  `SmtLibExpr.kt`, linear-term / relation / objective lowering in `SmtLibLinear.kt`, and the real
  *  (LRA) lowering in `SmtLibReal.kt`. */
-object SmtLib {
-    /** Parse SMT-LIB linear-arithmetic [text] into an [SmtLibProblem]. Source integer sides without a
-     *  provable bound remain open in its [ProblemSpec]. */
-    fun parse(
-        text: String,
-        unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-        unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-        strictBounds: Boolean = false,
-    ): SmtLibProblem = parse(StringCharSource(text), unboundedIntLo, unboundedIntHi, strictBounds)
-
-    /** Parse SMT-LIB linear-arithmetic from a streamed [source], pulling one top-level command at a time
-     *  so the whole script is never materialized. Semantically identical to the [String] overload. */
-    fun parse(
-        source: CharSource,
-        unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
-        unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
-        strictBounds: Boolean = false,
-    ): SmtLibProblem {
-        val b = Builder(unboundedIntLo, unboundedIntHi, strictBounds)
-        val reader = SExprReader(source)
-        while (true) b.command(reader.readCommandOrNull() ?: break)
-        return b.build()
-    }
-
+internal object SmtLib {
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
      *  `internal fun SmtLib.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
     internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
