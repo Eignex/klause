@@ -1,7 +1,6 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.WideLinComb
@@ -22,7 +21,7 @@ import com.ionspin.kotlin.bignum.integer.BigInteger
 private val LONG_MAX = BigInteger.fromLong(Long.MAX_VALUE)
 
 /** The bounds of [v]'s current presolve domain; a side is null when the domain is open there. */
-private fun SmtLib.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (val d = intDomains[v]) {
+private fun Compiler.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (val d = intDomains[v]) {
     is PresolveDomain.Finite -> d.domain.min to d.domain.max
     is PresolveDomain.Open -> d.lo to d.hi
 }
@@ -31,7 +30,7 @@ private fun SmtLib.Builder.domainBounds(v: Int): Pair<Long?, Long?> = when (val 
  * An open side has no finite magnitude. The open theory pipeline carries the fresh quantity as an open
  * ordinary integer; only the finite CP pipeline needs a digit vector for a genuinely wide finite range.
  */
-internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteger>? {
+internal fun Compiler.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteger>? {
     var lo = w.constant
     var hi = w.constant
     for ((v, c) in w.coeffs) {
@@ -47,7 +46,7 @@ internal fun SmtLib.Builder.wideRange(w: WideLinComb): Pair<BigInteger, BigInteg
 }
 
 /** A bound on `|value|` of [t]. */
-internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger? {
+internal fun Compiler.Builder.intCombMagnitude(t: IntComb): BigInteger? {
     val (lo, hi) = wideRange(t.toWide()) ?: return null
     val a = lo.abs()
     val b = hi.abs()
@@ -61,7 +60,7 @@ internal fun SmtLib.Builder.intCombMagnitude(t: IntComb): BigInteger? {
  * digit columns, the leading one signed — one digit vector per value, so search never revisits a value
  * it has already ruled out.
  */
-internal fun SmtLib.Builder.freshWideInt(magnitude: BigInteger?): IntComb {
+internal fun Compiler.Builder.freshWideInt(magnitude: BigInteger?): IntComb {
     if (magnitude == null) return IntComb.Narrow(LinComb(mapOf(newInt(null, null) to 1), 0))
     val m = magnitude.abs()
     if (m <= LONG_MAX) {
@@ -76,7 +75,7 @@ internal fun SmtLib.Builder.freshWideInt(magnitude: BigInteger?): IntComb {
 }
 
 /** `|x|` as a fresh quantity `y` with `y ≥ x`, `y ≥ −x` and `y = x ∨ y = −x`, at arbitrary precision. */
-internal fun SmtLib.Builder.wideAbsTerm(x: WideLinComb): IntComb {
+internal fun Compiler.Builder.wideAbsTerm(x: WideLinComb): IntComb {
     val y = freshWideInt(intCombMagnitude(IntComb.Wide(x)))
     val xc = IntComb.Wide(x)
     val negX = IntComb.Wide(x.scaled(BigInteger.ONE.negate()))
@@ -90,7 +89,7 @@ internal fun SmtLib.Builder.wideAbsTerm(x: WideLinComb): IntComb {
  * Euclidean `div`/`mod` by a **constant** divisor at arbitrary precision: fresh `q` and `m` with
  * `a = d·q + m` and `0 ≤ m < |d|`. A non-constant divisor is genuinely non-linear, so rejected.
  */
-internal fun SmtLib.Builder.wideDivModTerm(a: IntComb, b: IntComb, quotient: Boolean): IntComb {
+internal fun Compiler.Builder.wideDivModTerm(a: IntComb, b: IntComb, quotient: Boolean): IntComb {
     val bw = b.toWide()
     if (bw.coeffs.isNotEmpty()) smtUnsupported("non-constant divisor in div/mod")
     val d = bw.constant

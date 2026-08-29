@@ -1,6 +1,5 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.simplex.exact.BigFraction
 
 /**

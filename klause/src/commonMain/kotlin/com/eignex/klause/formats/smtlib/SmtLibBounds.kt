@@ -1,8 +1,7 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.util.Bits
@@ -23,7 +22,7 @@ import com.eignex.klause.util.Bits
  * `ite`/`div`/`mod` auxiliary's range and drops `distinct` from an [com.eignex.klause.factor.global.AllDifferent]
  * to pairwise `≠`. Everything else is left to presolve, which tightens under its budget.
  */
-internal fun SmtLib.Builder.inferBounds() {
+internal fun Compiler.Builder.inferBounds() {
     if (intNames.isEmpty()) return
     // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
     val lo = arrayOfNulls<Long>(nextInt)
@@ -61,7 +60,7 @@ internal fun SmtLib.Builder.inferBounds() {
 }
 
 /** Snapshot the declared and inferred integer bounds without materializing an open side. */
-internal fun SmtLib.Builder.modelIntBounds(): IntBounds {
+internal fun Compiler.Builder.modelIntBounds(): IntBounds {
     val lower = LongArray(nextInt)
     val upper = LongArray(nextInt)
     var openLo: Bits? = null
@@ -86,7 +85,7 @@ internal fun SmtLib.Builder.modelIntBounds(): IntBounds {
 
 // lo/hi are nullable (a null slot is ±infinity), so a primitive LongArray cannot represent them.
 @Suppress("ArrayPrimitive")
-internal fun SmtLib.Builder.applyCtBound(
+internal fun Compiler.Builder.applyCtBound(
     lo: Array<Long?>,
     hi: Array<Long?>,
     tv: Int,
@@ -136,7 +135,7 @@ internal fun addOrNull(a: Long, b: Long): Long? {
     return if (((a xor s) and (b xor s)) < 0) null else s
 }
 
-internal fun SmtLib.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
+internal fun Compiler.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
     // Walk the `and` conjunction with an explicit worklist (not recursion), so a degenerate
     // conjunction can't overflow the stack during bound inference.
     val work = ArrayDeque<SExpr>()
@@ -169,7 +168,7 @@ internal fun SmtLib.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayLi
  * second variable, a coefficient, a wider relation — leaves the disjunction satisfiable outside the set,
  * and a bound read off the rest would not hold.
  */
-private fun SmtLib.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: ArrayList<Rel>) {
+private fun Compiler.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: ArrayList<Rel>) {
     if (t.items.size < 2) return
     var v = -1
     var min = Long.MAX_VALUE
@@ -206,7 +205,7 @@ private fun SmtLib.Builder.equalityDisjunctionBounds(t: SExpr.SList, out: ArrayL
  *  bound-inference pass must not descend into such a relation, since evaluating it would allocate
  *  variables the fixpoint's bound arrays aren't sized for. The scan is iterative (explicit stack) so
  *  a deep term can't overflow the call stack. */
-internal fun SmtLib.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
+internal fun Compiler.Builder.hasSideEffectingTerm(t: SExpr): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(t)
     while (work.isNotEmpty()) {

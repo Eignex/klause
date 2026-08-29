@@ -7,7 +7,6 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
-import com.eignex.klause.lowering.smtlib.SmtLib as SmtLibLowering
 
 /** An SMT-LIB source decoded and lowered into klause's representation. */
 data class SmtLibProblem(
@@ -42,7 +41,7 @@ object SmtLib {
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         strictBounds: Boolean = false,
     ): SmtLibProblem {
-        val builder = SmtLibLowering.Builder(unboundedIntLo, unboundedIntHi, strictBounds)
+        val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds)
         val reader = SExprReader(source)
         while (true) builder.command(reader.readCommandOrNull() ?: break)
         return builder.build()

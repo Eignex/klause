@@ -1,8 +1,7 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
@@ -49,10 +48,10 @@ internal fun WideLinComb.toRealComb(): RealComb = RealComb(
     BigFraction.of(constant, BigInteger.ONE),
 )
 
-/** Syntactic real classifier, worklist-driven like [SmtLib.Builder.isBoolExpr] so a deeply
+/** Syntactic real classifier, worklist-driven like [Compiler.Builder.isBoolExpr] so a deeply
  *  nested arithmetic chain cannot overflow the call stack: true when the term is real-sorted (a real
  *  variable / literal, `to_real`, `/`, or an arithmetic combination with a real operand). */
-internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
+internal fun Compiler.Builder.isRealExpr(t: SExpr): Boolean {
     val work = ArrayDeque<SExpr>()
     work.addLast(t)
     while (work.isNotEmpty()) {
@@ -88,7 +87,7 @@ internal fun SmtLib.Builder.isRealExpr(t: SExpr): Boolean {
 
 /** Whether a relation node compares real-sorted operands (either side suffices — SMT-LIB mixed
  *  comparisons arrive through `to_real`, but be permissive about which side carries it). */
-internal fun SmtLib.Builder.isRealRelation(node: SExpr.SList): Boolean {
+internal fun Compiler.Builder.isRealRelation(node: SExpr.SList): Boolean {
     for (i in 1 until node.items.size) if (isRealExpr(node.items[i])) return true
     return false
 }
@@ -112,7 +111,7 @@ internal fun parseRealLiteral(s: String): BigFraction? {
 /** Post a top-level real relation as hard LP-only rows; strictness rides through to the delta-rational
  *  deciders. An n-ary chain `(op a1 … an)` posts its n−1 consecutive relations. `distinct` needs the
  *  real-atom machinery and rejects. */
-internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
+internal fun Compiler.Builder.assertRealLinear(node: SExpr.SList) {
     val op = node.atomAt(0, "relation operator")
     requireChainableRelation(node, op)
     val terms = (1 until node.items.size).map { realTerm(node.items[it]) }
@@ -120,7 +119,7 @@ internal fun SmtLib.Builder.assertRealLinear(node: SExpr.SList) {
 }
 
 /** Post one real relation `a ⟨op⟩ b`, resolving a variable-free comparison to trivially true or unsat. */
-private fun SmtLib.Builder.assertRealRelation(op: String, a: RealComb, b: RealComb) {
+private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: RealComb) {
     val (linOp, strict) = when (op) {
         "<=" -> LinearOp.LE to false
         ">=" -> LinearOp.GE to false
@@ -159,7 +158,7 @@ private fun SmtLib.Builder.assertRealRelation(op: String, a: RealComb, b: RealCo
 
 /** Scale an all-integer-variable `d ⟨op⟩ 0` by the least common denominator into an exact Long row
  *  `Σ coeffs·vars ⟨op⟩ bound`, or null when a scaled value escapes 64 bits. */
-internal fun SmtLib.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray, Long>? {
+internal fun Compiler.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray, Long>? {
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
     val scale = BigFraction.of(lcm, BigInteger.ONE)
@@ -178,7 +177,7 @@ internal fun SmtLib.Builder.integerRow(d: RealComb): Triple<IntArray, LongArray,
 /** Scale `d ⟨op⟩ 0` by the least common denominator and emit the exact-integer double row. A scaled
  *  value past the exactly-representable double range routes through the [wideRealRow] chain encoding
  *  instead — exact either way, never approximated. */
-internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean = false): Linear {
+internal fun Compiler.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean = false): Linear {
     var lcm = d.constant.den
     for (c in d.intCoeffs.values) lcm = lcmOf(lcm, c.den)
     for (c in d.realCoeffs.values) lcm = lcmOf(lcm, c.den)
@@ -215,7 +214,7 @@ internal fun SmtLib.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean =
 // emitted coefficient is a base-B digit — an exact double. An oversized constant moves onto the
 // auxiliary real pinned to 1. Depth is capped at WIDE_MAX_DIGITS digits; beyond that the row rejects
 // (exact-or-reject, never approximated).
-private fun SmtLib.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: LinearOp, strict: Boolean): Linear {
+private fun Compiler.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: LinearOp, strict: Boolean): Linear {
     val realVarsL = ArrayList<Int>()
     val realCoeffsL = ArrayList<Double>()
     val intVarsL = ArrayList<Int>()
@@ -263,7 +262,7 @@ private fun SmtLib.Builder.wideRealRow(d: RealComb, scale: BigFraction, op: Line
 }
 
 // The chain variable standing for `Bᵏ · var`, with its exact defining row added on first use.
-private fun SmtLib.Builder.chainVar(varId: Int, k: Int, isInt: Boolean): Int {
+private fun Compiler.Builder.chainVar(varId: Int, k: Int, isInt: Boolean): Int {
     val key = (varId.toLong() shl 3) or (k.toLong() shl 1) or (if (isInt) 1L else 0L)
     realChainVars[key]?.let { return it }
     val fresh = nextReal++
@@ -281,7 +280,7 @@ private fun SmtLib.Builder.chainVar(varId: Int, k: Int, isInt: Boolean): Int {
 }
 
 // The auxiliary real pinned to 1 (for oversized row constants), created on first use.
-private fun SmtLib.Builder.oneVar(): Int {
+private fun Compiler.Builder.oneVar(): Int {
     if (realOneVar >= 0) return realOneVar
     val fresh = nextReal++
     factors.add(Linear(IntArray(0), DoubleArray(0), intArrayOf(fresh), doubleArrayOf(1.0), LinearOp.EQ, 1.0))
@@ -296,7 +295,7 @@ private fun lcmOf(a: BigInteger, b: BigInteger): BigInteger = ((a * b) / a.gcd(b
  * [ReifiedRealLinear]; an equality is the conjunction of its two inequality atoms (its complement is
  * a disjunction no single row expresses). Pure-integer sides fall back to the integer reification.
  */
-internal fun SmtLib.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): Int {
+internal fun Compiler.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): Int {
     val d = a.plus(b.scaled(BigFraction.MINUS_ONE))
     if (op == "=") {
         return tseitinAnd(
@@ -313,7 +312,7 @@ internal fun SmtLib.Builder.reifyRealRel(op: String, a: RealComb, b: RealComb): 
     return reifyRealAtom(d, linOp, strict)
 }
 
-private fun SmtLib.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: Boolean): Int {
+private fun Compiler.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: Boolean): Int {
     if (d.isConstant) {
         val sign = d.constant.signum()
         val holds = when {
@@ -355,7 +354,7 @@ private fun SmtLib.Builder.reifyRealAtom(d: RealComb, linOp: LinearOp, strict: B
  * A real `ite`: a fresh real variable pinned to each branch by the condition through conditional
  * equality atoms (`c ⇒ v = a`, `¬c ⇒ v = b`), each equality being its two reified inequality atoms.
  */
-internal fun SmtLib.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb {
+internal fun Compiler.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealComb {
     val v = RealComb(emptyMap(), mapOf(nextReal++ to BigFraction.ONE), BigFraction.ZERO)
     val negCond = Lit.negate(cond)
     val dA = v.plus(a.scaled(BigFraction.MINUS_ONE))
@@ -371,7 +370,7 @@ internal fun SmtLib.Builder.realIte(cond: Int, a: RealComb, b: RealComb): RealCo
  * `to_int` of a fractional real term: a fresh unbounded integer `n` with the floor definition
  * `n ≤ r < n + 1` — the upper half strict, riding the delta-rational deciders.
  */
-internal fun SmtLib.Builder.realFloor(r: RealComb): LinComb {
+internal fun Compiler.Builder.realFloor(r: RealComb): LinComb {
     val n = newInt(null, null)
     val nReal = LinComb(mapOf(n to 1), 0).toRealComb()
     factors.add(realRow(nReal.plus(r.scaled(BigFraction.MINUS_ONE)), LinearOp.LE))
@@ -382,11 +381,11 @@ internal fun SmtLib.Builder.realFloor(r: RealComb): LinComb {
 }
 
 /** Fold [t] to a real combination (iteratively, via [evalTerm]). */
-internal fun SmtLib.Builder.realTerm(t: SExpr): RealComb = (evalTerm(t, Sort.REAL) as Res.R).comb
+internal fun Compiler.Builder.realTerm(t: SExpr): RealComb = (evalTerm(t, Sort.REAL) as Res.R).comb
 
 /** A real OMT objective: exact-double coefficients over real and int variables. Rejects a rational
  *  coefficient a double cannot carry exactly rather than silently mis-reporting the optimum. */
-internal fun SmtLib.Builder.realObjective(t: SExpr, negate: Boolean): LinearObjectiveSpec {
+internal fun Compiler.Builder.realObjective(t: SExpr, negate: Boolean): LinearObjectiveSpec {
     val comb0 = realTerm(t)
     val comb = if (negate) comb0.scaled(BigFraction.MINUS_ONE) else comb0
     val intCoeffs = LongArray(nextInt)

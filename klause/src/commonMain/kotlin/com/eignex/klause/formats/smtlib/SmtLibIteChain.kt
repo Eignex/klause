@@ -1,8 +1,7 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Element
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LinComb
@@ -110,7 +109,7 @@ internal class IteChainTable {
  * Fold `(ite cond thenTerm elseTerm)` into a chain, returning the chain's result term, or null when the
  * condition is not an equality on a finite-domain variable (the caller then lowers the `ite` directly).
  */
-internal fun SmtLib.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: LinComb): LinComb? {
+internal fun Compiler.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: LinComb): LinComb? {
     // `(ite (not (= i k)) A B)` is the positive chain step `(ite (= i k) B A)`.
     val negated = iteChains.atomOf(cond) == null
     val atomLit = if (negated) Lit.negate(cond) else cond
@@ -136,16 +135,16 @@ internal fun SmtLib.Builder.chainIte(cond: Int, thenTerm: LinComb, elseTerm: Lin
 
 /** Lower the chain defining [variable], if one is open — called once the value escapes into a binding,
  *  where a further arm can no longer reach it. */
-internal fun SmtLib.Builder.closeIteChain(variable: Int) {
+internal fun Compiler.Builder.closeIteChain(variable: Int) {
     iteChains.close(variable)?.let { lowerIteChain(it) }
 }
 
 /** Lower every chain that never escaped into a binding. */
-internal fun SmtLib.Builder.lowerOpenIteChains() {
+internal fun Compiler.Builder.lowerOpenIteChains() {
     for (chain in iteChains.drain()) lowerIteChain(chain)
 }
 
-private fun SmtLib.Builder.lowerIteChain(chain: IteChain) {
+private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     if (!collapseToElement(chain)) lowerAsDecisionList(chain)
 }
 
@@ -154,7 +153,7 @@ private fun SmtLib.Builder.lowerIteChain(chain: IteChain) {
  * variable. The arms are mutually exclusive (distinct constants on one selector), so the decision
  * list's priority order carries no information and each arm can be posted independently.
  */
-private fun SmtLib.Builder.lowerAsDecisionList(chain: IteChain) {
+private fun Compiler.Builder.lowerAsDecisionList(chain: IteChain) {
     val self = LinComb(mapOf(chain.result to 1), 0)
     for (i in chain.keys.indices) {
         factors.add(Clause(intArrayOf(Lit.negate(chain.conds[i]), reifyEq(self, chain.arms[i]))))
@@ -164,7 +163,7 @@ private fun SmtLib.Builder.lowerAsDecisionList(chain: IteChain) {
 }
 
 /** Post the chain as one [Element] over the selector's whole domain, or decline. */
-private fun SmtLib.Builder.collapseToElement(chain: IteChain): Boolean {
+private fun Compiler.Builder.collapseToElement(chain: IteChain): Boolean {
     if (chain.keys.size < MIN_CHAIN_DEPTH) return false
     val domain = (intDomains[chain.selector] as? PresolveDomain.Finite)?.domain ?: return false
     val lo = domain.min
@@ -198,11 +197,11 @@ private fun SmtLib.Builder.collapseToElement(chain: IteChain): Boolean {
 }
 
 /** The variable holding a constant array entry — one per distinct value, shared across every chain. */
-private fun SmtLib.Builder.entryVar(value: Long): Int = iteChains.fixedVar(value) { newInt(it, it) }
+private fun Compiler.Builder.entryVar(value: Long): Int = iteChains.fixedVar(value) { newInt(it, it) }
 
 /** The variable holding an arm's value: the term itself when it is a bare variable, a shared pinned
  *  variable when it is constant, else a fresh one equated to the term. */
-private fun SmtLib.Builder.armVar(arm: LinComb): Int {
+private fun Compiler.Builder.armVar(arm: LinComb): Int {
     arm.asSimpleVar()?.let { return it }
     if (arm.coeffs.isEmpty()) return entryVar(arm.constant)
     val (lo, hi) = linCombRange(arm)
@@ -212,7 +211,7 @@ private fun SmtLib.Builder.armVar(arm: LinComb): Int {
 }
 
 /** Widen [variable]'s domain to also cover [term]'s range — the chain result takes every arm's value. */
-private fun SmtLib.Builder.widenToInclude(variable: Int, term: LinComb) {
+private fun Compiler.Builder.widenToInclude(variable: Int, term: LinComb) {
     val (termLo, termHi) = linCombRange(term)
     val curLo: Long?
     val curHi: Long?

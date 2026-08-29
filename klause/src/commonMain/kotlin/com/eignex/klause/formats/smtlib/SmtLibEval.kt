@@ -1,9 +1,8 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.ALL_DIFFERENT_WITNESS_MIN_ARITY
@@ -68,7 +67,7 @@ private sealed interface Frame {
 }
 
 /** Fold [root] to a [Res] of the requested [sort] with no unbounded call-stack recursion. */
-internal fun SmtLib.Builder.evalTerm(root: SExpr, sort: Sort): Res {
+internal fun Compiler.Builder.evalTerm(root: SExpr, sort: Sort): Res {
     val work = ArrayDeque<Frame>()
     val vals = ArrayDeque<Res>()
     work.addLast(Frame.Eval(root, sort))
@@ -82,11 +81,11 @@ internal fun SmtLib.Builder.evalTerm(root: SExpr, sort: Sort): Res {
                 // Values were pushed in binding order, so the top-of-stack is the last binding.
                 val popped = ArrayList<Res>(k)
                 repeat(k) { popped.add(vals.removeLast()) }
-                val bound = ArrayList<Pair<String, SmtLib.Builder.Binding>>(k)
+                val bound = ArrayList<Pair<String, Compiler.Builder.Binding>>(k)
                 for (i in 0 until k) {
                     val res = popped[k - 1 - i]
                     val isReal = res is Res.R
-                    val b = SmtLib.Builder.Binding(isBool = fr.bools[i], isReal = isReal)
+                    val b = Compiler.Builder.Binding(isBool = fr.bools[i], isReal = isReal)
                     when {
                         fr.bools[i] -> b.lit = res.asLit()
                         isReal -> b.real = res.comb
@@ -141,7 +140,7 @@ internal fun SmtLib.Builder.evalTerm(root: SExpr, sort: Sort): Res {
 
 /** Push the frames for `(let (bindings) body)`: evaluate each binding value, build the scope, run the
  *  body, then pop — all in-stack, so nested lets never recurse through [evalTerm]. */
-private fun SmtLib.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
+private fun Compiler.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: ArrayDeque<Frame>) {
     val bindingList = node.argAt(1, "let bindings") as? SExpr.SList
         ?: smtUnsupported("malformed let bindings")
     val pairs = bindingList.items.map { it as? SExpr.SList ?: smtUnsupported("malformed let binding") }
@@ -164,7 +163,7 @@ private fun SmtLib.Builder.scheduleLet(node: SExpr.SList, sort: Sort, work: Arra
 
 /** Inline a `define-fun` call `(f a…)` by binding its parameters to the arguments like a `let` and
  *  evaluating the body — non-recursive, so this expands to a bounded nest handled on the work-stack. */
-private fun SmtLib.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: Sort, work: ArrayDeque<Frame>) {
+private fun Compiler.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: Sort, work: ArrayDeque<Frame>) {
     val m = macros.getValue(head)
     val callArgs = node.items.drop(1)
     if (callArgs.size != m.params.size) {
@@ -175,7 +174,7 @@ private fun SmtLib.Builder.scheduleMacro(node: SExpr.SList, head: String, sort: 
 }
 
 /** The child sub-terms to fold (with their sorts) for a non-`let` list node. */
-private fun SmtLib.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
+private fun Compiler.Builder.childTasks(node: SExpr.SList, sort: Sort): List<Pair<SExpr, Sort>> {
     val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
         ?: smtUnsupported("malformed operator")
     val args = node.items.drop(1)
@@ -264,7 +263,7 @@ private fun requireArgCount(head: String, args: List<SExpr>, count: Int) {
 }
 
 /** Combine a list node's already-folded child results [args] into this node's [Res]. */
-private fun SmtLib.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
+private fun Compiler.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res>): Res {
     val head = node.atomAt(0, "operator")
     return when (sort) {
         Sort.BOOL -> combineBool(node, head, args)
@@ -274,7 +273,7 @@ private fun SmtLib.Builder.combine(node: SExpr.SList, sort: Sort, args: List<Res
 }
 
 /** Combine a real-sorted node: exact-rational folding; `*` and `/` need a constant side. */
-private fun SmtLib.Builder.combineReal(head: String, args: List<Res>): Res = when (head) {
+private fun Compiler.Builder.combineReal(head: String, args: List<Res>): Res = when (head) {
     "+" -> Res.R(sumRealCombs(args.map { it.asReal() }))
 
     "-" -> if (args.size == 1) {
@@ -310,7 +309,7 @@ private fun SmtLib.Builder.combineReal(head: String, args: List<Res>): Res = whe
     else -> smtUnsupported("unsupported real op '$head'")
 }
 
-private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: List<Res>): Res = when (head) {
+private fun Compiler.Builder.combineBool(node: SExpr.SList, head: String, args: List<Res>): Res = when (head) {
     "not" -> Res.B(Lit.negate(args[0].asLit()))
 
     "and" -> Res.B(tseitinAnd(args.map { it.asLit() }))
@@ -362,7 +361,7 @@ private fun SmtLib.Builder.combineBool(node: SExpr.SList, head: String, args: Li
     else -> smtUnsupported("unsupported boolean op '$head'")
 }
 
-private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
+private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = when (head) {
     "+" -> Res.I(sumIntCombs(args.map { it.asIntComb() }))
 
     "-" -> if (args.size == 1) {
@@ -404,7 +403,7 @@ private fun SmtLib.Builder.combineInt(head: String, args: List<Res>): Res = when
 }
 
 /** `div`/`mod` on the 64-bit path when both operands fit it, at arbitrary precision otherwise. */
-private fun SmtLib.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean): Res =
+private fun Compiler.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean): Res =
     if (a is IntComb.Narrow && b is IntComb.Narrow) {
         narrowRes(divModTerm(a.lin, b.lin, quotient))
     } else {
@@ -417,7 +416,7 @@ private fun SmtLib.Builder.divModRes(a: IntComb, b: IntComb, quotient: Boolean):
  * On the 64-bit path its domain is the union of the two branch ranges, so an unbounded default never
  * enters the reified equality. Past 64 bits the quantity is digit columns wide enough for either branch.
  */
-private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
+private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
     if (a is IntComb.Narrow && b is IntComb.Narrow) {
         // A chain of equality tests on one selector defines the same quantity, and defers its lowering
         // until the chain's extent is known.
@@ -441,14 +440,14 @@ private fun SmtLib.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
 
 /** Post a hard linear relation `a ⟨op⟩ b`; a variable-free relation is checked for consistency
  *  (posting the false literal when it cannot hold) rather than an empty [Linear] row. */
-internal fun SmtLib.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
+internal fun Compiler.Builder.postLinearRel(a: LinComb, b: LinComb, op: LinearOp) {
     val (vars, coeffs, bound) = diff(a, b)
     assertLinearRow(coeffs, vars, op, bound)
 }
 
 /** `abs(x)` as a fresh `y ≥ 0` pinned to `|x|`: `y ≥ x`, `y ≥ −x`, and `y = x ∨ y = −x`. The fresh
  *  var is bounded by `x`'s own range so an unbounded default never enters its defining constraints. */
-private fun SmtLib.Builder.absTerm(x: LinComb): LinComb {
+private fun Compiler.Builder.absTerm(x: LinComb): LinComb {
     val (xLo, xHi) = linCombRange(x)
     val y = LinComb(mapOf(newInt(0L, absHi(xLo, xHi)) to 1), 0)
     val negX = x.scaled(-1L)
@@ -461,7 +460,7 @@ private fun SmtLib.Builder.absTerm(x: LinComb): LinComb {
 /** Euclidean `div`/`mod` by a **constant** divisor `d`: fresh `q`, `m` with `a = d·q + m` and
  *  `0 ≤ m < |d|`. `q` is bounded by `a`'s range / `d`; when `a` is open on the driving side `q` stays
  *  open (an [PresolveDomain.Open] aux var). A non-constant divisor is genuinely non-linear, so rejected. */
-private fun SmtLib.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
+private fun Compiler.Builder.divModTerm(a: LinComb, b: LinComb, quotient: Boolean): LinComb {
     if (b.coeffs.isNotEmpty()) smtUnsupported("non-constant divisor in div/mod")
     val d = b.constant
     if (d == 0L) smtUnsupported("division by zero in div/mod")
@@ -489,7 +488,7 @@ private fun absHi(lo: Long?, hi: Long?): Long? {
 
 /** The value range `[lo, hi]` of [lin] over the current presolve domains; a side is null when
  *  unbounded (an open domain or an arithmetic overflow) — infinity is structural, no `±Long/4`. */
-internal fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
+internal fun Compiler.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
     var lo: Long? = lin.constant
     var hi: Long? = lin.constant
     for ((v, c) in lin.coeffs) {
@@ -522,7 +521,7 @@ internal fun SmtLib.Builder.linCombRange(lin: LinComb): Pair<Long?, Long?> {
 
 /** Reify an arithmetic relation from its folded operands (wide when a value exceeds 64 bits); an n-ary
  *  chain reifies as the conjunction of its n−1 consecutive pairs. */
-private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
+private fun Compiler.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: List<Res>): Int {
     requireChainableRelation(node, op)
     val terms = args.map { it.asIntComb() }
     return chainReified(terms.size) { i -> reifyRelation(op, terms[i], terms[i + 1]) }
@@ -531,12 +530,12 @@ private fun SmtLib.Builder.reifyRelArgs(node: SExpr.SList, op: String, args: Lis
 /** The literal for a chainable relation over [n] operands: the single pair, or the conjunction of the
  *  n−1 consecutive pairs. The native chain factor is hard-only (no reified form), so a chain under
  *  boolean structure stays a conjunction of reified pairs. */
-private inline fun SmtLib.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
+private inline fun Compiler.Builder.chainReified(n: Int, reifyPair: (Int) -> Int): Int =
     if (n == 2) reifyPair(0) else tseitinAnd((0 until n - 1).map(reifyPair))
 
 /** Reified `distinct` over folded operands (bool operands channelled to a 0/1 int term): the linear-size
  *  witness encoding where every operand is a bare finite-domain variable, else pairwise strict-order choices. */
-private fun SmtLib.Builder.distinctFromArgs(args: List<Res>): Int {
+private fun Compiler.Builder.distinctFromArgs(args: List<Res>): Int {
     if (args.size < 2) return trueLit()
     val terms = args.map {
         if (it is Res.B) IntComb.Narrow(litToIntTerm(it.lit)) else it.asIntComb()
@@ -555,7 +554,7 @@ private fun SmtLib.Builder.distinctFromArgs(args: List<Res>): Int {
 
 /** The witness reification of `distinct`, or null when an operand is not a bare variable, repeats another,
  *  or carries an open domain — the same gate the asserted form uses to reach the native global. */
-private fun SmtLib.Builder.witnessDistinct(terms: List<IntComb>): Int? {
+private fun Compiler.Builder.witnessDistinct(terms: List<IntComb>): Int? {
     if (terms.size < ALL_DIFFERENT_WITNESS_MIN_ARITY) return null
     val vars = IntArray(terms.size) { i ->
         val narrow = terms[i] as? IntComb.Narrow ?: return null
@@ -574,7 +573,7 @@ private fun SmtLib.Builder.witnessDistinct(terms: List<IntComb>): Int? {
 }
 
 /** Fold an atom to a boolean literal, integer term, or real term. */
-private fun SmtLib.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.REAL) {
+private fun Compiler.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sort == Sort.REAL) {
     evalRealAtom(node)
 } else if (sort == Sort.BOOL) {
     when (node.text) {
@@ -622,7 +621,7 @@ private fun SmtLib.Builder.evalAtom(node: SExpr.Atom, sort: Sort): Res = if (sor
 
 /** Fold a real-sorted atom: numeral / decimal literals, real variables, bindings, and (via the
  *  implicit embedding) integer variables reached from a real context through `to_real`. */
-private fun SmtLib.Builder.evalRealAtom(node: SExpr.Atom): Res {
+private fun Compiler.Builder.evalRealAtom(node: SExpr.Atom): Res {
     val lit = parseRealLiteral(node.text)
     if (lit != null) return Res.R(RealComb(emptyMap(), emptyMap(), lit))
     val binding = lookup(node.text)

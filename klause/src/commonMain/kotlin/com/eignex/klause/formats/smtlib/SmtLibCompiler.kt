@@ -1,6 +1,5 @@
-package com.eignex.klause.lowering.smtlib
+package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.formats.smtlib.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
@@ -19,9 +18,9 @@ internal data class Rel(val vars: IntArray, val coeffs: LongArray, val op: Linea
  *  functions: bound inference in `SmtLibBounds.kt`, boolean / assert / distinct compilation in
  *  `SmtLibExpr.kt`, linear-term / relation / objective lowering in `SmtLibLinear.kt`, and the real
  *  (LRA) lowering in `SmtLibReal.kt`. */
-internal object SmtLib {
+internal object Compiler {
     /** Mutable compilation state for one SMT-LIB parse. The heavy compilation logic is attached as
-     *  `internal fun SmtLib.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
+     *  `internal fun Compiler.Builder.…` extension functions in the sibling `SmtLib*.kt` files. */
     internal class Builder(val unboundedIntLo: Long, val unboundedIntHi: Long, val strictBounds: Boolean) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
