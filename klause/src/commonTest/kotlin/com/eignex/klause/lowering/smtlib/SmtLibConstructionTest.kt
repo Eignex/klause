@@ -8,12 +8,13 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import com.eignex.klause.formats.smtlib.SmtLib as FormatSmtLib
 
 class SmtLibConstructionTest {
 
     @Test
     fun `an asserted equality constructs its normalized linear row`() {
-        val parsed = SmtLib.parse("(declare-const x Int) (assert (= (+ x 2) 5))")
+        val parsed = FormatSmtLib.parse("(declare-const x Int) (assert (= (+ x 2) 5))")
 
         assertEquals(mapOf("x" to 0), parsed.intVarNames)
         val row = parsed.model.factors.single() as Linear
@@ -26,7 +27,7 @@ class SmtLibConstructionTest {
     @Test
     fun `a duplicate declaration is rejected before it can create an unreachable variable`() {
         val error = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(declare-const x Int) (declare-const x Bool)")
+            FormatSmtLib.parse("(declare-const x Int) (declare-const x Bool)")
         }
 
         assertTrue(error.message!!.contains("duplicate declaration of 'x'"))
@@ -35,7 +36,7 @@ class SmtLibConstructionTest {
     @Test
     fun `a malformed command reports its expected argument count`() {
         val error = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(declare-const x Int unexpected)")
+            FormatSmtLib.parse("(declare-const x Int unexpected)")
         }
 
         assertTrue(error.message!!.contains("declare-const expects 2 arguments"))
@@ -44,7 +45,7 @@ class SmtLibConstructionTest {
     @Test
     fun `a malformed ite reports a format error instead of an index failure`() {
         val error = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(declare-const x Int) (assert (= x (ite true 1)))")
+            FormatSmtLib.parse("(declare-const x Int) (assert (= x (ite true 1)))")
         }
 
         assertTrue(error.message!!.contains("ite"))
@@ -53,7 +54,7 @@ class SmtLibConstructionTest {
     @Test
     fun `a macro rejects unsupported parameter sorts`() {
         val error = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(define-fun f ((x BitVec)) Int x)")
+            FormatSmtLib.parse("(define-fun f ((x BitVec)) Int x)")
         }
 
         assertTrue(error.message!!.contains("unsupported sort 'BitVec'"))
@@ -62,7 +63,7 @@ class SmtLibConstructionTest {
     @Test
     fun `an unknown command is rejected instead of being ignored`() {
         val error = assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(declare-const x Int) (asert (= x 1))")
+            FormatSmtLib.parse("(declare-const x Int) (asert (= x 1))")
         }
 
         assertTrue(error.message!!.contains("unsupported command 'asert'"))

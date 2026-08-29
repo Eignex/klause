@@ -1,10 +1,10 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSpec
-import com.eignex.klause.lowering.smtlib.SmtLib
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
