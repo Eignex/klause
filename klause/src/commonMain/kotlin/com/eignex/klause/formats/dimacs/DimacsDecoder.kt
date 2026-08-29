@@ -1,10 +1,8 @@
 @file:Suppress("MatchingDeclarationName")
 
-package com.eignex.klause.lowering.dimacs
+package com.eignex.klause.formats.dimacs
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.dimacs.CnfDocument
-import com.eignex.klause.formats.dimacs.WcnfDocument
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit

@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.catalog
 
 import com.eignex.klause.formats.dimacs.Dimacs
+import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lowering.dimacs.toProblem
 import kotlin.random.Random
 
 /**

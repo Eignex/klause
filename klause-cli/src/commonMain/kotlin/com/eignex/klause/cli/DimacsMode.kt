@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.dimacs.Dimacs
-import com.eignex.klause.lowering.dimacs.toProblem
+import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 
