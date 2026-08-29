@@ -4,7 +4,7 @@ import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.lowering.flatzinc.SolveDirective
+import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.maximizeInt
 import com.eignex.klause.solver.objective.minimizeInt

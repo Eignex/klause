@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.flatzinc
+package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.config.DEFAULT_FLOAT_BUCKETS
 import com.eignex.klause.config.DEFAULT_FLOAT_SCALE
@@ -6,7 +6,6 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit

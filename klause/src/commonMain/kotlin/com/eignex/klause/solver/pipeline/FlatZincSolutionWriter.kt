@@ -1,12 +1,12 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.formats.flatzinc.*
+import com.eignex.klause.formats.flatzinc.FlatZincArray
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
+import com.eignex.klause.formats.flatzinc.OutputItem
+import com.eignex.klause.formats.flatzinc.SetVarLayout
+import com.eignex.klause.formats.flatzinc.SolveDirective
 import com.eignex.klause.lowering.FloatBucketing
-import com.eignex.klause.lowering.flatzinc.FlatZincArray
-import com.eignex.klause.lowering.flatzinc.FlatZincProgram
-import com.eignex.klause.lowering.flatzinc.OutputItem
-import com.eignex.klause.lowering.flatzinc.SetVarLayout
-import com.eignex.klause.lowering.flatzinc.SolveDirective
 import com.eignex.klause.solver.Sample
 
 /** Render one solved sample in FlatZinc output format. */

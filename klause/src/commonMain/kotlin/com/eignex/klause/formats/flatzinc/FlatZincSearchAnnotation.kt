@@ -1,6 +1,5 @@
-package com.eignex.klause.lowering.flatzinc
+package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.util.IntArrayList
 
 /** Build a `FlatZincSearchHints` view from one `solve` annotation block. */

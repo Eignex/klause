@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.flatzinc
+package com.eignex.klause.formats.flatzinc
 
 import kotlin.test.Test
 import kotlin.test.assertFalse

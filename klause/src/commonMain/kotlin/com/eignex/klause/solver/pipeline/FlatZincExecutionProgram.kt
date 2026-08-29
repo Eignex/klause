@@ -8,7 +8,6 @@ import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.lowering.flatzinc.*
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.FunctionalObjective.Operand
 import com.eignex.klause.solver.objective.IncrementalObjective

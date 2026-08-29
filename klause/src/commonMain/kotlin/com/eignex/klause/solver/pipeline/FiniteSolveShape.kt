@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 
