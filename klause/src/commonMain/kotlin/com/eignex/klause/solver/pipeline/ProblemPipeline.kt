@@ -48,7 +48,10 @@ sealed interface SourceProblemRoute {
     ) : SourceProblemRoute
 
     /** An open source model for which no complete route exists. */
-    data object UnsupportedOpen : SourceProblemRoute
+    data class UnsupportedOpen(
+        /** The column and factor that prevented routing, when one specific column caused the refusal. */
+        val unplaceable: UnplaceableColumn?,
+    ) : SourceProblemRoute
 }
 
 /**
@@ -69,7 +72,7 @@ fun ProblemSpec.pipelineRoute(
     }
     val request = OpenTheoryRequest(this, objective, maximize)
     return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {
-        SourceProblemRoute.UnsupportedOpen
+        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable)
     } else {
         SourceProblemRoute.OpenTheory(request)
     }

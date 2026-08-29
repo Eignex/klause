@@ -9076,8 +9076,12 @@ public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$OpenTheo
 }
 
 public final class com/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen : com/eignex/klause/solver/pipeline/SourceProblemRoute {
-	public static final field INSTANCE Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;)V
+	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/SourceProblemRoute$UnsupportedOpen;
 	public fun equals (Ljava/lang/Object;)Z
+	public final fun getUnplaceable ()Lcom/eignex/klause/solver/pipeline/UnplaceableColumn;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }

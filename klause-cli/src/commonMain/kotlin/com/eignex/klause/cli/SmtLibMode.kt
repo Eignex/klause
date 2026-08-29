@@ -4,12 +4,11 @@ import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.UnsupportedSmtException
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.solver.pipeline.componentPlan
+import com.eignex.klause.solver.pipeline.UnplaceableColumn
 import com.eignex.klause.solver.pipeline.pipelineRoute
 
 /**
@@ -64,8 +63,8 @@ internal object SmtLibMode : CliMode {
                     }
                 }
 
-                SourceProblemRoute.UnsupportedOpen ->
-                    throw UnsupportedSmtException(unsupportedOpenReason(parsed.model, ints))
+                is SourceProblemRoute.UnsupportedOpen ->
+                    throw UnsupportedSmtException(unsupportedOpenReason(route.unplaceable, ints))
             }
         }
 
@@ -131,15 +130,12 @@ internal class SmtLibOutput : BufferedBestOutput() {
  * or state a decomposition for that constraint the theories can take — where naming neither leaves a
  * user to guess which of their constraints is the unsupported one.
  */
-internal fun unsupportedOpenReason(model: ProblemSpec, names: Map<String, Int>): String {
-    // Builds the plan a second time, after `sourceRoute` built one to reach this branch. Deliberate:
-    // the run ends here either way, and threading the plan out of routing would put a cost on every
-    // model to save one on a rejected one.
-    val unplaceable = model.componentPlan().unplaceable
+internal fun unsupportedOpenReason(unplaceable: UnplaceableColumn?, names: Map<String, Int>): String {
+    val detail = unplaceable
         ?: return "open integer bounds require supported difference, General LIA, or exact LIRA coverage"
-    val column = names.entries.firstOrNull { it.value == unplaceable.column }?.key
-        ?: "integer column ${unplaceable.column}"
-    val kind = unplaceable.factorKind ?: "a constraint"
+    val column = names.entries.firstOrNull { it.value == detail.column }?.key
+        ?: "integer column ${detail.column}"
+    val kind = detail.factorKind ?: "a constraint"
     return "$column has no bound to search over and $kind needs one; " +
         "bound it, or state this constraint as rows a theory can hold"
 }

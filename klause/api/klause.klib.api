@@ -2373,7 +2373,14 @@ sealed interface com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.e
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.OpenTheory.toString|toString(){}[0]
     }
 
-    final object UnsupportedOpen : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen|null[0]
+    final class UnsupportedOpen : com.eignex.klause.solver.pipeline/SourceProblemRoute { // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen|null[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/UnplaceableColumn?) // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.<init>|<init>(com.eignex.klause.solver.pipeline.UnplaceableColumn?){}[0]
+
+        final val unplaceable // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.unplaceable|{}unplaceable[0]
+            final fun <get-unplaceable>(): com.eignex.klause.solver.pipeline/UnplaceableColumn? // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.unplaceable.<get-unplaceable>|<get-unplaceable>(){}[0]
+
+        final fun component1(): com.eignex.klause.solver.pipeline/UnplaceableColumn? // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.component1|component1(){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/UnplaceableColumn? = ...): com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.copy|copy(com.eignex.klause.solver.pipeline.UnplaceableColumn?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/SourceProblemRoute.UnsupportedOpen.toString|toString(){}[0]
