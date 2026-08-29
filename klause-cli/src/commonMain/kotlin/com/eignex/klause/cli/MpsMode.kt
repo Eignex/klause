@@ -1,9 +1,9 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.mps.Mps
-import com.eignex.klause.lowering.mps.MpsCompiled
-import com.eignex.klause.lowering.mps.MpsLoweringException
-import com.eignex.klause.lowering.mps.toProblem
+import com.eignex.klause.formats.mps.MpsCompiled
+import com.eignex.klause.formats.mps.MpsLoweringException
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
@@ -14,7 +14,7 @@ import kotlin.math.floor
 
 /**
  * MPS (Mathematical Programming System) MIP front-end (`.mps`). Parses the instance and lowers it to
- * klause's hybrid model (see [com.eignex.klause.lowering.mps.toProblem]: integer columns become CP search
+ * klause's hybrid model (see [com.eignex.klause.formats.mps.toProblem]: integer columns become CP search
  * variables, float columns become LP-only continuous variables the simplex resolves). An open integer
  * model is routed to a complete supported theory pipeline or rejected at load.
  * Emits an `o <cost>` line per improving incumbent, then a final `s SATISFIABLE` / `s OPTIMUM FOUND` /
