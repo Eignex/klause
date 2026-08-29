@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  */
 class Xcsp3TableParseTest {
 
-    private fun rows(text: String, arity: Int): ShortRows = Xcsp3.Builder().parseShortRows(text, arity)
+    private fun rows(text: String, arity: Int): ShortRows = Compiler.Builder().parseShortRows(text, arity)
 
     @Test
     fun `a ground table carries one array for both cell bounds`() {

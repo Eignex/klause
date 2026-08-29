@@ -1,9 +1,8 @@
-package com.eignex.klause.lowering.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.factor.table.internals.TableGroupCache
-import com.eignex.klause.formats.xcsp3.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.reifyLinear
@@ -20,7 +19,7 @@ import com.eignex.klause.util.MutableIntIntMap
 // lower to one nogood clause per forbidden tuple. Both keep the encoding linear in the written tuples
 // rather than in the Cartesian product the wildcards denote.
 
-internal fun Xcsp3.Builder.extension(e: XmlElement) {
+internal fun Compiler.Builder.extension(e: XmlElement) {
     val vars = listVars(e)
     // The raw (untrimmed) text is one shared String object across a group's rows, so the support
     // template cache keys on it by identity; the tuple scan already skips surrounding whitespace.
@@ -51,7 +50,7 @@ private const val COMPLEMENT_MATERIALIZE_CEILING = 1_000_000L
  *  ([COMPLEMENT_MATERIALIZE_CEILING]), complement it to a positive [Table] — STR2 propagates that at GAC
  *  strength, which matters for dense binary negatives (e.g. FRB) where forward checking is far too weak.
  *  Otherwise lower to nogood clauses (forward-checking strength) to avoid materializing a large complement. */
-internal fun Xcsp3.Builder.postConflicts(vars: IntArray, text: String) {
+internal fun Compiler.Builder.postConflicts(vars: IntArray, text: String) {
     val rows = parseShortRows(text, vars.size)
     var product = 1L
     for (v in vars) {
@@ -63,7 +62,7 @@ internal fun Xcsp3.Builder.postConflicts(vars: IntArray, text: String) {
 
 /** The allowed complement of a forbidden-tuple table as a positive [Table]: every domain combination
  *  that matches no forbidden row. An empty complement ⇒ every assignment forbidden ⇒ unsatisfiable. */
-internal fun Xcsp3.Builder.postConflictComplement(vars: IntArray, rows: ShortRows) {
+internal fun Compiler.Builder.postConflictComplement(vars: IntArray, rows: ShortRows) {
     val arity = vars.size
     val doms = vars.map { domainValues(it) }
     val nRows = rows.lo.size / arity
@@ -154,7 +153,7 @@ internal class SupportTemplate(val triviallySat: Boolean, val tuples: LongArray,
 /** Return the support template for [text], reusing the last one when [text] is the same object — the
  *  case for a `<group>`'s rows, which share one `<supports>` String object. */
 @Suppress("AvoidReferentialEquality")
-private inline fun Xcsp3.Builder.supportTemplateFor(text: String, compute: () -> SupportTemplate): SupportTemplate {
+private inline fun Compiler.Builder.supportTemplateFor(text: String, compute: () -> SupportTemplate): SupportTemplate {
     cachedSupportTemplate?.let { if (text === cachedSupportsText) return it }
     val built = compute()
     cachedSupportsText = text
@@ -166,14 +165,14 @@ private inline fun Xcsp3.Builder.supportTemplateFor(text: String, compute: () ->
  *  cells (an interval `[lo, hi]`; a `*` is `[MIN, MAX]`), so each written tuple is exactly one row.
  *  A fully unbounded row matches every assignment, so the whole constraint is trivially satisfied. The
  *  parsed tuple arrays are cached by text identity and shared across a group's rows. */
-internal fun Xcsp3.Builder.postSupportTable(vars: IntArray, text: String) {
+internal fun Compiler.Builder.postSupportTable(vars: IntArray, text: String) {
     val arity = vars.size
     val tpl = supportTemplateFor(text) { buildSupportTemplate(arity, text) }
     if (tpl.triviallySat) return
     factors.add(Table(xs = vars, tuples = tpl.tuples, hi = tpl.hi).also { it.groupCache = tpl.groupCache })
 }
 
-private fun Xcsp3.Builder.buildSupportTemplate(arity: Int, text: String): SupportTemplate {
+private fun Compiler.Builder.buildSupportTemplate(arity: Int, text: String): SupportTemplate {
     val rows = parseShortRows(text, arity)
     val n = rows.lo.size / arity
     for (r in 0 until n) {
@@ -194,7 +193,7 @@ private fun Xcsp3.Builder.buildSupportTemplate(arity: Int, text: String): Suppor
 /** Post a negative `<conflicts>` table as one nogood clause per forbidden tuple — the disjunction of
  *  each column "differing" from its cell: `x ≠ v` for a point, `x < lo ∨ x > hi` for a range, and
  *  nothing for a `*` (it forbids regardless of that variable). Never materializes the complement. */
-internal fun Xcsp3.Builder.postConflictClauses(vars: IntArray, rows: ShortRows) {
+internal fun Compiler.Builder.postConflictClauses(vars: IntArray, rows: ShortRows) {
     val arity = vars.size
     val n = rows.lo.size / arity
     for (r in 0 until n) {
@@ -244,7 +243,7 @@ internal class ShortRows(val lo: LongArray, private val intervals: LongArray?) {
 /** Parse `<supports>`/`<conflicts>` tuple text into short rows, one row per written tuple: a `*`
  *  column is `[MIN, MAX]`, a `lo..hi` column is that interval, everything else is a point `[v, v]`.
  *  Unary tables use the bare-value form (`0 1 2`, no parentheses). */
-internal fun Xcsp3.Builder.parseShortRows(text: String, arity: Int): ShortRows {
+internal fun Compiler.Builder.parseShortRows(text: String, arity: Int): ShortRows {
     val bare = arity == 1 && '(' !in text
     // Size the cell arrays exactly from one cheap counting pass. Accumulating into growable lists made a
     // multi-MB table peak at several times the payload it produces — each list doubles while filling and

@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ComparisonClause
@@ -6,7 +6,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.xcsp3.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearObjectiveSpec
@@ -94,7 +93,7 @@ internal fun splitCondition(text: String): Pair<String, String> {
 }
 
 /** Compiler for the supported XCSP3 integer subset. */
-internal object Xcsp3 {
+internal object Compiler {
     internal class Builder : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes

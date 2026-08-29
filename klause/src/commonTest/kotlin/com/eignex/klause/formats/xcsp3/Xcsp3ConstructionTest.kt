@@ -1,20 +1,18 @@
-package com.eignex.klause.lowering.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.formats.xcsp3.UnsupportedXcsp3Exception
 import com.eignex.klause.ir.LinearOp
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import com.eignex.klause.formats.xcsp3.Xcsp3 as FormatXcsp3
 
 class Xcsp3ConstructionTest {
 
     @Test
     fun `a sum condition constructs its declared variables and normalized row`() {
-        val parsed = FormatXcsp3.parse(
+        val parsed = Xcsp3.parse(
             """<instance><variables><var id="x">1..3</var><var id="y">2..4</var></variables>
                 <constraints><sum><list>x y</list><coeffs>2 -1</coeffs><condition>(eq, 1)</condition></sum></constraints>
                 </instance>""",
@@ -33,7 +31,7 @@ class Xcsp3ConstructionTest {
     @Test
     fun `a malformed streamed closing tag reports an XCSP3 error`() {
         val error = assertFailsWith<UnsupportedXcsp3Exception> {
-            FormatXcsp3.parse("<instance><variables></constraints></instance>")
+            Xcsp3.parse("<instance><variables></constraints></instance>")
         }
 
         assertTrue(error.message.orEmpty().contains("mismatched closing tag"))
@@ -41,7 +39,7 @@ class Xcsp3ConstructionTest {
 
     @Test
     fun `a processing instruction between streamed children is ignored`() {
-        val parsed = FormatXcsp3.parse(
+        val parsed = Xcsp3.parse(
             "<instance><variables><?tool ignore?><var id=\"x\">0..1</var></variables></instance>",
         )
 

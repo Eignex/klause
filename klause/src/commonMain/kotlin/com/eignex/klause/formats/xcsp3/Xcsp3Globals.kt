@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
@@ -17,7 +17,6 @@ import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.factor.table.Table
-import com.eignex.klause.formats.xcsp3.*
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LayeredMddData
@@ -30,7 +29,7 @@ import com.eignex.klause.util.IntArrayList
 
 // XCSP3 global-constraint family emitters (allDifferent excepted).
 
-internal fun Xcsp3.Builder.count(e: XmlElement) {
+internal fun Compiler.Builder.count(e: XmlElement) {
     val vars = listVars(e)
     val values = parseInts(e.child("values")?.textContent)
         ?: throw UnsupportedXcsp3Exception("count: only constant <values> supported")
@@ -50,7 +49,7 @@ internal fun Xcsp3.Builder.count(e: XmlElement) {
     postCondition(intArrayOf(1), intArrayOf(cnt), requireNotNull(e.child("condition")).textContent.trim())
 }
 
-internal fun Xcsp3.Builder.element(e: XmlElement) {
+internal fun Compiler.Builder.element(e: XmlElement) {
     e.child("matrix")?.let { return elementMatrix(e, it) }
     val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
     val idx = singleTermVar(
@@ -98,7 +97,7 @@ internal fun Xcsp3.Builder.element(e: XmlElement) {
  *  is a 3-column [Table] over `(i, j, v)` — one tuple per cell; a matrix of variables (e.g. an
  *  `x[][]` array reference, which the constant path reads as empty) is decomposed cell-by-cell. */
 @Suppress("ThrowsCount") // one guard per unsupported shape (bad index, empty constant/variable matrix)
-internal fun Xcsp3.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
+internal fun Compiler.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
     // Matrix element uses per-axis start indices (defaulting to 0), not a single startIndex.
     val rowOffset = e.attr("startRowIndex").ifBlank { "0" }.toInt()
     val colOffset = e.attr("startColIndex").ifBlank { "0" }.toInt()
@@ -129,7 +128,7 @@ internal fun Xcsp3.Builder.elementMatrix(e: XmlElement, matrix: XmlElement) {
 
 /** The rows of a constant integer `<matrix>` (`(1,2)(3,4)`), or null when it is not an all-constant
  *  parenthesised matrix (an array reference, or one with variable entries — handled elsewhere). */
-internal fun Xcsp3.Builder.constMatrixRows(text: String): List<IntArray>? {
+internal fun Compiler.Builder.constMatrixRows(text: String): List<IntArray>? {
     if ('(' !in text) return null
     val rows = ArrayList<IntArray>()
     val cur = IntArrayList()
@@ -147,7 +146,14 @@ internal fun Xcsp3.Builder.constMatrixRows(text: String): List<IntArray>? {
 /** `element` over a matrix of variables: `M[i][j] = v`, decomposed as `(i=r) ∧ (j=c) ⟹ v = M[r][c]`
  *  per cell, with the index pinned into the matrix's range so an out-of-range selection cannot
  *  leave `v` unconstrained. */
-internal fun Xcsp3.Builder.elementVarMatrix(rows: List<IntArray>, i: Int, j: Int, v: Int, rowOff: Int, colOff: Int) {
+internal fun Compiler.Builder.elementVarMatrix(
+    rows: List<IntArray>,
+    i: Int,
+    j: Int,
+    v: Int,
+    rowOff: Int,
+    colOff: Int,
+) {
     val nCols = rows[0].size
     require(rows.all { it.size == nCols }) { "element: ragged <matrix>" }
     // The index must select a real cell (Element semantics require a valid index).
@@ -165,7 +171,7 @@ internal fun Xcsp3.Builder.elementVarMatrix(rows: List<IntArray>, i: Int, j: Int
     }
 }
 
-internal fun Xcsp3.Builder.channel(e: XmlElement) {
+internal fun Compiler.Builder.channel(e: XmlElement) {
     val lists = e.children.filter { it.tag == "list" }
     when (lists.size) {
         1 -> {
@@ -192,7 +198,7 @@ internal fun Xcsp3.Builder.channel(e: XmlElement) {
 /** A two-list `channel` with `|X| < |Y|` (XCSP3 Semantics 32): the one-way implication
  *  `∀i,j: x[i]=j ⟹ y[j]=i`. The reverse does NOT hold — entries `y[j]` for `j` never taken
  *  by any `x[i]` are unconstrained — so unlike the equal-length case this is not a bijection. */
-internal fun Xcsp3.Builder.channelPartial(x: IntArray, y: IntArray) {
+internal fun Compiler.Builder.channelPartial(x: IntArray, y: IntArray) {
     for (i in x.indices) {
         for (j in y.indices) {
             val xij = reifyLinear(intArrayOf(1), intArrayOf(x[i]), LinearOp.EQ, j) // x[i] = j
@@ -370,7 +376,7 @@ internal class RegularAutomaton(
 // Referential equality is the intent: group rows share one `<transitions>` String object, and distinct
 // constraints hold distinct objects, so `===` reuses within a group and never conflates unrelated text.
 @Suppress("AvoidReferentialEquality")
-private inline fun Xcsp3.Builder.automatonFor(text: String, compute: () -> RegularAutomaton): RegularAutomaton {
+private inline fun Compiler.Builder.automatonFor(text: String, compute: () -> RegularAutomaton): RegularAutomaton {
     cachedAutomaton?.let { if (text === cachedAutomatonText) return it }
     val built = compute()
     cachedAutomatonText = text
@@ -396,7 +402,7 @@ private fun buildAutomaton(trs: InternedTransitions, numStates: Int, q0: Int, ac
     return RegularAutomaton(numStates, s, offset, table, q0, accepting)
 }
 
-internal fun Xcsp3.Builder.regular(e: XmlElement) {
+internal fun Compiler.Builder.regular(e: XmlElement) {
     val text = requireNotNull(e.child("transitions")).textContent
     val automaton = automatonFor(text) {
         // The start state is interned first (id 1), then the transitions, then any final absent from
@@ -424,7 +430,7 @@ internal class MddResult(val layered: LayeredMddData?)
 
 /** Return the mdd lowering for [text], reusing the last one when [text] is the same object (a group). */
 @Suppress("AvoidReferentialEquality")
-private inline fun Xcsp3.Builder.mddResultFor(text: String, compute: () -> MddResult): MddResult {
+private inline fun Compiler.Builder.mddResultFor(text: String, compute: () -> MddResult): MddResult {
     cachedMddResult?.let { if (text === cachedMddText) return it }
     val built = compute()
     cachedMddText = text
@@ -435,7 +441,7 @@ private inline fun Xcsp3.Builder.mddResultFor(text: String, compute: () -> MddRe
 /** A multi-valued decision diagram is a layered automaton. It is lowered onto the native layered `Mdd`
  *  factor when the diagram is cleanly layered — every state at one depth from the root, all sinks at the
  *  final depth — and falls back to a flattened [Regular] automaton otherwise. */
-internal fun Xcsp3.Builder.mdd(e: XmlElement) {
+internal fun Compiler.Builder.mdd(e: XmlElement) {
     val text = requireNotNull(e.child("transitions")).textContent
     val seq = listVars(e)
     val layered = mddResultFor(text) {
@@ -545,7 +551,7 @@ private fun layerMdd(trs: InternedTransitions): LayeredMddData? {
 
 /** Post a [Regular] factor over [seqVars] for the shared [automaton], allocating per-constraint only the
  *  offset-shifted sequence (and its channels) when the automaton's symbols are not already 1-based. */
-private fun Xcsp3.Builder.emitRegular(seqVars: IntArray, automaton: RegularAutomaton) {
+private fun Compiler.Builder.emitRegular(seqVars: IntArray, automaton: RegularAutomaton) {
     if (seqVars.isEmpty()) throw UnsupportedXcsp3Exception("regular/mdd: empty sequence list")
     val offset = automaton.offset
     val seq = if (offset == 0) {
@@ -571,7 +577,7 @@ private fun Xcsp3.Builder.emitRegular(seqVars: IntArray, automaton: RegularAutom
     )
 }
 
-internal fun Xcsp3.Builder.cumulative(e: XmlElement) {
+internal fun Compiler.Builder.cumulative(e: XmlElement) {
     val starts = refList(requireNotNull(e.child("origins")).textContent)
     val (durations, durationVars) = taskDims(requireNotNull(e.child("lengths")).textContent)
     val (resources, resourceVars) = taskDims(requireNotNull(e.child("heights")).textContent)
@@ -616,13 +622,13 @@ internal fun Xcsp3.Builder.cumulative(e: XmlElement) {
 /** Resolve a cumulative dimension list (`<lengths>`/`<heights>`) to (constants-or-upper-bounds,
  *  variable ids). Constant when every entry is an integer; otherwise each entry is a variable and
  *  the constant array holds its domain upper bound (used by [Cumulative] for horizon sizing). */
-internal fun Xcsp3.Builder.taskDims(text: String): Pair<LongArray, IntArray> {
+internal fun Compiler.Builder.taskDims(text: String): Pair<LongArray, IntArray> {
     parseInts(text)?.let { return it.widenToLong() to IntArray(0) }
     val vars = refList(text)
     return LongArray(vars.size) { domains[vars[it]].max } to vars
 }
 
-internal fun Xcsp3.Builder.circuit(e: XmlElement) {
+internal fun Compiler.Builder.circuit(e: XmlElement) {
     val offset = e.attr("startIndex").ifBlank { "0" }.toInt()
     if (offset != 0) throw UnsupportedXcsp3Exception("circuit: only startIndex=0 supported")
     val succ = refList(listText(e))
@@ -645,7 +651,7 @@ internal fun Xcsp3.Builder.circuit(e: XmlElement) {
     }
 }
 
-internal fun Xcsp3.Builder.lex(e: XmlElement) {
+internal fun Compiler.Builder.lex(e: XmlElement) {
     val (strict, swap) = lexOp(e)
     val matrixEl = e.children.firstOrNull { it.tag == "matrix" }
     if (matrixEl != null) {
@@ -666,7 +672,7 @@ internal fun Xcsp3.Builder.lex(e: XmlElement) {
 
 /** Parse a lex `<operator>` into (strict, swap): `gt`/`ge` swap the pair so `a ⊙ b` becomes the
  *  equivalent `b </≤ a`. */
-internal fun Xcsp3.Builder.lexOp(e: XmlElement): Pair<Boolean, Boolean> {
+internal fun Compiler.Builder.lexOp(e: XmlElement): Pair<Boolean, Boolean> {
     val opText = (e.child("operator")?.textContent?.trim() ?: e.attr("operator")).ifBlank { "lt" }
     return when (opText) {
         "lt" -> true to false
@@ -678,7 +684,7 @@ internal fun Xcsp3.Builder.lexOp(e: XmlElement): Pair<Boolean, Boolean> {
 }
 
 /** Post `vectors[i] ⊙ vectors[i+1]` for consecutive vectors as [LexLess] factors. */
-internal fun Xcsp3.Builder.postLexChain(vectors: List<IntArray>, strict: Boolean, swap: Boolean) {
+internal fun Compiler.Builder.postLexChain(vectors: List<IntArray>, strict: Boolean, swap: Boolean) {
     for (i in 0 until vectors.size - 1) {
         val a = vectors[i]
         val b = vectors[i + 1]
@@ -688,9 +694,9 @@ internal fun Xcsp3.Builder.postLexChain(vectors: List<IntArray>, strict: Boolean
 
 /** Rows of a `<matrix>`: explicit `(a,b)(c,d)` tuples, or a 2-D array reference (`x[][]`,
  *  `g[1..8][8..15]`). The reference is reshaped from its two index axes — an empty bracket spans the
- *  array's declared dimension ([Xcsp3.Builder.arrayDims]), a `lo..hi` bracket that inclusive range —
+ *  array's declared dimension ([Compiler.Builder.arrayDims]), a `lo..hi` bracket that inclusive range —
  *  and each cell is referenced directly by index, so no structure is recovered from generated names. */
-internal fun Xcsp3.Builder.matrixRows(text: String): List<IntArray> {
+internal fun Compiler.Builder.matrixRows(text: String): List<IntArray> {
     val t = text.trim()
     if ('(' in t) {
         val rows = ArrayList<IntArray>()
@@ -746,7 +752,7 @@ private fun matrixAxis(base: String, spec: String, dimSize: Int?): IntArray = wh
 }
 
 /** Fix each listed variable to the corresponding value. */
-internal fun Xcsp3.Builder.instantiation(e: XmlElement) {
+internal fun Compiler.Builder.instantiation(e: XmlElement) {
     val vars = listVars(e)
     val vals = parseInts(e.child("values")?.textContent)
         ?: throw UnsupportedXcsp3Exception("instantiation: non-constant <values>")
@@ -775,7 +781,7 @@ private fun IntArray.reversedCopy(): IntArray = IntArray(size) { this[size - 1 -
 
 /** Chain relation over consecutive list entries: `vars[i] ⟨op⟩ vars[i+1]`, or with `<lengths>`,
  *  `vars[i] + length[i] ⟨op⟩ vars[i+1]` (one length per gap; constants or variables). */
-internal fun Xcsp3.Builder.ordered(e: XmlElement) {
+internal fun Compiler.Builder.ordered(e: XmlElement) {
     val vars = listVars(e)
     val opText = (e.child("operator")?.textContent?.trim() ?: e.attr("operator")).ifBlank { "le" }
     val (op, delta) = relOp(opText) ?: throw UnsupportedXcsp3Exception("ordered operator '$opText'")
@@ -812,7 +818,7 @@ internal fun Xcsp3.Builder.ordered(e: XmlElement) {
 }
 
 /** All listed variables take the same value. */
-internal fun Xcsp3.Builder.allEqual(e: XmlElement) {
+internal fun Compiler.Builder.allEqual(e: XmlElement) {
     // <except> weakens the constraint (listed values are exempt); dropping it would be unsound.
     if (e.child("except") != null) throw UnsupportedXcsp3Exception("allEqual with <except>")
     val vars = refList(listText(e))
@@ -822,7 +828,7 @@ internal fun Xcsp3.Builder.allEqual(e: XmlElement) {
 }
 
 /** `minimum`/`maximum` of a list constrained by a condition, via [ArrayMinMax] + the condition. */
-internal fun Xcsp3.Builder.minMax(e: XmlElement, max: Boolean) {
+internal fun Compiler.Builder.minMax(e: XmlElement, max: Boolean) {
     // Entries may be plain variables or expressions (e.g. `sub(y,37)`), each resolved to an int var.
     val vars = requireNotNull(e.child("list")).textContent.splitWs()
         .flatMap { tok -> expandNames(tok).map { termVar(it) } }.toIntArray()
@@ -833,7 +839,7 @@ internal fun Xcsp3.Builder.minMax(e: XmlElement, max: Boolean) {
 
 /** Global cardinality: each value in `<values>` occurs a fixed count, an interval, or a
  *  variable count (`<occurs>`) among the listed variables. */
-internal fun Xcsp3.Builder.cardinality(e: XmlElement) {
+internal fun Compiler.Builder.cardinality(e: XmlElement) {
     val vars = listVars(e)
     val valuesEl = requireNotNull(e.child("values"))
     val values = (
@@ -880,7 +886,7 @@ internal fun Xcsp3.Builder.cardinality(e: XmlElement) {
 }
 
 /** Reify `x == value` onto a fresh 0/1 int var. */
-internal fun Xcsp3.Builder.eqValue01(x: Int, value: Long): Int {
+internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     val eq = newBool()
     factors.add(ReifiedLinear(eq, longArrayOf(1), intArrayOf(x), LinearOp.EQ, value))
     val ch = newAuxVar(0L, 1L)
@@ -890,7 +896,7 @@ internal fun Xcsp3.Builder.eqValue01(x: Int, value: Long): Int {
 
 /** `binPacking`: item `i` goes to bin `list[i]`; each bin's total item size meets the condition. */
 @Suppress("ThrowsCount") // one guard per unsupported shape across the loads/limits/condition forms
-internal fun Xcsp3.Builder.binPacking(e: XmlElement) {
+internal fun Compiler.Builder.binPacking(e: XmlElement) {
     val items = listVars(e)
     val sizes = parseInts(e.child("sizes")?.textContent)
         ?: throw UnsupportedXcsp3Exception("binPacking: non-constant <sizes>")
@@ -944,7 +950,7 @@ internal fun Xcsp3.Builder.binPacking(e: XmlElement) {
 }
 
 /** `knapsack`: a weighted-sum condition on item weights and one on item profits. */
-internal fun Xcsp3.Builder.knapsack(e: XmlElement) {
+internal fun Compiler.Builder.knapsack(e: XmlElement) {
     val items = listVars(e)
     val weights = parseInts(e.child("weights")?.textContent)
         ?: throw UnsupportedXcsp3Exception("knapsack: non-constant <weights>")
@@ -959,7 +965,7 @@ internal fun Xcsp3.Builder.knapsack(e: XmlElement) {
 
 /** `nValues`: the number of distinct values taken across the list — excluding any `<except>`
  *  values — meets the condition. */
-internal fun Xcsp3.Builder.nValues(e: XmlElement) {
+internal fun Compiler.Builder.nValues(e: XmlElement) {
     val vars = listVars(e)
     val condText = requireNotNull(e.child("condition")).textContent.trim()
     // Use one native [NValue] factor only when the count meets a CONSTANT bound and there is no <except>.
@@ -980,7 +986,7 @@ internal fun Xcsp3.Builder.nValues(e: XmlElement) {
 /** A fresh int var equal to the count of distinct values taken across [vars], decomposed as
  *  `Σ used[v]` where `used[v] = 1` iff some variable equals `v`. Values in [except] are not
  *  counted (XCSP3 `nValues` with `<except>`). */
-internal fun Xcsp3.Builder.distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
+internal fun Compiler.Builder.distinctCountVar(vars: IntArray, except: Set<Int> = emptySet()): Int {
     val loV = vars.minOf { domains[it].min }
     val hiV = vars.maxOf { domains[it].max }
     val used = ArrayList<Int>()
@@ -1000,7 +1006,7 @@ internal fun Xcsp3.Builder.distinctCountVar(vars: IntArray, except: Set<Int> = e
  *  occur before `t` — `t` at position `j` requires some `s` at an earlier position, and `t`
  *  cannot occupy position 0. With no `<values>`, the chain runs over the sorted union of the
  *  variables' domain values. */
-internal fun Xcsp3.Builder.precedence(e: XmlElement) {
+internal fun Compiler.Builder.precedence(e: XmlElement) {
     if (e.attr("covered").equals("true", ignoreCase = true)) {
         throw UnsupportedXcsp3Exception("precedence: covered form")
     }
@@ -1021,7 +1027,7 @@ internal fun Xcsp3.Builder.precedence(e: XmlElement) {
 /** 1-D no-overlap (disjunctive): tasks with constant durations share a unit resource, so at
  *  most one runs at a time — a [Cumulative] with unit heights and capacity 1. */
 @Suppress("ThrowsCount") // one guard per unsupported noOverlap shape
-internal fun Xcsp3.Builder.noOverlap(e: XmlElement) {
+internal fun Compiler.Builder.noOverlap(e: XmlElement) {
     val originsText = requireNotNull(e.child("origins")).textContent
     if ('(' in originsText) return noOverlapMulti(e, originsText)
     val starts = refList(originsText)
@@ -1048,7 +1054,7 @@ internal fun Xcsp3.Builder.noOverlap(e: XmlElement) {
  *  dimension in which one box lies entirely before the other. Origins are variables, lengths
  *  may be constants or variables. `zeroIgnored="false"` (zero-width boxes may not be placed) is
  *  not expressible here and is rejected. */
-internal fun Xcsp3.Builder.noOverlapMulti(e: XmlElement, originsText: String) {
+internal fun Compiler.Builder.noOverlapMulti(e: XmlElement, originsText: String) {
     if (e.attr("zeroIgnored").equals("false", ignoreCase = true)) {
         throw UnsupportedXcsp3Exception("noOverlap: zeroIgnored=false not supported for boxes")
     }
@@ -1092,11 +1098,11 @@ internal fun Xcsp3.Builder.noOverlapMulti(e: XmlElement, originsText: String) {
 }
 
 /** Reify `a + b ≤ c` (a,b,c variable ids) onto a literal. */
-internal fun Xcsp3.Builder.reifyLe3(a: Int, b: Int, c: Int): Int =
+internal fun Compiler.Builder.reifyLe3(a: Int, b: Int, c: Int): Int =
     reifyLinear(intArrayOf(1, 1, -1), intArrayOf(a, b, c), LinearOp.LE, 0)
 
 /** Parse `(t,t,…)(t,t,…)…` tuple rows, resolving each entry with [resolve]. */
-internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): List<IntArray> {
+internal fun Compiler.Builder.tupleRows(text: String, resolve: (String) -> Int): List<IntArray> {
     val rows = ArrayList<IntArray>()
     val cur = IntArrayList()
     forEachTuple(
@@ -1111,7 +1117,7 @@ internal fun Xcsp3.Builder.tupleRows(text: String, resolve: (String) -> Int): Li
 }
 
 @Suppress("ThrowsCount") // one guard per malformed/unsupported shape (matrix, except, empty list)
-internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
+internal fun Compiler.Builder.allDifferent(e: XmlElement) {
     // `<matrix>` form: values must be pairwise distinct on each row *and* on each column (not one
     // all-different over the whole matrix — that would demand more distinct values than the shared
     // domain holds and spuriously fail, e.g. a Sudoku grid). Rows and columns each get their own.
@@ -1139,7 +1145,7 @@ internal fun Xcsp3.Builder.allDifferent(e: XmlElement) {
 /** Post one all-different over [vars] as an [AllDifferent] factor, or as pairwise `!=` when the global
  *  cannot hold the members — see [allDifferentWindow]. Fewer than two variables is vacuous and posts
  *  nothing. */
-internal fun Xcsp3.Builder.postAllDifferent(vars: IntArray) {
+internal fun Compiler.Builder.postAllDifferent(vars: IntArray) {
     // An XCSP3 column always declares a finite domain, so both sides are always present here; the
     // shared judgement still owns the window, and admits an open column the day the format grows one.
     val window = allDifferentWindow(vars, { domains[it].min }, { domains[it].max })
@@ -1157,7 +1163,7 @@ internal fun Xcsp3.Builder.postAllDifferent(vars: IntArray) {
 /** `allDifferent` with `<except>`: variables must be pairwise distinct unless they take an exempt
  *  value. Decomposed as `x[i] = x[j] ⟹ x[i] ∈ except` per pair — two equal variables share a value,
  *  so it suffices to require that common value be exempt (one membership guard, symmetric). */
-internal fun Xcsp3.Builder.allDifferentExcept(vars: IntArray, except: IntArray) {
+internal fun Compiler.Builder.allDifferentExcept(vars: IntArray, except: IntArray) {
     // x[i] ∈ except, reused across every pair sharing i.
     val inExcept = IntArray(vars.size) { i ->
         tseitinOr(except.map { reifyLinear(intArrayOf(1), intArrayOf(vars[i]), LinearOp.EQ, it) })
