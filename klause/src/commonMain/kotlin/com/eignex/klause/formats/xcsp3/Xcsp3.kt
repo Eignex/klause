@@ -6,7 +6,6 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
-import com.eignex.klause.lowering.xcsp3.Xcsp3 as Xcsp3Lowering
 
 /** Raised when an XCSP3 construct outside the supported subset is encountered. */
 class UnsupportedXcsp3Exception(msg: String) : FormatException("XCSP3", msg)
@@ -33,7 +32,7 @@ object Xcsp3 {
     /** Decode and lower a streamed XCSP3 [source], retaining only bounded subtrees. */
     @Suppress("SwallowedException")
     fun parse(source: CharSource): Xcsp3Problem = try {
-        Xcsp3Lowering.Builder().run {
+        Compiler.Builder().run {
             val reader = XmlReader(source)
             reader.openRoot()
             // Single forward pass over `<instance>`'s children keeps the container order and tolerates

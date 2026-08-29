@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.xcsp3
+package com.eignex.klause.formats.xcsp3
 
 import com.eignex.klause.brute.BruteForceParams
 import com.eignex.klause.brute.BruteForceSolver
@@ -6,14 +6,12 @@ import com.eignex.klause.factor.global.Increasing
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
-import com.eignex.klause.formats.xcsp3.Xcsp3Problem
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.propagation.bake
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import com.eignex.klause.formats.xcsp3.Xcsp3 as FormatXcsp3
 
 /**
  * A source that names a global gets that global posted rather than a decomposition of it. Each case
@@ -22,7 +20,7 @@ import com.eignex.klause.formats.xcsp3.Xcsp3 as FormatXcsp3
  */
 class Xcsp3GlobalPostingTest {
 
-    private fun parse(constraints: String, vars: String): Xcsp3Problem = FormatXcsp3.parse(
+    private fun parse(constraints: String, vars: String): Xcsp3Problem = Xcsp3.parse(
         "<instance><variables>$vars</variables><constraints>$constraints</constraints></instance>",
     )
 
