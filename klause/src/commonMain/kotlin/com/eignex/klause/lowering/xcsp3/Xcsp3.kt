@@ -6,7 +6,6 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.xcsp3.*
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -33,27 +32,8 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
-import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.IntArrayList
 import com.eignex.klause.util.MutableLongIntMap
-import com.eignex.klause.util.StringCharSource
-
-/** Raised when an XCSP3 construct outside the supported subset is encountered. */
-class UnsupportedXcsp3Exception(msg: String) : FormatException("XCSP3", msg)
-
-/** A parsed XCSP3 instance lifted into klause's representation. */
-data class Xcsp3Problem(
-    /** Compiled solver problem. */
-    val problem: Problem,
-    /** Objective, or null for satisfaction instances. */
-    val objective: LinearObjectiveSpec?,
-    /** Declared variable name to int var id. */
-    val intVarNames: Map<String, Int> = emptyMap(),
-    /** The objective's optimisation sense (minimise for satisfaction instances, which have none). */
-    val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
-    /** Int vars the front-end knows are functionally defined (sound local-search `defines_var` hints). */
-    val definedVars: IntArray = IntArray(0),
-)
 
 /** Split on runs of whitespace into non-blank tokens without allocating matcher state per call. */
 internal fun String.splitWs(): List<String> {
@@ -113,56 +93,8 @@ internal fun splitCondition(text: String): Pair<String, String> {
     return inner.substring(0, comma).trim() to inner.substring(comma + 1).trim()
 }
 
-/** Parser/compiler for the supported XCSP3 integer subset. */
-object Xcsp3 {
-    /** Parse XCSP3 [text] into an [Xcsp3Problem]. Parsing only reads: the base bake is deferred to
-     *  presolve step 0, bounded there by the presolve deadline. */
-    // The scanners report malformed input via `require` and the throw is re-typed, not swallowed: the
-    // original message is carried into the format exception verbatim.
-    fun parse(text: String): Xcsp3Problem = parse(StringCharSource(text))
-
-    /** Parse XCSP3 from a streamed [source], driving a pull cursor over the document so the container
-     *  elements and — crucially — a `<group>`'s `<args>` rows are consumed one at a time and never held
-     *  whole. Semantically identical to the [String] overload: the same per-element [Builder] logic
-     *  receives the same bounded subtrees, just fed incrementally rather than from a resident DOM. */
-    @Suppress("SwallowedException")
-    fun parse(source: CharSource): Xcsp3Problem = try {
-        Builder().run {
-            val reader = XmlReader(source)
-            reader.openRoot()
-            // Single forward pass over `<instance>`'s children, dispatching by tag. A separate scan per
-            // container would over-consume when one (e.g. a pure-COP with no `<constraints>`) is absent,
-            // since the scan cannot rewind; the ordered walk both keeps memory bounded and tolerates gaps.
-            while (true) {
-                when (reader.nextChildTag() ?: break) {
-                    "variables" -> if (reader.enterPeeked()) {
-                        while (reader.nextChildTag() != null) declareVar(reader.materializeChild())
-                    }
-
-                    "constraints" -> if (reader.enterPeeked()) streamConstraints(reader)
-
-                    // Only the first objective is taken; the rest of the block is still drained so its
-                    // closing tag is consumed and the outer walk stays aligned.
-                    "objectives" -> if (reader.enterPeeked()) {
-                        var first = true
-                        while (reader.nextChildTag() != null) {
-                            if (first) objective(reader.materializeChild()) else reader.materializeChild()
-                            first = false
-                        }
-                    }
-
-                    else -> reader.materializeChild() // annotations and any other sibling: skip its subtree
-                }
-            }
-            build()
-        }
-    } catch (e: IllegalArgumentException) {
-        // The XML / FExpr / tuple scanners report malformed input with `require`, and a few numeric
-        // reads throw NumberFormatException (an IllegalArgumentException) — route both through the
-        // format-typed exception so a caller catches a malformed document like any other format's.
-        throw UnsupportedXcsp3Exception(e.message ?: "malformed XCSP3 document")
-    }
-
+/** Compiler for the supported XCSP3 integer subset. */
+internal object Xcsp3 {
     internal class Builder : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
