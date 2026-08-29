@@ -4772,6 +4772,59 @@ final class com.eignex.klause.formats.minizinc/OznParseException : com.eignex.kl
     constructor <init>(kotlin/String) // com.eignex.klause.formats.minizinc/OznParseException.<init>|<init>(kotlin.String){}[0]
 }
 
+final class com.eignex.klause.formats.mps/MpsColumn { // com.eignex.klause.formats.mps/MpsColumn|null[0]
+    constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Int) // com.eignex.klause.formats.mps/MpsColumn.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Int){}[0]
+
+    final val id // com.eignex.klause.formats.mps/MpsColumn.id|{}id[0]
+        final fun <get-id>(): kotlin/Int // com.eignex.klause.formats.mps/MpsColumn.id.<get-id>|<get-id>(){}[0]
+    final val name // com.eignex.klause.formats.mps/MpsColumn.name|{}name[0]
+        final fun <get-name>(): kotlin/String // com.eignex.klause.formats.mps/MpsColumn.name.<get-name>|<get-name>(){}[0]
+    final val real // com.eignex.klause.formats.mps/MpsColumn.real|{}real[0]
+        final fun <get-real>(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsColumn.real.<get-real>|<get-real>(){}[0]
+
+    final fun component1(): kotlin/String // com.eignex.klause.formats.mps/MpsColumn.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsColumn.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // com.eignex.klause.formats.mps/MpsColumn.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.formats.mps/MpsColumn // com.eignex.klause.formats.mps/MpsColumn.copy|copy(kotlin.String;kotlin.Boolean;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsColumn.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsColumn.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsColumn.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.formats.mps/MpsCompiled { // com.eignex.klause.formats.mps/MpsCompiled|null[0]
+    constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin/Boolean, kotlin.collections/List<com.eignex.klause.formats.mps/MpsColumn>, kotlin/Long, kotlin/Double?, kotlin/Boolean, kotlin/Int) // com.eignex.klause.formats.mps/MpsCompiled.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.formats.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
+
+    final val columns // com.eignex.klause.formats.mps/MpsCompiled.columns|{}columns[0]
+        final fun <get-columns>(): kotlin.collections/List<com.eignex.klause.formats.mps/MpsColumn> // com.eignex.klause.formats.mps/MpsCompiled.columns.<get-columns>|<get-columns>(){}[0]
+    final val floatColumns // com.eignex.klause.formats.mps/MpsCompiled.floatColumns|{}floatColumns[0]
+        final fun <get-floatColumns>(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.floatColumns.<get-floatColumns>|<get-floatColumns>(){}[0]
+    final val hasInnerConstraintApproximation // com.eignex.klause.formats.mps/MpsCompiled.hasInnerConstraintApproximation|{}hasInnerConstraintApproximation[0]
+        final fun <get-hasInnerConstraintApproximation>(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.hasInnerConstraintApproximation.<get-hasInnerConstraintApproximation>|<get-hasInnerConstraintApproximation>(){}[0]
+    final val maximize // com.eignex.klause.formats.mps/MpsCompiled.maximize|{}maximize[0]
+        final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.maximize.<get-maximize>|<get-maximize>(){}[0]
+    final val model // com.eignex.klause.formats.mps/MpsCompiled.model|{}model[0]
+        final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.formats.mps/MpsCompiled.model.<get-model>|<get-model>(){}[0]
+    final val objective // com.eignex.klause.formats.mps/MpsCompiled.objective|{}objective[0]
+        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.mps/MpsCompiled.objective.<get-objective>|<get-objective>(){}[0]
+    final val objectiveErrorBound // com.eignex.klause.formats.mps/MpsCompiled.objectiveErrorBound|{}objectiveErrorBound[0]
+        final fun <get-objectiveErrorBound>(): kotlin/Double? // com.eignex.klause.formats.mps/MpsCompiled.objectiveErrorBound.<get-objectiveErrorBound>|<get-objectiveErrorBound>(){}[0]
+    final val objectiveScale // com.eignex.klause.formats.mps/MpsCompiled.objectiveScale|{}objectiveScale[0]
+        final fun <get-objectiveScale>(): kotlin/Long // com.eignex.klause.formats.mps/MpsCompiled.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+
+    final fun component1(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.formats.mps/MpsCompiled.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.formats.mps/MpsCompiled.component2|component2(){}[0]
+    final fun component3(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<com.eignex.klause.formats.mps/MpsColumn> // com.eignex.klause.formats.mps/MpsCompiled.component4|component4(){}[0]
+    final fun component5(): kotlin/Long // com.eignex.klause.formats.mps/MpsCompiled.component5|component5(){}[0]
+    final fun component6(): kotlin/Double? // com.eignex.klause.formats.mps/MpsCompiled.component6|component6(){}[0]
+    final fun component7(): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.component7|component7(){}[0]
+    final fun component8(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.component8|component8(){}[0]
+    final fun copy(com.eignex.klause.ir/ProblemSpec = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin/Boolean = ..., kotlin.collections/List<com.eignex.klause.formats.mps/MpsColumn> = ..., kotlin/Long = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/MpsCompiled.copy|copy(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.formats.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsCompiled.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsCompiled.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsCompiled.toString|toString(){}[0]
+}
+
 final class com.eignex.klause.formats.mps/MpsConstraint { // com.eignex.klause.formats.mps/MpsConstraint|null[0]
     constructor <init>(kotlin/String, kotlin/IntArray, kotlin/DoubleArray, kotlin/Double?, kotlin/Double?, com.eignex.klause.formats.mps/MpsIndicator? = ...) // com.eignex.klause.formats.mps/MpsConstraint.<init>|<init>(kotlin.String;kotlin.IntArray;kotlin.DoubleArray;kotlin.Double?;kotlin.Double?;com.eignex.klause.formats.mps.MpsIndicator?){}[0]
 
@@ -4818,6 +4871,10 @@ final class com.eignex.klause.formats.mps/MpsIndicator { // com.eignex.klause.fo
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.mps/MpsIndicator.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.mps/MpsIndicator.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.mps/MpsIndicator.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.formats.mps/MpsLoweringException : kotlin/IllegalArgumentException { // com.eignex.klause.formats.mps/MpsLoweringException|null[0]
+    constructor <init>(kotlin/String) // com.eignex.klause.formats.mps/MpsLoweringException.<init>|<init>(kotlin.String){}[0]
 }
 
 final class com.eignex.klause.formats.mps/MpsModel { // com.eignex.klause.formats.mps/MpsModel|null[0]
@@ -6400,63 +6457,6 @@ final class com.eignex.klause.lowering.flatzinc/SetVarLayout { // com.eignex.kla
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.flatzinc/SetVarLayout.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.flatzinc/SetVarLayout.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.lowering.flatzinc/SetVarLayout.toString|toString(){}[0]
-}
-
-final class com.eignex.klause.lowering.mps/MpsColumn { // com.eignex.klause.lowering.mps/MpsColumn|null[0]
-    constructor <init>(kotlin/String, kotlin/Boolean, kotlin/Int) // com.eignex.klause.lowering.mps/MpsColumn.<init>|<init>(kotlin.String;kotlin.Boolean;kotlin.Int){}[0]
-
-    final val id // com.eignex.klause.lowering.mps/MpsColumn.id|{}id[0]
-        final fun <get-id>(): kotlin/Int // com.eignex.klause.lowering.mps/MpsColumn.id.<get-id>|<get-id>(){}[0]
-    final val name // com.eignex.klause.lowering.mps/MpsColumn.name|{}name[0]
-        final fun <get-name>(): kotlin/String // com.eignex.klause.lowering.mps/MpsColumn.name.<get-name>|<get-name>(){}[0]
-    final val real // com.eignex.klause.lowering.mps/MpsColumn.real|{}real[0]
-        final fun <get-real>(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsColumn.real.<get-real>|<get-real>(){}[0]
-
-    final fun component1(): kotlin/String // com.eignex.klause.lowering.mps/MpsColumn.component1|component1(){}[0]
-    final fun component2(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsColumn.component2|component2(){}[0]
-    final fun component3(): kotlin/Int // com.eignex.klause.lowering.mps/MpsColumn.component3|component3(){}[0]
-    final fun copy(kotlin/String = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.lowering.mps/MpsColumn // com.eignex.klause.lowering.mps/MpsColumn.copy|copy(kotlin.String;kotlin.Boolean;kotlin.Int){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsColumn.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.mps/MpsColumn.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.lowering.mps/MpsColumn.toString|toString(){}[0]
-}
-
-final class com.eignex.klause.lowering.mps/MpsCompiled { // com.eignex.klause.lowering.mps/MpsCompiled|null[0]
-    constructor <init>(com.eignex.klause.ir/ProblemSpec, com.eignex.klause.ir/LinearObjectiveSpec?, kotlin/Boolean, kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn>, kotlin/Long, kotlin/Double?, kotlin/Boolean, kotlin/Int) // com.eignex.klause.lowering.mps/MpsCompiled.<init>|<init>(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.lowering.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
-
-    final val columns // com.eignex.klause.lowering.mps/MpsCompiled.columns|{}columns[0]
-        final fun <get-columns>(): kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> // com.eignex.klause.lowering.mps/MpsCompiled.columns.<get-columns>|<get-columns>(){}[0]
-    final val floatColumns // com.eignex.klause.lowering.mps/MpsCompiled.floatColumns|{}floatColumns[0]
-        final fun <get-floatColumns>(): kotlin/Int // com.eignex.klause.lowering.mps/MpsCompiled.floatColumns.<get-floatColumns>|<get-floatColumns>(){}[0]
-    final val hasInnerConstraintApproximation // com.eignex.klause.lowering.mps/MpsCompiled.hasInnerConstraintApproximation|{}hasInnerConstraintApproximation[0]
-        final fun <get-hasInnerConstraintApproximation>(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.hasInnerConstraintApproximation.<get-hasInnerConstraintApproximation>|<get-hasInnerConstraintApproximation>(){}[0]
-    final val maximize // com.eignex.klause.lowering.mps/MpsCompiled.maximize|{}maximize[0]
-        final fun <get-maximize>(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.maximize.<get-maximize>|<get-maximize>(){}[0]
-    final val model // com.eignex.klause.lowering.mps/MpsCompiled.model|{}model[0]
-        final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.lowering.mps/MpsCompiled.model.<get-model>|<get-model>(){}[0]
-    final val objective // com.eignex.klause.lowering.mps/MpsCompiled.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.mps/MpsCompiled.objective.<get-objective>|<get-objective>(){}[0]
-    final val objectiveErrorBound // com.eignex.klause.lowering.mps/MpsCompiled.objectiveErrorBound|{}objectiveErrorBound[0]
-        final fun <get-objectiveErrorBound>(): kotlin/Double? // com.eignex.klause.lowering.mps/MpsCompiled.objectiveErrorBound.<get-objectiveErrorBound>|<get-objectiveErrorBound>(){}[0]
-    final val objectiveScale // com.eignex.klause.lowering.mps/MpsCompiled.objectiveScale|{}objectiveScale[0]
-        final fun <get-objectiveScale>(): kotlin/Long // com.eignex.klause.lowering.mps/MpsCompiled.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
-
-    final fun component1(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.lowering.mps/MpsCompiled.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.ir/LinearObjectiveSpec? // com.eignex.klause.lowering.mps/MpsCompiled.component2|component2(){}[0]
-    final fun component3(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.component3|component3(){}[0]
-    final fun component4(): kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> // com.eignex.klause.lowering.mps/MpsCompiled.component4|component4(){}[0]
-    final fun component5(): kotlin/Long // com.eignex.klause.lowering.mps/MpsCompiled.component5|component5(){}[0]
-    final fun component6(): kotlin/Double? // com.eignex.klause.lowering.mps/MpsCompiled.component6|component6(){}[0]
-    final fun component7(): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.component7|component7(){}[0]
-    final fun component8(): kotlin/Int // com.eignex.klause.lowering.mps/MpsCompiled.component8|component8(){}[0]
-    final fun copy(com.eignex.klause.ir/ProblemSpec = ..., com.eignex.klause.ir/LinearObjectiveSpec? = ..., kotlin/Boolean = ..., kotlin.collections/List<com.eignex.klause.lowering.mps/MpsColumn> = ..., kotlin/Long = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/MpsCompiled.copy|copy(com.eignex.klause.ir.ProblemSpec;com.eignex.klause.ir.LinearObjectiveSpec?;kotlin.Boolean;kotlin.collections.List<com.eignex.klause.lowering.mps.MpsColumn>;kotlin.Long;kotlin.Double?;kotlin.Boolean;kotlin.Int){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.lowering.mps/MpsCompiled.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.lowering.mps/MpsCompiled.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.lowering.mps/MpsCompiled.toString|toString(){}[0]
-}
-
-final class com.eignex.klause.lowering.mps/MpsLoweringException : kotlin/IllegalArgumentException { // com.eignex.klause.lowering.mps/MpsLoweringException|null[0]
-    constructor <init>(kotlin/String) // com.eignex.klause.lowering.mps/MpsLoweringException.<init>|<init>(kotlin.String){}[0]
 }
 
 final class com.eignex.klause.lowering/FloatBucketing { // com.eignex.klause.lowering/FloatBucketing|null[0]
@@ -11347,7 +11347,7 @@ final val com.eignex.klause.solver/indices // com.eignex.klause.solver/indices|@
 
 final fun (com.eignex.klause.formats.dimacs/CnfDocument).com.eignex.klause.formats.dimacs/toProblem(): com.eignex.klause.ir/Problem // com.eignex.klause.formats.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.CnfDocument(){}[0]
 final fun (com.eignex.klause.formats.dimacs/WcnfDocument).com.eignex.klause.formats.dimacs/toProblem(): com.eignex.klause.formats.dimacs/WcnfProblem // com.eignex.klause.formats.dimacs/toProblem|toProblem@com.eignex.klause.formats.dimacs.WcnfDocument(){}[0]
-final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.lowering.mps/toProblem(): com.eignex.klause.lowering.mps/MpsCompiled // com.eignex.klause.lowering.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(){}[0]
+final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(){}[0]
 final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(){}[0]
 final fun (com.eignex.klause.ir/Factor).com.eignex.klause.factor.arithmetic/linearRow(): com.eignex.klause.factor.arithmetic/FactorRow? // com.eignex.klause.factor.arithmetic/linearRow|linearRow@com.eignex.klause.ir.Factor(){}[0]
 final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotlin.random/Random): kotlin/Long // com.eignex.klause.ir/randomValue|randomValue@com.eignex.klause.ir.IntDomain(kotlin.random.Random){}[0]

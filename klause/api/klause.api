@@ -2016,6 +2016,50 @@ public final class com/eignex/klause/formats/mps/Mps {
 	public final fun parse (Ljava/lang/String;)Lcom/eignex/klause/formats/mps/MpsModel;
 }
 
+public final class com/eignex/klause/formats/mps/MpsColumn {
+	public fun <init> (Ljava/lang/String;ZI)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Z
+	public final fun component3 ()I
+	public final fun copy (Ljava/lang/String;ZI)Lcom/eignex/klause/formats/mps/MpsColumn;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsColumn;Ljava/lang/String;ZIILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsColumn;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()I
+	public final fun getName ()Ljava/lang/String;
+	public final fun getReal ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/mps/MpsCompiled {
+	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JLjava/lang/Double;ZI)V
+	public final fun component1 ()Lcom/eignex/klause/ir/ProblemSpec;
+	public final fun component2 ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()J
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun component7 ()Z
+	public final fun component8 ()I
+	public final fun copy (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JLjava/lang/Double;ZI)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/mps/MpsCompiled;Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JLjava/lang/Double;ZIILjava/lang/Object;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColumns ()Ljava/util/List;
+	public final fun getFloatColumns ()I
+	public final fun getHasInnerConstraintApproximation ()Z
+	public final fun getMaximize ()Z
+	public final fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
+	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
+	public final fun getObjectiveErrorBound ()Ljava/lang/Double;
+	public final fun getObjectiveScale ()J
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/mps/MpsCompilerKt {
+	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;)Lcom/eignex/klause/formats/mps/MpsCompiled;
+}
+
 public final class com/eignex/klause/formats/mps/MpsConstraint {
 	public fun <init> (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/formats/mps/MpsIndicator;)V
 	public synthetic fun <init> (Ljava/lang/String;[I[DLjava/lang/Double;Ljava/lang/Double;Lcom/eignex/klause/formats/mps/MpsIndicator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -2053,6 +2097,10 @@ public final class com/eignex/klause/formats/mps/MpsIndicator {
 	public final fun getWhenOne ()Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/mps/MpsLoweringException : java/lang/IllegalArgumentException {
+	public fun <init> (Ljava/lang/String;)V
 }
 
 public final class com/eignex/klause/formats/mps/MpsModel {
@@ -4463,54 +4511,6 @@ public final class com/eignex/klause/lowering/flatzinc/SolveDirective$Satisfy : 
 	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/lowering/mps/MpsColumn {
-	public fun <init> (Ljava/lang/String;ZI)V
-	public final fun component1 ()Ljava/lang/String;
-	public final fun component2 ()Z
-	public final fun component3 ()I
-	public final fun copy (Ljava/lang/String;ZI)Lcom/eignex/klause/lowering/mps/MpsColumn;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsColumn;Ljava/lang/String;ZIILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsColumn;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getId ()I
-	public final fun getName ()Ljava/lang/String;
-	public final fun getReal ()Z
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/lowering/mps/MpsCompiled {
-	public fun <init> (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JLjava/lang/Double;ZI)V
-	public final fun component1 ()Lcom/eignex/klause/ir/ProblemSpec;
-	public final fun component2 ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
-	public final fun component3 ()Z
-	public final fun component4 ()Ljava/util/List;
-	public final fun component5 ()J
-	public final fun component6 ()Ljava/lang/Double;
-	public final fun component7 ()Z
-	public final fun component8 ()I
-	public final fun copy (Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JLjava/lang/Double;ZI)Lcom/eignex/klause/lowering/mps/MpsCompiled;
-	public static synthetic fun copy$default (Lcom/eignex/klause/lowering/mps/MpsCompiled;Lcom/eignex/klause/ir/ProblemSpec;Lcom/eignex/klause/ir/LinearObjectiveSpec;ZLjava/util/List;JLjava/lang/Double;ZIILjava/lang/Object;)Lcom/eignex/klause/lowering/mps/MpsCompiled;
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getColumns ()Ljava/util/List;
-	public final fun getFloatColumns ()I
-	public final fun getHasInnerConstraintApproximation ()Z
-	public final fun getMaximize ()Z
-	public final fun getModel ()Lcom/eignex/klause/ir/ProblemSpec;
-	public final fun getObjective ()Lcom/eignex/klause/ir/LinearObjectiveSpec;
-	public final fun getObjectiveErrorBound ()Ljava/lang/Double;
-	public final fun getObjectiveScale ()J
-	public fun hashCode ()I
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/lowering/mps/MpsCompiledKt {
-	public static final fun toProblem (Lcom/eignex/klause/formats/mps/MpsModel;)Lcom/eignex/klause/lowering/mps/MpsCompiled;
-}
-
-public final class com/eignex/klause/lowering/mps/MpsLoweringException : java/lang/IllegalArgumentException {
-	public fun <init> (Ljava/lang/String;)V
 }
 
 public final class com/eignex/klause/lp/Contribution : java/lang/Enum {

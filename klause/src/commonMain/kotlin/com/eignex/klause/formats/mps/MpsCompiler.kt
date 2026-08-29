@@ -1,13 +1,9 @@
-package com.eignex.klause.lowering.mps
+package com.eignex.klause.formats.mps
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.formats.mps.MpsConstraint
-import com.eignex.klause.formats.mps.MpsIndicator
-import com.eignex.klause.formats.mps.MpsModel
-import com.eignex.klause.formats.mps.MpsVar
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearObjectiveSpec

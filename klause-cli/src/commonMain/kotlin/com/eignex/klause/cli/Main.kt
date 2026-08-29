@@ -1,8 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.FormatException
+import com.eignex.klause.formats.mps.MpsLoweringException
 import com.eignex.klause.formats.opb.OpbLoweringException
-import com.eignex.klause.lowering.mps.MpsLoweringException
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.PipelineConfigException
 

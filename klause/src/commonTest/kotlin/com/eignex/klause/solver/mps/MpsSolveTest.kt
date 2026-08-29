@@ -6,8 +6,8 @@ import com.eignex.klause.formats.mps.MpsConstraint
 import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.MpsObjective
 import com.eignex.klause.formats.mps.MpsVar
-import com.eignex.klause.lowering.mps.problem
-import com.eignex.klause.lowering.mps.toProblem
+import com.eignex.klause.formats.mps.problem
+import com.eignex.klause.formats.mps.toProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.toLinearObjective
