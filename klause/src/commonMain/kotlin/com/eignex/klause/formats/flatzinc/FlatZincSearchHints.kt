@@ -1,4 +1,4 @@
-package com.eignex.klause.lowering.flatzinc
+package com.eignex.klause.formats.flatzinc
 
 /** Neutral search-annotation metadata extracted from `solve :: ..._search(...)` clauses. */
 data class FlatZincSearchHints(

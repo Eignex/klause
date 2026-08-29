@@ -17,10 +17,10 @@ import com.eignex.klause.backtrack.selector.SmallestLowerBound
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.backtrack.selector.ValueSelector
 import com.eignex.klause.backtrack.selector.VariableSelector
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchTier
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchValueSelector
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchVarSelector
+import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
+import com.eignex.klause.formats.flatzinc.FlatZincSearchTier
+import com.eignex.klause.formats.flatzinc.FlatZincSearchValueSelector
+import com.eignex.klause.formats.flatzinc.FlatZincSearchVarSelector
 
 /** Convert format-side search hints into backtrack-ready parameters. */
 fun FlatZincSearchHints.toBacktrackParams(numBoolVars: Int, numIntVars: Int): BacktrackParams =

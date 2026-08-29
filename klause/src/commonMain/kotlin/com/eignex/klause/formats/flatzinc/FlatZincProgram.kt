@@ -1,6 +1,5 @@
-package com.eignex.klause.lowering.flatzinc
+package com.eignex.klause.formats.flatzinc
 
-import com.eignex.klause.formats.flatzinc.*
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.FloatBucketing
 

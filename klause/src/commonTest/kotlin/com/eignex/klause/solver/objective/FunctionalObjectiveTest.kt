@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.objective
 
+import com.eignex.klause.formats.flatzinc.FlatZincProgram
 import com.eignex.klause.ir.values
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.lowering.flatzinc.FlatZincProgram
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.parseFlatZincExecution
 import kotlin.math.abs

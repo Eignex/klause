@@ -5,10 +5,10 @@ import com.eignex.klause.backtrack.BacktrackRecipe
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.backtrack.toBacktrackParams
+import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.strategy.LocalSearchRecipe
-import com.eignex.klause.lowering.flatzinc.FlatZincSearchHints
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.AttributedImprovement
 import com.eignex.klause.portfolio.BacktrackCatalog
