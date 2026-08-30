@@ -36,4 +36,31 @@ class InstanceClassifierTest {
         assertEquals("sat", f.structure)
         assertTrue(f.boolHeavy)
     }
+
+    @Test
+    fun `an smtlib instance reports its declared logic`() {
+        val f = InstanceClassifier.fromSource(
+            Format.SMTLIB,
+            "(set-logic QF_LIA)\n(declare-fun x () Int)\n(assert (>= x 0))\n(check-sat)",
+        )
+        assertEquals("QF_LIA", f.logic)
+    }
+
+    @Test
+    fun `an smtlib instance with no set-logic reports a blank logic`() {
+        val f = InstanceClassifier.fromSource(Format.SMTLIB, "(declare-fun x () Int)\n(check-sat)")
+        assertEquals("", f.logic)
+    }
+
+    @Test
+    fun `an mps instance with an INTORG marker is a MIP`() {
+        val f = InstanceClassifier.fromSource(Format.MPS, "MARKER\n    M1 'MARKER' 'INTORG'\n")
+        assertEquals("MIP", f.logic)
+    }
+
+    @Test
+    fun `an mps instance with no marker is an LP`() {
+        val f = InstanceClassifier.fromSource(Format.MPS, "ROWS\n N obj\nCOLUMNS\n")
+        assertEquals("LP", f.logic)
+    }
 }

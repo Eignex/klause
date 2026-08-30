@@ -65,32 +65,20 @@ internal object CorpusSelection {
             override fun discover(root: File): List<Discovered> {
                 val base = if (subDir.isEmpty()) root else File(root, subDir)
                 if (!base.isDirectory) return emptyList()
-                val families = base.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
+                return discoverFamilyDirs(root, base)
+            }
+        }
+
+        /** The whole `mzn-challenge` archive: every year directory (`2008`, `2009`, … — discovered
+         *  dynamically, so a new challenge year is picked up without a code change) is itself a
+         *  [MznChallenge] layout. Names and family keys are year-prefixed (`2013/cargo`) since the
+         *  same problem name recurs across years (`black-hole` in both 2013 and 2025) and a bare
+         *  name would silently merge two different problems into one family. */
+        data object MznChallengeAllYears : Layout {
+            override fun discover(root: File): List<Discovered> {
+                val years = root.listFiles { f -> f.isDirectory && f.name.toIntOrNull() != null }
                     ?.sortedBy { it.name } ?: return emptyList()
-                val perFamily = ArrayList<List<Discovered>>()
-                for (pd in families) {
-                    val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.toList()
-                        ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()
-                    if (candidates.isEmpty()) continue
-                    val primary = pickPrimaryMzn(pd.name, candidates)
-                    val mznRel = primary.relativeTo(root).path
-                    val dzns = pd.walkTopDown().maxDepth(3)
-                        .filter { it.isFile && it.extension == "dzn" }
-                        .sortedBy { it.relativeTo(pd).path }.toList()
-                    val instances = if (dzns.isEmpty()) {
-                        listOf(Discovered(pd.name, mznRel))
-                    } else {
-                        dzns.map { dzn ->
-                            Discovered(
-                                "${pd.name}/${dzn.relativeTo(pd).path.removeSuffix(".dzn")}",
-                                mznRel,
-                                dzn.relativeTo(root).path,
-                            )
-                        }
-                    }
-                    if (instances.isNotEmpty()) perFamily += instances
-                }
-                return interleave(perFamily)
+                return interleave(years.map { discoverFamilyDirs(root, it, prefix = it.name) })
             }
         }
 
@@ -230,6 +218,44 @@ internal object CorpusSelection {
             }
         }
         return quota
+    }
+
+    /** One family per immediate subdirectory of [base]: each is a `.mzn` (pick the primary) plus
+     *  `.dzn` data files in nested dirs, relative to [root]. [prefix] (a challenge year, for
+     *  [Layout.MznChallengeAllYears]) is prepended to the name/family key so same-named problems
+     *  from different years don't collide. Shared by [Layout.MznChallenge] (one year, no prefix)
+     *  and [Layout.MznChallengeAllYears] (every year, prefixed). */
+    private fun discoverFamilyDirs(root: File, base: File, prefix: String? = null): List<Discovered> {
+        val families = base.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
+            ?.sortedBy { it.name } ?: return emptyList()
+        val out = ArrayList<Discovered>()
+        for (pd in families) {
+            val candidates = pd.listFiles { f -> f.isFile && f.extension == "mzn" }?.toList()
+                ?: pd.walkTopDown().maxDepth(3).filter { it.isFile && it.extension == "mzn" }.toList()
+            if (candidates.isEmpty()) continue
+            val primary = pickPrimaryMzn(pd.name, candidates)
+            val mznRel = primary.relativeTo(root).path
+            val familyName = if (prefix != null) "$prefix/${pd.name}" else pd.name
+            val dzns = pd.walkTopDown().maxDepth(3)
+                .filter { it.isFile && it.extension == "dzn" }
+                .sortedBy { it.relativeTo(pd).path }.toList()
+            if (dzns.isEmpty()) {
+                // familyKey is set explicitly (not left to the name.substringBefore('/') fallback)
+                // because a year-prefixed name already contains a '/' (`2013/black-hole`), which
+                // would otherwise collapse every problem in a year into one family.
+                out += Discovered(familyName, mznRel, familyKey = familyName)
+            } else {
+                dzns.mapTo(out) { dzn ->
+                    Discovered(
+                        "$familyName/${dzn.relativeTo(pd).path.removeSuffix(".dzn")}",
+                        mznRel,
+                        dzn.relativeTo(root).path,
+                        familyKey = familyName,
+                    )
+                }
+            }
+        }
+        return out
     }
 
     /** Pick the canonical `.mzn` for [familyName] from [candidates]: exact basename, then

@@ -42,12 +42,12 @@ internal object Suites {
         listOf(
             DynamicSuite(
                 "mzn-bench",
-                "MiniZinc Challenge benchmarks (fetched; 1/family by default)",
+                "MiniZinc Challenge benchmarks, every year 2008-present (fetched; 1/family by default)",
                 defaultPerFamily = 1,
             ) { sel ->
                 CorpusSelection.select(
-                    ExternalCollections.minizincBenchmarks,
-                    CorpusSelection.Layout.MznChallenge(),
+                    ExternalCollections.minizincChallenge,
+                    CorpusSelection.Layout.MznChallengeAllYears,
                     sel,
                     Category.OPTIMIZATION,
                 )
@@ -142,6 +142,87 @@ internal object Suites {
                     format = Format.SMTLIB,
                 )
             },
+            // The logics below are outside klause's theory set (QF_IDL/QF_RDL/QF_LIA/QF_LRA/QF_LIRA
+            // are the klause-solvable set above) — z3-only reference coverage; see
+            // ExternalCollections.smtlibQfNia's KDoc for why `bench solve` on these is still safe.
+            DynamicSuite(
+                "smtlib-qfnia",
+                "SMT-LIB QF_NIA non-incremental set (fetched; z3-only, klause has no nonlinear-int theory)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfNia,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_NIA", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfnra",
+                "SMT-LIB QF_NRA non-incremental set (fetched; z3-only, klause has no nonlinear-real theory)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfNra,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_NRA", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfuf",
+                "SMT-LIB QF_UF non-incremental set (fetched; z3-only, klause has no EUF theory)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfUf,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_UF", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfuflia",
+                "SMT-LIB QF_UFLIA non-incremental set (fetched; z3-only, klause has no EUF theory)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfUflia,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_UFLIA", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfbv",
+                "SMT-LIB QF_BV non-incremental set (fetched, 1.65GB; z3-only, klause has no bitvector theory)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfBv,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_BV", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
+            DynamicSuite(
+                "smtlib-qfabv",
+                "SMT-LIB QF_ABV non-incremental set (fetched; z3-only, klause has neither theory)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.smtlibQfAbv,
+                    CorpusSelection.Layout.Flat("non-incremental/QF_ABV", "smt2"),
+                    sel,
+                    Category.CSP,
+                    format = Format.SMTLIB,
+                )
+            },
             DynamicSuite(
                 "miplib2017",
                 "MIPLIB 2017 collection (fetched per-instance, ~1065 .mps; 1/family by default)",
@@ -193,6 +274,35 @@ internal object Suites {
                 CorpusSelection.select(
                     ExternalCollections.pbComp2024,
                     CorpusSelection.Layout.Flat("PB24", "wbo", familyOf = { it.substringBeforeLast('/', it) }),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.OPB,
+                )
+            },
+            // `PB25` subdir mirrors PB24's tar layout (`PB<year>/...`) by analogy — same publisher,
+            // same archive tooling — but is unverified against an actual extraction; if the archive
+            // shape moved, this discovers zero and the fix is a one-line subDir change.
+            DynamicSuite(
+                "pb-comp-2025",
+                "Pseudo-Boolean Competition 2025 selected OPB set (fetched; 1/family by default)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.pbComp2025,
+                    CorpusSelection.Layout.Flat("PB25", "opb", familyOf = { it.substringBeforeLast('/', it) }),
+                    sel,
+                    Category.OPTIMIZATION,
+                    format = Format.OPB,
+                )
+            },
+            DynamicSuite(
+                "pb-comp-2025-wbo",
+                "Pseudo-Boolean Competition 2025 WBO soft-constraint set (fetched; 1/family)",
+                defaultPerFamily = 1,
+            ) { sel ->
+                CorpusSelection.select(
+                    ExternalCollections.pbComp2025,
+                    CorpusSelection.Layout.Flat("PB25", "wbo", familyOf = { it.substringBeforeLast('/', it) }),
                     sel,
                     Category.OPTIMIZATION,
                     format = Format.OPB,
@@ -729,11 +839,18 @@ internal object Suites {
  * here so the "where did this come from / why isn't it in the repo" answer is auditable.
  */
 internal object ExternalCollections {
-    val minizincBenchmarks = ExternalCollection(
-        id = "minizinc-benchmarks",
-        url = "https://github.com/MiniZinc/minizinc-benchmarks.git",
-        license = "GPLv3 + per-problem licenses",
-        reason = "GPLv3 — redistribution outside a fetch cache is restricted",
+    /** The actively-maintained MiniZinc Challenge archive — one directory per year (2008–present),
+     *  each with the year's family dirs; `mzn-bench` selects across every year via
+     *  [com.eignex.klause.bench.source.CorpusSelection.Layout.MznChallengeAllYears]. Replaces the
+     *  old `minizinc-benchmarks` repo (a flat, GPLv3-mixed aggregate that had fallen behind and only
+     *  covered a curated slice of the mid-2010s challenge years) — problems submitted to recent
+     *  challenge years are required to ship under MIT, and the repo is updated as each year's
+     *  challenge runs. */
+    val minizincChallenge = ExternalCollection(
+        id = "mzn-challenge",
+        url = "https://github.com/MiniZinc/mzn-challenge.git",
+        license = "MIT (recent years); per-problem LICENSE files for older years where known",
+        reason = "the actively-maintained per-year MiniZinc Challenge archive",
         fetch = FetchMethod.GitClone(depth = 1),
     )
     val libminizincTests = ExternalCollection(
@@ -777,7 +894,7 @@ internal object ExternalCollections {
         fetch = FetchMethod.Tarball,
     )
 
-    val all = listOf(minizincBenchmarks, libminizincTests, hakank, satlibUf20, satlibUuf50)
+    val all = listOf(minizincChallenge, libminizincTests, hakank, satlibUf20, satlibUuf50)
 
     // XCSP3 competition library (instance archives, xcsp.org / CRIL).
     // Instances ship as individually `.xml.lzma`-compressed files inside each zip; the
@@ -815,30 +932,34 @@ internal object ExternalCollections {
         xcsp3Csp,
     )
 
-    /** SMT-LIB QF_LIA non-incremental benchmark set: the per-logic `.tar.zst` archive from the
-     *  SMT-LIB 2024 Zenodo release (record 11061097), extracting to `.smt2` files under
+    /** Per-logic `.tar.zst` archive base URL from the SMT-LIB non-incremental Zenodo release (record
+     *  15493090, published 2025-05-22 — supersedes the 2024 record 11061097 that these collections
+     *  previously pinned). */
+    private fun smtlibLogic(logic: String) = "https://zenodo.org/records/15493090/files/$logic.tar.zst?download=1"
+
+    /** SMT-LIB QF_LIA non-incremental benchmark set, extracting to `.smt2` files under
      *  `non-incremental/QF_LIA/<family>/`. */
     val smtlibQfLia = ExternalCollection(
         id = "smtlib-qf_lia",
-        url = "https://zenodo.org/records/11061097/files/QF_LIA.tar.zst?download=1",
+        url = smtlibLogic("QF_LIA"),
         license = "SMT-LIB (per-family licenses)",
-        reason = "large benchmark set (689MB compressed, ~13k instances); fetched rather than vendored",
+        reason = "large benchmark set (656MB compressed, ~13k instances); fetched rather than vendored",
         fetch = FetchMethod.TarballZst,
     )
 
     /** SMT-LIB QF_LRA non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. */
     val smtlibQfLra = ExternalCollection(
         id = "smtlib-qf_lra",
-        url = "https://zenodo.org/records/11061097/files/QF_LRA.tar.zst?download=1",
+        url = smtlibLogic("QF_LRA"),
         license = "SMT-LIB (per-family licenses)",
-        reason = "real-arithmetic benchmark set (174MB compressed, ~1.7k instances); fetched rather than vendored",
+        reason = "real-arithmetic benchmark set (173MB compressed, ~1.7k instances); fetched rather than vendored",
         fetch = FetchMethod.TarballZst,
     )
 
     /** SMT-LIB QF_LIRA non-incremental benchmark set, same Zenodo release as [smtlibQfLia]. */
     val smtlibQfLira = ExternalCollection(
         id = "smtlib-qf_lira",
-        url = "https://zenodo.org/records/11061097/files/QF_LIRA.tar.zst?download=1",
+        url = smtlibLogic("QF_LIRA"),
         license = "SMT-LIB (per-family licenses)",
         reason = "small mixed int/real benchmark set (0.2MB compressed); fetched rather than vendored",
         fetch = FetchMethod.TarballZst,
@@ -849,7 +970,7 @@ internal object ExternalCollections {
      *  every integer domain open — the shape the deferred bounding has to invent a search box for. */
     val smtlibQfIdl = ExternalCollection(
         id = "smtlib-qf_idl",
-        url = "https://zenodo.org/records/11061097/files/QF_IDL.tar.zst?download=1",
+        url = smtlibLogic("QF_IDL"),
         license = "SMT-LIB (per-family licenses)",
         reason = "integer difference-logic benchmark set (408MB compressed); fetched rather than vendored",
         fetch = FetchMethod.TarballZst,
@@ -860,9 +981,59 @@ internal object ExternalCollections {
      *  meet the integer search box at all. Small, so it is the cheap one to sweep. */
     val smtlibQfRdl = ExternalCollection(
         id = "smtlib-qf_rdl",
-        url = "https://zenodo.org/records/11061097/files/QF_RDL.tar.zst?download=1",
+        url = smtlibLogic("QF_RDL"),
         license = "SMT-LIB (per-family licenses)",
-        reason = "real difference-logic benchmark set (10MB compressed); fetched rather than vendored",
+        reason = "real difference-logic benchmark set (9.5MB compressed); fetched rather than vendored",
+        fetch = FetchMethod.TarballZst,
+    )
+
+    /** SMT-LIB logics outside klause's theory set (`theory.difference`/`theory.lia`/`theory.qflra`
+     *  decide only QF_IDL/QF_RDL/QF_LIA/QF_LRA/QF_LIRA above). klause's SMT-LIB compiler cleanly
+     *  refuses what it can't lower (`UnsupportedSmtException` on a non-0-arity function symbol,
+     *  a bitvector sort, or a nonlinear term), so pointing `bench solve` at these is safe — it
+     *  reports a refusal per instance rather than crashing. They exist for z3-only reference coverage
+     *  and to track klause's refusal rate as its theory set grows, not for klause to attempt and win.
+     *  Same Zenodo release and archive shape as [smtlibQfLia]. */
+    val smtlibQfNia = ExternalCollection(
+        id = "smtlib-qf_nia",
+        url = smtlibLogic("QF_NIA"),
+        license = "SMT-LIB (per-family licenses)",
+        reason = "nonlinear integer arithmetic (182MB compressed); z3-only, klause has no QF_NIA theory",
+        fetch = FetchMethod.TarballZst,
+    )
+    val smtlibQfNra = ExternalCollection(
+        id = "smtlib-qf_nra",
+        url = smtlibLogic("QF_NRA"),
+        license = "SMT-LIB (per-family licenses)",
+        reason = "nonlinear real arithmetic (201MB compressed); z3-only, klause has no QF_NRA theory",
+        fetch = FetchMethod.TarballZst,
+    )
+    val smtlibQfUf = ExternalCollection(
+        id = "smtlib-qf_uf",
+        url = smtlibLogic("QF_UF"),
+        license = "SMT-LIB (per-family licenses)",
+        reason = "pure uninterpreted functions (52MB compressed); z3-only, klause rejects non-0-arity symbols",
+        fetch = FetchMethod.TarballZst,
+    )
+    val smtlibQfUflia = ExternalCollection(
+        id = "smtlib-qf_uflia",
+        url = smtlibLogic("QF_UFLIA"),
+        license = "SMT-LIB (per-family licenses)",
+        reason = "EUF + linear integer arithmetic (18MB compressed); z3-only, klause has no EUF theory",
+        fetch = FetchMethod.TarballZst,
+    )
+    val smtlibQfBv = ExternalCollection(
+        id = "smtlib-qf_bv",
+        url = smtlibLogic("QF_BV"),
+        license = "SMT-LIB (per-family licenses)",
+        reason = "fixed-size bitvectors (1.65GB compressed); z3-only, klause has no bitvector theory",
+        fetch = FetchMethod.TarballZst,
+    )
+    val smtlibQfAbv = ExternalCollection(
+        id = "smtlib-qf_abv",
+        url = smtlibLogic("QF_ABV"),
+        license = "SMT-LIB (per-family licenses)",
+        reason = "arrays + bitvectors (132MB compressed); z3-only, klause has neither theory",
         fetch = FetchMethod.TarballZst,
     )
 
@@ -905,6 +1076,16 @@ internal object ExternalCollections {
         url = "https://www.cril.univ-artois.fr/PB24/benchs/selected-PB24.tar",
         license = "Pseudo-Boolean Competition (academic benchmarks)",
         reason = "255MB PB'24 selected-benchmark set; fetched rather than vendored",
+        fetch = FetchMethod.Tar,
+    )
+
+    /** PB'25 selected-benchmark set, same archive shape as [pbComp2024] (`.opb.xz` + `.wbo.xz` under
+     *  a per-competition dir). */
+    val pbComp2025 = ExternalCollection(
+        id = "pb-comp-2025",
+        url = "https://www.cril.univ-artois.fr/PB25/benchs/selected-PB25.tar",
+        license = "Pseudo-Boolean Competition (academic benchmarks)",
+        reason = "357MB PB'25 selected-benchmark set; fetched rather than vendored",
         fetch = FetchMethod.Tar,
     )
 

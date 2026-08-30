@@ -16,6 +16,11 @@ internal data class InstanceFeatures(
     val numGlobal: Int,
     val numLinear: Int,
     val boolHeavy: Boolean,
+    /** The instance's theory/logic where the format names one directly: an SMT-LIB `(set-logic …)`
+     *  (`QF_LIA`, `QF_NRA`, …) or an MPS integrality class (`MIP` has an `INTORG` marker, else `LP`).
+     *  Blank where the format has no such single-axis classification (MiniZinc/XCSP3/OPB/DIMACS use
+     *  [structure] instead). */
+    val logic: String = "",
 )
 
 /**
@@ -51,6 +56,8 @@ internal object InstanceClassifier {
             Format.XCSP3 -> xcsp3(fmt, text)
             Format.OPB -> pseudoBoolean(fmt, text)
             Format.DIMACS -> sat(fmt, text)
+            Format.SMTLIB -> smtlib(fmt, text)
+            Format.MPS -> mps(fmt, text)
             else -> InstanceFeatures(fmt, "arithmetic", 0, 0, boolHeavy = false)
         }
     }
@@ -102,5 +109,22 @@ internal object InstanceClassifier {
             t.endsWith(" 0") && !t.startsWith("c")
         }
         return InstanceFeatures(fmt, "sat", 0, clauses, boolHeavy = true)
+    }
+
+    /** The declared `(set-logic X)` names the SMT theory directly — the axis the SMT-LIB competition
+     *  itself organizes benchmarks by, so it is reported as [InstanceFeatures.logic] verbatim rather
+     *  than folded into [InstanceFeatures.structure]. */
+    private fun smtlib(fmt: String, text: String): InstanceFeatures {
+        val logic = Regex("""\(set-logic\s+([A-Za-z0-9_]+)\)""").find(text)?.groupValues?.get(1).orEmpty()
+        val asserts = Regex("""\(assert\b""").findAll(text).count()
+        return InstanceFeatures(fmt, "arithmetic", 0, asserts, boolHeavy = false, logic = logic)
+    }
+
+    /** An `INTORG` marker section means the model has integer columns (a MIP); its absence means every
+     *  column is continuous (an LP). Reported as [InstanceFeatures.logic] since MPS has no other native
+     *  theory/structure axis. */
+    private fun mps(fmt: String, text: String): InstanceFeatures {
+        val logic = if (Regex("""\bINTORG\b""").containsMatchIn(text)) "MIP" else "LP"
+        return InstanceFeatures(fmt, "arithmetic", 0, 0, boolHeavy = false, logic = logic)
     }
 }

@@ -85,6 +85,25 @@ class CorpusSelectionTest {
     }
 
     @Test
+    fun `MznChallengeAllYears layout year-prefixes families so a repeated name doesn't collide`() {
+        val root = Files.createTempDirectory("mznyears").toFile()
+        try {
+            File(root, "2013/black-hole").mkdirs()
+            File(root, "2013/black-hole/black-hole.mzn").writeText("% 2013 model")
+            File(root, "2025/black-hole").mkdirs()
+            File(root, "2025/black-hole/black-hole.mzn").writeText("% 2025 model")
+            // A non-year directory (the archive's README/.gitignore live alongside the year dirs)
+            // is not mistaken for a challenge year.
+            File(root, "not-a-year").mkdirs()
+            val found = Layout.MznChallengeAllYears.discover(root).sortedBy { it.name }
+            assertEquals(listOf("2013/black-hole", "2025/black-hole"), found.map { it.name })
+            assertEquals(listOf("2013/black-hole", "2025/black-hole"), found.map { it.family })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `Flat layout groups by familyOf so per-family samples across series`() {
         val root = Files.createTempDirectory("xcspsel").toFile()
         try {
