@@ -43,6 +43,10 @@ internal data class ReferenceEntry(
     val numLinear: Int? = null,
     /** Bool-dominated (more bool than int variable declarations); null = unclassified. */
     val boolHeavy: Boolean? = null,
+    /** Theory/logic where the format names one directly: an SMT-LIB `(set-logic …)` (`QF_LIA`,
+     *  `QF_NRA`, …) or an MPS integrality class (`MIP` / `LP`). Blank for formats classified purely by
+     *  [structure] (MiniZinc/XCSP3/OPB/DIMACS), or when unclassified. */
+    val logic: String = "",
 )
 
 /**
@@ -61,7 +65,7 @@ internal object ReferenceStore {
     // table, `<config>.csv` for a per-run result table), so `readCsv` reads it from the file name.
     private val COLUMNS = listOf(
         "suite", "problem", "maximize", "objective", "feasible", "proven", "elapsedMs", "budgetMs",
-        "format", "structure", "numGlobal", "numLinear", "boolHeavy",
+        "format", "structure", "numGlobal", "numLinear", "boolHeavy", "logic",
     )
 
     /** The oracle-only prefix — a legacy row (pre-features) has exactly this many columns and decodes
@@ -177,6 +181,7 @@ internal object ReferenceStore {
                     numGlobal = feat.numGlobal,
                     numLinear = feat.numLinear,
                     boolHeavy = feat.boolHeavy,
+                    logic = feat.logic,
                 )
                 matched += k
                 changed = true
@@ -209,6 +214,7 @@ internal object ReferenceStore {
         e.numGlobal?.toString().orEmpty(),
         e.numLinear?.toString().orEmpty(),
         e.boolHeavy?.toString().orEmpty(),
+        csv(e.logic),
     ).joinToString(",")
 
     /** Parse one CSV data row into a [ReferenceEntry] with the given [solver] (test seam over the
@@ -233,6 +239,7 @@ internal object ReferenceStore {
             numGlobal = f.getOrNull(10)?.ifEmpty { null }?.toInt(),
             numLinear = f.getOrNull(11)?.ifEmpty { null }?.toInt(),
             boolHeavy = f.getOrNull(12)?.ifEmpty { null }?.toBoolean(),
+            logic = f.getOrElse(13) { "" },
         )
     }
 
