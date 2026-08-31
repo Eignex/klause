@@ -81,8 +81,9 @@ internal data class SolveRecord(
     val proven: Boolean,
     val stats: Map<String, String> = emptyMap(),
     /** Per-arm improvement stream from a klause portfolio `-s` run (`%%%klause-arm:` lines), in
-     *  arrival order; empty for references and single-engine klause. The `credit.sh` script
-     *  aggregates this across a config dir into first/best/sole/marginal per-arm credit. */
+     *  arrival order; empty for references and single-engine klause. Each current record preserves
+     *  the exact discrete objective as decimal text and, when needed, the whole continuous objective.
+     *  The legacy numeric [Attribution.objective] remains readable in persisted records. */
     val attribution: List<Attribution> = emptyList(),
     val gitSha: String?,
     val timestamp: String,
@@ -232,7 +233,7 @@ internal object SolveMetric {
         sha: String?,
         r: SolverInvocation.Result,
     ): SolveRecord {
-        val (firstFeasibleMs, bestMs) = timings(r, entry.maximize)
+        val (firstFeasibleMs, bestMs) = timings(r)
         return SolveRecord(
             problem = entry.name,
             solver = solverId,
@@ -261,17 +262,15 @@ internal object SolveMetric {
      * lines (parsed into [SolverInvocation.Result.attribution]), but the MiniZinc `----------` stream
      * is flushed once at termination — so the separator-based timings collapse to ~budget. When the
      * attribution stream is present, recover the truth from it: the first incumbent is the first
-     * feasible solution, and the earliest best-objective incumbent is the time-to-best. Reference
-     * solvers carry no attribution, so fall back to their (correctly streamed) separator timings.
+     * feasible solution and the final strict improvement is the best incumbent. This uses the ordered
+     * stream rather than a floating-point comparison, so continuous objectives and exact values past
+     * 2^53 do not change calibration timing. Reference solvers carry no attribution, so fall back to
+     * their (correctly streamed) separator timings.
      */
-    private fun timings(r: SolverInvocation.Result, maximize: Boolean): Pair<Long?, Long?> {
+    internal fun timings(r: SolverInvocation.Result): Pair<Long?, Long?> {
         if (r.attribution.isEmpty()) return r.timeToFirstFeasibleMs to r.timeToBestMs
         val firstFeasibleMs = r.attribution.first().elapsedMs
-        val objectives = r.attribution.mapNotNull { it.objective }
-        val best = objectives.maxByOrNull { if (maximize) it else -it }
-        val bestMs = best?.let { b -> r.attribution.first { it.objective == b }.elapsedMs }
-            ?: r.attribution.last().elapsedMs
-        return firstFeasibleMs to bestMs
+        return firstFeasibleMs to r.attribution.last().elapsedMs
     }
 
     private fun errorRecord(

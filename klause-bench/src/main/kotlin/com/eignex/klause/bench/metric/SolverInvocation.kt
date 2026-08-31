@@ -393,15 +393,24 @@ internal object SolverInvocation {
         )
     }
 
-    /** Parse a `%%%klause-arm:` body (`label=<l> objective=<v> time=<ms>`); null if malformed. */
+    /** Parse a `%%%klause-arm:` body. `objective` is always the exact discrete `Long` channel;
+     *  `continuousObjective`, when present, is the whole objective because a continuous column carries
+     *  cost. The fields are independent so a zero continuous whole value is never confused with an
+     *  omitted continuous channel. */
     private fun parseArm(body: String): Attribution? {
         val kv = body.trim().split(' ').mapNotNull {
             it.split('=', limit = 2).takeIf { p -> p.size == 2 }?.let { p -> p[0] to p[1] }
         }.toMap()
         val label = kv["label"] ?: return null
+        val exactObjective = kv["objective"]?.toLongOrNull() ?: return null
+        val continuousObjective = kv["continuousObjective"]?.let { value ->
+            value.toDoubleOrNull()?.takeIf(Double::isFinite) ?: return null
+        }
         return Attribution(
             label = label,
-            objective = kv["objective"]?.toDoubleOrNull(),
+            objective = exactObjective.toDouble(),
+            exactObjective = exactObjective.toString(),
+            continuousObjective = continuousObjective,
             elapsedMs = kv["time"]?.toLongOrNull() ?: return null,
         )
     }
@@ -437,9 +446,19 @@ internal object SolverInvocation {
     private const val REGISTRY_WAIT_MILLIS = 10_000L
 }
 
-/** One strict global improvement, parsed off a klause portfolio's `%%%klause-arm:` line: the arm
- *  ([label]) that produced the incumbent, its model-oriented [objective], and the [elapsedMs] at
- *  which it was found. The ordered list across a solve is the per-arm credit signal (which arm got
- *  the first incumbent, held the last/best, how many it contributed). */
+/** One strict global improvement, parsed off a klause portfolio's `%%%klause-arm:` line. The exact
+ *  model-oriented discrete value is [exactObjective], encoded as decimal text so JSON never rounds a
+ *  value past 2^53. [continuousObjective] is the whole model-oriented objective when a continuous
+ *  column carries cost; it is null only for an exact discrete objective. [objective] is retained for
+ *  decoding and serving pre-two-channel records and must not be used where exactness matters.
+ *
+ * The ordered list across a solve is the per-arm credit signal: every entry is a strict global
+ * improvement, so its last arm holds the final best incumbent. */
 @Serializable
-internal data class Attribution(val label: String, val objective: Double?, val elapsedMs: Long)
+internal data class Attribution(
+    val label: String,
+    @Deprecated("Use exactObjective or continuousObjective") val objective: Double? = null,
+    val exactObjective: String? = null,
+    val continuousObjective: Double? = null,
+    val elapsedMs: Long,
+)

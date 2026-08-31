@@ -554,7 +554,12 @@ internal object SolveCore {
                     if (common.statistics) {
                         val objective = solvable.objectiveValue?.invoke(improvement.sample)
                             ?: improvement.objective.toLong()
-                        output.onImprovement(improvement.workerLabel, objective, improvement.elapsedMs)
+                        output.onImprovement(
+                            improvement.workerLabel,
+                            objective,
+                            solvable.continuousObjectiveValue?.invoke(improvement.sample),
+                            improvement.elapsedMs,
+                        )
                     }
                 },
             ),
