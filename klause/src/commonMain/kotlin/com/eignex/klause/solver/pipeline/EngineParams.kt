@@ -155,13 +155,18 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "var-selector", "val-selector",
 )
 
+// Named rather than sliced positionally off BACKTRACK_OVERRIDE_KEYS (a `dropLast(2)` would silently
+// drop the wrong keys if the list above is ever reordered or grown past these two).
+private val BACKTRACK_SELECTOR_KEYS = setOf("var-selector", "val-selector")
+
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
  *  reusable [BacktrackParams] edit — applied to *each arm* of a pool the way the `ls` axis edits are, so
  *  `-e cp -p8 --param var-selector=vsids` still runs a full 8-worker portfolio with the override pinned
  *  across it (the arms keep their own seed/lp/luby diversity). Selectors are rebuilt **per worker** (the
  *  edit closure constructs a fresh instance from the arm's seed), so parallel arms never share mutable
  *  heuristic state. `seed` is left to the caller. [allowSelectors] gates the `var-selector`/`val-selector`
- *  keys: the annotation-following `fixed` engine passes `false` (the annotation decides the heuristic).
+ *  keys: `cp`/`mixed` always pass `true` (inherently free-search); the `fixed` engine passes `false` only
+ *  while a source annotation selects its heuristic, and `true` otherwise (no heuristic to preserve).
  *  Null when no override key is present. */
 fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
     val maxDecisions = p.long("max-decisions")
@@ -254,8 +259,8 @@ internal fun applyFixedBacktrackParams(
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
     backtrackOverride(p, allowSelectors)?.let { out = it(out) }
-    val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS.dropLast(2)
-    p.finish("cp", "seed, ${accepted.joinToString()}")
+    val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS - BACKTRACK_SELECTOR_KEYS
+    p.finish("fixed", "seed, ${accepted.joinToString()}")
     return out
 }
 

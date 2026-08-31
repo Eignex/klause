@@ -886,6 +886,25 @@ class CliModeTest {
     }
 
     @Test
+    fun `fixed still rejects selector overrides when a source search annotation exists`() {
+        val fzn = File.createTempFile("cliannotated", ".fzn").apply {
+            writeText(
+                "var 1..3: x;\nconstraint int_lt(x, 3);\n" +
+                    "solve :: int_search([x], input_order, indomain_min, complete) satisfy;\n",
+            )
+            deleteOnExit()
+        }
+
+        var code = -1
+        val err = captureErr {
+            code = runCli(arrayOf("-e", "fixed", "--param", "var-selector=input-order", fzn.absolutePath))
+        }
+
+        assertEquals(2, code, "an annotation must still own the heuristic:\n$err")
+        assertTrue("var-selector" in err, err)
+    }
+
+    @Test
     fun `-s prints mzn-stat lines for satisfy and optimize verdicts`() {
         val sat = File.createTempFile("cli", ".fzn").apply {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
