@@ -451,7 +451,6 @@ final enum class com.eignex.klause.solver.pipeline/ProblemPipeline : kotlin/Enum
     enum entry EXACT_LIRA // com.eignex.klause.solver.pipeline/ProblemPipeline.EXACT_LIRA|null[0]
     enum entry EXACT_LRA // com.eignex.klause.solver.pipeline/ProblemPipeline.EXACT_LRA|null[0]
     enum entry FINITE_CP // com.eignex.klause.solver.pipeline/ProblemPipeline.FINITE_CP|null[0]
-    enum entry GENERAL_LIA // com.eignex.klause.solver.pipeline/ProblemPipeline.GENERAL_LIA|null[0]
     enum entry UNSUPPORTED_OPEN // com.eignex.klause.solver.pipeline/ProblemPipeline.UNSUPPORTED_OPEN|null[0]
 
     final val entries // com.eignex.klause.solver.pipeline/ProblemPipeline.entries|#static{}entries[0]
@@ -2191,22 +2190,6 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com
         final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.realValue|realValue(kotlin.Int){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.ExactLra.toString|toString(){}[0]
     }
-
-    final class GeneralLia : com.eignex.klause.solver.pipeline/OpenTheoryAssignment { // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia|null[0]
-        constructor <init>(com.eignex.klause.theory.lia/GeneralLiaAssignment) // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.<init>|<init>(com.eignex.klause.theory.lia.GeneralLiaAssignment){}[0]
-
-        final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.assignment|{}assignment[0]
-            final fun <get-assignment>(): com.eignex.klause.theory.lia/GeneralLiaAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.assignment.<get-assignment>|<get-assignment>(){}[0]
-
-        final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.boolValue|boolValue(kotlin.Int){}[0]
-        final fun component1(): com.eignex.klause.theory.lia/GeneralLiaAssignment // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.theory.lia/GeneralLiaAssignment = ...): com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.copy|copy(com.eignex.klause.theory.lia.GeneralLiaAssignment){}[0]
-        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.equals|equals(kotlin.Any?){}[0]
-        final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.hashCode|hashCode(){}[0]
-        final fun intValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.intValue|intValue(kotlin.Int){}[0]
-        final fun realValue(kotlin/Int): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.realValue|realValue(kotlin.Int){}[0]
-        final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryAssignment.GeneralLia.toString|toString(){}[0]
-    }
 }
 
 sealed interface com.eignex.klause.solver.pipeline/OpenTheoryExecution { // com.eignex.klause.solver.pipeline/OpenTheoryExecution|null[0]
@@ -3881,6 +3864,8 @@ final class com.eignex.klause.factor.arithmetic/ComparisonClause : com.eignex.kl
 
     final val consts // com.eignex.klause.factor.arithmetic/ComparisonClause.consts|{}consts[0]
         final fun <get-consts>(): kotlin/LongArray // com.eignex.klause.factor.arithmetic/ComparisonClause.consts.<get-consts>|<get-consts>(){}[0]
+    final val exactTheoryOwnable // com.eignex.klause.factor.arithmetic/ComparisonClause.exactTheoryOwnable|{}exactTheoryOwnable[0]
+        final fun <get-exactTheoryOwnable>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ComparisonClause.exactTheoryOwnable.<get-exactTheoryOwnable>|<get-exactTheoryOwnable>(){}[0]
     final val integerTheoryOwnable // com.eignex.klause.factor.arithmetic/ComparisonClause.integerTheoryOwnable|{}integerTheoryOwnable[0]
         final fun <get-integerTheoryOwnable>(): kotlin/Boolean // com.eignex.klause.factor.arithmetic/ComparisonClause.integerTheoryOwnable.<get-integerTheoryOwnable>|<get-integerTheoryOwnable>(){}[0]
     final val ops // com.eignex.klause.factor.arithmetic/ComparisonClause.ops|{}ops[0]
@@ -10243,26 +10228,20 @@ final class com.eignex.klause.solver.result/OpenTheoryWorkSink { // com.eignex.k
         final fun <get-exhausted>(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.exhausted.<get-exhausted>|<get-exhausted>(){}[0]
 
     final fun boolDecision(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.boolDecision|boolDecision(){}[0]
-    final fun cancellationPoll() // com.eignex.klause.solver.result/OpenTheoryWorkSink.cancellationPoll|cancellationPoll(){}[0]
     final fun hasAllowance(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.hasAllowance|hasAllowance(){}[0]
     final fun intDecision(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.intDecision|intDecision(){}[0]
-    final fun liaRowVisit(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.liaRowVisit|liaRowVisit(){}[0]
     final fun snapshot(): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/OpenTheoryWorkSink.snapshot|snapshot(){}[0]
     final fun theoryCheck(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.theoryCheck|theoryCheck(){}[0]
     final fun theoryDecision(): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkSink.theoryDecision|theoryDecision(){}[0]
 }
 
 final class com.eignex.klause.solver.result/OpenTheoryWorkStats { // com.eignex.klause.solver.result/OpenTheoryWorkStats|null[0]
-    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryWorkStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    constructor <init>(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...) // com.eignex.klause.solver.result/OpenTheoryWorkStats.<init>|<init>(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
 
     final val openBoolDecisions // com.eignex.klause.solver.result/OpenTheoryWorkStats.openBoolDecisions|{}openBoolDecisions[0]
         final fun <get-openBoolDecisions>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openBoolDecisions.<get-openBoolDecisions>|<get-openBoolDecisions>(){}[0]
-    final val openCancellationPolls // com.eignex.klause.solver.result/OpenTheoryWorkStats.openCancellationPolls|{}openCancellationPolls[0]
-        final fun <get-openCancellationPolls>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openCancellationPolls.<get-openCancellationPolls>|<get-openCancellationPolls>(){}[0]
     final val openIntDecisions // com.eignex.klause.solver.result/OpenTheoryWorkStats.openIntDecisions|{}openIntDecisions[0]
         final fun <get-openIntDecisions>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openIntDecisions.<get-openIntDecisions>|<get-openIntDecisions>(){}[0]
-    final val openLiaRowVisits // com.eignex.klause.solver.result/OpenTheoryWorkStats.openLiaRowVisits|{}openLiaRowVisits[0]
-        final fun <get-openLiaRowVisits>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openLiaRowVisits.<get-openLiaRowVisits>|<get-openLiaRowVisits>(){}[0]
     final val openTheoryChecks // com.eignex.klause.solver.result/OpenTheoryWorkStats.openTheoryChecks|{}openTheoryChecks[0]
         final fun <get-openTheoryChecks>(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.openTheoryChecks.<get-openTheoryChecks>|<get-openTheoryChecks>(){}[0]
     final val openTheoryDecisions // com.eignex.klause.solver.result/OpenTheoryWorkStats.openTheoryDecisions|{}openTheoryDecisions[0]
@@ -10275,9 +10254,7 @@ final class com.eignex.klause.solver.result/OpenTheoryWorkStats { // com.eignex.
     final fun component3(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component3|component3(){}[0]
     final fun component4(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component4|component4(){}[0]
     final fun component5(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component5|component5(){}[0]
-    final fun component6(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component6|component6(){}[0]
-    final fun component7(): kotlin/Long // com.eignex.klause.solver.result/OpenTheoryWorkStats.component7|component7(){}[0]
-    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/OpenTheoryWorkStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
+    final fun copy(kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ..., kotlin/Long = ...): com.eignex.klause.solver.result/OpenTheoryWorkStats // com.eignex.klause.solver.result/OpenTheoryWorkStats.copy|copy(kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long;kotlin.Long){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/OpenTheoryWorkStats.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/OpenTheoryWorkStats.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.result/OpenTheoryWorkStats.toString|toString(){}[0]
@@ -10727,43 +10704,6 @@ final class com.eignex.klause.theory.difference/DifferenceTheorySolver : com.eig
         final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.theory.difference/DifferenceTheorySolver.model.<get-model>|<get-model>(){}[0]
 
     final fun check(kotlin/BooleanArray, com.eignex.klause.theory/TheoryContext): com.eignex.klause.theory/TheoryCheck<com.eignex.klause.solver/Sample> // com.eignex.klause.theory.difference/DifferenceTheorySolver.check|check(kotlin.BooleanArray;com.eignex.klause.theory.TheoryContext){}[0]
-}
-
-final class com.eignex.klause.theory.lia/GeneralLiaAssignment { // com.eignex.klause.theory.lia/GeneralLiaAssignment|null[0]
-    constructor <init>(kotlin/BooleanArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>) // com.eignex.klause.theory.lia/GeneralLiaAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
-
-    final val bools // com.eignex.klause.theory.lia/GeneralLiaAssignment.bools|{}bools[0]
-        final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.theory.lia/GeneralLiaAssignment.bools.<get-bools>|<get-bools>(){}[0]
-    final val ints // com.eignex.klause.theory.lia/GeneralLiaAssignment.ints|{}ints[0]
-        final fun <get-ints>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.lia/GeneralLiaAssignment.ints.<get-ints>|<get-ints>(){}[0]
-
-    final fun component1(): kotlin/BooleanArray // com.eignex.klause.theory.lia/GeneralLiaAssignment.component1|component1(){}[0]
-    final fun component2(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.lia/GeneralLiaAssignment.component2|component2(){}[0]
-    final fun copy(kotlin/BooleanArray = ..., kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ...): com.eignex.klause.theory.lia/GeneralLiaAssignment // com.eignex.klause.theory.lia/GeneralLiaAssignment.copy|copy(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.lia/GeneralLiaAssignment.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.theory.lia/GeneralLiaAssignment.hashCode|hashCode(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.theory.lia/GeneralLiaAssignment.toString|toString(){}[0]
-}
-
-final class com.eignex.klause.theory.lia/GeneralLiaSearchComponent : com.eignex.klause.solver.search/SearchBrancher, com.eignex.klause.solver.search/TheoryComponent { // com.eignex.klause.theory.lia/GeneralLiaSearchComponent|null[0]
-    constructor <init>(com.eignex.klause.ir/ProblemSpec, kotlin/IntArray = ..., kotlin/Function2<com.eignex.klause.theory.lia/GeneralLiaAssignment, com.eignex.klause.solver.search/SearchModel, kotlin/Unit>? = ...) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.<init>|<init>(com.eignex.klause.ir.ProblemSpec;kotlin.IntArray;kotlin.Function2<com.eignex.klause.theory.lia.GeneralLiaAssignment,com.eignex.klause.solver.search.SearchModel,kotlin.Unit>?){}[0]
-
-    final fun assert(com.eignex.klause.solver.search/SearchDecision, com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.assert|assert(com.eignex.klause.solver.search.SearchDecision;com.eignex.klause.solver.search.SearchContext){}[0]
-    final fun check(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentCheck // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.check|check(com.eignex.klause.solver.search.SearchContext){}[0]
-    final fun contributeModel(com.eignex.klause.solver.search/SearchModel, com.eignex.klause.solver.search/SearchContext) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.contributeModel|contributeModel(com.eignex.klause.solver.search.SearchModel;com.eignex.klause.solver.search.SearchContext){}[0]
-    final fun initialize(com.eignex.klause.solver.search/SearchContext): com.eignex.klause.solver.search/ComponentResult // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.initialize|initialize(com.eignex.klause.solver.search.SearchContext){}[0]
-    final fun nextBranch(com.eignex.klause.solver.search/SearchContext): kotlin.collections/List<com.eignex.klause.solver.search/SearchDecision>? // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.nextBranch|nextBranch(com.eignex.klause.solver.search.SearchContext){}[0]
-    final fun onRestart(com.eignex.klause.solver.search/SearchContext) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.onRestart|onRestart(com.eignex.klause.solver.search.SearchContext){}[0]
-    final fun retract(kotlin/Int) // com.eignex.klause.theory.lia/GeneralLiaSearchComponent.retract|retract(kotlin.Int){}[0]
-}
-
-final class com.eignex.klause.theory.lia/GeneralLiaSolver : com.eignex.klause.theory/Theory<com.eignex.klause.theory.lia/GeneralLiaAssignment> { // com.eignex.klause.theory.lia/GeneralLiaSolver|null[0]
-    constructor <init>(com.eignex.klause.ir/ProblemSpec) // com.eignex.klause.theory.lia/GeneralLiaSolver.<init>|<init>(com.eignex.klause.ir.ProblemSpec){}[0]
-
-    final val model // com.eignex.klause.theory.lia/GeneralLiaSolver.model|{}model[0]
-        final fun <get-model>(): com.eignex.klause.ir/ProblemSpec // com.eignex.klause.theory.lia/GeneralLiaSolver.model.<get-model>|<get-model>(){}[0]
-
-    final fun check(kotlin/BooleanArray, com.eignex.klause.theory/TheoryContext): com.eignex.klause.theory/TheoryCheck<com.eignex.klause.theory.lia/GeneralLiaAssignment> // com.eignex.klause.theory.lia/GeneralLiaSolver.check|check(kotlin.BooleanArray;com.eignex.klause.theory.TheoryContext){}[0]
 }
 
 final class com.eignex.klause.theory.qflra/ExactLiraAssignment { // com.eignex.klause.theory.qflra/ExactLiraAssignment|null[0]

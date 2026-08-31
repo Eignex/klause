@@ -111,8 +111,6 @@ internal fun openTheoryStatPairs(stats: SolveStats): List<Pair<String, String>> 
         "openIntDecisions" to "$openIntDecisions",
         "openTheoryDecisions" to "$openTheoryDecisions",
         "openTheoryChecks" to "$openTheoryChecks",
-        "openLiaRowVisits" to "$openLiaRowVisits",
-        "openCancellationPolls" to "$openCancellationPolls",
         "openWork" to "$openWork",
     ) + with(stats.openTheoryClauses) {
         listOf(

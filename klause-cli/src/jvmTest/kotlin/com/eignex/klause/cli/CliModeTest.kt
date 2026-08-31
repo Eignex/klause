@@ -138,7 +138,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an open SMT general LIA model is solved without finite lowering`() {
+    fun `an open SMT exact LIA model is solved without finite lowering`() {
         val smt = File.createTempFile("cliopen", ".smt2").apply {
             writeText(
                 """
@@ -230,7 +230,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an open MPS general LIA row is solved without finite lowering`() {
+    fun `an open MPS exact LIA row is solved without finite lowering`() {
         val mps = File.createTempFile("clilia", ".mps").apply {
             writeText(
                 """
@@ -744,7 +744,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `an open wide General LIA witness is rendered without Long narrowing`() {
+    fun `an open wide exact LIA witness is rendered without Long narrowing`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
                 "(set-logic QF_LIA)\n" +
@@ -763,7 +763,7 @@ class CliModeTest {
     }
 
     @Test
-    fun `mixed open General LIA arithmetic is decided without a Long witness box`() {
+    fun `mixed open exact LIA arithmetic is decided without a Long witness box`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
                 "(set-logic QF_LIA)\n" +

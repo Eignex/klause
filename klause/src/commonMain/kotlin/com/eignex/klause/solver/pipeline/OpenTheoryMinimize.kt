@@ -181,10 +181,6 @@ class OpenTheoryMinimizer(model: ProblemSpec, objective: LinearObjective) {
                 total += BigInteger.fromLong(coefficients[i]) * BigInteger.fromLong(assignment.sample.ints[terms[i]])
             }
 
-            is OpenTheoryAssignment.GeneralLia -> for (i in terms.indices) {
-                total += BigInteger.fromLong(coefficients[i]) * assignment.assignment.ints[terms[i]]
-            }
-
             // A mixed model carries continuous columns the objective does not weight, so its value is
             // still the integer sum; the reals are decided alongside and contribute nothing to it.
             is OpenTheoryAssignment.ExactLira -> for (i in terms.indices) {

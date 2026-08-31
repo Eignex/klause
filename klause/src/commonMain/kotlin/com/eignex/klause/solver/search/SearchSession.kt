@@ -146,10 +146,6 @@ class SearchSession(
         return openTheoryWork?.theoryCheck() != false
     }
 
-    internal fun consumeLiaRowVisit(): Boolean = openTheoryWork?.liaRowVisit() != false
-    internal fun recordCancellationPoll() {
-        openTheoryWork?.cancellationPoll()
-    }
     internal fun workExhausted(): Boolean = openTheoryWork?.exhausted == true
     internal fun checkBudgetExhausted(): Boolean = checksExhausted
     internal fun decisionBudgetExhausted(): Boolean = decisionsExhausted

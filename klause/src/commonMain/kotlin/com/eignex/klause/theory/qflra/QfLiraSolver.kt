@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qflra
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.FactorRow
 import com.eignex.klause.factor.arithmetic.IntegerConstants
 import com.eignex.klause.factor.arithmetic.Linear
@@ -36,7 +37,7 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.MutableIntObjectMap
 import com.ionspin.kotlin.bignum.integer.BigInteger
 
-/** An exact mixed integer/rational witness for an open QF_LIRA model. */
+/** An exact integer/rational witness for an open QF_LIRA or QF_LIA model. */
 data class ExactLiraAssignment(
     /** Boolean values indexed by model Boolean variable id. */
     val bools: BooleanArray,
@@ -47,7 +48,7 @@ data class ExactLiraAssignment(
 )
 
 /**
- * Exact feasibility for the supported open QF_LIRA fragment.
+ * Exact feasibility for the supported open QF_LIRA and QF_LIA fragments.
  *
  * The Boolean skeleton is fixed first. At a Boolean leaf the rational simplex sees both integer and
  * real columns. A fractional integer witness is split at its exact [BigInteger] floor, so the child
@@ -58,7 +59,7 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
     private val witnessBound = requireNotNull(model.liraWitnessBound())
 
     init {
-        require(model.supportsExactLira()) { "exact LIRA search requires a supported open mixed linear model" }
+        require(model.supportsExactLira()) { "exact LIRA search requires a supported integer-containing linear model" }
     }
 
     override fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<ExactLiraAssignment> {
@@ -98,6 +99,14 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
                 if (!consumeLeaf()) return IntegerSearchResult.Budget
                 if (cancellation()) return IntegerSearchResult.Cancelled
                 val node = stack.removeLast()
+                val comparison = node.nextComparison(model)
+                if (comparison >= 0) {
+                    val clause = model.factors[comparison] as ComparisonClause
+                    for (literal in clause.vars.indices.reversed()) {
+                        stack.addLast(node.withComparison(comparison, literal))
+                    }
+                    continue
+                }
                 val disequality = node.nextDisequality(model, bools)
                 if (disequality >= 0) {
                     stack.addLast(node.withDirection(disequality, LinearOp.GE))
@@ -155,7 +164,7 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
     }
 }
 
-/** Incremental exact QF_LIRA search component. */
+/** Incremental exact QF_LIRA and QF_LIA search component. */
 class ExactLiraSearchComponent(
     private val model: ProblemSpec,
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
@@ -175,7 +184,9 @@ class ExactLiraSearchComponent(
     private var outcome: ComponentCheck? = null
 
     init {
-        require(model.supportsExactLira()) { "exact LIRA component requires a supported mixed linear model" }
+        require(
+            model.supportsExactLira(),
+        ) { "exact LIRA component requires a supported integer-containing linear model" }
         nodesByLevel.put(0, root)
     }
 
@@ -224,6 +235,13 @@ class ExactLiraSearchComponent(
             context::intLowerBound,
             context::intUpperBound,
         )
+        val comparison = current.nextComparison(model)
+        if (comparison >= 0) {
+            val clause = model.factors[comparison] as ComparisonClause
+            return clause.vars.indices.map { literal ->
+                decision(current.withComparison(comparison, literal))
+            }
+        }
         val disequality = current.nextDisequality(model, values)
         if (disequality >= 0) {
             return listOf(
@@ -307,19 +325,36 @@ private data class IntegerBranch(val variable: Int, val lower: BigInteger? = nul
 
 private data class SearchNode(
     val branches: List<IntegerBranch> = emptyList(),
+    val comparisonChoices: Map<Int, Int> = emptyMap(),
     val disequalityDirections: Map<Int, LinearOp> = emptyMap(),
     val cuts: List<ExactGmiCut> = emptyList(),
 ) {
     fun withBranch(branch: IntegerBranch): SearchNode = copy(branches = branches + branch)
+
+    fun withComparison(factor: Int, literal: Int): SearchNode =
+        copy(comparisonChoices = comparisonChoices + (factor to literal))
 
     fun withDirection(factor: Int, direction: LinearOp): SearchNode =
         copy(disequalityDirections = disequalityDirections + (factor to direction))
 
     fun withCut(cut: ExactGmiCut): SearchNode = copy(cuts = cuts + cut)
 
+    fun nextComparison(model: ProblemSpec): Int {
+        for (index in model.factors.indices) {
+            if (model.factors[index] is ComparisonClause && index !in comparisonChoices) return index
+        }
+        return -1
+    }
+
     fun nextDisequality(model: ProblemSpec, bools: BooleanArray): Int {
         for (index in model.factors.indices) {
             if (index in disequalityDirections) continue
+            val comparison = model.factors[index] as? ComparisonClause
+            if (comparison != null) {
+                val literal = comparisonChoices[index] ?: continue
+                if (comparison.ops[literal] == LinearOp.NE) return index
+                continue
+            }
             val row = model.factors[index].linearRow() ?: continue
             val truth = row.activator == FactorRow.ALWAYS || bools[row.activator]
             if ((if (truth) row.op else row.op.complemented()) == LinearOp.NE) return index
@@ -413,6 +448,24 @@ private class QfLiraSystem(private val model: ProblemSpec) {
         // an ungated row is read as one whose activator is true.
         for ((index, factor) in model.factors.withIndex()) {
             if (cancellation()) return null
+            if (factor is ComparisonClause) {
+                val literal = requireNotNull(node.comparisonChoices[index]) {
+                    "comparison clause must be selected before exact feasibility"
+                }
+                if (!addComparison(
+                        intsPositive,
+                        intsNegative,
+                        constants,
+                        factor.vars[literal],
+                        factor.ops[literal],
+                        factor.consts[literal],
+                        node.disequalityDirections[index],
+                    )
+                ) {
+                    return null
+                }
+                continue
+            }
             val row = factor.linearRow() ?: continue
             val truth = row.activator == FactorRow.ALWAYS || bools[row.activator]
             val direction = node.disequalityDirections[index]
@@ -449,6 +502,29 @@ private class QfLiraSystem(private val model: ProblemSpec) {
             builder.addRealRow(cut.columns, cut.coefficients, Relation.GE, cut.rhs)
         }
         return QfLiraLeaf(builder.build(Sense.MINIMIZE), intsPositive, intsNegative, realsPositive, realsNegative)
+    }
+
+    private fun addComparison(
+        positive: IntArray,
+        negative: IntArray,
+        constants: BigConstantEncoder,
+        variable: Int,
+        op: LinearOp,
+        bound: Long,
+        direction: LinearOp?,
+    ): Boolean {
+        val (actualOp, actualBound) = lowerWideDisequality(op, BigInteger.fromLong(bound), direction)
+        return constants.addBound(
+            positive[variable],
+            negative[variable],
+            when (actualOp) {
+                LinearOp.LE -> Relation.LE
+                LinearOp.GE -> Relation.GE
+                LinearOp.EQ -> Relation.EQ
+                LinearOp.NE -> error("comparison disequality must be directed")
+            },
+            actualBound,
+        )
     }
 
     private fun addReified(
@@ -874,6 +950,10 @@ private fun ProblemSpec.liraWitnessBound(): BigInteger? {
     for (factor in factors) {
         when (factor) {
             is Clause -> Unit
+
+            is ComparisonClause -> for (constant in factor.consts) {
+                row(listOf(BigFraction.ONE, BigFraction.ofLong(constant)))
+            }
 
             is Linear -> when (val c = factor.constants) {
                 is WideConstants -> wideRow(c.coefficients.toTypedArray(), c.bound, factor.op == LinearOp.NE)
