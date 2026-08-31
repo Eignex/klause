@@ -103,7 +103,7 @@ class CliModeTest {
 
         var code = -1
         val out = capture {
-            code = runCli(arrayOf("-s", "--param", "open-work-limit=0", smt.absolutePath))
+            code = runCli(arrayOf("-s", "--param", "node-limit=0", smt.absolutePath))
         }
 
         assertEquals(0, code, out)
@@ -869,6 +869,20 @@ class CliModeTest {
             val out = capture { main(engineArgs + arrayOf("-t", "10000", fzn.absolutePath)) }
             assertTrue("x = " in out, out)
         }
+    }
+
+    @Test
+    fun `fixed accepts selector overrides when no source search annotation exists`() {
+        val fzn = File.createTempFile("cliunannotated", ".fzn").apply {
+            writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
+            deleteOnExit()
+        }
+
+        val out = capture {
+            main(arrayOf("-e", "fixed", "--param", "var-selector=input-order", fzn.absolutePath))
+        }
+
+        assertTrue("x = " in out, out)
     }
 
     @Test

@@ -239,14 +239,23 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     }
 }
 
-/** Apply `--param` overrides for the naked `fixed` backtrack solve on top of [base] and reject any
- *  leftover keys. Selector keys are not accepted (the annotation decides the heuristic — free-search
- *  heuristic A/B lives on `-e cp`). */
-fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
+/** Apply `--param` overrides for the annotation-following fixed backtrack solve on top of [base]. */
+fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams =
+    applyFixedBacktrackParams(base, p, allowSelectors = false)
+
+/** Apply fixed-route overrides. [allowSelectors] is false only when a source annotation selects the
+ *  heuristic; an unannotated finite model has no heuristic to preserve, so its single fixed run accepts
+ *  selector overrides without becoming a portfolio. */
+internal fun applyFixedBacktrackParams(
+    base: BacktrackParams,
+    p: EngineParams,
+    allowSelectors: Boolean,
+): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
-    backtrackOverride(p, allowSelectors = false)?.let { out = it(out) }
-    p.finish("cp", "seed, ${BACKTRACK_OVERRIDE_KEYS.dropLast(2).joinToString()}")
+    backtrackOverride(p, allowSelectors)?.let { out = it(out) }
+    val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS.dropLast(2)
+    p.finish("cp", "seed, ${accepted.joinToString()}")
     return out
 }
 
@@ -654,9 +663,6 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? 
 /** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
  *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
 const val NODE_LIMIT_KEY = "node-limit"
-
-/** The `--param` key for deterministic solve-wide open-theory work. */
-const val OPEN_WORK_LIMIT_KEY = "open-work-limit"
 
 /** [pool], or the curated pool when it is null, with every arm spending [budget]. */
 fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeBudget): List<() -> BacktrackRecipe> =

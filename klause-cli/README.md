@@ -86,7 +86,11 @@ Solver-control flags are common to **every** mode:
   (`fixed`) is single-core. Pool size auto-tunes from `n`, overridable with
   `--param arms=N` (or the `ls=N`/`bt=N` split).
 - `-e <engine>` / `--engine <engine>` — the engine enum (also via the `klause.engine` property):
-  - `fixed` *(default)* — single naked backtrack following the model's `int_search` annotation (FD).
+  - `fixed` *(default)* — a single naked backtrack. It follows a FlatZinc `int_search` annotation;
+    for a finite model with no annotation (DIMACS, OPB, and unannotated FlatZinc/XCSP3/MPS), it uses
+    the standard conflict-driven heuristic. In that unannotated case, `var-selector` and `val-selector`
+    are accepted as the heuristic for the one fixed run. They remain rejected when an annotation is
+    present; use `-e cp` for a free-search portfolio.
   - `backtrack` (alias `bt`, `cp`) — backtrack-only portfolio (free). `mixed` — bt+ls portfolio.
     `localsearch` (alias `ls`) — local-search portfolio.
   - `backtrack` also accepts the per-solver `var-selector`/`val-selector` (and `luby`/`phase-saving`/…)
@@ -110,6 +114,11 @@ Solver-control flags are common to **every** mode:
     picks its pivots in. `markowitz` (the default) takes the lowest estimated fill first; `stable_id` takes
     them in model order. Both yield the same solutions; the order decides how many variables the pass
     eliminates within its fill-in budget, so `stable_id` is only there as a measurement baseline.
+
+Open-theory input (open SMT-LIB or MPS) is selected by the model route, not by `-e`: it always uses
+the complete theory solver. `--param node-limit=N` is a deterministic solve-wide budget: it counts
+finite decision nodes on a finite route and open-theory decisions, checks, and LIA row visits on an
+open route.
 
 MiniZinc-mode-only flags:
 
