@@ -32,7 +32,7 @@ class FinitePipelineTest {
             numIntVars = 0,
             intDomains = emptyArray<IntDomain>(),
             factors = emptyArray<Factor>(),
-        )
+        ).bake()
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
@@ -72,7 +72,7 @@ class FinitePipelineTest {
             numIntVars = 2,
             intDomains = arrayOf(IntDomain(0, 3), IntDomain(0, 10)),
             factors = arrayOf<Factor>(Linear(intArrayOf(-2, 1), intArrayOf(0, 1), LinearOp.EQ, 1)),
-        )
+        ).bake()
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(problem, FiniteEngine.BACKTRACK),
@@ -96,7 +96,7 @@ class FinitePipelineTest {
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
                 Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
             ),
-        )
+        ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
 
         val once = FinitePipeline.prepare(

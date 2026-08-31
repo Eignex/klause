@@ -11,6 +11,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
@@ -38,37 +39,37 @@ import kotlin.test.assertTrue
 class SmtLibTest {
 
     private fun openSolve(
-        model: com.eignex.klause.ir.ProblemSpec,
+        model: com.eignex.klause.ir.Problem,
         params: TheoryParams = TheoryParams(),
     ): OpenTheoryResult = OpenTheoryEngine(model, model.componentPlan().theoryPipeline).solve(params)
 
     private fun liraSat(
-        model: com.eignex.klause.ir.ProblemSpec,
+        model: com.eignex.klause.ir.Problem,
         params: TheoryParams = TheoryParams(),
     ): ExactLiraAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model, params))
         return assertIs<OpenTheoryAssignment.ExactLira>(sat.assignment).assignment
     }
 
-    private fun liraUnsat(model: com.eignex.klause.ir.ProblemSpec, params: TheoryParams = TheoryParams()) {
+    private fun liraUnsat(model: com.eignex.klause.ir.Problem, params: TheoryParams = TheoryParams()) {
         assertIs<OpenTheoryResult.Unsat>(openSolve(model, params))
     }
 
-    private fun lraSat(model: com.eignex.klause.ir.ProblemSpec): ExactLraAssignment {
+    private fun lraSat(model: com.eignex.klause.ir.Problem): ExactLraAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
         return assertIs<OpenTheoryAssignment.ExactLra>(sat.assignment).assignment
     }
 
-    private fun lraUnsat(model: com.eignex.klause.ir.ProblemSpec) {
+    private fun lraUnsat(model: com.eignex.klause.ir.Problem) {
         assertIs<OpenTheoryResult.Unsat>(openSolve(model))
     }
 
-    private fun liaSat(model: com.eignex.klause.ir.ProblemSpec): ExactLiraAssignment {
+    private fun liaSat(model: com.eignex.klause.ir.Problem): ExactLiraAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
         return assertIs<OpenTheoryAssignment.ExactLira>(sat.assignment).assignment
     }
 
-    private fun differenceSat(model: com.eignex.klause.ir.ProblemSpec): Sample {
+    private fun differenceSat(model: com.eignex.klause.ir.Problem): Sample {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
         return assertIs<OpenTheoryAssignment.Difference>(sat.assignment).sample
     }
@@ -89,7 +90,7 @@ class SmtLibTest {
         return r.assignment.ints
     }
 
-    private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.bakeFiniteBounds()
 
     @Test
     fun `open QF LIRA returns an exact mixed witness`() {
@@ -1066,7 +1067,7 @@ class SmtLibTest {
         if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
-        val r = BacktrackSolver(parsed.model.materializeFiniteBounds().bake()).solve(BacktrackParams())
+        val r = BacktrackSolver(parsed.model.bakeFiniteBounds().bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")
         return BigInteger.fromLong(r.assignment.ints[parsed.intVarNames.values.first()])
     }

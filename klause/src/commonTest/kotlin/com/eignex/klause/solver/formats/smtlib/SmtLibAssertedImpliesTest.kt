@@ -8,6 +8,7 @@ import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.propagation.bakeFiniteBounds
 import com.eignex.klause.solver.SolveResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,7 +19,7 @@ import kotlin.test.assertEquals
  */
 class SmtLibAssertedImpliesTest {
 
-    private fun SmtLibProblem.bounded(): Problem = model.materializeFiniteBounds()
+    private fun SmtLibProblem.bounded(): Problem = model.bakeFiniteBounds()
 
     private fun parse(text: String): Problem = SmtLib.parse("$text\n(check-sat)").bounded()
 

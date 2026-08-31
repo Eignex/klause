@@ -4,7 +4,6 @@ import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.presolve.PresolveEmphasis
@@ -538,42 +537,6 @@ internal fun linearSolvable(
         // defined), so LS descends the true objective on the decision vars; else null and LS
         // descends the linear objective directly.
         lsObjective = functionalObjectiveFor(objective, objSweep),
-        linearObjective = objective,
-        objVarId = objective.singleIntObjective()?.varId,
-        definitionalSweep = sweep,
-        render = render,
-        objectiveValue = { s -> objective.evaluateLong(s).let { if (maximize) -it else it } },
-        continuousObjectiveValue = objective.continuousObjectiveValue(maximize),
-    )
-}
-
-/** Build a solvable whose source model deliberately has no CP search domains yet. */
-internal fun linearModelSolvable(
-    model: com.eignex.klause.ir.ProblemSpec,
-    objective: LinearObjectiveSpec?,
-    maximize: Boolean,
-    render: (Sample) -> String,
-): Solvable = linearModelSolvable(model, objective?.toLinearObjective(), maximize, render)
-
-internal fun linearModelSolvable(
-    model: com.eignex.klause.ir.ProblemSpec,
-    objective: LinearObjective?,
-    maximize: Boolean,
-    render: (Sample) -> String,
-): Solvable {
-    val sweep = DefinitionalSweep.infer(model.factors, model.numIntVars, IntArray(0), emptyList())
-    if (objective == null) {
-        return Solvable(
-            problem = null, optimize = false, maximize = false,
-            lsObjective = null, linearObjective = null, objVarId = null,
-            definitionalSweep = sweep, render = render, objectiveValue = null,
-        )
-    }
-    return Solvable(
-        problem = null,
-        optimize = true,
-        maximize = maximize,
-        lsObjective = functionalObjectiveFor(objective, sweep),
         linearObjective = objective,
         objVarId = objective.singleIntObjective()?.varId,
         definitionalSweep = sweep,

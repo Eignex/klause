@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,9 +21,9 @@ import kotlin.test.assertTrue
 class OpenPresolveTest {
 
     /** `n` columns, all open above, lower bound 0. */
-    private fun openAbove(n: Int, vararg factors: Factor): ProblemSpec {
+    private fun openAbove(n: Int, vararg factors: Factor): Problem {
         val openHi = Bits(n).also { bits -> repeat(n) { bits.set(it) } }
-        return ProblemSpec(
+        return Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(LongArray(n), LongArray(n), null, openHi),
             factors = arrayOf(*factors),
@@ -31,9 +31,9 @@ class OpenPresolveTest {
     }
 
     /** `n` columns open on both sides, so nothing bounds them but the rows. */
-    private fun fullyOpen(n: Int, vararg factors: Factor): ProblemSpec {
+    private fun fullyOpen(n: Int, vararg factors: Factor): Problem {
         val all = Bits(n).also { bits -> repeat(n) { bits.set(it) } }
-        return ProblemSpec(
+        return Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
                 LongArray(n),
@@ -68,7 +68,7 @@ class OpenPresolveTest {
 
     @Test
     fun `a model with no open side is handed back untouched`() {
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(9), null, null),
             factors = arrayOf<Factor>(row(0 to 1L, op = LinearOp.LE, bound = 5L)),
@@ -167,7 +167,7 @@ class OpenPresolveTest {
     @Test
     fun `a unit-asserted reified row is rounded in open presolve`() {
         val openHi = Bits(1).also { it.set(0) }
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(0), null, openHi),
             factors = arrayOf(
@@ -182,7 +182,7 @@ class OpenPresolveTest {
     @Test
     fun `a unit-negated reified row is rounded in open presolve`() {
         val openHi = Bits(1).also { it.set(0) }
-        val spec = ProblemSpec(
+        val spec = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(0), null, openHi),
             factors = arrayOf(

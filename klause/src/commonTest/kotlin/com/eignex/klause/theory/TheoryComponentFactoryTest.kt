@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.theoryComponent
 import com.eignex.klause.theory.difference.DifferenceSearchComponent
@@ -17,7 +17,7 @@ class TheoryComponentFactoryTest {
     @Test
     fun `component plan builds the selected theory fragment component`() {
         val openUpper = Bits(1).also { it.set(1) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(3, 0), null, openUpper),
             factors = arrayOf(
@@ -33,7 +33,7 @@ class TheoryComponentFactoryTest {
 
     @Test
     fun `component plan retains exact LRA with no integer columns`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             factors = arrayOf(

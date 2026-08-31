@@ -13,7 +13,7 @@ import com.eignex.klause.factor.arithmetic.linearRow
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
@@ -55,7 +55,7 @@ data class ExactLiraAssignment(
  * boxes are disjoint and cover every integer value. This deliberately lives beside QF_LRA rather than
  * entering finite CP: the only branching here is theory-local integrality branching.
  */
-class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignment> {
+class ExactLiraSolver(override val model: Problem) : Theory<ExactLiraAssignment> {
     private val witnessBound = requireNotNull(model.liraWitnessBound())
 
     init {
@@ -166,7 +166,7 @@ class ExactLiraSolver(override val model: ProblemSpec) : Theory<ExactLiraAssignm
 
 /** Incremental exact QF_LIRA and QF_LIA search component. */
 class ExactLiraSearchComponent(
-    private val model: ProblemSpec,
+    private val model: Problem,
     private val modelContribution: ((ExactLiraAssignment, SearchModel) -> Unit)? = null,
 ) : TheoryComponent,
     SearchBrancher {
@@ -339,14 +339,14 @@ private data class SearchNode(
 
     fun withCut(cut: ExactGmiCut): SearchNode = copy(cuts = cuts + cut)
 
-    fun nextComparison(model: ProblemSpec): Int {
+    fun nextComparison(model: Problem): Int {
         for (index in model.factors.indices) {
             if (model.factors[index] is ComparisonClause && index !in comparisonChoices) return index
         }
         return -1
     }
 
-    fun nextDisequality(model: ProblemSpec, bools: BooleanArray): Int {
+    fun nextDisequality(model: Problem, bools: BooleanArray): Int {
         for (index in model.factors.indices) {
             if (index in disequalityDirections) continue
             val comparison = model.factors[index] as? ComparisonClause
@@ -381,7 +381,7 @@ private fun SearchNode.withPublishedBounds(
 
 private data class ExactLiraDecision(val node: SearchNode) : SearchTheoryDecision
 
-private class QfLiraSystem(private val model: ProblemSpec) {
+private class QfLiraSystem(private val model: Problem) {
     fun build(bools: BooleanArray, node: SearchNode, cancellation: Cancellation): QfLiraLeaf? {
         val builder = LpBuilder()
         // Split every source column as p - n. Both halves use true open-above columns rather than
@@ -904,7 +904,7 @@ private fun IntBounds.upperOrNull(variable: Int): Long? = if (hasUpper(
     null
 }
 
-private fun ProblemSpec.liraWitnessBound(): BigInteger? {
+private fun Problem.liraWitnessBound(): BigInteger? {
     val variables = numIntVars + numRealVars
     if (variables == 0) return BigInteger.ONE
     var largest = BigInteger.ONE

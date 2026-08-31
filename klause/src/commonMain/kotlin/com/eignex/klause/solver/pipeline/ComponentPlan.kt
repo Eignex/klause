@@ -2,13 +2,10 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.FiniteIntColumns
-import com.eignex.klause.ir.IntColumn
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.MixedIntColumns
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.ir.VarRemap
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
@@ -34,7 +31,7 @@ enum class FactorOwner {
     SHARED,
 }
 
-/** Immutable build-time decomposition of a [ProblemSpec]. */
+/** Immutable build-time decomposition of a [Problem]. */
 class ComponentPlan internal constructor(
     private val intOwners: Array<IntVariableOwner>,
     private val factorOwners: Array<FactorOwner>,
@@ -65,37 +62,29 @@ class ComponentPlan internal constructor(
     val hasTheoryComponent: Boolean get() =
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY }
 
-    /** Materialize the finite-domain columns of [spec]. */
-    fun materialize(spec: ProblemSpec, cpDomains: Map<Int, IntDomain>): Problem {
-        require(cpDomains.keys.all { it in intOwners.indices && intOwners[it] == IntVariableOwner.CP }) {
-            "only CP-owned integer columns may receive finite domains"
+    /** Build the full finite, root-propagated projection selected for a bounded route. */
+    fun finiteProjection(spec: Problem, cpDomains: Map<Int, IntDomain>): BakedProblem {
+        require(!hasTheoryComponent && cpIntVars.size == spec.numIntVars) {
+            "a full finite projection requires every integer column to be CP-owned"
         }
-        if (!hasTheoryComponent) {
-            val domains = Array(intOwners.size) { v ->
-                requireNotNull(cpDomains[v]) { "missing finite domain for CP integer column $v" }
-            }
-            return spec.materialize(FiniteIntColumns(domains))
-        }
-        val columns = Array<IntColumn>(intOwners.size) { v ->
-            when (intOwners[v]) {
-                IntVariableOwner.CP -> IntColumn.Finite(
-                    requireNotNull(cpDomains[v]) { "missing finite domain for CP integer column $v" },
-                )
-
-                IntVariableOwner.THEORY -> IntColumn.Bounded(
-                    lower = if (spec.intBounds.hasLower(v)) spec.intBounds.lower(v) else null,
-                    upper = if (spec.intBounds.hasUpper(v)) spec.intBounds.upper(v) else null,
-                )
-            }
-        }
-        return spec.materialize(MixedIntColumns(columns))
+        requireBelongsTo(spec)
+        return BakedProblem(
+            numBoolVars = spec.numBoolVars,
+            numIntVars = spec.numIntVars,
+            intDomains = sourceDomains(cpDomains, cpIntVars),
+            factors = spec.factors,
+            impliedFactorMask = spec.impliedFactorMask,
+            hasSymmetryBreaking = spec.hasSymmetryBreaking,
+            numRealVars = spec.numRealVars,
+            realLower = spec.realLower,
+            realUpper = spec.realUpper,
+            modelBounds = spec.intBounds,
+        )
     }
 
     /** Build the compact finite problem owned by the CP component. */
-    fun cpProjection(spec: ProblemSpec, cpDomains: Map<Int, IntDomain>): CpProblemProjection {
-        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
-            "component plan belongs to a different source model"
-        }
+    fun cpProjection(spec: Problem, cpDomains: Map<Int, IntDomain>): CpProblemProjection {
+        requireBelongsTo(spec)
         val sourceToCp = IntArray(intOwners.size) { -1 }
         val cpToSource = cpIntVars
         for (local in cpToSource.indices) sourceToCp[cpToSource[local]] = local
@@ -105,35 +94,43 @@ class ComponentPlan internal constructor(
             }
         }
         val boolMap = IntArray(spec.numBoolVars) { it }
-        val factors = factorOwners.indices.asSequence()
-            .filter { factorOwners[it] == FactorOwner.CP }
-            .map { factor ->
-                val sourceFactor = spec.factors[factor]
-                require(sourceFactor.intVars.all { sourceToCp[it] >= 0 }) {
-                    "CP factor $factor mentions a theory-owned integer column"
-                }
-                sourceFactor.remap(VarRemap(boolMap, sourceToCp))
+        val factorIds = factorOwners.indices.filter { factorOwners[it] == FactorOwner.CP }
+        val factors = factorIds.map { factor ->
+            val sourceFactor = spec.factors[factor]
+            require(sourceFactor.intVars.all { sourceToCp[it] >= 0 }) {
+                "CP factor $factor mentions a theory-owned integer column"
             }
-            .toList()
+            sourceFactor.remap(VarRemap(boolMap, sourceToCp))
+        }
             .toTypedArray()
         return CpProblemProjection(
-            Problem(spec.numBoolVars, domains.size, domains, factors),
+            BakedProblem(
+                numBoolVars = spec.numBoolVars,
+                numIntVars = domains.size,
+                intDomains = domains,
+                factors = factors,
+                impliedFactorMask = spec.impliedFactorMask?.let { mask ->
+                    BooleanArray(factorIds.size) { mask[factorIds[it]] }
+                },
+                hasSymmetryBreaking = spec.hasSymmetryBreaking,
+                numRealVars = 0,
+                realLower = doubleArrayOf(),
+                realUpper = doubleArrayOf(),
+            ),
             sourceToCp,
             cpToSource,
         )
     }
 
     /** Source view consumed by the selected theory component. */
-    fun theoryFragment(spec: ProblemSpec): ProblemSpec = fragment(spec) { it != FactorOwner.CP }
+    fun theoryFragment(spec: Problem): Problem = fragment(spec) { it != FactorOwner.CP }
 
     // Shared clauses stay out because the shared clause component enforces them in the same session.
-    internal fun theoryOwnedFragment(spec: ProblemSpec): ProblemSpec = fragment(spec) { it == FactorOwner.THEORY }
+    internal fun theoryOwnedFragment(spec: Problem): Problem = fragment(spec) { it == FactorOwner.THEORY }
 
-    private fun fragment(spec: ProblemSpec, keep: (FactorOwner) -> Boolean): ProblemSpec {
-        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
-            "component plan belongs to a different source model"
-        }
-        return ProblemSpec(
+    private fun fragment(spec: Problem, keep: (FactorOwner) -> Boolean): Problem {
+        requireBelongsTo(spec)
+        return Problem(
             numBoolVars = spec.numBoolVars,
             intBounds = spec.intBounds,
             factors = factorOwners.indices.asSequence()
@@ -146,12 +143,28 @@ class ComponentPlan internal constructor(
             realUpper = spec.realUpper,
         )
     }
+
+    private fun requireBelongsTo(spec: Problem) {
+        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
+            "component plan belongs to a different source model"
+        }
+    }
+
+    private fun sourceDomains(cpDomains: Map<Int, IntDomain>, variables: IntArray): Array<IntDomain> {
+        require(cpDomains.keys.all { it in intOwners.indices && intOwners[it] == IntVariableOwner.CP }) {
+            "only CP-owned integer columns may receive finite domains"
+        }
+        return Array(variables.size) { local ->
+            val source = variables[local]
+            requireNotNull(cpDomains[source]) { "missing finite domain for CP integer column $source" }
+        }
+    }
 }
 
 /** Mapping between source integer ids and the compact finite CP component. */
 class CpProblemProjection internal constructor(
     /** Finite-domain problem passed to the propagation component. */
-    val problem: Problem,
+    val problem: BakedProblem,
     private val sourceToCp: IntArray,
     private val cpToSource: IntArray,
 ) {
@@ -163,7 +176,16 @@ class CpProblemProjection internal constructor(
 }
 
 /** Select component ownership from the source model. */
-fun ProblemSpec.componentPlan(): ComponentPlan {
+fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan {
+    if (preferFinite) {
+        return ComponentPlan(
+            intOwners = Array(numIntVars) { IntVariableOwner.CP },
+            factorOwners = Array(factors.size) { factor ->
+                if (factors[factor] is Clause) FactorOwner.SHARED else FactorOwner.CP
+            },
+            theoryPipeline = ProblemPipeline.FINITE_CP,
+        )
+    }
     val partition = variablePartition()
     val completeTheory = when {
         supportsExactLra() -> ProblemPipeline.EXACT_LRA
@@ -205,7 +227,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
             else -> FactorOwner.CP
         }
     }
-    val theoryFragment = ProblemSpec(
+    val theoryFragment = Problem(
         numBoolVars = numBoolVars,
         intBounds = intBounds,
         factors = factorOwners.indices.asSequence()

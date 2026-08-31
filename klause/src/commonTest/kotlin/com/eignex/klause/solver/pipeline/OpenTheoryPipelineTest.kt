@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.IntBounds
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,7 +13,7 @@ class OpenTheoryPipelineTest {
     fun `selects and executes a satisfiability route`() {
         val openUpper = Bits(1).also { it.set(0) }
         val request = OpenTheoryRequest(
-            model = ProblemSpec(
+            model = Problem(
                 numBoolVars = 0,
                 intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
                 factors = emptyArray(),

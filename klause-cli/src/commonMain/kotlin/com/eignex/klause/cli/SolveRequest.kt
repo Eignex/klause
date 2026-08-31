@@ -3,12 +3,15 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.flatzinc.FlatZincSearchHints
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryRequest
+import com.eignex.klause.solver.pipeline.SourceProblemRoute
+import com.eignex.klause.solver.pipeline.pipelineRoute
 
 /**
  * A parsed instance, lowered to exactly what [SolveCore] needs — mode-neutral. Both the
@@ -56,8 +59,7 @@ internal class Solvable(
         /** The component set selected once while loading the source model. */
         pipeline: SolvablePipeline = SolvablePipeline.FiniteCp,
     ) : this(
-        finite = FiniteSolveShape(
-            problem,
+        finite = problem?.finiteSolveShape(
             optimize,
             maximize,
             lsObjective,
@@ -73,7 +75,7 @@ internal class Solvable(
     )
 
     /** Finite CP problem. */
-    val problem: Problem? get() = finite?.problem
+    val problem: BakedProblem? get() = finite?.problem
     val optimize: Boolean get() = finite?.optimize ?: false
     val maximize: Boolean get() = finite?.maximize ?: false
     val lsObjective: IncrementalObjective? get() = finite?.localSearchObjective
@@ -82,7 +84,37 @@ internal class Solvable(
     val definitionalSweep: DefinitionalSweep? get() = finite?.definitionalSweep
     val searchHints: FlatZincSearchHints? get() = finite?.searchHints
     val finiteShape: FiniteSolveShape get() = requireNotNull(finite) { "open model was not materialized" }
-    val finiteProblem: Problem get() = requireNotNull(problem) { "open model was not materialized" }
+    val finiteProblem: BakedProblem get() = requireNotNull(problem) { "open model was not materialized" }
+}
+
+private fun Problem.finiteSolveShape(
+    optimize: Boolean,
+    maximize: Boolean,
+    localSearchObjective: IncrementalObjective?,
+    linearObjective: LinearObjective?,
+    objectiveIntVar: Int?,
+    definitionalSweep: DefinitionalSweep?,
+    searchHints: FlatZincSearchHints?,
+): FiniteSolveShape {
+    val route = pipelineRoute(linearObjective, maximize)
+    require(route is SourceProblemRoute.Finite) { "finite solve requested for ${sourceRouteName(route)}" }
+    return FiniteSolveShape(
+        route.problem,
+        optimize,
+        maximize,
+        localSearchObjective,
+        linearObjective,
+        objectiveIntVar,
+        definitionalSweep,
+        searchHints,
+        route.componentPlan,
+    )
+}
+
+private fun sourceRouteName(route: SourceProblemRoute): String = when (route) {
+    is SourceProblemRoute.Finite -> "a finite model"
+    is SourceProblemRoute.OpenTheory -> "an open theory model"
+    is SourceProblemRoute.UnsupportedOpen -> "an unsupported open model"
 }
 
 /** A concrete solve pipeline, selected before [SolveCore] starts its finite CP loop. */

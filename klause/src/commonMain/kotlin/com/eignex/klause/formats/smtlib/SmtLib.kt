@@ -4,14 +4,14 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.CharSource
 import com.eignex.klause.util.StringCharSource
 
 /** An SMT-LIB source decoded and lowered into klause's representation. */
 data class SmtLibProblem(
     /** Compiled model. Open integer sides remain open until a finite-search backend materializes them. */
-    val model: ProblemSpec,
+    val model: Problem,
     /** Objective, or null for satisfaction instances. */
     val objective: LinearObjectiveSpec?,
     /** Declared `Int` variable name to int id. */

@@ -59,12 +59,11 @@ class IntColumnsTest {
 
     @Test
     fun `a problem holding a theory column refuses to pose as finite`() {
-        val spec = ProblemSpec(
+        val problem = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(3), null, null),
             factors = emptyArray(),
         )
-        val problem = spec.materialize(MixedIntColumns(arrayOf(IntColumn.Bounded(0, 3))))
 
         assertNull(problem.intColumns.allFiniteOrNull())
         assertFailsWith<IllegalArgumentException> { problem.requireFiniteIntDomains() }

@@ -1,6 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.Cancellation
 
@@ -27,6 +28,37 @@ fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem 
         numBoolVars = numBoolVars,
         numIntVars = numIntVars,
         intDomains = Array(numIntVars) { requireFiniteIntDomains()[it] },
+        factors = factors,
+        cancellation = cancellation,
+        impliedFactorMask = impliedFactorMask,
+        hasSymmetryBreaking = hasSymmetryBreaking,
+        numRealVars = numRealVars,
+        realLower = realLower,
+        realUpper = realUpper,
+        packedOpenIntLo = intBounds.openLowerBits,
+        packedOpenIntHi = intBounds.openUpperBits,
+        modelBounds = intBounds,
+    )
+}
+
+/**
+ * Build the finite, root-propagated projection of this model's declared integer domains.
+ *
+ * Existing finite domains retain holes. A canonical bounds-only model is accepted only when every
+ * declared side is finite; no fallback endpoint is invented here.
+ */
+fun Problem.bakeFiniteBounds(cancellation: Cancellation = Cancellation.Never): BakedProblem {
+    if (this is BakedProblem) return this
+    val domains = intColumns.allFiniteOrNull() ?: Array(numIntVars) { variable ->
+        require(intBounds.hasLower(variable) && intBounds.hasUpper(variable)) {
+            "integer column $variable is open and needs an explicit finite search domain"
+        }
+        IntDomain(intBounds.lower(variable), intBounds.upper(variable))
+    }
+    return BakedProblem(
+        numBoolVars = numBoolVars,
+        numIntVars = numIntVars,
+        intDomains = domains,
         factors = factors,
         cancellation = cancellation,
         impliedFactorMask = impliedFactorMask,

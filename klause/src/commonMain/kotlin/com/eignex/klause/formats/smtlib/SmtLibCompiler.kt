@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
 
@@ -274,7 +274,7 @@ internal object Compiler {
             lowerOpenIteChains() // an objective term can open chains of its own
             val sourceBounds = modelIntBounds()
 
-            val model = ProblemSpec(
+            val model = Problem(
                 numBoolVars = nextBool,
                 intBounds = sourceBounds,
                 factors = factors.toTypedArray(),

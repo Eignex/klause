@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.exactBoundsInfeasible
 import com.eignex.klause.lp.longOrNull
@@ -23,7 +23,7 @@ sealed interface OpenPresolveResult {
      * @property spec the same model over tighter bounds; every other part of it is carried through.
      * @property closedSides how many open sides the phase proved a bound for.
      */
-    class Tightened(val spec: ProblemSpec, val closedSides: Int) : OpenPresolveResult
+    class Tightened(val spec: Problem, val closedSides: Int) : OpenPresolveResult
 
     /**
      * The model has no solution.
@@ -56,7 +56,7 @@ sealed interface OpenPresolveResult {
  * [cancellation] is polled between variables and threaded into each LP solve, so a budget spent partway
  * through leaves the bounds it had already proved — every one of them sound on its own.
  */
-fun ProblemSpec.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult {
+fun Problem.presolveOpen(cancellation: Cancellation = Cancellation.Never): OpenPresolveResult {
     val columns = numIntVars
     if (columns == 0) return OpenPresolveResult.Tightened(this, closedSides = 0)
     val declared = Array(columns) { v ->
@@ -100,7 +100,7 @@ fun ProblemSpec.presolveOpen(cancellation: Cancellation = Cancellation.Never): O
 }
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
-private fun ProblemSpec.openPresolveRows(): List<Linear> {
+private fun Problem.openPresolveRows(): List<Linear> {
     val rows = ArrayList<Linear>()
     for (factor in factors) {
         if (factor is Linear) rows += roundIntegerRow(factor)
@@ -162,7 +162,7 @@ private fun crossed(b: OpenIntBounds): Boolean {
 }
 
 /** This model over [bounds], carrying every other part of it through unchanged. */
-private fun ProblemSpec.withBounds(bounds: Array<OpenIntBounds>): ProblemSpec {
+private fun Problem.withBounds(bounds: Array<OpenIntBounds>): Problem {
     val lower = LongArray(bounds.size)
     val upper = LongArray(bounds.size)
     var openLo: Bits? = null
@@ -173,7 +173,7 @@ private fun ProblemSpec.withBounds(bounds: Array<OpenIntBounds>): ProblemSpec {
         val hi = bounds[v].hi
         if (hi == null) (openHi ?: Bits(bounds.size).also { openHi = it }).set(v) else upper[v] = hi
     }
-    return ProblemSpec(
+    return Problem(
         numBoolVars = numBoolVars,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLo, openHi),
         factors = factors,

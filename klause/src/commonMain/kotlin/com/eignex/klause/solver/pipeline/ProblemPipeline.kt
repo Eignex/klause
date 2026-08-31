@@ -1,18 +1,19 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.theory.qflra.supportsExactLra
 
-/** The solver pipeline selected once from a source [ProblemSpec]. */
+/** The solver pipeline selected once from a source [Problem]. */
 enum class ProblemPipeline {
     /**
      * Finite search and optimization route.
      *
-     * This is a frontend policy, not variable ownership: [ProblemSpec.componentPlan] may still select a
+     * This is a frontend policy, not variable ownership: [Problem.componentPlan] may still select a
      * complete arithmetic theory for the same finite source model when no finite-domain factor is present.
      */
     FINITE_CP,
@@ -35,7 +36,9 @@ sealed interface SourceProblemRoute {
     /** A fully bounded source model materialized for finite-domain search. */
     data class Finite(
         /** The materialized finite-domain model. */
-        val problem: Problem,
+        val problem: BakedProblem,
+        /** Component ownership selected from the same canonical source model. */
+        val componentPlan: ComponentPlan,
     ) : SourceProblemRoute
 
     /** A supported open source model with its selected theory request. */
@@ -58,16 +61,22 @@ sealed interface SourceProblemRoute {
  * request when one exists; callers only need to render its uniform assignment surface. A frontend that
  * supports exact pure-real solving sets [routePureRealToTheory] to select that lane instead of finite CP.
  */
-fun ProblemSpec.pipelineRoute(
+fun Problem.pipelineRoute(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     routePureRealToTheory: Boolean = false,
 ): SourceProblemRoute {
     val finiteIntegerRanges = (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }
-    if (finiteIntegerRanges && (!routePureRealToTheory || !supportsExactLra())) {
-        return SourceProblemRoute.Finite(materializeFiniteBounds())
+    val preferFinite = finiteIntegerRanges && (!routePureRealToTheory || !supportsExactLra())
+    val plan = componentPlan(preferFinite)
+    if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
+        if (this is BakedProblem) return SourceProblemRoute.Finite(this, plan)
+        val domains = plan.cpIntVars.associateWith { variable ->
+            intDomainOrNull(variable) ?: IntDomain(intBounds.lower(variable), intBounds.upper(variable))
+        }
+        return SourceProblemRoute.Finite(plan.finiteProjection(this, domains), plan)
     }
-    val request = OpenTheoryRequest(this, objective, maximize)
+    val request = OpenTheoryRequest(this, objective, maximize, plan)
     return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {
         SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable)
     } else {
@@ -83,9 +92,9 @@ fun ProblemSpec.pipelineRoute(
  * classified by [componentPlan], which reads column and factor ownership rather than demanding one
  * theory cover the whole model.
  */
-fun ProblemSpec.sourceRoute(): ProblemPipeline = when {
-    (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) } -> ProblemPipeline.FINITE_CP
-    else -> componentPlan().theoryPipeline
+fun Problem.sourceRoute(): ProblemPipeline {
+    val finite = (0 until numIntVars).all { intBounds.hasLower(it) && intBounds.hasUpper(it) }
+    return componentPlan(preferFinite = finite).theoryPipeline
 }
 
 /**

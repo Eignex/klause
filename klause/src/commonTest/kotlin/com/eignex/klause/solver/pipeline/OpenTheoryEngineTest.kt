@@ -8,7 +8,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.SearchSession
@@ -27,12 +27,12 @@ import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
 
-    private fun sourceRoute(model: ProblemSpec): ProblemPipeline = model.sourceRoute()
+    private fun sourceRoute(model: Problem): ProblemPipeline = model.sourceRoute()
 
     @Test
     fun `open difference route executes through the planned shared session`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
@@ -47,7 +47,7 @@ class OpenTheoryEngineTest {
     @Test
     fun `open route distinguishes external cancellation from a wall timeout`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
@@ -63,7 +63,7 @@ class OpenTheoryEngineTest {
     @Test
     fun `a spent shared decision allowance reports budget exhaustion`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
@@ -80,7 +80,7 @@ class OpenTheoryEngineTest {
     @Test
     fun `shared decision allowance spans feasibility rounds`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
@@ -116,7 +116,7 @@ class OpenTheoryEngineTest {
     @Test
     fun `open route reports a wall timeout without external cancellation`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
             factors = emptyArray(),
@@ -132,7 +132,7 @@ class OpenTheoryEngineTest {
 
     @Test
     fun `unlimited open work counters are repeatable`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(
                 lowerBounds = longArrayOf(0),
@@ -231,7 +231,7 @@ class OpenTheoryEngineTest {
             it.set(0)
             it.set(1)
         }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
             factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
@@ -261,7 +261,7 @@ class OpenTheoryEngineTest {
 
     @Test
     fun `open exact LRA route assembles its theory assignment`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(), longArrayOf(), null, null),
             factors = arrayOf(
@@ -372,7 +372,7 @@ class OpenTheoryEngineTest {
 
     @Test
     fun `pure LIA exact component finds an integral witness`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, null),
             factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.EQ, 0)),
@@ -419,7 +419,7 @@ class OpenTheoryEngineTest {
             it.set(0)
             it.set(1)
         }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
             factors = arrayOf(
@@ -490,7 +490,7 @@ class OpenTheoryEngineTest {
             it.set(0)
             it.set(1)
         }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
             factors = arrayOf(

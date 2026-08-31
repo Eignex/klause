@@ -6,7 +6,7 @@ import com.eignex.klause.arithmetic.difference.Potentials
 import com.eignex.klause.arithmetic.difference.ShortestPaths
 import com.eignex.klause.arithmetic.difference.potentialSample
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.differenceFragmentOf
 import com.eignex.klause.solver.search.ComponentCheck
@@ -20,7 +20,7 @@ import com.eignex.klause.solver.search.TheoryComponent
 
 /** Incremental difference-logic search component. */
 class DifferenceSearchComponent private constructor(
-    private val model: ProblemSpec,
+    private val model: Problem,
     private val modelIntVars: IntArray,
     private val rootBoundVars: IntArray,
 ) : TheoryComponent {
@@ -52,7 +52,7 @@ class DifferenceSearchComponent private constructor(
     private var assignment: Sample? = null
 
     constructor(
-        model: ProblemSpec,
+        model: Problem,
         modelIntVars: IntArray = IntArray(model.numIntVars) { it },
     ) : this(model, modelIntVars, intArrayOf())
 
@@ -196,7 +196,7 @@ class DifferenceSearchComponent private constructor(
         private const val MAX_ROOT_BOUND_RELAXATIONS = 65_536L
 
         fun withRootBounds(
-            model: ProblemSpec,
+            model: Problem,
             modelIntVars: IntArray,
             rootBoundVars: IntArray,
         ): DifferenceSearchComponent = DifferenceSearchComponent(model, modelIntVars, rootBoundVars)

@@ -10,7 +10,7 @@ import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.RowScale
 import com.eignex.klause.lowering.RowScaleBuilder
 import com.eignex.klause.lowering.channelBoolTo01
@@ -42,7 +42,7 @@ data class MpsColumn(
 data class MpsCompiled(
     /** The compiled solver problem — an integer variable per integer MPS column, an LP-only continuous
      *  variable per (bounded or unbounded) float column. */
-    val model: ProblemSpec,
+    val model: Problem,
     /** Objective, or `null` for a feasibility instance (no `N` row). */
     val objective: LinearObjectiveSpec?,
     /** True when the objective is a maximise. */
@@ -67,7 +67,7 @@ data class MpsCompiled(
 private const val MPS_INFINITY = 1e20
 
 /**
- * Lower an [MpsModel] to a klause [ProblemSpec] for the hybrid MIP/CP engine:
+ * Lower an [MpsModel] to a klause [Problem] for the hybrid MIP/CP engine:
  *  - **integer columns** become model integer variables; a side left unbounded (or at the `1e30`
  *    marker) stays open for pipeline selection.
  *  - **float columns** become LP-only continuous variables — present in the LP relaxation, absent from CP
@@ -160,7 +160,7 @@ fun MpsModel.toProblem(): MpsCompiled {
         buildObjective(isFloat, intVarOf, realVarOf, guards.numBool, numInt, numReal, objRowScale)
     }
 
-    val model = ProblemSpec(
+    val model = Problem(
         numBoolVars = guards.numBool,
         intBounds = IntBounds.fromModelBounds(lower, upper, openLoBits, openHiBits),
         factors = factors.toTypedArray(),

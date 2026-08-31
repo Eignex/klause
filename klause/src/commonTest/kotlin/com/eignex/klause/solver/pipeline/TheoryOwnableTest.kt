@@ -7,7 +7,7 @@ import com.eignex.klause.ir.FactorKind
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
@@ -28,7 +28,7 @@ class TheoryOwnableTest {
         override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.LINEAR) { int(0) }
     }
 
-    private fun specOf(vararg factors: Factor) = ProblemSpec(
+    private fun specOf(vararg factors: Factor) = Problem(
         numBoolVars = 0,
         intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(9), null, null),
         factors = arrayOf(*factors),

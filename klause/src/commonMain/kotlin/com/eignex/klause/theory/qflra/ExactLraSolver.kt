@@ -1,6 +1,6 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalOutcome
@@ -23,7 +23,7 @@ data class ExactLraAssignment(
  * Each Boolean leaf emits only its active real atoms into the existing LP assembler, then the exact
  * rational simplex decides that conjunction. The finite CP and double-simplex lanes are never entered.
  */
-class ExactLraSolver(override val model: ProblemSpec) : Theory<ExactLraAssignment> {
+class ExactLraSolver(override val model: Problem) : Theory<ExactLraAssignment> {
     init {
         require(model.supportsExactLra()) {
             "exact LRA search requires a pure-real linear source model"

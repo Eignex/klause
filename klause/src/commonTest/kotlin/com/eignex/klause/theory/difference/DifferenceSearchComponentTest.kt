@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -25,7 +25,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `unconditional root rows publish an equality for a finite peer`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(7, 0), null, null),
             factors = arrayOf(
@@ -46,7 +46,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `guarded root row does not publish an unconditional bound`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
             factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 7)),
@@ -67,7 +67,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `unconditional root bounds report a root conflict`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(7), null, null),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 8)),
@@ -84,7 +84,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `published root equality survives backtracking and restart`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(7, 0), null, null),
             factors = arrayOf(
@@ -112,7 +112,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `a Long minimum root lower bound is not negated into a false edge`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(Long.MIN_VALUE), longArrayOf(3), null, null),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
@@ -133,7 +133,7 @@ class DifferenceSearchComponentTest {
     @Test
     fun `abandoned root paths publish no partial bound`() {
         val open = com.eignex.klause.util.Bits.full(2)
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
             factors = arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 7)),
@@ -157,7 +157,7 @@ class DifferenceSearchComponentTest {
     @Test
     fun `unconditional paths publish a multihop one-sided bound`() {
         val open = com.eignex.klause.util.Bits.full(3)
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(0, 0, 0), open, open),
             factors = arrayOf(
@@ -185,7 +185,7 @@ class DifferenceSearchComponentTest {
     @Test
     fun `reset root facts recomputes unconditional consequences`() {
         val open = com.eignex.klause.util.Bits.full(2)
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
             factors = arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 2)),
@@ -219,7 +219,7 @@ class DifferenceSearchComponentTest {
         val guarded = Array<Factor>(1_000) {
             ReifiedLinear(0, intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, it)
         }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 1,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(10, 10), null, null),
             factors = guarded,
@@ -247,7 +247,7 @@ class DifferenceSearchComponentTest {
         val factors = Array<Factor>(variables - 1) { variable ->
             Linear(intArrayOf(1, -1), intArrayOf(variable, variable + 1), LinearOp.LE, 0)
         }
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(
                 LongArray(variables),
@@ -276,7 +276,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `difference component rejects a shared bound conflict before a Boolean leaf`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
@@ -292,7 +292,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `difference component contributes its complete model through the shared session`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)),
@@ -310,7 +310,7 @@ class DifferenceSearchComponentTest {
 
     @Test
     fun `guarded negative cycle learns an asserting shared backjump`() {
-        val model = ProblemSpec(
+        val model = Problem(
             numBoolVars = 2,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(10), null, null),
             factors = arrayOf(

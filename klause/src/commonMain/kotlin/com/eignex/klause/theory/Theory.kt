@@ -1,12 +1,12 @@
 package com.eignex.klause.theory
 
-import com.eignex.klause.ir.ProblemSpec
+import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.SearchExplanation
 
 /** A complete decision procedure for one open-model theory fragment. */
 interface Theory<out A> {
     /** Source model. */
-    val model: ProblemSpec
+    val model: Problem
 
     /** Decides a complete Boolean assignment. */
     fun check(bools: BooleanArray, context: TheoryContext): TheoryCheck<A>
