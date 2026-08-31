@@ -1,13 +1,10 @@
 package com.eignex.klause.presolve
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.internals.ceilDivLong
 import com.eignex.klause.factor.arithmetic.internals.floorDivLong
-import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.exactBoundsInfeasible
@@ -104,30 +101,11 @@ fun ProblemSpec.presolveOpen(cancellation: Cancellation = Cancellation.Never): O
 
 /** Unconditional integer rows plus the integer rows a root unit clause asserts. */
 private fun ProblemSpec.openPresolveRows(): List<Linear> {
-    val truth = BooleanArray(numBoolVars)
-    val fixed = BooleanArray(numBoolVars)
-    for (clause in factors.filterIsInstance<Clause>()) {
-        if (clause.literals.size != 1) continue
-        val literal = clause.literals[0]
-        val variable = Lit.variable(literal)
-        val value = Lit.isPositive(literal)
-        if (fixed[variable] && truth[variable] != value) return emptyList()
-        fixed[variable] = true
-        truth[variable] = value
-    }
     val rows = ArrayList<Linear>()
     for (factor in factors) {
-        when (factor) {
-            is Linear -> rows += roundIntegerRow(factor)
-
-            is ReifiedLinear -> if (fixed[factor.auxBoolVar] && truth[factor.auxBoolVar]) {
-                val constants = factor.integerConstants ?: continue
-                rows += roundIntegerRow(Linear(constants.coeffs, factor.vars.copyOf(), factor.op, constants.bound))
-            }
-
-            else -> Unit
-        }
+        if (factor is Linear) rows += roundIntegerRow(factor)
     }
+    for (row in rootFixedReifiedRows(factors.asList())) rows += roundIntegerRow(row)
     return rows
 }
 

@@ -178,4 +178,19 @@ class OpenPresolveTest {
 
         assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
     }
+
+    @Test
+    fun `a unit-negated reified row is rounded in open presolve`() {
+        val openHi = Bits(1).also { it.set(0) }
+        val spec = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(1), longArrayOf(0), null, openHi),
+            factors = arrayOf(
+                Clause(intArrayOf(Lit.make(0, positive = false))),
+                ReifiedLinear(0, longArrayOf(2), intArrayOf(0), LinearOp.GE, 2L),
+            ),
+        )
+
+        assertIs<OpenPresolveResult.Refuted>(spec.presolveOpen())
+    }
 }
