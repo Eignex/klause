@@ -14,6 +14,10 @@ object Reports {
     internal val json: Json = Json {
         prettyPrint = true
         encodeDefaults = true
+        // Report/cache schemas only ever grow fields (e.g. Attribution's exactObjective/
+        // continuousObjective); a record written by a newer revision must still decode under an older
+        // one instead of throwing on the unrecognised key.
+        ignoreUnknownKeys = true
     }
 
     internal inline fun <reified T> writeJson(path: String, value: T) {

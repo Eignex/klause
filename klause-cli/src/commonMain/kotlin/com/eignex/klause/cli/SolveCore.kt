@@ -550,14 +550,12 @@ internal object SolveCore {
             FiniteSolveCallbacks(
                 onSample = { sample -> emit(output, solvable, sample) },
                 onImprovement = { improvement ->
-                    emit(output, solvable, improvement.sample)
+                    val (objective, continuousObjective) = emit(output, solvable, improvement.sample)
                     if (common.statistics) {
-                        val objective = solvable.objectiveValue?.invoke(improvement.sample)
-                            ?: improvement.objective.toLong()
                         output.onImprovement(
                             improvement.workerLabel,
-                            objective,
-                            solvable.continuousObjectiveValue?.invoke(improvement.sample),
+                            objective ?: improvement.objective.toLong(),
+                            continuousObjective,
                             improvement.elapsedMs,
                         )
                     }
@@ -619,12 +617,13 @@ internal object SolveCore {
         FiniteSolveVerdict.BEST_FOUND -> Verdict.BEST_FOUND
     }
 
-    private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample) {
-        output.onSolution(
-            solvable.render(sample),
-            solvable.objectiveValue?.invoke(sample),
-            solvable.continuousObjectiveValue?.invoke(sample),
-        )
+    /** Renders [sample] and returns its (objective, continuousObjective) pair so a caller that also
+     *  needs those values (e.g. arm attribution) doesn't re-walk the objective's coefficient arrays. */
+    private fun emit(output: OutputProtocol, solvable: Solvable, sample: Sample): Pair<Long?, Double?> {
+        val objective = solvable.objectiveValue?.invoke(sample)
+        val continuousObjective = solvable.continuousObjectiveValue?.invoke(sample)
+        output.onSolution(solvable.render(sample), objective, continuousObjective)
+        return objective to continuousObjective
     }
 
     private fun stats(

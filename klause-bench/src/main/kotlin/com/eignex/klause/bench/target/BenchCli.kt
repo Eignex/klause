@@ -347,7 +347,7 @@ object BenchCli {
             val rec = runCatching { Reports.json.decodeFromString<SolveRecord>(jsonFile.readText()) }.getOrNull()
             if (rec != null && rec.kind == "optimize" && rec.attribution.isNotEmpty()) {
                 rec.attribution.forEach { arms += it.label }
-                won += setOf(rec.attribution.last().label)
+                won += setOf(SolveMetric.best(rec.attribution, rec.maximize).label)
             }
         }
         return arms.toList() to won
