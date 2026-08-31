@@ -225,7 +225,9 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
          */
 
         // Looks at the budget once per pollStride units of work, so a sweep over a large model notices
-        // it. A unit is one term of one row, not one factor: a row's cost is quadratic in its width.
+        // it. A unit is one term of one row, not one factor: even with [rowRange] tracked as a running
+        // total, a row with many terms is real work on its own, and a factor-boundary poll would let one
+        // very wide row run unchecked.
         private var untilPoll = pollStride
 
         private fun budgetSpent(): Boolean {
@@ -257,7 +259,7 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
                     // Too wide to narrow within a deadline: leave this row's domains as they are. The
                     // sweep stays sound, only less tight, and the search keeps its shot at the model.
                     if (rowExceedsArithmetic(row.vars, row.coeffs, domains)) continue
-                    var rowRange = rowRange(row, domains)
+                    var rowRange = rowRange(row)
                     for (i in row.vars.indices) {
                         if (budgetSpent()) return null
                         val coefficient = row.coeffs[i]
@@ -290,7 +292,7 @@ class GeneralLiaSolver(override val model: ProblemSpec) : Theory<GeneralLiaAssig
             return true
         }
 
-        private fun rowRange(row: BigRow, domains: Array<BigInterval>): BigInterval = exactRowRange(
+        private fun rowRange(row: BigRow): BigInterval = exactRowRange(
             row.vars,
             row.coeffs,
             domains,
@@ -451,7 +453,6 @@ class GeneralLiaSearchComponent(
     private var outcome: ComponentCheck? = null
     private var possibleDomains: Array<BigInterval>? = null
     private var possibleBools: IntArray? = null
-    private var factorPossibility: BooleanArray? = null
     private var factorRanges: Array<BigInterval?>? = null
 
     init {
@@ -471,10 +472,7 @@ class GeneralLiaSearchComponent(
         }
         witnessBound = bound
         pollStride = pollStrideFor(bound.bitLength())
-        possibleDomains = null
-        possibleBools = null
-        factorPossibility = null
-        factorRanges = null
+        clearFactorCache()
         val initialDomains = initialDomains(context) ?: return ComponentResult.Indeterminate
         domainsByLevel.put(0, initialDomains)
         return if (domainsByLevel.getValue(
@@ -516,6 +514,22 @@ class GeneralLiaSearchComponent(
         domainsByLevel.removeKeysAbove(decisionLevel)
         assignment = null
         outcome = null
+    }
+
+    /**
+     * A restart returns to the root without calling [initialize], so the per-factor cache would
+     * otherwise survive across what is logically an unrelated search state. The cache is a pure
+     * function of [bools] and [domains], so a stale entry cannot itself be wrong — but clearing it
+     * here removes the need for that argument to keep holding across future changes.
+     */
+    override fun onRestart(context: SearchContext) {
+        clearFactorCache()
+    }
+
+    private fun clearFactorCache() {
+        possibleDomains = null
+        possibleBools = null
+        factorRanges = null
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
@@ -719,10 +733,8 @@ class GeneralLiaSearchComponent(
     private fun factorsPossible(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         var untilPoll = pollStride
         val cachedDomains = possibleDomains
-        val cachedPossibility = factorPossibility
+        val cachedBools = possibleBools
         val cachedRanges = factorRanges
-        val boolsUnchanged = possibleBools?.contentEquals(bools) == true
-        val result = BooleanArray(model.factors.size)
         val ranges = arrayOfNulls<BigInterval>(model.factors.size)
         for (factorIndex in model.factors.indices) {
             if (!context.consumeGeneralLiaWork()) return null
@@ -731,81 +743,102 @@ class GeneralLiaSearchComponent(
                 if (context.pollGeneralLiaCancellation()) return null
             }
             val factor = model.factors[factorIndex]
-            val possible = if (boolsUnchanged && cachedDomains != null && cachedPossibility != null &&
-                factorDomainsUnchanged(factor, domains, cachedDomains)
+            val possible = if (cachedDomains != null && cachedBools != null &&
+                factorInputsUnchanged(factor, domains, cachedDomains, cachedBools)
             ) {
                 ranges[factorIndex] = cachedRanges?.get(factorIndex)
-                cachedPossibility[factorIndex]
+                true
             } else {
                 when (factor) {
-                is Clause -> factor.literals.any { literal ->
-                    bools[literal ushr 1] == UNASSIGNED ||
-                        bools[literal ushr 1] == truth(
-                            literal,
+                    is Clause -> factor.literals.any { literal ->
+                        bools[literal ushr 1] == UNASSIGNED ||
+                            bools[literal ushr 1] == truth(
+                                literal,
+                            )
+                    }
+
+                    is Linear -> {
+                        val range = incrementalRange(
+                            factor.vars,
+                            exactConstantsOf(factor),
+                            factorIndex,
+                            cachedDomains,
+                            cachedRanges,
+                            domains,
                         )
-                }
-
-                is Linear -> {
-                    val updatedRange = if (boolsUnchanged && cachedDomains != null) {
-                        cachedRanges?.get(factorIndex)?.let {
-                            updateRowRange(it, factor.vars, exactConstantsOf(factor), cachedDomains, domains)
-                        }
-                    } else {
-                        null
+                        ranges[factorIndex] = range
+                        relationPossible(range, factor.op, linearBound(factor))
                     }
-                    val range = updatedRange ?: rowRange(factor, domains)
-                    ranges[factorIndex] = range
-                    relationPossible(range, factor.op, linearBound(factor))
-                }
 
-                is ReifiedLinear -> if (bools[factor.auxBoolVar] == UNASSIGNED) {
-                    true
-                } else {
-                    val updatedRange = if (boolsUnchanged && cachedDomains != null) {
-                        cachedRanges?.get(factorIndex)?.let {
-                            updateRowRange(it, factor.vars, factor.constants, cachedDomains, domains)
-                        }
+                    is ReifiedLinear -> if (bools[factor.auxBoolVar] == UNASSIGNED) {
+                        true
                     } else {
-                        null
+                        val range = incrementalRange(
+                            factor.vars,
+                            factor.constants,
+                            factorIndex,
+                            cachedDomains,
+                            cachedRanges,
+                            domains,
+                        )
+                        ranges[factorIndex] = range
+                        reifiedPossible(factor, range)
                     }
-                    val range = updatedRange ?: rowRange(factor, domains)
-                    ranges[factorIndex] = range
-                    reifiedPossible(factor, range)
-                }
 
-                is ComparisonClause -> factor.vars.indices.any { index ->
-                    relationPossible(
-                        domains[factor.vars[index]],
-                        factor.ops[index],
-                        BigInteger.fromLong(factor.consts[index]),
-                    )
-                }
+                    is ComparisonClause -> factor.vars.indices.any { index ->
+                        relationPossible(
+                            domains[factor.vars[index]],
+                            factor.ops[index],
+                            BigInteger.fromLong(factor.consts[index]),
+                        )
+                    }
 
-                else -> false
-            }
+                    else -> false
+                }
             }
             if (!possible) return false
-            result[factorIndex] = true
         }
         possibleDomains = domains.copyOf()
         possibleBools = bools.copyOf()
-        factorPossibility = result
         factorRanges = ranges
         return true
     }
 
-    private fun factorDomainsUnchanged(
+    /**
+     * Whether every variable [factor] reads — Boolean or integer — carries the same value it did
+     * when [cachedDomains]/[cachedBools] were captured, so a cached possibility verdict for it can
+     * be reused verbatim.
+     *
+     * Driven by [Factor.intVars]/[Factor.boolVars] rather than a per-factor-type list: any factor
+     * kind this component ever comes to admit is covered without a matching edit here.
+     */
+    private fun factorInputsUnchanged(
         factor: Factor,
         domains: Array<BigInterval>,
         cachedDomains: Array<BigInterval>,
-    ): Boolean {
-        val vars = when (factor) {
-            is Linear -> factor.vars
-            is ReifiedLinear -> factor.vars
-            is ComparisonClause -> factor.vars
-            else -> return true
+        cachedBools: IntArray,
+    ): Boolean = factor.intVars.all { domains[it] == cachedDomains[it] } &&
+        factor.boolVars.all { bools[it] == cachedBools[it] }
+
+    /**
+     * The row range for [vars]/[coeffs] over [domains], reusing [cachedRanges]'s entry at
+     * [factorIndex] via [updateRowRange] when [cachedDomains] is available, or computing it fresh
+     * via [exactRowRange] otherwise.
+     *
+     * Sound regardless of any Boolean variable: the row sum itself never reads `bools`.
+     */
+    private fun incrementalRange(
+        vars: IntArray,
+        coeffs: IntegralConstants,
+        factorIndex: Int,
+        cachedDomains: Array<BigInterval>?,
+        cachedRanges: Array<BigInterval?>?,
+        domains: Array<BigInterval>,
+    ): BigInterval {
+        val updated = cachedDomains?.let { old ->
+            cachedRanges?.get(factorIndex)?.let { updateRowRange(it, vars, coeffs, old, domains) }
         }
-        return vars.all { domains[it] == cachedDomains[it] }
+        return updated ?: exactRowRange(vars, coeffs, domains, checkNotNull(witnessBound))
     }
 
     private fun factorsHold(domains: Array<BigInterval>, context: SearchContext): Boolean? {
@@ -841,15 +874,6 @@ class GeneralLiaSearchComponent(
         }
         return true
     }
-
-    private fun rowRange(factor: Linear, domains: Array<BigInterval>): BigInterval =
-        rowRange(factor.vars, exactConstantsOf(factor), domains)
-
-    private fun rowRange(factor: ReifiedLinear, domains: Array<BigInterval>): BigInterval =
-        rowRange(factor.vars, factor.constants, domains)
-
-    private fun rowRange(vars: IntArray, coeffs: IntegralConstants, domains: Array<BigInterval>): BigInterval =
-        exactRowRange(vars, coeffs, domains, checkNotNull(witnessBound))
 
     private fun rowValue(factor: Linear, domains: Array<BigInterval>): BigInteger =
         rowValue(factor.vars, exactConstantsOf(factor), domains)
