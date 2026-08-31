@@ -137,8 +137,9 @@ internal object SolveCore {
         // engine (fixed) is inherently single-core.
         val cores = common.parallel ?: 1
         when (engine) {
-            // Naked single backtrack following the model's search annotation (FD track). The
-            // annotation decides the heuristic, so per-solver selector --params are rejected.
+            // Naked single backtrack (FD track). A source search annotation, when present, decides
+            // the heuristic and per-solver selector --params are rejected; an unannotated model has
+            // no heuristic to preserve, so its one run accepts them (see runBacktrack).
             FiniteEngine.FIXED -> {
                 rejectParallel(engine, cores, alt = null)
                 runBacktrack(
