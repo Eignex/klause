@@ -446,6 +446,19 @@ class GeneralLiaSearchComponent(
     private var witnessBound: BigInteger? = null
     private var pollStride = MAX_POLL_FACTORS
     private val theoryIntVars = theoryIntVars.copyOf()
+    private val equalityRows = model.factors.mapNotNull { factor ->
+        when (factor) {
+            is Linear -> if (factor.op == LinearOp.EQ) LiaRow.of(factor) else null
+
+            is ReifiedLinear -> if (factor.op == LinearOp.EQ) {
+                LiaRow.of(factor).copy(auxBoolVar = factor.auxBoolVar)
+            } else {
+                null
+            }
+
+            else -> null
+        }
+    }
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val domainsByLevel = MutableIntObjectMap<Array<BigInterval>>()
@@ -629,8 +642,9 @@ class GeneralLiaSearchComponent(
      * Narrow [domains] through the equality rows until nothing moves, or null when the budget was spent.
      *
      * Null is a third answer on purpose: `false` means the domains emptied, which licenses infeasible,
-     * and a sweep that stopped early must not claim that. The walk is over every factor in [BigInteger],
-     * so on a large model a single pass runs long enough that a poll at the branch above never lands.
+     * and a sweep that stopped early must not claim that. The walk is over active equality rows in
+     * [BigInteger], so on a large model a single pass runs long enough that a poll at the branch above
+     * never lands.
      */
     private fun propagateEqualities(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         var changed: Boolean
@@ -638,25 +652,13 @@ class GeneralLiaSearchComponent(
         do {
             if (context.pollGeneralLiaCancellation()) return null
             changed = false
-            for (factor in model.factors) {
+            for (row in equalityRows) {
+                if (row.auxBoolVar >= 0 && bools[row.auxBoolVar] != TRUE) continue
                 if (!context.consumeGeneralLiaWork()) return null
                 if (--untilPoll <= 0) {
                     untilPoll = pollStride
                     if (context.pollGeneralLiaCancellation()) return null
                 }
-                val row = when (factor) {
-                    is Linear -> if (factor.op == LinearOp.EQ) LiaRow.of(factor) else null
-
-                    is ReifiedLinear -> if (bools[factor.auxBoolVar] == TRUE && factor.op == LinearOp.EQ) {
-                        LiaRow.of(
-                            factor,
-                        )
-                    } else {
-                        null
-                    }
-
-                    else -> null
-                } ?: continue
                 // Too wide to narrow within a deadline: leave this row's domains as they are. The sweep
                 // stays sound, only less tight, and the search keeps its shot at the model.
                 if (rowExceedsArithmetic(row.vars, row.coeffs, domains)) continue
@@ -968,7 +970,13 @@ private fun exactConstantsOf(factor: Linear): IntegralConstants =
 
 private data class GeneralLiaDecision(val domains: Array<BigInterval>) : SearchTheoryDecision
 
-private data class LiaRow(val vars: IntArray, val coeffs: Array<BigInteger>, val bound: BigInteger) {
+private data class LiaRow(
+    val vars: IntArray,
+    val coeffs: Array<BigInteger>,
+    val bound: BigInteger,
+    // Reifying Boolean of a ReifiedLinear source, or -1 for a Linear row that is always asserted.
+    val auxBoolVar: Int = -1,
+) {
     companion object {
         fun of(factor: Linear): LiaRow = of(factor.vars, exactConstantsOf(factor))
 

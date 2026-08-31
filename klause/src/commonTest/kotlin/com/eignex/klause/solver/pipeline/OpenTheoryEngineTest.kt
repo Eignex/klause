@@ -195,8 +195,8 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
 
         assertIs<OpenTheoryResult.Sat>(result)
-        assertEquals(10L, result.stats.openTheory.openCancellationPolls)
-        assertEquals(9L, result.stats.openTheory.openWork)
+        assertEquals(9L, result.stats.openTheory.openCancellationPolls)
+        assertEquals(6L, result.stats.openTheory.openWork)
     }
 
     @Test
@@ -523,6 +523,47 @@ class OpenTheoryEngineTest {
         val second = requireNotNull(session.branchAlternatives())
 
         assertEquals(2, second.size)
-        assertEquals(14L, work.snapshot().openLiaRowVisits)
+        assertEquals(10L, work.snapshot().openLiaRowVisits)
+    }
+
+    @Test
+    fun `general LIA equality propagation visits only equality rows`() {
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Clause(intArrayOf(0)),
+            ),
+        )
+        val work = OpenTheoryWorkSink()
+        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
+        session.attachOpenTheoryWork(work)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertNull(session.branchAlternatives())
+
+        assertEquals(6L, work.snapshot().openLiaRowVisits)
+    }
+
+    @Test
+    fun `shared clauses still refute a General LIA fragment`() {
+        val openUpper = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Clause(intArrayOf(1)),
+                Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
+        )
+
+        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(model))
+        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
     }
 }

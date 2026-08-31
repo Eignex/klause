@@ -125,7 +125,12 @@ class ComponentPlan internal constructor(
     }
 
     /** Source view consumed by the selected theory component. */
-    fun theoryFragment(spec: ProblemSpec): ProblemSpec {
+    fun theoryFragment(spec: ProblemSpec): ProblemSpec = fragment(spec) { it != FactorOwner.CP }
+
+    // Shared clauses stay out because the shared clause component enforces them in the same session.
+    internal fun theoryOwnedFragment(spec: ProblemSpec): ProblemSpec = fragment(spec) { it == FactorOwner.THEORY }
+
+    private fun fragment(spec: ProblemSpec, keep: (FactorOwner) -> Boolean): ProblemSpec {
         require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
             "component plan belongs to a different source model"
         }
@@ -133,7 +138,7 @@ class ComponentPlan internal constructor(
             numBoolVars = spec.numBoolVars,
             intBounds = spec.intBounds,
             factors = factorOwners.indices.asSequence()
-                .filter { factorOwners[it] != FactorOwner.CP }
+                .filter { keep(factorOwners[it]) }
                 .map { spec.factors[it] }
                 .toList()
                 .toTypedArray(),
