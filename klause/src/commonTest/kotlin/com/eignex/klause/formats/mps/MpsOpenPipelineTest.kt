@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class MpsOpenPipelineTest {
 
     @Test
-    fun `keeps an open integer row for the General LIA route`() {
+    fun `keeps an open integer row for the exact LIA route`() {
         val compiled = MpsModel(
             "m",
             ObjectiveSense.MINIMIZE,
@@ -22,7 +22,7 @@ class MpsOpenPipelineTest {
 
         assertTrue(compiled.model.intBounds.isOpenLower(0))
         assertTrue(compiled.model.intBounds.isOpenUpper(0))
-        assertEquals(ProblemPipeline.GENERAL_LIA, compiled.model.sourceRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, compiled.model.sourceRoute())
     }
 
     @Test

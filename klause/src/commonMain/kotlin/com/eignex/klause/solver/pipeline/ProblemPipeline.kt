@@ -20,13 +20,10 @@ enum class ProblemPipeline {
     /** Open integer sides are covered entirely by difference logic. */
     DIFFERENCE_THEORY,
 
-    /** Open integer sides are covered by the complete finite-witness General LIA procedure. */
-    GENERAL_LIA,
-
     /** Open pure-real linear arithmetic, decided by the exact rational simplex under Boolean search. */
     EXACT_LRA,
 
-    /** Open mixed integer/real linear arithmetic, decided by exact rational LP and integer branching. */
+    /** Open integer or mixed integer/real linear arithmetic, decided by exact LP and integer branching. */
     EXACT_LIRA,
 
     /** An open integer side reaches a factor no available theory decides. */

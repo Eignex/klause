@@ -14,8 +14,8 @@ import com.eignex.klause.lp.engine.Relation
  * `x = x⁺ − x⁻`, over two non-negative columns ([openColumns]), and a row's terms are rewritten onto that
  * pair ([splitTerms]).
  *
- * Shared by the passes that reason over open ranges — the cube witness ([unitCubeSolution]) and the
- * Farkas refutation ([openLpInfeasible]) — so both build the same columns from the same declared bounds.
+ * Shared by the passes that reason over open ranges, so relaxation and Farkas checks build the same
+ * columns from the same declared bounds.
  */
 internal class OpenColumns(val builder: LpBuilder, val posCol: IntArray, val negCol: IntArray)
 

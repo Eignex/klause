@@ -93,8 +93,6 @@ data class SolveStats(
                 openTheory.openIntDecisions + other.openTheory.openIntDecisions,
                 openTheory.openTheoryDecisions + other.openTheory.openTheoryDecisions,
                 openTheory.openTheoryChecks + other.openTheory.openTheoryChecks,
-                openTheory.openLiaRowVisits + other.openTheory.openLiaRowVisits,
-                openTheory.openCancellationPolls + other.openTheory.openCancellationPolls,
                 openTheory.openWork + other.openTheory.openWork,
             ),
             openTheoryClauses = openTheoryClauses.mergedWith(other.openTheoryClauses),

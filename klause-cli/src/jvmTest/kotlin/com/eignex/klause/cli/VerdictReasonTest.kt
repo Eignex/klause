@@ -56,8 +56,8 @@ class VerdictReasonTest {
         val out = capture {
             SmtLibOutput().onStatistics(
                 SolveStats(
-                    run = RunStats(backend = "general-lia"),
-                    openTheory = OpenTheoryWorkStats(1, 2, 3, 4, 5, 6, 21),
+                    run = RunStats(backend = "exact-lira"),
+                    openTheory = OpenTheoryWorkStats(1, 2, 3, 4, 10),
                 ),
                 solveTimeMs = 0,
                 solutions = 0,
@@ -69,8 +69,6 @@ class VerdictReasonTest {
             "openIntDecisions",
             "openTheoryDecisions",
             "openTheoryChecks",
-            "openLiaRowVisits",
-            "openCancellationPolls",
             "openWork",
         )) {
             assertTrue("; $key=" in out, "missing $key in: $out")

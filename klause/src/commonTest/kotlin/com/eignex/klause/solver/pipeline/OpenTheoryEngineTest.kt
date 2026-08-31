@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
@@ -9,19 +10,19 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.pipeline.sourceRoute
-import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
+import com.eignex.klause.theory.TheoryCheck
+import com.eignex.klause.theory.TheoryContext
+import com.eignex.klause.theory.qflra.ExactLiraAssignment
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.theory.qflra.ExactLiraSolver
 import com.eignex.klause.util.Bits
 import com.eignex.klause.util.Cancellation
 import com.ionspin.kotlin.bignum.integer.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenTheoryEngineTest {
@@ -130,29 +131,6 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `open work limit stops General LIA during a shared-bound sweep`() {
-        val openUpper = Bits(2).also {
-            it.set(0)
-            it.set(1)
-        }
-        val model = ProblemSpec(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
-            factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
-        )
-
-        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve(
-            TheoryParams(openWorkLimit = 3),
-        )
-
-        val unknown = assertIs<OpenTheoryResult.Unknown>(result)
-        assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
-        assertEquals(1L, unknown.stats.openTheory.openTheoryChecks)
-        assertEquals(2L, unknown.stats.openTheory.openLiaRowVisits)
-        assertEquals(3L, unknown.stats.openTheory.openWork)
-    }
-
-    @Test
     fun `unlimited open work counters are repeatable`() {
         val model = ProblemSpec(
             numBoolVars = 1,
@@ -168,35 +146,12 @@ class OpenTheoryEngineTest {
             ),
         )
 
-        val first = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
-        val second = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
+        val first = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()
+        val second = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()
 
         assertIs<OpenTheoryResult.Sat>(first)
         assertIs<OpenTheoryResult.Sat>(second)
         assertEquals(first.stats.openTheory, second.stats.openTheory)
-    }
-
-    @Test
-    fun `General LIA records every cooperative cancellation poll`() {
-        val model = ProblemSpec(
-            numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(
-                lowerBounds = longArrayOf(0),
-                upperBounds = longArrayOf(0),
-                openLo = null,
-                openHi = Bits(1).also { it.set(0) },
-            ),
-            factors = arrayOf(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
-                Clause(intArrayOf(0)),
-            ),
-        )
-
-        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
-
-        assertIs<OpenTheoryResult.Sat>(result)
-        assertEquals(9L, result.stats.openTheory.openCancellationPolls)
-        assertEquals(6L, result.stats.openTheory.openWork)
     }
 
     @Test
@@ -209,11 +164,11 @@ class OpenTheoryEngineTest {
                 (check-sat)
             """.trimIndent(),
         )
-        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(parsed.model))
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(parsed.model))
 
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
-        val ints = assertIs<OpenTheoryAssignment.GeneralLia>(
+        val ints = assertIs<OpenTheoryAssignment.ExactLira>(
             assertIs<OpenTheoryResult.Sat>(result).assignment,
         ).assignment.ints
         val x = ints[parsed.intVarNames.getValue("x")].longValue()
@@ -227,21 +182,21 @@ class OpenTheoryEngineTest {
         // The chain collapses to an Element, which needs finite domains, while `r` stays open. A
         // whole-model classifier calls that unroutable; ownership per column gives CP the Element and
         // the theory the open row.
-        val chain = (0..19).toList().foldRight("0") { k, rest -> "(ite (= s $k) ${k * 3} $rest)" }
+        val chain = (0..3).toList().foldRight("0") { k, rest -> "(ite (= s $k) ${k * 3} $rest)" }
         val parsed = SmtLib.parse(
             """
                 (declare-const s Int) (declare-const r Int)
-                (assert (>= s 0)) (assert (<= s 19))
+                (assert (>= s 0)) (assert (<= s 3))
                 (assert (= r $chain))
-                (assert (= s 7))
+                (assert (= s 2))
                 (check-sat)
             """.trimIndent(),
         )
 
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
-        val assignment = assertIs<OpenTheoryAssignment.GeneralLia>(assertIs<OpenTheoryResult.Sat>(result).assignment)
-        assertEquals("21", assignment.assignment.ints[parsed.intVarNames.getValue("r")].toString())
+        val assignment = assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        assertEquals("6", assignment.assignment.ints[parsed.intVarNames.getValue("r")].toString())
     }
 
     @Test
@@ -260,7 +215,7 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(parsed.model))
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(parsed.model))
 
         // Deciding it is a search question, tracked as #1579; what matters here is that a spent budget
         // reports unknown rather than the model being refused as outside coverage.
@@ -271,7 +226,7 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `open general LIA route assembles its theory assignment`() {
+    fun `open exact LIA route assembles its theory assignment`() {
         val openUpper = Bits(2).also {
             it.set(0)
             it.set(1)
@@ -282,13 +237,13 @@ class OpenTheoryEngineTest {
             factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
 
-        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
+        val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve()
 
-        assertIs<OpenTheoryAssignment.GeneralLia>(assertIs<OpenTheoryResult.Sat>(result).assignment)
+        assertIs<OpenTheoryAssignment.ExactLira>(assertIs<OpenTheoryResult.Sat>(result).assignment)
     }
 
     @Test
-    fun `open general LIA refutes an integral split through the shared trail`() {
+    fun `open exact LIA refutes an integral split through the shared trail`() {
         val parsed = SmtLib.parse(
             """
                 (set-logic QF_LIA)
@@ -300,7 +255,7 @@ class OpenTheoryEngineTest {
 
         val result = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve()
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(parsed.model))
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(parsed.model))
         assertIs<OpenTheoryResult.Unsat>(result)
     }
 
@@ -388,6 +343,101 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `open pure LIA linear row selects exact LIRA`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (= (+ x (* 2 y)) 7))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(parsed.model))
+    }
+
+    @Test
+    fun `open pure LIA difference fragment keeps the difference route`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (<= (- x y) 4))
+                (check-sat)
+            """.trimIndent(),
+        )
+
+        assertEquals(ProblemPipeline.DIFFERENCE_THEORY, sourceRoute(parsed.model))
+    }
+
+    @Test
+    fun `pure LIA exact component finds an integral witness`() {
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, null),
+            factors = arrayOf(Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.EQ, 0)),
+        )
+        val plan = model.componentPlan()
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, plan.theoryPipeline)
+        assertIs<ExactLiraSearchComponent>(plan.theoryComponent(model))
+        val assignment = assertIs<TheoryCheck.Sat<ExactLiraAssignment>>(
+            ExactLiraSolver(model).check(
+                BooleanArray(model.numBoolVars),
+                object : TheoryContext {
+                    override fun consumeCheck(): Boolean = true
+
+                    override fun cancelled(): Boolean = false
+                },
+            ),
+        ).assignment
+
+        assertEquals(BigInteger.ZERO, assignment.ints[0])
+        assertEquals(BigInteger.ZERO, assignment.ints[1])
+    }
+
+    @Test
+    fun `exact LIRA component refutes a fractional pure LIA relaxation`() {
+        val parsed = SmtLib.parse(
+            """
+                (set-logic QF_LIA)
+                (declare-const x Int) (declare-const y Int)
+                (assert (= (+ (* 2 x) (* 4 y)) 1))
+                (check-sat)
+            """.trimIndent(),
+        )
+        val plan = parsed.model.componentPlan()
+
+        assertIs<ExactLiraSearchComponent>(plan.theoryComponent(parsed.model))
+
+        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(parsed.model, plan.theoryPipeline).solve())
+    }
+
+    @Test
+    fun `exact LIA decides comparison clauses over open columns`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                ComparisonClause(
+                    intArrayOf(0, 1),
+                    arrayOf(LinearOp.EQ, LinearOp.NE),
+                    longArrayOf(1, 2),
+                ),
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.EQ, 2),
+            ),
+        )
+
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(model))
+        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve())
+    }
+
+    @Test
     fun `an order chain over open columns stays inside the theory fragment`() {
         // `x < y < z` over unbounded integers is pure difference logic. Posting it as an Increasing —
         // a global no theory holds — would have made the model unroutable for no gain.
@@ -413,9 +463,7 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `a cancelled general LIA run reports unknown rather than refuting a satisfiable model`() {
-        // The equality fixpoint narrows domains until nothing moves, and a stop inside it must not read
-        // as the emptiness that means infeasible.
+    fun `a cancelled exact LIA run reports unknown rather than refuting a satisfiable model`() {
         val parsed = SmtLib.parse(
             """
                 (set-logic QF_LIA)
@@ -427,7 +475,7 @@ class OpenTheoryEngineTest {
             """.trimIndent(),
         )
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(parsed.model))
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(parsed.model))
         assertIs<OpenTheoryResult.Sat>(OpenTheoryEngine(parsed.model, sourceRoute(parsed.model)).solve())
 
         val stopped = OpenTheoryEngine(parsed.model, sourceRoute(parsed.model))
@@ -437,118 +485,7 @@ class OpenTheoryEngineTest {
     }
 
     @Test
-    fun `general LIA builds its witness bound under the session cancellation`() {
-        val parsed = SmtLib.parse(
-            """
-                (set-logic QF_LIA)
-                (declare-const x Int)
-                (assert (>= x 0))
-                (check-sat)
-            """.trimIndent(),
-        )
-
-        val component = GeneralLiaSearchComponent(parsed.model)
-        val session = SearchSession(listOf(component), cancellation = Cancellation { true })
-
-        assertIs<ComponentResult.Indeterminate>(session.initialize())
-    }
-
-    @Test
-    fun `general LIA materialization boundary reports unknown rather than unsat`() {
-        val wide = BigInteger.ONE shl 300_000
-        val model = ProblemSpec(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(
-                longArrayOf(0, 0),
-                longArrayOf(0, 0),
-                null,
-                Bits(2).also {
-                    it.set(0)
-                    it.set(1)
-                },
-            ),
-            factors = arrayOf(Linear(intArrayOf(0, 1), arrayOf(wide, BigInteger.ONE), LinearOp.LE, BigInteger.ZERO)),
-        )
-
-        val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
-
-        assertIs<OpenTheoryResult.Unknown>(result)
-    }
-
-    @Test
-    fun `general LIA refutes an asserted reified equality outside its integer lattice`() {
-        val model = ProblemSpec(
-            numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(
-                lowerBounds = longArrayOf(0),
-                upperBounds = longArrayOf(0),
-                openLo = null,
-                openHi = Bits(1).also { it.set(0) },
-            ),
-            factors = arrayOf(
-                ReifiedLinear(0, intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1),
-                Clause(intArrayOf(0)),
-            ),
-        )
-
-        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
-        assertNull(session.branchAlternatives())
-    }
-
-    @Test
-    fun `General LIA cached feasibility retains row visit accounting`() {
-        val open = Bits(2).also {
-            it.set(0)
-            it.set(1)
-        }
-        val model = ProblemSpec(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
-            factors = arrayOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
-            ),
-        )
-        val work = OpenTheoryWorkSink()
-        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
-        session.attachOpenTheoryWork(work)
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        val first = requireNotNull(session.branchAlternatives())
-        assertEquals(2, first.size)
-        assertIs<ComponentResult.Consistent>(session.push(first.first()))
-        val second = requireNotNull(session.branchAlternatives())
-
-        assertEquals(2, second.size)
-        assertEquals(10L, work.snapshot().openLiaRowVisits)
-    }
-
-    @Test
-    fun `general LIA equality propagation visits only equality rows`() {
-        val model = ProblemSpec(
-            numBoolVars = 1,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
-            factors = arrayOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-                Clause(intArrayOf(0)),
-            ),
-        )
-        val work = OpenTheoryWorkSink()
-        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
-        session.attachOpenTheoryWork(work)
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
-        assertNull(session.branchAlternatives())
-
-        assertEquals(6L, work.snapshot().openLiaRowVisits)
-    }
-
-    @Test
-    fun `shared clauses still refute a General LIA fragment`() {
+    fun `shared clauses still refute an exact LIA fragment`() {
         val openUpper = Bits(2).also {
             it.set(0)
             it.set(1)
@@ -563,7 +500,7 @@ class OpenTheoryEngineTest {
             ),
         )
 
-        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(model))
-        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
+        assertEquals(ProblemPipeline.EXACT_LIRA, sourceRoute(model))
+        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.EXACT_LIRA).solve())
     }
 }

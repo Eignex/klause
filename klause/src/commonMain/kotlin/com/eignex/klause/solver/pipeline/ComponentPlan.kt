@@ -10,7 +10,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.solver.supportsCompleteDifferenceTheory
-import com.eignex.klause.theory.lia.admitsGeneralLia
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
 
@@ -168,10 +167,17 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
     val partition = variablePartition()
     val completeTheory = when {
         supportsExactLra() -> ProblemPipeline.EXACT_LRA
+
+        numRealVars == 0 && supportsCompleteDifferenceTheory(
+            factors,
+            numIntVars,
+            intBounds,
+        ) -> ProblemPipeline.DIFFERENCE_THEORY
+
         supportsExactLira() -> ProblemPipeline.EXACT_LIRA
+
         numRealVars != 0 -> null
-        supportsCompleteDifferenceTheory(factors, numIntVars, intBounds) -> ProblemPipeline.DIFFERENCE_THEORY
-        admitsGeneralLia() -> ProblemPipeline.GENERAL_LIA
+
         else -> null
     }
     // An open column some CP-only factor reads has no owner: CP cannot index it and no theory can hold
@@ -194,6 +200,7 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         val factor = factors[i]
         when {
             factor is Clause -> FactorOwner.SHARED
+            completeTheory == ProblemPipeline.EXACT_LIRA && factor.exactTheoryOwnable -> FactorOwner.THEORY
             factor.isTheoryOwnable(numRealVars != 0) -> FactorOwner.THEORY
             else -> FactorOwner.CP
         }
@@ -218,17 +225,15 @@ fun ProblemSpec.componentPlan(): ComponentPlan {
         intOwners.any { it == IntVariableOwner.THEORY } || factorOwners.any { it == FactorOwner.THEORY } -> when {
             theoryFragment.supportsExactLra() -> ProblemPipeline.EXACT_LRA
 
-            theoryFragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
-
-            theoryFragment.numRealVars != 0 -> ProblemPipeline.UNSUPPORTED_OPEN
-
-            supportsCompleteDifferenceTheory(
+            theoryFragment.numRealVars == 0 && supportsCompleteDifferenceTheory(
                 theoryFragment.factors,
                 theoryFragment.numIntVars,
                 theoryFragment.intBounds,
             ) -> ProblemPipeline.DIFFERENCE_THEORY
 
-            theoryFragment.admitsGeneralLia() -> ProblemPipeline.GENERAL_LIA
+            theoryFragment.supportsExactLira() -> ProblemPipeline.EXACT_LIRA
+
+            theoryFragment.numRealVars != 0 -> ProblemPipeline.UNSUPPORTED_OPEN
 
             else -> ProblemPipeline.UNSUPPORTED_OPEN
         }

@@ -23,7 +23,6 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.theory.lia.GeneralLiaAssignment
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qflra.supportsExactLra
@@ -64,9 +63,9 @@ class SmtLibTest {
         assertIs<OpenTheoryResult.Unsat>(openSolve(model))
     }
 
-    private fun liaSat(model: com.eignex.klause.ir.ProblemSpec): GeneralLiaAssignment {
+    private fun liaSat(model: com.eignex.klause.ir.ProblemSpec): ExactLiraAssignment {
         val sat = assertIs<OpenTheoryResult.Sat>(openSolve(model))
-        return assertIs<OpenTheoryAssignment.GeneralLia>(sat.assignment).assignment
+        return assertIs<OpenTheoryAssignment.ExactLira>(sat.assignment).assignment
     }
 
     private fun differenceSat(model: com.eignex.klause.ir.ProblemSpec): Sample {
@@ -76,7 +75,7 @@ class SmtLibTest {
 
     private fun solve(text: String): LongArray {
         val parsed = SmtLib.parse(text)
-        if (parsed.model.sourceRoute() == ProblemPipeline.GENERAL_LIA) {
+        if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             val assignment = liaSat(parsed.model)
             return LongArray(parsed.intVarNames.values.maxOrNull()?.plus(1) ?: 0) { v ->
                 assignment.ints[v].longValue()
@@ -967,11 +966,11 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a pinned open variable routes to General LIA`() {
+    fun `a pinned open variable routes to exact LIA`() {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ (* 2 x) y) 10))\n(assert (= y 0))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         assertEquals(5L, solveFor(text, "x"))
     }
 
@@ -991,16 +990,16 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a coupled open equality system routes to General LIA`() {
+    fun `a coupled open equality system routes to exact LIA`() {
         val text = "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
             "(assert (= (+ x y) 10))\n(assert (= (- x y) 4))\n(check-sat)"
         val parsed = SmtLib.parse(text)
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
         assertEquals(7L, solveFor(text, "x"))
     }
 
     @Test
-    fun `a fresh variable over an unbounded operand stays in General LIA`() {
+    fun `a fresh variable over an unbounded operand stays in exact LIA`() {
         val cases = listOf(
             "(declare-fun x () Int) (assert (> (abs x) 3000000000000)) (check-sat)" to
                 "the fresh abs var inherits x's unbounded range",
@@ -1011,17 +1010,17 @@ class SmtLibTest {
         )
         for ((text, message) in cases) {
             val parsed = SmtLib.parse(text)
-            assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute(), message)
+            assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute(), message)
         }
     }
 
     @Test
-    fun `a divisibility-only open equality system routes to General LIA`() {
+    fun `a divisibility-only open equality system routes to exact LIA`() {
         val parsed = SmtLib.parse(
             "(set-logic QF_LIA)\n(declare-fun x () Int)\n(declare-fun y () Int)\n" +
                 "(assert (= (+ (* 3 x) (* 3 y)) 1))\n(check-sat)",
         )
-        assertEquals(ProblemPipeline.GENERAL_LIA, parsed.model.sourceRoute())
+        assertEquals(ProblemPipeline.EXACT_LIRA, parsed.model.sourceRoute())
     }
 
     @Test
@@ -1064,7 +1063,7 @@ class SmtLibTest {
     /** The value of the single declared int in [text], read off its digit columns when it has them. */
     private fun soleIntValue(text: String): BigInteger {
         val parsed = SmtLib.parse(text)
-        if (parsed.model.sourceRoute() == ProblemPipeline.GENERAL_LIA) {
+        if (parsed.model.sourceRoute() == ProblemPipeline.EXACT_LIRA) {
             return liaSat(parsed.model).ints[parsed.intVarNames.values.first()]
         }
         val r = BacktrackSolver(parsed.model.materializeFiniteBounds().bake()).solve(BacktrackParams())
@@ -1102,8 +1101,8 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a declared integer the model drives past Long stays in General LIA`() {
-        // b = 2^32·a and c = 2^32·b with a > 2^32 force both b past 2^64 and c past 2^96. General LIA
+    fun `a declared integer the model drives past Long stays in exact LIA`() {
+        // b = 2^32·a and c = 2^32·b with a > 2^32 force both b past 2^64 and c past 2^96. Exact LIA
         // keeps its wide rows and witness in BigInteger rather than rewriting a declared column onto
         // finite Long digits.
         val text = """

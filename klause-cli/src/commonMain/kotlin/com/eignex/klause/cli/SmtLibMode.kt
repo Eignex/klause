@@ -117,7 +117,7 @@ internal class SmtLibOutput : BufferedBestOutput() {
         private val SMT_SEARCH_KEYS = setOf(
             "nodes", "failures", "propagations",
             "openBoolDecisions", "openIntDecisions", "openTheoryDecisions", "openTheoryChecks",
-            "openLiaRowVisits", "openCancellationPolls", "openWork", "openLearned", "openRelearned",
+            "openWork", "openLearned", "openRelearned",
             "openRestarts", "openReductions", "openDropped", "openRetained", "openPeakRetained",
             "openLearnedWatchVisits",
         )
@@ -134,7 +134,7 @@ internal class SmtLibOutput : BufferedBestOutput() {
  */
 internal fun unsupportedOpenReason(unplaceable: UnplaceableColumn?, names: Map<String, Int>): String {
     val detail = unplaceable
-        ?: return "open integer bounds require supported difference, General LIA, or exact LIRA coverage"
+        ?: return "open integer bounds require supported difference or exact linear arithmetic coverage"
     val column = names.entries.firstOrNull { it.value == detail.column }?.key
         ?: "integer column ${detail.column}"
     val kind = detail.factorKind ?: "a constraint"
