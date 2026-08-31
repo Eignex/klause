@@ -155,13 +155,18 @@ val BACKTRACK_OVERRIDE_KEYS = listOf(
     "var-selector", "val-selector",
 )
 
+// Named rather than sliced positionally off BACKTRACK_OVERRIDE_KEYS (a `dropLast(2)` would silently
+// drop the wrong keys if the list above is ever reordered or grown past these two).
+private val BACKTRACK_SELECTOR_KEYS = setOf("var-selector", "val-selector")
+
 /** Read the backtrack `--param` overrides in [BACKTRACK_OVERRIDE_KEYS] **once** (consuming them) into a
  *  reusable [BacktrackParams] edit — applied to *each arm* of a pool the way the `ls` axis edits are, so
  *  `-e cp -p8 --param var-selector=vsids` still runs a full 8-worker portfolio with the override pinned
  *  across it (the arms keep their own seed/lp/luby diversity). Selectors are rebuilt **per worker** (the
  *  edit closure constructs a fresh instance from the arm's seed), so parallel arms never share mutable
  *  heuristic state. `seed` is left to the caller. [allowSelectors] gates the `var-selector`/`val-selector`
- *  keys: the annotation-following `fixed` engine passes `false` (the annotation decides the heuristic).
+ *  keys: `cp`/`mixed` always pass `true` (inherently free-search); the `fixed` engine passes `false` only
+ *  while a source annotation selects its heuristic, and `true` otherwise (no heuristic to preserve).
  *  Null when no override key is present. */
 fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackParams) -> BacktrackParams)? {
     val maxDecisions = p.long("max-decisions")
@@ -239,14 +244,23 @@ fun backtrackOverride(p: EngineParams, allowSelectors: Boolean): ((BacktrackPara
     }
 }
 
-/** Apply `--param` overrides for the naked `fixed` backtrack solve on top of [base] and reject any
- *  leftover keys. Selector keys are not accepted (the annotation decides the heuristic — free-search
- *  heuristic A/B lives on `-e cp`). */
-fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams {
+/** Apply `--param` overrides for the annotation-following fixed backtrack solve on top of [base]. */
+fun applyBacktrackParams(base: BacktrackParams, p: EngineParams): BacktrackParams =
+    applyFixedBacktrackParams(base, p, allowSelectors = false)
+
+/** Apply fixed-route overrides. [allowSelectors] is false only when a source annotation selects the
+ *  heuristic; an unannotated finite model has no heuristic to preserve, so its single fixed run accepts
+ *  selector overrides without becoming a portfolio. */
+internal fun applyFixedBacktrackParams(
+    base: BacktrackParams,
+    p: EngineParams,
+    allowSelectors: Boolean,
+): BacktrackParams {
     var out = base
     p.long("seed")?.let { out = out.copy(randomSeed = it) }
-    backtrackOverride(p, allowSelectors = false)?.let { out = it(out) }
-    p.finish("cp", "seed, ${BACKTRACK_OVERRIDE_KEYS.dropLast(2).joinToString()}")
+    backtrackOverride(p, allowSelectors)?.let { out = it(out) }
+    val accepted = if (allowSelectors) BACKTRACK_OVERRIDE_KEYS else BACKTRACK_OVERRIDE_KEYS - BACKTRACK_SELECTOR_KEYS
+    p.finish("fixed", "seed, ${accepted.joinToString()}")
     return out
 }
 
@@ -654,9 +668,6 @@ fun resolveBtRecipes(p: EngineParams, kind: Kind): List<() -> BacktrackRecipe>? 
 /** The `--param` key naming a [NodeBudget]; consumed in `SolveCore` rather than here, because one
  *  budget has to serve the whole invocation and [EngineParams] consumes keys per instance. */
 const val NODE_LIMIT_KEY = "node-limit"
-
-/** The `--param` key for deterministic solve-wide open-theory work. */
-const val OPEN_WORK_LIMIT_KEY = "open-work-limit"
 
 /** [pool], or the curated pool when it is null, with every arm spending [budget]. */
 fun withNodeBudget(pool: List<() -> BacktrackRecipe>?, kind: Kind, budget: NodeBudget): List<() -> BacktrackRecipe> =

@@ -8535,7 +8535,6 @@ public final class com/eignex/klause/solver/pipeline/EngineParams {
 
 public final class com/eignex/klause/solver/pipeline/EngineParamsKt {
 	public static final field NODE_LIMIT_KEY Ljava/lang/String;
-	public static final field OPEN_WORK_LIMIT_KEY Ljava/lang/String;
 	public static final fun applyBacktrackParams (Lcom/eignex/klause/backtrack/BacktrackParams;Lcom/eignex/klause/solver/pipeline/EngineParams;)Lcom/eignex/klause/backtrack/BacktrackParams;
 	public static final fun autoArms (I)I
 	public static final fun backtrackOverride (Lcom/eignex/klause/solver/pipeline/EngineParams;Z)Lkotlin/jvm/functions/Function1;

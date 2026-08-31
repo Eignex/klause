@@ -12,9 +12,7 @@ import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
-import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.util.Bits
@@ -501,6 +499,34 @@ class OpenTheoryEngineTest {
     }
 
     @Test
+    fun `General LIA cached feasibility retains row visit accounting`() {
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = ProblemSpec(
+            numBoolVars = 0,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 0),
+            ),
+        )
+        val work = OpenTheoryWorkSink()
+        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
+        session.attachOpenTheoryWork(work)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        val first = requireNotNull(session.branchAlternatives())
+        assertEquals(2, first.size)
+        assertIs<ComponentResult.Consistent>(session.push(first.first()))
+        val second = requireNotNull(session.branchAlternatives())
+
+        assertEquals(2, second.size)
+        assertEquals(10L, work.snapshot().openLiaRowVisits)
+    }
+
+    @Test
     fun `general LIA equality propagation visits only equality rows`() {
         val model = ProblemSpec(
             numBoolVars = 1,
@@ -539,22 +565,5 @@ class OpenTheoryEngineTest {
 
         assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(model))
         assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
-    }
-
-    @Test
-    fun `general LIA reuses unchanged row feasibility across Boolean siblings`() {
-        val model = ProblemSpec(
-            numBoolVars = 2,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
-            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
-        )
-        val work = OpenTheoryWorkSink(limit = 16)
-        val component = GeneralLiaSearchComponent(model)
-        val session = SearchComponentSet(listOf(component)).session()
-        session.attachOpenTheoryWork(work)
-
-        assertIs<ComponentResult.Consistent>(session.initialize())
-        assertIs<SearchResult.Satisfied>(session.solve(numBoolVars = 2))
-        assertEquals(16L, work.snapshot().openWork)
     }
 }
