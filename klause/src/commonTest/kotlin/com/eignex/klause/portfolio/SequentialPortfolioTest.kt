@@ -10,6 +10,8 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
@@ -40,6 +42,15 @@ class SequentialPortfolioTest {
                 withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },
             )
         }
+
+    private fun lsArm(problem: Problem, objective: LinearObjective): PortfolioWorker = PortfolioWorker.of(
+        "ls",
+        0,
+        LocalSearchSolver(problem.bake()).session(),
+        LocalSearchParams(randomSeed = 0L),
+        objective = objective,
+        withInstructionBudget = { p, limit -> p.copy(maxInstructions = limit) },
+    )
 
     @Test
     fun `sequential solve on a satisfiable problem returns sat`() {
@@ -109,5 +120,37 @@ class SequentialPortfolioTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 2L))
         val r = SequentialPortfolio.ucb1(btArms(problem, 3, obj)).use { it.minimize() }
         assertEquals(3.0, assertIs<MinimizeResult.Optimal>(r).objectiveValue)
+    }
+
+    @Test
+    fun `mixed sequential runs report identical counted work`() {
+        // The LS arm runs first during warmup; the complete arm then exhausts and ends the portfolio,
+        // exposing the LS segment counters.
+        val problem = Problem(0, 0, emptyArray(), emptyArray())
+        val objective = LinearObjective()
+        fun workers() = listOf(
+            lsArm(problem, objective),
+            PortfolioWorker.of(
+                "bt",
+                1,
+                BacktrackSolver(problem.bake()).session(),
+                BacktrackParams(randomSeed = 1L),
+                objective = objective,
+                withBound = { p, supplier -> p.copy(objectiveBoundSupplier = supplier) },
+            ),
+        )
+        fun run() = SequentialPortfolio.exp3(
+            workers(),
+            baseSliceFlips = 7L,
+        ).use { it.minimize() }
+
+        val first = run()
+        val second = run()
+
+        assertIs<MinimizeResult.Optimal>(first)
+        assertIs<MinimizeResult.Optimal>(second)
+        assertEquals(7.0, first.stats.ls.moves.sum, "LS work must stop at its counted segment allowance")
+        assertEquals(first.stats.ls.moves, second.stats.ls.moves, "mixed runs must reproduce LS work")
+        assertEquals(first.stats.search.nodes, second.stats.search.nodes, "mixed runs must reproduce CP work")
     }
 }

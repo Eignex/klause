@@ -27,15 +27,19 @@ class PortfolioWorker private constructor(
      *  arms < cores — share it, so per-arm credit pools across them. Distinct from [label], which a
      *  backtrack replica index-numbers. */
     val armId: Int,
-    private val solveFn: (Cancellation) -> SolveResult,
-    private val improvementsFn: (() -> Double, Sample?, Cancellation) -> Sequence<MinimizeResult>,
+    private val solveFn: (Cancellation, Long?) -> SolveResult,
+    private val improvementsFn: (() -> Double, Sample?, Cancellation, Long?) -> Sequence<MinimizeResult>,
     private val samplesFn: (Cancellation) -> Sequence<Sample>,
     private val resumableFn: ((readBound: () -> Double) -> ResumableSearch)?,
+    private val withInstructions: Boolean,
     private val closeFn: () -> Unit,
 ) : AutoCloseable {
 
     /** Solve once, honouring [cancel] (set when a sibling wins the race). */
-    fun solve(cancel: Cancellation): SolveResult = solveFn(cancel)
+    fun solve(cancel: Cancellation, maxInstructions: Long? = null): SolveResult = solveFn(cancel, maxInstructions)
+
+    /** Whether this worker accepts the counted instruction budget used to schedule LS segments. */
+    val acceptsInstructionBudget: Boolean get() = withInstructions
 
     /**
      * Open a fresh pause/resume handle over this worker's optimisation, or `null` when the engine
@@ -62,7 +66,8 @@ class PortfolioWorker private constructor(
         readBound: () -> Double,
         cancel: Cancellation,
         warmStart: Sample? = null,
-    ): Sequence<MinimizeResult> = improvementsFn(readBound, warmStart, cancel)
+        maxInstructions: Long? = null,
+    ): Sequence<MinimizeResult> = improvementsFn(readBound, warmStart, cancel, maxInstructions)
 
     /** Stream diverse samples, honouring [cancel] (set when the collector stops). */
     fun samples(cancel: Cancellation): Sequence<Sample> = samplesFn(cancel)
@@ -85,6 +90,9 @@ class PortfolioWorker private constructor(
          * portfolio incumbent assignment into the params for [improvements] (e.g.
          * `{ p, sample -> p.copy(initialAssignment = sample) }` for local search); pass null for
          * engines with no warm-start seam (backtrack, which only consumes the shared bound).
+         * [withInstructionBudget] installs a counted per-segment allowance. Local search maps it to
+         * [com.eignex.klause.localsearch.LocalSearchParams.maxInstructions]; engines without a
+         * deterministic segment counter leave it null and retain their own execution path.
          */
         fun <P : SolverParams> of(
             label: String,
@@ -93,6 +101,7 @@ class PortfolioWorker private constructor(
             params: P,
             objective: LinearObjective? = null,
             withWarmStart: ((P, Sample) -> P)? = null,
+            withInstructionBudget: ((P, Long) -> P)? = null,
             withBound: ((P, () -> Double) -> P)? = null,
         ): PortfolioWorker {
             // withCancellation declares a SolverParams return on the interface but every
@@ -115,18 +124,28 @@ class PortfolioWorker private constructor(
             return PortfolioWorker(
                 label = label,
                 armId = armId,
-                solveFn = { c -> session.solve(withCancel(c)) },
-                improvementsFn = { readBound, warmStart, c ->
+                solveFn = { c, maxInstructions ->
+                    var p = withCancel(c)
+                    if (maxInstructions != null && withInstructionBudget != null) {
+                        p = withInstructionBudget(p, maxInstructions)
+                    }
+                    session.solve(p)
+                },
+                improvementsFn = { readBound, warmStart, c, maxInstructions ->
                     val obj = requireNotNull(objective) {
                         "PortfolioWorker '$label' was built without an objective; cannot stream improvements"
                     }
                     var p = withCancel(c)
+                    if (maxInstructions != null && withInstructionBudget != null) {
+                        p = withInstructionBudget(p, maxInstructions)
+                    }
                     p = withBound?.invoke(p, readBound) ?: p
                     if (warmStart != null && withWarmStart != null) p = withWarmStart(p, warmStart)
                     session.improvements(obj, p)
                 },
                 samplesFn = { c -> session.samples(withCancel(c)) },
                 resumableFn = resumableFn,
+                withInstructions = withInstructionBudget != null,
                 closeFn = { session.close() },
             )
         }

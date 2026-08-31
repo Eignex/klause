@@ -15,16 +15,17 @@ import com.eignex.klause.util.Cancellation
  * constructor; this data class carries the knobs that vary per `sample` / `enumerate` /
  * `solve` call.
  *
- *  - [maxFlips] — flip budget *per yield attempt*. After this many flips elapse without
- *    producing a fresh sample, the sequence ends. Counter resets on every yield. Leave at
- *    [Long.MAX_VALUE] to never give up; lower it to make `enumerate` short-circuit when
- *    the engine has effectively exhausted the local solution space.
+ *  - [maxFlips] — deterministic local-search work allowance. Every accepted move and restart
+ *    transition consumes one unit. Sampling resets the allowance after yielding a fresh sample;
+ *    minimisation spends it across the entire call. Leave at [Long.MAX_VALUE] to never give up;
+ *    lower it to make `enumerate` short-circuit when the engine has effectively exhausted the
+ *    local solution space.
  */
 data class LocalSearchParams(
     val maxFlips: Long = Long.MAX_VALUE,
     /**
      * Wall-clock-independent operation budget across all backends. For [LocalSearchSolver] one
-     * instruction = one flip (the unit [maxFlips] counts); when both are set, the smaller wins.
+     * instruction = one local-search work step (move or restart); when both are set, the smaller wins.
      * `null` = no cap. Exists so callers can use one budget name across the backends' param objects.
      */
     val maxInstructions: Long? = null,
