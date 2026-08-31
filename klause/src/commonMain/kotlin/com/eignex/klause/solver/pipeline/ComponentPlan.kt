@@ -142,6 +142,25 @@ class ComponentPlan internal constructor(
             realUpper = spec.realUpper,
         )
     }
+
+    // Shared clauses stay out because the shared clause component enforces them in the same session.
+    internal fun theoryOwnedFragment(spec: ProblemSpec): ProblemSpec {
+        require(spec.numIntVars == intOwners.size && spec.factors.size == factorOwners.size) {
+            "component plan belongs to a different source model"
+        }
+        return ProblemSpec(
+            numBoolVars = spec.numBoolVars,
+            intBounds = spec.intBounds,
+            factors = factorOwners.indices.asSequence()
+                .filter { factorOwners[it] == FactorOwner.THEORY }
+                .map { spec.factors[it] }
+                .toList()
+                .toTypedArray(),
+            numRealVars = spec.numRealVars,
+            realLower = spec.realLower,
+            realUpper = spec.realUpper,
+        )
+    }
 }
 
 /** Mapping between source integer ids and the compact finite CP component. */

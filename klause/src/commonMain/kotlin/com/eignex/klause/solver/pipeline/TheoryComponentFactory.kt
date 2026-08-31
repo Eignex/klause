@@ -12,7 +12,11 @@ import com.eignex.klause.theory.qflra.ExactLraSolver
 
 /** Builds the theory component selected by this plan. */
 internal fun ComponentPlan.theoryComponent(spec: ProblemSpec): TheoryComponent? {
-    val fragment = theoryFragment(spec)
+    val fragment = if (theoryPipeline == ProblemPipeline.GENERAL_LIA) {
+        theoryOwnedFragment(spec)
+    } else {
+        theoryFragment(spec)
+    }
     return when (theoryPipeline) {
         ProblemPipeline.DIFFERENCE_THEORY -> DifferenceSearchComponent.withRootBounds(
             fragment,

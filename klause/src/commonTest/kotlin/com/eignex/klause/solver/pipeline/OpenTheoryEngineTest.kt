@@ -9,9 +9,12 @@ import com.eignex.klause.ir.IntBounds
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ProblemSpec
 import com.eignex.klause.solver.pipeline.sourceRoute
+import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentResult
+import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.lia.GeneralLiaSearchComponent
 import com.eignex.klause.util.Bits
@@ -194,8 +197,8 @@ class OpenTheoryEngineTest {
         val result = OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve()
 
         assertIs<OpenTheoryResult.Sat>(result)
-        assertEquals(10L, result.stats.openTheory.openCancellationPolls)
-        assertEquals(9L, result.stats.openTheory.openWork)
+        assertEquals(9L, result.stats.openTheory.openCancellationPolls)
+        assertEquals(6L, result.stats.openTheory.openWork)
     }
 
     @Test
@@ -495,5 +498,63 @@ class OpenTheoryEngineTest {
         assertIs<ComponentResult.Consistent>(session.initialize())
         assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
         assertNull(session.branchAlternatives())
+    }
+
+    @Test
+    fun `general LIA equality propagation visits only equality rows`() {
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            factors = arrayOf(
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                Clause(intArrayOf(0)),
+            ),
+        )
+        val work = OpenTheoryWorkSink()
+        val session = SearchSession(listOf(GeneralLiaSearchComponent(model)))
+        session.attachOpenTheoryWork(work)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<ComponentResult.Consistent>(session.push(SearchDecision.Bool(0)))
+        assertNull(session.branchAlternatives())
+
+        assertEquals(6L, work.snapshot().openLiaRowVisits)
+    }
+
+    @Test
+    fun `shared clauses still refute a General LIA fragment`() {
+        val openUpper = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
+        val model = ProblemSpec(
+            numBoolVars = 1,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), null, openUpper),
+            factors = arrayOf(
+                Clause(intArrayOf(0)),
+                Clause(intArrayOf(1)),
+                Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
+        )
+
+        assertEquals(ProblemPipeline.GENERAL_LIA, sourceRoute(model))
+        assertIs<OpenTheoryResult.Unsat>(OpenTheoryEngine(model, ProblemPipeline.GENERAL_LIA).solve())
+    }
+
+    @Test
+    fun `general LIA reuses unchanged row feasibility across Boolean siblings`() {
+        val model = ProblemSpec(
+            numBoolVars = 2,
+            intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
+            factors = arrayOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
+        )
+        val work = OpenTheoryWorkSink(limit = 16)
+        val component = GeneralLiaSearchComponent(model)
+        val session = SearchComponentSet(listOf(component)).session()
+        session.attachOpenTheoryWork(work)
+
+        assertIs<ComponentResult.Consistent>(session.initialize())
+        assertIs<SearchResult.Satisfied>(session.solve(numBoolVars = 2))
+        assertEquals(16L, work.snapshot().openWork)
     }
 }

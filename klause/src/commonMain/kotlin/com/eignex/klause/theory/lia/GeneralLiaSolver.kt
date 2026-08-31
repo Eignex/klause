@@ -458,9 +458,27 @@ class GeneralLiaSearchComponent(
     private var witnessBound: BigInteger? = null
     private var pollStride = MAX_POLL_FACTORS
     private val theoryIntVars = theoryIntVars.copyOf()
+    private val equalityRows = model.factors.mapNotNull { factor ->
+        when (factor) {
+            is Linear -> if (factor.op == LinearOp.EQ) EqualityRow(LiaRow.of(factor)) else null
+
+            is ReifiedLinear -> if (factor.op == LinearOp.EQ) {
+                EqualityRow(LiaRow.of(factor), factor.auxBoolVar)
+            } else {
+                null
+            }
+
+            else -> null
+        }
+    }
     private val bools = IntArray(model.numBoolVars) { UNASSIGNED }
     private val boolLevels = IntArray(model.numBoolVars) { -1 }
     private val domainsByLevel = MutableIntObjectMap<Array<BigInterval>>()
+    private var possibleSourceDomains: Array<BigInterval>? = null
+    private var possibleDomains: Array<BigInterval>? = null
+    private val possibleKnown = BooleanArray(model.factors.size)
+    private val possibleValues = BooleanArray(model.factors.size)
+    private val possibleGuards = IntArray(model.factors.size) { UNASSIGNED }
     private var assignment: GeneralLiaAssignment? = null
     private var outcome: ComponentCheck? = null
 
@@ -530,7 +548,8 @@ class GeneralLiaSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        val domains = currentDomains().copyOf()
+        val sourceDomains = currentDomains()
+        val domains = sourceDomains.copyOf()
         val imported = applyPublishedBounds(domains, context)
         if (imported == null) {
             outcome = ComponentCheck.Indeterminate
@@ -545,7 +564,7 @@ class GeneralLiaSearchComponent(
             outcome = ComponentCheck.Indeterminate
             return null
         }
-        val possible = factorsPossible(domains, context)
+        val possible = factorsPossible(domains, sourceDomains, context)
         if (possible == null) {
             outcome = ComponentCheck.Indeterminate
             return null
@@ -621,8 +640,9 @@ class GeneralLiaSearchComponent(
      * Narrow [domains] through the equality rows until nothing moves, or null when the budget was spent.
      *
      * Null is a third answer on purpose: `false` means the domains emptied, which licenses infeasible,
-     * and a sweep that stopped early must not claim that. The walk is over every factor in [BigInteger],
-     * so on a large model a single pass runs long enough that a poll at the branch above never lands.
+     * and a sweep that stopped early must not claim that. The walk is over active equality rows in
+     * [BigInteger], so on a large model a single pass runs long enough that a poll at the branch above
+     * never lands.
      */
     private fun propagateEqualities(domains: Array<BigInterval>, context: SearchContext): Boolean? {
         var changed: Boolean
@@ -630,25 +650,14 @@ class GeneralLiaSearchComponent(
         do {
             if (context.pollGeneralLiaCancellation()) return null
             changed = false
-            for (factor in model.factors) {
+            for (candidate in equalityRows) {
+                if (candidate.auxBoolVar >= 0 && bools[candidate.auxBoolVar] != TRUE) continue
                 if (!context.consumeGeneralLiaWork()) return null
                 if (--untilPoll <= 0) {
                     untilPoll = pollStride
                     if (context.pollGeneralLiaCancellation()) return null
                 }
-                val row = when (factor) {
-                    is Linear -> if (factor.op == LinearOp.EQ) LiaRow.of(factor) else null
-
-                    is ReifiedLinear -> if (bools[factor.auxBoolVar] == TRUE && factor.op == LinearOp.EQ) {
-                        LiaRow.of(
-                            factor,
-                        )
-                    } else {
-                        null
-                    }
-
-                    else -> null
-                } ?: continue
+                val row = candidate.row
                 // Too wide to narrow within a deadline: leave this row's domains as they are. The sweep
                 // stays sound, only less tight, and the search keeps its shot at the model.
                 if (rowExceedsArithmetic(row.vars, row.coeffs, domains)) continue
@@ -728,37 +737,64 @@ class GeneralLiaSearchComponent(
     }
 
     /** Whether every factor can still hold over [domains], or null when the budget was spent mid-walk. */
-    private fun factorsPossible(domains: Array<BigInterval>, context: SearchContext): Boolean? {
-        var untilPoll = pollStride
-        return model.factors.all { factor ->
-            if (!context.consumeGeneralLiaWork()) return null
-            if (--untilPoll <= 0) {
-                untilPoll = pollStride
-                if (context.pollGeneralLiaCancellation()) return null
-            }
-            when (factor) {
-                is Clause -> factor.literals.any { literal ->
-                    bools[literal ushr 1] == UNASSIGNED ||
-                        bools[literal ushr 1] == truth(
-                            literal,
-                        )
-                }
-
-                is Linear -> relationPossible(rowRange(factor, domains), factor.op, linearBound(factor))
-
-                is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || reifiedPossible(factor, domains)
-
-                is ComparisonClause -> factor.vars.indices.any { index ->
-                    relationPossible(
-                        domains[factor.vars[index]],
-                        factor.ops[index],
-                        BigInteger.fromLong(factor.consts[index]),
-                    )
-                }
-
-                else -> false
-            }
+    private fun factorsPossible(
+        domains: Array<BigInterval>,
+        sourceDomains: Array<BigInterval>,
+        context: SearchContext,
+    ): Boolean? {
+        // Feasibility depends only on these domains and, for a reified row, its guard. A Boolean sibling
+        // changes few guards, so retaining the other results avoids proving the same rows possible again.
+        if (possibleSourceDomains !== sourceDomains || possibleDomains?.contentEquals(domains) != true) {
+            possibleSourceDomains = sourceDomains
+            possibleDomains = domains
+            possibleKnown.fill(false)
         }
+        var untilPoll = pollStride
+        for (index in model.factors.indices) {
+            val factor = model.factors[index]
+            val reusable = possibleKnown[index] && when (factor) {
+                is ReifiedLinear -> possibleGuards[index] == bools[factor.auxBoolVar]
+                is Clause -> false
+                else -> true
+            }
+            val possible = if (reusable) {
+                possibleValues[index]
+            } else {
+                if (!context.consumeGeneralLiaWork()) return null
+                if (--untilPoll <= 0) {
+                    untilPoll = pollStride
+                    if (context.pollGeneralLiaCancellation()) return null
+                }
+                when (factor) {
+                    is Clause -> factor.literals.any { literal ->
+                        bools[literal ushr 1] == UNASSIGNED ||
+                            bools[literal ushr 1] == truth(
+                                literal,
+                            )
+                    }
+
+                    is Linear -> relationPossible(rowRange(factor, domains), factor.op, linearBound(factor))
+
+                    is ReifiedLinear -> bools[factor.auxBoolVar] == UNASSIGNED || reifiedPossible(factor, domains)
+
+                    is ComparisonClause -> factor.vars.indices.any { index ->
+                        relationPossible(
+                            domains[factor.vars[index]],
+                            factor.ops[index],
+                            BigInteger.fromLong(factor.consts[index]),
+                        )
+                    }
+
+                    else -> false
+                }.also { value ->
+                    possibleKnown[index] = true
+                    possibleValues[index] = value
+                    if (factor is ReifiedLinear) possibleGuards[index] = bools[factor.auxBoolVar]
+                }
+            }
+            if (!possible) return false
+        }
+        return true
     }
 
     private fun factorsHold(domains: Array<BigInterval>, context: SearchContext): Boolean? {
@@ -910,6 +946,8 @@ private fun exactConstantsOf(factor: Linear): IntegralConstants =
     checkNotNull(factor.integralConstants) { "open LIA row carries continuous constants" }
 
 private data class GeneralLiaDecision(val domains: Array<BigInterval>) : SearchTheoryDecision
+
+private data class EqualityRow(val row: LiaRow, val auxBoolVar: Int = -1)
 
 private data class LiaRow(val vars: IntArray, val coeffs: Array<BigInteger>, val bound: BigInteger) {
     companion object {
