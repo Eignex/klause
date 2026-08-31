@@ -90,7 +90,7 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
     val base = request.annotatedParams ?: BacktrackPresets.conflictDriven()
     val engineParams = EngineParams(request.engineParams)
     val dryRun = engineParams.bool("dry-run-solver") ?: false
-    val params = applyBacktrackParams(
+    val params = applyFixedBacktrackParams(
         base.copy(
             randomSeed = request.randomSeed ?: base.randomSeed,
             cancellation = request.cancellation,
@@ -101,6 +101,7 @@ fun FinitePipeline.planFixedBacktrack(request: FixedBacktrackPlanRequest): Fixed
             lpConfig = request.lpConfig,
         ),
         engineParams,
+        allowSelectors = request.annotatedParams == null,
     )
     return FixedBacktrackPlan(params, dryRun)
 }

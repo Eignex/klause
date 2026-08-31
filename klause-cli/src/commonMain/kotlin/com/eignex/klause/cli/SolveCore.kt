@@ -16,7 +16,6 @@ import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.NODE_LIMIT_KEY
-import com.eignex.klause.solver.pipeline.OPEN_WORK_LIMIT_KEY
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
 import com.eignex.klause.solver.pipeline.OpenTheoryOptimum
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -69,23 +68,21 @@ internal object SolveCore {
         // Taken before the token is built, because the allowance has to stop the driver and not only the
         // engine: an engine-local check leaves the driver re-entering arms that cancel at their first
         // poll, which burns the whole deadline and overshoots the cap several times over.
-        val nodeBudget = takeNodeBudget(common)
-        val openWorkLimit = takeOpenWorkLimit(common)
         val (deadline, deadlineCancel) = deadlineCancellation(common)
-        val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
         when (val pipeline = rawSolvable.pipeline) {
             is SolvablePipeline.OpenTheory -> {
+                val nodeLimit = takeOpenNodeLimit(common)
                 if (common.allSolutions || (common.solutionCap ?: 1L) > 1L) {
                     usageError("all-solution enumeration is unavailable for open theory models")
                 }
                 val theoryParams = TheoryParams(
-                    maxLeaves = nodeBudget?.limit ?: Long.MAX_VALUE,
-                    openWorkLimit = openWorkLimit ?: Long.MAX_VALUE,
+                    maxLeaves = Long.MAX_VALUE,
+                    openWorkLimit = nodeLimit ?: Long.MAX_VALUE,
                     maxDecisions = takeOpenLongParam(common, "max-decisions", nonNegative = true) ?: Long.MAX_VALUE,
                     sharedRestart = takeOpenLongParam(common, "shared-restart", nonNegative = false),
                     maxLearnedClauses = takeOpenIntParam(common, "max-learned", nonNegative = true),
                     lbdGlue = takeOpenIntParam(common, "lbd-glue", nonNegative = true) ?: 2,
-                    cancellation = cancel,
+                    cancellation = deadlineCancel,
                     timeout = deadlineCancel,
                 )
                 val request = pipeline.request
@@ -132,6 +129,8 @@ internal object SolveCore {
 
             SolvablePipeline.FiniteCp -> Unit
         }
+        val nodeBudget = takeNodeBudget(common)
+        val cancel = nodeBudget?.let { deadlineCancel or Cancellation { it.exhausted() } } ?: deadlineCancel
         val (presolveCancel, presolveBudget) = presolveAllowance(common, cancel, deadline)
         // `-p N` is MiniZinc-standard parallelism = the **core** count. The portfolio engines
         // (cp/mixed/ls) run sequentially at `-p1` and as a parallel pool at `-pN`. The one naked
@@ -195,14 +194,14 @@ internal object SolveCore {
         return NodeBudget(limit)
     }
 
-    /** Consume the open-theory-only fixed-work limit before generic engine-param validation. */
-    private fun takeOpenWorkLimit(common: CommonOptions): Long? {
-        val entry = common.engineParams.firstOrNull { it.startsWith("$OPEN_WORK_LIMIT_KEY=") } ?: return null
+    /** Consume the route-local fixed-work limit for an open-theory solve. */
+    private fun takeOpenNodeLimit(common: CommonOptions): Long? {
+        val entry = common.engineParams.firstOrNull { it.startsWith("$NODE_LIMIT_KEY=") } ?: return null
         common.engineParams.remove(entry)
         val raw = entry.substringAfter('=')
         val limit = raw.toLongOrNull()
-            ?: usageError("engine param `$OPEN_WORK_LIMIT_KEY` expects a non-negative integer, got `$raw`")
-        if (limit < 0) usageError("engine param `$OPEN_WORK_LIMIT_KEY` expects a non-negative integer, got $limit")
+            ?: usageError("engine param `$NODE_LIMIT_KEY` expects a non-negative integer, got `$raw`")
+        if (limit < 0) usageError("engine param `$NODE_LIMIT_KEY` expects a non-negative integer, got $limit")
         return limit
     }
 
@@ -274,9 +273,8 @@ internal object SolveCore {
         return Cancellation { nowMillis() > cap } to PresolveBudget { cap - nowMillis() }
     }
 
-    /** Naked single backtrack solve for the `fixed`/FD engine: follows the model's `solve :: *_search`
-     *  annotation. Per-solver `var-selector`/`val-selector` --params are rejected (the annotation
-     *  decides the heuristic); free-search heuristic A/B lives on `-e cp` instead. */
+    /** Naked single backtrack solve for the `fixed`/FD engine. A model annotation selects its heuristic;
+     *  without one, the standard conflict-driven heuristic is used and selector overrides are accepted. */
     private fun runBacktrack(
         solvable: Solvable,
         common: CommonOptions,
